@@ -5471,6 +5471,11 @@ def start_debug_session(solution_id):
     if not solution or not _check_access(solution):
         abort(404)
 
+    from app.models.user import Permission
+
+    if not current_user.can(Permission.GENERAL):
+        return jsonify({"success": False, "error": "You do not have permission to modify code."}), 403
+
     data = request.get_json(silent=True) or {}
     error_log = data.get("error_log", "").strip()
 
@@ -5523,6 +5528,11 @@ def debug_analyze_with_llm(solution_id):
     solution = db.session.get(Solution, solution_id)
     if not solution or not _check_access(solution):
         abort(404)
+
+    from app.models.user import Permission
+
+    if not current_user.can(Permission.GENERAL):
+        return jsonify({"success": False, "error": "You do not have permission to modify code."}), 403
 
     data = request.get_json(silent=True) or {}
     workspace_id = data.get("workspace_id")
@@ -5577,6 +5587,11 @@ def debug_apply_fix(solution_id):
     solution = db.session.get(Solution, solution_id)
     if not solution or not _check_access(solution):
         abort(404)
+
+    from app.models.user import Permission
+
+    if not current_user.can(Permission.GENERAL):
+        return jsonify({"success": False, "error": "You do not have permission to modify code."}), 403
 
     data = request.get_json(silent=True) or {}
     workspace_id = data.get("workspace_id")
@@ -5643,6 +5658,11 @@ def debug_continue(solution_id):
     solution = db.session.get(Solution, solution_id)
     if not solution or not _check_access(solution):
         abort(404)
+
+    from app.models.user import Permission
+
+    if not current_user.can(Permission.GENERAL):
+        return jsonify({"success": False, "error": "You do not have permission to modify code."}), 403
 
     data = request.get_json(silent=True) or {}
     workspace_id = data.get("workspace_id")

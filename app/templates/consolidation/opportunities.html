@@ -1,5 +1,6 @@
 {% extends "layouts/admin_base.html" %}
 {% from 'macros/page_shell.html' import page_shell %}
+{% from 'macros/shadcn_compat.html' import metric_card %}
 
 {% block title %}Consolidation Opportunities{% endblock %}
 
@@ -7,22 +8,39 @@
 <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
     {{ page_shell(title='Consolidation Opportunities', breadcrumb=[('Home', '/'), ('Consolidation Opportunities', none)], subtitle='Cost savings and rationalization opportunities') }}
 
-    {% if savings_forecast %}
+    {% set forecast = savings_forecast if savings_forecast is mapping else {} %}
+    {% set opportunities_included = forecast.opportunities_included if forecast.opportunities_included is not none else 0 %}
+    {% set forecast_by_year = forecast.forecast_by_year if forecast.forecast_by_year is mapping else {} %}
+
+    {% if opportunities_included == 0 %}
     <div class="rounded-xl border-2 border-input bg-background p-6 mb-6">
         <div class="flex items-center gap-3">
-            <div class="rounded-lg bg-success/10 p-2">
-                <i data-lucide="trending-up" class="w-5 h-5 text-success" aria-hidden="true"></i>
+            <div class="rounded-lg bg-muted/50 p-2">
+                <i data-lucide="trending-up" class="w-5 h-5 text-muted-foreground" aria-hidden="true"></i>
             </div>
             <div>
                 <p class="text-sm text-muted-foreground">Estimated Annual Savings</p>
-                <p class="text-2xl font-bold text-foreground">{{ savings_forecast }}</p>
+                <p class="text-2xl font-bold text-foreground">No savings estimated yet: no opportunity has been included</p>
             </div>
         </div>
     </div>
+    {% elif forecast_by_year %}
+    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 mb-6">
+        {% for year, amount in forecast_by_year.items() %}
+        {{ metric_card(
+            label='FY ' ~ year,
+            value=(amount|round(0)|int)|currency,
+            delta='',
+            trend='up',
+            footer_label='Projected annual savings',
+            footer_text='From ' ~ opportunities_included ~ (' opportunities' if opportunities_included != 1 else ' opportunity')
+        ) }}
+        {% endfor %}
+    </div>
     {% endif %}
 
-    <div data-slot="card" class="rounded-xl border bg-card shadow-sm">
-        <table class="w-full text-sm">
+    <div data-slot="card" class="rounded-lg border border-border bg-card">
+        <table class="dense-table w-full text-sm">
             <thead>
                 <tr class="border-b border-border">
                     <th class="px-6 py-3 text-left font-medium text-muted-foreground">Opportunity</th>

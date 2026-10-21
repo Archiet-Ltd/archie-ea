@@ -186,6 +186,7 @@ def _option(db_session, analysis, *, vendor_name, total_score=77.0, vendor_organ
     option = VendorOption(
         analysis_id=analysis.id, vendor_name=vendor_name, total_score=total_score,
         vendor_organization_id=vendor_organization_id,
+        organization_id=analysis.organization_id,
     )
     db_session.add(option)
     db_session.flush()

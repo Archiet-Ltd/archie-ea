@@ -113,16 +113,8 @@ class JiraALMConnector(BaseConnector):
                 issues = await self._fetch_project_issues(project_key, since)
                 all_issues.extend(issues)
 
-            # Process issues
-            processed = await self._process_jira_issues(all_issues)
-
-            return {
-                "status": "completed",
-                "records_processed": len(all_issues),
-                "records_created": processed["created"],
-                "records_updated": processed["updated"],
-                "records_deleted": processed["deleted"],
-            }
+            # Write the issues into the organisation's model
+            return await self._process_jira_issues(all_issues)
 
         except Exception as e:
             logger.error(f"Batch sync failed: {e}")
@@ -173,35 +165,23 @@ class JiraALMConnector(BaseConnector):
 
         return all_issues
 
-    async def _process_jira_issues(self, issues: List[Dict[str, Any]]) -> Dict[str, int]:
-        """Process Jira issues and update knowledge graph."""
-        created = 0
-        updated = 0
-        deleted = 0
+    def _issue_to_element(self, issue: Dict[str, Any]) -> Dict[str, Any]:
+        """One Jira issue as a work package: the issue id is its identity, the summary its name."""
+        mapped = self._apply_field_mappings(issue)
+        # Jira's v3 API returns the description as a rich-text document, not text.
+        description = mapped.get("description")
+        return {
+            "external_id": mapped["external_id"],
+            "name": mapped["title"],
+            "description": description if isinstance(description, str) else None,
+            "element_type": "WorkPackage",
+        }
 
-        for issue in issues:
-            try:
-                # Apply field mappings
-                mapped_data = {}
-                for mapping in self.get_field_mappings():
-                    try:
-                        value = mapping.apply(issue)
-                        if value is not None:
-                            mapped_data[mapping.target_field] = value
-                    except ValueError as e:
-                        logger.warning(f"Field mapping failed for {issue.get('key')}: {e}")
-                        continue
-
-                logger.warning(
-                    "Issue %s mapped but not persisted — KG ALM integration not available",
-                    issue.get("key"),
-                )
-
-            except Exception as e:
-                logger.error(f"Failed to process Jira issue {issue.get('key')}: {e}")
-                continue
-
-        return {"created": created, "updated": updated, "deleted": deleted}
+    async def _process_jira_issues(self, issues: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """Write Jira issues into the organisation's model; returns the sync counts."""
+        return self.persist_records(
+            issues, source_system="jira", to_element=self._issue_to_element
+        )
 
     async def incremental_sync(self, event_data: Dict[str, Any]) -> Dict[str, Any]:
         """Handle real-time Jira updates from webhooks."""
@@ -211,15 +191,7 @@ class JiraALMConnector(BaseConnector):
                 raise ValueError("No issue data in webhook event")
 
             # Process single issue
-            processed = await self._process_jira_issues([issue])
-
-            return {
-                "status": "completed",
-                "records_processed": 1,
-                "records_created": processed["created"],
-                "records_updated": processed["updated"],
-                "records_deleted": processed["deleted"],
-            }
+            return await self._process_jira_issues([issue])
 
         except Exception as e:
             logger.error(f"Incremental sync failed: {e}")

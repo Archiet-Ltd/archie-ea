@@ -7,6 +7,9 @@
   "ai-chat-approval/model-approve-call": {
    "app/modules/enterprise_genome/services/ai_system_grounding.py": 2
   },
+  "archimate-drawing-engine/second-archimate-renderer": {
+   "app/static/js/archimate_diagram_renderer.js": 1
+  },
   "archimate-element-writer/element-construction": {
    "app/api/archimate_generation_routes.py": 1,
    "app/application_mgmt/archimate_routes.py": 1,

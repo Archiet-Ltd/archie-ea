@@ -20,9 +20,9 @@
     {% endfor %}
   {% endwith %}
 
-  <div class="rounded-lg border bg-card text-card-foreground shadow-sm">
+  <div class="rounded-lg border border-border bg-card text-card-foreground">
     {% if grants %}
-    <table class="w-full text-sm" data-testid="connected-assistants-table">
+    <table class="dense-table w-full text-sm" data-testid="connected-assistants-table">
       <thead>
         <tr class="border-b text-left text-muted-foreground">
           <th class="px-6 py-3 font-medium" scope="col">Assistant</th>
@@ -43,7 +43,7 @@
           <td class="px-6 py-4 text-right">
             <form method="post" action="{% if 'connected_assistants.revoke' in flask.current_app.view_functions %}{{ url_for('connected_assistants.revoke', grant_id=grant.grant_id) }}{% endif %}">
               <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-              <button type="submit" class="inline-flex h-9 items-center justify-center rounded-md border border-input bg-background px-4 text-sm font-medium hover:bg-accent hover:text-accent-foreground">Disconnect</button>
+              <button type="submit" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">Disconnect</button>
             </form>
           </td>
           {% endif %}
@@ -60,7 +60,7 @@
   <form method="post" class="mt-6 flex justify-end"
         action="{% if admin_view %}{% if 'connected_assistants.admin_revoke' in flask.current_app.view_functions %}{{ url_for('connected_assistants.admin_revoke', user_id=subject.id) }}{% endif %}{% else %}{% if 'connected_assistants.revoke_all' in flask.current_app.view_functions %}{{ url_for('connected_assistants.revoke_all') }}{% endif %}{% endif %}">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-    <button type="submit" class="inline-flex h-9 items-center justify-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90">
+    <button type="submit" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
       {% if admin_view %}Disconnect every assistant{% else %}Disconnect all{% endif %}
     </button>
   </form>

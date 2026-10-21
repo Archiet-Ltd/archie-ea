@@ -13,7 +13,7 @@
 
     {# ── 1. Financial Summary ─────────────────────────────────────── #}
     <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
-        <div class="rounded-xl border bg-card p-5">
+        <div class="rounded-lg border border-border bg-card p-5">
             <div class="flex items-center gap-3 mb-2">
                 <div class="flex items-center justify-center w-10 h-10 rounded-lg bg-success/10">
                     <i data-lucide="trending-up" class="h-5 w-5 text-success"></i>
@@ -25,7 +25,7 @@
             </div>
             <p class="text-xs text-muted-foreground">Aggregate projected annual savings from all tracked applications</p>
         </div>
-        <div class="rounded-xl border bg-card p-5">
+        <div class="rounded-lg border border-border bg-card p-5">
             <div class="flex items-center gap-3 mb-2">
                 <div class="flex items-center justify-center w-10 h-10 rounded-lg bg-primary/10">
                     <i data-lucide="badge-check" class="h-5 w-5 text-primary"></i>
@@ -40,13 +40,13 @@
     </div>
 
     {# ── 2. Dependency Risk Detail ────────────────────────────────── #}
-    <div id="dependencies" class="rounded-xl border bg-card mb-8">
+    <div id="dependencies" class="rounded-lg border border-border bg-card mb-8">
         <div class="p-5 border-b border-border flex items-center justify-between">
             <h2 class="text-sm font-semibold text-foreground">Portfolio Dependency Risk</h2>
             <div class="flex items-center gap-2">
                 {# RATA-012: Import Dependencies button #}
                 <button type="button" @click="showImportModal = true"
-                        class="inline-flex items-center justify-center rounded-md text-xs font-medium border border-input bg-background hover:bg-accent hover:text-accent-foreground h-8 px-3 gap-1.5">
+                        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
                     <i data-lucide="upload" class="h-3.5 w-3.5"></i> Import
                 </button>
                 <select x-model="depRiskFilter" @change="loadDependencyRisk()"
@@ -77,7 +77,7 @@
 
         <template x-if="!depLoading && depResults.length > 0">
             <div>
-                <table class="w-full text-sm">
+                <table class="dense-table w-full text-sm">
                     <thead class="bg-muted/50">
                         <tr>
                             <th class="px-4 py-3 text-left font-medium text-muted-foreground">Application</th>
@@ -118,7 +118,7 @@
     </div>
 
     {# ── 3. Retirement Sequence ───────────────────────────────────── #}
-    <div class="rounded-xl border bg-card p-5 mb-8">
+    <div class="rounded-lg border border-border bg-card p-5 mb-8">
         <h2 class="text-sm font-semibold text-foreground mb-4">Retirement Sequence</h2>
 
         <template x-if="retLoading">
@@ -140,7 +140,7 @@
                 <template x-for="(wave, idx) in retWaves" :key="idx">
                     <div class="border rounded-lg p-4">
                         <div class="flex items-center gap-2 mb-2">
-                            <span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-primary/10 text-primary text-xs font-bold"
+                            <span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-primary/10 text-info-emphasis text-xs font-bold"
                                   x-text="idx + 1"></span>
                             <span class="text-sm font-semibold text-foreground" x-text="'Wave ' + (idx + 1)"></span>
                             <span class="text-xs text-muted-foreground" x-text="wave.apps.length + ' application(s)'"></span>
@@ -162,8 +162,8 @@
     <div x-show="showImportModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center"
          @keydown.escape.window="showImportModal = false"
          role="dialog" aria-modal="true" aria-labelledby="import-deps-title">
-        <div class="absolute inset-0 bg-black/30" @click="showImportModal = false"></div>
-        <div class="relative bg-card rounded-xl border shadow-xl w-full max-w-lg mx-4 p-6">
+        <div class="absolute inset-0 bg-overlay/50" @click="showImportModal = false"></div>
+        <div class="relative bg-card rounded-lg border border-border w-full max-w-lg mx-4 p-6">
             <h3 id="import-deps-title" class="text-base font-semibold text-foreground mb-4">Import Dependencies</h3>
 
             {# File input #}
@@ -180,7 +180,7 @@
                     <div>
                         <p class="text-xs font-medium text-muted-foreground mb-2">Preview (first 10 rows)</p>
                         <div class="overflow-x-auto border rounded-lg">
-                            <table class="w-full text-xs">
+                            <table class="dense-table w-full text-xs">
                                 <thead class="bg-muted/50">
                                     <tr>
                                         <th class="px-2 py-1.5 text-left">Source</th>

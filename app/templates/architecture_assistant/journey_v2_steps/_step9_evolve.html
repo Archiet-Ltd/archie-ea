@@ -21,7 +21,7 @@
                   placeholder="e.g., Add a Priority field to orders. High priority should skip approval for amounts under $10K."
                   class="w-full px-3 py-2 text-sm bg-background border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring"></textarea>
         <button type="button" @click="submitChangeRequest()" :disabled="!changeRequestText || changeRequestProcessing"
-                class="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 disabled:opacity-50">
+                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
             <i data-lucide="sparkles" class="w-4 h-4" aria-hidden="true"></i>
             <span x-text="changeRequestProcessing ? 'Analysing impact...' : 'Analyse Impact'"></span>
         </button>
@@ -31,7 +31,7 @@
             <div class="space-y-3 mt-4">
                 {# Warnings #}
                 <template x-if="changeAnalysis.warnings && changeAnalysis.warnings.length > 0">
-                    <div class="p-3 bg-warning/10 border border-warning/30 rounded-lg space-y-1">
+                    <div class="px-3 py-2 bg-warning/10 border border-warning/40 rounded-md space-y-1">
                         <p class="text-sm font-medium text-warning-emphasis flex items-center gap-1">
                             <i data-lucide="alert-triangle" class="w-4 h-4" aria-hidden="true"></i>
                             Warnings

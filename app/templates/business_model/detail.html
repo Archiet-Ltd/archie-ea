@@ -71,14 +71,14 @@
       </div>
       <select aria-label="Operating model archetype" x-model="operatingModelType" @change="saveOperatingModel()"
         data-testid="bmc-operating-model-select"
-        class="flex h-9 w-full sm:w-64 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+        class="flex h-9 w-full sm:w-64 rounded-md border border-input bg-transparent px-3 py-1 text-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
         <option value="">Not set</option>
         {% for t in operating_model_types %}
         <option value="{{ t }}">{{ t | capitalize }}</option>
         {% endfor %}
       </select>
       <span x-show="operatingModelType" x-cloak
-        class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-primary border border-primary/30"
+        class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-info-emphasis border border-primary/30"
         x-text="operatingModelType.charAt(0).toUpperCase() + operatingModelType.slice(1)"></span>
       <span x-show="savingMeta" x-cloak class="text-xs text-muted-foreground inline-flex items-center gap-1">
         <i data-lucide="loader-2" class="h-3 w-3 animate-spin" aria-hidden="true"></i> Saving…
@@ -96,22 +96,22 @@
         <span class="text-sm font-medium text-foreground">Export &amp; share</span>
       </div>
       <button type="button" @click="exportImage()" data-testid="bmc-export-image"
-        class="inline-flex items-center justify-center rounded-md text-sm font-medium border border-input bg-background hover:bg-accent hover:text-accent-foreground h-9 px-3 py-1.5">
+        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
         <i data-lucide="image" class="h-4 w-4 mr-1.5" aria-hidden="true"></i> Export as image
       </button>
       <select aria-label="File export format" x-model="exportFormat" data-testid="bmc-export-format"
-        class="flex h-9 rounded-md border border-input bg-transparent px-2 py-1 text-sm shadow-sm">
+        class="flex h-9 rounded-md border border-input bg-transparent px-2 py-1 text-sm">
         <option value="mermaid">Mermaid (.mmd)</option>
         <option value="lucid">Lucidchart (.lucid)</option>
         <option value="archi">Archi (.archimate)</option>
       </select>
       <a :href="exportFileUrl" data-testid="bmc-export-file"
-        class="inline-flex items-center justify-center rounded-md text-sm font-medium border border-input bg-background hover:bg-accent hover:text-accent-foreground h-9 px-3 py-1.5">
+        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
         <i data-lucide="download" class="h-4 w-4 mr-1.5" aria-hidden="true"></i> Download file
       </a>
       <template x-if="shareUrl">
         <a :href="shareUrl" target="_blank" rel="noopener" data-testid="bmc-share-link"
-          class="inline-flex items-center justify-center rounded-md text-sm font-medium border border-input bg-background hover:bg-accent hover:text-accent-foreground h-9 px-3 py-1.5">
+          class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
           <i data-lucide="link" class="h-4 w-4 mr-1.5" aria-hidden="true"></i> Share
         </a>
       </template>
@@ -188,7 +188,7 @@
           @blur="saveBlock('{{ b.key }}')"
           data-testid="bmc-textarea-{{ b.key }}"
           placeholder="One idea per line…"
-          class="flex-1 w-full min-h-[120px] rounded-md border border-input bg-background px-2 py-1.5 text-xs leading-relaxed shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring resize-y"
+          class="flex-1 w-full min-h-[120px] rounded-md border border-input bg-background px-2 py-1.5 text-xs leading-relaxed transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring resize-y"
          aria-label="One idea per line…"></textarea>
         <div x-show="draftError === '{{ b.key }}'" x-cloak class="mt-1 text-xs text-destructive-emphasis bg-destructive/10 border border-destructive/30 rounded px-1.5 py-1" x-text="draftErrorMessage"></div>
         <div class="mt-1 h-4">
@@ -210,11 +210,11 @@
   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
   <div class="flex justify-end gap-3 pt-2">
     <button type="button" data-modal-close="bmc-delete-modal"
-      class="inline-flex items-center justify-center rounded-md text-sm font-medium bg-secondary text-secondary-foreground hover:bg-secondary/80 h-9 px-4 py-2">
+      class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4">
       Cancel
     </button>
     <button type="submit" data-testid="bmc-delete-submit"
-      class="inline-flex items-center justify-center rounded-md text-sm font-medium bg-destructive text-destructive-foreground hover:bg-destructive/90 h-9 px-4 py-2">
+      class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-destructive text-destructive-foreground text-sm font-semibold transition-colors hover:bg-destructive/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
       Delete
     </button>
   </div>

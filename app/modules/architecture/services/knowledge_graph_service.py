@@ -289,6 +289,27 @@ class KnowledgeGraphService:
             for e in rows
         ]
 
+    def search_elements(self, query, element_type=None, limit=50):
+        """Elements whose name or description contains the text (case-insensitive)."""
+        from app.models.archimate_core import ArchiMateElement
+        text = str(query or "").strip()
+        if not text:
+            return []
+        escaped = text.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        pattern = f"%{escaped}%"
+        q = ArchiMateElement.query.filter(
+            ArchiMateElement.name.ilike(pattern, escape="\\")
+            | ArchiMateElement.description.ilike(pattern, escape="\\")
+        )
+        if element_type:
+            q = q.filter(ArchiMateElement.type == element_type)
+        rows = q.order_by(ArchiMateElement.name).limit(int(limit or 50)).all()
+        return [
+            {"id": e.id, "name": e.name, "type": e.type,
+             "layer": getattr(e, "layer", None), "description": getattr(e, "description", None)}
+            for e in rows
+        ]
+
     def get_relationships(self, relationship_type=None, source_id=None, target_id=None):
         """ArchiMate relationships as KG edges, with optional filters."""
         from app.models.archimate_core import ArchiMateRelationship

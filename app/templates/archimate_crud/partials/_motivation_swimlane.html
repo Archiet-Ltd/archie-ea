@@ -38,7 +38,7 @@
                 </div>
                 <template x-for="el in elements.filter(e => e.element_type === col.type && (!searchQuery || e.name.toLowerCase().indexOf(searchQuery.toLowerCase()) >= 0))" :key="el.id + ':' + el.element_type">
                     <a :href="detailUrl(el)"
-                       class="rounded-md border p-3 space-y-1 hover:shadow-sm transition-shadow block"
+                       class="rounded-md border p-3 space-y-1 transition-shadow block"
                        :class="col.bg + ' ' + col.border">
                         <p class="font-medium text-sm leading-tight" x-text="el.name"></p>
                         <p class="text-xs text-muted-foreground line-clamp-2" x-text="el.description || 'No description'"></p>

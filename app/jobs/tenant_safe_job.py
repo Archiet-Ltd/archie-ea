@@ -109,6 +109,7 @@ TENANT_JOBS: frozenset[str] = frozenset({
     "model_health_scan",            # per-org drift detection + store
     "graph_projection_refresh",     # per-org projection snapshot, visited via run_for_each_tenant
     "owner_digest",                 # per-owner notification digest, visited via run_for_each_tenant
+    "change_feed_consumer",         # owner notifications from the event log, visited via run_for_each_tenant
 })
 
 

@@ -274,7 +274,7 @@
             Deploy your application in Step 7 to unlock data loading.
         </p>
         <button type="button" @click="currentStep = 7"
-                class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium border border-input rounded-md hover:bg-accent transition-colors">
+                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
             <i data-lucide="arrow-left" class="w-4 h-4" aria-hidden="true"></i>
             Back to Code Generation
         </button>
@@ -392,7 +392,7 @@
 
             {# Upload error #}
             <div x-show="uploadError" x-cloak
-                 class="flex items-start gap-3 rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3">
+                 class="flex items-start gap-3 rounded-md border border-destructive/40 bg-destructive/10 px-4 py-2">
                 <i data-lucide="alert-triangle" class="w-4 h-4 text-destructive shrink-0 mt-0.5" aria-hidden="true"></i>
                 <p class="text-sm text-destructive-emphasis" x-text="uploadError"></p>
             </div>
@@ -457,7 +457,7 @@
 
             {# Mapping error #}
             <div x-show="mappingError" x-cloak
-                 class="flex items-start gap-3 rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3">
+                 class="flex items-start gap-3 rounded-md border border-destructive/40 bg-destructive/10 px-4 py-2">
                 <i data-lucide="alert-triangle" class="w-4 h-4 text-destructive shrink-0 mt-0.5" aria-hidden="true"></i>
                 <p class="text-sm text-destructive-emphasis" x-text="mappingError"></p>
             </div>
@@ -477,7 +477,7 @@
 
                 {# Table #}
                 <div class="border border-border rounded-lg overflow-hidden">
-                    <table class="w-full text-sm">
+                    <table class="dense-table w-full text-sm">
                         <thead>
                             <tr class="bg-muted/50 border-b border-border">
                                 <th class="text-left px-4 py-2.5 text-xs font-medium text-muted-foreground uppercase tracking-wider">Source Column</th>
@@ -534,12 +534,12 @@
                 {# Confirm mapping button #}
                 <div class="flex items-center justify-between pt-2">
                     <button type="button" @click="dataPhase = 'upload'; clearFile(); uploadedSheets = []; sheetMappings = {}; selectedSheet = null"
-                            class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium border border-input rounded-md hover:bg-accent transition-colors">
+                            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                         <i data-lucide="arrow-left" class="w-4 h-4" aria-hidden="true"></i>
                         Upload Different File
                     </button>
                     <button type="button" @click="confirmMapping()" :disabled="getMappedCount() === 0"
-                            class="inline-flex items-center gap-2 px-6 py-2.5 text-sm font-medium bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors disabled:opacity-50">
+                            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                         Confirm Mapping &amp; Continue
                         <i data-lucide="arrow-right" class="w-4 h-4" aria-hidden="true"></i>
                     </button>
@@ -586,7 +586,7 @@
 
             {# Import error #}
             <div x-show="importError" x-cloak
-                 class="flex items-start gap-3 rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3">
+                 class="flex items-start gap-3 rounded-md border border-destructive/40 bg-destructive/10 px-4 py-2">
                 <i data-lucide="alert-triangle" class="w-4 h-4 text-destructive shrink-0 mt-0.5" aria-hidden="true"></i>
                 <p class="text-sm text-destructive-emphasis" x-text="importError"></p>
             </div>
@@ -594,12 +594,12 @@
             {# Import button #}
             <div class="flex items-center justify-between">
                 <button type="button" @click="dataPhase = 'mapping'"
-                        class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium border border-input rounded-md hover:bg-accent transition-colors">
+                        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                     <i data-lucide="arrow-left" class="w-4 h-4" aria-hidden="true"></i>
                     Back to Mapping
                 </button>
                 <button type="button" @click="importData()" :disabled="importLoading"
-                        class="inline-flex items-center gap-2 px-6 py-2.5 text-sm font-medium bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors disabled:opacity-50">
+                        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                     <template x-if="importLoading">
                         <span class="flex items-center gap-2">
                             <span class="animate-spin h-4 w-4 border-2 border-current border-t-transparent rounded-full"></span>
@@ -646,17 +646,17 @@
             {# Action buttons #}
             <div class="flex items-center gap-3 pt-2">
                 <button type="button" @click="resetDataFlow()"
-                        class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium border border-input rounded-md hover:bg-accent transition-colors">
+                        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                     <i data-lucide="upload" class="w-4 h-4" aria-hidden="true"></i>
                     Upload Another File
                 </button>
                 <a :href="deployUrl ? deployUrl + '/admin' : '#'" target="_blank" rel="noopener"
-                   class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium border border-input rounded-md hover:bg-accent transition-colors">
+                   class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                     <i data-lucide="external-link" class="w-4 h-4" aria-hidden="true"></i>
                     View in Admin Panel
                 </a>
                 <a :href="deployUrl" target="_blank" rel="noopener"
-                   class="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors">
+                   class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                     <i data-lucide="globe" class="w-4 h-4" aria-hidden="true"></i>
                     Open Your App
                 </a>

@@ -14,6 +14,7 @@ import logging
 import re
 
 from app import db
+from app.utils.tenant import current_organization_id
 
 logger = logging.getLogger(__name__)
 
@@ -374,7 +375,16 @@ class PortfolioSearchService:
         try:
             mod = importlib.import_module(module_path)
             model_cls = getattr(mod, class_name)
-            entity = db.session.get(model_cls, entity_id)
+            stmt = db.select(model_cls).where(model_cls.id == entity_id)
+            if hasattr(model_cls, "organization_id"):
+                # Tenant-owned types carry an explicit predicate: session.get
+                # returns an identity-map hit without emitting SQL, so the
+                # do_orm_execute tenant filter never runs for it.
+                org_id = current_organization_id()
+                if org_id is None:
+                    return None
+                stmt = stmt.where(model_cls.organization_id == org_id)
+            entity = db.session.execute(stmt).scalars().first()
             if not entity:
                 return None
             name = entity.name or ""

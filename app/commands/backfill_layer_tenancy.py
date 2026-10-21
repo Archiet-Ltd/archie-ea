@@ -188,6 +188,18 @@ _DERIVABLE_ORG = {
            AND i.organization_id IS NULL
            AND a.organization_id IS NOT NULL
     """,
+    # The five vendor-analysis child tables (vendor_options, analysis_recommendations,
+    # analysis_scenarios, required_capabilities, analysis_audit_logs) are derived once,
+    # in migration 20261018_vendor_analysis_rls, which runs ahead of the policy that
+    # needs the column; no second derivation lives here.
+
+    # Six generic-tree-API tables (tasks, portfolio_initiatives, system_boundaries,
+    # compliance_requirements, vendor_capability_hierarchy, vendor_process_hierarchy)
+    # are derived once, in migration 20261018_tree_models_org_id, which runs ahead of
+    # the policy that needs the column, the same way the vendor-analysis child tables
+    # above are; no second derivation lives here. required_capabilities -- the
+    # generic tree API's seventh registered tree -- is not one of these six: its
+    # derivation is the vendor-analysis one above, not this one.
 
     # --- Motivation, requirements, strategic and technology
     # layer tables. Every entry below derives from a table that is already
@@ -464,6 +476,16 @@ _PURGE_ORPHANS = {}
 # could belong to, so the ordinary single-organisation rule still applies.
 _PROVENANCE_ONLY = {
     "application_ownership", "options_analysis", "organization_units", "stakeholder_inputs",
+    "vendor_options", "analysis_recommendations", "analysis_scenarios",
+    "required_capabilities", "analysis_audit_logs",
+    # The six generic-tree-API tables derived in 20261018_tree_models_org_id
+    # (see the comment by that block above): a row with no project/template/
+    # ArchiMate-element link, no resolvable parent and no creator with an
+    # organisation is a genuine orphan, left NULL and reported there, not a
+    # candidate for this command's own single-organisation or --org-id
+    # assignment.
+    "tasks", "portfolio_initiatives", "system_boundaries", "compliance_requirements",
+    "vendor_capability_hierarchy", "vendor_process_hierarchy",
     # Every table above whose _DERIVABLE_ORG entry can leave
     # a genuine remainder (a row whose own attribution columns are all NULL,
     # or all point at rows that are themselves unattributed) -- the fenced,

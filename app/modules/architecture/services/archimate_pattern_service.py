@@ -10,6 +10,7 @@ from collections import defaultdict
 from typing import Dict, List
 
 from app.models import ArchiMateElement, ArchiMateRelationship, ArchitectureModel
+from app.models.archimate_element_types import is_application_kind
 
 logger = logging.getLogger(__name__)
 
@@ -307,7 +308,9 @@ class ArchiMatePatternService:
                 missing.append("No business services defined")
 
         elif pattern_id == "microservices":
-            app_components = element_type_counts.get("ApplicationComponent", 0)
+            app_components = sum(
+                n for t, n in element_type_counts.items() if is_application_kind(t)
+            )
             data_objects = element_type_counts.get("DataObject", 0)
 
             if app_components >= indicators["min_app_components"]:
@@ -454,7 +457,9 @@ class ArchiMatePatternService:
                 missing.append("No interface serving multiple components")
 
         elif pattern_id == "database_per_service":
-            app_components = element_type_counts.get("ApplicationComponent", 0)
+            app_components = sum(
+                n for t, n in element_type_counts.items() if is_application_kind(t)
+            )
             data_objects = element_type_counts.get("DataObject", 0)
 
             if app_components > 0 and data_objects > 0:
