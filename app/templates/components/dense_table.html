@@ -29,7 +29,7 @@
    max_height  CSS height of the scroll container; the header sticks inside it.
    flush       true when the table sits inside a card that already draws the
                border: the wrapper then has no border or radius of its own.
-   attrs       extra attributes for the <table> element (data hooks).
+   attrs       extra attributes for the <table> element (data hooks), as a dict; values are escaped.
    tbody_id    id for the <tbody> when a page script fills the rows
                (document.getElementById(...) hooks); tbody_attrs for data-*.
 
@@ -40,7 +40,7 @@
 {% set matrix = variant == 'matrix' %}
 <div class="{% if flush %}bg-card{% else %}rounded-lg border border-border bg-card{% endif %} {{ class }}" role="region"{% if caption %} aria-label="{{ caption }}"{% endif %}{% if id %} id="{{ id }}"{% endif %}>
     <div class="overflow-x-auto overflow-y-auto"{% if max_height %} style="max-height: {{ max_height }}"{% endif %}>
-        <table class="dense-table {% if matrix %}matrix sticky-header sticky-col {% endif %}w-full border-collapse text-sm {{ table_class }}"{% if testid %} data-testid="{{ testid }}"{% endif %}{% if attrs %} {{ attrs|safe }}{% endif %}>
+        <table class="dense-table {% if matrix %}matrix sticky-header sticky-col {% endif %}w-full border-collapse text-sm {{ table_class }}"{% if testid %} data-testid="{{ testid }}"{% endif %}{% if attrs %}{{ attrs|xmlattr }}{% endif %}>
             {% if caption %}<caption class="sr-only">{{ caption }}</caption>{% endif %}
             <thead class="sticky top-0 z-10 bg-card">
                 <tr class="border-b border-border">
@@ -62,7 +62,7 @@
                 </tr>
             </tbody>
             {% else %}
-            <tbody class="divide-y divide-border"{% if tbody_id %} id="{{ tbody_id }}"{% endif %}{% if tbody_attrs %} {{ tbody_attrs|safe }}{% endif %}>
+            <tbody class="divide-y divide-border"{% if tbody_id %} id="{{ tbody_id }}"{% endif %}{% if tbody_attrs %}{{ tbody_attrs|xmlattr }}{% endif %}>
                 {{ caller() }}
             </tbody>
             {% endif %}
@@ -103,11 +103,11 @@
                'not-recorded' (the answer is unknown, not "none").
    title       optional tooltip text (the names behind a count, for instance). #}
 {% macro matrix_row_header(label, href=None, attrs='') %}
-<th scope="row" class="sticky left-0 z-10 h-12 bg-card px-2 text-left align-middle text-sm font-medium normal-case tracking-normal text-foreground"{% if attrs %} {{ attrs|safe }}{% endif %}>{% if href %}<a href="{{ href }}" class="hover:text-info">{{ label }}</a>{% else %}{{ label }}{% endif %}</th>
+<th scope="row" class="sticky left-0 z-10 h-12 bg-card px-2 text-left align-middle text-sm font-medium normal-case tracking-normal text-foreground"{% if attrs %}{{ attrs|xmlattr }}{% endif %}>{% if href %}<a href="{{ href }}" class="hover:text-info">{{ label }}</a>{% else %}{{ label }}{% endif %}</th>
 {% endmacro %}
 
 {% macro matrix_cell(state='empty', value=None, title=None, attrs='') %}
-<td class="px-2 text-center align-middle" data-state="{{ state }}"{% if attrs %} {{ attrs|safe }}{% endif %}>
+<td class="px-2 text-center align-middle" data-state="{{ state }}"{% if attrs %}{{ attrs|xmlattr }}{% endif %}>
     {%- if state == 'single-value' -%}
     <span class="inline-flex min-w-6 items-center justify-center rounded-md border px-1.5 py-0.5 text-2xs font-medium tabular-nums border-border bg-muted text-foreground"{% if title %} title="{{ title }}"{% endif %}>{{ value }}</span>
     {%- elif state == 'multiple-count' -%}

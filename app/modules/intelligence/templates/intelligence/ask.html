@@ -440,7 +440,7 @@
         </ul>
         {% endif %}
         {% if derivation_status.runs %}
-{% call dense_table(columns=[('Finished', ''), ('Started by', ''), ('Relationships read', ''), ('Connections found', ''), ('Time taken', '')], caption='Recent runs', attrs='data-derivation-runs', flush=true) %}
+{% call dense_table(columns=[('Finished', ''), ('Started by', ''), ('Relationships read', ''), ('Connections found', ''), ('Time taken', '')], caption='Recent runs', attrs={'data-derivation-runs': ''}, flush=true) %}
                     {% for run in derivation_status.runs %}
                     <tr class="last:border-0" data-derivation-run>
                         <td class="px-2">{{ run.finished_at | format_datetime if run.finished_at else '—' }}</td>

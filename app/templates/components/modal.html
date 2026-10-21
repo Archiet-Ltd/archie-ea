@@ -62,7 +62,7 @@
     aria-modal="true"
     {% if _lby %}aria-labelledby="{{ _lby }}"{% endif %}
     class="modal-root fixed inset-0 items-center justify-center p-4"
-    {% if attrs %}{{ attrs|safe }}{% endif %}
+    {% if attrs %}{{ attrs|xmlattr }}{% endif %}
 >
     <!-- Backdrop -->
     <div

@@ -47,7 +47,7 @@
               <label class="block text-sm font-medium text-muted-foreground mb-2">
                 Upload File (Excel, CSV, or JSON)
               </label>
-              {% call form_group(id='excel-file-input', label='Import file', help_text='Drag & drop or click to select. Supports: .xlsx, .xls, .csv, .json', class='border-2 border-dashed border-input rounded-lg p-8 text-center transition-colors hover:border-primary', attrs='id="drop-zone"') %}
+              {% call form_group(id='excel-file-input', label='Import file', help_text='Drag & drop or click to select. Supports: .xlsx, .xls, .csv, .json', class='border-2 border-dashed border-input rounded-lg p-8 text-center transition-colors hover:border-primary', attrs={'id': 'drop-zone'}) %}
                 <input type="file" id="excel-file-input" accept=".xlsx,.xls,.csv,.json" class="hidden" @change="handleExcelFileSelect(event)">
                 <button type="button" @click="document.getElementById('excel-file-input').click()" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center" aria-label="Choose file to upload">
                   <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">

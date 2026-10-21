@@ -758,7 +758,7 @@
   </div>{# end table card #}
 
   {# AI Map modal — inside the appPortfolio() x-data scope, which owns aiMap state #}
-  {% call modal(id='ai-map-modal', title='AI Map Applications', description='Analyze existing applications with AI and propose capability, process and ArchiMate mappings.', attrs='data-testid="ai-map-modal"') %}
+  {% call modal(id='ai-map-modal', title='AI Map Applications', description='Analyze existing applications with AI and propose capability, process and ArchiMate mappings.', attrs={'data-testid': 'ai-map-modal'}) %}
       <div class="overflow-y-auto flex-1 space-y-4">
         <div x-show="!aiMap.result" x-cloak class="space-y-3">
           {% call form_group(id='ai-map-max', label='Applications to analyze', help_text='Most recently added applications are analyzed first.') %}
