@@ -105,7 +105,7 @@
     {% if sp_total > 0 and sp_phases|length == 1 and sp_phases[0].phase is none %}
     {% set sp_line = sp_total ~ ' without a recorded ADM phase' %}
     {% elif sp_total > 0 and sp_phases|length == 1 %}
-    {% set sp_letter, sp_name = sp_phases[0].label.split(': ', 1) %}
+    {% set _sp_parts = (sp_phases[0].label or '').split(': ', 1) %}{% set sp_letter = _sp_parts[0] if _sp_parts|length == 2 else '' %}{% set sp_name = _sp_parts[1] if _sp_parts|length == 2 else (sp_phases[0].label or '') %}
     {% set sp_line = 'Nothing past ' ~ sp_name ~ ' yet — all ' ~ sp_total ~ ' solution' ~ ('s' if sp_total != 1 else '') ~ ' ' ~ ('are' if sp_total != 1 else 'is') ~ ' in phase ' ~ sp_letter %}
     {% elif sp_total > 0 %}
     {% set sp_line = sp_phases|length ~ ' of ' ~ sp|length ~ ' ADM phases active' %}
@@ -114,9 +114,9 @@
     {% endif %}
     <section aria-label="Key figures" class="grid grid-cols-2 gap-4 lg:grid-cols-4">
         {% set kpis = [
-            ('Applications', metrics.applications|default(0), 'health-kpi-applications', none),
-            ('Solutions', nav_stats.solutions|default(0), 'health-kpi-solutions', sp_line),
-            ('ArchiMate elements', nav_stats.elements|default(0), 'health-kpi-elements', none),
+            ('Applications', metrics.applications|dash, 'health-kpi-applications', none),
+            ('Solutions', nav_stats.solutions|dash, 'health-kpi-solutions', sp_line),
+            ('ArchiMate elements', nav_stats.elements|dash, 'health-kpi-elements', none),
             ('Health score', health_score_text|default('—'), 'health-score-value', none)
         ] %}
         {% for label, value, testid, line in kpis %}
@@ -154,8 +154,8 @@
         <div class="min-w-0">
             <h2 class="text-sm font-semibold text-foreground">Architecture Overview — Layered Viewpoint</h2>
             <p class="mt-0.5 text-xs text-muted-foreground tabular-nums">
-                {{ '{:,}'.format(nav_stats.elements) if nav_stats and nav_stats.elements else '0' }} elements ·
-                {{ '{:,}'.format(nav_stats.relationships) if nav_stats and nav_stats.relationships else '0' }} relationships across all ArchiMate layers
+                {{ '{:,}'.format(nav_stats.elements) if nav_stats and nav_stats.elements is not none else '—' }} elements ·
+                {{ '{:,}'.format(nav_stats.relationships) if nav_stats and nav_stats.relationships is not none else '—' }} relationships across all ArchiMate layers
             </p>
         </div>
         <a href="/archimate/composer?viewpoint=layered" class="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90">
@@ -193,7 +193,7 @@
     <section aria-labelledby="lifecycle-chart-heading" class="rounded-lg border border-border bg-card" data-testid="lifecycle-distribution">
         <div class="flex items-center justify-between border-b border-border px-4 py-2">
             <h2 id="lifecycle-chart-heading" class="text-base font-semibold text-foreground">Applications by lifecycle</h2>
-            <span class="text-2xs font-semibold uppercase tracking-[0.06em] text-muted-foreground tabular-nums">{{ metrics.applications|default(0) }} in portfolio</span>
+            <span class="text-2xs font-semibold uppercase tracking-[0.06em] text-muted-foreground tabular-nums">{{ metrics.applications|dash }} in portfolio</span>
         </div>
         {% set lc = lifecycle_distribution|default([]) %}
         {% if lc %}
@@ -256,7 +256,7 @@
     <p class="text-sm text-foreground">{{ sp_sum }} solution{{ 's' if sp_sum != 1 else '' }} without a recorded ADM phase.</p>
     <p class="mt-1 text-sm text-muted-foreground">Set the ADM phase on each solution to see the pipeline. <a href="{{ url_for('solution_design.list_solutions') }}" class="text-info hover:underline">Open the pipeline</a></p>
     {% else %}
-    {% set sp_letter, sp_name = sp_one.label.split(': ', 1) %}
+    {% set _sp_parts = (sp_one.label or '').split(': ', 1) %}{% set sp_letter = _sp_parts[0] if _sp_parts|length == 2 else '' %}{% set sp_name = _sp_parts[1] if _sp_parts|length == 2 else (sp_one.label or '') %}
     <p class="text-sm text-foreground">Nothing past {{ sp_name }} yet — all {{ sp_sum }} solution{{ 's' if sp_sum != 1 else '' }} {{ 'are' if sp_sum != 1 else 'is' }} in phase {{ sp_letter }}.</p>
     <p class="mt-1 text-sm text-muted-foreground">Nothing further yet. <a href="{{ url_for('solution_design.list_solutions') }}" class="text-info hover:underline">Open the pipeline</a></p>
     {% endif %}
@@ -360,10 +360,10 @@
 
         <section aria-label="CTO key figures" class="grid grid-cols-2 gap-4 lg:grid-cols-4">
             {% for label, value, testid, href in [
-                ('Applications', metrics.applications|default(0), 'cto-kpi-applications', '/applications/'),
+                ('Applications', metrics.applications|dash, 'cto-kpi-applications', '/applications/'),
                 ('Health score', health_score_text|default('—'), 'cto-health-score-value', '/dashboard/health'),
-                ('Solutions', nav_stats.solutions|default(0), 'cto-kpi-solutions', '/solutions/'),
-                ('ArchiMate elements', nav_stats.elements|default(0), 'cto-kpi-elements', '/architecture/dashboard')
+                ('Solutions', nav_stats.solutions|dash, 'cto-kpi-solutions', '/solutions/'),
+                ('ArchiMate elements', nav_stats.elements|dash, 'cto-kpi-elements', '/architecture/dashboard')
             ] %}
             <a href="{{ href }}" data-slot="card" class="rounded-lg border border-border bg-card p-4 transition-colors hover:border-ring">
                 <p data-slot="card-description" class="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground">{{ label }}</p>
@@ -391,7 +391,7 @@
                             {% for level, tone in [('critical', 'text-destructive-emphasis'), ('high', 'text-warning-emphasis'), ('medium', 'text-info'), ('low', 'text-success-emphasis')] %}
                             <tr class="h-10 border-b border-border last:border-b-0">
                                 <td class="px-4 align-middle capitalize {{ tone }}">{{ level }}</td>
-                                <td class="px-4 text-right align-middle tabular-nums text-foreground">{{ (cto.get('risk_counts') or {}).get(level, 0) }}</td>
+                                <td class="px-4 text-right align-middle tabular-nums text-foreground">{{ ((cto.get('risk_counts') or {}).get(level))|dash }}</td>
                             </tr>
                             {% endfor %}
                         </tbody>
@@ -410,7 +410,7 @@
                             {% for status_key, label, tone in [('pending', 'Pending', 'text-warning-emphasis'), ('approved', 'Approved', 'text-success-emphasis'), ('rejected', 'Rejected', 'text-destructive-emphasis')] %}
                             <tr class="h-10 border-b border-border last:border-b-0">
                                 <td class="px-4 align-middle {{ tone }}">{{ label }}</td>
-                                <td class="px-4 text-right align-middle tabular-nums text-foreground">{{ (cto.get('arb_pipeline') or {}).get(status_key, 0) }}</td>
+                                <td class="px-4 text-right align-middle tabular-nums text-foreground">{{ ((cto.get('arb_pipeline') or {}).get(status_key))|dash }}</td>
                             </tr>
                             {% endfor %}
                         </tbody>
@@ -427,10 +427,10 @@
     <div x-show="activeRole === 'cfo'" x-cloak class="space-y-8" data-testid="lens-cfo">
         <section aria-label="CFO key figures" class="grid grid-cols-2 gap-4 lg:grid-cols-4">
             {% for label, value, testid, href in [
-                ('Applications', metrics.applications|default(0), 'cfo-kpi-applications', '/applications/'),
-                ('Vendors', metrics.vendors|default(0), 'cfo-kpi-vendors', '/applications/vendors'),
+                ('Applications', metrics.applications|dash, 'cfo-kpi-applications', '/applications/'),
+                ('Vendors', metrics.vendors|dash, 'cfo-kpi-vendors', '/applications/vendors'),
                 ('Health score', health_score_text|default('—'), 'cfo-health-score-value', '/dashboard/health'),
-                ('Solutions', nav_stats.solutions|default(0), 'cfo-kpi-solutions', '/solutions/')
+                ('Solutions', nav_stats.solutions|dash, 'cfo-kpi-solutions', '/solutions/')
             ] %}
             <a href="{{ href }}" data-slot="card" class="rounded-lg border border-border bg-card p-4 transition-colors hover:border-ring">
                 <p data-slot="card-description" class="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground">{{ label }}</p>
@@ -475,18 +475,18 @@
     <div x-show="Object.keys(_layers).includes(activeRole)" x-cloak data-testid="lens-layer"
          x-data="{
            _layers: {
-             motivation:     { label: 'Motivation',   count: {{ layer_breakdown.motivation|default(0) }},     blurb: 'Drivers, goals, outcomes, requirements, constraints and principles — why the architecture changes.' },
-             strategy:       { label: 'Strategy',     count: {{ layer_breakdown.strategy|default(0) }},         blurb: 'Capabilities, value streams, resources and courses of action — what the enterprise must be able to do.' },
-             business:       { label: 'Business',     count: {{ layer_breakdown.business|default(0) }},         blurb: 'Actors, roles, processes, services and business objects — how the business operates.' },
-             application:    { label: 'Application',  count: {{ layer_breakdown.application|default(0) }},      blurb: 'Application components, services, interfaces and data objects — the software realising the business.' },
-             technology:     { label: 'Technology',   count: {{ layer_breakdown.technology|default(0) }},       blurb: 'Nodes, system software, technology services and physical equipment — the platform the software runs on.' },
-             implementation: { label: 'Implementation & Migration', count: {{ layer_breakdown.implementation|default(0) }}, blurb: 'Work packages, deliverables, plateaus and gaps — the transition from the as-is to the to-be architecture.' }
+             motivation:     { label: 'Motivation',   count: {{ layer_breakdown.motivation if layer_breakdown and layer_breakdown.motivation is not none else 'null' }},     blurb: 'Drivers, goals, outcomes, requirements, constraints and principles — why the architecture changes.' },
+             strategy:       { label: 'Strategy',     count: {{ layer_breakdown.strategy if layer_breakdown and layer_breakdown.strategy is not none else 'null' }},         blurb: 'Capabilities, value streams, resources and courses of action — what the enterprise must be able to do.' },
+             business:       { label: 'Business',     count: {{ layer_breakdown.business if layer_breakdown and layer_breakdown.business is not none else 'null' }},         blurb: 'Actors, roles, processes, services and business objects — how the business operates.' },
+             application:    { label: 'Application',  count: {{ layer_breakdown.application if layer_breakdown and layer_breakdown.application is not none else 'null' }},      blurb: 'Application components, services, interfaces and data objects — the software realising the business.' },
+             technology:     { label: 'Technology',   count: {{ layer_breakdown.technology if layer_breakdown and layer_breakdown.technology is not none else 'null' }},       blurb: 'Nodes, system software, technology services and physical equipment — the platform the software runs on.' },
+             implementation: { label: 'Implementation & Migration', count: {{ layer_breakdown.implementation if layer_breakdown and layer_breakdown.implementation is not none else 'null' }}, blurb: 'Work packages, deliverables, plateaus and gaps — the transition from the as-is to the to-be architecture.' }
            }
          }">
         <section aria-labelledby="layer-heading" class="rounded-lg border border-border bg-card">
             <div class="flex items-center justify-between border-b border-border px-4 py-2">
                 <h2 id="layer-heading" class="text-base font-semibold text-foreground" x-text="(_layers[activeRole]||{label:''}).label + ' layer'"></h2>
-                <span class="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground tabular-nums"><span x-text="((_layers[activeRole]||{count:0}).count).toLocaleString()"></span> elements</span>
+                <span class="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground tabular-nums"><span x-text="((c) => c == null ? '—' : c.toLocaleString())((_layers[activeRole]||{}).count)"></span> elements</span>
             </div>
             <div class="px-4 py-3">
                 <p class="max-w-2xl text-sm text-muted-foreground" x-text="(_layers[activeRole]||{blurb:''}).blurb"></p>
