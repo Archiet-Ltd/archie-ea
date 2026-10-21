@@ -250,21 +250,7 @@
                 </ul>
             </div>
 
-<<<<<<< HEAD
-            <div class="overflow-x-auto rounded-md border border-border">
-                <table class="w-full text-sm">
-                    <thead class="bg-muted/50">
-                        <tr>
-                            <th scope="col" class="px-3 py-2 text-left font-medium text-muted-foreground">Name</th>
-                            <th scope="col" class="px-3 py-2 text-left font-medium text-muted-foreground">Type</th>
-                            <th scope="col" class="px-3 py-2 text-left font-medium text-muted-foreground">Status</th>
-                            <th scope="col" class="px-3 py-2 text-left font-medium text-muted-foreground">Why</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-border">
-=======
-{% call dense_table(columns=[('Name', ''), ('Type', ''), ('Status', '')]) %}
->>>>>>> anioko/main
+{% call dense_table(columns=[('Name', ''), ('Type', ''), ('Status', ''), ('Why', '')]) %}
                         <template x-for="(elem, idx) in (preview ? preview.elements : [])" :key="elem.identifier + '-' + idx">
                             <tr>
                                 <td class="px-2 font-medium text-foreground break-words" x-text="elem.name"></td>
@@ -273,7 +259,7 @@
                                     <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium border"
                                           :class="statusClass(elem.status)" x-text="statusLabel(elem.status)"></span>
                                 </td>
-                                <td class="px-3 py-2 text-muted-foreground" data-testid="preview-decision-reason"
+                                <td class="px-2 text-muted-foreground" data-testid="preview-decision-reason"
                                     x-text="elem.application_kind_decision || ''"></td>
                             </tr>
                         </template>
