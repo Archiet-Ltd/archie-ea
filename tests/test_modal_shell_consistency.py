@@ -5,7 +5,8 @@ into three backdrop treatments (`bg-black/50`, `bg-black/80`, inline
 `rgba(0,0,0,.5)`), three z-index strategies (`z-50`, inline `z-index:1000`, and
 `var(--modal-z, 1000)`) and two alignments (flex-centred vs `relative top-10`).
 `components/modal.html` is the canonical macro (DESIGN.md § Modals) and defines
-the shell: `bg-background/80` backdrop, `z-index: var(--modal-z, 1000)` on the
+the shell: `bg-slate-900/50` backdrop (design/patterns.json: dialog — a slate
+overlay at 50%, no blur), `z-index: var(--modal-z, 1000)` on the
 root with `+1` on the panel, `role="dialog" aria-modal="true"`, and close via
 `data-modal-close` / `data-modal-backdrop` / Escape (all handled by
 `static/js/ui/modal.js`).
@@ -39,7 +40,7 @@ MODAL_FILES = [
 
 # The canonical backdrop, taken from components/modal.html. Semantic token, and
 # compiled into app/static/css/tailwind-output.css.
-CANONICAL_BACKDROP = "bg-background/80"
+CANONICAL_BACKDROP = "bg-overlay/50"
 
 
 def _read(rel: str) -> str:

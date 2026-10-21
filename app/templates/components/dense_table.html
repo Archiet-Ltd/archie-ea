@@ -1,0 +1,121 @@
+{# Canonical dense table (design/patterns.json: dense-table; north star).
+
+   Server-rendered rows go in the call block; the macro owns the wrapper,
+   header, sticky behaviour and the empty state. For the Alpine client-side
+   table with pagination see components/data_table.html — that is a different
+   mechanism, not a second copy of this one.
+
+   Call shape:
+     {% from 'components/dense_table.html' import dense_table %}
+     {% call dense_table(columns=[('Name', ''), ('Owner', ''), ('Cost', 'text-right'), ('', 'text-right')],
+                         empty_text='No applications yet.', caption='Applications', testid='applications-table',
+                         rows=applications|length, max_height='calc(100vh - 280px)') %}
+       {% for app in applications %}
+       <tr class="group h-12 transition-colors hover:bg-muted/50">
+         <td class="px-2 align-middle font-medium text-foreground">{{ app.name }}</td>
+         ...
+       </tr>
+       {% endfor %}
+     {% endcall %}
+
+   columns     list of (label, extra th classes). An empty label renders a
+               visually hidden header cell (use for action columns).
+   header      alternative to columns: the header row's cells as markup, built
+               with {% set hdr %}<th scope="col" ...>...</th>{% endset %}. Use it
+               when a header cell holds a checkbox, a sort control or a legend.
+   rows        the row count; 0 renders the empty-state slot instead of <tbody>.
+   empty_text  the empty-state line (12px muted) — or pass empty_caller for markup.
+   caption     accessible caption (sr-only) and the region's label.
+   max_height  CSS height of the scroll container; the header sticks inside it.
+   flush       true when the table sits inside a card that already draws the
+               border: the wrapper then has no border or radius of its own.
+   attrs       extra attributes for the <table> element (data hooks).
+   tbody_id    id for the <tbody> when a page script fills the rows
+               (document.getElementById(...) hooks); tbody_attrs for data-*.
+
+   Spec: wrapper 8px radius + hairline border, header row 40px / 11px / 500 /
+   uppercase / muted on the card surface, sticky inside the scroll container,
+   cells 8px padding, rows 48px, tabular figures everywhere, no shadows. #}
+{% macro dense_table(columns=[], header=None, rows=None, empty_text='Nothing recorded yet.', empty_caller=None, caption=None, testid=None, max_height=None, flush=false, class='', table_class='', id=None, attrs='', tbody_id=None, tbody_attrs='', variant=None, legend=None) %}
+{% set matrix = variant == 'matrix' %}
+<div class="{% if flush %}bg-card{% else %}rounded-lg border border-border bg-card{% endif %} {{ class }}" role="region"{% if caption %} aria-label="{{ caption }}"{% endif %}{% if id %} id="{{ id }}"{% endif %}>
+    <div class="overflow-x-auto overflow-y-auto"{% if max_height %} style="max-height: {{ max_height }}"{% endif %}>
+        <table class="dense-table {% if matrix %}matrix sticky-header sticky-col {% endif %}w-full border-collapse text-sm {{ table_class }}"{% if testid %} data-testid="{{ testid }}"{% endif %}{% if attrs %} {{ attrs|safe }}{% endif %}>
+            {% if caption %}<caption class="sr-only">{{ caption }}</caption>{% endif %}
+            <thead class="sticky top-0 z-10 bg-card">
+                <tr class="border-b border-border">
+                    {% if header %}{{ header }}{% else %}
+                    {% for col in columns %}
+                    {% set label = col[0] if col is sequence and col is not string else col %}
+                    {% set extra = col[1] if col is sequence and col is not string and col|length > 1 else '' %}
+                    <th scope="col" class="h-10 px-2 align-middle {% if matrix and loop.first %}sticky left-0 z-20 bg-card {% endif %}{% if 'text-right' not in extra and 'text-center' not in extra %}text-left {% endif %}{{ extra }}">{% if label %}{{ label }}{% else %}<span class="sr-only">Actions</span>{% endif %}</th>
+                    {% endfor %}
+                    {% endif %}
+                </tr>
+            </thead>
+            {% if rows is not none and rows == 0 %}
+            <tbody>
+                <tr>
+                    <td colspan="{{ columns|length or 1 }}" class="dense-empty px-2 text-center">
+                        {% if empty_caller %}{{ empty_caller() }}{% else %}<p class="text-xs text-muted-foreground">{{ empty_text }}</p>{% endif %}
+                    </td>
+                </tr>
+            </tbody>
+            {% else %}
+            <tbody class="divide-y divide-border"{% if tbody_id %} id="{{ tbody_id }}"{% endif %}{% if tbody_attrs %} {{ tbody_attrs|safe }}{% endif %}>
+                {{ caller() }}
+            </tbody>
+            {% endif %}
+        </table>
+    </div>
+    {% if matrix %}
+    {# The legend is part of the variant, never a page's own markup: the four
+       cell states read the same on every matrix. #}
+    <div class="matrix-legend flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-border px-2 py-2 text-xs text-muted-foreground" aria-label="Legend">
+        {% if legend %}{{ legend }}{% else %}
+        <span class="inline-flex items-center gap-1.5"><span class="not-recorded" aria-hidden="true">·</span> none</span>
+        <span class="inline-flex items-center gap-1.5"><span class="badge badge-sm" aria-hidden="true">value</span> one</span>
+        <span class="inline-flex items-center gap-1.5"><span class="badge badge-neutral badge-sm" aria-hidden="true">n</span> several (count)</span>
+        <span class="inline-flex items-center gap-1.5"><span class="badge badge-warning badge-sm" aria-hidden="true">?</span> not recorded</span>
+        {% endif %}
+    </div>
+    {% endif %}
+</div>
+{% endmacro %}
+
+{# Matrix variant (design/patterns.json: matrix; design register: table.variants.matrix).
+   Rows are one entity each, columns the other; the first cell of every row is
+   a sticky row header and every other cell is one of four states. No
+   pagination: a matrix is read whole, scrolled in both directions.
+
+     {% call dense_table(variant='matrix', columns=[('Business unit', ''), ('SAP', ''), ...], caption='...') %}
+       <tr class="h-12">
+         {{ matrix_row_header('Finance') }}
+         {{ matrix_cell('single-value', 'uses') }}
+         {{ matrix_cell('multiple-count', 3) }}
+         {{ matrix_cell('empty') }}
+         {{ matrix_cell('not-recorded') }}
+       </tr>
+     {% endcall %}
+
+   state       'empty' (nothing to say: a middle dot), 'single-value' (one
+               relationship: its label), 'multiple-count' (several: the number),
+               'not-recorded' (the answer is unknown, not "none").
+   title       optional tooltip text (the names behind a count, for instance). #}
+{% macro matrix_row_header(label, href=None, attrs='') %}
+<th scope="row" class="sticky left-0 z-10 h-12 bg-card px-2 text-left align-middle font-medium text-foreground"{% if attrs %} {{ attrs|safe }}{% endif %}>{% if href %}<a href="{{ href }}" class="hover:text-info">{{ label }}</a>{% else %}{{ label }}{% endif %}</th>
+{% endmacro %}
+
+{% macro matrix_cell(state='empty', value=None, title=None, attrs='') %}
+<td class="px-2 text-center align-middle" data-state="{{ state }}"{% if attrs %} {{ attrs|safe }}{% endif %}>
+    {%- if state == 'single-value' -%}
+    <span class="badge badge-sm"{% if title %} title="{{ title }}"{% endif %}>{{ value }}</span>
+    {%- elif state == 'multiple-count' -%}
+    <span class="badge badge-neutral badge-sm tabular-nums"{% if title %} title="{{ title }}"{% endif %}>{{ value }}</span>
+    {%- elif state == 'not-recorded' -%}
+    <span class="badge badge-warning badge-sm"{% if title %} title="{{ title }}"{% endif %}><span class="sr-only">not recorded</span><span aria-hidden="true">?</span></span>
+    {%- else -%}
+    <span class="not-recorded text-muted-foreground/60"{% if title %} title="{{ title }}"{% endif %}><span class="sr-only">none</span><span aria-hidden="true">·</span></span>
+    {%- endif -%}
+</td>
+{% endmacro %}

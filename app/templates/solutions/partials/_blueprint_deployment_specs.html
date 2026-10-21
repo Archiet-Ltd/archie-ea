@@ -45,7 +45,7 @@
                     <span class="text-xs text-muted-foreground"
                           x-text="'Version ' + ((deploymentSpecs[elem.element_id || elem.id] && deploymentSpecs[elem.element_id || elem.id].deployment) ? (deploymentSpecs[elem.element_id || elem.id].deployment.version || 0) : 0)"></span>
                     <div class="flex gap-2">
-                        <button type="button" class="inline-flex items-center px-3 py-1 text-xs font-medium bg-primary text-primary-foreground hover:bg-primary/90 rounded-md transition-colors"
+                        <button type="button" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center"
                                 x-on:click="suggestDeploymentSpec(elem.element_id || elem.id)"
                                 :disabled="deployLoading[elem.element_id || elem.id]">
                             <span x-show="!deployLoading[elem.element_id || elem.id]">Suggest Spec</span>
@@ -58,7 +58,7 @@
                 <template x-if="deploymentSpecs[elem.element_id || elem.id] && deploymentSpecs[elem.element_id || elem.id].deployment">
                     <div class="space-y-4">
                         {# Runtime info #}
-                        <div class="rounded-lg border border-border bg-muted/20 p-3">
+                        <div class="rounded-md border border-border bg-muted/20 px-3 py-2">
                             <h5 class="text-xs font-medium text-foreground mb-2">Runtime Configuration</h5>
                             <div class="grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
                                 <template x-if="deploymentSpecs[elem.element_id || elem.id].deployment.runtime">
@@ -84,7 +84,7 @@
 
                         {# Resources #}
                         <template x-if="deploymentSpecs[elem.element_id || elem.id].deployment.resources">
-                            <div class="rounded-lg border border-border bg-muted/20 p-3">
+                            <div class="rounded-md border border-border bg-muted/20 px-3 py-2">
                                 <h5 class="text-xs font-medium text-foreground mb-2">Resource Requirements</h5>
                                 <div class="grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
                                     <template x-if="deploymentSpecs[elem.element_id || elem.id].deployment.resources.cpu">
@@ -117,10 +117,10 @@
 
                         {# Environment variables #}
                         <template x-if="deploymentSpecs[elem.element_id || elem.id].deployment.env_vars && deploymentSpecs[elem.element_id || elem.id].deployment.env_vars.length > 0">
-                            <div class="rounded-lg border border-border bg-muted/20 p-3">
+                            <div class="rounded-md border border-border bg-muted/20 px-3 py-2">
                                 <h5 class="text-xs font-medium text-foreground mb-2">Environment Variables</h5>
                                 <div class="overflow-x-auto">
-                                    <table class="w-full text-xs">
+                                    <table class="dense-table w-full text-xs">
                                         <thead>
                                             <tr class="border-b border-border">
                                                 <th class="text-left py-1.5 px-2 text-muted-foreground font-medium">Name</th>
@@ -146,7 +146,7 @@
 
                         {# Ports / networking #}
                         <template x-if="deploymentSpecs[elem.element_id || elem.id].deployment.ports && deploymentSpecs[elem.element_id || elem.id].deployment.ports.length > 0">
-                            <div class="rounded-lg border border-border bg-muted/20 p-3">
+                            <div class="rounded-md border border-border bg-muted/20 px-3 py-2">
                                 <h5 class="text-xs font-medium text-foreground mb-2">Network Ports</h5>
                                 <div class="flex flex-wrap gap-2">
                                     <template x-for="port in deploymentSpecs[elem.element_id || elem.id].deployment.ports" :key="port.port || port">
@@ -159,7 +159,7 @@
 
                         {# Health checks #}
                         <template x-if="deploymentSpecs[elem.element_id || elem.id].deployment.health_check">
-                            <div class="rounded-lg border border-border bg-muted/20 p-3">
+                            <div class="rounded-md border border-border bg-muted/20 px-3 py-2">
                                 <h5 class="text-xs font-medium text-foreground mb-2">Health Check</h5>
                                 <div class="grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
                                     <template x-if="deploymentSpecs[elem.element_id || elem.id].deployment.health_check.path">

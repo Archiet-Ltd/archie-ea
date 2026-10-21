@@ -69,7 +69,7 @@
     {% with active_view = 'network' %}{% include 'capability_map/_view_switcher.html' %}{% endwith %}
 
     <!-- Controls -->
-    <div class="bg-card rounded-lg shadow border p-4">
+    <div class="bg-card rounded-lg border border-border p-4">
         <div class="flex items-center justify-between">
             <div class="flex items-center space-x-4">
                 <label class="flex items-center">
@@ -88,7 +88,7 @@
     </div>
 
     <!-- Network Graph -->
-    <div class="bg-card rounded-lg shadow border">
+    <div class="bg-card rounded-lg border border-border">
         <div x-show="loadError" x-cloak class="p-12 text-center">
             <p class="text-sm font-medium text-destructive-emphasis" x-text="loadError"></p>
             <p class="mt-1 text-sm text-muted-foreground">The graph was never drawn — this is not an empty capability model.</p>
@@ -106,7 +106,7 @@
                 </p>
                 <div class="mt-6">
                     <a href="{{ url_for('capability_map.hierarchy') }}"
-                       class="inline-flex items-center px-4 py-2 bg-primary hover:bg-primary/90 text-primary-foreground text-sm font-medium rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-ring transition-colors">
+                       class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                         <i data-lucide="git-branch" class="w-4 h-4 mr-2" aria-hidden="true"></i>
                         View Capability Hierarchy
                     </a>
@@ -117,7 +117,7 @@
     </div>
 
     <!-- Legend -->
-    <div class="bg-card rounded-lg shadow border p-6">
+    <div class="bg-card rounded-lg border border-border p-6">
         <h3 class="text-lg font-medium text-foreground mb-4">Domain Legend</h3> <!-- frontend-quality-ok: h3 in legend card, pre-existing content -->
         <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
             <template x-for="domain in domains" :key="domain.id || domain.name || domain">

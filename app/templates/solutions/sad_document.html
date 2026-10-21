@@ -129,7 +129,7 @@
     {# Drivers #}
     <h3 class="text-sm font-semibold text-foreground mb-1 mt-3">Business Drivers</h3>
     {% if s.drivers %}
-    <table class="sad-table" aria-label="Business Drivers">
+    <table class="dense-table sad-table" aria-label="Business Drivers">
       <thead><tr><th>Driver</th><th>Type</th><th>Impact</th><th>Description</th></tr></thead>
       <tbody>{# actionable-rows-ok: generated SAD deliverable (GET /solutions/<id>/sad) — the document is assembled read-only from the solution's records for print and download; the user edits any of these records through "Back to Solution" in the header, then re-opens the document. #}
         {% for d in s.drivers %}
@@ -143,7 +143,7 @@
     {# Goals #}
     <h3 class="text-sm font-semibold text-foreground mb-1 mt-4">Goals</h3>
     {% if s.goals %}
-    <table class="sad-table" aria-label="Goals">
+    <table class="dense-table sad-table" aria-label="Goals">
       <thead><tr><th>Goal</th><th>Priority</th><th>Description</th></tr></thead>
       <tbody>{# actionable-rows-ok: generated SAD deliverable (GET /solutions/<id>/sad) — the document is assembled read-only from the solution's records for print and download; the user edits any of these records through "Back to Solution" in the header, then re-opens the document. #}
         {% for g in s.goals %}
@@ -156,7 +156,7 @@
     {# Requirements #}
     <h3 class="text-sm font-semibold text-foreground mb-1 mt-4">Requirements</h3>
     {% if s.requirements %}
-    <table class="sad-table" aria-label="Requirements">
+    <table class="dense-table sad-table" aria-label="Requirements">
       <thead><tr><th>Requirement</th><th>Type</th><th>Priority</th><th>Mandatory</th></tr></thead>
       <tbody>{# actionable-rows-ok: generated SAD deliverable (GET /solutions/<id>/sad) — the document is assembled read-only from the solution's records for print and download; the user edits any of these records through "Back to Solution" in the header, then re-opens the document. #}
         {% for r in s.requirements %}
@@ -231,7 +231,7 @@
   {# ── Macro: ArchiMate element table ──────────────────────────────────── #}
   {% macro archimate_table(elements, section_title, empty_state) %}
     {% if elements %}
-    <table class="sad-table" aria-label="{{ section_title }} elements">
+    <table class="dense-table sad-table" aria-label="{{ section_title }} elements">
       <thead>
         <tr>
           <th>Name</th><th>Type</th><th>Layer</th><th>Description</th>
@@ -295,7 +295,7 @@
       {% if s.layers.get(key) %}{% set has_any.v = true %}{% endif %}
     {% endfor %}
     {% if has_any.v %}
-    <table class="sad-table" aria-label="Cross-layer traceability">
+    <table class="dense-table sad-table" aria-label="Cross-layer traceability">
       <thead><tr><th>Layer</th><th>Count</th><th>Sample Items</th></tr></thead>
       <tbody>{# actionable-rows-ok: generated SAD deliverable (GET /solutions/<id>/sad) — the document is assembled read-only from the solution's records for print and download; the user edits any of these records through "Back to Solution" in the header, then re-opens the document. #}
         {% for key, label in layers_order %}
@@ -342,7 +342,7 @@
     {% endif %}
     {% if s.constraints %}
     <h3 class="text-sm font-semibold text-foreground mb-1">Constraints</h3>
-    <table class="sad-table" aria-label="Constraints">
+    <table class="dense-table sad-table" aria-label="Constraints">
       <thead><tr><th>Constraint</th><th>Type</th><th>Severity</th><th>Value</th><th>Description</th></tr></thead>
       <tbody>{# actionable-rows-ok: generated SAD deliverable (GET /solutions/<id>/sad) — the document is assembled read-only from the solution's records for print and download; the user edits any of these records through "Back to Solution" in the header, then re-opens the document. #}
         {% for c in s.constraints %}
@@ -366,7 +366,7 @@
   <section class="sad-section" id="sad-s9" aria-labelledby="sad-s9-title">
     <h2 id="sad-s9-title">{{ s.title }}</h2>
     {% if s.work_packages %}
-    <table class="sad-table" aria-label="Work packages">
+    <table class="dense-table sad-table" aria-label="Work packages">
       <thead><tr><th>#</th><th>Work Package</th><th>Status</th><th>Priority</th></tr></thead>
       <tbody>{# actionable-rows-ok: generated SAD deliverable (GET /solutions/<id>/sad) — the document is assembled read-only from the solution's records for print and download; the user edits any of these records through "Back to Solution" in the header, then re-opens the document. #}
         {% for wp in s.work_packages %}
@@ -389,7 +389,7 @@
   <section class="sad-section" id="sad-s10" aria-labelledby="sad-s10-title">
     <h2 id="sad-s10-title">{{ s.title }}</h2>
     {% if s.risks %}
-    <table class="sad-table" aria-label="Risks">
+    <table class="dense-table sad-table" aria-label="Risks">
       <thead>
         <tr>
           <th>Risk</th><th>Likelihood</th><th>Impact</th><th>Status</th><th>Description</th>

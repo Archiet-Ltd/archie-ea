@@ -216,6 +216,13 @@ class ArchiMateTraceabilityService:
                 'business': business_els[:3],
                 'technology': tech_els[:3],
                 'data': data_els[:3],
+                # The lists above are capped at three for display; the matrix cells
+                # show these true counts (same chain, same filters, same org scope).
+                'counts': {
+                    'motivation': len(motivation_els), 'strategy': len(strategy_els),
+                    'business': len(business_els), 'technology': len(tech_els),
+                    'data': len(data_els),
+                },
             })
         return rows
 

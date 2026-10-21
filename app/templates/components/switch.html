@@ -17,7 +17,7 @@
     class="peer inline-flex h-6 w-11 shrink-0 items-center rounded-full border-2 border-transparent transition-colors bg-muted-foreground data-[state=checked]:bg-primary {{ class }}">
     <span 
         :class="{{ bind_checked }} ? 'translate-x-5' : 'translate-x-0'"
-        class="pointer-events-none block h-5 w-5 rounded-full bg-background shadow-lg ring-0 transition-transform data-[state=checked]:translate-x-5 data-[state=unchecked]:translate-x-0"
+        class="pointer-events-none block h-5 w-5 rounded-full bg-background ring-0 transition-transform data-[state=checked]:translate-x-5 data-[state=unchecked]:translate-x-0"
     ></span>
 </span>
 {% elif bind_checked %}
@@ -34,7 +34,7 @@
   aria-label="{{ aria_label if aria_label else 'Toggle' }}">
     <span 
         :class="{{ bind_checked }} ? 'translate-x-5' : 'translate-x-0'"
-        class="pointer-events-none block h-5 w-5 rounded-full bg-background shadow-lg ring-0 transition-transform data-[state=checked]:translate-x-5 data-[state=unchecked]:translate-x-0"
+        class="pointer-events-none block h-5 w-5 rounded-full bg-background ring-0 transition-transform data-[state=checked]:translate-x-5 data-[state=unchecked]:translate-x-0"
     ></span>
     {% if name %}
     <input type="hidden" name="{{ name }}" :value="{{ bind_checked }}" />
@@ -56,7 +56,7 @@
   aria-label="{{ aria_label if aria_label else 'Toggle' }}">
     <span 
         :class="checked ? 'translate-x-5' : 'translate-x-0'"
-        class="pointer-events-none block h-5 w-5 rounded-full bg-background shadow-lg ring-0 transition-transform data-[state=checked]:translate-x-5 data-[state=unchecked]:translate-x-0"
+        class="pointer-events-none block h-5 w-5 rounded-full bg-background ring-0 transition-transform data-[state=checked]:translate-x-5 data-[state=unchecked]:translate-x-0"
     ></span>
     {% if name %}
     <input type="hidden" name="{{ name }}" :value="checked" />
