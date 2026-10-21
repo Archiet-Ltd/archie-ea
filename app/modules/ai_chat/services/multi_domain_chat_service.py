@@ -2542,6 +2542,7 @@ class MultiDomainChatService:
                     message_text=msg.get("content", ""),
                     message_role=msg.get("role", "user"),
                     domain=msg.get("domain"),
+
                     metadata_json={
                         "session_name": session_name,
                         "context": context or {},
@@ -2556,16 +2557,7 @@ class MultiDomainChatService:
         except Exception as e:
             self.logger.error(f"Failed to save session to DB: {e}")
             db.session.rollback()
-            # Fallback to in-memory
-            self._saved_sessions[session_id] = {
-                "id": session_id,
-                "name": session_name,
-                "messages": messages or [],
-                "context": context or {},
-                "created_at": datetime.utcnow().isoformat(),
-                "user_id": self.user_id,
-            }
-            message_count = len(self._saved_sessions.get(session_id, {}).get("messages", []))
+            raise
 
         return {
             "success": True,
