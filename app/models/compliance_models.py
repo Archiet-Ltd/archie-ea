@@ -56,6 +56,12 @@ class ComplianceControl(db.Model):
     # Reference
     official_reference = db.Column(db.String(500))
 
+    # What the control becomes in the model (ArchiMate 3.2): "Constraint" when it restricts
+    # how something may be realised or forbids an action, "Requirement" when it states a need
+    # or an outcome to achieve. Written by the library seed from the pack; NULL reads as the
+    # default, Requirement.
+    kind = db.Column(db.String(16), nullable=True)
+
     # Cross-framework harmonisation
     harmonized_control_id = db.Column(
         db.Integer, db.ForeignKey("compliance_controls.id"), nullable=True, index=True

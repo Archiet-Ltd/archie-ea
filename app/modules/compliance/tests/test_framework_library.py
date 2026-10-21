@@ -192,17 +192,57 @@ def test_a_control_becomes_one_requirement_element_with_its_id_as_a_property(app
     assert first.custom_properties["control_code"] == "AC-2"
 
 
-def test_a_prohibition_becomes_a_constraint(db_session, make_org):
+def test_the_kind_of_a_control_is_data_not_a_reading_of_its_wording(db_session, make_org):
     from app.modules.compliance.services.control_model_service import control_to_element
 
-    org = make_org("prohibit")
-    prohibition = _control(db_session, "Art. 9", "Special categories",
-                           "Processing special categories of personal data is prohibited unless an exception applies.")
-    duty = _control(db_session, "Art. 32", "Security of processing",
-                    "Controllers implement security measures appropriate to the risk.")
+    org = make_org("kind")
+    restricting = _control(db_session, "Art. 9", "Special categories", "Processing is prohibited unless an exception applies.")
+    restricting.kind = "Constraint"
+    need = _control(db_session, "Art. 32", "Security of processing", "Controllers implement security measures.")
+    need.kind = "Requirement"
+    unmarked = _control(db_session, "Art. 99", "Unmarked", "Processing is prohibited in this case.")
 
-    assert control_to_element(prohibition, org.id).type == "Constraint"
-    assert control_to_element(duty, org.id).type == "Requirement"
+    assert control_to_element(restricting, org.id).type == "Constraint"
+    assert control_to_element(need, org.id).type == "Requirement"
+    assert control_to_element(unmarked, org.id).type == "Requirement", "no kind: the stated default, never a guess from wording"
+
+
+def test_gdpr_art_22_is_a_constraint_and_art_32_a_requirement(db_session, seeded, make_org):
+    from app.models.compliance_models import ComplianceControl, RegulatoryFramework
+    from app.modules.compliance.services.control_model_service import control_to_element
+
+    org = make_org("gdpr-kind")
+    framework = db_session.query(RegulatoryFramework).filter_by(code="GDPR").one()
+    controls = {c.control_code: c for c in db_session.query(ComplianceControl).filter_by(framework_id=framework.id)}
+
+    assert controls["Art. 22"].kind == "Constraint"
+    assert control_to_element(controls["Art. 22"], org.id).type == "Constraint"
+    assert controls["Art. 32"].kind == "Requirement"
+    assert control_to_element(controls["Art. 32"], org.id).type == "Requirement"
+
+
+def test_every_library_control_states_its_kind_and_each_pack_states_its_default(seeded):
+    for pack in seeded.load_library_packs():
+        assert pack["default_kind"] in ("Requirement", "Constraint"), pack["code"]
+        for control in pack["controls"]:
+            assert control.get("kind") in ("Requirement", "Constraint"), (pack["code"], control["control_code"])
+
+
+def test_a_control_without_a_kind_takes_its_packs_default_in_the_seed(db_session, seeded, monkeypatch):
+    from app.models.compliance_models import ComplianceControl
+
+    pack = {
+        "code": "KIND-TEST", "name": "Kind test", "default_kind": "Constraint",
+        "controls": [
+            {"control_code": "K-1", "title": "Unmarked"},
+            {"control_code": "K-2", "title": "Marked", "kind": "Requirement"},
+            {"control_code": "K-3", "title": "Nonsense", "kind": "Guess"},
+        ],
+    }
+    monkeypatch.setattr(seeded, "load_library_packs", staticmethod(lambda: [pack]))
+    seeded.seed_manufacturing_frameworks()
+    kinds = {c.control_code: c.kind for c in db_session.query(ComplianceControl).filter(ComplianceControl.control_code.like("K-%"))}
+    assert kinds == {"K-1": "Constraint", "K-2": "Requirement", "K-3": "Constraint"}
 
 
 def test_two_organisations_get_their_own_element_for_the_same_control(db_session, make_org):

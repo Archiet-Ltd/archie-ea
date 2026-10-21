@@ -1,8 +1,8 @@
 """A compliance control in the model: one mapping function and the links to it.
 
 A control in the reference library (``ComplianceControl``) has one model-side twin per
-organisation: an ArchiMate Requirement element, or a Constraint element when the control
-is a prohibition. ``control_to_element`` is the only function that makes it, through the
+organisation: an ArchiMate Requirement element, or a Constraint element when the control's ``kind``
+says it restricts how something is realised. ``control_to_element`` is the only function that makes it, through the
 one element writer (``archimate_backbone``), and the control's id is a property of the
 element.
 
@@ -20,7 +20,6 @@ and names the old row on it, so the two stores agree and the old evidence still 
 from __future__ import annotations
 
 import logging
-import re
 from typing import Any, Dict, List, Optional
 
 from app import db
@@ -42,18 +41,20 @@ ORIGIN_FOLD = "folded_application_compliance_control"
 # The control id travels on the element under this property name.
 CONTROL_PROPERTY = "compliance_control_id"
 
-_PROHIBITION = re.compile(
-    r"\b(shall not|must not|may not|is prohibited|are prohibited|prohibit(?:s|ed)?|"
-    r"not permitted|forbid(?:s|den)?)\b",
-    re.IGNORECASE,
-)
-
 REALISED_LIMIT = 200
 
 
-def is_prohibition(control: ComplianceControl) -> bool:
-    """True when the control forbids something rather than asks for something."""
-    return bool(_PROHIBITION.search(f"{control.title or ''} {control.description or ''}"))
+# The kind of a control is data on the control (``ComplianceControl.kind``), written by the
+# library seed from the pack. ArchiMate 3.2: a Constraint restricts how the architecture may
+# be realised or forbids an action; a Requirement states a need or an outcome to achieve.
+# A control with no kind takes the stated default, never a reading of its wording.
+DEFAULT_KIND = REQUIREMENT_TYPE
+
+
+def element_type_for(control: ComplianceControl) -> str:
+    """The ArchiMate element type a control becomes: its ``kind`` when it states one, else
+    the default (Requirement)."""
+    return CONSTRAINT_TYPE if (control.kind or DEFAULT_KIND) == CONSTRAINT_TYPE else REQUIREMENT_TYPE
 
 
 def _existing_element(control_id: int, organization_id: int) -> Optional[ArchiMateElement]:
@@ -75,7 +76,7 @@ def control_to_element(control: ComplianceControl, organization_id: int) -> Arch
 
     framework = control.framework
     framework_code = framework.code if framework is not None else None
-    element_type = CONSTRAINT_TYPE if is_prohibition(control) else REQUIREMENT_TYPE
+    element_type = element_type_for(control)
     label = f"{framework_code} {control.control_code}" if framework_code else control.control_code
     return create_backbone_element(
         element_type=element_type,

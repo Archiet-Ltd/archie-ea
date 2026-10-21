@@ -13,6 +13,7 @@
  "standard_version": "2.0",
  "total_controls": 106,
  "content_level": "full",
+ "default_kind": "Requirement",
  "controls": [
   {
    "control_code": "GV.OC-01",
@@ -20,7 +21,8 @@
    "description": "The organizational mission is understood and informs cybersecurity risk management",
    "category": "GV.OC Organizational Context",
    "subcategory": "GOVERN",
-   "official_reference": "NIST CSF 2.0 GV.OC-01"
+   "official_reference": "NIST CSF 2.0 GV.OC-01",
+   "kind": "Requirement"
   },
   {
    "control_code": "GV.OC-02",
@@ -28,7 +30,8 @@
    "description": "Internal and external stakeholders are understood, and their needs and expectations regarding cybersecurity risk management are understood and considered",
    "category": "GV.OC Organizational Context",
    "subcategory": "GOVERN",
-   "official_reference": "NIST CSF 2.0 GV.OC-02"
+   "official_reference": "NIST CSF 2.0 GV.OC-02",
+   "kind": "Requirement"
   },
   {
    "control_code": "GV.OC-03",
@@ -36,7 +39,8 @@
    "description": "Legal, regulatory, and contractual requirements regarding cybersecurity, including privacy and civil liberties obligations, are understood and managed",
    "category": "GV.OC Organizational Context",
    "subcategory": "GOVERN",
-   "official_reference": "NIST CSF 2.0 GV.OC-03"
+   "official_reference": "NIST CSF 2.0 GV.OC-03",
+   "kind": "Requirement"
   },
   {
    "control_code": "GV.OC-04",
@@ -44,7 +48,8 @@
    "description": "Critical objectives, capabilities, and services that external stakeholders depend on or expect from the organization are understood and communicated",
    "category": "GV.OC Organizational Context",
    "subcategory": "GOVERN",
-   "official_reference": "NIST CSF 2.0 GV.OC-04"
+   "official_reference": "NIST CSF 2.0 GV.OC-04",
+   "kind": "Requirement"
   },
   {
    "control_code": "GV.OC-05",
@@ -52,7 +57,8 @@
    "description": "Outcomes, capabilities, and services that the organization depends on are understood and communicated",
    "category": "GV.OC Organizational Context",
    "subcategory": "GOVERN",
-   "official_reference": "NIST CSF 2.0 GV.OC-05"
+   "official_reference": "NIST CSF 2.0 GV.OC-05",
+   "kind": "Requirement"
   },
   {
    "control_code": "GV.RM-01",
@@ -60,7 +66,8 @@
    "description": "Risk management objectives are established and agreed to by organizational stakeholders",
    "category": "GV.RM Risk Management Strategy",
    "subcategory": "GOVERN",
-   "official_reference": "NIST CSF 2.0 GV.RM-01"
+   "official_reference": "NIST CSF 2.0 GV.RM-01",
+   "kind": "Requirement"
   },
   {
    "control_code": "GV.RM-02",
@@ -68,7 +75,8 @@
    "description": "Risk appetite and risk tolerance statements are established, communicated, and maintained",
    "category": "GV.RM Risk Management Strategy",
    "subcategory": "GOVERN",
-   "official_reference": "NIST CSF 2.0 GV.RM-02"
+   "official_reference": "NIST CSF 2.0 GV.RM-02",
+   "kind": "Requirement"
   },
   {
    "control_code": "GV.RM-03",
@@ -76,7 +84,8 @@
    "description": "Cybersecurity risk management activities and outcomes are included in enterprise risk management processes",
    "category": "GV.RM Risk Management Strategy",
    "subcategory": "GOVERN",
-   "official_reference": "NIST CSF 2.0 GV.RM-03"
+   "official_reference": "NIST CSF 2.0 GV.RM-03",
+   "kind": "Requirement"
   },
   {
    "control_code": "GV.RM-04",
@@ -84,7 +93,8 @@
    "description": "Strategic direction that describes appropriate risk response options is established and communicated",
    "category": "GV.RM Risk Management Strategy",
    "subcategory": "GOVERN",
-   "official_reference": "NIST CSF 2.0 GV.RM-04"
+   "official_reference": "NIST CSF 2.0 GV.RM-04",
+   "kind": "Requirement"
   },
   {
    "control_code": "GV.RM-05",
@@ -92,7 +102,8 @@
    "description": "Lines of communication across the organization are established for cybersecurity risks, including risks from suppliers and other third parties",
    "category": "GV.RM Risk Management Strategy",
    "subcategory": "GOVERN",
-   "official_reference": "NIST CSF 2.0 GV.RM-05"
+   "official_reference": "NIST CSF 2.0 GV.RM-05",
+   "kind": "Requirement"
   },
   {
    "control_code": "GV.RM-06",
@@ -100,7 +111,8 @@
    "description": "A standardized method for calculating, documenting, categorizing, and prioritizing cybersecurity risks is established and communicated",
    "category": "GV.RM Risk Management Strategy",
    "subcategory": "GOVERN",
-   "official_reference": "NIST CSF 2.0 GV.RM-06"
+   "official_reference": "NIST CSF 2.0 GV.RM-06",
+   "kind": "Requirement"
   },
   {
    "control_code": "GV.RM-07",
@@ -108,7 +120,8 @@
    "description": "Strategic opportunities (that is, positive risks) are characterized and are included in organizational cybersecurity risk discussions",
    "category": "GV.RM Risk Management Strategy",
    "subcategory": "GOVERN",
-   "official_reference": "NIST CSF 2.0 GV.RM-07"
+   "official_reference": "NIST CSF 2.0 GV.RM-07",
+   "kind": "Requirement"
   },
   {
    "control_code": "GV.RR-01",
@@ -116,7 +129,8 @@
    "description": "Organizational leadership is responsible and accountable for cybersecurity risk and fosters a culture that is risk-aware, ethical, and continually improving",
    "category": "GV.RR Roles, Responsibilities, and Authorities",
    "subcategory": "GOVERN",
-   "official_reference": "NIST CSF 2.0 GV.RR-01"
+   "official_reference": "NIST CSF 2.0 GV.RR-01",
+   "kind": "Requirement"
   },
   {
    "control_code": "GV.RR-02",
@@ -124,7 +138,8 @@
    "description": "Roles, responsibilities, and authorities related to cybersecurity risk management are established, communicated, understood, and enforced",
    "category": "GV.RR Roles, Responsibilities, and Authorities",
    "subcategory": "GOVERN",
-   "official_reference": "NIST CSF 2.0 GV.RR-02"
+   "official_reference": "NIST CSF 2.0 GV.RR-02",
+   "kind": "Requirement"
   },
   {
    "control_code": "GV.RR-03",
@@ -132,7 +147,8 @@
    "description": "Adequate resources are allocated commensurate with the cybersecurity risk strategy, roles, responsibilities, and policies",
    "category": "GV.RR Roles, Responsibilities, and Authorities",
    "subcategory": "GOVERN",
-   "official_reference": "NIST CSF 2.0 GV.RR-03"
+   "official_reference": "NIST CSF 2.0 GV.RR-03",
+   "kind": "Requirement"
   },
   {
    "control_code": "GV.RR-04",
@@ -140,7 +156,8 @@
    "description": "Cybersecurity is included in human resources practices",
    "category": "GV.RR Roles, Responsibilities, and Authorities",
    "subcategory": "GOVERN",
-   "official_reference": "NIST CSF 2.0 GV.RR-04"
+   "official_reference": "NIST CSF 2.0 GV.RR-04",
+   "kind": "Requirement"
   },
   {
    "control_code": "GV.PO-01",
@@ -148,7 +165,8 @@
    "description": "Policy for managing cybersecurity risks is established based on organizational context, cybersecurity strategy, and priorities and is communicated and enforced",
    "category": "GV.PO Policy",
    "subcategory": "GOVERN",
-   "official_reference": "NIST CSF 2.0 GV.PO-01"
+   "official_reference": "NIST CSF 2.0 GV.PO-01",
+   "kind": "Requirement"
   },
   {
    "control_code": "GV.PO-02",
@@ -156,7 +174,8 @@
    "description": "Policy for managing cybersecurity risks is reviewed, updated, communicated, and enforced to reflect changes in requirements, threats, technology, and organizational mission",
    "category": "GV.PO Policy",
    "subcategory": "GOVERN",
-   "official_reference": "NIST CSF 2.0 GV.PO-02"
+   "official_reference": "NIST CSF 2.0 GV.PO-02",
+   "kind": "Requirement"
   },
   {
    "control_code": "GV.OV-01",
@@ -164,7 +183,8 @@
    "description": "Cybersecurity risk management strategy outcomes are reviewed to inform and adjust strategy and direction",
    "category": "GV.OV Oversight",
    "subcategory": "GOVERN",
-   "official_reference": "NIST CSF 2.0 GV.OV-01"
+   "official_reference": "NIST CSF 2.0 GV.OV-01",
+   "kind": "Requirement"
   },
   {
    "control_code": "GV.OV-02",
@@ -172,7 +192,8 @@
    "description": "The cybersecurity risk management strategy is reviewed and adjusted to ensure coverage of organizational requirements and risks",
    "category": "GV.OV Oversight",
    "subcategory": "GOVERN",
-   "official_reference": "NIST CSF 2.0 GV.OV-02"
+   "official_reference": "NIST CSF 2.0 GV.OV-02",
+   "kind": "Requirement"
   },
   {
    "control_code": "GV.OV-03",
@@ -180,7 +201,8 @@
    "description": "Organizational cybersecurity risk management performance is evaluated and reviewed for adjustments needed",
    "category": "GV.OV Oversight",
    "subcategory": "GOVERN",
-   "official_reference": "NIST CSF 2.0 GV.OV-03"
+   "official_reference": "NIST CSF 2.0 GV.OV-03",
+   "kind": "Requirement"
   },
   {
    "control_code": "GV.SC-01",
@@ -188,7 +210,8 @@
    "description": "A cybersecurity supply chain risk management program, strategy, objectives, policies, and processes are established and agreed to by organizational stakeholders",
    "category": "GV.SC Cybersecurity Supply Chain Risk Management",
    "subcategory": "GOVERN",
-   "official_reference": "NIST CSF 2.0 GV.SC-01"
+   "official_reference": "NIST CSF 2.0 GV.SC-01",
+   "kind": "Requirement"
   },
   {
    "control_code": "GV.SC-02",
@@ -196,7 +219,8 @@
    "description": "Cybersecurity roles and responsibilities for suppliers, customers, and partners are established, communicated, and coordinated internally and externally",
    "category": "GV.SC Cybersecurity Supply Chain Risk Management",
    "subcategory": "GOVERN",
-   "official_reference": "NIST CSF 2.0 GV.SC-02"
+   "official_reference": "NIST CSF 2.0 GV.SC-02",
+   "kind": "Requirement"
   },
   {
    "control_code": "GV.SC-03",
@@ -204,7 +228,8 @@
    "description": "Cybersecurity supply chain risk management is integrated into cybersecurity and enterprise risk management, risk assessment, and improvement processes",
    "category": "GV.SC Cybersecurity Supply Chain Risk Management",
    "subcategory": "GOVERN",
-   "official_reference": "NIST CSF 2.0 GV.SC-03"
+   "official_reference": "NIST CSF 2.0 GV.SC-03",
+   "kind": "Requirement"
   },
   {
    "control_code": "GV.SC-04",
@@ -212,7 +237,8 @@
    "description": "Suppliers are known and prioritized by criticality",
    "category": "GV.SC Cybersecurity Supply Chain Risk Management",
    "subcategory": "GOVERN",
-   "official_reference": "NIST CSF 2.0 GV.SC-04"
+   "official_reference": "NIST CSF 2.0 GV.SC-04",
+   "kind": "Requirement"
   },
   {
    "control_code": "GV.SC-05",
@@ -220,7 +246,8 @@
    "description": "Requirements to address cybersecurity risks in supply chains are established, prioritized, and integrated into contracts and other types of agreements with suppliers and other relevant third parties",
    "category": "GV.SC Cybersecurity Supply Chain Risk Management",
    "subcategory": "GOVERN",
-   "official_reference": "NIST CSF 2.0 GV.SC-05"
+   "official_reference": "NIST CSF 2.0 GV.SC-05",
+   "kind": "Requirement"
   },
   {
    "control_code": "GV.SC-06",
@@ -228,7 +255,8 @@
    "description": "Planning and due diligence are performed to reduce risks before entering into formal supplier or other third-party relationships",
    "category": "GV.SC Cybersecurity Supply Chain Risk Management",
    "subcategory": "GOVERN",
-   "official_reference": "NIST CSF 2.0 GV.SC-06"
+   "official_reference": "NIST CSF 2.0 GV.SC-06",
+   "kind": "Requirement"
   },
   {
    "control_code": "GV.SC-07",
@@ -236,7 +264,8 @@
    "description": "The risks posed by a supplier, their products and services, and other third parties are understood, recorded, prioritized, assessed, responded to, and monitored over the course of the relationship",
    "category": "GV.SC Cybersecurity Supply Chain Risk Management",
    "subcategory": "GOVERN",
-   "official_reference": "NIST CSF 2.0 GV.SC-07"
+   "official_reference": "NIST CSF 2.0 GV.SC-07",
+   "kind": "Requirement"
   },
   {
    "control_code": "GV.SC-08",
@@ -244,7 +273,8 @@
    "description": "Relevant suppliers and other third parties are included in incident planning, response, and recovery activities",
    "category": "GV.SC Cybersecurity Supply Chain Risk Management",
    "subcategory": "GOVERN",
-   "official_reference": "NIST CSF 2.0 GV.SC-08"
+   "official_reference": "NIST CSF 2.0 GV.SC-08",
+   "kind": "Requirement"
   },
   {
    "control_code": "GV.SC-09",
@@ -252,7 +282,8 @@
    "description": "Supply chain security practices are integrated into cybersecurity and enterprise risk management programs, and their performance is monitored throughout the technology product and service life cycle",
    "category": "GV.SC Cybersecurity Supply Chain Risk Management",
    "subcategory": "GOVERN",
-   "official_reference": "NIST CSF 2.0 GV.SC-09"
+   "official_reference": "NIST CSF 2.0 GV.SC-09",
+   "kind": "Requirement"
   },
   {
    "control_code": "GV.SC-10",
@@ -260,7 +291,8 @@
    "description": "Cybersecurity supply chain risk management plans include provisions for activities that occur after the conclusion of a partnership or service agreement",
    "category": "GV.SC Cybersecurity Supply Chain Risk Management",
    "subcategory": "GOVERN",
-   "official_reference": "NIST CSF 2.0 GV.SC-10"
+   "official_reference": "NIST CSF 2.0 GV.SC-10",
+   "kind": "Requirement"
   },
   {
    "control_code": "ID.AM-01",
@@ -268,7 +300,8 @@
    "description": "Inventories of hardware managed by the organization are maintained",
    "category": "ID.AM Asset Management",
    "subcategory": "IDENTIFY",
-   "official_reference": "NIST CSF 2.0 ID.AM-01"
+   "official_reference": "NIST CSF 2.0 ID.AM-01",
+   "kind": "Requirement"
   },
   {
    "control_code": "ID.AM-02",
@@ -276,7 +309,8 @@
    "description": "Inventories of software, services, and systems managed by the organization are maintained",
    "category": "ID.AM Asset Management",
    "subcategory": "IDENTIFY",
-   "official_reference": "NIST CSF 2.0 ID.AM-02"
+   "official_reference": "NIST CSF 2.0 ID.AM-02",
+   "kind": "Requirement"
   },
   {
    "control_code": "ID.AM-03",
@@ -284,7 +318,8 @@
    "description": "Representations of the organization's authorized network communication and internal and external network data flows are maintained",
    "category": "ID.AM Asset Management",
    "subcategory": "IDENTIFY",
-   "official_reference": "NIST CSF 2.0 ID.AM-03"
+   "official_reference": "NIST CSF 2.0 ID.AM-03",
+   "kind": "Requirement"
   },
   {
    "control_code": "ID.AM-04",
@@ -292,7 +327,8 @@
    "description": "Inventories of services provided by suppliers are maintained",
    "category": "ID.AM Asset Management",
    "subcategory": "IDENTIFY",
-   "official_reference": "NIST CSF 2.0 ID.AM-04"
+   "official_reference": "NIST CSF 2.0 ID.AM-04",
+   "kind": "Requirement"
   },
   {
    "control_code": "ID.AM-05",
@@ -300,7 +336,8 @@
    "description": "Assets are prioritized based on classification, criticality, resources, and impact on the mission",
    "category": "ID.AM Asset Management",
    "subcategory": "IDENTIFY",
-   "official_reference": "NIST CSF 2.0 ID.AM-05"
+   "official_reference": "NIST CSF 2.0 ID.AM-05",
+   "kind": "Requirement"
   },
   {
    "control_code": "ID.AM-07",
@@ -308,7 +345,8 @@
    "description": "Inventories of data and corresponding metadata for designated data types are maintained",
    "category": "ID.AM Asset Management",
    "subcategory": "IDENTIFY",
-   "official_reference": "NIST CSF 2.0 ID.AM-07"
+   "official_reference": "NIST CSF 2.0 ID.AM-07",
+   "kind": "Requirement"
   },
   {
    "control_code": "ID.AM-08",
@@ -316,7 +354,8 @@
    "description": "Systems, hardware, software, services, and data are managed throughout their life cycles",
    "category": "ID.AM Asset Management",
    "subcategory": "IDENTIFY",
-   "official_reference": "NIST CSF 2.0 ID.AM-08"
+   "official_reference": "NIST CSF 2.0 ID.AM-08",
+   "kind": "Requirement"
   },
   {
    "control_code": "ID.RA-01",
@@ -324,7 +363,8 @@
    "description": "Vulnerabilities in assets are identified, validated, and recorded",
    "category": "ID.RA Risk Assessment",
    "subcategory": "IDENTIFY",
-   "official_reference": "NIST CSF 2.0 ID.RA-01"
+   "official_reference": "NIST CSF 2.0 ID.RA-01",
+   "kind": "Requirement"
   },
   {
    "control_code": "ID.RA-02",
@@ -332,7 +372,8 @@
    "description": "Cyber threat intelligence is received from information sharing forums and sources",
    "category": "ID.RA Risk Assessment",
    "subcategory": "IDENTIFY",
-   "official_reference": "NIST CSF 2.0 ID.RA-02"
+   "official_reference": "NIST CSF 2.0 ID.RA-02",
+   "kind": "Requirement"
   },
   {
    "control_code": "ID.RA-03",
@@ -340,7 +381,8 @@
    "description": "Internal and external threats to the organization are identified and recorded",
    "category": "ID.RA Risk Assessment",
    "subcategory": "IDENTIFY",
-   "official_reference": "NIST CSF 2.0 ID.RA-03"
+   "official_reference": "NIST CSF 2.0 ID.RA-03",
+   "kind": "Requirement"
   },
   {
    "control_code": "ID.RA-04",
@@ -348,7 +390,8 @@
    "description": "Potential impacts and likelihoods of threats exploiting vulnerabilities are identified and recorded",
    "category": "ID.RA Risk Assessment",
    "subcategory": "IDENTIFY",
-   "official_reference": "NIST CSF 2.0 ID.RA-04"
+   "official_reference": "NIST CSF 2.0 ID.RA-04",
+   "kind": "Requirement"
   },
   {
    "control_code": "ID.RA-05",
@@ -356,7 +399,8 @@
    "description": "Threats, vulnerabilities, likelihoods, and impacts are used to understand inherent risk and inform risk response prioritization",
    "category": "ID.RA Risk Assessment",
    "subcategory": "IDENTIFY",
-   "official_reference": "NIST CSF 2.0 ID.RA-05"
+   "official_reference": "NIST CSF 2.0 ID.RA-05",
+   "kind": "Requirement"
   },
   {
    "control_code": "ID.RA-06",
@@ -364,7 +408,8 @@
    "description": "Risk responses are chosen, prioritized, planned, tracked, and communicated",
    "category": "ID.RA Risk Assessment",
    "subcategory": "IDENTIFY",
-   "official_reference": "NIST CSF 2.0 ID.RA-06"
+   "official_reference": "NIST CSF 2.0 ID.RA-06",
+   "kind": "Requirement"
   },
   {
    "control_code": "ID.RA-07",
@@ -372,7 +417,8 @@
    "description": "Changes and exceptions are managed, assessed for risk impact, recorded, and tracked",
    "category": "ID.RA Risk Assessment",
    "subcategory": "IDENTIFY",
-   "official_reference": "NIST CSF 2.0 ID.RA-07"
+   "official_reference": "NIST CSF 2.0 ID.RA-07",
+   "kind": "Requirement"
   },
   {
    "control_code": "ID.RA-08",
@@ -380,7 +426,8 @@
    "description": "Processes for receiving, analyzing, and responding to vulnerability disclosures are established",
    "category": "ID.RA Risk Assessment",
    "subcategory": "IDENTIFY",
-   "official_reference": "NIST CSF 2.0 ID.RA-08"
+   "official_reference": "NIST CSF 2.0 ID.RA-08",
+   "kind": "Requirement"
   },
   {
    "control_code": "ID.RA-09",
@@ -388,7 +435,8 @@
    "description": "The authenticity and integrity of hardware and software are assessed prior to acquisition and use",
    "category": "ID.RA Risk Assessment",
    "subcategory": "IDENTIFY",
-   "official_reference": "NIST CSF 2.0 ID.RA-09"
+   "official_reference": "NIST CSF 2.0 ID.RA-09",
+   "kind": "Requirement"
   },
   {
    "control_code": "ID.RA-10",
@@ -396,7 +444,8 @@
    "description": "Critical suppliers are assessed prior to acquisition",
    "category": "ID.RA Risk Assessment",
    "subcategory": "IDENTIFY",
-   "official_reference": "NIST CSF 2.0 ID.RA-10"
+   "official_reference": "NIST CSF 2.0 ID.RA-10",
+   "kind": "Requirement"
   },
   {
    "control_code": "ID.IM-01",
@@ -404,7 +453,8 @@
    "description": "Improvements are identified from evaluations",
    "category": "ID.IM Improvement",
    "subcategory": "IDENTIFY",
-   "official_reference": "NIST CSF 2.0 ID.IM-01"
+   "official_reference": "NIST CSF 2.0 ID.IM-01",
+   "kind": "Requirement"
   },
   {
    "control_code": "ID.IM-02",
@@ -412,7 +462,8 @@
    "description": "Improvements are identified from security tests and exercises, including those done in coordination with suppliers and relevant third parties",
    "category": "ID.IM Improvement",
    "subcategory": "IDENTIFY",
-   "official_reference": "NIST CSF 2.0 ID.IM-02"
+   "official_reference": "NIST CSF 2.0 ID.IM-02",
+   "kind": "Requirement"
   },
   {
    "control_code": "ID.IM-03",
@@ -420,7 +471,8 @@
    "description": "Improvements are identified from execution of operational processes, procedures, and activities",
    "category": "ID.IM Improvement",
    "subcategory": "IDENTIFY",
-   "official_reference": "NIST CSF 2.0 ID.IM-03"
+   "official_reference": "NIST CSF 2.0 ID.IM-03",
+   "kind": "Requirement"
   },
   {
    "control_code": "ID.IM-04",
@@ -428,7 +480,8 @@
    "description": "Incident response plans and other cybersecurity plans that affect operations are established, communicated, maintained, and improved",
    "category": "ID.IM Improvement",
    "subcategory": "IDENTIFY",
-   "official_reference": "NIST CSF 2.0 ID.IM-04"
+   "official_reference": "NIST CSF 2.0 ID.IM-04",
+   "kind": "Requirement"
   },
   {
    "control_code": "PR.AA-01",
@@ -436,7 +489,8 @@
    "description": "Identities and credentials for authorized users, services, and hardware are managed by the organization",
    "category": "PR.AA Identity Management, Authentication, and Access Control",
    "subcategory": "PROTECT",
-   "official_reference": "NIST CSF 2.0 PR.AA-01"
+   "official_reference": "NIST CSF 2.0 PR.AA-01",
+   "kind": "Requirement"
   },
   {
    "control_code": "PR.AA-02",
@@ -444,7 +498,8 @@
    "description": "Identities are proofed and bound to credentials based on the context of interactions",
    "category": "PR.AA Identity Management, Authentication, and Access Control",
    "subcategory": "PROTECT",
-   "official_reference": "NIST CSF 2.0 PR.AA-02"
+   "official_reference": "NIST CSF 2.0 PR.AA-02",
+   "kind": "Requirement"
   },
   {
    "control_code": "PR.AA-03",
@@ -452,7 +507,8 @@
    "description": "Users, services, and hardware are authenticated",
    "category": "PR.AA Identity Management, Authentication, and Access Control",
    "subcategory": "PROTECT",
-   "official_reference": "NIST CSF 2.0 PR.AA-03"
+   "official_reference": "NIST CSF 2.0 PR.AA-03",
+   "kind": "Requirement"
   },
   {
    "control_code": "PR.AA-04",
@@ -460,7 +516,8 @@
    "description": "Identity assertions are protected, conveyed, and verified",
    "category": "PR.AA Identity Management, Authentication, and Access Control",
    "subcategory": "PROTECT",
-   "official_reference": "NIST CSF 2.0 PR.AA-04"
+   "official_reference": "NIST CSF 2.0 PR.AA-04",
+   "kind": "Requirement"
   },
   {
    "control_code": "PR.AA-05",
@@ -468,7 +525,8 @@
    "description": "Access permissions, entitlements, and authorizations are defined in a policy, managed, enforced, and reviewed, and incorporate the principles of least privilege and separation of duties",
    "category": "PR.AA Identity Management, Authentication, and Access Control",
    "subcategory": "PROTECT",
-   "official_reference": "NIST CSF 2.0 PR.AA-05"
+   "official_reference": "NIST CSF 2.0 PR.AA-05",
+   "kind": "Requirement"
   },
   {
    "control_code": "PR.AA-06",
@@ -476,7 +534,8 @@
    "description": "Physical access to assets is managed, monitored, and enforced commensurate with risk",
    "category": "PR.AA Identity Management, Authentication, and Access Control",
    "subcategory": "PROTECT",
-   "official_reference": "NIST CSF 2.0 PR.AA-06"
+   "official_reference": "NIST CSF 2.0 PR.AA-06",
+   "kind": "Requirement"
   },
   {
    "control_code": "PR.AT-01",
@@ -484,7 +543,8 @@
    "description": "Personnel are provided with awareness and training so that they possess the knowledge and skills to perform general tasks with cybersecurity risks in mind",
    "category": "PR.AT Awareness and Training",
    "subcategory": "PROTECT",
-   "official_reference": "NIST CSF 2.0 PR.AT-01"
+   "official_reference": "NIST CSF 2.0 PR.AT-01",
+   "kind": "Requirement"
   },
   {
    "control_code": "PR.AT-02",
@@ -492,7 +552,8 @@
    "description": "Individuals in specialized roles are provided with awareness and training so that they possess the knowledge and skills to perform relevant tasks with cybersecurity risks in mind",
    "category": "PR.AT Awareness and Training",
    "subcategory": "PROTECT",
-   "official_reference": "NIST CSF 2.0 PR.AT-02"
+   "official_reference": "NIST CSF 2.0 PR.AT-02",
+   "kind": "Requirement"
   },
   {
    "control_code": "PR.DS-01",
@@ -500,7 +561,8 @@
    "description": "The confidentiality, integrity, and availability of data-at-rest are protected",
    "category": "PR.DS Data Security",
    "subcategory": "PROTECT",
-   "official_reference": "NIST CSF 2.0 PR.DS-01"
+   "official_reference": "NIST CSF 2.0 PR.DS-01",
+   "kind": "Requirement"
   },
   {
    "control_code": "PR.DS-02",
@@ -508,7 +570,8 @@
    "description": "The confidentiality, integrity, and availability of data-in-transit are protected",
    "category": "PR.DS Data Security",
    "subcategory": "PROTECT",
-   "official_reference": "NIST CSF 2.0 PR.DS-02"
+   "official_reference": "NIST CSF 2.0 PR.DS-02",
+   "kind": "Requirement"
   },
   {
    "control_code": "PR.DS-10",
@@ -516,7 +579,8 @@
    "description": "The confidentiality, integrity, and availability of data-in-use are protected",
    "category": "PR.DS Data Security",
    "subcategory": "PROTECT",
-   "official_reference": "NIST CSF 2.0 PR.DS-10"
+   "official_reference": "NIST CSF 2.0 PR.DS-10",
+   "kind": "Requirement"
   },
   {
    "control_code": "PR.DS-11",
@@ -524,7 +588,8 @@
    "description": "Backups of data are created, protected, maintained, and tested",
    "category": "PR.DS Data Security",
    "subcategory": "PROTECT",
-   "official_reference": "NIST CSF 2.0 PR.DS-11"
+   "official_reference": "NIST CSF 2.0 PR.DS-11",
+   "kind": "Requirement"
   },
   {
    "control_code": "PR.PS-01",
@@ -532,7 +597,8 @@
    "description": "Configuration management practices are established and applied",
    "category": "PR.PS Platform Security",
    "subcategory": "PROTECT",
-   "official_reference": "NIST CSF 2.0 PR.PS-01"
+   "official_reference": "NIST CSF 2.0 PR.PS-01",
+   "kind": "Requirement"
   },
   {
    "control_code": "PR.PS-02",
@@ -540,7 +606,8 @@
    "description": "Software is maintained, replaced, and removed commensurate with risk",
    "category": "PR.PS Platform Security",
    "subcategory": "PROTECT",
-   "official_reference": "NIST CSF 2.0 PR.PS-02"
+   "official_reference": "NIST CSF 2.0 PR.PS-02",
+   "kind": "Requirement"
   },
   {
    "control_code": "PR.PS-03",
@@ -548,7 +615,8 @@
    "description": "Hardware is maintained, replaced, and removed commensurate with risk",
    "category": "PR.PS Platform Security",
    "subcategory": "PROTECT",
-   "official_reference": "NIST CSF 2.0 PR.PS-03"
+   "official_reference": "NIST CSF 2.0 PR.PS-03",
+   "kind": "Requirement"
   },
   {
    "control_code": "PR.PS-04",
@@ -556,7 +624,8 @@
    "description": "Log records are generated and made available for continuous monitoring",
    "category": "PR.PS Platform Security",
    "subcategory": "PROTECT",
-   "official_reference": "NIST CSF 2.0 PR.PS-04"
+   "official_reference": "NIST CSF 2.0 PR.PS-04",
+   "kind": "Requirement"
   },
   {
    "control_code": "PR.PS-05",
@@ -564,7 +633,8 @@
    "description": "Installation and execution of unauthorized software are prevented",
    "category": "PR.PS Platform Security",
    "subcategory": "PROTECT",
-   "official_reference": "NIST CSF 2.0 PR.PS-05"
+   "official_reference": "NIST CSF 2.0 PR.PS-05",
+   "kind": "Requirement"
   },
   {
    "control_code": "PR.PS-06",
@@ -572,7 +642,8 @@
    "description": "Secure software development practices are integrated, and their performance is monitored throughout the software development life cycle",
    "category": "PR.PS Platform Security",
    "subcategory": "PROTECT",
-   "official_reference": "NIST CSF 2.0 PR.PS-06"
+   "official_reference": "NIST CSF 2.0 PR.PS-06",
+   "kind": "Requirement"
   },
   {
    "control_code": "PR.IR-01",
@@ -580,7 +651,8 @@
    "description": "Networks and environments are protected from unauthorized logical access and usage",
    "category": "PR.IR Technology Infrastructure Resilience",
    "subcategory": "PROTECT",
-   "official_reference": "NIST CSF 2.0 PR.IR-01"
+   "official_reference": "NIST CSF 2.0 PR.IR-01",
+   "kind": "Requirement"
   },
   {
    "control_code": "PR.IR-02",
@@ -588,7 +660,8 @@
    "description": "The organization's technology assets are protected from environmental threats",
    "category": "PR.IR Technology Infrastructure Resilience",
    "subcategory": "PROTECT",
-   "official_reference": "NIST CSF 2.0 PR.IR-02"
+   "official_reference": "NIST CSF 2.0 PR.IR-02",
+   "kind": "Requirement"
   },
   {
    "control_code": "PR.IR-03",
@@ -596,7 +669,8 @@
    "description": "Mechanisms are implemented to achieve resilience requirements in normal and adverse situations",
    "category": "PR.IR Technology Infrastructure Resilience",
    "subcategory": "PROTECT",
-   "official_reference": "NIST CSF 2.0 PR.IR-03"
+   "official_reference": "NIST CSF 2.0 PR.IR-03",
+   "kind": "Requirement"
   },
   {
    "control_code": "PR.IR-04",
@@ -604,7 +678,8 @@
    "description": "Adequate resource capacity to ensure availability is maintained",
    "category": "PR.IR Technology Infrastructure Resilience",
    "subcategory": "PROTECT",
-   "official_reference": "NIST CSF 2.0 PR.IR-04"
+   "official_reference": "NIST CSF 2.0 PR.IR-04",
+   "kind": "Requirement"
   },
   {
    "control_code": "DE.CM-01",
@@ -612,7 +687,8 @@
    "description": "Networks and network services are monitored to find potentially adverse events",
    "category": "DE.CM Continuous Monitoring",
    "subcategory": "DETECT",
-   "official_reference": "NIST CSF 2.0 DE.CM-01"
+   "official_reference": "NIST CSF 2.0 DE.CM-01",
+   "kind": "Requirement"
   },
   {
    "control_code": "DE.CM-02",
@@ -620,7 +696,8 @@
    "description": "The physical environment is monitored to find potentially adverse events",
    "category": "DE.CM Continuous Monitoring",
    "subcategory": "DETECT",
-   "official_reference": "NIST CSF 2.0 DE.CM-02"
+   "official_reference": "NIST CSF 2.0 DE.CM-02",
+   "kind": "Requirement"
   },
   {
    "control_code": "DE.CM-03",
@@ -628,7 +705,8 @@
    "description": "Personnel activity and technology usage are monitored to find potentially adverse events",
    "category": "DE.CM Continuous Monitoring",
    "subcategory": "DETECT",
-   "official_reference": "NIST CSF 2.0 DE.CM-03"
+   "official_reference": "NIST CSF 2.0 DE.CM-03",
+   "kind": "Requirement"
   },
   {
    "control_code": "DE.CM-06",
@@ -636,7 +714,8 @@
    "description": "External service provider activities and services are monitored to find potentially adverse events",
    "category": "DE.CM Continuous Monitoring",
    "subcategory": "DETECT",
-   "official_reference": "NIST CSF 2.0 DE.CM-06"
+   "official_reference": "NIST CSF 2.0 DE.CM-06",
+   "kind": "Requirement"
   },
   {
    "control_code": "DE.CM-09",
@@ -644,7 +723,8 @@
    "description": "Computing hardware and software, runtime environments, and their data are monitored to find potentially adverse events",
    "category": "DE.CM Continuous Monitoring",
    "subcategory": "DETECT",
-   "official_reference": "NIST CSF 2.0 DE.CM-09"
+   "official_reference": "NIST CSF 2.0 DE.CM-09",
+   "kind": "Requirement"
   },
   {
    "control_code": "DE.AE-02",
@@ -652,7 +732,8 @@
    "description": "Potentially adverse events are analyzed to better understand associated activities",
    "category": "DE.AE Adverse Event Analysis",
    "subcategory": "DETECT",
-   "official_reference": "NIST CSF 2.0 DE.AE-02"
+   "official_reference": "NIST CSF 2.0 DE.AE-02",
+   "kind": "Requirement"
   },
   {
    "control_code": "DE.AE-03",
@@ -660,7 +741,8 @@
    "description": "Information is correlated from multiple sources",
    "category": "DE.AE Adverse Event Analysis",
    "subcategory": "DETECT",
-   "official_reference": "NIST CSF 2.0 DE.AE-03"
+   "official_reference": "NIST CSF 2.0 DE.AE-03",
+   "kind": "Requirement"
   },
   {
    "control_code": "DE.AE-04",
@@ -668,7 +750,8 @@
    "description": "The estimated impact and scope of adverse events are understood",
    "category": "DE.AE Adverse Event Analysis",
    "subcategory": "DETECT",
-   "official_reference": "NIST CSF 2.0 DE.AE-04"
+   "official_reference": "NIST CSF 2.0 DE.AE-04",
+   "kind": "Requirement"
   },
   {
    "control_code": "DE.AE-06",
@@ -676,7 +759,8 @@
    "description": "Information on adverse events is provided to authorized staff and tools",
    "category": "DE.AE Adverse Event Analysis",
    "subcategory": "DETECT",
-   "official_reference": "NIST CSF 2.0 DE.AE-06"
+   "official_reference": "NIST CSF 2.0 DE.AE-06",
+   "kind": "Requirement"
   },
   {
    "control_code": "DE.AE-07",
@@ -684,7 +768,8 @@
    "description": "Cyber threat intelligence and other contextual information are integrated into the analysis",
    "category": "DE.AE Adverse Event Analysis",
    "subcategory": "DETECT",
-   "official_reference": "NIST CSF 2.0 DE.AE-07"
+   "official_reference": "NIST CSF 2.0 DE.AE-07",
+   "kind": "Requirement"
   },
   {
    "control_code": "DE.AE-08",
@@ -692,7 +777,8 @@
    "description": "Incidents are declared when adverse events meet the defined incident criteria",
    "category": "DE.AE Adverse Event Analysis",
    "subcategory": "DETECT",
-   "official_reference": "NIST CSF 2.0 DE.AE-08"
+   "official_reference": "NIST CSF 2.0 DE.AE-08",
+   "kind": "Requirement"
   },
   {
    "control_code": "RS.MA-01",
@@ -700,7 +786,8 @@
    "description": "The incident response plan is executed in coordination with relevant third parties once an incident is declared",
    "category": "RS.MA Incident Management",
    "subcategory": "RESPOND",
-   "official_reference": "NIST CSF 2.0 RS.MA-01"
+   "official_reference": "NIST CSF 2.0 RS.MA-01",
+   "kind": "Requirement"
   },
   {
    "control_code": "RS.MA-02",
@@ -708,7 +795,8 @@
    "description": "Incident reports are triaged and validated",
    "category": "RS.MA Incident Management",
    "subcategory": "RESPOND",
-   "official_reference": "NIST CSF 2.0 RS.MA-02"
+   "official_reference": "NIST CSF 2.0 RS.MA-02",
+   "kind": "Requirement"
   },
   {
    "control_code": "RS.MA-03",
@@ -716,7 +804,8 @@
    "description": "Incidents are categorized and prioritized",
    "category": "RS.MA Incident Management",
    "subcategory": "RESPOND",
-   "official_reference": "NIST CSF 2.0 RS.MA-03"
+   "official_reference": "NIST CSF 2.0 RS.MA-03",
+   "kind": "Requirement"
   },
   {
    "control_code": "RS.MA-04",
@@ -724,7 +813,8 @@
    "description": "Incidents are escalated or elevated as needed",
    "category": "RS.MA Incident Management",
    "subcategory": "RESPOND",
-   "official_reference": "NIST CSF 2.0 RS.MA-04"
+   "official_reference": "NIST CSF 2.0 RS.MA-04",
+   "kind": "Requirement"
   },
   {
    "control_code": "RS.MA-05",
@@ -732,7 +822,8 @@
    "description": "The criteria for initiating incident recovery are applied",
    "category": "RS.MA Incident Management",
    "subcategory": "RESPOND",
-   "official_reference": "NIST CSF 2.0 RS.MA-05"
+   "official_reference": "NIST CSF 2.0 RS.MA-05",
+   "kind": "Requirement"
   },
   {
    "control_code": "RS.AN-03",
@@ -740,7 +831,8 @@
    "description": "Analysis is performed to establish what has taken place during an incident and the root cause of the incident",
    "category": "RS.AN Incident Analysis",
    "subcategory": "RESPOND",
-   "official_reference": "NIST CSF 2.0 RS.AN-03"
+   "official_reference": "NIST CSF 2.0 RS.AN-03",
+   "kind": "Requirement"
   },
   {
    "control_code": "RS.AN-06",
@@ -748,7 +840,8 @@
    "description": "Actions performed during an investigation are recorded, and the records' integrity and provenance are preserved",
    "category": "RS.AN Incident Analysis",
    "subcategory": "RESPOND",
-   "official_reference": "NIST CSF 2.0 RS.AN-06"
+   "official_reference": "NIST CSF 2.0 RS.AN-06",
+   "kind": "Requirement"
   },
   {
    "control_code": "RS.AN-07",
@@ -756,7 +849,8 @@
    "description": "Incident data and metadata are collected, and their integrity and provenance are preserved",
    "category": "RS.AN Incident Analysis",
    "subcategory": "RESPOND",
-   "official_reference": "NIST CSF 2.0 RS.AN-07"
+   "official_reference": "NIST CSF 2.0 RS.AN-07",
+   "kind": "Requirement"
   },
   {
    "control_code": "RS.AN-08",
@@ -764,7 +858,8 @@
    "description": "An incident's magnitude is estimated and validated",
    "category": "RS.AN Incident Analysis",
    "subcategory": "RESPOND",
-   "official_reference": "NIST CSF 2.0 RS.AN-08"
+   "official_reference": "NIST CSF 2.0 RS.AN-08",
+   "kind": "Requirement"
   },
   {
    "control_code": "RS.CO-02",
@@ -772,7 +867,8 @@
    "description": "Internal and external stakeholders are notified of incidents",
    "category": "RS.CO Incident Response Reporting and Communication",
    "subcategory": "RESPOND",
-   "official_reference": "NIST CSF 2.0 RS.CO-02"
+   "official_reference": "NIST CSF 2.0 RS.CO-02",
+   "kind": "Requirement"
   },
   {
    "control_code": "RS.CO-03",
@@ -780,7 +876,8 @@
    "description": "Information is shared with designated internal and external stakeholders",
    "category": "RS.CO Incident Response Reporting and Communication",
    "subcategory": "RESPOND",
-   "official_reference": "NIST CSF 2.0 RS.CO-03"
+   "official_reference": "NIST CSF 2.0 RS.CO-03",
+   "kind": "Requirement"
   },
   {
    "control_code": "RS.MI-01",
@@ -788,7 +885,8 @@
    "description": "Incidents are contained",
    "category": "RS.MI Incident Mitigation",
    "subcategory": "RESPOND",
-   "official_reference": "NIST CSF 2.0 RS.MI-01"
+   "official_reference": "NIST CSF 2.0 RS.MI-01",
+   "kind": "Requirement"
   },
   {
    "control_code": "RS.MI-02",
@@ -796,7 +894,8 @@
    "description": "Incidents are eradicated",
    "category": "RS.MI Incident Mitigation",
    "subcategory": "RESPOND",
-   "official_reference": "NIST CSF 2.0 RS.MI-02"
+   "official_reference": "NIST CSF 2.0 RS.MI-02",
+   "kind": "Requirement"
   },
   {
    "control_code": "RC.RP-01",
@@ -804,7 +903,8 @@
    "description": "The recovery portion of the incident response plan is executed once initiated from the incident response process",
    "category": "RC.RP Incident Recovery Plan Execution",
    "subcategory": "RECOVER",
-   "official_reference": "NIST CSF 2.0 RC.RP-01"
+   "official_reference": "NIST CSF 2.0 RC.RP-01",
+   "kind": "Requirement"
   },
   {
    "control_code": "RC.RP-02",
@@ -812,7 +912,8 @@
    "description": "Recovery actions are selected, scoped, prioritized, and performed",
    "category": "RC.RP Incident Recovery Plan Execution",
    "subcategory": "RECOVER",
-   "official_reference": "NIST CSF 2.0 RC.RP-02"
+   "official_reference": "NIST CSF 2.0 RC.RP-02",
+   "kind": "Requirement"
   },
   {
    "control_code": "RC.RP-03",
@@ -820,7 +921,8 @@
    "description": "The integrity of backups and other restoration assets is verified before using them for restoration",
    "category": "RC.RP Incident Recovery Plan Execution",
    "subcategory": "RECOVER",
-   "official_reference": "NIST CSF 2.0 RC.RP-03"
+   "official_reference": "NIST CSF 2.0 RC.RP-03",
+   "kind": "Requirement"
   },
   {
    "control_code": "RC.RP-04",
@@ -828,7 +930,8 @@
    "description": "Critical mission functions and cybersecurity risk management are considered to establish post-incident operational norms",
    "category": "RC.RP Incident Recovery Plan Execution",
    "subcategory": "RECOVER",
-   "official_reference": "NIST CSF 2.0 RC.RP-04"
+   "official_reference": "NIST CSF 2.0 RC.RP-04",
+   "kind": "Requirement"
   },
   {
    "control_code": "RC.RP-05",
@@ -836,7 +939,8 @@
    "description": "The integrity of restored assets is verified, systems and services are restored, and normal operating status is confirmed",
    "category": "RC.RP Incident Recovery Plan Execution",
    "subcategory": "RECOVER",
-   "official_reference": "NIST CSF 2.0 RC.RP-05"
+   "official_reference": "NIST CSF 2.0 RC.RP-05",
+   "kind": "Requirement"
   },
   {
    "control_code": "RC.RP-06",
@@ -844,7 +948,8 @@
    "description": "The end of incident recovery is declared based on criteria, and incident-related documentation is completed",
    "category": "RC.RP Incident Recovery Plan Execution",
    "subcategory": "RECOVER",
-   "official_reference": "NIST CSF 2.0 RC.RP-06"
+   "official_reference": "NIST CSF 2.0 RC.RP-06",
+   "kind": "Requirement"
   },
   {
    "control_code": "RC.CO-03",
@@ -852,7 +957,8 @@
    "description": "Recovery activities and progress in restoring operational capabilities are communicated to designated internal and external stakeholders",
    "category": "RC.CO Incident Recovery Communication",
    "subcategory": "RECOVER",
-   "official_reference": "NIST CSF 2.0 RC.CO-03"
+   "official_reference": "NIST CSF 2.0 RC.CO-03",
+   "kind": "Requirement"
   },
   {
    "control_code": "RC.CO-04",
@@ -860,7 +966,8 @@
    "description": "Public updates on incident recovery are shared using approved methods and messaging",
    "category": "RC.CO Incident Recovery Communication",
    "subcategory": "RECOVER",
-   "official_reference": "NIST CSF 2.0 RC.CO-04"
+   "official_reference": "NIST CSF 2.0 RC.CO-04",
+   "kind": "Requirement"
   }
  ]
 }

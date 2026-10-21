@@ -13,6 +13,7 @@
  "standard_version": "4.0",
  "total_controls": 12,
  "content_level": "identifiers",
+ "default_kind": "Requirement",
  "controls": [
   {
    "control_code": "Req. 1",
@@ -20,7 +21,8 @@
    "description": null,
    "category": "Principal requirement",
    "subcategory": null,
-   "official_reference": "PCI DSS v4.0"
+   "official_reference": "PCI DSS v4.0",
+   "kind": "Requirement"
   },
   {
    "control_code": "Req. 2",
@@ -28,7 +30,8 @@
    "description": null,
    "category": "Principal requirement",
    "subcategory": null,
-   "official_reference": "PCI DSS v4.0"
+   "official_reference": "PCI DSS v4.0",
+   "kind": "Requirement"
   },
   {
    "control_code": "Req. 3",
@@ -36,7 +39,8 @@
    "description": null,
    "category": "Principal requirement",
    "subcategory": null,
-   "official_reference": "PCI DSS v4.0"
+   "official_reference": "PCI DSS v4.0",
+   "kind": "Requirement"
   },
   {
    "control_code": "Req. 4",
@@ -44,7 +48,8 @@
    "description": null,
    "category": "Principal requirement",
    "subcategory": null,
-   "official_reference": "PCI DSS v4.0"
+   "official_reference": "PCI DSS v4.0",
+   "kind": "Requirement"
   },
   {
    "control_code": "Req. 5",
@@ -52,7 +57,8 @@
    "description": null,
    "category": "Principal requirement",
    "subcategory": null,
-   "official_reference": "PCI DSS v4.0"
+   "official_reference": "PCI DSS v4.0",
+   "kind": "Requirement"
   },
   {
    "control_code": "Req. 6",
@@ -60,7 +66,8 @@
    "description": null,
    "category": "Principal requirement",
    "subcategory": null,
-   "official_reference": "PCI DSS v4.0"
+   "official_reference": "PCI DSS v4.0",
+   "kind": "Requirement"
   },
   {
    "control_code": "Req. 7",
@@ -68,7 +75,8 @@
    "description": null,
    "category": "Principal requirement",
    "subcategory": null,
-   "official_reference": "PCI DSS v4.0"
+   "official_reference": "PCI DSS v4.0",
+   "kind": "Constraint"
   },
   {
    "control_code": "Req. 8",
@@ -76,7 +84,8 @@
    "description": null,
    "category": "Principal requirement",
    "subcategory": null,
-   "official_reference": "PCI DSS v4.0"
+   "official_reference": "PCI DSS v4.0",
+   "kind": "Requirement"
   },
   {
    "control_code": "Req. 9",
@@ -84,7 +93,8 @@
    "description": null,
    "category": "Principal requirement",
    "subcategory": null,
-   "official_reference": "PCI DSS v4.0"
+   "official_reference": "PCI DSS v4.0",
+   "kind": "Constraint"
   },
   {
    "control_code": "Req. 10",
@@ -92,7 +102,8 @@
    "description": null,
    "category": "Principal requirement",
    "subcategory": null,
-   "official_reference": "PCI DSS v4.0"
+   "official_reference": "PCI DSS v4.0",
+   "kind": "Requirement"
   },
   {
    "control_code": "Req. 11",
@@ -100,7 +111,8 @@
    "description": null,
    "category": "Principal requirement",
    "subcategory": null,
-   "official_reference": "PCI DSS v4.0"
+   "official_reference": "PCI DSS v4.0",
+   "kind": "Requirement"
   },
   {
    "control_code": "Req. 12",
@@ -108,7 +120,8 @@
    "description": null,
    "category": "Principal requirement",
    "subcategory": null,
-   "official_reference": "PCI DSS v4.0"
+   "official_reference": "PCI DSS v4.0",
+   "kind": "Requirement"
   }
  ]
 }

@@ -41,6 +41,11 @@ LIBRARY_DIR = os.path.join(
 )
 
 
+# What a control becomes in the model: see ComplianceControl.kind.
+KINDS = ("Requirement", "Constraint")
+DEFAULT_KIND = "Requirement"
+
+
 class RegulatoryFrameworkService:
     """Service for managing regulatory frameworks and compliance controls"""
 
@@ -841,14 +846,21 @@ class RegulatoryFrameworkService:
     }
 
     @staticmethod
-    def _control_values(raw: Dict) -> Dict:
-        """A control definition reduced to ComplianceControl columns."""
+    def _control_values(raw: Dict, default_kind: str = DEFAULT_KIND) -> Dict:
+        """A control definition reduced to ComplianceControl columns. ``kind`` is the
+        control's own when it is one of KINDS; a missing or unrecognised value takes the
+        framework's ``default_kind`` (the one rule that applies only when the field is
+        missing)."""
         columns = {c.name for c in ComplianceControl.__table__.columns} - {"id", "framework_id"}
         values = {}
         for key, value in raw.items():
             key = RegulatoryFrameworkService._CONTROL_FIELD_ALIASES.get(key, key)
             if key in columns and key not in values:
                 values[key] = value
+        if values.get("kind") not in KINDS:
+            if "kind" in values:
+                logger.warning(f"Control {values.get('control_code')}: kind {values['kind']!r} not recognised, default applied")
+            values["kind"] = default_kind if default_kind in KINDS else DEFAULT_KIND
         return values
 
     @staticmethod
@@ -908,8 +920,9 @@ class RegulatoryFrameworkService:
                 c.control_code: c
                 for c in ComplianceControl.query.filter_by(framework_id=framework.id).all()
             }
+            default_kind = framework_data.get("default_kind", DEFAULT_KIND)
             for raw in controls_data:
-                values = RegulatoryFrameworkService._control_values(raw)
+                values = RegulatoryFrameworkService._control_values(raw, default_kind)
                 code = values.get("control_code")
                 if not code:
                     continue
@@ -917,7 +930,7 @@ class RegulatoryFrameworkService:
                 if control is None:
                     db.session.add(ComplianceControl(framework_id=framework.id, **values))
                 else:
-                    for key in ("title", "description", "category", "subcategory", "official_reference"):
+                    for key in ("title", "description", "category", "subcategory", "official_reference", "kind"):
                         if key in values and getattr(control, key) != values[key]:
                             setattr(control, key, values[key])
 
