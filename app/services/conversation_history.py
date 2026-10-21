@@ -11,6 +11,7 @@ from sqlalchemy import text
 
 from app import db
 from app.extensions.cache import cached, invalidate_cache
+from app.middleware.tenant_context import current_org_id
 
 # Vector search imports
 try:
@@ -106,7 +107,12 @@ class ConversationHistoryService:
                 self.chroma_client = None
 
     def create_thread(
-        self, user_id: int, title: str, model: str, initial_message: Optional[str] = None
+        self,
+        user_id: int,
+        title: str,
+        model: str,
+        initial_message: Optional[str] = None,
+        organization_id: Optional[int] = None,
     ) -> ConversationThread:
         """
         Create a new conversation thread.
@@ -116,10 +122,13 @@ class ConversationHistoryService:
             title: Thread title
             model: AI model used in thread
             initial_message: Optional first message
+            organization_id: Organisation the thread is made in (defaults to the active one)
 
         Returns:
             ConversationThread object
         """
+        if organization_id is None:
+            organization_id = current_org_id()
         thread_id = str(uuid.uuid4())
         now = datetime.utcnow()
 
@@ -128,8 +137,8 @@ class ConversationHistoryService:
             text(
                 """
                 INSERT INTO conversation_threads
-                (id, user_id, title, model, created_at, updated_at, message_count)
-                VALUES (:id, :user_id, :title, :model, :created_at, :updated_at, 0)
+                (id, user_id, title, model, created_at, updated_at, message_count, organization_id)
+                VALUES (:id, :user_id, :title, :model, :created_at, :updated_at, 0, :organization_id)
             """
             ),
             {
@@ -139,6 +148,7 @@ class ConversationHistoryService:
                 "model": model,
                 "created_at": now,
                 "updated_at": now,
+                "organization_id": organization_id,
             },
         )
         db.session.commit()
@@ -257,7 +267,11 @@ class ConversationHistoryService:
     # tenant-scoping-ok: default cache key includes call args (user_id/thread_id), which already differentiate callers.
     @cached(ttl=300, key_prefix="threads:user")
     def get_user_threads(
-        self, user_id: int, limit: int = 50, offset: int = 0
+        self,
+        user_id: int,
+        limit: int = 50,
+        offset: int = 0,
+        organization_id: Optional[int] = None,
     ) -> List[ConversationThread]:
         """
         Get conversation threads for a user.
@@ -266,21 +280,29 @@ class ConversationHistoryService:
             user_id: User ID
             limit: Max threads to return
             offset: Pagination offset
+            organization_id: Only threads made in this organisation (the cache key
+                includes it); None lists every organisation, for system callers.
 
         Returns:
             List of ConversationThread objects
         """
-        result = db.session.execute(  # tenant-filtered: scoped via parent FK (user_id)
+        org_clause = "" if organization_id is None else "AND organization_id = :organization_id"
+        result = db.session.execute(  # tenant-filtered: user_id and organization_id
             text(
-                """
+                f"""
                 SELECT id, user_id, title, model, created_at, updated_at, message_count
                 FROM conversation_threads
-                WHERE user_id = :user_id
+                WHERE user_id = :user_id {org_clause}
                 ORDER BY updated_at DESC
                 LIMIT :limit OFFSET :offset
-            """
+            """  # nosec B608 - fixed fragment, values are bound
             ),
-            {"user_id": user_id, "limit": limit, "offset": offset},
+            {
+                "user_id": user_id,
+                "limit": limit,
+                "offset": offset,
+                **({} if organization_id is None else {"organization_id": organization_id}),
+            },
         )
 
         threads = []
@@ -476,8 +498,9 @@ def get_history_service() -> ConversationHistoryService:
     return _history_service
 
 
-def thread_owned_by(thread_id: str, user_id: int) -> bool:
-    """True when *thread_id* exists and belongs to *user_id*.
+def thread_owned_by(thread_id: str, user_id: int, organization_id: Optional[int] = None) -> bool:
+    """True when *thread_id* exists, belongs to *user_id* and was made in the
+    caller's active organisation (or *organization_id* when given).
 
     Ownership is the authorisation boundary for the thread routes: conversation
     threads are keyed by user, so without this check any authenticated user
@@ -485,12 +508,18 @@ def thread_owned_by(thread_id: str, user_id: int) -> bool:
     """
     if not thread_id or not user_id:
         return False
-    row = db.session.execute(  # tenant-filtered: scoped via parent FK (user_id)
+    if organization_id is None:
+        organization_id = current_org_id()
+    org_clause = "" if organization_id is None else " AND organization_id = :organization_id"
+    params = {"thread_id": str(thread_id), "user_id": user_id}
+    if organization_id is not None:
+        params["organization_id"] = organization_id
+    row = db.session.execute(  # tenant-filtered: user_id and organization_id
         text(
             "SELECT 1 FROM conversation_threads "
-            "WHERE id = :thread_id AND user_id = :user_id LIMIT 1"
+            "WHERE id = :thread_id AND user_id = :user_id" + org_clause + " LIMIT 1"  # nosec B608 - fixed fragment
         ),
-        {"thread_id": str(thread_id), "user_id": user_id},
+        params,
     ).first()
     return row is not None
 

@@ -17,10 +17,9 @@ never reachable in the first place.
 
 The switched-organisation case: a user who belongs to both organisations, with
 organisation B active, asking for the records they created while A was active.
-Routes backed by tenant-scoped models refuse. Conversation threads, saved
-sessions and chat history have no organisation column (they are keyed to the
-user), so they cannot be separated by organisation without a migration; those
-cases are strict expected failures that name the gap.
+Conversation threads, saved sessions, chat history and the page-guide history
+carry the organisation that was active when they were made, so every route
+refuses them while the other organisation is active.
 """
 
 from __future__ import annotations
@@ -98,16 +97,16 @@ def world(db_session, make_org):
 
     tag = uuid.uuid4().hex[:8]
     now = datetime.utcnow()
-    # --- conversation thread (keyed to the user; no organisation column)
+    # --- conversation thread (made in organisation A)
     def make_thread(user_id):
         tid = str(uuid.uuid4())
         db_session.execute(
             text(
                 "INSERT INTO conversation_threads "
-                "(id, user_id, title, model, created_at, updated_at, message_count) "
-                "VALUES (:i, :u, :t, 'm', :n, :n, 1)"
+                "(id, user_id, title, model, created_at, updated_at, message_count, organization_id) "
+                "VALUES (:i, :u, :t, 'm', :n, :n, 1, :o)"
             ),
-            {"i": tid, "u": user_id, "t": f"{MARK} thread {tag}", "n": now},
+            {"i": tid, "u": user_id, "t": f"{MARK} thread {tag}", "n": now, "o": a.id},
         )
         db_session.execute(
             text(
@@ -124,6 +123,7 @@ def world(db_session, make_org):
             ChatMessageEmbedding(
                 chat_session_id=session_id,
                 user_id=user_id,
+                organization_id=a.id,
                 message_text=f"{MARK} history {tag}",
                 message_role="user",
                 domain="general",
@@ -236,16 +236,6 @@ LIST_ROUTES = {
     "approvals-decided": ("get", f"{AI}/approvals/decided", None),
     "guide-history-clear": ("post", f"{AI}/guide/history/clear", {"page_key": "dashboard.overview", "scope_key": "scope-{tag}"}),
 }
-
-# The three stores keyed only to the user: no organisation column to scope by.
-NO_ORG_COLUMN = {"thread-read", "thread-delete", "session-load"}
-NO_ORG_COLUMN_LISTS = {"history-read", "sessions-list", "threads-list", "guide-history-read"}
-GAP = (
-    "conversation_threads and chat_message_embeddings have no organisation column "
-    "(they are keyed to the user), so a user who belongs to two organisations sees "
-    "records made in the other one; closing it needs a migration"
-)
-
 
 def _fill(value, w):
     if isinstance(value, str):
@@ -365,7 +355,7 @@ def test_a_foreign_thread_id_is_not_loaded_into_the_prompt(db_session, world):
 @pytest.mark.parametrize(
     "name",
     [
-        pytest.param(n, marks=pytest.mark.xfail(strict=True, reason=GAP)) if n in NO_ORG_COLUMN else n
+        n
         for n in sorted(ID_ROUTES)
         if n.startswith(("thread-read", "thread-delete", "session-", "workspace", "approval-impact",
                          "document-read", "run-record-read"))
@@ -384,7 +374,7 @@ def test_switched_organisation_does_not_see_the_other_organisations_record(
 @pytest.mark.parametrize(
     "name",
     [
-        pytest.param(n, marks=pytest.mark.xfail(strict=True, reason=GAP)) if n in NO_ORG_COLUMN_LISTS else n
+        n
         for n in ("history-read", "sessions-list", "threads-list", "guide-history-read", "documents-list", "approvals-pending")
     ],
 )

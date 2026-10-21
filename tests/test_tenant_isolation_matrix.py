@@ -54,6 +54,17 @@ INTENTIONALLY_GLOBAL = {
         "reach the row regardless of the tenant filter; every query is keyed by "
         "sid or user_id and organization_id is kept for attribution only"
     ),
+    "ConversationThreadRecord": (
+        "a chat thread is keyed to its user and to the organisation active when it "
+        "was made; the chat service scopes its raw SQL by both user_id and "
+        "organization_id, and the column is nullable for a user with no home organisation"
+    ),
+    "ChatMessageEmbedding": (
+        "chat history, saved sessions and page-guide history are keyed to their user "
+        "and to the organisation active when written; every read goes through "
+        "ChatMessageEmbedding.in_active_org(), and the column is nullable for a "
+        "user with no home organisation"
+    ),
     # Child rows reached only through a TenantMixin parent, which scopes them.
     "ApplicationCapabilityMapping": "reached via ApplicationComponent, which is scoped",
     "ApplicationVersioning": "reached via ApplicationComponent, which is scoped",
