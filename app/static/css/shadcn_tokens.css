@@ -43,6 +43,8 @@
     --border: 214.3 31.8% 91.4%;
     --input: 214.3 31.8% 91.4%;
     --ring: 243.4 75.4% 58.6%;
+    /* Dialog backdrop: navy in both themes, used at 50% (bg-overlay/50). */
+    --overlay: 222.2 47.4% 11.2%;
     --radius: 0.5rem;
 
     /* ArchiMate layer semantic colors (TOGAF ADM phases) */
@@ -99,6 +101,7 @@
     --border: 215.3 25% 26.7%;
     --input: 215.3 25% 26.7%;
     --ring: 234.5 89.5% 73.9%;
+    --overlay: 222.2 47.4% 11.2%;
 
     /* ArchiMate layer semantic colors (dark mode) */
     --layer-motivation: 263 70% 65%;

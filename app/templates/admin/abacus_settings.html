@@ -227,7 +227,7 @@
                             <h4 class="text-sm font-medium mb-4">Connection Settings</h4>
                             <div class="space-y-4">
                                 <div>
-                                    <label for="base_url" class="block text-sm font-medium mb-2">
+                                    <label for="base_url" class="block text-sm font-medium text-muted-foreground mb-1">
                                         Base URL <span class="text-destructive-emphasis">*</span>
                                     </label>
                                     <input type="url"
@@ -235,13 +235,13 @@
                                            name="base_url"
                                            value="{{ form.base_url.data or '' }}"
                                            placeholder="https://your-instance.avolutionsoftware.com"
-                                           class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                           class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                                            required>
                                      <p class="text-xs text-muted-foreground mt-1">Your Abacus instance URL (e.g., https://abacus.example.com)</p>
                                 </div>
 
                                 <div>
-                                    <label for="client_id" class="block text-sm font-medium mb-2">
+                                    <label for="client_id" class="block text-sm font-medium text-muted-foreground mb-1">
                                         Client ID <span class="text-destructive-emphasis">*</span>
                                     </label>
                                     <input type="text"
@@ -249,13 +249,13 @@
                                            name="client_id"
                                            value="{{ form.client_id.data or '' }}"
                                            placeholder="your-client-id"
-                                           class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                           class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                                            required>
                                      <p class="text-xs text-muted-foreground mt-1">OAuth2 client ID from Abacus API settings</p>
                                 </div>
 
                                 <div>
-                                    <label for="client_secret" class="block text-sm font-medium mb-2">
+                                    <label for="client_secret" class="block text-sm font-medium text-muted-foreground mb-1">
                                         Client Secret {% if not env_config %}<span class="text-destructive-emphasis">*</span>{% endif %}
                                     </label>
                                     <input type="password"
@@ -263,7 +263,7 @@
                                            name="client_secret"
                                            value="{{ form.client_secret.data or '' }}"
                                            placeholder="{% if abacus_config or env_config %}••••••••••••{% else %}your-client-secret{% endif %}"
-                                           class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                           class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                                            {% if not abacus_config and not env_config %}required{% endif %} autocomplete="new-password">
                                     <p class="text-xs text-muted-foreground mt-1">
                                         {% if env_config %}
@@ -282,7 +282,7 @@
                             <div class="space-y-4">
                                 <div class="flex items-center justify-between p-3 bg-accent/50 rounded-md">
                                     <div>
-                                        <label for="enabled" class="text-sm font-medium">Enable Integration</label>
+                                        <label for="enabled" class="block text-sm font-medium text-muted-foreground mb-1">Enable Integration</label>
                                         <p class="text-xs text-muted-foreground">Allow data synchronization with Abacus</p>
                                     </div>
                                     <label class="relative inline-flex items-center cursor-pointer">
@@ -298,7 +298,7 @@
 
                                 <div class="flex items-center justify-between p-3 bg-accent/50 rounded-md">
                                     <div>
-                                        <label for="sync_enabled" class="text-sm font-medium">Enable Auto-Sync</label>
+                                        <label for="sync_enabled" class="block text-sm font-medium text-muted-foreground mb-1">Enable Auto-Sync</label>
                                         <p class="text-xs text-muted-foreground">Automatically sync data on schedule</p>
                                     </div>
                                     <label class="relative inline-flex items-center cursor-pointer">
@@ -313,12 +313,12 @@
                                 </div>
 
                                 <div>
-                                    <label for="sync_interval_minutes" class="block text-sm font-medium mb-2">
+                                    <label for="sync_interval_minutes" class="block text-sm font-medium text-muted-foreground mb-1">
                                         Sync Interval (minutes)
                                     </label>
                                     <select id="sync_interval_minutes"
                                             name="sync_interval_minutes"
-                                            class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                                            class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                                         <option value="60" {% if form.sync_interval_minutes.data == 60 %}selected{% endif %}>Every Hour</option>
                                         <option value="240" {% if form.sync_interval_minutes.data == 240 %}selected{% endif %}>Every 4 Hours</option>
                                         <option value="720" {% if form.sync_interval_minutes.data == 720 %}selected{% endif %}>Every 12 Hours</option>
@@ -335,7 +335,7 @@
                             <h4 class="text-sm font-medium mb-4">Relationship Import</h4>
                             <div class="flex items-center justify-between p-3 bg-accent/50 rounded-md">
                                 <div>
-                                    <label for="sync_relationships" class="text-sm font-medium">Sync Relationships</label>
+                                    <label for="sync_relationships" class="block text-sm font-medium text-muted-foreground mb-1">Sync Relationships</label>
                                     <p class="text-xs text-muted-foreground">Import OutConnection relationships as ArchiMate relationships after apps + capabilities</p>
                                 </div>
                                 <label class="relative inline-flex items-center cursor-pointer">
@@ -370,7 +370,7 @@
                                     Fetching from Abacus API...
                                 </div>
                                 <div x-show="typesLoaded" x-cloak>
-                                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                    <div class="grid grid-cols-1 gap-2">
                                         <template x-for="t in availableTypes" :key="t.name">
                                             <label class="flex items-center gap-2 p-2 rounded-md hover:bg-muted cursor-pointer text-sm border border-transparent" :class="selectedTypes.includes(t.name) ? 'bg-primary/5 border-primary/20' : ''">
                                                 <input type="checkbox" :value="t.name" :checked="selectedTypes.includes(t.name)"
@@ -392,7 +392,7 @@
                             <div class="space-y-4">
                                 <div class="p-3 bg-accent/50 rounded-md space-y-3">
                                     <div>
-                                        <label for="filter_countries" class="text-sm font-medium">Country Filter</label>
+                                        <label for="filter_countries" class="block text-sm font-medium text-muted-foreground mb-1">Country Filter</label>
                                         <p class="text-xs text-muted-foreground">Select which countries to import applications from via the "App is used in Country" relationship</p>
                                     </div>
                                     <div>
@@ -401,7 +401,7 @@
                                                name="filter_countries"
                                                value="{{ form.filter_countries.data or '' }}"
                                                placeholder="e.g. United Kingdom,Ireland,France"
-                                               class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring">
+                                               class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring">
                                     </div>
                                     <div class="flex flex-wrap gap-2">
                                         <button type="button" @click="addCountry('United Kingdom')" class="text-xs px-2 py-1 rounded bg-accent text-accent-foreground hover:bg-accent/80" aria-label="Add United Kingdom to filter">+ United Kingdom</button>
@@ -455,7 +455,7 @@
                                     </div>
 
                                     <div>
-                                        <label for="filter-dimension-select" class="text-xs font-medium mb-1 block">Filter Dimension</label>
+                                        <label for="filter-dimension-select" class="block text-sm font-medium text-muted-foreground mb-1">Filter Dimension</label>
                                         <select id="filter-dimension-select" x-model="selectedDimension"
                                                 class="w-full h-9 px-3 text-sm rounded-md border border-input bg-background">
                                             <option value="">Select a dimension...</option>
@@ -467,7 +467,7 @@
 
                                     {% for dim, values in filter_dimensions.items() %}
                                     <div x-show="selectedDimension === '{{ dim }}'" x-cloak>
-                                        <label class="text-xs font-medium mb-1 block">Select Values</label>
+                                        <label class="block text-sm font-medium text-muted-foreground mb-1">Select Values</label>
                                         <div class="max-h-48 overflow-y-auto border border-border rounded-md bg-background p-2 space-y-1">
                                             {% for val in values %}
                                             <label class="flex items-center gap-2 px-2 py-1 rounded hover:bg-muted cursor-pointer text-sm">

@@ -1,4 +1,7 @@
 {% extends "layouts/admin_base.html" %}
+{% from 'components/modal.html' import modal %}
+{% from 'components/form_field.html' import form_group, form_footer %}
+{% from 'components/dense_table.html' import dense_table %}
 {# smoke-coverage-ok: CSP inline style fix (removed style="width:0%"); covered by tests/test_capability_map_a11y_csp.py #}
 {% from 'components/data_card.html' import data_card %}
 {% from 'components/page_header.html' import page_header %}
@@ -242,56 +245,51 @@
                         </div>
                     </div>
 
-                    <div class="overflow-x-auto">
-                        <table class="dense-table min-w-full divide-y divide-border">
-                            <thead class="bg-muted/50">
-                                <tr>
-                                    <th class="px-6 py-3 text-left">
+{% set _dt_header_17648 %}
+                                    <th scope="col" class="h-10 px-2 align-middle text-left">
                                         <input type="checkbox" class="rounded border-input text-primary focus-visible:ring-ring"
                                                @change="$el.checked ? selectAllCapabilities('unified') : deselectAllCapabilities('unified')" aria-label="Checkbox field">
                                     </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-pointer" @click="sortTable('unified', 'capability_name')">
+                                    <th scope="col" class="h-10 px-2 align-middle text-left cursor-pointer" @click="sortTable('unified', 'capability_name')">
                                         Capability Name <i data-lucide="arrow-up-down" class="w-3 h-3 inline ml-1" aria-hidden="true"></i>
                                     </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-pointer" @click="sortTable('unified', 'domain')">
+                                    <th scope="col" class="h-10 px-2 align-middle text-left cursor-pointer" @click="sortTable('unified', 'domain')">
                                         Domain <i data-lucide="arrow-up-down" class="w-3 h-3 inline ml-1" aria-hidden="true"></i>
                                     </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-pointer" @click="sortTable('unified', 'level')">
+                                    <th scope="col" class="h-10 px-2 align-middle text-left cursor-pointer" @click="sortTable('unified', 'level')">
                                         Level <i data-lucide="arrow-up-down" class="w-3 h-3 inline ml-1" aria-hidden="true"></i>
                                     </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-pointer" @click="sortTable('unified', 'business_owner')">
+                                    <th scope="col" class="h-10 px-2 align-middle text-left cursor-pointer" @click="sortTable('unified', 'business_owner')">
                                         Business Owner <i data-lucide="arrow-up-down" class="w-3 h-3 inline ml-1" aria-hidden="true"></i>
                                     </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-pointer" @click="sortTable('unified', 'application_name')">
+                                    <th scope="col" class="h-10 px-2 align-middle text-left cursor-pointer" @click="sortTable('unified', 'application_name')">
                                         Application <i data-lucide="arrow-up-down" class="w-3 h-3 inline ml-1" aria-hidden="true"></i>
                                     </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-pointer" @click="sortTable('unified', 'business_impact')">
+                                    <th scope="col" class="h-10 px-2 align-middle text-left cursor-pointer" @click="sortTable('unified', 'business_impact')">
                                         Business Impact <i data-lucide="arrow-up-down" class="w-3 h-3 inline ml-1" aria-hidden="true"></i>
                                     </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-pointer" @click="sortTable('unified', 'strategic_importance')">
+                                    <th scope="col" class="h-10 px-2 align-middle text-left cursor-pointer" @click="sortTable('unified', 'strategic_importance')">
                                         Priority <i data-lucide="arrow-up-down" class="w-3 h-3 inline ml-1" aria-hidden="true"></i>
                                     </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-pointer" @click="sortTable('unified', 'coverage_percentage')">
+                                    <th scope="col" class="h-10 px-2 align-middle text-left cursor-pointer" @click="sortTable('unified', 'coverage_percentage')">
                                         Coverage <i data-lucide="arrow-up-down" class="w-3 h-3 inline ml-1" aria-hidden="true"></i>
                                     </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                                    <th scope="col" class="h-10 px-2 align-middle text-left">
                                         Status <i data-lucide="arrow-up-down" class="w-3 h-3 inline ml-1" aria-hidden="true"></i>
                                     </th>
-                                    <th class="px-6 py-3 text-right text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                                    <th scope="col" class="h-10 px-2 align-middle text-right">
                                         Actions
                                     </th>
-                                </tr>
-                            </thead>
-                            <tbody id="unified-table-body" class="bg-card divide-y divide-border">
+                                
+{% endset %}
+{% call dense_table(header=_dt_header_17648, tbody_id='unified-table-body') %}
                                 <tr>
-                                    <td colspan="11" class="px-6 py-8 text-center text-muted-foreground">
+                                    <td colspan="11" class="px-2 dense-empty text-center text-muted-foreground">
                                         <i data-lucide="loader-2" class="w-8 h-8 animate-spin text-primary mx-auto mb-4" aria-hidden="true"></i>
                                         <p>Loading unified capability data...</p>
                                     </td>
                                 </tr>
-                            </tbody>
-                        </table>
-                    </div>
+                            {% endcall %}
 
                     <!-- Pagination and Bulk Actions -->
                     <div class="px-6 py-4 border-t border-border">
@@ -534,56 +532,51 @@
                         </div>
                     </div>
 
-                    <div class="overflow-x-auto">
-                        <table class="dense-table min-w-full divide-y divide-border">
-                            <thead class="bg-muted/50">
-                                <tr>
-                                    <th class="px-6 py-3 text-left">
+{% set _dt_header_39335 %}
+                                    <th scope="col" class="h-10 px-2 align-middle text-left">
                                         <input type="checkbox" class="rounded border-input text-primary focus-visible:ring-ring"
                                                @change="this.checked ? selectAllCapabilities('manufacturing') : deselectAllCapabilities('manufacturing')" aria-label="Checkbox field">
                                     </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-pointer" @click="sortTable('manufacturing', 'capability_name')">
+                                    <th scope="col" class="h-10 px-2 align-middle text-left cursor-pointer" @click="sortTable('manufacturing', 'capability_name')">
                                         Capability Name <i data-lucide="arrow-up-down" class="w-3 h-3 inline ml-1" aria-hidden="true"></i>
                                     </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-pointer" @click="sortTable('manufacturing', 'domain')">
+                                    <th scope="col" class="h-10 px-2 align-middle text-left cursor-pointer" @click="sortTable('manufacturing', 'domain')">
                                         Domain <i data-lucide="arrow-up-down" class="w-3 h-3 inline ml-1" aria-hidden="true"></i>
                                     </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-pointer" @click="sortTable('manufacturing', 'level')">
+                                    <th scope="col" class="h-10 px-2 align-middle text-left cursor-pointer" @click="sortTable('manufacturing', 'level')">
                                         Level <i data-lucide="arrow-up-down" class="w-3 h-3 inline ml-1" aria-hidden="true"></i>
                                     </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-pointer" @click="sortTable('manufacturing', 'business_owner')">
+                                    <th scope="col" class="h-10 px-2 align-middle text-left cursor-pointer" @click="sortTable('manufacturing', 'business_owner')">
                                         Business Owner <i data-lucide="arrow-up-down" class="w-3 h-3 inline ml-1" aria-hidden="true"></i>
                                     </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-pointer" @click="sortTable('manufacturing', 'application_name')">
+                                    <th scope="col" class="h-10 px-2 align-middle text-left cursor-pointer" @click="sortTable('manufacturing', 'application_name')">
                                         Application <i data-lucide="arrow-up-down" class="w-3 h-3 inline ml-1" aria-hidden="true"></i>
                                     </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-pointer" @click="sortTable('manufacturing', 'business_impact')">
+                                    <th scope="col" class="h-10 px-2 align-middle text-left cursor-pointer" @click="sortTable('manufacturing', 'business_impact')">
                                         Business Impact <i data-lucide="arrow-up-down" class="w-3 h-3 inline ml-1" aria-hidden="true"></i>
                                     </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-pointer" @click="sortTable('manufacturing', 'strategic_importance')">
+                                    <th scope="col" class="h-10 px-2 align-middle text-left cursor-pointer" @click="sortTable('manufacturing', 'strategic_importance')">
                                         Priority <i data-lucide="arrow-up-down" class="w-3 h-3 inline ml-1" aria-hidden="true"></i>
                                     </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-pointer" @click="sortTable('manufacturing', 'coverage_percentage')">
+                                    <th scope="col" class="h-10 px-2 align-middle text-left cursor-pointer" @click="sortTable('manufacturing', 'coverage_percentage')">
                                         Coverage <i data-lucide="arrow-up-down" class="w-3 h-3 inline ml-1" aria-hidden="true"></i>
                                     </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                                    <th scope="col" class="h-10 px-2 align-middle text-left">
                                         Status <i data-lucide="arrow-up-down" class="w-3 h-3 inline ml-1" aria-hidden="true"></i>
                                     </th>
-                                    <th class="px-6 py-3 text-right text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                                    <th scope="col" class="h-10 px-2 align-middle text-right">
                                         Actions
                                     </th>
-                                </tr>
-                            </thead>
-                            <tbody id="manufacturing-table-body" class="bg-card divide-y divide-border">
+                                
+{% endset %}
+{% call dense_table(header=_dt_header_39335, tbody_id='manufacturing-table-body') %}
                                 <tr>
-                                    <td colspan="11" class="px-6 py-8 text-center text-muted-foreground">
+                                    <td colspan="11" class="px-2 dense-empty text-center text-muted-foreground">
                                         <i data-lucide="loader-2" class="w-8 h-8 animate-spin text-primary mx-auto mb-4" aria-hidden="true"></i>
                                         <p>Loading manufacturing capability data...</p>
                                     </td>
                                 </tr>
-                            </tbody>
-                        </table>
-                    </div>
+                            {% endcall %}
 
                     <!-- Bulk Actions -->
                     <div class="px-6 py-3 border-t border-border flex items-center space-x-4">
@@ -687,56 +680,51 @@
                         </div>
                     </div>
 
-                    <div class="overflow-x-auto">
-                        <table class="dense-table min-w-full divide-y divide-border">
-                            <thead class="bg-muted/50">
-                                <tr>
-                                    <th class="px-6 py-3 text-left">
+{% set _dt_header_50200 %}
+                                    <th scope="col" class="h-10 px-2 align-middle text-left">
                                         <input type="checkbox" class="rounded border-input text-primary focus-visible:ring-ring"
                                                @change="this.checked ? selectAllCapabilities('application') : deselectAllCapabilities('application')" aria-label="Checkbox field">
                                     </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-pointer" @click="sortTable('application', 'capability_name')">
+                                    <th scope="col" class="h-10 px-2 align-middle text-left cursor-pointer" @click="sortTable('application', 'capability_name')">
                                         Capability Name <i data-lucide="arrow-up-down" class="w-3 h-3 inline ml-1" aria-hidden="true"></i>
                                     </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-pointer" @click="sortTable('application', 'domain')">
+                                    <th scope="col" class="h-10 px-2 align-middle text-left cursor-pointer" @click="sortTable('application', 'domain')">
                                         Domain <i data-lucide="arrow-up-down" class="w-3 h-3 inline ml-1" aria-hidden="true"></i>
                                     </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-pointer" @click="sortTable('application', 'level')">
+                                    <th scope="col" class="h-10 px-2 align-middle text-left cursor-pointer" @click="sortTable('application', 'level')">
                                         Level <i data-lucide="arrow-up-down" class="w-3 h-3 inline ml-1" aria-hidden="true"></i>
                                     </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-pointer" @click="sortTable('application', 'business_owner')">
+                                    <th scope="col" class="h-10 px-2 align-middle text-left cursor-pointer" @click="sortTable('application', 'business_owner')">
                                         Business Owner <i data-lucide="arrow-up-down" class="w-3 h-3 inline ml-1" aria-hidden="true"></i>
                                     </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-pointer" @click="sortTable('application', 'application_name')">
+                                    <th scope="col" class="h-10 px-2 align-middle text-left cursor-pointer" @click="sortTable('application', 'application_name')">
                                         Application <i data-lucide="arrow-up-down" class="w-3 h-3 inline ml-1" aria-hidden="true"></i>
                                     </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-pointer" @click="sortTable('application', 'business_impact')">
+                                    <th scope="col" class="h-10 px-2 align-middle text-left cursor-pointer" @click="sortTable('application', 'business_impact')">
                                         Business Impact <i data-lucide="arrow-up-down" class="w-3 h-3 inline ml-1" aria-hidden="true"></i>
                                     </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-pointer" @click="sortTable('application', 'strategic_importance')">
+                                    <th scope="col" class="h-10 px-2 align-middle text-left cursor-pointer" @click="sortTable('application', 'strategic_importance')">
                                         Priority <i data-lucide="arrow-up-down" class="w-3 h-3 inline ml-1" aria-hidden="true"></i>
                                     </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-pointer" @click="sortTable('application', 'coverage_percentage')">
+                                    <th scope="col" class="h-10 px-2 align-middle text-left cursor-pointer" @click="sortTable('application', 'coverage_percentage')">
                                         Coverage <i data-lucide="arrow-up-down" class="w-3 h-3 inline ml-1" aria-hidden="true"></i>
                                     </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                                    <th scope="col" class="h-10 px-2 align-middle text-left">
                                         Status <i data-lucide="arrow-up-down" class="w-3 h-3 inline ml-1" aria-hidden="true"></i>
                                     </th>
-                                    <th class="px-6 py-3 text-right text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                                    <th scope="col" class="h-10 px-2 align-middle text-right">
                                         Actions
                                     </th>
-                                </tr>
-                            </thead>
-                            <tbody id="application-table-body" class="bg-card divide-y divide-border">
+                                
+{% endset %}
+{% call dense_table(header=_dt_header_50200, tbody_id='application-table-body') %}
                                 <tr>
-                                    <td colspan="11" class="px-6 py-8 text-center text-muted-foreground">
+                                    <td colspan="11" class="px-2 dense-empty text-center text-muted-foreground">
                                         <i data-lucide="loader-2" class="w-8 h-8 animate-spin text-primary mx-auto mb-4" aria-hidden="true"></i>
                                         <p>Loading application capability data...</p>
                                     </td>
                                 </tr>
-                            </tbody>
-                        </table>
-                    </div>
+                            {% endcall %}
 
                     <!-- Bulk Actions -->
                     <div class="px-6 py-3 border-t border-border flex items-center space-x-4">
@@ -839,56 +827,51 @@
                         </div>
                     </div>
 
-                    <div class="overflow-x-auto">
-                        <table class="dense-table min-w-full divide-y divide-border">
-                            <thead class="bg-muted/50">
-                                <tr>
-                                    <th class="px-6 py-3 text-left">
+{% set _dt_header_60937 %}
+                                    <th scope="col" class="h-10 px-2 align-middle text-left">
                                         <input type="checkbox" class="rounded border-input text-primary focus-visible:ring-ring"
                                                @change="this.checked ? selectAllCapabilities('gap') : deselectAllCapabilities('gap')" aria-label="Checkbox field">
                                     </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-pointer" @click="sortTable('gap', 'capability_name')">
+                                    <th scope="col" class="h-10 px-2 align-middle text-left cursor-pointer" @click="sortTable('gap', 'capability_name')">
                                         Capability Name <i data-lucide="arrow-up-down" class="w-3 h-3 inline ml-1" aria-hidden="true"></i>
                                     </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-pointer" @click="sortTable('gap', 'domain')">
+                                    <th scope="col" class="h-10 px-2 align-middle text-left cursor-pointer" @click="sortTable('gap', 'domain')">
                                         Domain <i data-lucide="arrow-up-down" class="w-3 h-3 inline ml-1" aria-hidden="true"></i>
                                     </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-pointer" @click="sortTable('gap', 'level')">
+                                    <th scope="col" class="h-10 px-2 align-middle text-left cursor-pointer" @click="sortTable('gap', 'level')">
                                         Level <i data-lucide="arrow-up-down" class="w-3 h-3 inline ml-1" aria-hidden="true"></i>
                                     </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-pointer" @click="sortTable('gap', 'business_owner')">
+                                    <th scope="col" class="h-10 px-2 align-middle text-left cursor-pointer" @click="sortTable('gap', 'business_owner')">
                                         Business Owner <i data-lucide="arrow-up-down" class="w-3 h-3 inline ml-1" aria-hidden="true"></i>
                                     </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-pointer" @click="sortTable('gap', 'application_name')">
+                                    <th scope="col" class="h-10 px-2 align-middle text-left cursor-pointer" @click="sortTable('gap', 'application_name')">
                                         Application <i data-lucide="arrow-up-down" class="w-3 h-3 inline ml-1" aria-hidden="true"></i>
                                     </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-pointer" @click="sortTable('gap', 'business_impact')">
+                                    <th scope="col" class="h-10 px-2 align-middle text-left cursor-pointer" @click="sortTable('gap', 'business_impact')">
                                         Business Impact <i data-lucide="arrow-up-down" class="w-3 h-3 inline ml-1" aria-hidden="true"></i>
                                     </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-pointer" @click="sortTable('gap', 'strategic_importance')">
+                                    <th scope="col" class="h-10 px-2 align-middle text-left cursor-pointer" @click="sortTable('gap', 'strategic_importance')">
                                         Priority <i data-lucide="arrow-up-down" class="w-3 h-3 inline ml-1" aria-hidden="true"></i>
                                     </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-pointer" @click="sortTable('gap', 'coverage_percentage')">
+                                    <th scope="col" class="h-10 px-2 align-middle text-left cursor-pointer" @click="sortTable('gap', 'coverage_percentage')">
                                         Coverage <i data-lucide="arrow-up-down" class="w-3 h-3 inline ml-1" aria-hidden="true"></i>
                                     </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                                    <th scope="col" class="h-10 px-2 align-middle text-left">
                                         Status <i data-lucide="arrow-up-down" class="w-3 h-3 inline ml-1" aria-hidden="true"></i>
                                     </th>
-                                    <th class="px-6 py-3 text-right text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                                    <th scope="col" class="h-10 px-2 align-middle text-right">
                                         Actions
                                     </th>
-                                </tr>
-                            </thead>
-                            <tbody id="gap-table-body" class="bg-card divide-y divide-border">
+                                
+{% endset %}
+{% call dense_table(header=_dt_header_60937, tbody_id='gap-table-body') %}
                                 <tr>
-                                    <td colspan="11" class="px-6 py-8 text-center text-muted-foreground">
+                                    <td colspan="11" class="px-2 dense-empty text-center text-muted-foreground">
                                         <i data-lucide="loader-2" class="w-8 h-8 animate-spin text-primary mx-auto mb-4" aria-hidden="true"></i>
                                         <p>Loading gap analysis data...</p>
                                     </td>
                                 </tr>
-                            </tbody>
-                        </table>
-                    </div>
+                            {% endcall %}
 
                     <!-- Bulk Actions -->
                     <div class="px-6 py-3 border-t border-border flex items-center space-x-4">
@@ -1035,40 +1018,14 @@
                                 <span id="acm-gap-showing">0</span> capabilities
                             </div>
                         </div>
-                        <div class="overflow-x-auto">
-                            <table class="dense-table min-w-full divide-y divide-border">
-                                <thead class="bg-muted/50">
+{% call dense_table(columns=[('Capability', ''), ('Domain', ''), ('Level', ''), ('Applications', ''), ('Vendors', ''), ('Status', '')], tbody_id='acm-gap-table-body') %}
                                     <tr>
-                                        <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                                            Capability
-                                        </th>
-                                        <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                                            Domain
-                                        </th>
-                                        <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                                            Level
-                                        </th>
-                                        <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                                            Applications
-                                        </th>
-                                        <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                                            Vendors
-                                        </th>
-                                        <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                                            Status
-                                        </th>
-                                    </tr>
-                                </thead>
-                                <tbody id="acm-gap-table-body" class="bg-card divide-y divide-border">
-                                    <tr>
-                                        <td colspan="6" class="px-6 py-8 text-center text-muted-foreground">
+                                        <td colspan="6" class="px-2 dense-empty text-center text-muted-foreground">
                                             <i data-lucide="loader-2" class="w-8 h-8 animate-spin text-info mx-auto mb-4" aria-hidden="true"></i>
                                             <p>Loading ACM gap analysis data...</p>
                                         </td>
                                     </tr>
-                                </tbody>
-                            </table>
-                        </div>
+                                {% endcall %}
                     </div>
                 </div>
             </div>
@@ -1345,52 +1302,47 @@
                         </div>
                     </div>
 
-                    <div class="overflow-x-auto">
-                        <table class="dense-table min-w-full divide-y divide-border">
-                            <thead class="bg-muted/50">
-                                <tr>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-pointer" @click="sortProcessGapTable('name')">
+{% set _dt_header_97593 %}
+                                    <th scope="col" class="h-10 px-2 align-middle text-left cursor-pointer" @click="sortProcessGapTable('name')">
                                         Process Name <i data-lucide="arrow-up-down" class="w-3 h-3 inline ml-1" aria-hidden="true"></i>
                                     </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-pointer" @click="sortProcessGapTable('process_type')">
+                                    <th scope="col" class="h-10 px-2 align-middle text-left cursor-pointer" @click="sortProcessGapTable('process_type')">
                                         Type <i data-lucide="arrow-up-down" class="w-3 h-3 inline ml-1" aria-hidden="true"></i>
                                     </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-pointer" @click="sortProcessGapTable('level')">
+                                    <th scope="col" class="h-10 px-2 align-middle text-left cursor-pointer" @click="sortProcessGapTable('level')">
                                         Level <i data-lucide="arrow-up-down" class="w-3 h-3 inline ml-1" aria-hidden="true"></i>
                                     </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-pointer" @click="sortProcessGapTable('process_owner')">
+                                    <th scope="col" class="h-10 px-2 align-middle text-left cursor-pointer" @click="sortProcessGapTable('process_owner')">
                                         Owner <i data-lucide="arrow-up-down" class="w-3 h-3 inline ml-1" aria-hidden="true"></i>
                                     </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-pointer" @click="sortProcessGapTable('mapping_count')">
+                                    <th scope="col" class="h-10 px-2 align-middle text-left cursor-pointer" @click="sortProcessGapTable('mapping_count')">
                                         Applications <i data-lucide="arrow-up-down" class="w-3 h-3 inline ml-1" aria-hidden="true"></i>
                                     </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-pointer" @click="sortProcessGapTable('avg_automation_coverage')">
+                                    <th scope="col" class="h-10 px-2 align-middle text-left cursor-pointer" @click="sortProcessGapTable('avg_automation_coverage')">
                                         Automation <i data-lucide="arrow-up-down" class="w-3 h-3 inline ml-1" aria-hidden="true"></i>
                                     </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-pointer" @click="sortProcessGapTable('business_impact')">
+                                    <th scope="col" class="h-10 px-2 align-middle text-left cursor-pointer" @click="sortProcessGapTable('business_impact')">
                                         Business Impact <i data-lucide="arrow-up-down" class="w-3 h-3 inline ml-1" aria-hidden="true"></i>
                                     </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-pointer" @click="sortProcessGapTable('gap_severity')">
+                                    <th scope="col" class="h-10 px-2 align-middle text-left cursor-pointer" @click="sortProcessGapTable('gap_severity')">
                                         Gap Severity <i data-lucide="arrow-up-down" class="w-3 h-3 inline ml-1" aria-hidden="true"></i>
                                     </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                                    <th scope="col" class="h-10 px-2 align-middle text-left">
                                         Gap Status
                                     </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                                    <th scope="col" class="h-10 px-2 align-middle text-left">
                                         Actions
                                     </th>
-                                </tr>
-                            </thead>
-                            <tbody id="process-gap-table-body" class="bg-card divide-y divide-border">
+                                
+{% endset %}
+{% call dense_table(header=_dt_header_97593, tbody_id='process-gap-table-body') %}
                                 <tr>
-                                    <td colspan="10" class="px-6 py-8 text-center text-muted-foreground">
+                                    <td colspan="10" class="px-2 dense-empty text-center text-muted-foreground">
                                         <i data-lucide="loader-2" class="w-8 h-8 animate-spin text-primary mx-auto mb-4" aria-hidden="true"></i>
                                         <p>Loading process gap data...</p>
                                     </td>
                                 </tr>
-                            </tbody>
-                        </table>
-                    </div>
+                            {% endcall %}
 
                     <!-- Pagination -->
                     <div class="px-6 py-4 border-t border-border flex items-center justify-between">
@@ -1499,7 +1451,7 @@
                             <h3 id="heatmap-detail-name" class="text-base font-bold text-foreground"></h3>
                             <p id="heatmap-detail-domain" class="text-xs text-muted-foreground"></p>
                         </div>
-                        <button aria-label="Close capability details" type="button" @click="document.getElementById('heatmap-detail').classList.add('hidden')" class="text-muted-foreground hover:text-foreground p-1">
+                        <button aria-label="Close capability details" type="button" @click="document.getElementById('heatmap-detail').classList.add('hidden')" class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                             <i data-lucide="x" class="w-4 h-4"></i>
                         </button>
                     </div>
@@ -1669,29 +1621,14 @@
                             </select>
                         </div>
                     </div>
-                    <div class="overflow-x-auto">
-                        <table class="dense-table min-w-full divide-y divide-border">
-                            <thead class="bg-muted/50">
+{% call dense_table(columns=[('Code', ''), ('Name', ''), ('Domain', ''), ('Level', ''), ('Apps', ''), ('Status', ''), ('Actions', '')], tbody_id='acm-capabilities-table') %}
                                 <tr>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Code</th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Name</th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Domain</th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Level</th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Apps</th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Status</th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody id="acm-capabilities-table" class="bg-card divide-y divide-border">
-                                <tr>
-                                    <td colspan="7" class="px-6 py-12 text-center text-muted-foreground">
+                                    <td colspan="7" class="px-2 dense-empty text-center text-muted-foreground">
                                         <i data-lucide="loader-2" class="w-6 h-6 animate-spin mx-auto mb-2" aria-hidden="true"></i>
                                         Loading capabilities...
                                     </td>
                                 </tr>
-                            </tbody>
-                        </table>
-                    </div>
+                            {% endcall %}
 
                     <!-- Pagination -->
                     <div class="px-6 py-4 border-t border-border flex items-center justify-between">
@@ -1724,25 +1661,10 @@
         </div>
 
         <!-- Convert to Roadmap Modal - Standardized Design -->
-        <div id="convert-modal" hidden role="dialog" aria-modal="true" aria-labelledby="convert-modal-title" class="modal-root fixed inset-0 bg-black/80 overflow-y-auto z-50">
-            <div class="relative top-20 mx-auto p-0 w-full max-w-2xl">
-                <div class="bg-card rounded-lg">
-                    <!-- Header -->
-                    <div class="flex items-center justify-between p-5 border-b border-border bg-primary rounded-t-lg">
-                        <div class="flex items-center space-x-3">
-                            <i data-lucide="git-branch" class="w-6 h-6 text-primary-foreground" aria-hidden="true"></i>
-                            <div>
-                                <h3 class="text-lg font-semibold text-primary-foreground">Convert Gaps to Roadmap Items</h3>
-                                <p class="text-sm text-primary-foreground/70">Transform auto-detected gaps into trackable roadmap items</p>
-                            </div>
-                        </div>
-                        <button type="button" @click="closeConvertModal()" class="text-primary-foreground hover:text-muted-foreground/50" aria-label="Close convert gaps modal">
-                            <i data-lucide="x" class="w-6 h-6" aria-hidden="true"></i>
-                        </button>
-                    </div>
+        {% call modal(id='convert-modal', title='Convert Gaps to Roadmap Items', description='Transform auto-detected gaps into trackable roadmap items', size='lg') %}
 
                     <!-- Quick Stats Bar -->
-                    <div class="bg-muted/50 border-b border-border px-6 py-4">
+                    <div class="bg-muted/50 border-b border-border py-4 pb-4 mb-4">
                         <div class="grid grid-cols-3 gap-4">
                             <div class="flex items-center space-x-3">
                                 <div class="w-10 h-10 rounded-full bg-accent flex items-center justify-center">
@@ -1775,7 +1697,7 @@
                     </div>
 
                     <!-- Body -->
-                    <div class="p-6 max-h-[60vh] overflow-y-auto">
+                    <div class="max-h-[60vh] overflow-y-auto">
                         <!-- Description -->
                         <div class="bg-primary/10 border border-primary/40 rounded-md px-3 py-2 mb-6">
                             <div class="flex items-start space-x-3">
@@ -1814,8 +1736,7 @@
                                 </div>
 
                                 <!-- Work Package Template -->
-                                <div id="convert-template-section">
-                                    <label for="convert-wp-template" class="block text-sm font-medium text-muted-foreground mb-2">Work Package Template</label>
+                                {% call form_group(id='convert-wp-template', label='Work Package Template', help_text='Select a template that matches your gap resolution approach. The auto-select option will choose the best template based on gap type.', attrs='id="convert-template-section"') %}
                                     <select id="convert-wp-template" class="w-full px-4 py-2.5 border border-input rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                                         <option value="auto">Auto-select based on gap type</option>
                                         <option value="default">Default (Requirements → Design → Implementation → Testing → Deploy)</option>
@@ -1823,10 +1744,7 @@
                                         <option value="modernization">Modernization (Assessment → Design → Migration → Validation)</option>
                                         <option value="retirement">Retirement (Impact Analysis → Migration → Archive → Decommission)</option>
                                     </select>
-                                    <p class="text-xs text-muted-foreground mt-2">
-                                        Select a template that matches your gap resolution approach. The auto-select option will choose the best template based on gap type.
-                                    </p>
-                                </div>
+                                {% endcall %}
                             </div>
                         </div>
 
@@ -1869,45 +1787,30 @@
                             </button>
                         </div>
                     </div>
-                </div>
-            </div>
-        </div>
+                
+{% endcall %}
 
         <!-- Edit Gap Modal -->
-        <div id="edit-gap-modal" hidden role="dialog" aria-modal="true" aria-labelledby="edit-gap-title" class="modal-root fixed inset-0 bg-black/80 overflow-y-auto z-50">
-            <div class="relative top-10 mx-auto p-0 w-full max-w-3xl">
-                <div class="bg-card rounded-lg">
-                    <!-- Header -->
-                    <div class="flex items-center justify-between p-4 border-b border-border bg-primary rounded-t-lg">
-                        <div class="flex items-center space-x-3">
-                            <i data-lucide="edit-3" class="w-6 h-6 text-primary-foreground" aria-hidden="true"></i>
-                            <h3 class="text-lg font-semibold text-primary-foreground" id="edit-gap-title">Edit Gap</h3>
-                        </div>
-                        <button type="button" @click="closeEditGapModal()" class="text-primary-foreground hover:text-muted-foreground/50" aria-label="Close edit gap modal">
-                            <i data-lucide="x" class="w-5 h-5" aria-hidden="true"></i>
-                        </button>
-                    </div>
+        {% call modal(id='edit-gap-modal', size='xl', labelledby='edit-gap-title') %}
+<h3 id="edit-gap-title" class="text-base font-semibold text-foreground mb-4">Edit Gap</h3>
 
                     <!-- Body -->
-                    <div class="p-6 max-h-[70vh] overflow-y-auto">
+                    <div class="max-h-[70vh] overflow-y-auto">
                         <input type="hidden" id="edit-gap-id">
 
                         <!-- Basic Info -->
                         <div class="grid grid-cols-2 gap-4 mb-6">
-                            <div class="col-span-2">
-                                <label for="edit-gap-name" class="block text-sm font-medium text-muted-foreground mb-1">Name</label>
+                            {% call form_group(id='edit-gap-name', label='Name', class='col-span-2') %}
                                 <input type="text" id="edit-gap-name" class="w-full px-3 py-2 border border-input rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                            </div>
-                            <div class="col-span-2">
-                                <label for="edit-gap-description" class="block text-sm font-medium text-muted-foreground mb-1">Description</label>
+                            {% endcall %}
+                            {% call form_group(id='edit-gap-description', label='Description', class='col-span-2') %}
                                 <textarea id="edit-gap-description" rows="3" class="w-full px-3 py-2 border border-input rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"></textarea>
-                            </div>
+                            {% endcall %}
                         </div>
 
                         <!-- Classification -->
                         <div class="grid grid-cols-3 gap-4 mb-6">
-                            <div>
-                                <label for="edit-gap-type" class="block text-sm font-medium text-muted-foreground mb-1">Gap Type</label>
+                            {% call form_group(id='edit-gap-type', label='Gap Type') %}
                                 <select id="edit-gap-type" class="w-full px-3 py-2 border border-input rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                                     <option value="coverage">Coverage</option>
                                     <option value="quality">Quality</option>
@@ -1915,36 +1818,32 @@
                                     <option value="modernization">Modernization</option>
                                     <option value="custom">Custom</option>
                                 </select>
-                            </div>
-                            <div>
-                                <label for="edit-gap-priority" class="block text-sm font-medium text-muted-foreground mb-1">Priority</label>
+                            {% endcall %}
+                            {% call form_group(id='edit-gap-priority', label='Priority') %}
                                 <select id="edit-gap-priority" class="w-full px-3 py-2 border border-input rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                                     <option value="critical">Critical</option>
                                     <option value="high">High</option>
                                     <option value="medium">Medium</option>
                                     <option value="low">Low</option>
                                 </select>
-                            </div>
-                            <div>
-                                <label for="edit-gap-status" class="block text-sm font-medium text-muted-foreground mb-1">Status</label>
+                            {% endcall %}
+                            {% call form_group(id='edit-gap-status', label='Status') %}
                                 <select id="edit-gap-status" class="w-full px-3 py-2 border border-input rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                                     <option value="identified">Identified</option>
                                     <option value="in_progress">In Progress</option>
                                     <option value="resolved">Resolved</option>
                                 </select>
-                            </div>
+                            {% endcall %}
                         </div>
 
                         <!-- Timeline & Color -->
                         <div class="grid grid-cols-3 gap-4 mb-6">
-                            <div>
-                                <label for="edit-gap-start-date" class="block text-sm font-medium text-muted-foreground mb-1">Start Date</label>
+                            {% call form_group(id='edit-gap-start-date', label='Start Date') %}
                                 <input type="date" id="edit-gap-start-date" class="w-full px-3 py-2 border border-input rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                            </div>
-                            <div>
-                                <label for="edit-gap-end-date" class="block text-sm font-medium text-muted-foreground mb-1">Target Resolution Date</label>
+                            {% endcall %}
+                            {% call form_group(id='edit-gap-end-date', label='Target Resolution Date') %}
                                 <input type="date" id="edit-gap-end-date" class="w-full px-3 py-2 border border-input rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                            </div>
+                            {% endcall %}
                             <div>
                                 <label class="block text-sm font-medium text-muted-foreground mb-1">Color</label>
                                 <div class="flex items-center space-x-2">
@@ -1964,18 +1863,15 @@
 
                         <!-- Owner & Effort -->
                         <div class="grid grid-cols-3 gap-4 mb-6">
-                            <div>
-                                <label for="edit-gap-owner" class="block text-sm font-medium text-muted-foreground mb-1">Owner</label>
+                            {% call form_group(id='edit-gap-owner', label='Owner') %}
                                 <input type="text" id="edit-gap-owner" class="w-full px-3 py-2 border border-input rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" placeholder="Responsible person">
-                            </div>
-                            <div>
-                                <label for="edit-gap-effort" class="block text-sm font-medium text-muted-foreground mb-1">Est. Effort (days)</label>
+                            {% endcall %}
+                            {% call form_group(id='edit-gap-effort', label='Est. Effort (days)') %}
                                 <input type="number" id="edit-gap-effort" class="w-full px-3 py-2 border border-input rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" min="0">
-                            </div>
-                            <div>
-                                <label for="edit-gap-cost" class="block text-sm font-medium text-muted-foreground mb-1">Est. Cost</label>
+                            {% endcall %}
+                            {% call form_group(id='edit-gap-cost', label='Est. Cost') %}
                                 <input type="number" id="edit-gap-cost" class="w-full px-3 py-2 border border-input rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" min="0" step="1000" placeholder="{{ config.CURRENCY_SYMBOL|default('£') }}">
-                            </div>
+                            {% endcall %}
                         </div>
 
                         <!-- Work Packages Section -->
@@ -2009,33 +1905,19 @@
                             </button>
                         </div>
                     </div>
-                </div>
-            </div>
-        </div>
+                
+{% endcall %}
 
         <!-- Edit Work Package Modal - Standardized Design -->
-        <div id="edit-wp-modal" hidden role="dialog" aria-modal="true" aria-labelledby="edit-wp-title" class="modal-root fixed inset-0 bg-black/80 overflow-y-auto z-50">
-            <div class="relative top-10 mx-auto p-0 w-full max-w-4xl">
-                <div class="bg-card rounded-lg">
-                    <!-- Header -->
-                    <div class="flex items-center justify-between p-5 border-b border-border bg-primary rounded-t-lg">
-                        <div class="flex items-center space-x-3">
-                            <i data-lucide="package" class="w-6 h-6 text-primary-foreground" aria-hidden="true"></i>
-                            <div>
-                                <h3 class="text-lg font-semibold text-primary-foreground" id="edit-wp-title">Edit Work Package</h3>
-                                <p class="text-sm text-primary-foreground/70" id="edit-wp-subtitle">Manage work package details and children</p>
-                            </div>
-                        </div>
-                        <button type="button" @click="closeEditWPModal()" class="text-primary-foreground hover:text-muted-foreground/50" aria-label="Close edit work package modal">
-                            <i data-lucide="x" class="w-6 h-6" aria-hidden="true"></i>
-                        </button>
-                    </div>
+        {% call modal(id='edit-wp-modal', size='xl', labelledby='edit-wp-title') %}
+<h3 id="edit-wp-title" class="text-base font-semibold text-foreground mb-4">Edit Work Package</h3>
+<p class="text-sm text-primary-foreground/70" id="edit-wp-subtitle">Manage work package details and children</p>
 
                     <input type="hidden" id="edit-wp-id">
                     <input type="hidden" id="edit-wp-parent-id">
 
                     <!-- Quick Stats Bar -->
-                    <div class="bg-muted/50 border-b border-border px-6 py-4">
+                    <div class="bg-muted/50 border-b border-border py-4 pb-4 mb-4">
                         <div class="grid grid-cols-4 gap-4">
                             <div class="flex items-center space-x-3">
                                 <div class="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
@@ -2109,14 +1991,12 @@
                                     Basic Information
                                 </h4>
                                 <div class="space-y-4">
-                                    <div>
-                                        <label for="edit-wp-name" class="block text-sm font-medium text-muted-foreground mb-1">Name *</label>
+                                    {% call form_group(id='edit-wp-name', label='Name', required=true) %}
                                         <input type="text" id="edit-wp-name" placeholder="Enter work package name..." class="w-full px-4 py-2.5 border border-input rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus:border-transparent">
-                                    </div>
-                                    <div>
-                                        <label for="edit-wp-description" class="block text-sm font-medium text-muted-foreground mb-1">Description</label>
+                                    {% endcall %}
+                                    {% call form_group(id='edit-wp-description', label='Description') %}
                                         <textarea id="edit-wp-description" rows="3" placeholder="Describe the work package objectives and scope..." class="w-full px-4 py-2.5 border border-input rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus:border-transparent"></textarea>
-                                    </div>
+                                    {% endcall %}
                                 </div>
                             </div>
 
@@ -2127,8 +2007,7 @@
                                     Status &amp; Progress
                                 </h4>
                                 <div class="grid grid-cols-3 gap-4">
-                                    <div>
-                                        <label for="edit-wp-status" class="block text-sm font-medium text-muted-foreground mb-1">Status</label>
+                                    {% call form_group(id='edit-wp-status', label='Status') %}
                                         <select id="edit-wp-status" class="w-full px-4 py-2.5 border border-input rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                                             <option value="planned">Planned</option>
                                             <option value="in_progress">In Progress</option>
@@ -2136,16 +2015,15 @@
                                             <option value="blocked">Blocked</option>
                                             <option value="cancelled">❌ Cancelled</option>
                                         </select>
-                                    </div>
-                                    <div>
-                                        <label for="edit-wp-priority" class="block text-sm font-medium text-muted-foreground mb-1">Priority</label>
+                                    {% endcall %}
+                                    {% call form_group(id='edit-wp-priority', label='Priority') %}
                                         <select id="edit-wp-priority" class="w-full px-4 py-2.5 border border-input rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                                             <option value="critical">Critical</option>
                                             <option value="high">High</option>
                                             <option value="medium">Medium</option>
                                             <option value="low">Low</option>
                                         </select>
-                                    </div>
+                                    {% endcall %}
                                     <div>
                                         <label class="block text-sm font-medium text-muted-foreground mb-1">Progress (%)</label>
                                         <div class="flex items-center space-x-3">
@@ -2167,14 +2045,12 @@
                                     Timeline &amp; Scheduling
                                 </h4>
                                 <div class="grid grid-cols-3 gap-4">
-                                    <div>
-                                        <label for="edit-wp-start-date" class="block text-sm font-medium text-muted-foreground mb-1">Start Date</label>
+                                    {% call form_group(id='edit-wp-start-date', label='Start Date') %}
                                         <input type="date" id="edit-wp-start-date" class="w-full px-4 py-2.5 border border-input rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                                    </div>
-                                    <div>
-                                        <label for="edit-wp-end-date" class="block text-sm font-medium text-muted-foreground mb-1">Target Date</label>
+                                    {% endcall %}
+                                    {% call form_group(id='edit-wp-end-date', label='Target Date') %}
                                         <input type="date" id="edit-wp-end-date" class="w-full px-4 py-2.5 border border-input rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                                    </div>
+                                    {% endcall %}
                                     <div>
                                         <label class="block text-sm font-medium text-muted-foreground mb-1">Color Theme</label>
                                         <div class="flex items-center space-x-2">
@@ -2193,14 +2069,12 @@
                                     Resources &amp; Budget
                                 </h4>
                                 <div class="grid grid-cols-4 gap-4">
-                                    <div>
-                                        <label for="edit-wp-est-hours" class="block text-sm font-medium text-muted-foreground mb-1">Est. Hours</label>
+                                    {% call form_group(id='edit-wp-est-hours', label='Est. Hours') %}
                                         <input type="number" id="edit-wp-est-hours" placeholder="0" class="w-full px-4 py-2.5 border border-input rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" min="0">
-                                    </div>
-                                    <div>
-                                        <label for="edit-wp-act-hours" class="block text-sm font-medium text-muted-foreground mb-1">Actual Hours</label>
+                                    {% endcall %}
+                                    {% call form_group(id='edit-wp-act-hours', label='Actual Hours') %}
                                         <input type="number" id="edit-wp-act-hours" placeholder="0" class="w-full px-4 py-2.5 border border-input rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" min="0">
-                                    </div>
+                                    {% endcall %}
                                     <div>
                                         <label for="edit-wp-est-cost" class="block text-sm font-medium text-muted-foreground mb-1">Est. Cost ({{ config.CURRENCY_SYMBOL|default('£') }})</label>
                                         <input type="number" id="edit-wp-est-cost" placeholder="0" class="w-full px-4 py-2.5 border border-input rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" min="0" step="100">
@@ -2311,27 +2185,14 @@
                             </button>
                         </div>
                     </div>
-                </div>
-            </div>
-        </div>
+                
+{% endcall %}
 
         <!-- Delete Confirmation Modal -->
-        <div id="delete-confirm-modal" hidden role="dialog" aria-modal="true" aria-labelledby="delete-confirm-title" class="modal-root fixed inset-0 bg-black/80 overflow-y-auto z-50">
-            <div class="relative top-20 mx-auto p-0 w-full max-w-md">
-                <div class="bg-card rounded-lg">
-                    <!-- Header -->
-                    <div class="flex items-center justify-between p-4 border-b border-border bg-destructive rounded-t-lg">
-                        <div class="flex items-center space-x-3">
-                            <i data-lucide="alert-triangle" class="w-6 h-6 text-primary-foreground" aria-hidden="true"></i>
-                            <h3 class="text-lg font-semibold text-primary-foreground">Confirm Delete</h3>
-                        </div>
-                        <button type="button" @click="closeDeleteConfirmModal()" class="text-primary-foreground hover:text-muted-foreground/50" aria-label="Close delete confirmation">
-                            <i data-lucide="x" class="w-5 h-5" aria-hidden="true"></i>
-                        </button>
-                    </div>
+        {% call modal(id='delete-confirm-modal', title='Confirm Delete') %}
 
                     <!-- Body -->
-                    <div class="p-6">
+                    <div class="">
                         <input type="hidden" id="delete-item-id">
                         <input type="hidden" id="delete-item-type">
 
@@ -2358,7 +2219,7 @@
                     </div>
 
                     <!-- Footer -->
-                    <div class="flex justify-end space-x-3 p-4 border-t border-border bg-muted/50 rounded-b-lg">
+                    <div class="flex justify-end space-x-3 border-t border-border bg-muted/50 rounded-b-lg pt-4 mt-4">
                         <button type="button" @click="closeDeleteConfirmModal()" class="px-4 py-2 text-muted-foreground bg-card border border-input rounded-md hover:bg-accent" aria-label="Cancel delete operation">
                             Cancel
                         </button>
@@ -2367,25 +2228,14 @@
                             Delete
                         </button>
                     </div>
-                </div>
-            </div>
-        </div>
+                
+{% endcall %}
 
         <!-- Add to Roadmap Modal -->
-        <div id="add-roadmap-modal" hidden role="dialog" aria-modal="true" aria-labelledby="add-roadmap-modal-title" class="modal-root fixed inset-0 bg-black/80 overflow-y-auto z-50">
-            <div class="relative top-20 mx-auto p-5 border border-border w-full max-w-lg rounded-md bg-card">
-                <div class="flex justify-between items-center mb-4 pb-3 border-b">
-                    <h3 class="text-lg font-bold text-foreground flex items-center">
-                        <i data-lucide="map" class="w-5 h-5 mr-2 text-primary" aria-hidden="true"></i>
-                        Add to Roadmap
-                    </h3>
-                    <button type="button" @click="closeAddRoadmapModal()" class="text-muted-foreground hover:text-muted-foreground" aria-label="Close">
-                        <i data-lucide="x" class="w-6 h-6" aria-hidden="true"></i>
-                    </button>
-                </div>
+        {% call modal(id='add-roadmap-modal', title='Add to Roadmap') %}
 
                 <!-- Capability Info -->
-                <div class="bg-muted/50 rounded-lg p-4 mb-4">
+                <div class="bg-muted/50 rounded-lg mb-4">
                     <div class="text-sm text-muted-foreground mb-1">Capability</div>
                     <div id="add-roadmap-cap-name" class="font-medium text-foreground"></div>
                     <div class="flex items-center gap-2 mt-2 text-xs text-muted-foreground">
@@ -2400,35 +2250,31 @@
 
                 <!-- Gap Details -->
                 <div class="space-y-4">
-                    <div>
-                        <label for="add-roadmap-gap-type" class="block text-sm font-medium text-muted-foreground mb-1">Gap Type</label>
+                    {% call form_group(id='add-roadmap-gap-type', label='Gap Type') %}
                         <select id="add-roadmap-gap-type" class="w-full px-3 py-2 border border-input rounded-md">
                             <option value="coverage">Coverage Gap</option>
                             <option value="quality">Quality Gap</option>
                             <option value="retirement">Retirement Gap</option>
                             <option value="modernization">Modernization Gap</option>
                         </select>
-                    </div>
+                    {% endcall %}
 
-                    <div>
-                        <label for="add-roadmap-priority" class="block text-sm font-medium text-muted-foreground mb-1">Priority</label>
+                    {% call form_group(id='add-roadmap-priority', label='Priority') %}
                         <select id="add-roadmap-priority" class="w-full px-3 py-2 border border-input rounded-md">
                             <option value="critical">Critical</option>
                             <option value="high">High</option>
                             <option value="medium" selected>Medium</option>
                             <option value="low">Low</option>
                         </select>
-                    </div>
+                    {% endcall %}
 
                     <div class="grid grid-cols-2 gap-4">
-                        <div>
-                            <label for="add-roadmap-start-date" class="block text-sm font-medium text-muted-foreground mb-1">Start Date</label>
+                        {% call form_group(id='add-roadmap-start-date', label='Start Date') %}
                             <input type="date" id="add-roadmap-start-date" class="w-full px-3 py-2 border border-input rounded-md">
-                        </div>
-                        <div>
-                            <label for="add-roadmap-end-date" class="block text-sm font-medium text-muted-foreground mb-1">Target Date</label>
+                        {% endcall %}
+                        {% call form_group(id='add-roadmap-end-date', label='Target Date') %}
                             <input type="date" id="add-roadmap-end-date" class="w-full px-3 py-2 border border-input rounded-md">
-                        </div>
+                        {% endcall %}
                     </div>
 
                     <div>
@@ -2465,33 +2311,21 @@
                         Add to Roadmap
                     </button>
                 </div>
-            </div>
-        </div>
+            
+{% endcall %}
 
         <!-- Quick Add to Roadmap Modal -->
-        <div id="quick-add-modal" hidden role="dialog" aria-modal="true" aria-labelledby="quick-add-modal-title" class="modal-root fixed inset-0 bg-black/80 overflow-y-auto z-50">
-            <div class="relative top-20 mx-auto p-5 border border-border w-full max-w-2xl rounded-md bg-card">
-                <div class="flex justify-between items-center mb-4 pb-3 border-b">
-                    <h3 class="text-lg font-bold text-foreground flex items-center">
-                        <i data-lucide="search" class="w-5 h-5 mr-2 text-primary" aria-hidden="true"></i>
-                        Quick Add to Roadmap
-                    </h3>
-                    <button type="button" @click="closeQuickAddModal()" class="text-muted-foreground hover:text-muted-foreground" aria-label="Close quick add modal">
-                        <i data-lucide="x" class="w-6 h-6" aria-hidden="true"></i>
-                    </button>
-                </div>
+        {% call modal(id='quick-add-modal', title='Quick Add to Roadmap', size='lg') %}
 
                 <!-- Search and Filters -->
                 <div class="mb-4 space-y-3">
-                    <div>
-                        <label for="quick-add-search" class="block text-sm font-medium text-muted-foreground mb-1">Search capabilities</label>
+                    {% call form_group(id='quick-add-search', label='Search capabilities') %}
                         <input type="text" id="quick-add-search" placeholder="Search capabilities..."
                                @input="loadQuickAddCapabilities()"
                                class="w-full px-4 py-2 border border-input rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                    </div>
+                    {% endcall %}
                     <div class="grid grid-cols-2 gap-3">
-                        <div>
-                            <label for="quick-add-type-filter" class="block text-sm font-medium text-muted-foreground mb-1">Type</label>
+                        {% call form_group(id='quick-add-type-filter', label='Type') %}
                             <select id="quick-add-type-filter" @change="loadQuickAddCapabilities()"
                                     class="w-full px-3 py-2 border border-input rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                                 <option value="">All Types</option>
@@ -2499,9 +2333,8 @@
                                 <option value="Manufacturing">Manufacturing</option>
                                 <option value="Application">Application</option>
                             </select>
-                        </div>
-                        <div>
-                            <label for="quick-add-level-filter" class="block text-sm font-medium text-muted-foreground mb-1">Level</label>
+                        {% endcall %}
+                        {% call form_group(id='quick-add-level-filter', label='Level') %}
                             <select id="quick-add-level-filter" @change="loadQuickAddCapabilities()"
                                     class="w-full px-3 py-2 border border-input rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                                 <option value="">All Levels</option>
@@ -2511,7 +2344,7 @@
                                 <option value="4">L4 (Detailed)</option>
                                 <option value="5">L5 (Task)</option>
                             </select>
-                        </div>
+                        {% endcall %}
                     </div>
                 </div>
 
@@ -2525,12 +2358,12 @@
 
                 <!-- Footer -->
                 <div class="flex justify-end pt-4 border-t">
-                    <button type="button" @click="closeQuickAddModal()" class="px-4 py-2 text-muted-foreground bg-muted rounded-md hover:bg-accent" aria-label="Close quick add dialog">
+                    <button type="button" @click="closeQuickAddModal()" class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Close quick add dialog">
                         Close
                     </button>
                 </div>
-            </div>
-        </div>
+            
+{% endcall %}
 
     {# ARCH-064: only the unified mapping modal is still rendered up front —
        it pulls in its own <script src=...>, which an injected fragment cannot

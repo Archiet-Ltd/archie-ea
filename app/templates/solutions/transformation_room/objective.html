@@ -9,8 +9,8 @@
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <input type="hidden" name="expected_revision" value="{{ room.workstream.revision }}">
       <input type="hidden" name="command_key" value="{{ room.command_key }}">
-      <label class="grid gap-2 text-sm font-medium text-foreground">Objective<textarea name="objective" rows="4" required class="rounded-md border border-input bg-background px-3 py-2 text-sm">{{ room.workstream.objective or '' }}</textarea></label>
-      <label class="grid gap-2 text-sm font-medium text-foreground">Business units in scope<input name="scope_expression" value="{{ room.workstream.scope_expression.business_units|join(', ') if room.workstream.scope_expression and room.workstream.scope_expression.business_units else '' }}" required class="h-9 rounded-md border border-input bg-background px-3 text-sm"></label>
+      <label class="block text-sm font-medium text-muted-foreground mb-1 grid gap-2">Objective<textarea name="objective" rows="4" required class="rounded-md border border-input bg-background px-3 py-2 text-sm">{{ room.workstream.objective or '' }}</textarea></label>
+      <label class="block text-sm font-medium text-muted-foreground mb-1 grid gap-2">Business units in scope<input name="scope_expression" value="{{ room.workstream.scope_expression.business_units|join(', ') if room.workstream.scope_expression and room.workstream.scope_expression.business_units else '' }}" required class="h-9 rounded-md border border-input bg-background px-3 text-sm"></label>
       <button type="submit" :disabled="submitting" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center"><span x-show="!submitting">Save objective</span><span x-show="submitting" x-cloak role="status" aria-live="polite">Saving…</span></button>
     </form>
   </section>

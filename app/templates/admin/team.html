@@ -57,24 +57,24 @@
         <form method="POST" action="{{ url_for('team.team_invite') }}" class="flex flex-wrap gap-3 items-end">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <div class="w-full sm:w-auto">
-                <label for="email" class="block text-sm font-medium text-foreground mb-1">Email</label>
+                <label for="email" class="block text-sm font-medium text-muted-foreground mb-1">Email</label>
                 <input id="email" name="email" type="email" required autocomplete="off"
-                    class="flex h-9 w-full sm:w-64 rounded-md border border-input bg-background text-foreground px-3 py-1 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                    class="flex h-9 w-full sm:w-64 rounded-md border border-input bg-background text-foreground px-3 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                     placeholder="user@example.com">
             </div>
             <div>
-                <label for="persona" class="block text-sm font-medium text-foreground mb-1">Persona</label>
+                <label for="persona" class="block text-sm font-medium text-muted-foreground mb-1">Persona</label>
                 <select id="persona" name="persona"
-                    class="flex h-9 rounded-md border border-input bg-background text-foreground px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+                    class="flex h-9 rounded-md border border-input bg-background text-foreground px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
                     {% for value, label in personas %}
                         <option value="{{ value }}">{{ label }}</option>
                     {% endfor %}
                 </select>
             </div>
             <div>
-                <label for="role" class="block text-sm font-medium text-foreground mb-1">Role</label>
+                <label for="role" class="block text-sm font-medium text-muted-foreground mb-1">Role</label>
                 <select id="role" name="role"
-                    class="flex h-9 rounded-md border border-input bg-background text-foreground px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+                    class="flex h-9 rounded-md border border-input bg-background text-foreground px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
                     {% for r in valid_roles %}
                         <option value="{{ r }}"{% if r == 'viewer' %} selected{% endif %}>{{ r }}</option>
                     {% endfor %}
@@ -175,7 +175,7 @@
                             {% set _raw_role = _role_from_map if _role_from_map else _role_from_member %}
                             {% set current_role = _raw_role if _raw_role in valid_roles else (valid_roles[0] if valid_roles else '') %}
                             <select name="role" data-autosubmit
-                                class="rounded-md border-border focus:border-primary focus:ring-primary sm:text-sm" aria-label="Role">
+                                class="h-9 rounded-md border-border focus:border-primary focus:ring-primary sm:text-sm" aria-label="Role">
                                 {% for r in valid_roles %}
                                     <option value="{{ r }}" {% if current_role == r %}selected{% endif %}>
                                         {{ r }}

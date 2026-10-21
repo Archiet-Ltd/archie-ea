@@ -59,11 +59,11 @@
 
     <!-- Filters -->
     <form method="get" action="{{ url_for('admin.connection_gaps') }}" class="mt-6 rounded-xl border bg-card p-4">
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+        <div class="grid grid-cols-1 gap-3">
             <div>
-                <label for="domain" class="block text-xs font-medium text-muted-foreground mb-1">Business Domain</label>
+                <label for="domain" class="block text-sm font-medium text-muted-foreground mb-1">Business Domain</label>
                 <select id="domain" name="domain"
-                        class="w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm">
+                        class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm">
                     <option value="">All Domains</option>
                     {% for d in domain_options %}
                     <option value="{{ d }}" {{ 'selected' if domain_filter == d else '' }}>{{ d }}</option>
@@ -71,9 +71,9 @@
                 </select>
             </div>
             <div>
-                <label for="type" class="block text-xs font-medium text-muted-foreground mb-1">Solution Type</label>
+                <label for="type" class="block text-sm font-medium text-muted-foreground mb-1">Solution Type</label>
                 <select id="type" name="type"
-                        class="w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm">
+                        class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm">
                     <option value="">All Types</option>
                     {% for t in type_options %}
                     <option value="{{ t }}" {{ 'selected' if type_filter == t else '' }}>{{ t }}</option>
@@ -81,14 +81,14 @@
                 </select>
             </div>
             <div>
-                <label for="score_min" class="block text-xs font-medium text-muted-foreground mb-1">Min Score (%)</label>
+                <label for="score_min" class="block text-sm font-medium text-muted-foreground mb-1">Min Score (%)</label>
                 <input type="number" id="score_min" name="score_min" value="{{ score_min }}" min="0" max="100" placeholder="0"
-                       class="w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm">
+                       class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm">
             </div>
             <div>
-                <label for="score_max" class="block text-xs font-medium text-muted-foreground mb-1">Max Score (%)</label>
+                <label for="score_max" class="block text-sm font-medium text-muted-foreground mb-1">Max Score (%)</label>
                 <input type="number" id="score_max" name="score_max" value="{{ score_max }}" min="0" max="100" placeholder="100"
-                       class="w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm">
+                       class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm">
             </div>
             <div class="flex items-end">
                 <button type="submit"

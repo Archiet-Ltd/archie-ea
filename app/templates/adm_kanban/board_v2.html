@@ -621,13 +621,13 @@
          role="dialog"
          aria-modal="true"
          aria-labelledby="create-task-title">
-        <div class="fixed inset-0 bg-black/40" @click="show = false"></div>
+        <div class="fixed inset-0 bg-overlay/50" @click="show = false"></div>
         <div class="relative bg-card border border-border rounded-lg w-full max-w-md mx-4"
              @click.stop>
             <div class="flex items-center justify-between px-5 py-4 border-b border-border">
                 <h2 id="create-task-title" class="text-sm font-semibold text-foreground">New Architecture Task</h2>
                 <button type="button" @click="show = false"
-                        class="p-1 text-muted-foreground hover:text-foreground rounded"
+                        class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                         aria-label="Close">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
@@ -1022,8 +1022,8 @@
          x-transition:leave-start="opacity-100"
          x-transition:leave-end="opacity-0"
          @keydown.escape.window="card = null">
-        <div class="fixed inset-0 bg-black/40" @click="card = null"></div>
-        <div class="relative bg-card border-l border-border w-full max-w-xl flex flex-col h-full"
+        <div class="fixed inset-0 bg-overlay/50" @click="card = null"></div>
+        <div class="relative bg-card border-l border-border w-full max-w-xl flex flex-col h-full border"
              role="dialog" aria-modal="true"
              x-show="card"
              x-transition:enter="transition ease-out duration-200"
@@ -1043,7 +1043,7 @@
                            x-text="card ? card.description : ''"></p>
                     </div>
                     <button aria-label="Close card details" type="button" @click="card = null"
-                            class="mt-0.5 p-1 rounded text-muted-foreground hover:text-foreground transition-colors shrink-0">
+                            class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring mt-0.5 shrink-0">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
                     </button>
                 </div>
@@ -2103,7 +2103,7 @@
          x-transition:leave-start="opacity-100"
          x-transition:leave-end="opacity-0"
          @click.self="open = false; $store.modal.close('sprint-planning-panel')"
-         class="fixed inset-0 bg-black/30 z-40"
+         class="fixed inset-0 z-40 bg-overlay/50"
          x-cloak></div>
 
     {# Panel #}
@@ -2122,7 +2122,7 @@
         <div class="flex items-center justify-between px-4 py-3 border-b border-border">
             <h2 class="text-sm font-semibold text-foreground">Sprint Planning</h2>
             <button type="button" @click="open = false; $store.modal.close('sprint-planning-panel')"
-                    class="text-muted-foreground hover:text-foreground transition-colors"
+                    class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     aria-label="Close Sprint Planning panel">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
@@ -2203,38 +2203,38 @@
                 <form @submit.prevent="createSprint(newSprint.name, newSprint.startDate, newSprint.endDate, newSprint.capacityPoints)"
                       class="space-y-3 p-3 rounded-md border border-border bg-muted/30">
                     <div>
-                        <label class="block text-xs font-medium text-muted-foreground mb-1" for="sprint-name">Sprint Name *</label>
+                        <label class="block text-sm font-medium text-muted-foreground mb-1" for="sprint-name">Sprint Name *</label>
                         <input id="sprint-name"
                                x-model="newSprint.name"
                                type="text"
                                required
                                placeholder="e.g. Sprint 1"
-                               class="w-full px-2.5 py-1.5 text-xs border border-border rounded-md bg-background focus:outline-none focus:ring-1 focus:ring-primary"/>
+                               class="h-9 w-full px-2.5 text-xs border border-border rounded-md bg-background focus:outline-none focus:ring-1 focus:ring-primary"/>
                     </div>
-                    <div class="grid grid-cols-2 gap-2">
+                    <div class="grid grid-cols-1 gap-2">
                         <div>
-                            <label class="block text-xs font-medium text-muted-foreground mb-1" for="sprint-start">Start Date</label>
+                            <label class="block text-sm font-medium text-muted-foreground mb-1" for="sprint-start">Start Date</label>
                             <input id="sprint-start"
                                    x-model="newSprint.startDate"
                                    type="date"
-                                   class="w-full px-2 py-1 text-xs border border-border rounded-md bg-background focus:outline-none focus:ring-1 focus:ring-primary"/>
+                                   class="h-9 w-full px-2 text-xs border border-border rounded-md bg-background focus:outline-none focus:ring-1 focus:ring-primary"/>
                         </div>
                         <div>
-                            <label class="block text-xs font-medium text-muted-foreground mb-1" for="sprint-end">End Date</label>
+                            <label class="block text-sm font-medium text-muted-foreground mb-1" for="sprint-end">End Date</label>
                             <input id="sprint-end"
                                    x-model="newSprint.endDate"
                                    type="date"
-                                   class="w-full px-2 py-1 text-xs border border-border rounded-md bg-background focus:outline-none focus:ring-1 focus:ring-primary"/>
+                                   class="h-9 w-full px-2 text-xs border border-border rounded-md bg-background focus:outline-none focus:ring-1 focus:ring-primary"/>
                         </div>
                     </div>
                     <div>
-                        <label class="block text-xs font-medium text-muted-foreground mb-1" for="sprint-capacity">Capacity Points</label>
+                        <label class="block text-sm font-medium text-muted-foreground mb-1" for="sprint-capacity">Capacity Points</label>
                         <input id="sprint-capacity"
                                x-model.number="newSprint.capacityPoints"
                                type="number"
                                min="0"
                                placeholder="0"
-                               class="w-full px-2.5 py-1.5 text-xs border border-border rounded-md bg-background focus:outline-none focus:ring-1 focus:ring-primary"/>
+                               class="h-9 w-full px-2.5 text-xs border border-border rounded-md bg-background focus:outline-none focus:ring-1 focus:ring-primary"/>
                     </div>
                     <button type="submit"
                             :disabled="!newSprint.name"

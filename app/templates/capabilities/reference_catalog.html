@@ -16,19 +16,19 @@
   {# ── Filter bar (GET form) ───────────────────────────────────────────── #}
   <form method="get" action="{{ url_for('enterprise_crud.reference_catalog') }}" class="flex flex-wrap items-end gap-3 mb-5 rounded-xl border border-border bg-card p-4">
     <div class="flex-1 min-w-[200px]">
-      <label for="q" class="block text-xs font-medium text-muted-foreground mb-1">Search</label>
+      <label for="q" class="block text-sm font-medium text-muted-foreground mb-1">Search</label>
       <input id="q" name="q" type="text" value="{{ active.q }}" placeholder="Solution name…"
-             class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
+             class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
     </div>
     <div>
-      <label for="domain" class="block text-xs font-medium text-muted-foreground mb-1">Domain</label>
+      <label for="domain" class="block text-sm font-medium text-muted-foreground mb-1">Domain</label>
       <select id="domain" name="domain" class="h-9 rounded-md border border-input bg-background px-3 text-sm">
         <option value="">All domains</option>
         {% for d in facets.domains %}<option value="{{ d }}" {% if active.domain == d %}selected{% endif %}>{{ d }}</option>{% endfor %}
       </select>
     </div>
     <div>
-      <label for="type" class="block text-xs font-medium text-muted-foreground mb-1">Type</label>
+      <label for="type" class="block text-sm font-medium text-muted-foreground mb-1">Type</label>
       <select id="type" name="type" class="h-9 rounded-md border border-input bg-background px-3 text-sm">
         <option value="">All types</option>
         {% for t in facets.types %}<option value="{{ t }}" {% if active.type == t %}selected{% endif %}>{{ t }}</option>{% endfor %}

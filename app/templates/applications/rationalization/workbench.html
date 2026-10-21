@@ -312,9 +312,9 @@
          class="fixed inset-0 z-50" @keydown.escape.window="breakdownOpen = false"
          role="dialog" aria-modal="true">
         {# Backdrop #}
-        <div class="absolute inset-0 bg-black/30" @click="breakdownOpen = false"></div>
+        <div class="absolute inset-0 bg-overlay/50" @click="breakdownOpen = false"></div>
         {# Panel #}
-        <div class="absolute right-0 top-0 bottom-0 w-full max-w-md bg-card border-l border-border overflow-y-auto"
+        <div class="absolute right-0 top-0 bottom-0 w-full max-w-md bg-card border-l border-border overflow-y-auto border"
              x-transition:enter="transition ease-out duration-200"
              x-transition:enter-start="translate-x-full" x-transition:enter-end="translate-x-0"
              x-transition:leave="transition ease-in duration-150"
@@ -323,7 +323,7 @@
                 <div class="flex items-center justify-between mb-4">
                     <h3 class="text-base font-semibold text-foreground" x-text="breakdownAppName || 'Score Breakdown'"></h3>
                     <button type="button" @click="breakdownOpen = false"
-                            class="p-1 rounded-md hover:bg-muted" aria-label="Close breakdown">
+                            class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Close breakdown">
                         <i data-lucide="x" class="h-4 w-4 text-muted-foreground"></i>
                     </button>
                 </div>

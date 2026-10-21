@@ -76,7 +76,7 @@
          x-transition:leave="transition ease-in duration-200"
          x-transition:leave-start="opacity-100"
          x-transition:leave-end="opacity-0"
-         class="modal-root fixed inset-0 bg-black/80 flex items-center justify-center z-50"
+         class="modal-root fixed inset-0 flex items-center justify-center z-50 bg-overlay/50"
          @click.self="showExportModal = false" role="dialog">
         <div class="bg-card border border-border rounded-lg p-6 w-full max-w-md"
              role="dialog" aria-modal="true" x-trap="showExportModal">
@@ -314,17 +314,17 @@ function implementationPlanningDashboard() {
 
 {% call modal(id='create-work-package', title='Create Work Package', description='Add a new implementation work package', size='lg') %}
 <form @submit.prevent="submitCreateWorkPackage()" class="space-y-4" x-data="workPackageCreateModal()">
-  <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-    <div class="sm:col-span-2">
-      <label for="cwp-name" class="block text-sm font-medium mb-1">Name <span class="text-destructive-emphasis">*</span></label>
+  <div class="grid grid-cols-1 gap-4">
+    <div class="">
+      <label for="cwp-name" class="block text-sm font-medium text-muted-foreground mb-1">Name <span class="text-destructive-emphasis">*</span></label>
       <input type="text" id="cwp-name" x-model="formData.name" required maxlength="255"
-             class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+             class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
              placeholder="e.g. Cloud Migration Phase 1">
     </div>
     <div>
-      <label for="cwp-priority" class="block text-sm font-medium mb-1">Priority</label>
+      <label for="cwp-priority" class="block text-sm font-medium text-muted-foreground mb-1">Priority</label>
       <select id="cwp-priority" x-model="formData.priority"
-              class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+              class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
         <option value="low">Low</option>
         <option value="medium" selected>Medium</option>
         <option value="high">High</option>
@@ -332,9 +332,9 @@ function implementationPlanningDashboard() {
       </select>
     </div>
     <div>
-      <label for="cwp-status" class="block text-sm font-medium mb-1">Status</label>
+      <label for="cwp-status" class="block text-sm font-medium text-muted-foreground mb-1">Status</label>
       <select id="cwp-status" x-model="formData.status"
-              class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+              class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
         <option value="planned" selected>Planned</option>
         <option value="in_progress">In Progress</option>
         <option value="completed">Completed</option>
@@ -342,23 +342,23 @@ function implementationPlanningDashboard() {
       </select>
     </div>
     <div>
-      <label for="cwp-start" class="block text-sm font-medium mb-1">Start Date</label>
+      <label for="cwp-start" class="block text-sm font-medium text-muted-foreground mb-1">Start Date</label>
       <input type="date" id="cwp-start" x-model="formData.start_date"
-             class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+             class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
     </div>
     <div>
-      <label for="cwp-end" class="block text-sm font-medium mb-1">End Date</label>
+      <label for="cwp-end" class="block text-sm font-medium text-muted-foreground mb-1">End Date</label>
       <input type="date" id="cwp-end" x-model="formData.end_date"
-             class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+             class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
     </div>
     <div>
-      <label for="cwp-assigned" class="block text-sm font-medium mb-1">Assigned To</label>
+      <label for="cwp-assigned" class="block text-sm font-medium text-muted-foreground mb-1">Assigned To</label>
       <input type="text" id="cwp-assigned" x-model="formData.assigned_to" maxlength="255"
-             class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+             class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
              placeholder="Name or team">
     </div>
-    <div class="sm:col-span-2">
-      <label for="cwp-description" class="block text-sm font-medium mb-1">Description</label>
+    <div class="">
+      <label for="cwp-description" class="block text-sm font-medium text-muted-foreground mb-1">Description</label>
       <textarea id="cwp-description" x-model="formData.description" rows="2"
                 class="flex min-h-[64px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 placeholder="Describe the scope and objectives"></textarea>
@@ -367,7 +367,7 @@ function implementationPlanningDashboard() {
   <div x-show="errorMsg" x-cloak class="rounded-md bg-destructive/10 border border-destructive/30 px-3 py-2 text-sm text-destructive-emphasis" x-text="errorMsg"></div>
   <div class="flex justify-end gap-3 pt-2 border-t border-border">
     <button type="button" data-modal-close="create-work-package"
-            class="px-4 py-2 text-sm font-medium rounded-md border border-input bg-background hover:bg-accent" aria-label="Action">Cancel</button>
+            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4" aria-label="Action">Cancel</button>
     <button type="submit" :disabled="submitting"
             class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center" aria-label="Submit">
       <i data-lucide="loader-2" class="h-4 w-4 animate-spin" x-show="submitting" x-cloak></i>

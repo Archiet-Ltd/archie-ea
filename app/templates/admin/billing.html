@@ -211,7 +211,7 @@
                 <input type="hidden" name="interval" value="{{ selected_interval }}">
                 {% if selected_plan.per_seat %}
                 <div class="max-w-xs space-y-2">
-                    <label for="seats" class="text-sm font-medium leading-none block">Editor seats</label>
+                    <label for="seats" class="block text-sm font-medium text-muted-foreground mb-1 leading-none">Editor seats</label>
                     <input type="number" id="seats" name="seats" min="1" max="10000" required
                            value="{{ subscription.seats_purchased if (plan.key == selected_plan.key) else selected_plan.default_seats }}"
                            class="{{ input_cls }}">
@@ -240,20 +240,20 @@
         {% elif details_error %}
             <p class="text-sm text-destructive-emphasis">Billing details could not be read: {{ details_error }}</p>
         {% else %}
-            <form method="post" action="{{ url_for('billing.billing_details') }}" class="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-2xl" data-testid="billing-details-form">
+            <form method="post" action="{{ url_for('billing.billing_details') }}" class="grid grid-cols-1 gap-4 max-w-2xl" data-testid="billing-details-form">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <div class="space-y-2">
-                    <label for="billing_email" class="text-sm font-medium leading-none block">Invoice e-mail</label>
+                    <label for="billing_email" class="block text-sm font-medium text-muted-foreground mb-1 leading-none">Invoice e-mail</label>
                     <input type="email" id="billing_email" name="billing_email" maxlength="254" autocomplete="email"
                            value="{{ details.email or '' }}" class="{{ input_cls }}">
                 </div>
                 <div class="space-y-2">
-                    <label for="po_number" class="text-sm font-medium leading-none block">Purchase-order number</label>
+                    <label for="po_number" class="block text-sm font-medium text-muted-foreground mb-1 leading-none">Purchase-order number</label>
                     <input type="text" id="po_number" name="po_number" maxlength="140"
                            value="{{ details.po_number or '' }}" class="{{ input_cls }}">
                 </div>
-                <p class="sm:col-span-2 text-xs text-muted-foreground">Printed on every invoice issued from now on. Change the card, billing address or tax number in Manage billing.</p>
-                <div class="sm:col-span-2">
+                <p class="text-xs text-muted-foreground">Printed on every invoice issued from now on. Change the card, billing address or tax number in Manage billing.</p>
+                <div class="">
                     <button type="submit" class="{{ btn_outline }}">Save billing details</button>
                 </div>
             </form>

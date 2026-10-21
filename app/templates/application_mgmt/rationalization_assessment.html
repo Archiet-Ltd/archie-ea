@@ -94,8 +94,8 @@
         </h2>
         <div class="space-y-6">
           <div class="question-card border rounded-lg p-4 transition-all duration-200 hover:-translate-y-0.5">
-            <label class="block font-medium mb-3">What is the current architecture pattern?</label>
-            <div class="grid grid-cols-2 gap-3">
+            <label class="block text-sm font-medium text-muted-foreground mb-1">What is the current architecture pattern?</label>
+            <div class="grid grid-cols-1 gap-3">
               <label class="flex items-center gap-3 p-3 border rounded-md cursor-pointer hover:bg-accent">
                 <input type="radio" name="architecture_pattern" value="modern_microservices" class="w-4 h-4" aria-label="Architecture Pattern">
                 <div><div class="font-medium">Modern/Microservices</div><div class="text-xs text-muted-foreground">Cloud-native, scalable</div></div>
@@ -116,7 +116,7 @@
           </div>
 
           <div class="question-card border rounded-lg p-4 transition-all duration-200 hover:-translate-y-0.5">
-            <label class="block font-medium mb-3">How would you rate the technical debt level?</label>
+            <label class="block text-sm font-medium text-muted-foreground mb-1">How would you rate the technical debt level?</label>
             <div class="flex gap-2">
               <label class="flex-1 text-center p-3 border rounded-md cursor-pointer hover:bg-accent">
                 <input type="radio" name="technical_debt" value="low" class="hidden peer" aria-label="Technical Debt">
@@ -142,8 +142,8 @@
           </div>
 
           <div class="question-card border rounded-lg p-4 transition-all duration-200 hover:-translate-y-0.5">
-            <label class="block font-medium mb-3">What is the deployment frequency?</label>
-            <select name="deployment_frequency" class="w-full rounded-md border px-3 py-2" aria-label="What is the deployment frequency?">
+            <label class="block text-sm font-medium text-muted-foreground mb-1">What is the deployment frequency?</label>
+            <select name="deployment_frequency" class="h-9 w-full rounded-md border px-3 border-input" aria-label="What is the deployment frequency?">
               <option value="">Select...</option>
               <option value="multiple_daily">Multiple times per day (CI/CD)</option>
               <option value="daily">Daily</option>
@@ -166,7 +166,7 @@
         </h2>
         <div class="space-y-6">
           <div class="question-card border rounded-lg p-4 transition-all duration-200 hover:-translate-y-0.5">
-            <label class="block font-medium mb-3">Strategic Importance</label>
+            <label class="block text-sm font-medium text-muted-foreground mb-1">Strategic Importance</label>
             <div class="flex gap-2">
               <label class="flex-1 text-center p-3 border rounded-md cursor-pointer hover:bg-accent">
                 <input type="radio" name="strategic_importance" value="critical" class="hidden peer" aria-label="Strategic Importance">
@@ -192,7 +192,7 @@
           </div>
 
           <div class="question-card border rounded-lg p-4 transition-all duration-200 hover:-translate-y-0.5">
-            <label class="block font-medium mb-3">User Satisfaction (1-10)</label>
+            <label class="block text-sm font-medium text-muted-foreground mb-1">User Satisfaction (1-10)</label>
             <input type="range" name="user_satisfaction" min="1" max="10" value="5" class="w-full mb-2" aria-label="User Satisfaction">
             <div class="flex justify-between text-xs text-muted-foreground">
               <span>Very Dissatisfied (1)</span>
@@ -202,7 +202,7 @@
           </div>
 
           <div class="question-card border rounded-lg p-4 transition-all duration-200 hover:-translate-y-0.5">
-            <label class="block font-medium mb-3">Business Process Coverage</label>
+            <label class="block text-sm font-medium text-muted-foreground mb-1">Business Process Coverage</label>
             <div class="flex gap-2">
               <label class="flex-1 text-center p-3 border rounded-md cursor-pointer hover:bg-accent">
                 <input type="radio" name="process_coverage" value="comprehensive" class="hidden peer" aria-label="Process Coverage">
@@ -234,8 +234,8 @@
         </h2>
         <div class="space-y-6">
           <div class="question-card border rounded-lg p-4 transition-all duration-200 hover:-translate-y-0.5">
-            <label class="block font-medium mb-3">Annual Operating Cost Tier</label>
-            <div class="grid grid-cols-2 gap-3">
+            <label class="block text-sm font-medium text-muted-foreground mb-1">Annual Operating Cost Tier</label>
+            <div class="grid grid-cols-1 gap-3">
               <label class="flex items-center gap-3 p-3 border rounded-md cursor-pointer hover:bg-accent">
                 <input type="radio" name="cost_tier" value="very_low" class="w-4 h-4" aria-label="Cost Tier">
                 <div><div class="font-medium">Very Low</div><div class="text-xs text-muted-foreground">&lt; $50K/year</div></div>
@@ -256,8 +256,8 @@
           </div>
 
           <div class="question-card border rounded-lg p-4 transition-all duration-200 hover:-translate-y-0.5">
-            <label class="block font-medium mb-3">License Optimization Opportunity</label>
-            <select name="license_optimization" class="w-full rounded-md border px-3 py-2" aria-label="License Optimization Opportunity">
+            <label class="block text-sm font-medium text-muted-foreground mb-1">License Optimization Opportunity</label>
+            <select name="license_optimization" class="h-9 w-full rounded-md border px-3 border-input" aria-label="License Optimization Opportunity">
               <option value="">Select...</option>
               <option value="high">High - Significant unused licenses</option>
               <option value="medium">Medium - Some optimization possible</option>
@@ -278,7 +278,7 @@
         </h2>
         <div class="space-y-6">
           <div class="question-card border rounded-lg p-4 transition-all duration-200 hover:-translate-y-0.5">
-            <label class="block font-medium mb-3">Vendor Financial Health</label>
+            <label class="block text-sm font-medium text-muted-foreground mb-1">Vendor Financial Health</label>
             <div class="flex gap-2">
               <label class="flex-1 text-center p-3 border rounded-md cursor-pointer hover:bg-accent">
                 <input type="radio" name="vendor_health" value="strong" class="hidden peer" aria-label="Vendor Health">
@@ -304,8 +304,8 @@
           </div>
 
           <div class="question-card border rounded-lg p-4 transition-all duration-200 hover:-translate-y-0.5">
-            <label class="block font-medium mb-3">Contract Status</label>
-            <select name="contract_status" class="w-full rounded-md border px-3 py-2" aria-label="Contract Status">
+            <label class="block text-sm font-medium text-muted-foreground mb-1">Contract Status</label>
+            <select name="contract_status" class="h-9 w-full rounded-md border px-3 border-input" aria-label="Contract Status">
               <option value="">Select...</option>
               <option value="long_term">Long-term contract (3+ years)</option>
               <option value="medium_term">Medium-term (1-3 years)</option>
@@ -327,7 +327,7 @@
         </h2>
         <div class="space-y-6">
           <div class="question-card border rounded-lg p-4 transition-all duration-200 hover:-translate-y-0.5">
-            <label class="block font-medium mb-3">Are there duplicate/similar applications?</label>
+            <label class="block text-sm font-medium text-muted-foreground mb-1">Are there duplicate/similar applications?</label>
             <div class="flex gap-4">
               <label class="flex items-center gap-2">
                 <input type="radio" name="has_duplicates" value="yes" class="w-4 h-4" aria-label="Has Duplicates">
@@ -345,8 +345,8 @@
           </div>
 
           <div class="question-card border rounded-lg p-4 transition-all duration-200 hover:-translate-y-0.5">
-            <label class="block font-medium mb-3">Integration Complexity</label>
-            <select name="integration_complexity" class="w-full rounded-md border px-3 py-2" aria-label="Integration Complexity">
+            <label class="block text-sm font-medium text-muted-foreground mb-1">Integration Complexity</label>
+            <select name="integration_complexity" class="h-9 w-full rounded-md border px-3 border-input" aria-label="Integration Complexity">
               <option value="">Select...</option>
               <option value="high">High - Many critical integrations</option>
               <option value="medium">Medium - Some integrations</option>
@@ -356,8 +356,8 @@
           </div>
 
           <div class="question-card border rounded-lg p-4 transition-all duration-200 hover:-translate-y-0.5">
-            <label class="block font-medium mb-3">Data Migration Complexity</label>
-            <select name="data_migration_complexity" class="w-full rounded-md border px-3 py-2" aria-label="Data Migration Complexity">
+            <label class="block text-sm font-medium text-muted-foreground mb-1">Data Migration Complexity</label>
+            <select name="data_migration_complexity" class="h-9 w-full rounded-md border px-3 border-input" aria-label="Data Migration Complexity">
               <option value="">Select...</option>
               <option value="simple">Simple - Standard data formats</option>
               <option value="moderate">Moderate - Some transformation needed</option>

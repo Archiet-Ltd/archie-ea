@@ -435,9 +435,9 @@
         x-transition
         class="modal-root fixed inset-0 z-50 flex items-center justify-center"
     >
-        <div class="modal-root fixed inset-0 bg-background/80" @click="showDetailModal = false"></div>
-        <div class="relative z-50 w-full max-w-2xl rounded-lg border bg-background p-6 max-h-[80vh] overflow-y-auto" role="dialog" aria-modal="true" tabindex="-1">
-            <button type="button" @click="showDetailModal = false" class="absolute right-4 top-4 rounded-sm opacity-70 hover:opacity-100" aria-label="Close element detail dialog">
+        <div class="modal-root fixed inset-0 bg-overlay/50" @click="showDetailModal = false"></div>
+        <div class="relative z-50 w-full max-w-2xl rounded-lg border bg-background p-6 max-h-[80vh] overflow-y-auto border-border" role="dialog" aria-modal="true" tabindex="-1">
+            <button type="button" @click="showDetailModal = false" class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring absolute right-4 top-4" aria-label="Close element detail dialog">
                 <i data-lucide="x" class="h-4 w-4" aria-hidden="true"></i>
             </button>
 
@@ -561,8 +561,8 @@
         x-transition
         class="modal-root fixed inset-0 z-50 flex items-center justify-center"
     >
-        <div class="modal-root fixed inset-0 bg-background/80" @click="showEditModal = false"></div>
-        <div class="relative z-50 w-full max-w-lg rounded-lg border bg-background p-6" role="dialog" aria-modal="true" tabindex="-1">
+        <div class="modal-root fixed inset-0 bg-overlay/50" @click="showEditModal = false"></div>
+        <div class="relative z-50 w-full max-w-lg rounded-lg border bg-background p-6 border-border" role="dialog" aria-modal="true" tabindex="-1">
             <button type="button" @click="showEditModal = false" class="absolute right-4 top-4 rounded-sm opacity-70 hover:opacity-100" aria-label="Edit">
                 <i data-lucide="x" class="h-4 w-4" aria-hidden="true"></i>
             </button>
@@ -571,25 +571,25 @@
 
             <form @submit.prevent="saveElement()" class="space-y-4">
                 <div>
-                    <label class="text-sm font-medium">Name</label>
+                    <label class="block text-sm font-medium text-muted-foreground mb-1">Name</label>
                     <input
                         type="text"
                         x-model="editingElement.name"
-                        class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring mt-1"
+                        class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring mt-1"
                      aria-label="Element name"/>
                 </div>
 
                 <div>
-                    <label class="text-sm font-medium">Type</label>
+                    <label class="block text-sm font-medium text-muted-foreground mb-1">Type</label>
                     <input
                         type="text"
                         x-model="editingElement.element_type"
-                        class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring mt-1"
+                        class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring mt-1"
                      aria-label="Element type"/>
                 </div>
 
                 <div>
-                    <label class="text-sm font-medium">Description</label>
+                    <label class="block text-sm font-medium text-muted-foreground mb-1">Description</label>
                     <textarea
                         x-model="editingElement.description"
                         rows="3"
@@ -601,7 +601,7 @@
                     <button
                         type="button"
                         @click="showEditModal = false"
-                        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center"
+                        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4"
                      aria-label="Edit">
                         Cancel
                     </button>
@@ -623,9 +623,9 @@
         x-transition
         class="modal-root fixed inset-0 z-50 flex items-center justify-center"
     >
-        <div class="modal-root fixed inset-0 bg-background/80" @click="showCommitModal = false"></div>
-        <div class="relative z-50 w-full max-w-md rounded-lg border bg-background p-6" role="alertdialog" aria-modal="true" tabindex="-1">
-            <button type="button" @click="showCommitModal = false" class="absolute right-4 top-4 rounded-sm opacity-70 hover:opacity-100" aria-label="Close commit confirmation dialog">
+        <div class="modal-root fixed inset-0 bg-overlay/50" @click="showCommitModal = false"></div>
+        <div class="relative z-50 w-full max-w-md rounded-lg border bg-background p-6 border-border" role="alertdialog" aria-modal="true" tabindex="-1">
+            <button type="button" @click="showCommitModal = false" class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring absolute right-4 top-4" aria-label="Close commit confirmation dialog">
                 <i data-lucide="x" class="h-4 w-4" aria-hidden="true"></i>
             </button>
 

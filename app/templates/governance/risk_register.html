@@ -1,4 +1,6 @@
 {% extends 'layouts/admin_base.html' %}
+{% from 'components/form_field.html' import form_group, form_footer %}
+{% from 'components/dense_table.html' import dense_table %}
 {% from 'macros/page_shell.html' import page_shell %}
 {% from 'components/modal.html' import modal %}
 {% from 'components/data_table.html' import data_table, data_table_script with context %}
@@ -195,35 +197,22 @@
             </div>
         </div>
         {% if raid_items %}
-        <div class="overflow-x-auto">
-            <table class="dense-table w-full text-sm">
-                <thead>
-                    <tr class="border-b border-border text-left text-xs uppercase tracking-wide text-muted-foreground">
-                        <th class="px-4 py-2 font-medium">Kind</th>
-                        <th class="px-4 py-2 font-medium">Title</th>
-                        <th class="px-4 py-2 font-medium">Programme</th>
-                        <th class="px-4 py-2 font-medium">Owner</th>
-                        <th class="px-4 py-2 font-medium">Target date</th>
-                        <th class="px-4 py-2 font-medium">Status</th>
-                        <th class="px-4 py-2 font-medium text-right">Action</th>
-                    </tr>
-                </thead>
-                <tbody class="divide-y divide-border">
+{% call dense_table(columns=[('Kind', ''), ('Title', ''), ('Programme', ''), ('Owner', ''), ('Target date', ''), ('Status', ''), ('Action', 'text-right')], flush=true) %}
                     {% for item in raid_items %}
                     <tr class="hover:bg-accent/40 transition-colors" x-show='!kindFilter || kindFilter === {{ item.kind.value | tojson }}'>
-                        <td class="px-4 py-2">
+                        <td class="px-2">
                             <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-muted text-muted-foreground capitalize">{{ item.kind.value }}</span>
                         </td>
-                        <td class="px-4 py-2">
+                        <td class="px-2">
                             <div class="font-medium text-foreground">{{ item.title }}</div>
                             {% if item.description %}
                             <div class="text-xs text-muted-foreground">{{ item.description | truncate(90) }}</div>
                             {% endif %}
                         </td>
-                        <td class="px-4 py-2 text-muted-foreground">{{ item.strategic_initiative.name if item.strategic_initiative else (item.programme_name or '—') }}</td>
-                        <td class="px-4 py-2 text-muted-foreground">{{ item.owner or '—' }}</td>
-                        <td class="px-4 py-2 tabular-nums text-muted-foreground">{{ item.target_date.isoformat() if item.target_date else '—' }}</td>
-                        <td class="px-4 py-2">
+                        <td class="px-2 text-muted-foreground">{{ item.strategic_initiative.name if item.strategic_initiative else (item.programme_name or '—') }}</td>
+                        <td class="px-2 text-muted-foreground">{{ item.owner or '—' }}</td>
+                        <td class="px-2 tabular-nums text-muted-foreground">{{ item.target_date.isoformat() if item.target_date else '—' }}</td>
+                        <td class="px-2">
                             <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium
                                 {% if item.status.value == 'open' %}bg-warning/10 text-warning-emphasis
                                 {% elif item.status.value == 'resolved' %}bg-info/10 text-info-emphasis
@@ -231,7 +220,7 @@
                                 {{ item.status.value | title }}
                             </span>
                         </td>
-                        <td class="px-4 py-2 text-right whitespace-nowrap">
+                        <td class="px-2 text-right whitespace-nowrap">
                             {% if item.status.value != 'closed' %}
                             {# DEF-068, Capgemini dry-run pass 3: the ternary's
                                output ('resolved'/'closed') rendered as a bare
@@ -258,9 +247,7 @@
                         </td>
                     </tr>
                     {% endfor %}
-                </tbody>
-            </table>
-        </div>
+                {% endcall %}
         {% else %}
         <div class="px-4 py-10 text-center">
             <p class="text-sm text-muted-foreground">No assumptions, issues or dependencies recorded yet.</p>
@@ -276,36 +263,31 @@
        directly and never noticed). #}
     {% call modal(id='create-raid-modal', title='Add RAID Item', description='Record an assumption, issue or dependency.', size='lg') %}
     <div class="space-y-4">
-        <div>
-            <label for="raid-kind" class="block text-sm font-medium mb-1">Kind <span class="text-destructive-emphasis">*</span></label>
+        {% call form_group(id='raid-kind', label='Kind', required=true) %}
             <select id="raid-kind" x-model="raidForm.kind"
                     class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm capitalize">
                 <template x-for="k in kinds" :key="k">
                     <option :value="k" x-text="k" class="capitalize"></option>
                 </template>
             </select>
-        </div>
-        <div>
-            <label for="raid-title" class="block text-sm font-medium mb-1">Title <span class="text-destructive-emphasis">*</span></label>
+        {% endcall %}
+        {% call form_group(id='raid-title', label='Title', required=true) %}
             <input id="raid-title" type="text" x-model="raidForm.title"
                    class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-        </div>
-        <div>
-            <label for="raid-description" class="block text-sm font-medium mb-1">Description</label>
+        {% endcall %}
+        {% call form_group(id='raid-description', label='Description') %}
             <textarea id="raid-description" x-model="raidForm.description" rows="3"
                       class="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm"></textarea>
-        </div>
+        {% endcall %}
         <div class="grid grid-cols-2 gap-3">
-            <div>
-                <label for="raid-owner" class="block text-sm font-medium mb-1">Owner</label>
+            {% call form_group(id='raid-owner', label='Owner') %}
                 <input id="raid-owner" type="text" x-model="raidForm.owner"
                        class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
-            </div>
-            <div>
-                <label for="raid-target-date" class="block text-sm font-medium mb-1">Target date</label>
+            {% endcall %}
+            {% call form_group(id='raid-target-date', label='Target date') %}
                 <input id="raid-target-date" type="date" x-model="raidForm.target_date"
                        class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
-            </div>
+            {% endcall %}
         </div>
         <div>
             <label for="raid-programme" class="block text-sm font-medium mb-1">Programme</label>
@@ -336,21 +318,18 @@
     {% call modal(id='create-risk-modal', title='Add Risk', description='Record an enterprise architecture risk.', size='lg') %}
     <div class="space-y-4">
         <p x-show="editingId" x-cloak class="text-xs font-medium text-primary -mt-1">Editing risk #<span x-text="editingId"></span> — use Map to… on the risk's own row to link it to an Application, Solution or Programme.</p>
-        <div>
-            <label for="risk-title" class="block text-sm font-medium mb-1">Title <span class="text-destructive-emphasis">*</span></label>
+        {% call form_group(id='risk-title', label='Title', required=true) %}
             <input id="risk-title" type="text" x-model="form.title"
                    class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                    placeholder="What could go wrong?">
-        </div>
-        <div>
-            <label for="risk-description" class="block text-sm font-medium mb-1">Description</label>
+        {% endcall %}
+        {% call form_group(id='risk-description', label='Description') %}
             <textarea id="risk-description" rows="2" x-model="form.description"
                       class="flex min-h-[64px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                       placeholder="Context and consequence"></textarea>
-        </div>
+        {% endcall %}
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-                <label for="risk-likelihood" class="block text-sm font-medium mb-1">Likelihood (1-5) <span class="text-destructive-emphasis">*</span></label>
+            {% call form_group(id='risk-likelihood', label='Likelihood (1-5)', required=true) %}
                 <select id="risk-likelihood" x-model="form.likelihood"
                         class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
                     <option value="1">1</option>
@@ -359,9 +338,8 @@
                     <option value="4">4</option>
                     <option value="5">5</option>
                 </select>
-            </div>
-            <div>
-                <label for="risk-impact" class="block text-sm font-medium mb-1">Impact (1-5) <span class="text-destructive-emphasis">*</span></label>
+            {% endcall %}
+            {% call form_group(id='risk-impact', label='Impact (1-5)', required=true) %}
                 <select id="risk-impact" x-model="form.impact"
                         class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
                     <option value="1">1</option>
@@ -370,20 +348,18 @@
                     <option value="4">4</option>
                     <option value="5">5</option>
                 </select>
-            </div>
+            {% endcall %}
         </div>
-        <div>
-            <label for="risk-owner" class="block text-sm font-medium mb-1">Owner</label>
+        {% call form_group(id='risk-owner', label='Owner') %}
             <input id="risk-owner" type="text" x-model="form.owner"
                    class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                    placeholder="Who carries this risk?">
-        </div>
-        <div>
-            <label for="risk-mitigation" class="block text-sm font-medium mb-1">Mitigation plan</label>
+        {% endcall %}
+        {% call form_group(id='risk-mitigation', label='Mitigation plan') %}
             <textarea id="risk-mitigation" rows="2" x-model="form.mitigation_plan"
                       class="flex min-h-[64px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                       placeholder="What reduces it?"></textarea>
-        </div>
+        {% endcall %}
         <div x-show="error" x-cloak role="alert"
              class="rounded-md bg-destructive/10 border border-destructive/20 px-3 py-2 text-sm text-destructive-emphasis"
              x-text="error"></div>
@@ -413,7 +389,7 @@
              x-transition:leave="transition ease-in duration-150"
              x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0"
              @click.self="panelOpen = false"
-             class="fixed inset-0 bg-black/30 z-40"></div>
+             class="fixed inset-0 z-40 bg-overlay/50"></div>
 
         <div x-show="panelOpen" x-cloak role="dialog" aria-modal="true" aria-label="Risk detail"
              x-transition:enter="transition ease-out duration-200"
@@ -424,7 +400,7 @@
 
             <div class="flex items-center justify-between px-4 py-3 border-b border-border">
                 <h2 class="text-sm font-semibold text-foreground truncate" x-text="selectedRisk ? selectedRisk.title : 'Risk detail'"></h2>
-                <button type="button" @click="panelOpen = false" class="text-muted-foreground hover:text-foreground transition-colors" aria-label="Close risk detail">
+                <button type="button" @click="panelOpen = false" class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Close risk detail">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
                 </button>
             </div>

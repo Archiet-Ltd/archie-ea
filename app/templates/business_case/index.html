@@ -87,7 +87,7 @@
       x-data="businessCaseSeed('{{ url_for('business_case.ai_prefill_new_case') }}')">
   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
   <div class="rounded-md border border-border bg-muted/30 p-3 space-y-2">
-    <label for="bc-seed-description" class="block text-sm font-medium">
+    <label for="bc-seed-description" class="block text-sm font-medium text-muted-foreground mb-1">
       <i data-lucide="sparkles" class="h-4 w-4 inline-block align-text-bottom"></i>
       Generate with AI
     </label>
@@ -103,18 +103,18 @@
     <div class="rounded-md border border-destructive/30 bg-destructive/10 p-2 text-xs text-destructive-emphasis" x-show="error" x-cloak x-text="error" data-testid="bc-seed-error"></div>
   </div>
   <div>
-    <label for="bc-title" class="block text-sm font-medium mb-1">Title <span class="text-destructive-emphasis" aria-hidden="true">*</span></label>
+    <label for="bc-title" class="block text-sm font-medium text-muted-foreground mb-1">Title <span class="text-destructive-emphasis" aria-hidden="true">*</span></label>
     <input id="bc-title" x-ref="bcTitle" name="title" type="text" required maxlength="256" placeholder="e.g. Consolidate Regional CRM Instances"
-      class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+      class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
   </div>
   <div>
-    <label for="bc-description" class="block text-sm font-medium mb-1">Description</label>
+    <label for="bc-description" class="block text-sm font-medium text-muted-foreground mb-1">Description</label>
     <textarea id="bc-description" x-ref="bcDescription" name="description" rows="2" maxlength="2000" placeholder="Optional context for this business case"
       class="flex min-h-[64px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"></textarea>
   </div>
   <div class="flex justify-end gap-3 pt-2 border-t">
     <button type="button" data-modal-close="bc-create-modal"
-      class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
+      class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4">
       Cancel
     </button>
     <button type="submit" data-testid="bc-create-submit"

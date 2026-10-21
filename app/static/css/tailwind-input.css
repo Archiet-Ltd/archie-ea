@@ -74,13 +74,25 @@
 }
 
 @layer components {
+  /* The one modal z-index scale, as stylesheet rules: an inline style attribute and a nonce-scoped
+     <style> block are both refused by the content security policy when a template imports the
+     modal without context, which left the backdrop below the sidebar. Every modal shell carries
+     modal-root or modal-backdrop on its base layer and modal-panel one above it. */
+  .modal-root,
+  .modal-backdrop {
+    z-index: var(--modal-z, 1000);
+  }
+  .modal-panel {
+    z-index: calc(var(--modal-z, 1000) + 1);
+  }
+
   .tabular {
     font-variant-numeric: tabular-nums;
   }
   /* Dense table (design/patterns.json: dense-table). shadcn-components.css
      scopes table rules to #main-content by id, so the pilot geometry needs an
-     id-plus-class selector to apply: 40px header, 48px rows, 12px cell
-     padding, hairline rows, card-coloured sticky header. */
+     id-plus-class selector to apply: 40px header at weight 500, 48px rows,
+     8px cell padding, hairline rows, card-coloured sticky header. */
   /* reuse-ok: the dense table is the authenticated app's canonical table (design/patterns.json: dense-table), not a copy of the public-site table */
   #main-content .dense-table thead {
     background-color: hsl(var(--card));
@@ -88,13 +100,30 @@
   /* reuse-ok: the dense table is the authenticated app's canonical table (design/patterns.json: dense-table), not a copy of the public-site table */
   #main-content .dense-table th {
     height: 2.5rem;
-    padding: 0 0.75rem;
+    padding: 0 0.5rem;
+    font-weight: 500;
     letter-spacing: 0.06em;
+    background-color: hsl(var(--card));
+  }
+  /* reuse-ok: matrix row headers are names, not column labels; this undoes the legacy #main-content th rule in shadcn-components.css */
+  #main-content .dense-table.matrix tbody th[scope="row"] {
+    text-transform: none;
+    letter-spacing: normal;
+    white-space: normal;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: hsl(var(--foreground));
+    padding: 0 0.5rem;
   }
   /* reuse-ok: the dense table is the authenticated app's canonical table (design/patterns.json: dense-table), not a copy of the public-site table */
   #main-content .dense-table td {
     height: 3rem;
-    padding: 0 0.75rem;
+    padding: 0 0.5rem;
+  }
+  /* reuse-ok: the dense table is the authenticated app's canonical table (design/patterns.json: dense-table), not a copy of the public-site table; this is its empty-row spacing */
+  #main-content .dense-table td.dense-empty {
+    height: auto;
+    padding: 2rem 0.5rem;
   }
   /* The question line above an answer cascade. */
   .question-line {

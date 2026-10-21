@@ -323,30 +323,30 @@
                 <span class="font-medium text-foreground" x-text="activeCell && activeCell.stageName"></span>
             </div>
             <div>
-                <label class="text-xs font-medium text-muted-foreground uppercase tracking-wide">Support Level (1-5)</label>
+                <label class="block text-sm font-medium text-muted-foreground mb-1">Support Level (1-5)</label>
                 <input type="range" min="1" max="5" step="1" x-model.number="cellForm.support_level"
                        class="mt-2 w-full" aria-label="Support Level (1-5)">
                 <div class="text-center text-sm font-semibold mt-1" x-text="cellForm.support_level"></div>
             </div>
             <div>
-                <label class="text-xs font-medium text-muted-foreground uppercase tracking-wide">Contribution (%)</label>
+                <label class="block text-sm font-medium text-muted-foreground mb-1">Contribution (%)</label>
                 <input type="number" min="0" max="100" x-model.number="cellForm.capability_contribution"
-                       class="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" aria-label="Contribution (%)">
+                       class="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" aria-label="Contribution (%)">
             </div>
-            <div class="grid grid-cols-2 gap-4">
+            <div class="grid grid-cols-1 gap-4">
                 <div>
-                    <label class="text-xs font-medium text-muted-foreground uppercase tracking-wide">Support Type</label>
+                    <label class="block text-sm font-medium text-muted-foreground mb-1">Support Type</label>
                     <select x-model="cellForm.support_type"
-                            class="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" aria-label="Support Type">
+                            class="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" aria-label="Support Type">
                         <option value="primary">Primary</option>
                         <option value="secondary">Secondary</option>
                         <option value="supporting">Supporting</option>
                     </select>
                 </div>
                 <div>
-                    <label class="text-xs font-medium text-muted-foreground uppercase tracking-wide">Impact Level</label>
+                    <label class="block text-sm font-medium text-muted-foreground mb-1">Impact Level</label>
                     <select x-model="cellForm.impact_level"
-                            class="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" aria-label="Impact Level">
+                            class="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" aria-label="Impact Level">
                         <option value="critical">Critical</option>
                         <option value="high">High</option>
                         <option value="medium">Medium</option>
@@ -361,7 +361,7 @@
                 </button>
                 <div class="flex gap-2 ml-auto">
                     <button type="button" data-modal-close="cell-edit-modal"
-                            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
+                            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4">
                         Cancel
                     </button>
                     <button type="submit" :disabled="saving"
@@ -380,51 +380,51 @@
     <form method="POST" action="{{ url_for('value_stream.create_stage', value_stream_id=value_stream.id) }}" class="space-y-4">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div>
-            <label for="stage-name" class="text-xs font-medium text-muted-foreground uppercase tracking-wide">Name</label>
+            <label for="stage-name" class="block text-sm font-medium text-muted-foreground mb-1">Name</label>
             <input type="text" id="stage-name" name="name" required
-                   class="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+                   class="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
         </div>
         <div>
-            <label for="stage-description" class="text-xs font-medium text-muted-foreground uppercase tracking-wide">Description</label>
+            <label for="stage-description" class="block text-sm font-medium text-muted-foreground mb-1">Description</label>
             <textarea id="stage-description" name="description" rows="2"
                       class="mt-1 flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"></textarea>
         </div>
         <div>
-            <label for="stage-entry-criteria" class="text-xs font-medium text-muted-foreground uppercase tracking-wide">Entry criteria</label>
+            <label for="stage-entry-criteria" class="block text-sm font-medium text-muted-foreground mb-1">Entry criteria</label>
             <textarea id="stage-entry-criteria" name="entry_criteria" rows="2"
                       class="mt-1 flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"></textarea>
         </div>
         <div>
-            <label for="stage-exit-criteria" class="text-xs font-medium text-muted-foreground uppercase tracking-wide">Exit criteria</label>
+            <label for="stage-exit-criteria" class="block text-sm font-medium text-muted-foreground mb-1">Exit criteria</label>
             <textarea id="stage-exit-criteria" name="exit_criteria" rows="2"
                       class="mt-1 flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"></textarea>
         </div>
-        <div class="grid grid-cols-2 gap-4">
+        <div class="grid grid-cols-1 gap-4">
             <div>
-                <label for="stage-stakeholders" class="text-xs font-medium text-muted-foreground uppercase tracking-wide">Stakeholders (one per line)</label>
+                <label for="stage-stakeholders" class="block text-sm font-medium text-muted-foreground mb-1">Stakeholders (one per line)</label>
                 <textarea id="stage-stakeholders" name="stakeholders" rows="2"
                           class="mt-1 flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"></textarea>
             </div>
             <div>
-                <label for="stage-value-items" class="text-xs font-medium text-muted-foreground uppercase tracking-wide">Value items (one per line)</label>
+                <label for="stage-value-items" class="block text-sm font-medium text-muted-foreground mb-1">Value items (one per line)</label>
                 <textarea id="stage-value-items" name="value_items" rows="2"
                           class="mt-1 flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"></textarea>
             </div>
         </div>
-        <div class="grid grid-cols-2 gap-4">
+        <div class="grid grid-cols-1 gap-4">
             <div>
-                <label for="stage-type" class="text-xs font-medium text-muted-foreground uppercase tracking-wide">Stage Type</label>
+                <label for="stage-type" class="block text-sm font-medium text-muted-foreground mb-1">Stage Type</label>
                 <select id="stage-type" name="stage_type"
-                        class="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+                        class="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
                     <option value="operational">Operational</option>
                     <option value="strategic">Strategic</option>
                     <option value="supporting">Supporting</option>
                 </select>
             </div>
             <div>
-                <label for="stage-order" class="text-xs font-medium text-muted-foreground uppercase tracking-wide">Order</label>
+                <label for="stage-order" class="block text-sm font-medium text-muted-foreground mb-1">Order</label>
                 <input type="number" id="stage-order" name="stage_order" min="1"
-                       class="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                       class="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                        placeholder="Auto">
             </div>
         </div>
@@ -440,7 +440,7 @@
         </div>
         <div class="flex justify-end gap-2 pt-2">
             <button type="button" data-modal-close="stage-create-modal"
-                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
+                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4">
                 Cancel
             </button>
             <button type="submit"
@@ -457,51 +457,51 @@
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <input type="hidden" name="value_stream_id" value="{{ value_stream.id }}">
         <div>
-            <label class="text-xs font-medium text-muted-foreground uppercase tracking-wide">Name</label>
+            <label class="block text-sm font-medium text-muted-foreground mb-1">Name</label>
             <input type="text" name="name" x-model="stageEditForm.name" required
-                   class="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" aria-label="Name">
+                   class="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" aria-label="Name">
         </div>
         <div>
-            <label class="text-xs font-medium text-muted-foreground uppercase tracking-wide">Description</label>
+            <label class="block text-sm font-medium text-muted-foreground mb-1">Description</label>
             <textarea name="description" x-model="stageEditForm.description" rows="2"
                       class="mt-1 flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" aria-label="Description"></textarea>
         </div>
         <div>
-            <label for="stage-edit-entry-criteria" class="text-xs font-medium text-muted-foreground uppercase tracking-wide">Entry criteria</label>
+            <label for="stage-edit-entry-criteria" class="block text-sm font-medium text-muted-foreground mb-1">Entry criteria</label>
             <textarea id="stage-edit-entry-criteria" name="entry_criteria" x-model="stageEditForm.entry_criteria" rows="2"
                       class="mt-1 flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"></textarea>
         </div>
         <div>
-            <label for="stage-edit-exit-criteria" class="text-xs font-medium text-muted-foreground uppercase tracking-wide">Exit criteria</label>
+            <label for="stage-edit-exit-criteria" class="block text-sm font-medium text-muted-foreground mb-1">Exit criteria</label>
             <textarea id="stage-edit-exit-criteria" name="exit_criteria" x-model="stageEditForm.exit_criteria" rows="2"
                       class="mt-1 flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"></textarea>
         </div>
-        <div class="grid grid-cols-2 gap-4">
+        <div class="grid grid-cols-1 gap-4">
             <div>
-                <label for="stage-edit-stakeholders" class="text-xs font-medium text-muted-foreground uppercase tracking-wide">Stakeholders (one per line)</label>
+                <label for="stage-edit-stakeholders" class="block text-sm font-medium text-muted-foreground mb-1">Stakeholders (one per line)</label>
                 <textarea id="stage-edit-stakeholders" name="stakeholders" x-model="stageEditForm.stakeholders" rows="2"
                           class="mt-1 flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"></textarea>
             </div>
             <div>
-                <label for="stage-edit-value-items" class="text-xs font-medium text-muted-foreground uppercase tracking-wide">Value items (one per line)</label>
+                <label for="stage-edit-value-items" class="block text-sm font-medium text-muted-foreground mb-1">Value items (one per line)</label>
                 <textarea id="stage-edit-value-items" name="value_items" x-model="stageEditForm.value_items" rows="2"
                           class="mt-1 flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"></textarea>
             </div>
         </div>
-        <div class="grid grid-cols-2 gap-4">
+        <div class="grid grid-cols-1 gap-4">
             <div>
-                <label class="text-xs font-medium text-muted-foreground uppercase tracking-wide">Stage Type</label>
+                <label class="block text-sm font-medium text-muted-foreground mb-1">Stage Type</label>
                 <select name="stage_type" x-model="stageEditForm.stage_type"
-                        class="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" aria-label="Stage Type">
+                        class="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" aria-label="Stage Type">
                     <option value="operational">Operational</option>
                     <option value="strategic">Strategic</option>
                     <option value="supporting">Supporting</option>
                 </select>
             </div>
             <div>
-                <label class="text-xs font-medium text-muted-foreground uppercase tracking-wide">Order</label>
+                <label class="block text-sm font-medium text-muted-foreground mb-1">Order</label>
                 <input type="number" name="stage_order" min="1" x-model.number="stageEditForm.stage_order"
-                       class="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" aria-label="Order">
+                       class="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" aria-label="Order">
             </div>
         </div>
         <div class="flex items-center gap-6">
@@ -516,7 +516,7 @@
         </div>
         <div class="flex justify-end gap-2 pt-2">
             <button type="button" data-modal-close="stage-edit-modal"
-                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
+                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4">
                 Cancel
             </button>
             <button type="submit"
@@ -538,7 +538,7 @@
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <input type="hidden" name="value_stream_id" value="{{ value_stream.id }}">
                 <button type="button" data-modal-close="stage-delete-modal"
-                        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
+                        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4">
                     Cancel
                 </button>
                 <button type="submit"
@@ -555,30 +555,30 @@
     <form method="POST" action="{{ url_for('value_stream.edit', value_stream_id=value_stream.id) }}" class="space-y-4">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div>
-            <label class="text-xs font-medium text-muted-foreground uppercase tracking-wide">Name</label>
+            <label class="block text-sm font-medium text-muted-foreground mb-1">Name</label>
             <input type="text" name="name" value="{{ value_stream.name }}" required
-                   class="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" aria-label="Name">
+                   class="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" aria-label="Name">
         </div>
         <div>
-            <label class="text-xs font-medium text-muted-foreground uppercase tracking-wide">Description</label>
+            <label class="block text-sm font-medium text-muted-foreground mb-1">Description</label>
             <textarea name="description" rows="3"
                       class="mt-1 flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" aria-label="Description">{{ value_stream.description or '' }}</textarea>
         </div>
-        <div class="grid grid-cols-2 gap-4">
+        <div class="grid grid-cols-1 gap-4">
             <div>
-                <label class="text-xs font-medium text-muted-foreground uppercase tracking-wide">Target Cycle Time (days)</label>
+                <label class="block text-sm font-medium text-muted-foreground mb-1">Target Cycle Time (days)</label>
                 <input type="number" name="target_cycle_time" value="{{ value_stream.target_cycle_time if value_stream.target_cycle_time is not none else '' }}"
-                       class="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" aria-label="Target Cycle Time (days)">
+                       class="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" aria-label="Target Cycle Time (days)">
             </div>
             <div>
-                <label class="text-xs font-medium text-muted-foreground uppercase tracking-wide">Current Cycle Time (days)</label>
+                <label class="block text-sm font-medium text-muted-foreground mb-1">Current Cycle Time (days)</label>
                 <input type="number" name="current_cycle_time" value="{{ value_stream.current_cycle_time if value_stream.current_cycle_time is not none else '' }}"
-                       class="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" aria-label="Current Cycle Time (days)">
+                       class="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" aria-label="Current Cycle Time (days)">
             </div>
         </div>
         <div class="flex justify-end gap-2 pt-2">
             <button type="button" data-modal-close="vs-edit-modal"
-                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
+                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4">
                 Cancel
             </button>
             <button type="submit"
@@ -598,7 +598,7 @@
         <form method="POST" action="{{ url_for('value_stream.delete', value_stream_id=value_stream.id) }}" class="flex justify-end gap-2">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <button type="button" data-modal-close="vs-delete-modal"
-                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
+                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4">
                 Cancel
             </button>
             <button type="submit"

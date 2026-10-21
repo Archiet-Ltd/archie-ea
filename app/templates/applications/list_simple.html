@@ -1,4 +1,7 @@
 {% extends 'layouts/admin_base.html' %}
+{% from 'components/modal.html' import modal %}
+{% from 'components/form_field.html' import form_group, form_footer %}
+{% from 'components/dense_table.html' import dense_table %}
 {% from 'components/skeleton.html' import skeleton_table %}
 {% from 'components/empty_state.html' import empty_state %}
 {% from 'macros/page_shell.html' import page_shell, stat_card %}
@@ -367,10 +370,8 @@
        bulkUpdateLifecycle() / promptBulkAssignOwner() / promptBulkTag() in
        static/js/applications/list.js. #}
 
-<table class="dense-table w-full border-collapse" data-testid="applications-table">
-        <thead class="sticky top-0 z-10 bg-card">
-          <tr class="border-b border-border">
-            <th class="text-2xs font-semibold uppercase tracking-[0.06em] text-muted-foreground h-10 px-3 py-0 align-middle w-10 text-left">
+{% set _dt_header_27049 %}
+            <th scope="col" class="h-10 px-2 align-middle text-left w-10">
               <input type="checkbox" id="select-all-desktop" data-testid="select-all"
                 :checked="allSelected()" :indeterminate="someSelected()"
                 @change="toggleSelectAll($event.target.checked)"
@@ -378,26 +379,26 @@
             </th>
             {# ARCH-100: sortable headers. sortBy() toggles asc/desc and re-navigates
                with the current filters + page preserved (see list.js _navigate()). #}
-            <th class="text-2xs font-semibold uppercase tracking-[0.06em] text-muted-foreground h-10 px-3 py-0 align-middle text-left w-20">
+            <th scope="col" class="h-10 px-2 align-middle text-left w-20">
               <button type="button" @click="sortBy('id')" data-testid="th-sort-id"
                 class="inline-flex items-center gap-1 hover:text-foreground transition-colors" aria-label="Sort by ID">
                 ID<i data-lucide="chevron-up" class="h-3 w-3" x-show="sort === 'id' && dir === 'asc'" x-cloak aria-hidden="true"></i><i data-lucide="chevron-down" class="h-3 w-3" x-show="sort === 'id' && dir === 'desc'" x-cloak aria-hidden="true"></i>
               </button>
             </th>
-            <th class="text-2xs font-semibold uppercase tracking-[0.06em] text-muted-foreground h-10 px-3 py-0 align-middle text-left min-w-[180px]">
+            <th scope="col" class="h-10 px-2 align-middle text-left min-w-[180px]">
               <button type="button" @click="sortBy('name')" data-testid="th-sort-name"
                 class="inline-flex items-center gap-1 hover:text-foreground transition-colors" aria-label="Sort by Application name">
                 Application<i data-lucide="chevron-up" class="h-3 w-3" x-show="sort === 'name' && dir === 'asc'" x-cloak aria-hidden="true"></i><i data-lucide="chevron-down" class="h-3 w-3" x-show="sort === 'name' && dir === 'desc'" x-cloak aria-hidden="true"></i>
               </button>
             </th>
-            <th class="text-2xs font-semibold uppercase tracking-[0.06em] text-muted-foreground h-10 px-3 py-0 align-middle text-left min-w-[120px]">
+            <th scope="col" class="h-10 px-2 align-middle text-left min-w-[120px]">
               <button type="button" @click="sortBy('type')" data-testid="th-sort-type"
                 class="inline-flex items-center gap-1 hover:text-foreground transition-colors" aria-label="Sort by Type">
                 Type<i data-lucide="chevron-up" class="h-3 w-3" x-show="sort === 'type' && dir === 'asc'" x-cloak aria-hidden="true"></i><i data-lucide="chevron-down" class="h-3 w-3" x-show="sort === 'type' && dir === 'desc'" x-cloak aria-hidden="true"></i>
               </button>
             </th>
-            <th class="text-2xs font-semibold uppercase tracking-[0.06em] text-muted-foreground h-10 px-3 py-0 align-middle text-left w-10" title="ArchiMate: whether this application has a linked ArchiMate element" aria-label="ArchiMate link status">AM</th>
-            <th class="text-2xs font-semibold uppercase tracking-[0.06em] text-muted-foreground h-10 px-3 py-0 align-middle text-left min-w-[160px]">
+            <th scope="col" class="h-10 px-2 align-middle text-left w-10" title="ArchiMate: whether this application has a linked ArchiMate element" aria-label="ArchiMate link status">AM</th>
+            <th scope="col" class="h-10 px-2 align-middle text-left min-w-[160px]">
               <button type="button" @click="sortBy('lifecycle_status')" data-testid="th-sort-lifecycle-status"
                 class="inline-flex items-center gap-1 hover:text-foreground transition-colors" aria-label="Sort by Lifecycle Status">
                 Lifecycle Status<i data-lucide="chevron-up" class="h-3 w-3" x-show="sort === 'lifecycle_status' && dir === 'asc'" x-cloak aria-hidden="true"></i><i data-lucide="chevron-down" class="h-3 w-3" x-show="sort === 'lifecycle_status' && dir === 'desc'" x-cloak aria-hidden="true"></i>
@@ -405,34 +406,34 @@
             </th>
             {# Hidden until data enrichment — Criticality, Business Owner, Vendor #}
             {#
-            <th class="text-2xs font-semibold uppercase tracking-[0.06em] text-muted-foreground h-10 px-3 py-0 align-middle text-left min-w-[130px]">Criticality</th>
-            <th class="text-2xs font-semibold uppercase tracking-[0.06em] text-muted-foreground h-10 px-3 py-0 align-middle text-left min-w-[140px]">Business Owner</th>
-            <th class="text-2xs font-semibold uppercase tracking-[0.06em] text-muted-foreground h-10 px-3 py-0 align-middle text-left min-w-[130px]">Vendor</th>
+            <th scope="col" class="h-10 px-2 align-middle text-left min-w-[130px]">Criticality</th>
+            <th scope="col" class="h-10 px-2 align-middle text-left min-w-[140px]">Business Owner</th>
+            <th scope="col" class="h-10 px-2 align-middle text-left min-w-[130px]">Vendor</th>
             #}
-            <th class="text-2xs font-semibold uppercase tracking-[0.06em] text-muted-foreground h-10 px-3 py-0 align-middle text-left min-w-[150px]">Capability</th>
-            <th class="text-2xs font-semibold uppercase tracking-[0.06em] text-muted-foreground h-10 px-3 py-0 align-middle text-right min-w-[180px]">Actions</th>
-          </tr>
-        </thead>
-        <tbody class="divide-y">
+            <th scope="col" class="h-10 px-2 align-middle text-left min-w-[150px]">Capability</th>
+            <th scope="col" class="h-10 px-2 align-middle text-right min-w-[180px]">Actions</th>
+          
+{% endset %}
+{% call dense_table(header=_dt_header_27049, testid='applications-table') %}
           {% for app in applications %}
           {%- set sk = (app.lifecycle_status or app.deployment_status or '').lower() -%}
           {%- set si = STATUS_MAP.get(sk, {'label': app.lifecycle_status or app.deployment_status or 'Not set', 'cls': 'bg-muted text-muted-foreground'}) -%}
           {%- set ck = (app.business_criticality or '').lower() -%}
           {%- set cc = CRIT_MAP.get(ck, 'bg-muted text-muted-foreground') -%}
           {%- set pc = app.capability_mappings[0] if app.capability_mappings else none -%}
-          <tr class="group h-12 border-b border-border transition-colors hover:bg-muted/50" data-app-id="{{ app.id }}" data-testid="app-row-{{ app.id }}">
-            <td class="px-3 py-0 align-middle">
+          <tr class="group transition-colors hover:bg-muted/50" data-app-id="{{ app.id }}" data-testid="app-row-{{ app.id }}">
+            <td class="px-2 align-middle">
               <input type="checkbox" class="row-select rounded border-input h-4 w-4 cursor-pointer"
                 :checked="selectedIds.has({{ app.id }})"
                 @change="toggleRow({{ app.id }}, $event.target.checked)"
                 aria-label="Select {{ app.name | e }}" data-testid="row-select-{{ app.id }}">
             </td>
-            <td class="px-3 py-0 align-middle"><span class="text-xs font-mono text-muted-foreground">{{ app.id }}</span></td>
-            <td class="px-3 py-0 align-middle">
+            <td class="px-2 align-middle"><span class="text-xs font-mono text-muted-foreground">{{ app.id }}</span></td>
+            <td class="px-2 align-middle">
               <p class="font-medium text-sm text-foreground truncate max-w-[220px]" title="{{ app.name | e }}{% if app.description %} — {{ app.description[:120] | e }}{% endif %}">{{ app.name }}</p>
             </td>
-            <td class="px-3 py-0 align-middle"><span class="text-sm text-muted-foreground">{{ app.component_type or '—' }}</span></td>
-            <td class="px-3 py-0 align-middle text-center">
+            <td class="px-2 align-middle"><span class="text-sm text-muted-foreground">{{ app.component_type or '—' }}</span></td>
+            <td class="px-2 align-middle text-center">
               {% if app.archimate_element_id %}
               {# role="img" makes the aria-label legal: a bare span is a generic
                  element, and aria-label on it is an aria-prohibited-attr
@@ -442,18 +443,18 @@
               <span class="inline-block h-2.5 w-2.5 rounded-full bg-muted-foreground/30" title="No ArchiMate link" role="img" aria-label="Not linked to an ArchiMate element"></span>
               {% endif %}
             </td>
-            <td class="px-3 py-0 align-middle">
+            <td class="px-2 align-middle">
               <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium {{ si.cls }}">{{ si.label }}</span>
             </td>
             {# Hidden until data enrichment — Criticality, Business Owner, Vendor #}
             {#
-            <td class="px-3 py-0 align-middle">
+            <td class="px-2 align-middle">
               {% if app.business_criticality %}
               <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium {{ cc }}">{{ app.business_criticality }}</span>
               {% else %}<span class="text-xs text-muted-foreground">—</span>{% endif %}
             </td>
-            <td class="px-3 py-0 align-middle"><span class="text-sm text-muted-foreground truncate max-w-[140px] block">{{ app.business_owner or '—' }}</span></td>
-            <td class="px-3 py-0 align-middle">
+            <td class="px-2 align-middle"><span class="text-sm text-muted-foreground truncate max-w-[140px] block">{{ app.business_owner or '—' }}</span></td>
+            <td class="px-2 align-middle">
               <span class="text-sm text-muted-foreground truncate max-w-[130px] block">
                 {%- if app.vendor_name %}{{ app.vendor_name }}
                 {%- elif app.primary_vendor_product is defined and app.primary_vendor_product %}{{ app.primary_vendor_product.name }}
@@ -461,12 +462,12 @@
               </span>
             </td>
             #}
-            <td class="px-3 py-0 align-middle">
+            <td class="px-2 align-middle">
               {% if pc and pc.business_capability %}
               <span class="text-xs text-muted-foreground truncate max-w-[150px] block" title="{{ pc.business_capability.name | e }}">{{ pc.business_capability.name }}</span>
               {% else %}<span class="text-xs text-muted-foreground">Not mapped</span>{% endif %}
             </td>
-            <td class="px-3 py-0 align-middle text-right">
+            <td class="px-2 align-middle text-right">
               <div class="flex justify-end gap-1 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
                 <a href="{{ url_for('unified_applications.application_detail', id=app.id) }}"
                   data-testid="btn-view-{{ app.id }}"
@@ -524,8 +525,7 @@
             </td>
           </tr>
           {% endfor %}
-        </tbody>
-      </table>
+        {% endcall %}
       {% else %}
       <div class="py-16 px-6 text-center">
         <div class="flex h-16 w-16 items-center justify-center rounded-full bg-muted mx-auto mb-4">
@@ -758,28 +758,13 @@
   </div>{# end table card #}
 
   {# AI Map modal — inside the appPortfolio() x-data scope, which owns aiMap state #}
-  <div id="ai-map-modal" hidden role="dialog" aria-modal="true" aria-labelledby="ai-map-modal-title"
-    class="modal-root fixed inset-0 z-[1000] bg-black/50 items-center justify-center p-4" data-modal-backdrop="ai-map-modal" aria-hidden="true"
-    data-testid="ai-map-modal">
-    <div class="bg-card rounded-xl  w-full max-w-lg border flex flex-col max-h-[90vh]">
-      <div class="flex items-center justify-between p-6 border-b shrink-0">
-        <div>
-          <h2 id="ai-map-modal-title" class="text-xl font-semibold tracking-[-0.01em]">AI Map Applications</h2>
-          <p class="text-sm text-muted-foreground mt-0.5">Analyze existing applications with AI and propose capability, process and ArchiMate mappings.</p>
-        </div>
-        <!-- inline-event-ok --><button type="button" @click="closeAiMapModal()" aria-label="Close"
-          class="h-8 w-8 rounded-md hover:bg-muted flex items-center justify-center">
-          <i data-lucide="x" class="h-4 w-4" aria-hidden="true"></i>
-        </button>
-      </div>
-      <div class="p-6 overflow-y-auto flex-1 space-y-4">
+  {% call modal(id='ai-map-modal', title='AI Map Applications', description='Analyze existing applications with AI and propose capability, process and ArchiMate mappings.', attrs='data-testid="ai-map-modal"') %}
+      <div class="overflow-y-auto flex-1 space-y-4">
         <div x-show="!aiMap.result" x-cloak class="space-y-3">
-          <div>
-            <label for="ai-map-max" class="block text-sm font-medium mb-1">Applications to analyze</label>
+          {% call form_group(id='ai-map-max', label='Applications to analyze', help_text='Most recently added applications are analyzed first.') %}
             <input id="ai-map-max" type="number" min="1" max="200" x-model.number="aiMap.maxApplications"
               class="flex h-10 w-32 rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-            <p class="text-xs text-muted-foreground mt-1">Most recently added applications are analyzed first.</p>
-          </div>
+          {% endcall %}
           <label class="flex items-center gap-2 text-sm">
             <input type="checkbox" x-model="aiMap.mapCapabilities" class="rounded border-input h-4 w-4">
             Map to business capabilities
@@ -825,7 +810,7 @@
       </div>
       <div class="flex justify-end gap-3 p-6 border-t shrink-0">
         <button type="button" @click="closeAiMapModal()"
-          class="px-4 py-2 text-sm font-medium rounded-md border border-input bg-background hover:bg-accent" aria-label="Close">Close</button>
+          class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Close">Close</button>
         <button type="button" x-show="!aiMap.result" x-cloak @click="runAiMap()" :disabled="aiMap.loading"
           class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
           data-testid="btn-ai-map-run" aria-label="Run AI analysis">
@@ -837,8 +822,8 @@
           <span x-text="aiMap.accepting ? 'Saving...' : 'Accept & Save'">Accept &amp; Save</span>
         </button>
       </div>
-    </div>
-  </div>
+    
+{% endcall %}
 </div>{# end app-portfolio-root #}
 
 {# ─ Include existing unified mapping modal ─ #}
@@ -847,31 +832,18 @@
 {% include 'application_mgmt/application_import_modal.html' %}
 
 {# ─ Create Application Modal ─ #}
-<div id="modal-create" hidden role="dialog" aria-modal="true" aria-labelledby="modal-create-title"
-  class="modal-root fixed inset-0 z-[1000] bg-black/50 items-center justify-center p-4" data-modal-backdrop="modal-create" aria-hidden="true">
-  <div class="bg-card rounded-xl  w-full max-w-lg border flex flex-col max-h-[90vh]">
-    <div class="flex items-center justify-between p-6 border-b shrink-0">
-      <div>
-        <h2 id="modal-create-title" class="text-xl font-semibold tracking-[-0.01em]">New Application</h2>
-        <p class="text-sm text-muted-foreground mt-0.5">Register a new application in the portfolio.</p>
-      </div>
-      <!-- inline-event-ok --><button type="button" @click="Platform.modal.close('modal-create')" aria-label="Close"
-        class="h-8 w-8 rounded-md hover:bg-muted flex items-center justify-center">
-        <i data-lucide="x" class="h-4 w-4" aria-hidden="true"></i>
-      </button>
-    </div>
-    <div class="p-6 overflow-y-auto flex-1" x-data="applicationCreateForm()">
+{% call modal(id='modal-create', title='New Application', description='Register a new application in the portfolio.') %}
+    <div class="overflow-y-auto flex-1" x-data="applicationCreateForm()">
       <form @submit.prevent="submit()" class="space-y-4">
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div class="sm:col-span-2">
-            <label for="ca-name" class="block text-sm font-medium mb-1">Application Name <span class="text-destructive-emphasis" aria-hidden="true">*</span></label>
+        <div class="grid grid-cols-1 gap-4">
+          {% call form_group(id='ca-name', label='Application Name', required=true) %}
             <input id="ca-name" type="text" x-model="form.name" @input="scheduleCheck()" required maxlength="255" placeholder="e.g. Customer Portal"
               :aria-invalid="fieldInvalid('name') ? 'true' : 'false'"
               :aria-describedby="fieldInvalid('name') ? 'ca-name-error' : null"
-              class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+              class="h-9 flex w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
             <p x-show="fieldInvalid('name')" x-cloak id="ca-name-error" role="alert" class="mt-1 text-sm text-destructive-emphasis" x-text="fieldErrors.name"></p>
-          </div>
-          <div class="sm:col-span-2" id="ca-duplicate-check" aria-live="polite">
+          {% endcall %}
+          <div class="" id="ca-duplicate-check" aria-live="polite">
             <p x-show="checkError" x-cloak class="text-sm text-warning-emphasis" role="alert" x-text="checkError"></p>
             <template x-if="matches && matches.length > 0"><div class="rounded-md border border-border bg-muted p-3 text-sm">
               <p class="font-medium mb-2">These applications already exist</p>
@@ -883,15 +855,13 @@
               <p x-show="hasSameName" class="mt-3 text-destructive-emphasis">An application with this exact name exists. Open it rather than registering a second record.</p>
             </div></template>
           </div>
-          <div>
-            <label for="ca-code" class="block text-sm font-medium mb-1">Application Code</label>
+          {% call form_group(id='ca-code', label='Application Code') %}
             <input id="ca-code" type="text" x-model="form.application_code" @input="scheduleCheck()" maxlength="50" placeholder="e.g. CUST-PORTAL"
-              class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-          </div>
-          <div>
-            <label for="ca-type" class="block text-sm font-medium mb-1">Application Type</label>
+              class="h-9 flex w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+          {% endcall %}
+          {% call form_group(id='ca-type', label='Application Type') %}
             <select id="ca-type" x-model="form.application_type"
-              class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+              class="h-9 flex w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
               <option value="">Select type...</option>
               <option value="application">Application</option>
               <option value="service">Service</option>
@@ -901,11 +871,10 @@
               <option value="database">Database</option>
               <option value="other">Other</option>
             </select>
-          </div>
-          <div>
-            <label for="ca-criticality" class="block text-sm font-medium mb-1">Business Criticality</label>
+          {% endcall %}
+          {% call form_group(id='ca-criticality', label='Business Criticality') %}
             <select id="ca-criticality" x-model="form.business_criticality"
-              class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+              class="h-9 flex w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
               {#- Values MUST stay inside VALID_CRITICALITY in
                   app/schemas/api_schemas.py. They previously read
                   mission_critical / business_critical / important / standard,
@@ -919,11 +888,10 @@
               <option value="medium">Medium</option>
               <option value="low">Low</option>
             </select>
-          </div>
-          <div>
-            <label for="ca-status" class="block text-sm font-medium mb-1">Deployment Status</label>
+          {% endcall %}
+          {% call form_group(id='ca-status', label='Deployment Status') %}
             <select id="ca-status" x-model="form.deployment_status"
-              class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+              class="h-9 flex w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
               <option value="">Select...</option>
               <option value="production">Production</option>
               <option value="staging">Staging</option>
@@ -931,15 +899,15 @@
               <option value="retired">Retired</option>
               <option value="planned">Planned</option>
             </select>
-          </div>
+          {% endcall %}
           {# F-09, Capgemini dry-run: Lifecycle Status (the TOGAF decommission
              vocabulary) is a real, separate column from Deployment Status
              above, shown on the detail page/filter/Workbench facet, but
              could previously only be set in bulk. #}
           <div>
-            <label for="ca-lifecycle" class="block text-sm font-medium mb-1">Lifecycle Status</label>
+            <label for="ca-lifecycle" class="block text-sm font-medium text-muted-foreground mb-1">Lifecycle Status</label>
             <select id="ca-lifecycle" x-model="form.lifecycle_status"
-              class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+              class="h-9 flex w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
               <option value="">Select...</option>
               {% for opt in filter_options.lifecycle_statuses %}
               <option value="{{ opt.value }}">{{ opt.label }}</option>
@@ -947,10 +915,10 @@
             </select>
           </div>
           <div x-data="userSearchWidget(() => form.business_owner, v => { form.business_owner = v; })" @click.outside="ushow = false">
-            <label for="ca-owner" class="block text-sm font-medium mb-1">Business Owner</label>
+            <label for="ca-owner" class="block text-sm font-medium text-muted-foreground mb-1">Business Owner</label>
             <div class="relative">
               <input id="ca-owner" type="text" x-model="form.business_owner" @input.debounce.300ms="usearch()" maxlength="255" placeholder="Search by name or email..."
-                class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" autocomplete="off">
+                class="h-9 flex w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" autocomplete="off">
               <div x-show="ushow" x-cloak class="absolute z-20 mt-1 w-full bg-popover border border-border rounded-md  max-h-40 overflow-y-auto">
                 <template x-for="u in ures" :key="u.id">
                   <button type="button" @click="uselect(u)" class="w-full px-3 py-1.5 text-left text-sm hover:bg-muted flex items-center justify-between">
@@ -961,16 +929,15 @@
               </div>
             </div>
           </div>
-          <div class="sm:col-span-2">
-            <label for="ca-description" class="block text-sm font-medium mb-1">Description</label>
+          {% call form_group(id='ca-description', label='Description') %}
             <textarea id="ca-description" x-model="form.description" rows="2" maxlength="2000" placeholder="Brief description"
               class="flex min-h-[64px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"></textarea>
-          </div>
+          {% endcall %}
         </div>
         <div x-show="errorMsg" x-cloak class="rounded-md bg-destructive/10 border border-destructive/30 px-3 py-2 text-sm text-destructive-emphasis" x-text="errorMsg" role="alert"></div>
         <div class="flex justify-end gap-3 pt-2 border-t">
           <!-- inline-event-ok --><button type="button" @click="Platform.modal.close('modal-create')"
-            class="px-4 py-2 text-sm font-medium rounded-md border border-input bg-background hover:bg-accent">Cancel</button>
+            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4">Cancel</button>
           <button type="submit" :disabled="submitting"
             class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50">
             <i data-lucide="loader-2" class="h-4 w-4 animate-spin" x-show="submitting" x-cloak aria-hidden="true"></i>
@@ -979,8 +946,8 @@
         </div>
       </form>
     </div>
-  </div>
-</div>
+  
+{% endcall %}
 
 {# ─ AI Map Modal — reuses the existing comprehensive-auto-map + accept
      endpoints (app/modules/applications/routes/auto_mapping_routes.py).

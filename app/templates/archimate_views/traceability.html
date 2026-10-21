@@ -1,5 +1,6 @@
 ﻿{# smoke-coverage-ok: plain-language filter wiring — el.type, pt.type, pt.layer, row.application.type now use |plain_name and |plain_layer filters #}
 {% extends "layouts/admin_base.html" %}
+{% from 'components/dense_table.html' import dense_table %}
 {% from 'components/page_header.html' import page_header %}
 
 {# DEF-032, Capgemini dry-run: the browser tab title said "Requirements
@@ -58,21 +59,21 @@
     <!-- TRC-011: direction toggle / TRC-015: pivot type selector -->
     <form method="get" action="{{ url_for('architect_ui.traceability_matrix') }}" class="rounded-lg border border-border bg-card p-3">
         <div class="flex flex-wrap items-center gap-3">
-            <label for="direction" class="text-sm font-medium text-foreground">Direction:</label>
+            <label for="direction" class="block text-sm font-medium text-muted-foreground mb-1">Direction:</label>
             <select
                 id="direction"
                 name="direction"
-                class="rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground"
+                class="h-9 rounded-md border border-input bg-background px-3 text-sm text-foreground"
             >
                 <option value="forward" {% if direction == 'forward' %}selected{% endif %}>Top-Down</option>
                 <option value="inverse" {% if direction == 'inverse' %}selected{% endif %}>Bottom-Up</option>
             </select>
             {% if direction == 'forward' and pivot_types %}
-            <label for="pivot_type" class="text-sm font-medium text-foreground">Pivot element:</label>
+            <label for="pivot_type" class="block text-sm font-medium text-muted-foreground mb-1">Pivot element:</label>
             <select
                 id="pivot_type"
                 name="pivot_type"
-                class="rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground"
+                class="h-9 rounded-md border border-input bg-background px-3 text-sm text-foreground"
             >
                 {% for pt in pivot_types %}
                 <option value="{{ pt.type }}" {% if pt.type == current_pivot_type %}selected{% endif %}>
@@ -103,11 +104,11 @@
                 name="search"
                 value="{{ current_search }}"
                 placeholder="Search by element name…"
-                class="w-full rounded-md border border-input bg-background pl-9 pr-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                class="h-9 w-full rounded-md border border-input bg-background pl-9 pr-3 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
              aria-label="Search by element name…">
         </div>
         <select name="scope"
-                class="rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground" aria-label="Filter by scope">
+                class="h-9 rounded-md border border-input bg-background px-3 text-sm text-foreground" aria-label="Filter by scope">
             <option value="" {% if not current_scope %}selected{% endif %}>All scopes</option>
             <option value="enterprise" {% if current_scope == 'enterprise' %}selected{% endif %}>Enterprise</option>
             <option value="application" {% if current_scope == 'application' %}selected{% endif %}>Application</option>
@@ -253,48 +254,45 @@
     <!-- Matrix table (visible by default) -->
     <div id="matrix-view" class="rounded-lg border border-border bg-card overflow-hidden">
         {% if matrix %}
-        <div class="overflow-x-auto">
-            <table class="dense-table w-full text-sm">
-                <thead class="border-b border-border bg-muted/50 sticky top-0 z-10">
-                    <tr class="border-b border-border bg-muted/50">
-                        <th class="px-4 py-3 text-left font-semibold text-foreground">{{ 'Technology Element' if direction == 'inverse' else 'Application Component' }}</th>
-                        <th class="px-4 py-3 text-left font-semibold text-foreground">
+{% set _dt_header_16428 %}
+                        <th scope="col" class="h-10 px-2 align-middle text-left">{{ 'Technology Element' if direction == 'inverse' else 'Application Component' }}</th>
+                        <th scope="col" class="h-10 px-2 align-middle text-left">
                             <span class="inline-flex items-center gap-1.5">
                                 <span class="h-2.5 w-2.5 rounded-full bg-fuchsia-500"></span>  <!-- design-tokens-ok: ArchiMate traceability matrix legend, distinct hue per layer/column -->
                                 Motivation / Goals
                             </span>
                         </th>
-                        <th class="px-4 py-3 text-left font-semibold text-foreground">
+                        <th scope="col" class="h-10 px-2 align-middle text-left">
                             <span class="inline-flex items-center gap-1.5">
                                 <span class="h-2.5 w-2.5 rounded-full bg-violet-500"></span>  <!-- design-tokens-ok: ArchiMate traceability matrix legend, distinct hue per layer/column -->
                                 Strategy Layer
                             </span>
                         </th>
-                        <th class="px-4 py-3 text-left font-semibold text-foreground">
+                        <th scope="col" class="h-10 px-2 align-middle text-left">
                             <span class="inline-flex items-center gap-1.5">
                                 <span class="h-2.5 w-2.5 rounded-full bg-emerald-500"></span>  <!-- design-tokens-ok: ArchiMate traceability matrix legend, distinct hue per layer/column -->
                                 Business Layer
                             </span>
                         </th>
-                        <th class="px-4 py-3 text-left font-semibold text-foreground">
+                        <th scope="col" class="h-10 px-2 align-middle text-left">
                             <span class="inline-flex items-center gap-1.5">
                                 <span class="h-2.5 w-2.5 rounded-full bg-amber-500"></span>  <!-- design-tokens-ok: ArchiMate traceability matrix legend, distinct hue per layer/column -->
                                 {{ 'Impact Assessment' if direction == 'inverse' else 'Technology Layer' }}
                             </span>
                         </th>
-                        <th class="px-4 py-3 text-left font-semibold text-foreground">
+                        <th scope="col" class="h-10 px-2 align-middle text-left">
                             <span class="inline-flex items-center gap-1.5">
                                 <span class="h-2.5 w-2.5 rounded-full bg-sky-500"></span>  <!-- design-tokens-ok: ArchiMate traceability matrix legend, distinct hue per layer/column -->
                                 Data Objects
                             </span>
                         </th>
-                    </tr>
-                </thead>
-                <tbody class="divide-y divide-border">
+                    
+{% endset %}
+{% call dense_table(header=_dt_header_16428, flush=true) %}
                     {% for row in matrix %}
                     <tr class="hover:bg-muted/30 transition-colors">
                         <!-- Application Component -->
-                        <td class="px-4 py-3">
+                        <td class="px-2">
                             <a href="{{ url_for('architect_ui.element_traceability', element_id=row.application.id) }}"
                                class="inline-flex items-center gap-1.5 font-medium text-foreground hover:text-primary transition-colors">
                                 <span>{{ row.application.name }}</span>
@@ -307,7 +305,7 @@
                         </td>
 
                         <!-- Motivation -->
-                        <td class="px-4 py-3">
+                        <td class="px-2">
                             <div class="flex flex-wrap gap-1.5">
                                 {% for el in row.motivation | default([], true) %}
                                 {% set relationship_label = el.relationship_type | replace('Relationship', '') if el.relationship_type else none %}
@@ -335,7 +333,7 @@
                         </td>
 
                         <!-- Strategy -->
-                        <td class="px-4 py-3">
+                        <td class="px-2">
                             <div class="flex flex-wrap gap-1.5">
                                 {% for el in row.strategy %}
                                 {% set relationship_label = el.relationship_type | replace('Relationship', '') if el.relationship_type else none %}
@@ -363,7 +361,7 @@
                         </td>
 
                         <!-- Business -->
-                        <td class="px-4 py-3">
+                        <td class="px-2">
                             <div class="flex flex-wrap gap-1.5">
                                 {% for el in row.business %}
                                 {% set relationship_label = el.relationship_type | replace('Relationship', '') if el.relationship_type else none %}
@@ -391,7 +389,7 @@
                         </td>
 
                         <!-- Technology / impact -->
-                        <td class="px-4 py-3">
+                        <td class="px-2">
                             {% if direction == 'inverse' %}
                             <a href="{{ url_for('architect_ui.impact_analysis', element_id=row.application.id) }}"
                                class="inline-flex items-center gap-2 text-sm font-medium text-primary hover:underline">
@@ -427,7 +425,7 @@
                         </td>
 
                         <!-- Data -->
-                        <td class="px-4 py-3">
+                        <td class="px-2">
                             <div class="flex flex-wrap gap-1.5">
                                 {% for el in row.data | default([], true) %}
                                 {% set relationship_label = el.relationship_type | replace('Relationship', '') if el.relationship_type else none %}
@@ -455,9 +453,7 @@
                         </td>
                     </tr>
                     {% endfor %}
-                </tbody>
-            </table>
-        </div>
+                {% endcall %}
         {# Show call-to-action when every row has zero connected elements #}
         {% set ns = namespace(aligned=0) %}
         {% for row in matrix %}

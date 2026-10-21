@@ -56,7 +56,7 @@
                                     <button
                                         type="button"
                                         class="w-full text-left mb-1 rounded-full px-2 py-0.5 text-xs font-medium
- bg-background/80 border border-border 
+ bg-overlay/50 border border-border 
  transition-shadow cursor-pointer truncate
  focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring"
                                         :title="risk.title + (risk.description ? ': ' + risk.description : '')"
@@ -116,7 +116,7 @@
     <div
         x-show="editOpen" x-cloak
         x-transition
-        class="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+        class="fixed inset-0 z-50 flex items-center justify-center bg-overlay/50"
         role="dialog"
         aria-modal="true"
         aria-labelledby="edit-risk-title"
@@ -129,7 +129,7 @@
         >
             <button
                 type="button"
-                class="absolute right-3 top-3 rounded-sm p-1 text-muted-foreground hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring"
+                class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring absolute right-3 top-3"
                 @click="editOpen = false"
                 aria-label="Close edit risk modal"
             >

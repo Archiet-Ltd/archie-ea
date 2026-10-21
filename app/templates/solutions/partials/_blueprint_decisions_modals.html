@@ -21,7 +21,7 @@
 
         {# Title #}
         <div>
-            <label class="block text-xs font-medium text-foreground mb-1.5" for="adr-title">
+            <label class="block text-sm font-medium text-muted-foreground mb-1" for="adr-title">
                 Title <span class="text-destructive-emphasis" aria-hidden="true">*</span>
             </label>
             <input id="adr-title" type="text"
@@ -30,17 +30,17 @@
                    @input="if(window._decisionsSection) window._decisionsSection.form.title = $event.target.value"
                    placeholder="e.g. Adopt event-driven messaging for integration layer"
                    required
-                   class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring">
+                   class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring">
         </div>
 
         {# Decision Type #}
         <div>
-            <label class="block text-xs font-medium text-foreground mb-1.5" for="adr-type">Decision Type</label>
+            <label class="block text-sm font-medium text-muted-foreground mb-1" for="adr-type">Decision Type</label>
             <select id="adr-type"
                     x-data
                     :value="window._decisionsSection ? window._decisionsSection.form.decision_type : ''"
                     @change="if(window._decisionsSection) window._decisionsSection.form.decision_type = $event.target.value"
-                    class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring">
+                    class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring">
                 <option value="">— select type —</option>
                 <option value="technology_choice">Technology Choice</option>
                 <option value="vendor_selection">Vendor Selection</option>
@@ -51,7 +51,7 @@
 
         {# Context #}
         <div>
-            <label class="block text-xs font-medium text-foreground mb-1.5" for="adr-context">Context</label>
+            <label class="block text-sm font-medium text-muted-foreground mb-1" for="adr-context">Context</label>
             <p class="text-2xs text-muted-foreground mb-1">Why was this decision needed? What forces are at play?</p>
             <textarea id="adr-context"
                       x-data
@@ -64,7 +64,7 @@
 
         {# Decision #}
         <div>
-            <label class="block text-xs font-medium text-foreground mb-1.5" for="adr-decision">
+            <label class="block text-sm font-medium text-muted-foreground mb-1" for="adr-decision">
                 Decision <span class="text-destructive-emphasis" aria-hidden="true">*</span>
             </label>
             <p class="text-2xs text-muted-foreground mb-1">What was decided? State it clearly and unambiguously.</p>
@@ -80,7 +80,7 @@
 
         {# Rationale #}
         <div>
-            <label class="block text-xs font-medium text-foreground mb-1.5" for="adr-rationale">Rationale</label>
+            <label class="block text-sm font-medium text-muted-foreground mb-1" for="adr-rationale">Rationale</label>
             <p class="text-2xs text-muted-foreground mb-1">Why was this option chosen over the alternatives?</p>
             <textarea id="adr-rationale"
                       x-data
@@ -93,7 +93,7 @@
 
         {# Consequences #}
         <div>
-            <label class="block text-xs font-medium text-foreground mb-1.5" for="adr-consequences">Consequences</label>
+            <label class="block text-sm font-medium text-muted-foreground mb-1" for="adr-consequences">Consequences</label>
             <textarea id="adr-consequences"
                       x-data
                       :value="window._decisionsSection ? window._decisionsSection.form.consequences : ''"
@@ -106,7 +106,7 @@
         {# Alternatives — dynamic list driven by decisionsSection #}
         <div x-data="{ get _s() { return window._decisionsSection || { form: { alternatives: [] }, addAlternative() {}, removeAlternative() {} }; } }">
             <div class="flex items-center justify-between mb-2">
-                <label class="text-xs font-medium text-foreground">Alternatives Considered</label>
+                <label class="block text-sm font-medium text-muted-foreground mb-1">Alternatives Considered</label>
                 <button type="button"
                         @click="_s.addAlternative()"
                         class="inline-flex items-center gap-1 text-2xs font-medium text-primary hover:text-primary/80 transition-colors">
@@ -121,22 +121,22 @@
                             <input type="text"
                                    x-model="alt.name"
                                    :placeholder="'Option ' + (idx + 1) + ' name'"
-                                   class="flex-1 rounded-md border border-input bg-background px-2 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring" aria-label="Name">
+                                   class="h-9 flex-1 rounded-md border border-input bg-background px-2 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring" aria-label="Name">
                             <button aria-label="Remove alternative" type="button"
                                     @click="_s.removeAlternative(idx)"
                                     class="text-muted-foreground hover:text-destructive-emphasis transition-colors">
                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
                             </button>
                         </div>
-                        <div class="grid grid-cols-2 gap-2">
+                        <div class="grid grid-cols-1 gap-2">
                             <div>
-                                <label class="block text-xs font-medium text-success-emphasis mb-1">Pros</label>
+                                <label class="block text-sm font-medium text-muted-foreground mb-1 text-success-emphasis">Pros</label>
                                 <textarea x-model="alt.pros" rows="2"
                                           placeholder="Advantages..."
                                           class="w-full rounded-md border border-input bg-background px-2 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring resize-none" aria-label="Pros"></textarea>
                             </div>
                             <div>
-                                <label class="block text-xs font-medium text-destructive-emphasis mb-1">Cons</label>
+                                <label class="block text-sm font-medium text-muted-foreground mb-1 text-destructive-emphasis">Cons</label>
                                 <textarea x-model="alt.cons" rows="2"
                                           placeholder="Disadvantages..."
                                           class="w-full rounded-md border border-input bg-background px-2 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring resize-none" aria-label="Cons"></textarea>
@@ -159,7 +159,7 @@
         <div class="flex items-center justify-end gap-2 pt-2 border-t border-border">
             <button type="button"
                     data-modal-close="decisions-form-modal"
-                    class="inline-flex items-center px-3 py-1.5 rounded-md text-sm font-medium border border-border text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors">
+                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4">
                 Cancel
             </button>
             <button type="submit"
@@ -187,7 +187,7 @@
           @submit.prevent="window._decisionsSection && window._decisionsSection.submitReject()"
           class="space-y-4">
         <div>
-            <label class="block text-xs font-medium text-foreground mb-1.5" for="adr-reject-reason">
+            <label class="block text-sm font-medium text-muted-foreground mb-1" for="adr-reject-reason">
                 Rejection Reason <span class="text-destructive-emphasis" aria-hidden="true">*</span>
             </label>
             <textarea id="adr-reject-reason"
@@ -206,7 +206,7 @@
         <div class="flex items-center justify-end gap-2 pt-2 border-t border-border">
             <button type="button"
                     data-modal-close="decisions-reject-modal"
-                    class="inline-flex items-center px-3 py-1.5 rounded-md text-sm font-medium border border-border text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors">
+                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4">
                 Cancel
             </button>
             <button type="submit"
