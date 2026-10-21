@@ -39,12 +39,10 @@
 
    <!-- Backdrop -->
    <div class="modal-backdrop fixed inset-0 transition-opacity duration-200 bg-overlay/50"
-        style="z-index: var(--modal-z, 1000);"
         data-modal-backdrop="confirm-dialog-{{ id }}" aria-hidden="true"></div>
 
    <!-- Dialog -->
-   <div class="modal-panel flex items-center justify-center p-4 fixed inset-0"
-        style="z-index: calc(var(--modal-z, 1000) + 1);" role="alertdialog"
+   <div class="modal-panel flex items-center justify-center p-4 fixed inset-0" role="alertdialog"
         aria-modal="true"
         aria-labelledby="dialog-title-{{ id }}"
         aria-describedby="dialog-desc-{{ id }}">

@@ -112,7 +112,6 @@
         x-transition:leave-end="opacity-0"
         @click="open = false"
         class="modal-backdrop fixed inset-0 transition-opacity duration-200 bg-overlay/50"
-        style="z-index: var(--modal-z, 1000);"
     ></div>
     
     <!-- Modal -->
@@ -128,7 +127,6 @@
         aria-modal="true"
         aria-label="Global search"
         class="modal-panel fixed top-[15vh] left-1/2 -translate-x-1/2 w-full max-w-2xl px-4"
-        style="z-index: calc(var(--modal-z, 1000) + 1);"
     >
         <div class="cmd-palette overflow-hidden">
             <!-- Search Input -->
