@@ -64,8 +64,9 @@
     {% call workspace_gate(home_url) %}
     {# Command pattern (design/patterns.json: focused_task): one large input, the
        question lenses as chips beneath it, the answer cascade below. The picker
-       is rendered once and always; a chip sets openKey, which onSelect() in
-       ask.js dispatches on. Chip ids are the contract the smoke journeys drive. #}
+       is rendered once and always; a chip calls toggleQuestion() in ask.js, which
+       sets openKey and answers straight away when an element is already chosen
+       (clicking the chip already chosen keeps it chosen). Chip ids are the contract the smoke journeys drive. #}
     <div class="mx-auto max-w-[760px] space-y-3">
         <div class="ask-large-input">{{ entity_picker('ask', prompt='Type a team, service or system name', input_class='h-12 w-full rounded-md border border-input bg-background px-4 text-base') }}</div>
         <div class="flex flex-wrap items-center gap-2" role="group" aria-label="Question">
@@ -84,7 +85,7 @@
                     class="inline-flex h-8 items-center rounded-md border px-3 text-13 font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     :class="(openKey || 'impact') === '{{ question.key }}' ? 'border-ring bg-muted text-info dark:bg-card' : 'border-input bg-background text-muted-foreground hover:bg-muted/50 hover:text-foreground'"
                     :aria-pressed="(openKey || 'impact') === '{{ question.key }}' ? 'true' : 'false'"
-                    @click="openKey = '{{ question.key }}'; $nextTick(() => $refs.pickerInput && $refs.pickerInput.focus())">
+                    @click="openKey === '{{ question.key }}' || toggleQuestion('{{ question.key }}')">
                 {{ chip_labels[question.key] }}
             </button>
             {% endfor %}
