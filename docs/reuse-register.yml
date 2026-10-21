@@ -618,3 +618,30 @@ entries:
         reason: third-party stylesheets, not ours to change
       - path: app/static/css/tailwind-output*
         reason: generated Tailwind utility output (minified), rebuilt from templates by scripts/build_css.py
+
+  - id: overlay-panel
+    concept: A panel that opens over the page for detail, a form or an explanation (dialog, side drawer)
+    status: active
+    canonical:
+      path: app/templates/components/dialog.html
+      symbols: [dialog]
+    reuse: >
+      Open detail, a form or an explanation over the page with the dialog macro. Side drawers are a banned
+      pattern (design/patterns.json banned_patterns: side-drawers); the side panel the navigation design
+      names is a docked inspector panel, which is not an overlay and arrives as its own pattern. Do not
+      import components/drawer.html into a new template; its current callers are listed below and move
+      onto the dialog or the inspector panel when their pages are rebuilt.
+    must_not_create:
+      - id: drawer-import
+        regex: 'from\s+[''"]components/drawer\.html[''"]\s+import'
+        scope: ["app/"]
+        suffixes: [.html]
+    known_exceptions:
+      - path: app/templates/components/drawer.html
+        reason: the drawer itself (its usage comment imports it); retire candidate
+      - path: app/modules/intelligence/templates/intelligence/_provenance_drawer.html
+        reason: the Why panel on Ask; moves when the one-place-to-ask chat replaces the Ask page
+      - path: app/templates/ai_chat/entity_matching_chat_interface.html
+        reason: the entity-matching chat; moves with the chat conformance group
+      - path: app/templates/components/page_guide_drawer.html
+        reason: the page guide; moves onto the dialog with the next guide change
