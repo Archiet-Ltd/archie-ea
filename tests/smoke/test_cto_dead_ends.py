@@ -255,9 +255,10 @@ def test_portfolio_empty_state_shows_one_action(page, live_server, seeded):
     response = page.request.get(live_server.rstrip("/") + href)
     assert response.status == 200, "CTA target %s returned %s" % (href, response.status)
 
-    # No administrator in visible text
+    # No administrator or import in visible text
     body_text = page.locator("body").inner_text().lower()
     assert "administrator" not in body_text
+    assert "import" not in body_text
 
 
 def test_portfolio_with_initiatives_renders_list(page, live_server, seeded):
