@@ -248,6 +248,21 @@ DEPENDENCIES:
         </a>
     </div>
     {% endif %}
+    {# Command Center is not one of the twelve launch modules, but a platform administrator must keep a
+       one-click way to the administration home from the sidebar (the brand-home journey asserts it).
+       It sits in the footer beside All modules, outside the grouped tree, so the tree and its
+       level-1 budget are unchanged. #}
+    {% if current_user.is_authenticated and current_user.is_platform_admin and 'admin.index' in flask.current_app.view_functions %}
+    <div class="px-2 py-0.5 border-t border-border">
+        <a href="{{ url_for('admin.index') }}"
+           title="Command Center"
+           data-testid="sidebar-command-center"
+           class="w-full flex items-center gap-2 rounded-md px-2 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-accent transition-colors {% if request.endpoint == 'admin.index' %}text-foreground font-medium{% endif %}">
+            <i data-lucide="command" class="h-3.5 w-3.5 flex-shrink-0"></i>
+            <span class="sidebar-footer-text">Command Center</span>
+        </a>
+    </div>
+    {% endif %}
     {# The "Collapse sidebar (Ctrl+B)" row that lived here duplicated the header's own collapse
        toggle (app/templates/components/admin_header.html), which already carries the same Ctrl+B hint in
        its `:title`/`:aria-label` bindings -- removing it reclaims height for #sidebar-nav's own scroll
