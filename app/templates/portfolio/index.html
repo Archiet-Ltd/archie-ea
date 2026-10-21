@@ -129,9 +129,13 @@
         icon='briefcase',
         title='No initiatives yet',
         description='Initiatives are loaded with your portfolio data. Each one tracks its phase, health, budget against spend and expected benefits.',
-        cta_text='Talk to us about loading yours',
-        cta_href=url_for('main.public_site_page', slug='contact')
+        cta_text='Import your portfolio',
+        cta_href=url_for('architect_ui.import_oef')
     ) }}
+    <a class="text-sm text-muted-foreground underline underline-offset-2"
+       href="{{ url_for('main.public_site_page', slug='contact') }}">
+        Talk to us about loading yours
+    </a>
     {% endif %}
   </div>
 

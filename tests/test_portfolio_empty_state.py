@@ -1,6 +1,8 @@
 """Portfolio empty state: an organisation with no initiatives sees the
-canonical empty state with one working action; an organisation with
-initiatives renders its list unchanged."""
+canonical empty state with one working action "Import your portfolio"
+opening the model importer; a quiet text link "Talk to us about loading
+yours" pointing at the contact page remains below it. An organisation
+with initiatives renders its list unchanged."""
 
 from bs4 import BeautifulSoup
 
@@ -42,8 +44,10 @@ def test_portfolio_empty_state_renders_canonical_empty_state(
     app, db_session, make_org, client, login_as
 ):
     """An organisation with no EnterpriseInitiative sees the canonical
-    empty_state: one icon, one headline, one body, one action whose target
-    returns 200. No mention of an administrator or an import."""
+    empty_state: one icon, one headline, one body, one primary action
+    "Import your portfolio" whose target returns 200, and a quiet
+    text link "Talk to us about loading yours" below it pointing at
+    the contact page."""
     org = make_org("portfolio-empty")
     user = _user(db_session, org.id)
     login_as(client, user)
@@ -57,24 +61,47 @@ def test_portfolio_empty_state_renders_canonical_empty_state(
     assert "No initiatives yet" in html
     assert "Initiatives are loaded with your portfolio data." in html
 
-    # Exactly one action button/link
-    ctas = soup.find_all("a", string=lambda text: text and "Talk to us about loading yours" in text.strip())
-    assert len(ctas) == 1, "expected exactly one CTA, found %d" % len(ctas)
-
-    # The CTA target returns 200
-    target = ctas[0].get("href")
-    assert target is not None
-    target_response = client.get(target)
-    assert target_response.status_code == 200, (
-        "CTA target %s returned %s, expected 200" % (target, target_response.status_code)
+    # Primary: "Import your portfolio" link opens the model importer
+    import_ctas = soup.find_all(
+        "a", string=lambda text: text and "Import your portfolio" in text.strip()
+    )
+    assert len(import_ctas) == 1, (
+        "expected exactly one Import CTA, found %d" % len(import_ctas)
+    )
+    import_target = import_ctas[0].get("href")
+    assert import_target is not None
+    import_target_response = client.get(import_target)
+    assert import_target_response.status_code == 200, (
+        "Import CTA target %s returned %s, expected 200"
+        % (import_target, import_target_response.status_code)
     )
 
-    # No mention of administrator or import in visible page text
+    # Quiet: "Talk to us about loading yours" link still present below
+    talk_ctas = soup.find_all(
+        "a", string=lambda text: text and "Talk to us about loading yours" in text.strip()
+    )
+    assert len(talk_ctas) == 1, (
+        "expected exactly one Talk CTA, found %d" % len(talk_ctas)
+    )
+    talk_target = talk_ctas[0].get("href")
+    assert talk_target is not None
+    talk_target_response = client.get(talk_target)
+    assert talk_target_response.status_code == 200, (
+        "Talk CTA target %s returned %s, expected 200"
+        % (talk_target, talk_target_response.status_code)
+    )
+
+    # The quiet "Talk to us about loading yours" CTA target is the contact page
+    talk_target = talk_ctas[0].get("href")
+    assert "contact" in talk_target.lower(), (
+        "expected Talk CTA target to contain 'contact', got %s" % talk_target
+    )
+
+    # No mention of administrator in visible page text
     for tag in soup(["script", "style"]):
         tag.decompose()
     visible_text = soup.get_text().lower()
     assert "administrator" not in visible_text
-    assert "import" not in visible_text
 
 
 def test_portfolio_with_initiatives_renders_list_unchanged(
