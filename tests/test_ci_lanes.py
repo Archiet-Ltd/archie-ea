@@ -17,6 +17,7 @@ SHARD_NAME = "Tests (pytest + coverage) — shard ${{ matrix.shard }}"
 REQUIRED_NAMES = {
     "static-gates": "Static gates (compile + ratchets)",
     "db-gates": "Database gates (schema drift)",
+    "store-agreement": "Store agreement (screens answer one number)",
     "boot-health": "Boot health (no database)",
     "security-sast": "SAST (bandit)",
     "secret-scan": "Secret scan (gitleaks)",
@@ -29,7 +30,7 @@ FULL_ONLY = [
     "smoke", "browser-compatibility", "walkthrough", "quarantine-tests",
 ]
 ALWAYS = ["secret-scan", "static-gates", "boot-health", "db-gates",
-          "security-sast", "dependency-audit"]
+          "store-agreement", "security-sast", "dependency-audit"]
 
 
 def _jobs():
