@@ -21,7 +21,7 @@ from flask_login import current_user, login_required
 
 from app import db
 from app.decorators import audit_log
-from app.security.rbac import Permission, ResourceDomain, require_permission
+from app.core.auth.decorators import require_permission, ResourceDomain, Permission
 from app.services.application_capability_catalog import ApplicationCapabilityCatalogService
 from app.services.archimate.archimate_service import ArchiMateService
 from app.services.capability_mapping_service import CapabilityMappingService
