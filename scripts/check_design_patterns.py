@@ -115,8 +115,10 @@ def class_tokens(value: str) -> list[str]:
 
 
 def opening_tags(src: str, name: str):
-    """Yield (match) for each opening tag of the given element name."""
-    return re.finditer(r"<%s\b[^>]*>" % name, src, re.S)
+    """Yield (match) for each opening tag of the given element name. Quoted attribute values
+    are read whole, so a ">" inside one (an Alpine arrow function, a comparison) never ends the
+    tag early, and the order of attributes never changes what a rule sees."""
+    return re.finditer(r"""<%s\b(?:"[^"]*"|'[^']*'|[^'">])*>""" % name, src, re.S)
 
 
 def attr(tag: str, name: str) -> str | None:
