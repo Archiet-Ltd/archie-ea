@@ -40,6 +40,7 @@ from app.services.rate_limiter import RateLimitExceeded, rate_limit
 from app.services.template_instantiation_service import TemplateInstantiationService
 from app.services.template_performance_optimizer import template_optimizer
 from app.utils.pagination import safe_int_arg
+from app.models.archimate_element_types import application_kind_types
 
 # ============================================================================
 # SECURITY CONFIGURATION
@@ -666,8 +667,9 @@ def link_template_elements(app_id):
     app = ApplicationComponent.query.get_or_404(app_id)
 
     # Get the application's ArchiMate element
-    app_element = ArchiMateElement.query.filter_by(
-        name=app.name, type="ApplicationComponent"
+    app_element = ArchiMateElement.query.filter(
+        ArchiMateElement.name == app.name,
+        ArchiMateElement.type.in_(application_kind_types()),
     ).first()
 
     if not app_element:

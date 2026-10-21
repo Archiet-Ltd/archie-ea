@@ -28,7 +28,7 @@
         <span class="text-foreground">That element is not recorded in your organisation.</span>
         {% endif %}
         <a href="{{ url_for('arch_decisions.list_decisions') }}"
-           class="inline-flex items-center gap-1 rounded-md px-2 py-1 text-muted-foreground hover:bg-accent hover:text-accent-foreground">
+           class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-8 px-2.5 items-center">
             <i data-lucide="x" class="h-3 w-3" aria-hidden="true"></i>Show all decisions
         </a>
     </div>
@@ -61,7 +61,7 @@
     <!-- Decisions Table -->
     <div class="bg-card border border-border rounded-lg overflow-hidden">
         {% if decisions %}
-        <table class="w-full text-sm">
+        <table class="dense-table w-full text-sm">
             <thead class="bg-muted/50 border-b border-border">
                 <tr>
                     <th class="text-left px-4 py-3 font-medium text-muted-foreground">Decision ID</th>
@@ -103,7 +103,7 @@
                     <td class="px-4 py-3">
                         {% if d.adm_phase %}
                         <a href="{{ url_for('arch_decisions.list_decisions', status=status_filter, phase=d.adm_phase) }}"
-                           class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-secondary text-secondary-foreground hover:bg-secondary/80">
+                           class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                             Phase {{ d.adm_phase }}
                         </a>
                         {% else %}
@@ -131,7 +131,7 @@
             <p class="text-sm text-muted-foreground mb-4">Record your first enterprise architecture decision.</p>
             {% endif %}
             <a href="{{ url_for('arch_decisions.create_decision', element_id=filter_element.id) if filter_element else url_for('arch_decisions.create_decision') }}"
-               class="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors">
+               class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                 <i data-lucide="plus" class="h-4 w-4"></i>
                 New Decision
             </a>

@@ -26,9 +26,9 @@
     {% else %}
     <form method="GET" action="{{ url_for('gdpr_bp.dsr_trace') }}" class="flex flex-wrap items-end gap-3" data-testid="trace-form">
         <div>
-            <label for="trace-category" class="block text-sm font-medium mb-1">Personal-data category</label>
+            <label for="trace-category" class="block text-sm font-medium text-muted-foreground mb-1">Personal-data category</label>
             <select id="trace-category" name="category_id" required data-testid="trace-category"
-                class="flex h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm">
+                class="flex h-9 rounded-md border border-input bg-transparent px-3 text-sm">
                 <option value="" {% if not selected %}selected{% endif %} disabled>Select…</option>
                 {% for c in categories %}
                 <option value="{{ c.id }}" {% if selected and c.id == selected.id %}selected{% endif %}>{{ c.name }}</option>
@@ -36,13 +36,13 @@
             </select>
         </div>
         <button type="submit" data-testid="trace-submit"
-            class="inline-flex items-center justify-center rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 h-9 px-4">
+            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
             Trace
         </button>
     </form>
 
     {% if traced %}
-    <div class="rounded-xl border border-border bg-card overflow-hidden" data-testid="trace-result">
+    <div class="rounded-lg border border-border bg-card overflow-hidden" data-testid="trace-result">
         <div class="p-4 border-b border-border bg-muted/30">
             <h2 class="text-lg font-semibold">{{ traced.category.name }}</h2>
         </div>

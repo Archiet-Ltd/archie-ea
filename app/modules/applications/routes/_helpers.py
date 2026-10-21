@@ -150,6 +150,58 @@ def _format_date(value):
         return str(value)
 
 
+_SCHEMA_CACHE = {}
+
+
+class _AnyColumn(frozenset):
+    """Stand-in for "cannot introspect": every column is assumed present."""
+
+    def __contains__(self, item):
+        return True
+
+
+_ANY_COLUMN = _AnyColumn()
+
+
+def _reset_schema_cache():
+    """Forget the cached live-schema lookups (tests, or after a migration)."""
+    _SCHEMA_CACHE.clear()
+
+
+def _live_table_columns(table):
+    """Return the set of column names of ``table`` in the live database, or
+    ``None`` when the table does not exist. Cached for the process."""
+    if table not in _SCHEMA_CACHE:
+        from sqlalchemy import inspect as _inspect
+
+        try:
+            insp = _inspect(db.session.connection())
+            if insp.has_table(table):
+                _SCHEMA_CACHE[table] = {c["name"] for c in insp.get_columns(table)}
+            else:
+                _SCHEMA_CACHE[table] = None
+        except Exception:
+            # Cannot introspect: do not cache; run the statement as before.
+            logger.debug("schema inspection failed for %s", table, exc_info=False)
+            return _ANY_COLUMN
+    return _SCHEMA_CACHE[table]
+
+
+def _statement_targets_exist(stmt):
+    """True when the table and every column named in a ``DELETE FROM t WHERE
+    col = :id [OR ...]`` clean-up statement exist in the live schema, so no
+    query is issued against a missing table or column."""
+    import re
+
+    m = re.match(r"\s*DELETE FROM (\w+)\s", stmt)
+    if not m:
+        return True
+    columns = _live_table_columns(m.group(1))
+    if columns is None:
+        return False
+    return all(c in columns for c in re.findall(r"(\w+)\s*=\s*:id", stmt))
+
+
 def _cascade_delete_application(app_id):
     """Delete all child records for an application before ORM deletion.
 
@@ -265,6 +317,8 @@ def _cascade_delete_application(app_id):
     ]
 
     for _stmt in _deletes:
+        if not _statement_targets_exist(_stmt):
+            continue
         _sp = db.session.begin_nested()
         try:
             db.session.execute(_sql(_stmt), {"id": app_id})
