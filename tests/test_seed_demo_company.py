@@ -26,8 +26,12 @@ def _row_counts(org_id):
     from app.models.unified_work_package import UnifiedWorkPackage
     from app.models.implementation_migration import Plateau, Gap
     from app.models.user import User
+    from app.models.business_model import BusinessModelCanvas
+    from app.models.vendor.vendor_organization import EnterpriseInitiative
 
     return {
+        "business_model_canvases": BusinessModelCanvas.query.filter_by(organization_id=org_id).count(),
+        "enterprise_initiatives": EnterpriseInitiative.query.filter_by(organization_id=org_id).count(),
         "elements": ArchiMateElement.query.filter_by(organization_id=org_id).count(),
         "relationships": ArchiMateRelationship.query.filter_by(organization_id=org_id).count(),
         "applications": ApplicationComponent.query.filter_by(organization_id=org_id).count(),
@@ -766,3 +770,81 @@ def test_proof_asset_data_is_idempotent(app, db_session, make_org):
     assert again["arb_reviews_created"] == 0
     assert again["capability_mappings_created"] == 0
     assert again["capabilities_created"] == 0
+
+
+# ── T-demo-01: the demo organisation answers the public promises ────────────
+
+
+def test_portfolio_screen_has_initiatives_with_recorded_figures(app, db_session, make_org):
+    """/portfolio reads EnterpriseInitiative; the demo organisation has five,
+    each with phase, health, budget, spend, completion and a sponsor."""
+    from app.models.vendor.vendor_organization import EnterpriseInitiative
+
+    stats = _seed_once()
+    assert stats["initiatives_created"] == 7
+    org_id = _get_lantern_org_id()
+    rows = EnterpriseInitiative.query.filter_by(organization_id=org_id).all()
+    assert len(rows) == 7
+    for row in rows:
+        assert row.current_phase and row.health_status and row.executive_sponsor
+        assert row.approved_budget and row.spent_to_date is not None
+        assert row.completion_percentage is not None
+    assert {r.health_status for r in rows} >= {"green", "yellow"}
+    again = _seed_once()
+    assert again["initiatives_created"] == 0
+    assert EnterpriseInitiative.query.filter_by(organization_id=org_id).count() == 7
+
+
+def test_work_packages_have_owner_initiative_and_connections(app, db_session, make_org):
+    """Every demo work package names an owner, belongs to an initiative and
+    reaches the model through at least one connection."""
+    from app.models import ArchiMateRelationship
+    from app.models.unified_work_package import UnifiedWorkPackage
+
+    stats = _seed_once()
+    assert stats["work_packages_linked"] == 12
+    org_id = _get_lantern_org_id()
+    wps = UnifiedWorkPackage.query.filter_by(organization_id=org_id).all()
+    assert len(wps) == 12
+    for wp in wps:
+        assert wp.owner_id is not None, wp.name
+        assert wp.enterprise_initiative_id is not None, wp.name
+        outgoing = ArchiMateRelationship.query.filter_by(
+            organization_id=org_id, source_id=wp.archimate_element_id
+        ).count()
+        assert outgoing >= 1, wp.name
+    assert _seed_once()["work_packages_linked"] == 0
+
+
+def test_ask_programme_card_has_owner_and_connections(app, db_session, make_org):
+    org_id = _seed_and_get_org_id()
+    from app.models.unified_work_package import UnifiedWorkPackage
+
+    wp = UnifiedWorkPackage.query.filter_by(
+        organization_id=org_id, name="Deploy automated calibration rigs"
+    ).first()
+    result = TestAskQuestions._call(
+        app, org_id, "programme_for_element", wp.archimate_element_id
+    )
+    card = result["work_packages"][0]
+    assert card["owner"] == "Ivo Reed"
+    assert card["affected_summary"]["explicit_count"] + card["affected_summary"]["derived_count"] > 0
+
+
+def test_business_model_canvas_is_seeded_once_and_tenant_scoped(app, db_session, make_org):
+    from app.models.business_model import CANVAS_BLOCKS, BusinessModelCanvas
+
+    stats = _seed_once()
+    assert stats["business_model_canvases_created"] == 1
+    org_id = _get_lantern_org_id()
+    canvases = BusinessModelCanvas.query.filter_by(organization_id=org_id).all()
+    assert len(canvases) == 1
+    canvas = canvases[0]
+    assert canvas.operating_model_type
+    for block in CANVAS_BLOCKS:
+        assert (getattr(canvas, block) or "").strip(), block
+    assert _seed_once()["business_model_canvases_created"] == 0
+    other = make_org("other-tenant-canvas")
+    other_id = other.id
+    db_session.commit()
+    assert BusinessModelCanvas.query.filter_by(organization_id=other_id).count() == 0

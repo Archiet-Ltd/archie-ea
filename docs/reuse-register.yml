@@ -306,6 +306,21 @@ entries:
       - id: maturity-score
         regex: 'def\s+_?(calculate|compute)_(\w+_)?maturity\w*\s*\('
 
+  - id: applications-list
+    concept: The active organisation's application list (single tenant-scoped reader)
+    status: active
+    canonical:
+      path: app/modules/applications/routes/list_views.py
+      symbols: [api_list]
+    reuse: >
+      Read the organisation's applications through api_list (GET /applications/api/list),
+      the single tenant-scoped applications list reader. Do not add a second list
+      endpoint or a second applications reader; call this one and shape its
+      ``applications`` payload for the caller.
+    must_not_create:
+      - id: second-applications-list-endpoint
+        regex: 'def\s+_?(applications|apps)_(list|all|index|reader)\s*\('
+
   - id: empty-state
     concept: Empty state shown when a list or page has no data
     status: active

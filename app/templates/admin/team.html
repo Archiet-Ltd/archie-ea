@@ -26,6 +26,18 @@
         {% endif %}
     {% endwith %}
 
+    <nav class="flex gap-4 border-b border-border mb-6" aria-label="Team sections" data-testid="team-tabs">
+        <a href="{{ url_for('team.team') }}" data-testid="team-tab-members"
+           class="px-1 pb-2 text-sm font-medium {% if tab != 'permissions' %}border-b-2 border-primary text-foreground{% else %}text-muted-foreground hover:text-foreground{% endif %}"
+           {% if tab != 'permissions' %}aria-current="page"{% endif %}>Members</a>
+        <a href="{{ url_for('team.team', tab='permissions') }}" data-testid="team-tab-permissions"
+           class="px-1 pb-2 text-sm font-medium {% if tab == 'permissions' %}border-b-2 border-primary text-foreground{% else %}text-muted-foreground hover:text-foreground{% endif %}"
+           {% if tab == 'permissions' %}aria-current="page"{% endif %}>Permissions</a>
+    </nav>
+
+    {% if tab == 'permissions' %}
+    {% include 'admin/_team_permissions.html' %}
+    {% else %}
     <!-- Invite Member -->
     <div class="bg-background rounded-lg mb-8 p-6">
         <h2 class="text-lg font-semibold text-foreground mb-1">Invite a teammate</h2>
@@ -202,6 +214,7 @@
             </tbody>
         </table>
     </div>
+    {% endif %}
 </div>
 {% endblock %}
 <script>
