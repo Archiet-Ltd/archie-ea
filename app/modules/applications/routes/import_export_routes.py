@@ -1176,9 +1176,10 @@ def application_import():
 
             # Column mapping sent by the import page: {file header: target field}.
             mapped_header_by_target = {}
-            mapped_headers = set()
+            mappings_sent = False
             _raw_mappings = request.form.get("field_mappings")
             if _raw_mappings:
+                mappings_sent = True  # the page's mapping is then the complete one
                 try:
                     _mappings = json.loads(_raw_mappings)
                 except json.JSONDecodeError:
@@ -1202,7 +1203,6 @@ def application_import():
                     "description",
                     "lifecycle_status",
                     "vendor_name",
-                    "package_vendor",
                     "cloud_provider",
                     "imported_capabilities",
                     "application_services",
@@ -1221,9 +1221,13 @@ def application_import():
                         )
                     elif _header not in _file_headers:
                         _bad.append(f"mapped column '{_header}' is not in the file")
+                    elif _target in mapped_header_by_target:
+                        _bad.append(
+                            f"columns '{mapped_header_by_target[_target]}' and "
+                            f"'{_header}' are both mapped to '{_target}'"
+                        )
                     else:
                         mapped_header_by_target[_target] = _header
-                    mapped_headers.add(_header)
                 if _bad:
                     raise ValueError("; ".join(_bad))
 
@@ -1237,7 +1241,7 @@ def application_import():
                 "app_name",
                 "appname",
             ]
-            for field in reader.fieldnames if not name_column else ():
+            for field in reader.fieldnames if not (name_column or mappings_sent) else ():
                 if field and field.lower().strip() in name_variants:
                     name_column = field
                     break
@@ -1255,9 +1259,9 @@ def application_import():
                     if target in mapped_header_by_target:
                         return row.get(mapped_header_by_target[target])
                 for variant in variants:
+                    if mappings_sent:
+                        break  # not named in the mapping, so not imported
                     for key in row.keys():
-                        if key in mapped_headers:
-                            continue  # already assigned to its own field
                         if key and key.lower().strip() == variant.lower():
                             return row[key]
                         if key and key.lower().replace(

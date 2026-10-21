@@ -233,3 +233,48 @@ def test_update_mode_values_replace_stored_vendor_and_hosting(
     _post(client, login_as, user, f"Name,Vendor,Public Cloud Provider\n{a},GitHub,AWS\n", mode="update")
     row = _apps(db_session, org, [a])[a]
     assert (row.vendor_name, row.cloud_provider) == ("GitHub", "AWS")
+
+
+@pytest.mark.parametrize("vendor_entry", [None, ""])
+def test_unmapped_or_skipped_column_is_not_imported_by_name(
+    client, db_session, make_org, login_as, vendor_entry
+):
+    org = make_org("csvk")
+    user = _admin(db_session, org)
+    a, b = _names()
+    text = (
+        "Name,Vendor,Public Cloud Provider@@{a},GitHub,AWS@@{b},Atlassian,Azure@@"
+    ).format(a=a, b=b).replace("@@", "\n")
+    mapping = {"Name": "name", "Public Cloud Provider": "cloud_provider"}
+    if vendor_entry is not None:
+        mapping["Vendor"] = vendor_entry
+    _post(client, login_as, user, text, mapping=mapping)
+    apps = _apps(db_session, org, [a, b])
+    assert {k: (v.vendor_name, v.cloud_provider) for k, v in apps.items()} == {
+        a: (None, "AWS"),
+        b: (None, "Azure"),
+    }
+
+
+def test_two_columns_mapped_to_one_field_are_reported(
+    client, db_session, make_org, login_as
+):
+    org = make_org("csvl")
+    user = _admin(db_session, org)
+    a, b = _names()
+    bad = dict(MAPPING, **{"Hosted On": "vendor_name"})
+    _post(client, login_as, user, CUSTOM.format(a=a, b=b), mapping=bad)
+    errors = [m for c, m in _flashes(client) if c == "error"]
+    assert any("vendor_name" in m for m in errors), errors
+    assert _apps(db_session, org, [a, b]) == {}
+
+
+def test_package_vendor_cannot_be_mapped(client, db_session, make_org, login_as):
+    org = make_org("csvm")
+    user = _admin(db_session, org)
+    a, b = _names()
+    bad = dict(MAPPING, Supplier="package_vendor")
+    _post(client, login_as, user, CUSTOM.format(a=a, b=b), mapping=bad)
+    errors = [m for c, m in _flashes(client) if c == "error"]
+    assert any("package_vendor" in m for m in errors), errors
+    assert _apps(db_session, org, [a, b]) == {}
