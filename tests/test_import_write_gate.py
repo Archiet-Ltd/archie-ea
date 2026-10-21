@@ -64,13 +64,18 @@ def _two_elements(db_session, org):
     return e1, e2
 
 
-def _count_elements_relationships(db_session):
-    """Return (element_count, relationship_count) after expiring all."""
-    from app.models.archimate_core import ArchiMateElement, ArchiMateRelationship
+def _count_elements_relationships(db_session, org):
+    """Return (element_count, relationship_count) for this organisation only."""
+    from sqlalchemy import text
 
     db_session.expire_all()
-    elem_count = db_session.query(ArchiMateElement).count()
-    rel_count = db_session.query(ArchiMateRelationship).count()
+    params = {"o": org.id}
+    elem_count = db_session.execute(
+        text("SELECT count(*) FROM archimate_elements WHERE organization_id = :o"), params
+    ).scalar()
+    rel_count = db_session.execute(
+        text("SELECT count(*) FROM archimate_relationships WHERE organization_id = :o"), params
+    ).scalar()
     return elem_count, rel_count
 
 
@@ -89,14 +94,14 @@ class TestViewerImportRefused:
 
         login_as(client, viewer)
 
-        elem_before, rel_before = _count_elements_relationships(db_session)
+        elem_before, rel_before = _count_elements_relationships(db_session, org)
 
         resp = client.post("/architecture/import/oef",
                            data={"file": (b"<?xml version='1.0'?><model></model>", "test.oef")},
                            content_type="multipart/form-data")
         assert resp.status_code == 403, f"Expected 403, got {resp.status_code}"
 
-        elem_after, rel_after = _count_elements_relationships(db_session)
+        elem_after, rel_after = _count_elements_relationships(db_session, org)
         assert elem_after == elem_before, "Element count changed despite 403"
         assert rel_after == rel_before, "Relationship count changed despite 403"
 
@@ -107,14 +112,14 @@ class TestViewerImportRefused:
 
         login_as(client, viewer)
 
-        elem_before, rel_before = _count_elements_relationships(db_session)
+        elem_before, rel_before = _count_elements_relationships(db_session, org)
 
         resp = client.post("/architecture/import/oef/preview",
                            data={"file": (b"<?xml version='1.0'?><model></model>", "test.oef")},
                            content_type="multipart/form-data")
         assert resp.status_code == 403, f"Expected 403, got {resp.status_code}"
 
-        elem_after, rel_after = _count_elements_relationships(db_session)
+        elem_after, rel_after = _count_elements_relationships(db_session, org)
         assert elem_after == elem_before, "Element count changed despite 403"
         assert rel_after == rel_before, "Relationship count changed despite 403"
 
@@ -125,14 +130,14 @@ class TestViewerImportRefused:
 
         login_as(client, viewer)
 
-        elem_before, rel_before = _count_elements_relationships(db_session)
+        elem_before, rel_before = _count_elements_relationships(db_session, org)
 
         resp = client.post("/archimate/api/import/oef",
                            data={"file": (b"<?xml version='1.0'?><model></model>", "test.oef")},
                            content_type="multipart/form-data")
         assert resp.status_code == 403, f"Expected 403, got {resp.status_code}"
 
-        elem_after, rel_after = _count_elements_relationships(db_session)
+        elem_after, rel_after = _count_elements_relationships(db_session, org)
         assert elem_after == elem_before, "Element count changed despite 403"
         assert rel_after == rel_before, "Relationship count changed despite 403"
 
@@ -149,14 +154,14 @@ class TestArchitectImportSucceeds:
 
         _two_elements(db_session, org)
 
-        elem_before, rel_before = _count_elements_relationships(db_session)
+        elem_before, rel_before = _count_elements_relationships(db_session, org)
 
         resp = client.post("/architecture/import/oef",
                            data={"file": (b"<?xml version='1.0'?><model></model>", "test.oef")},
                            content_type="multipart/form-data")
         assert resp.status_code not in (401, 403), f"Expected 200, got {resp.status_code}"
 
-        elem_after, rel_after = _count_elements_relationships(db_session)
+        elem_after, rel_after = _count_elements_relationships(db_session, org)
         # Import should have added elements/relationships
         assert elem_after >= elem_before, "No elements created for architect"
 
@@ -169,14 +174,14 @@ class TestArchitectImportSucceeds:
 
         _two_elements(db_session, org)
 
-        elem_before, rel_before = _count_elements_relationships(db_session)
+        elem_before, rel_before = _count_elements_relationships(db_session, org)
 
         resp = client.post("/architecture/import/oef/preview",
                            data={"file": (b"<?xml version='1.0'?><model></model>", "test.oef")},
                            content_type="multipart/form-data")
         assert resp.status_code not in (401, 403), f"Expected 200, got {resp.status_code}"
 
-        elem_after, rel_after = _count_elements_relationships(db_session)
+        elem_after, rel_after = _count_elements_relationships(db_session, org)
         assert elem_after >= elem_before, "No elements created for architect"
 
     def test_architect_succeeds_api_import_oef(self, app, db_session, login_as, client):
@@ -188,14 +193,14 @@ class TestArchitectImportSucceeds:
 
         _two_elements(db_session, org)
 
-        elem_before, rel_before = _count_elements_relationships(db_session)
+        elem_before, rel_before = _count_elements_relationships(db_session, org)
 
         resp = client.post("/api/import/oef",
                            data={"file": (b"<?xml version='1.0'?><model></model>", "test.oef")},
                            content_type="multipart/form-data")
         assert resp.status_code not in (401, 403), f"Expected 200, got {resp.status_code}"
 
-        elem_after, rel_after = _count_elements_relationships(db_session)
+        elem_after, rel_after = _count_elements_relationships(db_session, org)
         assert elem_after >= elem_before, "No elements created for architect"
 
 
