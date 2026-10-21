@@ -1485,11 +1485,12 @@ def seed_demo_company() -> dict:
         stats["application_owners_created"] = owners_created
 
         # ── 6b. owner text, owning units, and recorded annual cost ──────
-        # Every store that answers "which applications have an owner" and
+        # Every live store that answers "which applications have an owner" and
         # "which have a recorded annual cost" is written from the same facts,
-        # so the screens agree. Idempotent: only fills or corrects.
+        # so the screens agree. The retired application_costs table is not
+        # written. Idempotent: only fills or corrects.
         from app.models.enterprise_intelligence import (
-            ApplicationCost, ApplicationOwnership, OrganizationUnit,
+            ApplicationOwnership, OrganizationUnit,
         )
         from app.services.application_cost_accessor import sync_cost_fact
 
@@ -1522,14 +1523,6 @@ def seed_demo_company() -> dict:
             .filter(ApplicationOwnership.organization_id == org_id)
             .all()
         }
-        app_ids = [a.id for a in _resolve_apps(org_id).values()]
-        costed = {
-            c.application_id
-            for c in db.session.query(ApplicationCost)
-            .filter(ApplicationCost.application_id.in_(app_ids))
-            .all()
-        }
-        year = _dt.date.today().year
         agreed = 0
         for app_name, app in _resolve_apps(org_id).items():
             changed = False
@@ -1556,15 +1549,6 @@ def seed_demo_company() -> dict:
                     and app.infrastructure_cost_monthly == _APP_INFRASTRUCTURE_MONTHLY
                     and app.total_cost_of_ownership != _APP_TOTAL_COST):
                 app.total_cost_of_ownership = _APP_TOTAL_COST
-                changed = True
-            if app.id not in costed:
-                db.session.add(ApplicationCost(
-                    application_id=app.id, fiscal_year=year,
-                    license_cost=_APP_LICENSE_ANNUAL,
-                    infrastructure_cost=12 * _APP_INFRASTRUCTURE_MONTHLY,
-                    total_cost=_APP_TOTAL_COST, cost_type="OpEx",
-                ))
-                costed.add(app.id)
                 changed = True
             agreed += changed
         db.session.flush()
