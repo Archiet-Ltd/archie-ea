@@ -434,7 +434,9 @@ def test_component_block_key_shapes(app, db_session, make_org):
 
     result = _resolve(app, org.id, a.id)
     component = result["component"]
-    assert set(component.keys()) == {"name", "health", "cost", "cost_by_period", "licences", "licences_reason"}
+    assert set(component.keys()) == {
+        "name", "updated_at", "end_of_life_date", "health", "cost", "cost_by_period", "licences", "licences_reason",
+    }
     assert len(component["cost"]) == 11
     assert len(component["cost_by_period"]) == 7
     assert len(component["licences"][0]) == 11

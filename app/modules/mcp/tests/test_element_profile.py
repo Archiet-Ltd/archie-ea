@@ -1,6 +1,6 @@
 """Asking for everything about one element returns one cited answer.
 
-The ``answer`` tool with the ``element_profile`` question lists every connected
+Asking for the profile of an element over the connector lists every connected
 element for an Application Component, a Capability and a Work Package, grouped by
 what the connection means, each fact with its source record, its date and whether
 it is recorded or worked out. A group with nothing recorded says so. The
