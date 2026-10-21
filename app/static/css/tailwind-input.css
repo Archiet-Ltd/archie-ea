@@ -93,6 +93,16 @@
     letter-spacing: 0.06em;
     background-color: hsl(var(--card));
   }
+  /* reuse-ok: matrix row headers are names, not column labels; this undoes the legacy #main-content th rule in shadcn-components.css */
+  #main-content .dense-table.matrix tbody th[scope="row"] {
+    text-transform: none;
+    letter-spacing: normal;
+    white-space: normal;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: hsl(var(--foreground));
+    padding: 0 0.5rem;
+  }
   /* reuse-ok: the dense table is the authenticated app's canonical table (design/patterns.json: dense-table), not a copy of the public-site table */
   #main-content .dense-table td {
     height: 3rem;

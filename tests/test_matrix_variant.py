@@ -50,3 +50,14 @@ def test_default_legend_names_all_four_states_with_their_chips(app):
     for words in ("none", "one", "several, with the count", "not recorded"):
         assert words in legend
     assert "badge badge" not in legend
+
+
+def test_row_headers_outrank_the_legacy_th_rule_in_the_stylesheet():
+    from pathlib import Path
+    root = Path(__file__).resolve().parents[1]
+    legacy_th_rule = "#main-content th {" in (root / "app/static/styles/shadcn-components.css").read_text()
+    css = (root / "app/static/css/tailwind-input.css").read_text()
+    rule = css[css.index("#main-content .dense-table.matrix tbody th[scope=\"row\"]"):]
+    rule = rule[: rule.index("}")]
+    assert legacy_th_rule, "the legacy rule this override answers is gone; drop the override with it"
+    assert "text-transform: none" in rule and "letter-spacing: normal" in rule
