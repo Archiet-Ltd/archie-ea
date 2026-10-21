@@ -23,7 +23,7 @@ from flask_login import current_user, login_required
 from sqlalchemy.orm import joinedload
 
 from app import db
-from app.decorators import require_roles
+from app.core.auth.decorators import require_permission
 from app.models.constants import ArchiMateRelationshipType
 from app.modules.architecture.routes.lucidchart_import_routes import (
     register_lucidchart_import_routes,
@@ -1487,8 +1487,24 @@ def api_list_relationships():
     })
 
 
+def _in_callers_organisation(*rows):
+    """True when every row belongs to the caller's active organisation.
+
+    Compared explicitly on the loaded rows: the ORM fence and row-level
+    security filter a fresh SELECT, not an identity-map hit from
+    ``Session.get``.
+    """
+    from app.core.auth.permissions import _matrix_org
+
+    org_id = _matrix_org(current_user, None)
+    return org_id is not None and all(
+        row is not None and row.organization_id == org_id for row in rows
+    )
+
+
 @archimate_bp.route("/api/relationships", methods=["POST"])
 @login_required
+@require_permission("create", "relationship")
 # CSRF: Protected via X-CSRFToken header sent by Platform.fetch
 def api_create_relationship():
     """Create a new ArchiMate relationship.
@@ -1527,6 +1543,8 @@ def api_create_relationship():
         return api_error(f"Source element {source_id} not found", 404)
     if not target_el:
         return api_error(f"Target element {target_id} not found", 404)
+    if not _in_callers_organisation(source_el, target_el):
+        return api_error("Element not found", 404)
 
     # The relationship-type list above is a spelling check only. Confirm the
     # metamodel actually allows this type between these two element types —
@@ -1601,6 +1619,7 @@ def api_create_relationship():
 
 @archimate_bp.route("/api/relationships/<int:rel_id>", methods=["PUT"])
 @login_required
+@require_permission("edit", "relationship")
 # CSRF: Protected via X-CSRFToken header sent by Platform.fetch
 def api_update_relationship(rel_id):
     """Update an existing ArchiMate relationship.
@@ -1612,8 +1631,16 @@ def api_update_relationship(rel_id):
     """
     from app.models.archimate_core import ArchiMateRelationship
 
+    from app.models.archimate_core import ArchiMateElement
+
     rel = db.session.get(ArchiMateRelationship, rel_id)
     if not rel:
+        return api_error("Relationship not found", 404)
+    if not _in_callers_organisation(
+        rel,
+        db.session.get(ArchiMateElement, rel.source_id),
+        db.session.get(ArchiMateElement, rel.target_id),
+    ):
         return api_error("Relationship not found", 404)
 
     data = request.get_json(silent=True) or {}
@@ -1663,13 +1690,20 @@ def api_update_relationship(rel_id):
 
 @archimate_bp.route("/api/relationships/<int:rel_id>", methods=["DELETE"])
 @login_required
+@require_permission("delete", "relationship")
 # CSRF: Protected via X-CSRFToken header sent by Platform.fetch
 def api_delete_relationship(rel_id):
     """Delete an ArchiMate relationship by ID."""
-    from app.models.archimate_core import ArchiMateRelationship
+    from app.models.archimate_core import ArchiMateElement, ArchiMateRelationship
 
     rel = db.session.get(ArchiMateRelationship, rel_id)
     if not rel:
+        return api_error("Relationship not found", 404)
+    if not _in_callers_organisation(
+        rel,
+        db.session.get(ArchiMateElement, rel.source_id),
+        db.session.get(ArchiMateElement, rel.target_id),
+    ):
         return api_error("Relationship not found", 404)
 
     db.session.delete(rel)
@@ -7123,7 +7157,7 @@ def api_composer_element_metrics():
 
 @archimate_bp.route("/api/import/oef", methods=["POST"])
 @login_required
-@require_roles("admin", "architect")
+@require_permission("create", "relationship")
 def api_import_oef():
     """Import an OEF XML model and answer in the composer's shape.
 
