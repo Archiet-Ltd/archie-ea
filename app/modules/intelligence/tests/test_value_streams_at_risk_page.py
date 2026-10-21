@@ -246,7 +246,12 @@ def test_the_rendered_sidebar_links_to_the_page_for_a_business_architect(
     org = make_org("vsrp-nav")
     user = _user(db_session, org.id)
     login_as(client, user)
-    html = client.get(PAGE).get_data(as_text=True)
+    # Grouped sidebar (20 Oct 2026): the page is not one of the twelve launch modules, so it is no
+    # longer a sidebar entry. Nothing is removed: a business architect reaches it from the All modules
+    # page, which every rendered page links to from the sidebar footer.
+    sidebar_html = client.get("/dashboard/overview").get_data(as_text=True)
+    assert 'href="/modules/"' in sidebar_html
+    html = client.get("/modules/").get_data(as_text=True)
     assert f'href="{PAGE}"' in html
     assert "Value Streams at Risk" in html
 
