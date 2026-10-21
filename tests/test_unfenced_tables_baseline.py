@@ -82,3 +82,58 @@ def test_the_script_passes_on_the_repository(capfd):
     import subprocess
     out = subprocess.run([sys.executable, str(SCRIPT), "--new-tables"], capture_output=True, text=True)
     assert out.stdout.strip().splitlines()[-1] == "0", out.stdout
+
+
+def _git(repo, *args):
+    import subprocess
+    subprocess.run(["git", *args], cwd=repo, check=True, capture_output=True,
+                   env={"GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@t", "GIT_COMMITTER_NAME": "t",
+                        "GIT_COMMITTER_EMAIL": "t@t", "PATH": __import__("os").environ["PATH"],
+                        "HOME": str(repo)})
+
+
+def _repo_with_main(tmp_path):
+    repo = tmp_path / "r"
+    (repo / "scripts").mkdir(parents=True)
+    (repo / "scripts" / "unfenced_tables.txt").write_text("# h\nold_things\n")
+    (repo / "scripts" / "unfenced_tables_baseline.txt").write_text("old_things\n")
+    _git(repo, "init", "-q", "-b", "main")
+    _git(repo, "add", "-A")
+    _git(repo, "commit", "-q", "-m", "base")
+    _git(repo, "update-ref", "refs/remotes/origin/main", "HEAD")
+    _git(repo, "checkout", "-q", "-b", "feature")
+    return repo
+
+
+def test_a_branch_that_adds_a_name_to_both_files_fails_against_main(tmp_path):
+    repo = _repo_with_main(tmp_path)
+    (repo / "scripts" / "unfenced_tables.txt").write_text("# h\nold_things\nfresh_things\n")
+    (repo / "scripts" / "unfenced_tables_baseline.txt").write_text("old_things\nfresh_things\n")
+    base, source, error = gate.base_table_list(repo=repo, env={})
+    assert source.startswith("origin/main") and error is None
+    listed = gate.listed_tables(repo / "scripts" / "unfenced_tables.txt")
+    problems = gate.table_problems([], listed=listed, baseline=base, shared=(set(), []))
+    assert problems == ["  added to the unfenced list: fresh_things"]
+    # the committed snapshot alone would have passed it
+    snapshot = gate.listed_tables(repo / "scripts" / "unfenced_tables_baseline.txt")
+    assert gate.table_problems([], listed=listed, baseline=snapshot, shared=(set(), [])) == []
+
+
+def test_with_no_main_ref_the_snapshot_is_the_fallback(tmp_path, capsys):
+    repo = _repo_with_main(tmp_path)
+    _git(repo, "update-ref", "-d", "refs/remotes/origin/main")
+    base, source, error = gate.base_table_list(repo=repo, env={})
+    assert source == "snapshot" and error is None
+    assert "no main ref" in capsys.readouterr().err
+
+
+def test_a_pull_request_run_that_cannot_read_the_base_list_fails_closed(tmp_path):
+    repo = _repo_with_main(tmp_path)
+    base, source, error = gate.base_table_list(repo=repo, env={"GITHUB_BASE_REF": "nonexistent"})
+    assert base is None and "cannot read" in error
+
+
+def test_a_pull_request_run_reads_the_base_branch(tmp_path):
+    repo = _repo_with_main(tmp_path)
+    base, source, error = gate.base_table_list(repo=repo, env={"GITHUB_BASE_REF": "main"})
+    assert base == {"old_things"} and source.startswith("origin/main") and error is None

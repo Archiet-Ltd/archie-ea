@@ -46,7 +46,9 @@ Two checks, one script
 ``--count`` / the default report is the READ gate above. ``--new-tables`` is the TABLE
 gate: every database table whose model has no tenant fence must be listed in
 ``scripts/unfenced_tables.txt``, and that list is a baseline: it is compared with the committed
-``scripts/unfenced_tables_baseline.txt`` and any added name fails, so it can only shrink. A new
+copy on main (the pull request's base branch in CI, origin/main locally; the committed
+``scripts/unfenced_tables_baseline.txt`` only when no main ref exists) and any added name fails, so it
+can only shrink. A new
 table is protected (TenantMixin) or declared shared reference data in
 ``scripts/shared_reference_tables.txt`` with a reason after ``#`` (a line with no reason fails). A new table that is neither fenced nor listed fails, so
 the decision (fence it, or say it is global or reached only through a fenced parent)
@@ -81,7 +83,9 @@ from __future__ import annotations
 import argparse
 import ast
 import json
+import os
 import re
+import subprocess
 import sys
 from pathlib import Path
 
@@ -326,6 +330,67 @@ def shared_reference_tables(path=None):
     return names, bare
 
 
+LIST_REL = "scripts/unfenced_tables.txt"
+BASE_REFS = ("origin/main", "anioko/main")
+
+
+def _git_show(repo, ref, rel):
+    proc = subprocess.run(["git", "show", f"{ref}:{rel}"], cwd=repo, capture_output=True, text=True)
+    return proc.stdout if proc.returncode == 0 else None
+
+
+def _names(text):
+    out = set()
+    for line in text.splitlines():
+        line = line.split("#", 1)[0].strip()
+        if line:
+            out.add(line)
+    return out
+
+
+def base_table_list(repo=None, env=None):
+    """(names, source, error): the unfenced list as main has it, which this branch may not add to.
+
+    On a pull request run (``GITHUB_BASE_REF`` set) the base branch's copy is read, fetching that
+    one ref when the checkout is shallow; if it cannot be read, ``error`` says so and the gate
+    fails (it never passes without a base to compare). Otherwise the list at the merge base with
+    origin/main or anioko/main (whichever is nearer this branch) is used, so a table that main
+    gained after this branch left it is not read as added here. With no main ref at all the committed snapshot is the
+    fallback, with a note on stderr.
+    """
+    repo = repo or REPO
+    env = os.environ if env is None else env
+    base = env.get("GITHUB_BASE_REF", "").strip()
+    if base:
+        text = _git_show(repo, f"origin/{base}", LIST_REL)
+        source = f"origin/{base}"
+        if text is None:
+            fetched = subprocess.run(["git", "fetch", "--depth=1", "origin", base], cwd=repo,
+                                     capture_output=True, text=True)
+            text = _git_show(repo, "FETCH_HEAD", LIST_REL) if fetched.returncode == 0 else None
+            source = f"FETCH_HEAD ({base})"
+        if text is None:
+            return None, None, (f"cannot read {LIST_REL} from the pull request's base branch '{base}'; "
+                                "the gate fails rather than pass without a list to compare with")
+        return _names(text), source, None
+    best = None
+    for ref in BASE_REFS:
+        mb = subprocess.run(["git", "merge-base", "HEAD", ref], cwd=repo, capture_output=True, text=True)
+        if mb.returncode != 0 or not mb.stdout.strip():
+            continue
+        sha = mb.stdout.strip()
+        ahead = subprocess.run(["git", "rev-list", "--count", f"{sha}..HEAD"], cwd=repo,
+                               capture_output=True, text=True).stdout.strip()
+        text = _git_show(repo, sha, LIST_REL)
+        if text is not None and ahead.isdigit() and (best is None or int(ahead) < best[0]):
+            best = (int(ahead), text, f"{ref} (merge base {sha[:9]})")
+    if best:
+        return _names(best[1]), best[2], None
+    print("note: no main ref found (origin/main, anioko/main); comparing with the committed "
+          "snapshot scripts/unfenced_tables_baseline.txt instead", file=sys.stderr)
+    return listed_tables(TABLE_BASELINE), "snapshot", None
+
+
 def table_problems(tables, listed=None, baseline=None, shared=None):
     """Every reason the table gate fails, as printable lines (empty = pass).
 
@@ -390,7 +455,12 @@ def main() -> int:
             print("# inherit TenantMixin or be added here, which shows up in review.")
             print(chr(10).join(tables))
             return 0
-        problems = table_problems(tables)
+        base, source, error = base_table_list()
+        if error:
+            print(f"  {error}")
+            print(1)
+            return 0
+        problems = table_problems(tables, baseline=base)
         for line in problems:
             print(line)
         if problems:
