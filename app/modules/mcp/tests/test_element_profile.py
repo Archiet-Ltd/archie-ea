@@ -360,3 +360,79 @@ def test_message_names_the_groups_with_nothing_recorded(client, db_session, make
     assert _groups(env)["owner"]["status"] == "recorded"
     assert "Not recorded: Cost, Hosting node, End of support" in payload["message"], payload["message"]
     assert all(r["group"] == "owner" for r in env["rows"])
+
+
+def test_capability_cost_lists_an_application_once_even_with_two_links(client, db_session, make_org):
+    org = make_org("el360-cap-once")
+    seed = _capability(db_session, org, "co")
+    _link(db_session, org.id, seed["el"], seed["app"], "Association")
+    db_session.commit()
+    env, _ = _profile(client, _token(seed["user"], org), seed["el"].id)
+    assert [r["name"] for r in _rows(env, "cost")] == ["E-co-crm"]
+    assert len(_rows(env, "delivering_applications")) == 2
+    assert _rows(env, "cost")[0]["basis"] == "recorded"
+
+
+def test_capability_cost_through_a_worked_out_link_is_not_called_recorded(
+    client, db_session, make_org, monkeypatch
+):
+    from app.modules.intelligence.services import answer_envelope as ae
+
+    org = make_org("el360-cap-derived")
+    seed = _capability(db_session, org, "cd")
+    db_session.commit()
+    real = ae._profile_connections
+
+    def only_worked_out(element_id):
+        found, truncated, derived_cut = real(element_id)
+        for item in found:
+            item["derived"], item["derived_id"] = True, 1
+        return found, truncated, derived_cut
+
+    monkeypatch.setattr(ae, "_profile_connections", only_worked_out)
+    env, _ = _profile(client, _token(seed["user"], org), seed["el"].id)
+    cost = _rows(env, "cost")
+    assert len(cost) == 1 and cost[0]["basis"] == "worked_out", cost
+    assert cost[0]["reached_by"] == "worked_out_link"
+
+
+def test_a_cut_short_walk_never_reports_a_group_as_not_recorded(
+    client, db_session, make_org, monkeypatch
+):
+    from app.modules.intelligence.services import answer_envelope as ae
+
+    org = make_org("el360-trunc")
+    seed = _application(db_session, org, "tr")
+    for i in range(3):
+        _link(db_session, org.id, seed["el"], _make_element(db_session, org.id, f"tr-x{i}"), "Triggering")
+    db_session.commit()
+    monkeypatch.setattr(ae, "SET_IMPACT_MAX_ROWS", 2)
+    env, _ = _profile(client, _token(seed["user"], org), seed["el"].id)
+    assert "rows_truncated" in env["reasons"]
+    states = {g["group"]: g["status"] for g in env["summary"]["groups"]}
+    for group in ("hosting_node", "processes", "interfaces", "gaps"):
+        assert states[group] in ("recorded", "not_shown"), (group, states)
+    assert "not_shown" in states.values()
+
+
+def test_work_package_gap_and_plateau_carry_their_own_dates_and_only_this_package(
+    client, db_session, make_org
+):
+    from app.models.implementation_migration import Gap, Plateau
+
+    org = make_org("el360-wpdates")
+    seed = _work_package(db_session, org, "wd")
+    other = _work_package(db_session, org, "wo")
+    gap = db_session.query(Gap).filter(Gap.name == "wd-gap").one()
+    plateau = db_session.query(Plateau).filter(Plateau.name == "wd-target").one()
+    gap.updated_at = _dt.datetime(2026, 1, 5)
+    plateau.updated_at = _dt.datetime(2026, 2, 6)
+    seed["wp"].updated_at = _dt.datetime(2026, 9, 9)
+    db_session.commit()
+    env, _ = _profile(client, _token(seed["user"], org), seed["el"].id)
+    assert _rows(env, "gap_closed")[0]["as_of"].startswith("2026-01-05")
+    assert _rows(env, "plateau")[0]["as_of"].startswith("2026-02-06")
+    assert _rows(env, "owner")[0]["as_of"].startswith("2026-09-09")
+    names = [r["name"] for r in env["rows"]]
+    assert not [n for n in names if n.startswith("wo-")], names
+    assert other["wp"].id not in {r["source"]["id"] for r in env["rows"] if r["source"]["type"] == "work_package"}

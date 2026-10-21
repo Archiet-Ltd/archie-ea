@@ -498,39 +498,45 @@ def _recorded_on(model: Any, ids: List[Any], org_id: int) -> Dict[int, Optional[
     return out
 
 
-def _profile_connections(element_id: int) -> Tuple[List[Dict[str, Any]], bool]:
+def _profile_connections(element_id: int) -> Tuple[List[Dict[str, Any]], bool, bool]:
     """The element's direct connections, outgoing then incoming, from the one
-    canonical walk (run once per direction). Recorded connections are the depth-one
-    relationships; connections worked out from longer chains keep their confidence."""
+    canonical walk. Recorded connections come from a walk of depth one, so longer
+    chains never use up its page; connections worked out from longer chains come from
+    a second walk and keep their confidence. Returns the connections, whether the
+    recorded walk was cut short, and whether the worked-out walk was."""
     found: List[Dict[str, Any]] = []
-    truncated = False
+    recorded_cut = derived_cut = False
     for direction, side in (("downstream", "out"), ("upstream", "in")):
-        result = IntelligenceQueryService.cross_layer_impact(
-            element_id,
-            include_derived=True,
-            max_depth=3,
-            direction=direction,
-            with_owner=False,
-            page_size=SET_IMPACT_MAX_ROWS,
-        )
-        if result.get("next_cursor") is not None:
-            truncated = True
-        for row in result.get("rows") or []:
-            relation = row["relation"]
-            derived = relation.get("kind") == "derived"
-            if not derived and relation.get("depth") != 1:
-                continue
-            found.append({
-                "element_id": row["element_id"],
-                "side": side,
-                "relation_type": relation.get("type"),
-                "derived": derived,
-                "relationship_id": (relation.get("chain") or [None])[0],
-                "derived_id": relation.get("derived_id"),
-                "computed_at": relation.get("computed_at"),
-                "confidence": relation.get("confidence"),
-            })
-    return found, truncated
+        for with_derived in (False, True):
+            result = IntelligenceQueryService.cross_layer_impact(
+                element_id,
+                include_derived=with_derived,
+                max_depth=3 if with_derived else 1,
+                direction=direction,
+                with_owner=False,
+                page_size=SET_IMPACT_MAX_ROWS,
+            )
+            if result.get("next_cursor") is not None:
+                if with_derived:
+                    derived_cut = True
+                else:
+                    recorded_cut = True
+            for row in result.get("rows") or []:
+                relation = row["relation"]
+                derived = relation.get("kind") == "derived"
+                if derived != with_derived:
+                    continue
+                found.append({
+                    "element_id": row["element_id"],
+                    "side": side,
+                    "relation_type": relation.get("type"),
+                    "derived": derived,
+                    "relationship_id": (relation.get("chain") or [None])[0],
+                    "derived_id": relation.get("derived_id"),
+                    "computed_at": relation.get("computed_at"),
+                    "confidence": relation.get("confidence"),
+                })
+    return found, recorded_cut, derived_cut
 
 
 def _fact(group: str, label: str, name: str, source: Tuple[str, Any], as_of: Optional[str],
@@ -585,6 +591,7 @@ def _compute_element_profile(params: Dict[str, Any]) -> Dict[str, Any]:
     for cost and end of support, the risk and programme readers, and the capability
     maturity reader. A group with nothing recorded says so; nothing is invented."""
     from app.models import ArchiMateRelationship
+    from app.models.implementation_migration import Gap, Plateau
     from app.models.risk import Risk
     from app.models.unified_work_package import UnifiedWorkPackage
     from app.modules.capabilities.services.capability_heatmap_service import CapabilityHeatmapService
@@ -603,8 +610,8 @@ def _compute_element_profile(params: Dict[str, Any]) -> Dict[str, Any]:
     rows: List[Dict[str, Any]] = []
     reasons: List[str] = []
 
-    connections, truncated = _profile_connections(element_id)
-    if truncated:
+    connections, truncated, derived_cut = _profile_connections(element_id)
+    if truncated or derived_cut:
         reasons.append(ROWS_TRUNCATED_REASON)
     elements = _resolve_elements_batch([c["element_id"] for c in connections] + [element_id], org_id)
     dates = _recorded_on(
@@ -668,11 +675,21 @@ def _compute_element_profile(params: Dict[str, Any]) -> Dict[str, Any]:
                 ("capability", block.get("capability_id")), block.get("assessed_on"),
                 value={"current": block["current"], "target": block.get("target")},
             ))
-        delivering = [r for r in rows if r["group"] == "delivering_applications"]
-        for row in delivering[:PROFILE_MAX_COSTED_APPLICATIONS]:
+        delivering: Dict[int, Dict[str, Any]] = {}
+        for row in rows:
+            if row["group"] != "delivering_applications":
+                continue
+            kept = delivering.get(row["element_id"])
+            if kept is None or (kept["basis"] == "worked_out" and row["basis"] == "recorded"):
+                delivering[row["element_id"]] = row
+        for row in list(delivering.values())[:PROFILE_MAX_COSTED_APPLICATIONS]:
             portfolio = IntelligenceQueryService.portfolio_component_for_element(row["element_id"])
             for cost in _application_cost_and_support_rows(portfolio, labels, only="cost"):
                 cost["name"] = row["name"]
+                if row["basis"] == "worked_out":
+                    cost["basis"] = "worked_out"
+                    cost["reached_by"] = "worked_out_link"
+                    cost["confidence"] = row.get("confidence")
                 rows.append(cost)
         if len(delivering) > PROFILE_MAX_COSTED_APPLICATIONS and ROWS_TRUNCATED_REASON not in reasons:
             reasons.append(ROWS_TRUNCATED_REASON)
@@ -680,8 +697,18 @@ def _compute_element_profile(params: Dict[str, Any]) -> Dict[str, Any]:
     if element_type == "WorkPackage":
         programme = IntelligenceQueryService.programme_for_element(
             element_id, max_depth=1, include_derived=False)
-        packages = programme.get("work_packages") or []
+        own = set(db.session.execute(
+            db.select(UnifiedWorkPackage.id).where(
+                UnifiedWorkPackage.archimate_element_id == element_id,
+                UnifiedWorkPackage.organization_id == org_id,
+            )
+        ).scalars())
+        packages = [p for p in programme.get("work_packages") or [] if p["work_package_id"] in own]
         wp_dates = _recorded_on(UnifiedWorkPackage, [p["work_package_id"] for p in packages], org_id)
+        gap_dates = _recorded_on(
+            Gap, [(p.get("gap") or {}).get("gap_id") for p in packages], org_id)
+        plateau_dates = _recorded_on(
+            Plateau, [(p.get("plateau") or {}).get("plateau_id") for p in packages], org_id)
         for package in packages:
             wp_id = package["work_package_id"]
             if package.get("owner"):
@@ -692,25 +719,32 @@ def _compute_element_profile(params: Dict[str, Any]) -> Dict[str, Any]:
             if gap.get("gap_id") is not None:
                 rows.append(_fact(
                     "gap_closed", labels["gap_closed"], gap["name"], ("gap", gap["gap_id"]),
-                    wp_dates.get(wp_id), value=gap.get("resolution_status"),
+                    gap_dates.get(gap["gap_id"]), value=gap.get("resolution_status"),
                 ))
             if plateau.get("plateau_id") is not None:
                 rows.append(_fact(
                     "plateau", labels["plateau"], plateau["name"], ("plateau", plateau["plateau_id"]),
-                    wp_dates.get(wp_id), value=plateau.get("target_date"),
+                    plateau_dates.get(plateau["plateau_id"]), value=plateau.get("target_date"),
                 ))
 
     order = {name: index for index, (name, _label) in enumerate(groups + [PROFILE_OTHER_GROUP])}
     rows.sort(key=lambda r: (order[r["group"]], r["name"] or ""))
     group_status = []
+    # Groups read from the recorded walk: when it was cut short, one with no rows is
+    # not shown, never "not recorded".
+    walk_groups = {claimed for claimed, _side, _types in claims} | {PROFILE_OTHER_GROUP[0]}
+    if element_type == "Capability":
+        walk_groups.add("cost")
     for name, label in groups + [PROFILE_OTHER_GROUP]:
         count = sum(1 for r in rows if r["group"] == name)
         if name == PROFILE_OTHER_GROUP[0] and not count:
             continue
+        cut_short = truncated and name in walk_groups
         group_status.append({
             "group": name, "label": label,
-            "status": "recorded" if count else "not_recorded", "count": count,
-            "reason": None if count else _PROFILE_ABSENCE.get(name),
+            "status": "recorded" if count else ("not_shown" if cut_short else "not_recorded"),
+            "count": count,
+            "reason": None if count else (ROWS_TRUNCATED_REASON if cut_short else _PROFILE_ABSENCE.get(name)),
         })
     return {
         "rows": rows,
