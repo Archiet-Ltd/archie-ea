@@ -135,9 +135,25 @@ class FieldMapping:
         self.default_value = default_value
         self.required = required
 
+    def _lookup(self, source_data: Dict[str, Any]) -> Any:
+        """The source value: the key as written, else a dotted path into nested data.
+
+        Jira nests its fields (``fields.status.name``); a flat ``.get`` on that
+        name never finds them, so every nested mapping silently came back empty.
+        """
+        if self.source_field in source_data:
+            value = source_data[self.source_field]
+            return self.default_value if value is None else value
+        node: Any = source_data
+        for part in self.source_field.split("."):
+            if not isinstance(node, dict) or part not in node:
+                return self.default_value
+            node = node[part]
+        return self.default_value if node is None else node
+
     def apply(self, source_data: Dict[str, Any]) -> Any:
         """Apply field mapping to source data."""
-        value = source_data.get(self.source_field, self.default_value)
+        value = self._lookup(source_data)
 
         if self.required and value is None:
             raise ValueError(f"Required field '{self.source_field}' is missing")
@@ -217,6 +233,89 @@ class BaseConnector(ABC):
             raise ConnectorURLRefused("The connector URL is not an allowed address")
         return link.strip()
 
+    def _apply_field_mappings(self, record: Dict[str, Any]) -> Dict[str, Any]:
+        """Map one source record onto target field names.
+
+        A required field that is missing raises ``ValueError``; the caller counts
+        that record as failed. Fields with no value are left out.
+        """
+        mapped: Dict[str, Any] = {}
+        for mapping in self.get_field_mappings():
+            value = mapping.apply(record)
+            if value is not None:
+                mapped[mapping.target_field] = value
+        return mapped
+
+    def persist_records(
+        self,
+        raw_records: List[Dict[str, Any]],
+        *,
+        source_system: str,
+        to_element: Callable[[Dict[str, Any]], Dict[str, Any]],
+    ) -> Dict[str, Any]:
+        """Write fetched source records into the connector's organisation.
+
+        The one persistence step every connector uses. ``to_element`` turns one
+        raw record into ``{"external_id", "name", "element_type", "description"}``
+        (raising ``ValueError`` when the record cannot be mapped). Each record is
+        matched through the crosswalk and the matcher, then created through the
+        one element writer or updated in place, and linked in the crosswalk, all
+        inside a savepoint: a record that fails is counted and logged by id (never
+        by content or credential) and leaves nothing behind, and the run goes on.
+
+        The organisation is the connector's own; a connector with none writes
+        nothing. Returns the counts the sync log and ``run_connector_sync`` read.
+        """
+        org_id = getattr(self.config, "organization_id", None)
+        if not org_id:
+            raise ConnectorWriteRefused(
+                "A connector sync cannot write to the model without an organisation."
+            )
+
+        counts = {"created": 0, "updated": 0, "skipped": 0, "failed": 0}
+        touched: List[Dict[str, Any]] = []
+        for raw in raw_records:
+            try:
+                with db.session.begin_nested():
+                    outcome, element_id, external_id = _persist_element_record(
+                        org_id, source_system, to_element(raw)
+                    )
+            except Exception as exc:
+                counts["failed"] += 1
+                self.logger.warning(
+                    "%s record %s was not written (%s)",
+                    source_system,
+                    _record_label(raw),
+                    _failure_reason(exc),
+                )
+                continue
+            counts[outcome] += 1
+            if element_id is not None:
+                touched.append({"external_id": external_id, "element_id": element_id})
+
+        processed = len(raw_records)
+        if counts["failed"] and counts["failed"] == processed:
+            status = "error"
+        elif counts["failed"]:
+            status = "partial"
+        else:
+            status = "completed"
+        result: Dict[str, Any] = {
+            "status": status,
+            "records_processed": processed,
+            "records_created": counts["created"],
+            "records_updated": counts["updated"],
+            "records_skipped": counts["skipped"],
+            "records_failed": counts["failed"],
+            "records_deleted": 0,
+            "elements_touched": touched,
+        }
+        if counts["failed"]:
+            result["error_message"] = (
+                f"{counts['failed']} of {processed} records could not be written"
+            )
+        return result
+
     def validate_config(self) -> List[str]:
         """Validate connector configuration."""
         errors = []
@@ -234,6 +333,142 @@ class BaseConnector(ABC):
     def get_required_config_fields(self) -> List[str]:
         """Return list of required configuration fields."""
         return ["base_url", "api_key"]  # Default - override as needed
+
+
+def _record_label(raw: Any) -> str:
+    """A source record's id for log lines: an identifier only, never its content."""
+    if isinstance(raw, dict):
+        for key in ("sys_id", "id", "key"):
+            if isinstance(raw.get(key), (str, int)):
+                return str(raw[key])
+    return "(no id)"
+
+
+def _failure_reason(exc: Exception) -> str:
+    """Why a record failed, safe to log: our own validation messages, otherwise the class."""
+    if isinstance(exc, (ValueError, LookupError)):
+        return f"{type(exc).__name__}: {exc}"
+    return type(exc).__name__
+
+
+def _stored_element_name(name: str) -> str:
+    """The name as the element writer stores it (it caps the length)."""
+    from app.services.archimate_backbone import MAX_NAME
+
+    return name if len(name) <= MAX_NAME else name[: MAX_NAME - 1] + "…"
+
+
+def _review_already_queued(org_id: int, matched_element_id: int) -> bool:
+    """True when the matcher already put this element in the organisation's review queue.
+
+    The queue holds one matcher row per matched element (unique source), so a
+    second proposal for the same element, from this run or the next, is not made.
+    """
+    from app.models.ai_chat_crud_approval import AIChatCRUDApproval
+
+    return (
+        AIChatCRUDApproval.query.filter_by(
+            organization_id=org_id,
+            source_table="matcher_service",
+            source_id=matched_element_id,
+        ).first()
+        is not None
+    )
+
+
+def _persist_element_record(org_id: int, source_system: str, record: Dict[str, Any]):
+    """Create, update or leave one source record's element. Returns
+    ``(outcome, element_id, external_id)`` with outcome ``created``, ``updated``
+    or ``skipped``.
+
+    Identity is decided by the existing parts: the identifier crosswalk first,
+    then the matcher's name match. A certain match is updated in place; an
+    uncertain one is proposed into the organisation's approval queue and not
+    written; no match creates the element through the one element writer
+    (``create_backbone_element``). Every path ends in ``CrosswalkService.write_link``.
+    Raises on any record that cannot be written; the caller's savepoint undoes it.
+    """
+    from app.models.archimate_core import ArchiMateElement
+    from app.modules.intelligence.services.crosswalk_service import CrosswalkService
+    from app.modules.intelligence.services.matcher_service import MatcherService
+    from app.services.archimate_backbone import create_backbone_element
+    from app.services.archimate_import_service import ArchiMateImportService
+
+    external_id = str(record.get("external_id") or "").strip()
+    name = record.get("name")
+    name = name.strip() if isinstance(name, str) else ""
+    element_type = record.get("element_type")
+    description = record.get("description")
+    description = description if isinstance(description, str) and description.strip() else None
+    if not external_id:
+        raise ValueError("the record has no identifier")
+    if not name:
+        raise ValueError("the record has no name")
+    layer = ArchiMateImportService.TYPE_TO_LAYER.get(element_type)
+    if layer is None:
+        raise ValueError(f"unknown element type {element_type!r}")
+
+    match = MatcherService.match(
+        source_system=source_system,
+        external_id=external_id,
+        name=name,
+        type_name=element_type,
+        org_id=org_id,
+    )
+
+    # A name match onto an element this same source already links to under a
+    # different identifier is a different record that happens to share a title.
+    if match.matched_element_id is not None and match.match_method != "crosswalk":
+        links = CrosswalkService.get_links_for_element(match.matched_element_id, org_id=org_id)
+        if any(
+            link.source_system == source_system and link.external_id != external_id
+            for link in links
+        ):
+            match = MatcherService.match(
+                source_system=source_system, external_id=external_id, org_id=org_id
+            )
+
+    if match.matched_element_id is None:
+        element = create_backbone_element(
+            element_type=element_type,
+            layer=layer,
+            name=name,
+            description=description,
+            organization_id=org_id,
+        )
+        CrosswalkService.write_link(source_system, external_id, element.id, org_id=org_id)
+        return "created", element.id, external_id
+
+    if not match.certain:
+        if not _review_already_queued(org_id, match.matched_element_id):
+            MatcherService.propose_match(
+                source_system=source_system,
+                external_id=external_id,
+                name=name,
+                type_name=element_type,
+                org_id=org_id,
+            )
+        return "skipped", None, external_id
+
+    element = db.session.get(ArchiMateElement, match.matched_element_id)
+    if element is None or element.organization_id != org_id:
+        raise LookupError("the linked element is not in this organisation")
+    if getattr(element, "deleted_at", None) is not None:
+        return "skipped", None, external_id
+
+    changed = match.match_method != "crosswalk"  # a first link counts as an update
+    if match.match_method == "crosswalk":
+        stored_name = _stored_element_name(name)
+        if element.name != stored_name:
+            element.name, changed = stored_name, True
+        if element.type != element_type or element.layer != layer:
+            element.type, element.layer, changed = element_type, layer, True
+        if description is not None and element.description != description:
+            element.description, changed = description, True
+        if changed:
+            db.session.flush()
+    CrosswalkService.write_link(source_system, external_id, element.id, org_id=org_id)
+    return ("updated" if changed else "skipped"), element.id, external_id
 
 
 class ConnectorManager:
@@ -1013,12 +1248,16 @@ def run_connector_sync(
     sync_log.records_created = result.get("records_created", 0)
     sync_log.records_updated = result.get("records_updated", 0)
     sync_log.records_deleted = result.get("records_deleted", 0)
+    if result.get("error_message"):
+        sync_log.error_message = result["error_message"]
     sync_log.completed_at = datetime.utcnow()
 
+    # A partial run (some records written, some not) is still a working
+    # connector; the failures are on the sync log.
     cfg.last_sync = datetime.utcnow()
     cfg.status = (
         ConnectorStatus.ACTIVE.value
-        if sync_log.status in ("completed", "success")
+        if sync_log.status in ("completed", "success", "partial")
         else ConnectorStatus.ERROR.value
     )
 
@@ -1030,7 +1269,9 @@ def run_connector_sync(
 
     db.session.flush()
     logger.info("Connector sync completed for %s org %s: %s", cfg.id, resolved, result)
-    result["success"] = True
+    result["success"] = sync_log.status != "error"
+    if not result["success"]:
+        result.setdefault("error", result.get("error_message") or "The sync failed")
     return result
 
 

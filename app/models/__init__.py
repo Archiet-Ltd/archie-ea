@@ -89,6 +89,7 @@ else:
     # ACR-<year>-, ACN-<year>-). Imported here so create_all() builds its table on
     # a fresh install the same way the other infra tables on this list are.
     from .reference_number_counter import ReferenceNumberCounter  # noqa: F401
+    from .permission_grant import PermissionGrant  # noqa: F401 - per-organisation permission matrix
     from .service_incident import ServiceIncident  # noqa: F401 - service-status incident history
     from .gdpr_request import *  # noqa
     from .subscription import *  # noqa
