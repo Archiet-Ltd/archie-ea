@@ -83,4 +83,29 @@ def require_role(*allowed_roles: Role):
     return _check
 
 
+def require_permission(permission: str):
+    """FastAPI dependency: require caller's role to have a specific permission."""
+    async def _check(role: Role = Depends(get_current_user_role)) -> Role:
+        if not has_permission(role, permission):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Permission {permission!r} required",
+            )
+        return role
+    return _check
+
+
+# ── Pre-built role dependencies ───────────────────────────────────────────────
+{% for role in rbac.roles %}
+require_{{ role.snake }} = require_role(Role.{{ role.snake | upper }})
+"""Dependency: require {{ role.name }} role.{% if role.is_admin %} Admin-level access.{% endif %}"""
+{% endfor %}
+
+require_admin = require_permission("admin")
+"""Dependency: require admin permission (any admin role)."""
+
+require_write = require_permission("write")
+"""Dependency: require write permission."""
+
+require_read = require_permission("read")
 """Dependency: require at minimum read permission."""
