@@ -7,9 +7,9 @@ form-based linking of Goals, Drivers, Requirements to ApplicationComponents.
 """
 
 from flask import current_app, flash, redirect, request, url_for
-from flask_login import login_required
 
 from .. import db
+from ..core.auth.decorators import require_permission
 from ..models.application_portfolio import ApplicationComponent
 from ..models.models import Requirement
 from ..models.motivation import Driver, Goal
@@ -18,7 +18,7 @@ from .routes import _add_archimate_element, _delete_archimate_element
 
 # --- Motivation Layer ---
 @application_mgmt.route("/applications/<int:app_id>/stakeholders", methods=["POST"])
-@login_required
+@require_permission("create", "motivation_element")
 def add_stakeholder(app_id):
     return _add_archimate_element(
         app_id, "motivation", "Stakeholder", request.json, rel_type="influence"
@@ -28,13 +28,13 @@ def add_stakeholder(app_id):
 @application_mgmt.route(
     "/applications/<int:app_id>/stakeholders/<int:id>", methods=["DELETE"]
 )
-@login_required
+@require_permission("delete", "motivation_element")
 def delete_stakeholder(app_id, id):
     return _delete_archimate_element(id, "influence")
 
 
 @application_mgmt.route("/applications/<int:app_id>/requirements", methods=["POST"])
-@login_required
+@require_permission("create", "motivation_element")
 def add_requirement(app_id):
     return _add_archimate_element(
         app_id, "motivation", "Requirement", request.json, rel_type="realization"
@@ -44,7 +44,7 @@ def add_requirement(app_id):
 @application_mgmt.route(
     "/applications/<int:app_id>/requirements/<int:id>", methods=["DELETE"]
 )
-@login_required
+@require_permission("delete", "motivation_element")
 def delete_requirement(app_id, id):
     return _delete_archimate_element(id, "realization")
 
@@ -54,7 +54,7 @@ def delete_requirement(app_id, id):
 
 
 @application_mgmt.route("/applications/<int:id>/goals/add", methods=["POST"])
-@login_required
+@require_permission("edit", "application")
 def goal_add(id):
     """Link existing Goal to Application (direct FK)"""
     app = ApplicationComponent.query.get_or_404(id)
@@ -93,7 +93,7 @@ def goal_add(id):
 
 
 @application_mgmt.route("/applications/<int:id>/drivers/add", methods=["POST"])
-@login_required
+@require_permission("edit", "application")
 def driver_add(id):
     """Link existing Driver to Application (direct FK)"""
     app = ApplicationComponent.query.get_or_404(id)
@@ -136,7 +136,7 @@ def driver_add(id):
 
 
 @application_mgmt.route("/applications/<int:id>/requirements/add", methods=["POST"])
-@login_required
+@require_permission("edit", "application")
 def application_requirement_add(id):
     """Link existing Requirement to Application (direct FK)"""
     app = ApplicationComponent.query.get_or_404(id)
