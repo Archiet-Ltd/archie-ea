@@ -964,6 +964,56 @@ _PROGRAMMES = [
     ),
 ]
 
+
+# ── portfolio initiatives (the Portfolio screen) ───────────────────────────
+# The Portfolio screen lists EnterpriseInitiative rows. Invented figures for a
+# fictional company.
+
+_INITIATIVES = [
+    # (name, code, phase, status, health, budget, spent, forecast, complete %,
+    #  sponsor, manager, type, named elements the work packages sit under)
+    ("Calibration Modernisation", "LQ-INI-CALIBRATION", "implementation", "active", "yellow",
+     750000, 485000, 790000, 55, "Chief Operations Officer", "Ivo Reed", "modernization",
+     ("Calibration Automation Phase 1", "Calibration Automation Phase 2")),
+    ("Field Service Transformation", "LQ-INI-FIELD-SVC", "implementation", "active", "green",
+     420000, 210000, 415000, 50, "Chief Operations Officer", "Jordan FieldEng", "transformation",
+     ("Field Tester Rollout",)),
+    ("Event Backbone Hardening", "LQ-INI-EVENT-BACKBONE", "design", "active", "red",
+     600000, 540000, 720000, 30, "Chief Technology Officer", "Sage ITOps", "migration",
+     ("Event Backbone Migration",)),
+    ("Supplier Optimisation", "LQ-INI-SUPPLIER", "planning", "planning", "green",
+     240000, 30000, 240000, 10, "Chief Financial Officer", "Taylor Procurement", "consolidation",
+     ("Supplier Consolidation Programme",)),
+    ("Predictive Operations", "LQ-INI-PREDICTIVE", "planning", "planning", "yellow",
+     310000, 45000, 330000, 8, "Chief Technology Officer", "Drew DataAnalyst", "transformation",
+     ("Predictive Maintenance Pilot",)),
+    ("Compliance System Upgrade", "LQ-INI-COMPLIANCE", "testing", "active", "green",
+     180000, 150000, 175000, 80, "Chief Operations Officer", "Avery Compliance", "upgrade",
+     ("Compliance System Upgrade",)),
+    ("Inventory Accuracy Drive", "LQ-INI-INVENTORY", "deployment", "active", "green",
+     95000, 88000, 95000, 90, "Chief Operations Officer", "Casey Inventory", "upgrade",
+     ("Inventory Accuracy Drive",)),
+]
+
+# ── the business model canvas (the Business Model Canvas screen) ───────────
+
+_CANVAS_NAME = "Lantern Quay Systems"
+_CANVAS_DESCRIPTION = (
+    "How Lantern Quay Systems makes, calibrates, ships and recovers water-quality sensors."
+)
+_CANVAS_OPERATING_MODEL = "coordination"
+_CANVAS_BLOCKS = {
+    "customer_segments": "Municipal water utilities\nIndustrial process-water operators\nEnvironmental survey firms",
+    "value_propositions": "Calibrated sensors with a certificate for every batch\nRecovered assemblies recertified instead of scrapped\nRemote diagnostics that cut site visits",
+    "channels": "Direct account managers\nCustomer portal for orders and returns\nField service engineers",
+    "customer_relationships": "Named service engineer per account\nScheduled preventive maintenance visits\nQuarterly drift and compliance reports",
+    "revenue_streams": "Sensor sales\nAnnual calibration and maintenance contracts\nRecertified assembly resale",
+    "key_activities": "Assemble and calibrate sensor modules\nField calibration runs\nRecover and recertify returned assemblies",
+    "key_resources": "Calibration rigs and the calibration ledger\nField service engineers\nComponent stock and supplier panel",
+    "key_partners": "Component suppliers\nCourier and logistics partners\nRegional testing laboratories",
+    "cost_structure": "Components and assembly labour\nField service travel\nCloud hosting and data platform",
+}
+
 # ── work packages ──────────────────────────────────────────────────────────
 
 _WORK_PACKAGES = [
@@ -1139,6 +1189,8 @@ def seed_demo_company() -> dict:
     from app.models.risk import Risk, RiskStatus
     from app.models.enterprise_intelligence import PortfolioInitiative
     from app.models.unified_work_package import UnifiedWorkPackage
+    from app.models.business_model import BusinessModelCanvas
+    from app.models.vendor.vendor_organization import EnterpriseInitiative
     from app.services import work_package_service
     from app.models.implementation_migration import Plateau, Gap
     from app.jobs.tenant_safe_job import tenant_scope
@@ -1509,6 +1561,7 @@ def seed_demo_company() -> dict:
                 continue
             el = elements.get(el_name)
             prog = PortfolioInitiative(
+                organization_id=org_id,
                 name=name,
                 code=code,
                 status=status,
@@ -1570,6 +1623,121 @@ def seed_demo_company() -> dict:
         if wps_created:
             db.session.flush()
         stats["work_packages_created"] = wps_created
+
+
+        # ── 10b. portfolio initiatives ──────────────────────────────────
+        # The Portfolio screen reads EnterpriseInitiative, not the
+        # PortfolioInitiative rows above, so it showed no initiatives.
+        existing_codes = {
+            i.code
+            for i in db.session.query(EnterpriseInitiative)
+            .filter(EnterpriseInitiative.organization_id == org_id)
+            .all()
+        }
+        initiatives_created = 0
+        for (name, code, phase, status, health, budget, spent, forecast,
+             complete, sponsor, manager, kind, _elements) in _INITIATIVES:
+            if code in existing_codes:
+                continue
+            db.session.add(EnterpriseInitiative(
+                organization_id=org_id,
+                name=name,
+                code=code,
+                initiative_type=kind,
+                program_type="strategic",
+                current_phase=phase,
+                status=status,
+                health_status=health,
+                approved_budget=budget,
+                spent_to_date=spent,
+                forecast_cost=forecast,
+                completion_percentage=complete,
+                executive_sponsor=sponsor,
+                program_manager=manager,
+                planned_start_date=_dt.datetime(2026, 1, 15),
+                planned_end_date=_dt.datetime(2027, 3, 31),
+            ))
+            initiatives_created += 1
+        if initiatives_created:
+            db.session.flush()
+        stats["initiatives_created"] = initiatives_created
+
+        # ── 10c. work packages: owner, initiative and connections ───────
+        # Idempotent: only fills what is unset, so a database seeded before
+        # this step is repaired by a re-run.
+        from app.models import ArchiMateRelationship
+
+        initiative_by_element = {}
+        for row in db.session.query(EnterpriseInitiative).filter(
+            EnterpriseInitiative.organization_id == org_id
+        ):
+            for spec in _INITIATIVES:
+                if spec[1] == row.code:
+                    for element_name in spec[12]:
+                        initiative_by_element[element_name] = row
+        owner = _resolve_users(org_id).get("ivo.reed@lantern-quay.example.com")
+        wps_by_name = {
+            wp.name: wp
+            for wp in db.session.query(UnifiedWorkPackage)
+            .filter(UnifiedWorkPackage.organization_id == org_id)
+            .all()
+        }
+        linked = 0
+        for spec in _WORK_PACKAGES:
+            wp = wps_by_name.get(spec[0])
+            if wp is None:
+                continue
+            changed = False
+            if owner is not None and wp.owner_id is None:
+                wp.owner_id = owner.id
+                changed = True
+            initiative = initiative_by_element.get(spec[7])
+            if initiative is not None and wp.enterprise_initiative_id is None:
+                wp.enterprise_initiative_id = initiative.id
+                changed = True
+            target = elements.get(spec[7])
+            if target is not None and wp.archimate_element_id:
+                has_edge = (
+                    db.session.query(ArchiMateRelationship.id)
+                    .filter(
+                        ArchiMateRelationship.organization_id == org_id,
+                        ArchiMateRelationship.source_id == wp.archimate_element_id,
+                        ArchiMateRelationship.target_id == target.id,
+                    )
+                    .first()
+                )
+                if has_edge is None:
+                    db.session.add(ArchiMateRelationship(
+                        source_id=wp.archimate_element_id,
+                        target_id=target.id,
+                        type="Association",
+                        organization_id=org_id,
+                    ))
+                    changed = True
+            linked += changed
+        if linked:
+            db.session.flush()
+        stats["work_packages_linked"] = linked
+
+        # ── 10d. business model canvas ──────────────────────────────────
+        canvas_exists = (
+            db.session.query(BusinessModelCanvas.id)
+            .filter(
+                BusinessModelCanvas.organization_id == org_id,
+                BusinessModelCanvas.name == _CANVAS_NAME,
+            )
+            .first()
+        )
+        if canvas_exists is None:
+            db.session.add(BusinessModelCanvas(
+                organization_id=org_id,
+                name=_CANVAS_NAME,
+                description=_CANVAS_DESCRIPTION,
+                operating_model_type=_CANVAS_OPERATING_MODEL,
+                **_CANVAS_BLOCKS,
+            ))
+            db.session.flush()
+        stats["business_model_canvases_created"] = 0 if canvas_exists else 1
 
         # ── 11. plateaus ────────────────────────────────────────────────
         existing_plateaus = {

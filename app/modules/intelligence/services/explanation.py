@@ -145,7 +145,21 @@ def explain_fact(organization_id: int, fact: Dict[str, Any]) -> Dict[str, Any]:
             continue
         source = element(rel.source_id)
         target = element(rel.target_id)
-        who = drawn_by(rel.created_by_id)
+        # The origin the row recorded names itself ("Imported from <file>",
+        # "Drawn by <person>"); a row with no recorded origin reads as drawn by
+        # whoever created it, or as not recorded.
+        kind, label = rel.source_kind, (rel.source_label or "").strip()
+        if kind == "import" and label:
+            who = f"Imported from {label}"
+        elif kind == "manual" and label:
+            who = f"Drawn by {label}"
+        elif kind in ("connector", "derived") and label:
+            who = label
+        else:
+            who = drawn_by(rel.created_by_id)
+        # The recorded origin date wins; then the creation date, then the last
+        # change.
+        drawn_at_value = rel.source_recorded_at or rel.created_at or rel.updated_at
         links.append(
             {
                 "position": position,
@@ -162,8 +176,8 @@ def explain_fact(organization_id: int, fact: Dict[str, Any]) -> Dict[str, Any]:
                 "target": target,
                 "drawn_by": who,
                 "drawn_by_reason": None if who else DRAWN_BY_NOT_RECORDED,
-                "drawn_at": rel.created_at.isoformat() if rel.created_at else None,
-                "drawn_at_reason": None if rel.created_at else DRAWN_AT_NOT_RECORDED,
+                "drawn_at": drawn_at_value.isoformat() if drawn_at_value else None,
+                "drawn_at_reason": None if drawn_at_value else DRAWN_AT_NOT_RECORDED,
                 # How the relationship itself came to exist when nobody drew it
                 # (read from a diagram's notation, say); None when stated outright.
                 "inferred_from": rel.derived_from,

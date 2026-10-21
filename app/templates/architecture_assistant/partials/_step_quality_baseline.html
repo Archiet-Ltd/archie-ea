@@ -69,13 +69,13 @@
           <div>
             <label class="block text-xs font-medium text-foreground mb-1">Auth Provider <span class="text-destructive-emphasis">*</span></label>
             <input type="text" x-model="qualityBaseline.identity_access.auth_provider"
-              class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
               placeholder="e.g. Azure AD, Okta, Keycloak" aria-label="Auth Provider">
           </div>
           <div>
             <label class="block text-xs font-medium text-foreground mb-1">Authorization Model</label>
             <select x-model="qualityBaseline.identity_access.authz_model"
-              class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" aria-label="Authorization Model">
+              class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" aria-label="Authorization Model">
               <option value="RBAC">RBAC (Role-Based)</option>
               <option value="ABAC">ABAC (Attribute-Based)</option>
               <option value="PBAC">PBAC (Policy-Based)</option>
@@ -115,13 +115,13 @@
           <div>
             <label class="block text-xs font-medium text-foreground mb-1">Primary Database <span class="text-destructive-emphasis">*</span></label>
             <input type="text" x-model="qualityBaseline.data_management.primary_db"
-              class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
               placeholder="e.g. PostgreSQL, Oracle, Cosmos DB" aria-label="Primary Database">
           </div>
           <div>
             <label class="block text-xs font-medium text-foreground mb-1">Backup Frequency</label>
             <select x-model="qualityBaseline.data_management.backup_frequency"
-              class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" aria-label="Backup Frequency">
+              class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" aria-label="Backup Frequency">
               <option value="continuous">Continuous (WAL)</option>
               <option value="hourly">Hourly</option>
               <option value="daily">Daily</option>
@@ -131,19 +131,19 @@
           <div>
             <label class="block text-xs font-medium text-foreground mb-1">RTO (hours)</label>
             <input type="number" min="0" x-model="qualityBaseline.data_management.rto_hours"
-              class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
               placeholder="4" aria-label="RTO (hours)">
           </div>
           <div>
             <label class="block text-xs font-medium text-foreground mb-1">RPO (hours)</label>
             <input type="number" min="0" x-model="qualityBaseline.data_management.rpo_hours"
-              class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
               placeholder="1" aria-label="RPO (hours)">
           </div>
           <div>
             <label class="block text-xs font-medium text-foreground mb-1">Data Retention (years)</label>
             <input type="number" min="1" x-model="qualityBaseline.data_management.data_retention_years"
-              class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
               placeholder="7" aria-label="Data Retention (years)">
           </div>
         </div>
@@ -167,7 +167,7 @@
           <div>
             <label class="block text-xs font-medium text-foreground mb-1">Data Classification <span class="text-destructive-emphasis">*</span></label>
             <select x-model="qualityBaseline.security_controls.data_classification"
-              class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" aria-label="Data Classification">
+              class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" aria-label="Data Classification">
               <option value="">Select...</option>
               <option value="public">Public</option>
               <option value="internal">Internal</option>
@@ -179,7 +179,7 @@
           <div>
             <label class="block text-xs font-medium text-foreground mb-1">Secret Management</label>
             <input type="text" x-model="qualityBaseline.security_controls.secret_management"
-              class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
               placeholder="e.g. HashiCorp Vault, AWS Secrets Manager" aria-label="Secret Management">
           </div>
         </div>
@@ -231,7 +231,7 @@
         <div>
           <label class="block text-xs font-medium text-foreground mb-1">API Gateway</label>
           <input type="text" x-model="qualityBaseline.integration.api_gateway"
-            class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+            class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
             placeholder="e.g. Kong, AWS API Gateway, Azure APIM" aria-label="API Gateway">
         </div>
         <div class="flex flex-wrap items-center gap-6">
@@ -265,7 +265,7 @@
         <div>
           <label class="block text-xs font-medium text-foreground mb-1">Logging Platform <span class="text-destructive-emphasis">*</span></label>
           <input type="text" x-model="qualityBaseline.observability.logging_platform"
-            class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+            class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
             placeholder="e.g. ELK Stack, Datadog, Splunk, Azure Monitor" aria-label="Logging Platform">
         </div>
         <div class="flex flex-wrap items-center gap-6">
@@ -305,7 +305,7 @@
           <div>
             <label class="block text-xs font-medium text-foreground mb-1">Availability Target <span class="text-destructive-emphasis">*</span></label>
             <select x-model="qualityBaseline.reliability.availability_target"
-              class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" aria-label="Availability Target">
+              class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" aria-label="Availability Target">
               <option value="">Select...</option>
               <option value="99.0">99.0% (2 nines — ~87h downtime/yr)</option>
               <option value="99.5">99.5% (~44h/yr)</option>
@@ -318,7 +318,7 @@
           <div>
             <label class="block text-xs font-medium text-foreground mb-1">Redundancy Model</label>
             <select x-model="qualityBaseline.reliability.redundancy_model"
-              class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" aria-label="Redundancy Model">
+              class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" aria-label="Redundancy Model">
               <option value="">Select...</option>
               <option value="active-passive">Active-Passive</option>
               <option value="active-active">Active-Active</option>
@@ -329,7 +329,7 @@
           <div>
             <label class="block text-xs font-medium text-foreground mb-1">DR Strategy</label>
             <select x-model="qualityBaseline.reliability.dr_strategy"
-              class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" aria-label="DR Strategy">
+              class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" aria-label="DR Strategy">
               <option value="">Select...</option>
               <option value="backup-restore">Backup &amp; Restore</option>
               <option value="pilot-light">Pilot Light</option>
@@ -370,19 +370,19 @@
           <div>
             <label class="block text-xs font-medium text-foreground mb-1">P99 Latency (ms)</label>
             <input type="number" min="0" x-model="qualityBaseline.performance.p99_latency_ms"
-              class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
               placeholder="200" aria-label="P99 Latency (ms)">
           </div>
           <div>
             <label class="block text-xs font-medium text-foreground mb-1">Peak RPS</label>
             <input type="number" min="0" x-model="qualityBaseline.performance.peak_rps"
-              class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
               placeholder="1000" aria-label="Peak RPS">
           </div>
           <div>
             <label class="block text-xs font-medium text-foreground mb-1">Caching Strategy</label>
             <select x-model="qualityBaseline.performance.caching_strategy"
-              class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" aria-label="Caching Strategy">
+              class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" aria-label="Caching Strategy">
               <option value="">None</option>
               <option value="in-memory">In-Memory (Redis)</option>
               <option value="cdn">CDN</option>
@@ -411,7 +411,7 @@
           <div>
             <label class="block text-xs font-medium text-foreground mb-1">Hosting</label>
             <select x-model="qualityBaseline.deployment_release.hosting"
-              class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" aria-label="Hosting">
+              class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" aria-label="Hosting">
               <option value="">Select...</option>
               <option value="aws">AWS</option>
               <option value="azure">Azure</option>
@@ -424,7 +424,7 @@
           <div>
             <label class="block text-xs font-medium text-foreground mb-1">Deployment Pattern</label>
             <select x-model="qualityBaseline.deployment_release.deployment_pattern"
-              class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" aria-label="Deployment Pattern">
+              class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" aria-label="Deployment Pattern">
               <option value="">Select...</option>
               <option value="blue-green">Blue-Green</option>
               <option value="canary">Canary</option>
@@ -435,7 +435,7 @@
           <div>
             <label class="block text-xs font-medium text-foreground mb-1">CI/CD Platform</label>
             <input type="text" x-model="qualityBaseline.deployment_release.ci_cd_platform"
-              class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
               placeholder="e.g. GitHub Actions, Azure DevOps, Jenkins" aria-label="CI/CD Platform">
           </div>
         </div>
@@ -504,7 +504,7 @@
           <div>
             <label class="block text-xs font-medium text-foreground mb-1">Support Tier</label>
             <select x-model="qualityBaseline.operational_support.support_tier"
-              class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" aria-label="Support Tier">
+              class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" aria-label="Support Tier">
               <option value="">Select...</option>
               <option value="business-hours">Business Hours</option>
               <option value="extended">Extended (16x5)</option>
@@ -515,7 +515,7 @@
           <div>
             <label class="block text-xs font-medium text-foreground mb-1">Incident Response SLA (minutes)</label>
             <input type="number" min="1" x-model="qualityBaseline.operational_support.incident_response_sla_minutes"
-              class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
               placeholder="15" aria-label="Incident Response SLA (minutes)">
           </div>
         </div>
@@ -543,7 +543,7 @@
         <div>
           <label class="block text-xs font-medium text-foreground mb-1">Unit Coverage Target (%)</label>
           <input type="number" min="0" max="100" x-model="qualityBaseline.testing_quality.unit_coverage_target_pct"
-            class="flex h-9 w-48 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+            class="flex h-9 w-48 rounded-md border border-input bg-transparent px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
             placeholder="80" aria-label="Unit Coverage Target (%)">
         </div>
         <div class="flex flex-wrap items-center gap-6">
@@ -583,7 +583,7 @@
           <div>
             <label class="block text-xs font-medium text-foreground mb-1">Budget Model</label>
             <select x-model="qualityBaseline.cost_sustainability.budget_model"
-              class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" aria-label="Budget Model">
+              class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" aria-label="Budget Model">
               <option value="">Select...</option>
               <option value="capex">CapEx</option>
               <option value="opex">OpEx</option>
@@ -594,13 +594,13 @@
           <div>
             <label class="block text-xs font-medium text-foreground mb-1">Monthly Budget (USD)</label>
             <input type="number" min="0" x-model="qualityBaseline.cost_sustainability.monthly_budget_usd"
-              class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
               placeholder="50000" aria-label="Monthly Budget (USD)">
           </div>
           <div>
             <label class="block text-xs font-medium text-foreground mb-1">Cost Review Frequency</label>
             <select x-model="qualityBaseline.cost_sustainability.cost_review_frequency"
-              class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" aria-label="Cost Review Frequency">
+              class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" aria-label="Cost Review Frequency">
               <option value="">Select...</option>
               <option value="monthly">Monthly</option>
               <option value="quarterly">Quarterly</option>

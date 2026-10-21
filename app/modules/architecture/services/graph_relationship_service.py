@@ -12,6 +12,7 @@ from typing import Any, Dict, List, Optional
 from sqlalchemy import or_
 
 from app.models.archimate_core import ArchiMateElement, ArchiMateRelationship
+from app.models.archimate_element_types import StandardTypeTable, is_application_kind
 
 logger = logging.getLogger(__name__)
 
@@ -244,7 +245,7 @@ class GraphRelationshipService:
 
         Based on ArchiMate 3.2 patterns.
         """
-        common_patterns = {
+        common_patterns = StandardTypeTable({
             "ApplicationComponent": ["Composition", "Serving", "Realization"],
             "ApplicationInterface": ["Serving", "Composition"],
             "ApplicationService": ["Serving", "Composition", "Realization"],
@@ -252,7 +253,7 @@ class GraphRelationshipService:
             "BusinessCapability": ["Realization", "Composition"],
             "Goal": ["Realization", "Influence"],
             "Requirement": ["Realization", "Association"],
-        }
+        })
 
         return relationship_type in common_patterns.get(element_type, [])
 
@@ -276,7 +277,7 @@ class GraphRelationshipService:
         target_type = target.type
 
         # Common patterns
-        if source_type == "ApplicationComponent" and target_type == "ApplicationInterface":
+        if is_application_kind(source_type) and target_type == "ApplicationInterface":
             return "Composition"
         elif source_type == "ApplicationInterface" and target_type == "ApplicationService":
             return "Serving"

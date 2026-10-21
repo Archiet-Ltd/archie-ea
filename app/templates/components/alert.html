@@ -1,41 +1,50 @@
-{# shadcn/ui Alert Component #}
-{% macro alert(variant='default', icon=none, dismissible=false, class='') %}
-    {% set variants = {
-        'default': 'bg-background text-foreground',
-        'destructive': 'border-destructive/50 text-destructive [&>svg]:text-destructive'
+{# Quiet inline alert (design/patterns.json: quiet-alert).
+   One line, tinted hairline box, 12px text, optional link on the right.
+   Call shapes:
+     {% call alert('warning', title='Data quality') %}20 of 20 have an owner{% endcall %}  (ui-contract-ok: documentation example, the macro, not a native dialog)
+     {{ alert('success', text='Saved.') }}  (ui-contract-ok: documentation example, the macro, not a native dialog)
+   kind: info | success | warning | danger | neutral. The earlier names are
+   accepted too: variant='destructive' reads as danger, 'default' as neutral,
+   and icon= overrides the icon, so the review-board partials written against
+   the earlier signature render as quiet alerts without a change.
+   link_href / link_text: an action on the right edge.
+   role: alert for danger (assistive technology announces a failure at once),
+   status for every other kind.
+   alert_title and alert_description: the earlier two-part body, kept as
+   inline spans (a bold title, then the text) inside the one line.
+   Never a full-width block: it sits in the header area of the thing it is about. #}
+{% macro alert(kind='info', title=None, text=None, link_href=None, link_text=None, class='', testid=None, variant=None, icon=None, dismissible=false) %}
+    {% set aliases = {'destructive': 'danger', 'default': 'neutral', 'error': 'danger'} %}
+    {% set kind = aliases.get(variant or kind, variant or kind) %}
+    {% set kinds = {
+        'info': 'border-info/40 bg-info/10',
+        'success': 'border-success/40 bg-success/10',
+        'warning': 'border-warning/40 bg-warning/10',
+        'danger': 'border-destructive/40 bg-destructive/10',
+        'neutral': 'border-border bg-muted/50'
     } %}
-    
-    <div 
-        {% if dismissible %}
-        x-data="{ isVisible: true }" 
-        x-show="isVisible" x-cloak
-        x-transition
-        {% endif %}
-        class="relative w-full rounded-lg border p-4 [&>svg~*]:pl-7 [&>svg+div]:translate-y-[-3px] [&>svg]:absolute [&>svg]:left-4 [&>svg]:top-4 [&>svg]:text-foreground {{ variants[variant] }} {{ class }}" 
-        role="alert"
-    >
-        {% if icon %}
-            <i data-lucide="{{ icon }}" class="h-4 w-4"></i>
-        {% endif %}
-        <div>
-            {{ caller() }}
-        </div>
-        {% if dismissible %}
-            <button type="button" @click="isVisible = false" class="absolute top-4 right-4 rounded-md p-1 hover:bg-accent transition-colors" aria-label="Dismiss alert">
-                <i data-lucide="x" class="h-4 w-4"></i>
-            </button>
-        {% endif %}
+    {% set tones = {
+        'info': 'text-info-emphasis',
+        'success': 'text-success-emphasis',
+        'warning': 'text-warning-emphasis',
+        'danger': 'text-destructive-emphasis',
+        'neutral': 'text-foreground'
+    } %}
+    {% set icons = {'info': 'info', 'success': 'check-circle', 'warning': 'alert-triangle', 'danger': 'alert-circle', 'neutral': 'info'} %}
+    {% set kind = kind if kind in kinds else 'info' %}
+    <div class="flex min-w-0 items-center gap-2 rounded-md border px-3 py-1.5 text-xs text-foreground {{ kinds[kind] }} {{ class }}" role="{{ 'alert' if kind == 'danger' else 'status' }}"{% if testid %} data-testid="{{ testid }}"{% endif %}{% if dismissible %} x-data="{ isVisible: true }" x-show="isVisible"{% endif %}>
+        <i data-lucide="{{ icon or icons[kind] }}" class="h-3.5 w-3.5 shrink-0 {{ tones[kind] }}" aria-hidden="true"></i>
+        {% if title %}<span class="font-medium {{ tones[kind] }}">{{ title }}</span>{% endif %}
+        {% if caller %}<span class="min-w-0">{{ text or '' }}{{ caller() }}</span>{% else %}<span class="min-w-0 truncate">{{ text or '' }}</span>{% endif %}
+        {% if link_href %}<a href="{{ link_href }}" class="ml-auto shrink-0 font-medium text-info hover:underline">{{ link_text or 'View' }}</a>{% endif %}
+        {% if dismissible %}<button type="button" @click="isVisible = false" class="ml-auto inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-sm text-muted-foreground hover:bg-accent hover:text-foreground" aria-label="Dismiss"><i data-lucide="x" class="h-3.5 w-3.5" aria-hidden="true"></i></button>{% endif %}
     </div>
 {% endmacro %}
 
-{% macro alert_title(class='') %}
-    <h5 class="mb-1 font-medium leading-none tracking-tight {{ class }}">
-        {{ caller() }}
-    </h5>
-{% endmacro %}
+{% macro alert_title(class='') -%}
+<span class="font-medium {{ class }}">{{ caller() }}</span>
+{%- endmacro %}
 
-{% macro alert_description(class='') %}
-    <div class="text-sm [&_p]:leading-relaxed {{ class }}">
-        {{ caller() }}
-    </div>
-{% endmacro %}
+{% macro alert_description(class='') -%}
+<span class="ml-1 {{ class }}">{{ caller() }}</span>
+{%- endmacro %}

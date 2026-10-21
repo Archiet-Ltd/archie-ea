@@ -29,7 +29,7 @@
     </div>
 
     <!-- Graph Visualization Placeholder -->
-    <div data-slot="card" class="rounded-xl border bg-card">
+    <div data-slot="card" class="rounded-lg border border-border bg-card">
         <div class="p-6">
             <h3 class="font-semibold mb-4">Dependency Graph</h3>
             <div id="dependency-graph" class="h-96 bg-muted/20 rounded-lg flex items-center justify-center">
@@ -48,12 +48,12 @@
     </div>
 
     <!-- Health Analysis -->
-    <div data-slot="card" class="rounded-xl border bg-card">
+    <div data-slot="card" class="rounded-lg border border-border bg-card">
         <div class="p-6">
             <h3 class="font-semibold mb-4">Dependency Health Analysis</h3>
             <div class="grid gap-4 md:grid-cols-2">
                 {% for item in health_analysis|default([]) %}
-                <div class="p-4 rounded-lg bg-muted/20">
+                <div class="px-3 py-2 rounded-md bg-muted/20">
                     <div class="flex items-center justify-between mb-2">
                         <span class="font-medium">{{ item.component|default('Unknown') }}</span>
                         <span class="px-2 py-1 text-xs rounded-full
@@ -73,7 +73,7 @@
     </div>
 
     <!-- Recommendations -->
-    <div data-slot="card" class="rounded-xl border bg-card">
+    <div data-slot="card" class="rounded-lg border border-border bg-card">
         <div class="p-6">
             <h3 class="font-semibold mb-4">Recommendations</h3>
             <ul class="space-y-2">
