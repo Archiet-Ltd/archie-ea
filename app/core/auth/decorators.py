@@ -25,11 +25,44 @@ now imports the canonical, fixed implementation from ``app.decorators``
 instead.
 """
 
+from enum import Enum
 from functools import wraps
 
 from flask import abort, current_app, jsonify
 from flask_login import current_user
 from flask_login import login_required as flask_login_required
+
+
+# ---------------------------------------------------------------------------
+# Permission enums — canonical home alongside require_permission
+# ---------------------------------------------------------------------------
+
+
+class Permission(Enum):
+    """Permission levels for resources"""
+
+    NONE = 0
+    READ = 1
+    WRITE = 2
+    DELETE = 4
+    ADMIN = 8
+
+    @classmethod
+    def all(cls) -> int:
+        """Get combined value of all permissions"""
+        return cls.READ.value | cls.WRITE.value | cls.DELETE.value | cls.ADMIN.value
+
+
+class ResourceDomain(Enum):
+    """Resource domains for access control"""
+
+    ARCHITECTURE = "architecture"
+    APPLICATIONS = "applications"
+    VENDORS = "vendors"
+    CAPABILITIES = "capabilities"
+    ROADMAP = "roadmap"
+    COMPLIANCE = "compliance"
+    OPTIONS_ANALYSIS = "options_analysis"
 
 
 # ---------------------------------------------------------------------------
@@ -264,3 +297,9 @@ def audit_log(action_name: str):
     """
     from app.decorators import audit_log as _canonical_audit_log
     return _canonical_audit_log(action_name)
+
+
+# Re-export the canonical permission checker so both require_permission and can
+# are available from the one home (app.core.auth.decorators).
+from app.core.auth.permissions import can
+can = can  # module-level binding for reuse-register symbol detection
