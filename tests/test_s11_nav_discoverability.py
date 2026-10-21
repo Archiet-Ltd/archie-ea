@@ -182,7 +182,7 @@ def test_work_packages_api_returns_a_real_row(app, db_session, make_org, login_a
 
 @pytest.mark.parametrize(
     "endpoint",
-    ["enterprise.gap_analysis", "enterprise.work_packages", "arch_decisions.list_decisions"],
+    ["enterprise.gap_analysis", "enterprise.work_packages"],
 )
 def test_enterprise_architect_sidebar_links_the_capability(
     app, db_session, make_org, login_as, endpoint
@@ -199,3 +199,15 @@ def test_enterprise_architect_sidebar_links_the_capability(
     assert f'href="{href}"' in resp.get_data(as_text=True), (
         f"{endpoint} is not linked from the enterprise_architect sidebar"
     )
+
+
+def test_decisions_are_listed_on_the_more_tools_page(app, db_session, make_org, login_as):
+    """Launch cut: Decisions left the sidebar and is listed on /modules/ (Not in the launch cut)."""
+    user, _ = _user(db_session, make_org, "nav-decisions")
+    client = app.test_client()
+    login_as(client, user)
+    resp = client.get("/modules/")
+    assert resp.status_code == 200
+    with app.test_request_context():
+        href = url_for("arch_decisions.list_decisions")
+    assert f'href="{href}"' in resp.get_data(as_text=True)

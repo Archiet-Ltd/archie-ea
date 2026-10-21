@@ -641,7 +641,11 @@ def init_context_processors(app):
     app.jinja_env.globals["can"] = _template_can
 
     # NS-006: Register role-based access functions for persona navigation
-    from app.utils.role_access import get_sidebar_zones, role_access_context_processor
+    from app.utils.role_access import (
+        get_launch_sidebar_zones,
+        get_sidebar_zones,
+        role_access_context_processor,
+    )
     role_funcs = role_access_context_processor()
     for name, func in role_funcs.items():
         app.jinja_env.globals[name] = func
@@ -650,6 +654,7 @@ def init_context_processors(app):
     # template (components/admin_sidebar.html) renders from this only — see
     # app/utils/role_access.py for the single source of truth.
     app.jinja_env.globals["get_sidebar_zones"] = get_sidebar_zones
+    app.jinja_env.globals["get_launch_sidebar_zones"] = get_launch_sidebar_zones
 
     # E2E-7: the header's role badge (components/admin_header.html) read
     # current_user.role.name -- the legacy Flask-Base Role/Permission table,

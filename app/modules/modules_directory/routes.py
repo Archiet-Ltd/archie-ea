@@ -25,6 +25,8 @@ from flask_login import current_user, login_required
 
 from app.utils.role_access import (
     _ZONE_TITLES,
+    LAUNCH_ENDPOINTS,
+    MORE_TOOLS_FIRST_ENDPOINTS,
     SIDEBAR_ZONES,
     can_access_section,
     get_user_role,
@@ -375,6 +377,35 @@ def index():
         if endpoint not in zone_endpoints
         and _link_visible(endpoint, _MORE_TOOLS_REQUIRES.get(endpoint))
     )
+
+    # Launch cut: the twelve launch modules live in the sidebar, so every other
+    # module is listed here (none is removed), each marked as not in the cut.
+    sections = [
+        {"title": section["title"], "links": [entry for entry in section["links"] if entry["endpoint"] not in LAUNCH_ENDPOINTS]}
+        for section in sections
+    ]
+    more_tools = [entry for entry in more_tools if entry["endpoint"] not in LAUNCH_ENDPOINTS]
+
+    # The ArchiMate Composer and the Tech Radar go first: architects reach them most.
+    first = {}
+    for section in sections:
+        for link in section["links"]:
+            if link["endpoint"] in MORE_TOOLS_FIRST_ENDPOINTS:
+                first.setdefault(link["endpoint"], link)
+    for link in more_tools:
+        if link["endpoint"] in MORE_TOOLS_FIRST_ENDPOINTS:
+            first.setdefault(link["endpoint"], link)
+    sections = [
+        {"title": section["title"], "links": [entry for entry in section["links"] if entry["endpoint"] not in first]}
+        for section in sections
+    ]
+    more_tools = [entry for entry in more_tools if entry["endpoint"] not in first]
+    if first:
+        sections.insert(0, {
+            "title": "Architect tools",
+            "links": [first[e] for e in MORE_TOOLS_FIRST_ENDPOINTS if e in first],
+        })
+    sections = [section for section in sections if section["links"]]
     total = sum(len(section["links"]) for section in sections) + len(more_tools)
     return render_template(
         "modules_directory/index.html",
