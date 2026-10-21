@@ -50,7 +50,6 @@ def overview():
         format_health_score,
     )
     from app.services import portfolio_figures
-    from app.utils.role_access import is_hidden_not_ready
 
     metrics = {
         "applications": 0,
@@ -742,7 +741,6 @@ def overview():
         health_components=health_components,
         enterprise_role=enterprise_role,
         data_coverage=data_coverage,
-        hide_cfo_tab=is_hidden_not_ready("dashboard_v2.overview#cfo_tab"),
         governance_alerts=governance_alerts,
         dashboard_mode=dashboard_mode,
         guided_steps=guided_steps,

@@ -129,13 +129,8 @@ def _get(app, user, org, url):
 
 
 def _dash_with_cfo(app, user, org):
-    """The overview with the CFO lens shown (it is hidden by default with the unfinished pages)."""
-    old = app.config.get("HIDE_NOT_READY_MODULES")
-    app.config["HIDE_NOT_READY_MODULES"] = False
-    try:
-        return _get(app, user, org, "/dashboard/overview").get_data(as_text=True)
-    finally:
-        app.config["HIDE_NOT_READY_MODULES"] = old
+    """The overview; the CFO lens is always in it."""
+    return _get(app, user, org, "/dashboard/overview").get_data(as_text=True)
 
 
 def _int(text):
@@ -246,21 +241,19 @@ def test_nothing_recorded_shows_a_dash_not_a_zero(app, db_session, make_org):
     assert "applications have a cost" not in dash or "0 of 0" not in dash
 
 
-def test_the_cfo_tab_is_hidden_with_the_other_unfinished_pages(app, two_orgs):
+def test_the_cfo_tab_is_always_shown_and_says_what_is_missing_when_empty(app, db_session, two_orgs):
     from app.utils.role_access import NOT_READY_ENDPOINTS
 
-    assert "dashboard_v2.overview#cfo_tab" in NOT_READY_ENDPOINTS
+    assert "dashboard_v2.overview#cfo_tab" not in NOT_READY_ENDPOINTS
     org, user = two_orgs["A"]
     dash = _get(app, user, org, "/dashboard/overview").get_data(as_text=True)
-    assert 'data-testid="layer-tab-cfo"' not in dash
-    assert "activeRole === 'cfo'" not in dash
-    old = app.config.get("HIDE_NOT_READY_MODULES")
-    app.config["HIDE_NOT_READY_MODULES"] = False
-    try:
-        dash = _get(app, user, org, "/dashboard/overview").get_data(as_text=True)
-        assert 'data-testid="layer-tab-cfo"' in dash
-    finally:
-        app.config["HIDE_NOT_READY_MODULES"] = old
+    assert 'data-testid="layer-tab-cfo"' in dash
+    assert "activeRole === 'cfo'" in dash
+    # With no cost data the lens shows the shared empty state, naming the figure and where it is filled.
+    assert 'data-testid="cfo-empty-state"' in dash
+    assert "No cost figures yet" in dash
+    assert "cost import" in dash and "/consolidation-list/" in dash
+    assert "vendor pages" in dash and "/applications/vendors" in dash
 
 
 def test_owners_never_exceed_applications_with_a_duplicate_row(app, two_orgs):

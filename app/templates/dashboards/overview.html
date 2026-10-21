@@ -2,6 +2,7 @@
 {% from 'components/dense_table.html' import dense_table %}
 {% from 'macros/page_shell.html' import page_shell, section_card %}
 {% from 'components/answer_cascade.html' import answer_cascade %}
+{% from 'components/empty_state.html' import empty_state %}
 {% block title %}Dashboard{% endblock %}
 {% block guided_mode_steps %}
 <script id="guided-mode-steps-data" type="application/json">
@@ -134,24 +135,22 @@
             <p class="text-2xs font-semibold uppercase tracking-[0.06em] text-muted-foreground">{{ label }}</p>
             <p class="mt-1 text-28 font-semibold leading-9 tabular-nums text-foreground" data-testid="{{ testid }}">{{ value }}</p>
             {% if line %}<p class="mt-1 truncate text-xs text-muted-foreground tabular-nums" title="{{ line }}">{{ line }}</p>{% endif %}
+            {% if testid == 'health-kpi-applications' %}
+            {# Owner and cost coverage, read from their one store (portfolio_figures): the
+               same counts the application list and the cost screens show. A dash when unknown. #}
+            {% set cov = data_coverage if data_coverage is defined and data_coverage else {} %}
+            <p class="mt-1 truncate text-xs text-muted-foreground tabular-nums" data-testid="owner-count">{{ cov.owner_count|dash }} of {{ cov.application_count|dash }} applications have an owner</p>
+            <p class="truncate text-xs text-muted-foreground tabular-nums" data-testid="cost-count">{{ cov.cost_count|dash }} of {{ cov.application_count|dash }} applications have a cost, {{ (("{:,.0f}".format(cov.total_annual_cost)) if cov.total_annual_cost is not none and cov.total_annual_cost is defined else none)|dash }} a year</p>
+            {% endif %}
         </div>
         {% endfor %}
     </section>
-
-    {# Owner and cost coverage, read from their one store (portfolio_figures): the
-       same counts the application list and the cost screens show. #}
-    {% if data_coverage is defined and data_coverage.owner_count is defined and data_coverage.owner_count is not none %}
-    <p class="text-xs text-muted-foreground tabular-nums" data-testid="owner-count">{{ data_coverage.owner_count }} of {{ data_coverage.application_count }} applications have an owner</p>
-    {% endif %}
-    {% if data_coverage is defined and data_coverage.cost_count is defined and data_coverage.cost_count is not none %}
-    <p class="text-xs text-muted-foreground tabular-nums" data-testid="cost-count">{{ data_coverage.cost_count }} of {{ data_coverage.application_count }} applications have a cost{% if data_coverage.total_annual_cost is not none %}, {{ "{:,.0f}".format(data_coverage.total_annual_cost) }} a year{% endif %}</p>
-    {% endif %}
 
     {# Lenses: a 32px segmented control on the tokens. Overview, CTO and CFO are
        the executive summaries; the six ArchiMate 3.2 layers each open their own
        panel below. #}
     <div aria-label="Dashboard lens" class="flex w-fit max-w-full flex-wrap items-center gap-0.5 rounded-md bg-muted p-0.5">
-        {% for role_key, role_label in [('overview', 'Overview'), ('cto', 'CTO')] + ([] if hide_cfo_tab|default(false) else [('cfo', 'CFO')]) + [('motivation', 'Motivation'), ('strategy', 'Strategy'), ('business', 'Business'), ('application', 'Application'), ('technology', 'Technology'), ('implementation', 'Implementation & Migration')] %}
+        {% for role_key, role_label in [('overview', 'Overview'), ('cto', 'CTO'), ('cfo', 'CFO'), ('motivation', 'Motivation'), ('strategy', 'Strategy'), ('business', 'Business'), ('application', 'Application'), ('technology', 'Technology'), ('implementation', 'Implementation & Migration')] %}
         <button type="button" @click="activeRole = '{{ role_key }}'"
                 data-testid="layer-tab-{{ role_key }}"
                 :aria-pressed="activeRole === '{{ role_key }}' ? 'true' : 'false'"
@@ -426,7 +425,6 @@
     {# ══════════════════════════════════════════════════════════════════════
        CFO LENS — cost
        ══════════════════════════════════════════════════════════════════════ #}
-    {% if not hide_cfo_tab|default(false) %}
     {% set cfo = (persona_metrics or {}).get('cfo') or {} %}
     <div x-show="activeRole === 'cfo'" x-cloak class="space-y-8" data-testid="lens-cfo">
         <section aria-label="CFO key figures" class="grid grid-cols-2 gap-4 lg:grid-cols-4">
@@ -443,6 +441,19 @@
             {% endfor %}
         </section>
 
+        {% if not cfo.get('tco_by_category') %}
+        <section aria-label="Total cost of ownership" class="rounded-lg border border-border bg-card" data-testid="cfo-empty-state">
+            {{ empty_state(
+                icon='circle-dollar-sign',
+                title='No cost figures yet',
+                description='Total cost of ownership has nothing to add up. Costs per application come from the cost import on the consolidation list, and vendor contracts come from the vendor pages.',
+                cta_text='Import costs',
+                cta_href='/consolidation-list/',
+                secondary_cta_text='Open vendors',
+                secondary_cta_href='/applications/vendors'
+            ) }}
+        </section>
+        {% else %}
         <section aria-labelledby="tco-heading" class="rounded-lg border border-border bg-card">
             <div class="flex items-center justify-between border-b border-border px-4 py-2">
                 <h2 id="tco-heading" class="text-base font-semibold text-foreground">Total cost of ownership</h2>
@@ -470,8 +481,8 @@
                 </tbody>
             </table>
         </section>
+        {% endif %}
     </div>
-    {% endif %}
 
     {# ══════════════════════════════════════════════════════════════════════
        LAYER LENSES — the six ArchiMate 3.2 layers, one panel driven by the

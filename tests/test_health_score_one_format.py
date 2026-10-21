@@ -89,11 +89,8 @@ def _score_on_every_screen(client, login_as, user):
         "executive summary": summary.get_json()["data"]["Health Score"],
         "cto card": _text(overview, "cto-health-score-value"),
         "health scorecard": _text(scorecard, "health-score-value"),
+        "cfo card": _text(overview, "cfo-health-score-value"),
     }
-    # The CFO tab is held back for the soft launch (HIDE_NOT_READY_MODULES); its card is
-    # checked here again whenever the tab is shown.
-    if overview.find(attrs={"data-testid": "cfo-health-score-value"}) is not None:
-        shown["cfo card"] = _text(overview, "cfo-health-score-value")
     return shown
 
 
@@ -412,4 +409,5 @@ def test_every_screen_reads_the_formatted_score_not_the_plain_number(
         "executive summary": shown,
         "cto card": shown,
         "health scorecard": shown,
+        "cfo card": shown,
     }

@@ -21,12 +21,12 @@ def _login(page, base, email):
     page.wait_for_url(lambda u: "/account/login" not in u, timeout=PAGE_TIMEOUT)
 
 
-def test_owner_figure_agrees_and_cfo_tab_is_not_offered(browser, live_server, seeded):
+def test_owner_figure_agrees_and_cfo_tab_is_offered(browser, live_server, seeded):
     page = browser.new_page()
     _login(page, live_server, seeded["emails"]["cto"])
 
     page.goto(live_server + "/dashboard/overview", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
-    assert page.locator('[data-testid="layer-tab-cfo"]').count() == 0, "the CFO tab is offered"
+    assert page.locator('[data-testid="layer-tab-cfo"]').count() == 1, "the CFO tab is missing"
     assert page.locator('[data-testid="layer-tab-cto"]').count() == 1
     strip = page.locator('[data-testid="owner-count"]')
 
