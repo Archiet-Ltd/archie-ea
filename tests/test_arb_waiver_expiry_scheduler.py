@@ -91,6 +91,7 @@ def test_scheduler_disabled_preserves_established_jobs(monkeypatch):
         "approval_escalation",
         "event_log_relay",
         "event_log_partition_maintenance",
+        "change_feed_consumer",
     }
 
 
@@ -117,6 +118,7 @@ def test_malformed_optional_interval_does_not_disable_established_jobs(monkeypat
         "approval_escalation",
         "event_log_relay",
         "event_log_partition_maintenance",
+        "change_feed_consumer",
     }
 
 
@@ -146,6 +148,7 @@ def test_overflowing_optional_trigger_does_not_disable_established_jobs(monkeypa
         "approval_escalation",
         "event_log_relay",
         "event_log_partition_maintenance",
+        "change_feed_consumer",
     }
 
 
@@ -167,4 +170,5 @@ def test_optional_add_job_failure_does_not_disable_established_jobs(monkeypatch)
         "approval_escalation",
         "event_log_relay",
         "event_log_partition_maintenance",
+        "change_feed_consumer",
     }
