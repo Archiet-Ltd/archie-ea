@@ -54,7 +54,7 @@
     </div>
 
     {% if load_error %}
-    <div class="rounded-lg border border-destructive/30 bg-destructive/10 px-5 py-4 text-sm text-destructive-emphasis" role="alert">
+    <div class="rounded-md border border-destructive/40 bg-destructive/10 px-5 py-2 text-sm text-destructive-emphasis" role="alert">
         Could not load compliance data. Please try again.
     </div>
     {% endif %}
@@ -68,7 +68,7 @@
         </div>
         {% if frameworks %}
         <div class="overflow-x-auto">
-            <table class="w-full text-sm">
+            <table class="dense-table w-full text-sm">
                 <thead>
                     <tr class="text-left text-muted-foreground border-b border-border">
                         <th class="px-5 py-3 font-medium">Code</th>
@@ -112,7 +112,7 @@
                                 <div class="text-sm text-muted-foreground">No controls recorded for this framework.</div>
                             </template>
                             <template x-if="loadingId !== {{ f.id }} && (controlsByFramework[{{ f.id }}] || []).length > 0">
-                                <table class="w-full text-sm">
+                                <table class="dense-table w-full text-sm">
                                     <thead>
                                         <tr class="text-left text-muted-foreground">
                                             <th class="py-1 pr-4 font-medium">Control</th>

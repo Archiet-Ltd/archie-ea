@@ -26,7 +26,7 @@
             <div class="mb-2 flex gap-2">
                 <button type="button"
                     @click="showUpload = !showUpload"
-                    class="flex-1 inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 text-xs bg-primary/10 hover:bg-primary/20 text-primary rounded-md transition-colors"
+                    class="flex-1 inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 text-xs bg-primary/10 hover:bg-primary/20 text-info-emphasis rounded-md transition-colors"
                  aria-label="Toggle upload section">
                     <i data-lucide="upload-cloud" class="h-3.5 w-3.5"></i>
                     <span x-text="showUpload ? 'Hide Upload' : 'Upload Document'"></span>
@@ -34,7 +34,7 @@
                 </button>
                 <button type="button"
                     @click="showHistory = !showHistory; if(showHistory) loadDocumentHistory()"
-                    class="flex-1 inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 text-xs bg-muted hover:bg-accent text-muted-foreground rounded-md transition-colors"
+                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-8 px-2.5 flex-1 items-center justify-center"
                  aria-label="Toggle document history">
                     <i data-lucide="history" class="h-3.5 w-3.5"></i>
                     <span>History</span>
@@ -43,7 +43,7 @@
             </div>
             
             {# Context Selector - Application vs Vendor vs General #}
-            <div class="mb-3 p-2 bg-card border rounded-md">
+            <div class="mb-3 p-2 bg-card border border-border rounded-md">
                 <label class="text-xs font-medium text-muted-foreground mb-2 block">Link elements to:</label>
                 <div class="flex gap-2 mb-2">
                     <button type="button"
@@ -143,7 +143,7 @@
     {# Document History Panel #}
     <div x-show="showHistory" x-cloak 
          x-transition
-         class="mb-3 border rounded-md bg-card p-3">
+         class="mb-3 border border-border rounded-md bg-card p-3">
         <div class="flex items-center justify-between mb-2">
             <h4 class="text-xs font-semibold">Upload History</h4>
             <button type="button" @click="loadDocumentHistory()" class="text-xs text-muted-foreground hover:text-foreground" aria-label="Refresh document history">
@@ -226,7 +226,7 @@
          x-transition:leave-end="opacity-0 transform scale-95"
          class="mb-3">
         
-        <div class="rounded-lg border bg-card p-3">
+        <div class="rounded-lg border border-border bg-card p-3">
             <div class="flex items-center justify-between mb-3">
                 <div>
                     <h3 class="text-sm font-semibold">Document Upload</h3>
@@ -373,7 +373,7 @@
             </div>
 
             {# No Elements Found Message #}
-            <div x-show="!uploading && !analysisResults && previewElements.length === 0 && uploadStatus === 'No elements found'" x-cloak class="p-3 bg-warning/5 border border-warning/20 rounded-md mb-3">
+            <div x-show="!uploading && !analysisResults && previewElements.length === 0 && uploadStatus === 'No elements found'" x-cloak class="px-3 py-2 bg-warning/10 border border-warning/40 rounded-md mb-3">
                 <div class="flex items-center gap-2">
                     <i data-lucide="alert-circle" class="h-4 w-4 text-warning"></i>
                     <p class="text-sm text-warning-emphasis">
@@ -446,7 +446,7 @@
                                         
                                         {# Entity Resolution Badge #}
                                         <template x-if="elem.resolution && elem.resolution.confidence > 0.7">
-                                            <span class="text-xs px-1.5 py-0.5 bg-primary/10 text-primary rounded"
+                                            <span class="text-xs px-1.5 py-0.5 bg-primary/10 text-info-emphasis rounded"
                                                   :title="'Resolved from: ' + elem.name">
                                                 <i data-lucide="check-circle" class="h-3 w-3 inline"></i>
                                                 Resolved
@@ -768,7 +768,7 @@
                         <div class="flex items-center gap-2 mb-3">
                             <i data-lucide="plus-circle" class="h-4 w-4 text-primary"></i>
                             <h5 class="text-sm font-semibold text-primary">New Entities Discovered</h5>
-                            <span class="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full"
+                            <span class="text-xs bg-primary/10 text-info-emphasis px-2 py-0.5 rounded-full"
                                   x-text="(analysisResults?.entity_matching?.new_entities?.length || 0) + ' new'"></span>
                         </div>
                         <div class="space-y-2 max-h-32 overflow-y-auto">
@@ -798,7 +798,7 @@
                                 <div class="flex items-center gap-2 text-xs bg-background rounded p-2 border border-primary/20">
                                     <span class="text-primary" x-text="rel.source || rel.source_name"></span>
                                     <i data-lucide="arrow-right" class="h-3 w-3 text-primary"></i>
-                                    <span class="px-1.5 py-0.5 bg-primary/10 text-primary rounded" x-text="rel.relationship_type"></span>
+                                    <span class="px-1.5 py-0.5 bg-primary/10 text-info-emphasis rounded" x-text="rel.relationship_type"></span>
                                     <i data-lucide="arrow-right" class="h-3 w-3 text-primary"></i>
                                     <span class="text-primary" x-text="rel.target_name"></span>
                                 </div>
@@ -841,7 +841,7 @@
 
                 {# Persona-Specific Insights #}
                 <div x-show="analysisResults?.persona_insights?.persona" x-cloak
-                     class="p-4 bg-primary/5 rounded-lg border border-primary/20">
+                     class="px-3 py-2 bg-primary/10 rounded-md border border-primary/40">
                     <div class="flex items-center gap-2 mb-3">
                         <i data-lucide="user-cog" class="h-4 w-4 text-primary"></i>
                         <h5 class="text-sm font-semibold text-primary">
@@ -864,7 +864,7 @@
                 </div>
 
                 {# Domain Insights #}
-                <div x-show="analysisResults?.domain_insights" x-cloak class="p-4 bg-primary/5 rounded-lg border border-primary/20">
+                <div x-show="analysisResults?.domain_insights" x-cloak class="px-3 py-2 bg-primary/10 rounded-md border border-primary/40">
                     <div class="flex items-center gap-2 mb-2">
                         <i data-lucide="brain" class="h-4 w-4 text-primary"></i>
                         <h5 class="text-sm font-semibold text-primary">Domain Insights</h5>
@@ -922,14 +922,14 @@
                 <div class="flex items-center gap-2 pt-2">
                     <button type="button"
                         @click="addToChat()"
-                        class="flex-1 inline-flex items-center justify-center rounded-md text-xs font-medium bg-primary text-primary-foreground hover:bg-primary/90 h-7 px-2"
+                        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 flex-1 items-center justify-center"
                      aria-label="Add analysis results to chat">
                         <i data-lucide="plus-circle" class="mr-1.5 h-3.5 w-3.5"></i>
                         Add to Chat
                     </button>
                     <button type="button"
                         @click="analyzeWithDifferentProvider()"
-                        class="inline-flex items-center justify-center rounded-md text-xs font-medium border border-input bg-background hover:bg-accent hover:text-accent-foreground h-7 px-2"
+                        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center"
                      aria-label="Re-analyze with different provider">
                         <i data-lucide="refresh-cw" class="mr-1.5 h-3.5 w-3.5"></i>
                         Re-analyze

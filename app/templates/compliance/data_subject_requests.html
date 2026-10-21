@@ -16,7 +16,7 @@
         actions=[{'text': 'Trace a personal-data category', 'icon': 'git-fork', 'href': url_for('gdpr_bp.dsr_trace'), 'variant': 'outline'}]
     ) }}
 
-    <div class="rounded-xl border border-border bg-card overflow-hidden">
+    <div class="rounded-lg border border-border bg-card overflow-hidden">
         <div class="p-4 border-b border-border bg-muted/30">
             <h2 class="text-lg font-semibold">New request</h2>
             <p class="text-xs text-muted-foreground mt-1">Choose a person in your organisation for access or erasure of what this platform holds about them, or name an outside data subject to scope the search of your own systems.</p>
@@ -67,19 +67,19 @@
             </div>
             <div class="md:col-span-2">
                 <button type="submit" data-testid="dsr-create-submit"
-                    class="inline-flex items-center justify-center rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 h-9 px-4 py-2">
+                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
                     Record and scope
                 </button>
             </div>
         </form>
     </div>
 
-    <div class="rounded-xl border border-border bg-card overflow-hidden" data-testid="dsr-list">
+    <div class="rounded-lg border border-border bg-card overflow-hidden" data-testid="dsr-list">
         <div class="p-4 border-b border-border bg-muted/30">
             <h2 class="text-lg font-semibold">Requests</h2>
         </div>
         {% if requests %}
-        <table class="w-full text-sm">
+        <table class="dense-table w-full text-sm">
             <thead class="text-left text-muted-foreground">
                 <tr>
                     <th class="px-4 py-2 font-medium">Recorded</th>

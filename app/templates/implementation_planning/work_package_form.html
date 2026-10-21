@@ -27,13 +27,13 @@
                         <input type="text" id="name" name="name"
                                value="{{ work_package.name if work_package else '' }}"
                                required
-                               class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                               class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                                placeholder="Enter work package name" aria-label="Enter work package name">
                     </div>
                     <div class="space-y-2">
                         {% call label(for='status') %}Status{% endcall %}
                         <select id="status" name="status"
-                                class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2" aria-label="Select Status">
+                                class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2" aria-label="Select Status">
                             <option value="">Select Status</option>
                             <option value="planned" {% if work_package and work_package.status == 'planned' %}selected{% endif %}>Planned</option>
                             <option value="in_progress" {% if work_package and work_package.status == 'in_progress' %}selected{% endif %}>In Progress</option>
@@ -45,7 +45,7 @@
 
                 <div class="space-y-2">
                     {% call label(for='programme_id') %}Programme{% endcall %}
-                    <select id="programme_id" name="programme_id" class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2" aria-label="Select programme">
+                    <select id="programme_id" name="programme_id" class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2" aria-label="Select programme">
                         <option value="">No programme</option>
                         {% for programme in programmes %}
                         <option value="{{ programme.id }}" {% if work_package and work_package.enterprise_initiative_id == programme.id %}selected{% endif %}>{{ programme.name }}</option>
@@ -65,19 +65,19 @@
                         {% call label(for='start_date') %}Start Date{% endcall %}
                         <input type="date" id="start_date" name="start_date"
                                value="{{ work_package.start_date.strftime('%Y-%m-%d') if work_package and work_package.start_date else '' }}"
-                               class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2" aria-label="Start date">
+                               class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2" aria-label="Start date">
                     </div>
                     <div class="space-y-2">
                         {% call label(for='end_date') %}End Date{% endcall %}
                         <input type="date" id="end_date" name="end_date"
                                value="{{ work_package.end_date.strftime('%Y-%m-%d') if work_package and work_package.end_date else '' }}"
-                               class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2" aria-label="End date">
+                               class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2" aria-label="End date">
                     </div>
                 </div>
 
                 <div class="flex justify-between pt-4">
                     <a href="{{ url_for('implementation_planning.implementation_dashboard') }}"
-                       class="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-10 px-4 py-2">
+                       class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center whitespace-nowrap">
                         Cancel
                     </a>
                     {{ button(action + ' Work Package', variant='default', type='submit', icon='save') }}
@@ -106,7 +106,7 @@
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                 <div class="space-y-2 flex-1">
                     {% call label(for='dependency_id') %}Add a dependency{% endcall %}
-                    <select id="dependency_id" name="dependency_id" class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2" aria-label="Select the work package this depends on">
+                    <select id="dependency_id" name="dependency_id" class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2" aria-label="Select the work package this depends on">
                         {% for other in other_work_packages %}
                         <option value="{{ other.id }}">{{ other.name }}</option>
                         {% endfor %}

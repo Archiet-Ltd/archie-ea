@@ -24,7 +24,7 @@
     <form method="post" action="{{ request.path }}" class="space-y-6">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
-        <div class="rounded-lg border bg-card p-6 space-y-4">
+        <div class="rounded-lg border border-border bg-card p-6 space-y-4">
             <h2 class="text-sm font-semibold text-foreground uppercase tracking-wide">Identity</h2>
 
             <div>
@@ -49,7 +49,7 @@
             </div>
         </div>
 
-        <div class="rounded-lg border bg-card p-6 space-y-4">
+        <div class="rounded-lg border border-border bg-card p-6 space-y-4">
             <h2 class="text-sm font-semibold text-foreground uppercase tracking-wide">Classification</h2>
 
             <div class="grid grid-cols-2 gap-4">
@@ -134,7 +134,7 @@
     </form>
 
     {% if entity %}
-    <div class="rounded-lg border border-destructive/30 bg-destructive/5 p-6">
+    <div class="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2">
         <h2 class="text-sm font-semibold text-destructive-emphasis mb-2">Danger Zone</h2>
         <p class="text-sm text-muted-foreground mb-4">Deleting this data entity removes it permanently from the catalog.</p>
         <form id="delete-entity-form" method="post" action="{{ url_for('data_architecture.delete_data_entity', entity_id=entity.id) }}">

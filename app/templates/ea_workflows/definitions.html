@@ -15,7 +15,7 @@
         <div class="relative w-full sm:w-64">
             <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" aria-hidden="true"></i>
             <input type="text" x-model="search" placeholder="Search definitions..."
-                   class="w-full pl-9 pr-3 py-2 rounded-lg border-2 border-input text-sm bg-background focus:border-primary focus:outline-none"
+                   class="w-full pl-9 pr-3 py-2 rounded-md border-2 border-input text-sm bg-background focus:border-primary focus:outline-none"
                    aria-label="Search workflow definitions">
         </div>
     </div>
@@ -69,7 +69,7 @@
     {% if definitions %}
     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
         {% for defn in definitions %}
-        <div class="rounded-xl border-2 border-input bg-background p-6 hover:border-primary/50 hover:shadow-sm transition-all duration-200"
+        <div class="rounded-xl border-2 border-input bg-background p-6 hover:border-primary/50 transition-all duration-200"
              x-cloak
              x-show="!search || '{{ defn.workflow_name|lower }}'.includes(search.toLowerCase()) || '{{ defn.workflow_code|lower }}'.includes(search.toLowerCase()) || '{{ (defn.workflow_description or '')|lower }}'.includes(search.toLowerCase())">
             <div class="flex items-start justify-between mb-4">
@@ -104,7 +104,7 @@
 
             <h3 class="text-xl font-semibold mb-1">{{ defn.workflow_name }}</h3>
             {% if defn.adm_phase %}
-            <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-primary/10 text-primary mb-2">
+            <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-primary/10 text-info-emphasis mb-2">
                 Phase {{ defn.adm_phase }}: {{ defn.adm_phase_name|dash }}
             </span>
             {% endif %}
@@ -146,7 +146,7 @@
                     View Details
                 </a>
                 <a href="{{ url_for('main.ea_workflows_dashboard') }}?start={{ defn.workflow_code }}"
-                   class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary text-primary-foreground text-sm hover:bg-primary/90 transition-colors font-medium"
+                   class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center"
                    aria-label="Start {{ defn.workflow_name }}">
                     <i data-lucide="play" class="h-3.5 w-3.5" aria-hidden="true"></i>
                     Start

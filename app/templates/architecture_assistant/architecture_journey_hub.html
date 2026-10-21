@@ -48,7 +48,7 @@
 
           <label for="journey-title" class="mt-5 block text-sm font-medium text-foreground">What are you trying to change?</label>
           <input id="journey-title" type="text" x-model.trim="title" required maxlength="255"
-            class="mt-2 flex h-11 w-full rounded-md border border-input bg-transparent px-3 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+            class="mt-2 flex h-11 w-full rounded-md border border-input bg-transparent px-3 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
             placeholder="For example: reduce customer onboarding from days to minutes">
         </div>
 
@@ -99,7 +99,7 @@
           <div>
             <label for="journey-outcome" class="block text-sm font-medium text-foreground">Likely outcome</label>
             <select id="journey-outcome" x-model="outcomeType"
-              class="mt-2 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+              class="mt-2 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
               <option value="undecided">Decide during the journey</option>
               <option value="architecture_only">Architecture and documents only</option>
               <option value="no_change_recommended">No change recommended</option>
@@ -110,16 +110,16 @@
             </select>
           </div>
           <button type="submit" :disabled="starting || !canStart"
-            class="inline-flex h-11 items-center justify-center gap-2 rounded-md bg-primary px-6 text-base font-medium text-primary-foreground hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50">
+            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
             <span x-text="starting ? 'Opening journey…' : 'Start architecture journey'"></span>
             <i data-lucide="arrow-right" class="h-4 w-4" aria-hidden="true"></i>
           </button>
         </div>
-        <p x-show="error" x-cloak class="rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive-emphasis" role="alert" x-text="error"></p>
+        <p x-show="error" x-cloak class="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive-emphasis" role="alert" x-text="error"></p>
       </form>
 
       <aside class="space-y-4">
-        <div class="rounded-xl border border-border bg-card p-5">
+        <div class="rounded-lg border border-border bg-card p-5">
           <h2 class="text-sm font-semibold text-foreground">Bring evidence with you</h2>
           <p class="mt-2 text-sm leading-6 text-muted-foreground">Add documents, links, observations and existing models in the workspace. Each stays attached to the question or decision it supports.</p>
           <div class="mt-4 flex items-center gap-2 text-xs text-muted-foreground">
@@ -162,7 +162,7 @@
         <div class="min-w-[10rem] flex-1">
           <label for="filter-intent" class="text-xs font-medium text-muted-foreground">Purpose</label>
           <select id="filter-intent" name="intent_filter"
-            class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+            class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
             <option value="">Any purpose</option>
             {% for value, label, _description in intent_options %}
             <option value="{{ value }}" {% if filter_intent == value %}selected{% endif %}>{{ label }}</option>
@@ -172,7 +172,7 @@
         <div class="min-w-[9rem]">
           <label for="filter-stage" class="text-xs font-medium text-muted-foreground">Stage</label>
           <select id="filter-stage" name="stage"
-            class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+            class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
             <option value="">Any stage</option>
             {% for value in journey_stages %}
             <option value="{{ value }}" {% if filter_stage == value %}selected{% endif %}>{{ value|title }}</option>
@@ -182,19 +182,19 @@
         <div class="min-w-[9rem]">
           <label for="filter-status" class="text-xs font-medium text-muted-foreground">Status</label>
           <select id="filter-status" name="status"
-            class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+            class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
             {% for value in journey_statuses %}
             <option value="{{ value }}" {% if filter_status == value %}selected{% endif %}>{{ value|title }}</option>
             {% endfor %}
           </select>
         </div>
         <button type="submit"
-          class="inline-flex h-9 items-center justify-center rounded-md bg-secondary px-4 py-2 text-sm font-medium text-secondary-foreground hover:bg-secondary/80">
+          class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
           Apply
         </button>
         {% if journey_filters_active %}
         <a href="{{ url_for('architecture_journey.index') }}"
-           class="inline-flex h-9 items-center justify-center rounded-md px-4 py-2 text-sm font-medium text-foreground hover:bg-accent hover:text-accent-foreground">
+           class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
           Clear filters
         </a>
         {% endif %}
@@ -202,7 +202,7 @@
       {% if architecture_journeys %}
       <div class="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
         {% for journey in architecture_journeys %}
-        <a href="{{ journey.resume_path }}" class="group rounded-xl border border-border bg-card p-5 hover:border-primary/40 hover:shadow-sm">
+        <a href="{{ journey.resume_path }}" class="group rounded-xl border border-border bg-card p-5 hover:border-primary/40">
           <div class="flex items-start justify-between gap-4">
             <div class="min-w-0">
               <p class="truncate text-sm font-semibold text-foreground">{{ journey.title }}</p>
@@ -232,7 +232,7 @@
         <p class="mt-3 text-sm font-medium text-foreground">No journeys match these filters</p>
         <p class="mt-1 text-sm text-muted-foreground">Your other journeys are still here.</p>
         <a href="{{ url_for('architecture_journey.index') }}"
-           class="mt-4 inline-flex h-9 items-center justify-center rounded-md border border-input bg-background px-4 py-2 text-sm font-medium text-foreground hover:bg-accent">
+           class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 mt-4 items-center justify-center">
           Clear filters
         </a>
       </div>
@@ -255,11 +255,11 @@
         <div class="flex gap-2">
           {% if journey_page > 1 %}
           <a href="{{ url_for('architecture_journey.index', page=journey_page - 1, intent_filter=filter_intent, stage=filter_stage, status=filter_status) }}"
-             class="inline-flex h-9 items-center justify-center rounded-md border border-input bg-background px-4 py-2 text-sm font-medium text-foreground hover:bg-accent">Previous</a>
+             class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">Previous</a>
           {% endif %}
           {% if journey_page < journey_pages %}
           <a href="{{ url_for('architecture_journey.index', page=journey_page + 1, intent_filter=filter_intent, stage=filter_stage, status=filter_status) }}"
-             class="inline-flex h-9 items-center justify-center rounded-md border border-input bg-background px-4 py-2 text-sm font-medium text-foreground hover:bg-accent">Next</a>
+             class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">Next</a>
           {% endif %}
         </div>
       </nav>

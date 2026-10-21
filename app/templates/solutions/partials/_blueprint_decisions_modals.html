@@ -165,7 +165,7 @@
             <button type="submit"
                     x-data
                     :disabled="window._decisionsSection && window._decisionsSection.submitting"
-                    class="inline-flex items-center px-4 py-1.5 rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50">
+                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                 <svg x-show="window._decisionsSection && window._decisionsSection.submitting"
                      class="animate-spin h-3.5 w-3.5 mr-1.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
@@ -211,7 +211,7 @@
             </button>
             <button type="submit"
                     :disabled="window._decisionsSection && window._decisionsSection.submitting"
-                    class="inline-flex items-center px-4 py-1.5 rounded-md text-sm font-medium bg-destructive text-destructive-foreground hover:bg-destructive/90 transition-colors disabled:opacity-50">
+                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-destructive text-destructive-foreground text-sm font-semibold transition-colors hover:bg-destructive/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                 <span x-text="(window._decisionsSection && window._decisionsSection.submitting) ? 'Rejecting…' : 'Confirm Reject'">
                     Confirm Reject
                 </span>

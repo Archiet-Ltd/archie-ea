@@ -52,15 +52,15 @@
         </div>
         <div class="flex items-center gap-3 mt-3">
             <button type="submit"
-                    class="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors">
+                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
                 <i data-lucide="search" class="h-4 w-4 mr-1.5"></i> Filter
             </button>
             <a href="{{ url_for('admin.report_builder') }}"
-               class="inline-flex items-center justify-center rounded-md border border-input bg-background px-4 py-2 text-sm font-medium hover:bg-accent transition-colors">
+               class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
                 Clear
             </a>
             <a href="{{ url_for('admin.report_builder', q=search_q, lifecycle=lifecycle, date_from=date_from, date_to=date_to, vendor=vendor_filter, export='csv') }}"
-               class="inline-flex items-center justify-center rounded-md border border-input bg-background px-4 py-2 text-sm font-medium hover:bg-accent transition-colors ml-auto">
+               class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center ml-auto">
                 <i data-lucide="download" class="h-4 w-4 mr-1.5"></i> Export CSV
             </a>
         </div>
@@ -75,9 +75,9 @@
     </div>
 
     <!-- Results table -->
-    <div class="rounded-xl border bg-card overflow-hidden">
+    <div class="rounded-lg border border-border bg-card overflow-hidden">
         <div class="overflow-x-auto">
-            <table class="w-full text-sm">
+            <table class="dense-table w-full text-sm">
                 <thead>
                     <tr class="border-b bg-muted/50">
                         <th class="px-4 py-3 text-left font-medium text-muted-foreground">Name</th>
@@ -134,14 +134,14 @@
     <nav class="flex items-center justify-center gap-1 mt-6" aria-label="Report pagination">
         {% if page > 1 %}
         <a href="{{ url_for('admin.report_builder', page=page-1, q=search_q, lifecycle=lifecycle, date_from=date_from, date_to=date_to, vendor=vendor_filter) }}"
-           class="inline-flex items-center justify-center rounded-md border border-input bg-background px-3 py-1.5 text-sm hover:bg-accent transition-colors">
+           class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
             Previous
         </a>
         {% endif %}
         <span class="px-3 py-1.5 text-sm text-muted-foreground">Page {{ page }} of {{ total_pages }}</span>
         {% if page < total_pages %}
         <a href="{{ url_for('admin.report_builder', page=page+1, q=search_q, lifecycle=lifecycle, date_from=date_from, date_to=date_to, vendor=vendor_filter) }}"
-           class="inline-flex items-center justify-center rounded-md border border-input bg-background px-3 py-1.5 text-sm hover:bg-accent transition-colors">
+           class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
             Next
         </a>
         {% endif %}

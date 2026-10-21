@@ -38,14 +38,14 @@
                 <p class="mb-2 text-sm text-foreground" data-testid="service-status-subscribed">You are subscribed to status updates.</p>
                 <input type="hidden" name="subscribe" value="0">
                 <button type="submit" data-testid="service-status-unsubscribe"
-                        class="inline-flex h-9 items-center justify-center gap-1.5 rounded-md border border-input bg-background px-3 text-sm font-medium hover:bg-accent">
+                        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
                     <i data-lucide="bell-off" class="h-4 w-4" aria-hidden="true"></i> Unsubscribe
                 </button>
                 {% else %}
                 <p class="mb-2 text-sm text-muted-foreground" data-testid="service-status-not-subscribed">Get told when an incident opens or is resolved.</p>
                 <input type="hidden" name="subscribe" value="1">
                 <button type="submit" data-testid="service-status-subscribe"
-                        class="inline-flex h-9 items-center justify-center gap-1.5 rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground hover:bg-primary/90">
+                        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
                     <i data-lucide="bell" class="h-4 w-4" aria-hidden="true"></i> Subscribe
                 </button>
                 {% endif %}
@@ -87,7 +87,7 @@
         <h2 id="incident-history-heading" class="mb-2 text-base font-semibold text-foreground">Incident history</h2>
         {% if status.history %}
         <div class="overflow-x-auto rounded-lg border border-border">
-            <table class="w-full text-sm" data-testid="service-status-history">
+            <table class="dense-table w-full text-sm" data-testid="service-status-history">
                 <thead class="bg-muted/40 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                     <tr>
                         <th class="px-4 py-2.5">Incident</th>

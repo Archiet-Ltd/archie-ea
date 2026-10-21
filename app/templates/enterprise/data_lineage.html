@@ -79,7 +79,7 @@
                 </select>
             </div>
             <button type="submit" data-testid="lineage-create-submit"
-                class="inline-flex items-center justify-center rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 h-9 px-4 py-2">
+                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
                 Record lineage
             </button>
         </form>
@@ -149,7 +149,7 @@
                     <input type="hidden" name="source_id" value="{{ s.a.id }}">
                     <input type="hidden" name="target_id" value="{{ s.b.id }}">
                     <button type="submit" data-testid="lineage-confirm-{{ s.a.id }}-{{ s.b.id }}"
-                        class="inline-flex items-center justify-center rounded-md text-xs font-medium bg-primary text-primary-foreground hover:bg-primary/90 h-8 px-3">
+                        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
                         Confirm as lineage
                     </button>
                 </form>

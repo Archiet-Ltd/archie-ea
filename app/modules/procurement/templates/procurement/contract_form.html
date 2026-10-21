@@ -123,7 +123,7 @@
 
       <div class="flex items-center gap-3">
         <button type="button" @click="extract()" :disabled="extracting || !text.trim()"
-                class="inline-flex items-center gap-2 px-3 py-2 rounded-md bg-secondary text-secondary-foreground text-sm font-medium hover:bg-secondary/80 transition-colors disabled:opacity-60">
+                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
           <span x-show="extracting" class="animate-spin h-4 w-4 border-2 border-current border-t-transparent rounded-full inline-block"></span>
           <i data-lucide="sparkles" class="w-4 h-4" x-show="!extracting"></i>
           <span x-text="extracting ? 'Extracting…' : 'Extract from text'"></span>
@@ -358,7 +358,7 @@
                @focus="if (query.length >= 2) search()"
                placeholder="Search by name or email…" autocomplete="off"
                class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring">
-        <div x-show="showDropdown" x-cloak class="absolute z-20 mt-1 w-full bg-popover border border-border rounded-md shadow-lg max-h-40 overflow-y-auto">
+        <div x-show="showDropdown" x-cloak class="absolute z-20 mt-1 w-full bg-popover border border-border rounded-md max-h-40 overflow-y-auto">
           <template x-for="u in results" :key="u.id">
             <button type="button" @click="select(u)" class="w-full px-3 py-1.5 text-left text-sm hover:bg-muted flex items-center justify-between">
               <span x-text="u.name" class="font-medium"></span>
@@ -371,7 +371,7 @@
 
     <div class="flex items-center justify-between">
       <button type="submit" :disabled="submitting"
-              class="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-60">
+              class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
         <span x-show="submitting" class="animate-spin h-4 w-4 border-2 border-current border-t-transparent rounded-full inline-block"></span>
         <i data-lucide="save" class="w-4 h-4" x-show="!submitting"></i>
         <span x-text="submitting ? 'Saving…' : '{{ 'Save changes' if contract else 'Create contract' }}'"></span>

@@ -16,7 +16,7 @@
   ) }}
 
   {% if errors %}
-  <div class="mb-4 rounded-md border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive-emphasis" role="alert" data-testid="interface-form-error">
+  <div class="mb-4 rounded-md border border-destructive/40 bg-destructive/10 px-4 py-2 text-sm text-destructive-emphasis" role="alert" data-testid="interface-form-error">
     {{ errors }}
   </div>
   {% endif %}
@@ -184,7 +184,7 @@
                    aria-label="Search provider application"
                    class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
             <div x-show="providerResults.length > 0" x-cloak
-                 class="mt-1 border border-border rounded-md bg-popover shadow-md divide-y divide-border max-h-48 overflow-y-auto absolute z-10 w-full">
+                 class="mt-1 border border-border rounded-md bg-popover divide-y divide-border max-h-48 overflow-y-auto absolute z-10 w-full">
               <template x-for="app in providerResults" :key="app.id">
                 <button type="button" @click="selectProvider(app)"
                         class="w-full text-left px-3 py-2 text-sm hover:bg-accent transition-colors" x-text="app.name"></button>
@@ -212,7 +212,7 @@
                    aria-label="Search consumer application"
                    class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
             <div x-show="consumerResults.length > 0" x-cloak
-                 class="mt-1 border border-border rounded-md bg-popover shadow-md divide-y divide-border max-h-48 overflow-y-auto absolute z-10 w-full">
+                 class="mt-1 border border-border rounded-md bg-popover divide-y divide-border max-h-48 overflow-y-auto absolute z-10 w-full">
               <template x-for="app in consumerResults" :key="app.id">
                 <button type="button" @click="selectConsumer(app)"
                         class="w-full text-left px-3 py-2 text-sm hover:bg-accent transition-colors" x-text="app.name"></button>
@@ -225,11 +225,11 @@
 
     <div class="flex items-center justify-between">
       <a href="{{ url_for('interface_register.index', initiative_id=initiative.id) if initiative else url_for('interface_register.index') }}"
-         class="inline-flex items-center gap-2 px-4 py-2 rounded-md border border-input bg-background text-sm font-medium hover:bg-accent transition-colors">
+         class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
         Cancel
       </a>
       <button type="submit" data-testid="interface-form-submit"
-              class="inline-flex items-center gap-2 px-5 py-2 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors">
+              class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
         <i data-lucide="save" class="h-4 w-4" aria-hidden="true"></i>
         {% if interface %}Save changes{% else %}Create interface{% endif %}
       </button>

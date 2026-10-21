@@ -30,7 +30,7 @@
         {% endif %}
     {% endwith %}
 
-    <div class="bg-card border border-border rounded-lg shadow-sm p-6">
+    <div class="bg-card border border-border rounded-lg p-6">
 
         <form method="POST" action="{{ url_for('sso.admin_sso') }}" class="space-y-6">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">

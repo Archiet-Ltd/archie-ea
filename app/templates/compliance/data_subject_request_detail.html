@@ -36,7 +36,7 @@
         </div>
     </div>
 
-    <div class="rounded-xl border border-border bg-card overflow-hidden" data-testid="dsr-scope">
+    <div class="rounded-lg border border-border bg-card overflow-hidden" data-testid="dsr-scope">
         <div class="p-4 border-b border-border bg-muted/30">
             <h2 class="text-lg font-semibold">Where to search</h2>
             <p class="text-xs text-muted-foreground mt-1">Each system is listed because a personal-data category's data object is recorded as used by it; each supplier because it is recorded against one of those systems.</p>
@@ -83,7 +83,7 @@
                             {% endfor %}
                         </select>
                         <button type="submit" data-testid="dsr-assign-{{ loop.index }}"
-                            class="inline-flex items-center justify-center rounded-md text-xs font-medium border border-input hover:bg-muted h-8 px-3">
+                            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
                             Assign
                         </button>
                     </form>
@@ -91,7 +91,7 @@
                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         <input type="hidden" name="key" value="{{ item.key }}">
                         <button type="submit" data-testid="dsr-complete-{{ loop.index }}"
-                            class="inline-flex items-center justify-center rounded-md text-xs font-medium bg-primary text-primary-foreground hover:bg-primary/90 h-8 px-3">
+                            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
                             Mark search done
                         </button>
                     </form>
@@ -116,7 +116,7 @@
     </div>
 
     {% if req.canonical_type == 'access' and req.has_platform_account %}
-    <div class="rounded-xl border border-border bg-card overflow-hidden" data-testid="dsr-access">
+    <div class="rounded-lg border border-border bg-card overflow-hidden" data-testid="dsr-access">
         <div class="p-4 border-b border-border bg-muted/30">
             <h2 class="text-lg font-semibold">Data this platform holds</h2>
             <p class="text-xs text-muted-foreground mt-1">Download the subject's profile, AI chat history and uploaded document list.</p>
@@ -128,7 +128,7 @@
             <form method="POST" action="{{ url_for('gdpr_bp.dsr_access', request_id=req.id) }}" class="mt-2">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <button type="submit" data-testid="dsr-access-run"
-                    class="inline-flex items-center justify-center rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 h-9 px-4">
+                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
                     Download the subject's data
                 </button>
             </form>
@@ -137,7 +137,7 @@
     {% endif %}
 
     {% if req.canonical_type == 'erasure' and req.has_platform_account %}
-    <div class="rounded-xl border border-border bg-card overflow-hidden" data-testid="dsr-erasure">
+    <div class="rounded-lg border border-border bg-card overflow-hidden" data-testid="dsr-erasure">
         <div class="p-4 border-b border-border bg-muted/30">
             <h2 class="text-lg font-semibold">Erase data this platform holds</h2>
             <p class="text-xs text-muted-foreground mt-1">Review what will be removed, then run the erasure. It removes the person's name, e-mail address and sign-in credentials, their AI chat history and the documents they uploaded, and signs them out everywhere. It cannot be undone.</p>
@@ -155,7 +155,7 @@
             <form method="POST" action="{{ url_for('gdpr_bp.dsr_erasure_review', request_id=req.id) }}">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <button type="submit" data-testid="dsr-erasure-review"
-                    class="inline-flex items-center justify-center rounded-md text-sm font-medium border border-input hover:bg-muted h-9 px-4">
+                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
                     I have reviewed what will be removed
                 </button>
             </form>
@@ -169,7 +169,7 @@
                 </label>
                 <div>
                     <button type="submit" data-testid="dsr-erasure-run"
-                        class="inline-flex items-center justify-center rounded-md text-sm font-medium bg-destructive text-destructive-foreground hover:bg-destructive/90 h-9 px-4">
+                        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-destructive text-destructive-foreground text-sm font-semibold transition-colors hover:bg-destructive/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
                         Run erasure
                     </button>
                 </div>
@@ -182,7 +182,7 @@
     </div>
     {% endif %}
 
-    <div class="rounded-xl border border-border bg-card overflow-hidden" data-testid="dsr-evidence">
+    <div class="rounded-lg border border-border bg-card overflow-hidden" data-testid="dsr-evidence">
         <div class="p-4 border-b border-border bg-muted/30">
             <h2 class="text-lg font-semibold">Evidence</h2>
             <p class="text-xs text-muted-foreground mt-1">Entries in the organisation's audit trail for this request.</p>

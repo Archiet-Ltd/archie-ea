@@ -66,7 +66,7 @@
     ) }}
     <div class="flex flex-wrap items-center gap-2">
       <button type="button"
-        class="inline-flex items-center gap-2 rounded-md border border-input bg-background px-3 py-2 text-sm font-medium hover:bg-muted"
+        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center"
         @click="detectGaps()"
         :disabled="isDetecting">
         <i data-lucide="scan-search" class="h-4 w-4"></i>
@@ -74,13 +74,13 @@
         <span x-show="isDetecting" x-cloak>Detecting…</span>
       </button>
       <button type="button"
-        class="inline-flex items-center gap-2 rounded-md border border-input bg-background px-3 py-2 text-sm font-medium hover:bg-muted"
+        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center"
         @click="openCreatePlateauModal()">
         <i data-lucide="layers" class="h-4 w-4"></i>
         Add Plateau
       </button>
       <button type="button"
-        class="inline-flex items-center gap-2 rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:opacity-90"
+        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center"
         @click="openCreateGapModal()">
         <i data-lucide="plus" class="h-4 w-4"></i>
         Add Gap
@@ -90,35 +90,35 @@
 
   {# ── Metrics Row ── #}
   <div class="grid grid-cols-2 gap-4 md:grid-cols-6">
-    <div data-slot="card" class="rounded-xl border bg-card shadow-sm p-4">
+    <div data-slot="card" class="rounded-lg border border-border bg-card p-4">
       <p class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Capability Gaps Detected</p>
       <p class="mt-2 text-2xl font-semibold text-foreground" x-text="metrics.total_gaps"></p>
       <p class="mt-1 text-xs text-muted-foreground">Coverage, quality &amp; modernization signals across capabilities</p>
     </div>
-    <div data-slot="card" class="rounded-xl border bg-card shadow-sm p-4">
+    <div data-slot="card" class="rounded-lg border border-border bg-card p-4">
       <p class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Plateaus</p>
       <p class="mt-2 text-2xl font-semibold text-foreground" x-text="metrics.total_plateaus"></p>
     </div>
-    <div data-slot="card" class="rounded-xl border bg-card shadow-sm p-4">
+    <div data-slot="card" class="rounded-lg border border-border bg-card p-4">
       <p class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Work Packages</p>
       <p class="mt-2 text-2xl font-semibold text-foreground" x-text="metrics.total_wps"></p>
     </div>
-    <div data-slot="card" class="rounded-xl border bg-card shadow-sm p-4">
+    <div data-slot="card" class="rounded-lg border border-border bg-card p-4">
       <p class="text-xs font-medium uppercase tracking-wide text-muted-foreground">AI Generated</p>
       <p class="mt-2 text-2xl font-semibold text-foreground" x-text="metrics.ai_generated"></p>
     </div>
-    <div data-slot="card" class="rounded-xl border bg-card shadow-sm p-4">
+    <div data-slot="card" class="rounded-lg border border-border bg-card p-4">
       <p class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Capabilities</p>
       <p class="mt-2 text-2xl font-semibold text-foreground">{{ capability_count }}</p>
     </div>
-    <div data-slot="card" class="rounded-xl border bg-card shadow-sm p-4">
+    <div data-slot="card" class="rounded-lg border border-border bg-card p-4">
       <p class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Domains</p>
       <p class="mt-2 text-2xl font-semibold text-foreground">{{ domain_count }}</p>
     </div>
   </div>
 
   {# ── Plateau Timeline ── #}
-  <div data-slot="card" class="rounded-xl border bg-card shadow-sm">
+  <div data-slot="card" class="rounded-lg border border-border bg-card">
     <div class="flex items-center justify-between border-b px-6 py-4">
       <h2 class="text-base font-semibold text-foreground">Plateaus — Implementation Timeline</h2>
       <span class="text-xs text-muted-foreground">ArchiMate 3.2 Implementation &amp; Migration Layer</span>
@@ -140,7 +140,7 @@
           <p class="text-sm font-medium text-foreground">No plateaus defined</p>
           <p class="mt-1 text-xs text-muted-foreground">Add a plateau to define your implementation timeline phases.</p>
           <button type="button"
-            class="mt-4 inline-flex items-center gap-2 rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:opacity-90"
+            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 mt-4 items-center"
             @click="openCreatePlateauModal()">
             <i data-lucide="plus" class="h-4 w-4"></i>
             Add First Plateau
@@ -175,20 +175,20 @@
   <div id="rdm-gantt-chart"></div>
 
   {# ── Work Packages Table ── #}
-  <div data-slot="card" class="rounded-xl border bg-card shadow-sm">
+  <div data-slot="card" class="rounded-lg border border-border bg-card">
     <div class="flex items-center justify-between border-b px-6 py-4">
       <h2 class="text-base font-semibold text-foreground">Work Packages</h2>
       <div class="flex items-center gap-3">
         <template x-if="selectedGapIds.length > 0">
           <button type="button"
-            class="inline-flex items-center gap-2 rounded-md border border-input bg-background px-3 py-1.5 text-xs font-medium hover:bg-muted"
+            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center"
             @click="openAiGenerateModal()">
             <i data-lucide="sparkles" class="h-3.5 w-3.5"></i>
             AI Generate (<span x-text="selectedGapIds.length"></span> gaps)
           </button>
         </template>
         <button type="button"
-          class="inline-flex items-center gap-2 rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:opacity-90"
+          class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center"
           @click="openCreateWorkPackageModal(null)">
           <i data-lucide="plus" class="h-3.5 w-3.5"></i>
           Add Work Package
@@ -196,7 +196,7 @@
       </div>
     </div>
     <div class="overflow-x-auto">
-      <table class="min-w-full text-sm">
+      <table class="dense-table min-w-full text-sm">
         <thead class="bg-muted/50">
           <tr>
             <th class="w-8 px-4 py-3">
@@ -290,7 +290,7 @@
 
   {# ── Error Banner ── #}
   <template x-if="errorMessage">
-    <div class="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive-emphasis"
+    <div class="rounded-md border border-destructive/40 bg-destructive/10 px-4 py-2 text-sm text-destructive-emphasis"
       x-text="errorMessage"></div>
   </template>
 
@@ -305,7 +305,7 @@
      hidden
      role="dialog" aria-modal="true" aria-labelledby="rdm-gap-modal-title"
      class="fixed inset-0 z-50 items-center justify-center bg-black/50 p-4">
-  <div class="w-full max-w-lg rounded-xl border bg-card shadow-xl flex flex-col max-h-[90vh]"
+  <div class="w-full max-w-lg rounded-lg border border-border bg-card flex flex-col max-h-[90vh]"
        x-data="rdmGapModalForm()"
        x-init="initFromGlobal()">
     <div class="flex shrink-0 items-center justify-between border-b px-6 py-4">
@@ -369,7 +369,7 @@
      hidden
      role="dialog" aria-modal="true" aria-labelledby="rdm-plateau-modal-title"
      class="fixed inset-0 z-50 items-center justify-center bg-black/50 p-4">
-  <div class="w-full max-w-md rounded-xl border bg-card shadow-xl flex flex-col max-h-[90vh]"
+  <div class="w-full max-w-md rounded-lg border border-border bg-card flex flex-col max-h-[90vh]"
        x-data="rdmPlateauModalForm()"
        x-init="initFromGlobal()">
     <div class="flex shrink-0 items-center justify-between border-b px-6 py-4">
@@ -422,7 +422,7 @@
      hidden
      role="dialog" aria-modal="true" aria-labelledby="rdm-wp-modal-title"
      class="fixed inset-0 z-50 items-center justify-center bg-black/50 p-4">
-  <div class="w-full max-w-2xl rounded-xl border bg-card shadow-xl flex flex-col max-h-[90vh]"
+  <div class="w-full max-w-2xl rounded-lg border border-border bg-card flex flex-col max-h-[90vh]"
        x-data="rdmWpModalForm()"
        x-init="initFromGlobal()">
     <div class="flex shrink-0 items-center justify-between border-b px-6 py-4">
@@ -480,7 +480,7 @@
               <span x-show="form.gap_id" x-cloak>Linked: <span x-text="gapName"></span></span>
               <button type="button" x-show="form.gap_id" x-cloak class="ml-2 underline" @click="form.gap_id = null; gapName = ''; gapQuery = ''">Clear</button>
             </p>
-            <ul x-show="gapResults.length > 0" x-cloak class="absolute z-20 mt-1 w-full rounded-md border border-border bg-background shadow-md">
+            <ul x-show="gapResults.length > 0" x-cloak class="absolute z-20 mt-1 w-full rounded-md border border-border bg-background">
               <template x-for="g in gapResults" :key="g.id">
                 <li><button type="button" class="block w-full px-3 py-2 text-left text-sm hover:bg-muted"
                   @click="form.gap_id = g.id; gapName = g.name; gapQuery = ''; gapResults = []" x-text="g.name"></button></li>
@@ -524,7 +524,7 @@
      hidden
      role="dialog" aria-modal="true" aria-labelledby="rdm-ai-modal-title"
      class="fixed inset-0 z-50 items-center justify-center bg-black/50 p-4">
-  <div class="w-full max-w-2xl rounded-xl border bg-card shadow-xl flex flex-col max-h-[90vh]"
+  <div class="w-full max-w-2xl rounded-lg border border-border bg-card flex flex-col max-h-[90vh]"
        x-data="rdmAiModalForm()"
        x-init="initFromGlobal()">
     <div class="flex shrink-0 items-center justify-between border-b px-6 py-4">
@@ -1231,7 +1231,7 @@
 
       if (!workPackages.length) {
         document.getElementById('rdm-gantt-chart').innerHTML = `
-          <div class="rounded-xl border bg-card shadow-sm">
+          <div class="rounded-lg border border-border bg-card">
             <div class="flex items-center justify-between border-b px-6 py-4">
               <h2 class="text-base font-semibold text-foreground">Work Package Timeline</h2>
             </div>
@@ -1283,7 +1283,7 @@
       const chartEl = document.getElementById('rdm-gantt-chart');
       if (chartEl) {
         chartEl.innerHTML = `
-          <div class="rounded-xl border bg-card shadow-sm">
+          <div class="rounded-lg border border-border bg-card">
             <div class="flex flex-col items-center justify-center py-10 text-center">
               <i data-lucide="alert-circle" class="mb-3 h-10 w-10 text-destructive/60"></i>
               <p class="text-sm font-medium text-destructive-emphasis">Could not load the timeline.</p>
