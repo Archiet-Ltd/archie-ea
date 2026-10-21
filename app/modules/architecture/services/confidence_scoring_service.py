@@ -13,6 +13,7 @@ import logging
 from dataclasses import dataclass
 from enum import Enum
 from typing import Dict, List, Optional
+from app.models.archimate_element_types import StandardTypeTable
 
 logger = logging.getLogger(__name__)
 
@@ -212,14 +213,14 @@ class ConfidenceScoringService:
         score = 0.7  # Base confidence in type assignment
 
         # Check if type matches layer
-        type_to_layer = {
+        type_to_layer = StandardTypeTable({
             "ApplicationComponent": "application",
             "ApplicationInterface": "application",
             "BusinessActor": "business",
             "BusinessProcess": "business",
             "TechnologyService": "technology",
             "Node": "technology",
-        }
+        })
 
         expected_layer = type_to_layer.get(element_type, "")
         if expected_layer and layer.lower() == expected_layer.lower():
