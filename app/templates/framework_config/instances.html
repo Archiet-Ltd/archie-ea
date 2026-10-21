@@ -11,8 +11,8 @@
         description='Active configuration instances across the organisation'
     ) }}
 
-    <div data-slot="card" class="rounded-xl border bg-card shadow-sm">
-        <table class="w-full text-sm">
+    <div data-slot="card" class="rounded-lg border border-border bg-card">
+        <table class="dense-table w-full text-sm">
             <thead>
                 <tr class="border-b border-border">
                     <th class="px-6 py-3 text-left font-medium text-muted-foreground">Instance</th>
@@ -53,9 +53,9 @@
                         {% if s == 'operational' %}
                         <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-success/10 text-success-emphasis border border-success/30">Operational</span>
                         {% elif s == 'implementing' %}
-                        <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-primary border border-primary/30">Implementing</span>
+                        <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-info-emphasis border border-primary/30">Implementing</span>
                         {% elif s == 'optimizing' %}
-                        <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-primary border border-primary/30">Optimizing</span>
+                        <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-info-emphasis border border-primary/30">Optimizing</span>
                         {% elif s == 'retiring' %}
                         <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-warning/10 text-warning-emphasis border border-warning/30">Retiring</span>
                         {% else %}

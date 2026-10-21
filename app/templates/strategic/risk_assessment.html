@@ -63,7 +63,7 @@
             {% endcall %}
             {% call card_content() %}
                 <div class="overflow-x-auto">
-                    <table class="w-full">
+                    <table class="dense-table w-full">
                         <thead>
                             <tr class="border-b bg-muted/50">
                                 <th class="text-left p-3 text-sm font-medium text-muted-foreground">Capability</th>
@@ -120,7 +120,7 @@
                                 <td class="p-3">
                                     <button type="button"
                                         @click="$dispatch('open-risk-detail', {{ risk.capability_id }})"
-                                        class="inline-flex items-center gap-1 px-3 py-1.5 bg-destructive hover:bg-destructive/90 text-primary-foreground text-xs font-medium rounded-md transition-colors"
+                                        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-destructive text-destructive-foreground text-sm font-semibold transition-colors hover:bg-destructive/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center"
                                      aria-label="View risk details">
                                         <i data-lucide="eye" class="h-3 w-3" aria-hidden="true"></i>
                                         View Details

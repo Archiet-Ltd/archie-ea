@@ -44,7 +44,7 @@
                         <input type="file"
                             accept=".csv,.xlsx,.xls,.xml,.archimate,.pdf,.docx,.doc,.pptx,.ppt,.txt,.md,.rtf"
                             @change="onFileSelected($event)"
-                            class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" aria-label="File">
+                            class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" aria-label="File">
                         <p x-show="detectedMode" x-cloak class="text-xs text-muted-foreground">
                             Detected: <span class="font-medium" x-text="detectedMode"></span>
                         </p>
@@ -52,7 +52,7 @@
                     <div class="space-y-2" x-show="detectedMode === 'Structured Data (CSV/Excel)'" x-cloak>
                         <label class="block text-sm font-medium">Default Element Type (if no 'type' column)</label>
                         <select x-model="defaultType"
-                            class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" aria-label="Default Element Type (if no 'type' column)">
+                            class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" aria-label="Default Element Type (if no 'type' column)">
                             <option value="">-- Auto-detect from type column --</option>
                             <optgroup label="Application Layer">
                                 <option value="ApplicationComponent">ApplicationComponent</option>
@@ -100,7 +100,7 @@
                     <div class="space-y-2" x-show="detectedMode === 'ArchiMate Exchange (XML)'" x-cloak>
                         <label class="block text-sm font-medium">Import Strategy</label>
                         <select x-model="importStrategy"
-                            class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" aria-label="Import Strategy">
+                            class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" aria-label="Import Strategy">
                             <option value="skip_duplicates">Skip duplicates (safest)</option>
                             <option value="update_existing">Update existing descriptions</option>
                             <option value="create_all">Create all (allows duplicates)</option>
@@ -110,7 +110,7 @@
 
                 <div class="flex gap-3">
                     <button type="button" @click="uploadFile()" :disabled="!file || uploading"
-                        class="inline-flex items-center justify-center rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2 disabled:opacity-50">
+                        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
                         <span x-show="!uploading" x-cloak>
                             <span x-text="detectedMode === 'Document (AI Analysis)' ? 'Analyse & Extract Elements' : 'Upload & Create Elements'"></span>
                         </span>
@@ -129,7 +129,7 @@
 
                 {# Results #}
                 <div x-show="result" x-cloak class="space-y-4">
-                    <div class="rounded-md bg-success/10 border border-success/30 px-4 py-3">
+                    <div class="rounded-md bg-success/10 border border-success/40 px-4 py-2">
                         <p class="text-sm font-medium text-success-emphasis">
                             <span x-text="result?.created_count || 0"></span> elements created,
                             <span x-text="result?.skipped_count || 0"></span> duplicates skipped,
@@ -141,7 +141,7 @@
                     <div x-show="result?.element_ids?.length > 0" x-cloak class="flex gap-3">
                         <button type="button" @click="createDiagram()"
                             :disabled="creatingDiagram"
-                            class="inline-flex items-center justify-center rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2 disabled:opacity-50">
+                            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
                             <span x-show="!creatingDiagram" x-cloak>
                                 <i data-lucide="layout" class="h-4 w-4 mr-2 inline"></i>
                                 Generate Diagram in Composer
@@ -149,7 +149,7 @@
                             <span x-show="creatingDiagram" x-cloak>Creating diagram...</span>
                         </button>
                         <a href="/archimate/traceability"
-                            class="inline-flex items-center justify-center rounded-md text-sm font-medium border border-input bg-background hover:bg-accent h-10 px-4 py-2">
+                            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
                             View in Traceability
                         </a>
                     </div>
@@ -158,7 +158,7 @@
                     <div x-show="result?.created?.length > 0" x-cloak>
                         <h3 class="text-sm font-medium mb-2">Created Elements</h3>
                         <div class="border rounded-md overflow-hidden max-h-96 overflow-y-auto">
-                            <table class="w-full text-sm">
+                            <table class="dense-table w-full text-sm">
                                 <thead class="bg-muted/50 sticky top-0">
                                     <tr>
                                         <th class="px-3 py-2 text-left font-medium">Name</th>
@@ -171,7 +171,7 @@
                                         <tr class="border-t">
                                             <td class="px-3 py-2" x-text="elem.name"></td>
                                             <td class="px-3 py-2">
-                                                <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-primary border border-primary/30" x-text="elem.type"></span>
+                                                <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-info-emphasis border border-primary/30" x-text="elem.type"></span>
                                             </td>
                                             <td class="px-3 py-2" x-text="elem.layer"></td>
                                         </tr>

@@ -21,17 +21,17 @@
             <form method="POST" action="{{ url_for('unified_applications.vendors_create') }}" class="space-y-6">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
 
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="grid grid-cols-1 gap-6">
                     <div class="space-y-2">
                         {% call label(for='name', required=true) %}Vendor Name{% endcall %}
                         <input type="text" id="name" name="name" required
-                               class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                               class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                                placeholder="Enter vendor name" aria-label="Enter vendor name">
                     </div>
                     <div class="space-y-2">
                         {% call label(for='vendor_type') %}Vendor Type{% endcall %}
                         <select id="vendor_type" name="vendor_type"
-                                class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2" aria-label="Select Type">
+                                class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2" aria-label="Select Type">
                             <option value="">Select Type</option>
                             <option value="software_vendor">Software Vendor</option>
                             <option value="saas_platform">SaaS Platform</option>
@@ -50,24 +50,24 @@
                               placeholder="Describe the vendor and their offerings" aria-label="Describe the vendor and their offerings"></textarea>
                 </div>
 
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="grid grid-cols-1 gap-6">
                     <div class="space-y-2">
                         {% call label(for='website') %}Website{% endcall %}
                         <input type="url" id="website" name="website"
-                               class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                               class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                                placeholder="https://vendor.com" aria-label="https://vendor.com">
                     </div>
                     <div class="space-y-2">
                         {% call label(for='headquarters_location') %}Headquarters Location{% endcall %}
                         <input type="text" id="headquarters_location" name="headquarters_location"
-                               class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                               class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                                placeholder="e.g. San Francisco, CA" aria-label="e.g. San Francisco, CA">
                     </div>
                 </div>
 
                 <div class="flex justify-between pt-4">
                     <a href="{{ url_for('application_mgmt.vendors_dashboard') }}"
-                       class="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-10 px-4 py-2">
+                       class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center whitespace-nowrap">
                         Cancel
                     </a>
                     {{ button('Create Vendor', variant='default', type='submit', icon='plus') }}

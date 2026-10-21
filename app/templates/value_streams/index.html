@@ -32,7 +32,7 @@
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {% for vs in streams %}
             <a href="{{ url_for('value_stream.detail', value_stream_id=vs.id) }}"
-               class="block rounded-xl border border-input bg-background hover:border-primary/50 hover:shadow-sm transition-all duration-200 p-5">
+               class="block rounded-xl border border-input bg-background hover:border-primary/50 transition-all duration-200 p-5">
                 <div class="flex items-start justify-between mb-3">
                     <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
                         <i data-lucide="workflow" class="h-5 w-5 text-primary" aria-hidden="true"></i>
@@ -78,26 +78,26 @@
     <form method="POST" action="{{ url_for('value_stream.create') }}" class="space-y-4">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div>
-            <label for="vs-name" class="text-xs font-medium text-muted-foreground uppercase tracking-wide">Name</label>
+            <label for="vs-name" class="block text-sm font-medium text-muted-foreground mb-1">Name</label>
             <input type="text" id="vs-name" name="name" required
-                   class="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                   class="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                    placeholder="e.g. Order to Cash">
         </div>
-        <div class="grid grid-cols-2 gap-4">
+        <div class="grid grid-cols-1 gap-4">
             <div>
-                <label for="vs-code" class="text-xs font-medium text-muted-foreground uppercase tracking-wide">Code</label>
+                <label for="vs-code" class="block text-sm font-medium text-muted-foreground mb-1">Code</label>
                 <input type="text" id="vs-code" name="code"
-                       class="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm font-mono shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                       class="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm font-mono focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                        placeholder="OTC">
             </div>
             <div>
-                <label for="vs-type" class="text-xs font-medium text-muted-foreground uppercase tracking-wide">Type</label>
+                <label for="vs-type" class="block text-sm font-medium text-muted-foreground mb-1">Type</label>
                 {# DEF-056, Capgemini dry-run: no placeholder option meant the
                    browser pre-selected "Customer Facing" (the first option) —
                    a value stream saved without the user ever touching this
                    field, silently, as if it had been chosen deliberately. #}
                 <select id="vs-type" name="value_stream_type"
-                        class="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+                        class="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
                     <option value="">Select type…</option>
                     <option value="customer_facing">Customer Facing</option>
                     <option value="internal">Internal</option>
@@ -106,15 +106,15 @@
             </div>
         </div>
         <div>
-            <label for="vs-description" class="text-xs font-medium text-muted-foreground uppercase tracking-wide">Description</label>
+            <label for="vs-description" class="block text-sm font-medium text-muted-foreground mb-1">Description</label>
             <textarea id="vs-description" name="description" rows="3"
-                      class="mt-1 flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"></textarea>
+                      class="mt-1 flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"></textarea>
         </div>
-        <div class="grid grid-cols-2 gap-4">
+        <div class="grid grid-cols-1 gap-4">
             <div>
-                <label for="vs-importance" class="text-xs font-medium text-muted-foreground uppercase tracking-wide">Strategic Importance</label>
+                <label for="vs-importance" class="block text-sm font-medium text-muted-foreground mb-1">Strategic Importance</label>
                 <select id="vs-importance" name="strategic_importance"
-                        class="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+                        class="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
                     <option value="">—</option>
                     <option value="critical">Critical</option>
                     <option value="high">High</option>
@@ -123,18 +123,18 @@
                 </select>
             </div>
             <div>
-                <label for="vs-owner" class="text-xs font-medium text-muted-foreground uppercase tracking-wide">Business Owner</label>
+                <label for="vs-owner" class="block text-sm font-medium text-muted-foreground mb-1">Business Owner</label>
                 <input type="text" id="vs-owner" name="business_owner"
-                       class="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+                       class="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
             </div>
         </div>
         <div class="flex justify-end gap-2 pt-2">
             <button type="button" data-modal-close="vs-create-modal"
-                    class="inline-flex items-center justify-center rounded-md text-sm font-medium bg-secondary text-secondary-foreground hover:bg-secondary/80 h-9 px-4 py-2">
+                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4">
                 Cancel
             </button>
             <button type="submit"
-                    class="inline-flex items-center justify-center rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 h-9 px-4 py-2">
+                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
                 Create
             </button>
         </div>

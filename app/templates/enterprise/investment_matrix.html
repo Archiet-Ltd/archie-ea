@@ -27,11 +27,11 @@
     ) }}
 
     <!-- Investment Matrix Visualization -->
-    <div data-slot="card" class="rounded-xl border bg-card p-6">
+    <div data-slot="card" class="rounded-lg border border-border bg-card p-6">
         <h3 class="font-semibold mb-4">Investment Priority Matrix</h3>
         <div class="grid grid-cols-2 gap-4 h-96">
             <!-- High Value / High Risk -->
-            <div class="rounded-lg bg-warning/10 border border-warning/20 p-4">
+            <div class="rounded-md bg-warning/10 border border-warning/40 px-3 py-2">
                 <div class="text-sm font-medium text-warning-emphasis mb-2">Transform (High Value / High Risk)</div>
                 <div class="space-y-2">
                     {% for cap in capabilities|default([]) if cap.strategic_importance == 'critical' %}
@@ -40,7 +40,7 @@
                 </div>
             </div>
             <!-- High Value / Low Risk -->
-            <div class="rounded-lg bg-success/10 border border-success/20 p-4">
+            <div class="rounded-md bg-success/10 border border-success/40 px-3 py-2">
                 <div class="text-sm font-medium text-success-emphasis mb-2">Invest (High Value / Low Risk)</div>
                 <div class="space-y-2">
                     {% for cap in capabilities|default([]) if cap.strategic_importance == 'high' %}
@@ -49,7 +49,7 @@
                 </div>
             </div>
             <!-- Low Value / High Risk -->
-            <div class="rounded-lg bg-destructive/10 border border-destructive/20 p-4">
+            <div class="rounded-md bg-destructive/10 border border-destructive/40 px-3 py-2">
                 <div class="text-sm font-medium text-destructive-emphasis mb-2">Divest (Low Value / High Risk)</div>
                 <div class="space-y-2">
                     {% for cap in capabilities|default([]) if cap.strategic_importance == 'low' %}
@@ -58,7 +58,7 @@
                 </div>
             </div>
             <!-- Low Value / Low Risk -->
-            <div class="rounded-lg bg-primary/10 border border-primary/20 p-4">
+            <div class="rounded-md bg-primary/10 border border-primary/40 px-3 py-2">
                 <div class="text-sm font-medium text-primary mb-2">Maintain (Low Value / Low Risk)</div>
                 <div class="space-y-2">
                     {% for cap in capabilities|default([]) if cap.strategic_importance == 'medium' %}
@@ -70,7 +70,7 @@
     </div>
 
     <!-- 2x2 Investment Bubble Chart (Business Architect visual 3 — TIME quadrant) -->
-    <div data-slot="card" class="rounded-xl border bg-card p-6">
+    <div data-slot="card" class="rounded-lg border border-border bg-card p-6">
         <div class="flex items-center justify-between flex-wrap gap-3 mb-4">
             <div>
                 <h3 class="font-semibold">Investment Bubble — TIME Quadrant</h3>
@@ -104,11 +104,11 @@
     </div>
 
     <!-- Capabilities List -->
-    <div data-slot="card" class="rounded-xl border bg-card">
+    <div data-slot="card" class="rounded-lg border border-border bg-card">
         <div class="p-6">
             <h3 class="font-semibold mb-4">All Capabilities</h3>
             <div class="overflow-x-auto">
-                <table class="w-full">
+                <table class="dense-table w-full">
                     <thead>
                         <tr class="border-b">
                             <th class="text-left p-3 font-medium">Capability</th>

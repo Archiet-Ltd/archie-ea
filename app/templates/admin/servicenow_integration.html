@@ -25,7 +25,7 @@
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <!-- Status Panel -->
         <div class="lg:col-span-1">
-            <div data-slot="card" class="rounded-xl border-2 border-input bg-card">
+            <div data-slot="card" class="rounded-lg border border-input bg-card">
                 <div class="p-4 sm:p-6 border-b">
                     <h3 class="text-lg font-semibold flex items-center gap-2">
                         <i data-lucide="server" class="h-5 w-5 text-primary"></i>
@@ -104,7 +104,7 @@
             </div>
 
             <!-- Info Card -->
-            <div data-slot="card" class="rounded-xl border-2 border-input bg-card mt-6">
+            <div data-slot="card" class="rounded-lg border border-input bg-card mt-6">
                 <div class="p-4 sm:p-6">
                     <h4 class="text-sm font-semibold mb-3 flex items-center gap-2">
                         <i data-lucide="info" class="h-4 w-4 text-primary"></i>
@@ -138,7 +138,7 @@
 
         <!-- Settings Form -->
         <div class="lg:col-span-2">
-            <div data-slot="card" class="rounded-xl border-2 border-input bg-card">
+            <div data-slot="card" class="rounded-lg border border-input bg-card">
                 <div class="p-4 sm:p-6 border-b">
                     <h3 class="text-lg font-semibold">Configuration</h3>
                 </div>
@@ -148,7 +148,7 @@
 
                         <!-- Instance URL -->
                         <div>
-                            <label for="{{ form.instance_url.id }}" class="block text-sm font-medium mb-2">
+                            <label for="{{ form.instance_url.id }}" class="block text-sm font-medium text-muted-foreground mb-1">
                                 {{ form.instance_url.label.text }}
                                 <span class="text-destructive-emphasis">*</span>
                             </label>
@@ -163,7 +163,7 @@
 
                         <!-- Username -->
                         <div>
-                            <label for="{{ form.username.id }}" class="block text-sm font-medium mb-2">
+                            <label for="{{ form.username.id }}" class="block text-sm font-medium text-muted-foreground mb-1">
                                 {{ form.username.label.text }}
                                 <span class="text-destructive-emphasis">*</span>
                             </label>
@@ -178,7 +178,7 @@
 
                         <!-- Password / API Token -->
                         <div>
-                            <label for="{{ form.password.id }}" class="block text-sm font-medium mb-2">
+                            <label for="{{ form.password.id }}" class="block text-sm font-medium text-muted-foreground mb-1">
                                 {{ form.password.label.text }}
                                 {% if snow_config %}<span class="text-muted-foreground text-xs">(optional - leave blank to keep existing)</span>{% else %}<span class="text-destructive-emphasis">*</span>{% endif %}
                             </label>
@@ -191,10 +191,10 @@
                             {% endif %}
                         </div>
 
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div class="grid grid-cols-1 gap-6">
                             <!-- Batch Size -->
                             <div>
-                                <label for="{{ form.batch_size.id }}" class="block text-sm font-medium mb-2">
+                                <label for="{{ form.batch_size.id }}" class="block text-sm font-medium text-muted-foreground mb-1">
                                     {{ form.batch_size.label.text }}
                                 </label>
                                 {{ form.batch_size(class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50") }}
@@ -207,7 +207,7 @@
                             <div class="flex items-center justify-end">
                                 <div class="flex items-center space-x-2">
                                     {{ form.enabled(class="h-4 w-4 rounded border-input text-primary focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background") }}
-                                    <label for="{{ form.enabled.id }}" class="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                                    <label for="{{ form.enabled.id }}" class="block text-sm font-medium text-muted-foreground mb-1 leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
                                         {{ form.enabled.label.text }}
                                     </label>
                                 </div>
@@ -216,7 +216,7 @@
 
                         <!-- Query Filter -->
                         <div>
-                            <label for="{{ form.query_filter.id }}" class="block text-sm font-medium mb-2">
+                            <label for="{{ form.query_filter.id }}" class="block text-sm font-medium text-muted-foreground mb-1">
                                 {{ form.query_filter.label.text }}
                             </label>
                             {{ form.query_filter(class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50", placeholder="operational_status=1^install_status=1") }}
@@ -231,11 +231,11 @@
                         <!-- Submit Button -->
                         <div class="flex items-center justify-end gap-3 pt-4 border-t">
                             <a href="{{ url_for('admin.index') }}" 
-                               class="inline-flex items-center justify-center gap-2 rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-10 px-4 py-2">
+                               class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
                                 Cancel
                             </a>
                             <button type="submit"
-                                    class="inline-flex items-center justify-center gap-2 rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2">
+                                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
                                 <i data-lucide="save" class="h-4 w-4"></i>
                                 Save Configuration
                             </button>

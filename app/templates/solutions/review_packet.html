@@ -17,7 +17,7 @@
     ) }}
 
     {% if not packet.success %}
-    <div class="border border-destructive/30 bg-destructive/10 text-destructive-emphasis rounded-xl p-4 text-sm mt-4">{{ packet.error }}</div>
+    <div class="border border-destructive/40 bg-destructive/10 text-destructive-emphasis rounded-md px-3 py-2 text-sm mt-4">{{ packet.error }}</div>
     {% else %}
 
     {# Verdict banner #}
@@ -42,7 +42,7 @@
 
     <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
         {# Conformance #}
-        <div class="border border-border rounded-xl bg-card p-5">
+        <div class="border border-border rounded-lg bg-card p-5">
             <div class="flex items-center justify-between mb-3">
                 <h3 class="text-sm font-semibold text-foreground">Technical Conformance</h3>
                 <a href="/solutions/{{ solution.id }}/conformance" class="text-2xs text-primary hover:underline">Full review →</a>
@@ -71,7 +71,7 @@
         </div>
 
         {# Decision #}
-        <div class="border border-border rounded-xl bg-card p-5">
+        <div class="border border-border rounded-lg bg-card p-5">
             <div class="flex items-center justify-between mb-3">
                 <h3 class="text-sm font-semibold text-foreground">Recommended Decision</h3>
                 <a href="/solutions/{{ solution.id }}/options-advisor" class="text-2xs text-primary hover:underline">Options & ADR →</a>
@@ -90,7 +90,7 @@
     </div>
 
     {# Readiness checklist #}
-    <div class="border border-border rounded-xl bg-card p-5">
+    <div class="border border-border rounded-lg bg-card p-5">
         <h3 class="text-sm font-semibold text-foreground mb-3">Board-readiness checklist</h3>
         <ul class="space-y-2">
             {% for item in packet.readiness %}
