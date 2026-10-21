@@ -1079,8 +1079,13 @@ class ArchiMateImportService:
                 # already flushed) down with it.
                 with db.session.begin_nested():
                     # Identity is (source, target, modelled type), checked
-                    # before softening: a softened row is told apart from a
-                    # modelled Association by its "As modelled: <Type>." note.
+                    # before softening. The modelled type is read the same way
+                    # on both sides, from the "As modelled: <Type>." note in
+                    # the description that is (or would be) stored, so a
+                    # relationship whose own documentation already carries the
+                    # note matches itself on a second import, and a plain
+                    # Association stays distinct from a softened Serving.
+                    incoming_note = _modelled_note_type(rel.get("description"))
                     existing_rel = None
                     for cand in ArchiMateRelationship.query.filter(
                         ArchiMateRelationship.source_id == source_db_id,
@@ -1088,12 +1093,7 @@ class ArchiMateImportService:
                         ArchiMateRelationship.type == rel["type"],
                         *self._in_organization(ArchiMateRelationship, org_id),
                     ).all():
-                        cand_note = _modelled_note_type(cand.description)
-                        if rel.get("softened"):
-                            if cand_note == rel["modelled_type"]:
-                                existing_rel = cand
-                                break
-                        elif cand_note is None:
+                        if _modelled_note_type(cand.description) == incoming_note:
                             existing_rel = cand
                             break
                     if existing_rel is not None:
