@@ -75,11 +75,13 @@
     <div class="flex flex-wrap items-center gap-2" data-testid="page-actions">
       {# ARCH-105: grouped primary / data / AI-assisted, with tooltips explaining each
          action in plain business language and a divider between groups. #}
+      {% if can('create', 'application') %}
       <button type="button" data-testid="btn-add-application" data-modal-open="modal-create"
         title="Register a new application in the portfolio"
         class="inline-flex h-9 items-center gap-1.5 rounded-md bg-primary text-primary-foreground px-4 text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2" aria-label="Add application">
         <i data-lucide="plus" class="h-4 w-4" aria-hidden="true"></i>Add Application
       </button>
+      {% endif %}
       <div class="hidden sm:block h-6 border-l border-input" aria-hidden="true"></div>
       <button type="button" data-testid="btn-import" data-modal-open="application-import-modal"
         title="Import applications from a spreadsheet or the Abacus feed"
@@ -336,7 +338,7 @@
           class="h-8 px-3 rounded-md border border-input bg-background text-xs font-medium hover:bg-accent transition-colors inline-flex items-center gap-1.5" aria-label="Add tag">
           <i data-lucide="tag" class="h-3.5 w-3.5" aria-hidden="true"></i>Tag
         </button>
-        {% if current_user.is_admin() or current_user.role_archetype == 'architect' %}
+        {% if can('bulk_delete', 'application') %}
         <button type="button" data-testid="bulk-btn-delete" @click="confirmBulkDelete()"
           class="h-8 px-3 rounded-md border border-destructive/30 bg-destructive/5 text-destructive-emphasis text-xs font-medium hover:bg-destructive/10 transition-colors inline-flex items-center gap-1.5" aria-label="Delete">
           <i data-lucide="trash-2" class="h-3.5 w-3.5" aria-hidden="true"></i>Delete
@@ -472,9 +474,11 @@
                 <a href="{{ url_for('unified_applications.application_fact_sheet', id=app.id) }}"
                   data-testid="btn-factsheet-{{ app.id }}" title="Fact sheet — single source of truth"
                   class="inline-flex h-8 items-center justify-center rounded-md px-2.5 text-13 font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-info">Fact sheet</a>
+                {% if can('edit', 'application') %}
                 <a href="{{ url_for('unified_applications.application_edit', id=app.id) }}"
                   data-testid="btn-edit-{{ app.id }}"
                   class="inline-flex h-8 items-center justify-center rounded-md px-2.5 text-13 font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-info">Edit</a>
+                {% endif %}
                 <div class="relative" x-data="{ mapOpen: false }"
                   data-app-map-id="{{ app.id }}"
                   data-app-map-name="{{ app.name | e }}">
@@ -505,7 +509,7 @@
                     </button>
                   </div>
                 </div>
-                {% if current_user.is_admin() or current_user.role_archetype == 'architect' %}
+                {% if can('delete', 'application') %}
                 <form method="POST" action="{{ url_for('unified_applications.application_delete', id=app.id) }}"
                   @submit.prevent='Platform.modal.confirmSubmit($event, "Delete " + {{ app.name | tojson }} + "? This cannot be undone.")'>
                   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -614,11 +618,13 @@
               class="inline-flex items-center gap-1 h-8 px-2.5 rounded-md text-xs font-medium hover:bg-accent transition-colors">
               <i data-lucide="file-text" class="h-3.5 w-3.5" aria-hidden="true"></i>Fact sheet
             </a>
+            {% if can('edit', 'application') %}
             <a href="{{ url_for('unified_applications.application_edit', id=app.id) }}"
               data-testid="btn-edit-mobile-{{ app.id }}"
               class="inline-flex items-center gap-1 h-8 px-2.5 rounded-md text-xs font-medium hover:bg-accent transition-colors">
               <i data-lucide="pencil" class="h-3.5 w-3.5" aria-hidden="true"></i>Edit
             </a>
+            {% endif %}
             <div class="relative" x-data="{ mapOpen: false }"
               data-app-map-id="{{ app.id }}"
               data-app-map-name="{{ app.name | e }}">
@@ -650,7 +656,7 @@
                 </button>
               </div>
             </div>
-            {% if current_user.is_admin() or current_user.role_archetype == 'architect' %}
+            {% if can('delete', 'application') %}
             <form method="POST" action="{{ url_for('unified_applications.application_delete', id=app.id) }}" class="ml-auto"
               @submit.prevent='Platform.modal.confirmSubmit($event, "Delete " + {{ app.name | tojson }} + "? This cannot be undone.")'>
               <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">

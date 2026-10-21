@@ -391,6 +391,23 @@ class ArchiMateElementTypes:
     # =========================================================================
     APPLICATION_ELEMENTS = {
         # Active Structure Elements
+        # Entelim extension of ArchiMate 3.2 (ADR-0014): a specialisation of
+        # ApplicationComponent. Keeps every parent relationship rule (derived in the
+        # matrix module) and is exchanged as an ApplicationComponent.
+        "Application": ElementTypeDefinition(
+            name="Application",
+            layer="application",
+            aspect="active",
+            description=(
+                "A system, app, platform or product-level software offering that the "
+                "organisation lists, owns, costs and retires as one unit. It is "
+                "composed of application components."
+            ),
+            notation_symbol="Application component symbol, named <<Application>>",
+            # Keywords move from ApplicationComponent in the task that switches the type on.
+            example_keywords=[],
+            parent_type="ApplicationComponent",
+        ),
         "ApplicationComponent": ElementTypeDefinition(
             name="ApplicationComponent",
             layer="application",
@@ -1874,6 +1891,7 @@ PLAIN_LANGUAGE_NAMES: dict[str, str] = {
     "Representation": "Representation",
     "Product": "Product",
     # Application layer
+    "Application": "Application",
     "ApplicationComponent": "Application",
     "ApplicationCollaboration": "Application collaboration",
     "ApplicationInterface": "Application interface",
@@ -1964,6 +1982,26 @@ def plain_layer_name(layer: str | None) -> str:
     if pascal.lower() in PLAIN_LAYER_NAMES:
         return PLAIN_LAYER_NAMES[pascal.lower()]
     return layer
+
+
+# =============================================================================
+# Specialisations (ADR-0014)
+# =============================================================================
+# The only place a specialisation is resolved to its parent. Callers that mean
+# "the standard ArchiMate type" call base_type; callers that mean "an application
+# of either kind" call is_application_kind. Nothing else compares to a parent.
+
+SPECIALIZATIONS: Dict[str, str] = {"Application": "ApplicationComponent"}
+
+
+def base_type(element_type: Optional[str]) -> Optional[str]:
+    """The standard ArchiMate type of *element_type* (itself unless a specialisation)."""
+    return SPECIALIZATIONS.get(element_type, element_type)
+
+
+def is_application_kind(element_type: Optional[str]) -> bool:
+    """True for Application and for ApplicationComponent."""
+    return base_type(element_type) == "ApplicationComponent"
 
 
 # =============================================================================

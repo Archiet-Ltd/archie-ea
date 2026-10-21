@@ -22,6 +22,7 @@ from flask import Blueprint, Response, current_app, flash, jsonify, redirect, re
 from flask_login import current_user, login_required
 
 from app import db
+from app.core.auth.decorators import require_permission
 from app.utils.pagination import safe_int_arg
 # ArchiMateHealthService import removed — architecture_health route deleted
 
@@ -300,6 +301,7 @@ def _oef_wants_json():
 
 @architect_ui_bp.route("/architecture/import/oef", methods=["GET", "POST"])
 @login_required
+@require_permission("create", "relationship")
 def import_oef():
     """The model-import screen, over the one OEF import engine.
 
@@ -339,8 +341,16 @@ def import_oef():
             "No file uploaded. POST multipart/form-data with a field named 'oef_file'.", 400
         )
 
+    # The uploaded file name is the origin recorded on each row
+    source_label = None
+    for field in ("oef_file", "file"):
+        uploaded = request.files.get(field) if request.files else None
+        if uploaded is not None and uploaded.filename:
+            source_label = uploaded.filename
+            break
+
     try:
-        result = ArchiMateImportService().import_xml(content, strategy=strategy)
+        result = ArchiMateImportService().import_xml(content, strategy=strategy, source_label=source_label)
     except ImportRequestError as exc:
         return _refuse(str(exc), exc.status_code)
 
@@ -357,6 +367,7 @@ def import_oef():
 
 @architect_ui_bp.route("/architecture/import/oef/preview", methods=["POST"])
 @login_required
+@require_permission("create", "relationship")
 def import_oef_preview():
     """What an import of this document would do, writing nothing (JSON).
 

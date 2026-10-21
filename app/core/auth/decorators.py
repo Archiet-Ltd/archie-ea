@@ -178,6 +178,37 @@ def require_roles(*allowed_roles):
     return decorator
 
 
+def require_permission(action, object_type):
+    """Require the permission matrix to allow ``action`` on ``object_type``.
+
+    Anonymous callers get 401 and signed-in callers the matrix refuses get 403,
+    the same responses ``require_roles`` gives. The answer is the one the
+    ``can`` template global shows, from ``app.core.auth.permissions``.
+    """
+
+    def decorator(f):
+        @wraps(f)
+        def decorated_function(*args, **kwargs):
+            if not current_user.is_authenticated:
+                abort(401)
+
+            from app.core.auth.permissions import can
+
+            if not can(current_user, action, object_type):
+                current_app.logger.warning(
+                    f"Access denied to {f.__name__}: user "
+                    f"{getattr(current_user, 'username', None) or current_user.id} "
+                    f"may not {action} {object_type}"
+                )
+                abort(403)
+
+            return f(*args, **kwargs)
+
+        return decorated_function
+
+    return decorator
+
+
 # ---------------------------------------------------------------------------
 # Feature flags
 # ---------------------------------------------------------------------------

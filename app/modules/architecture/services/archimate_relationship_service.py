@@ -7,12 +7,32 @@ Provides comprehensive relationship validation and creation for all ArchiMate 3.
 """
 
 import logging
+from datetime import datetime, timezone
 from typing import Dict, List, Optional, Tuple
 
 from app import db
 from app.models.models import ArchiMateElement, ArchiMateRelationship  # dead-code-ok (pre-existing)
 
 logger = logging.getLogger(__name__)
+
+
+def _signed_in_person():
+    """The signed-in person as (id text, display name), or (None, None)."""
+    try:
+        from flask_login import current_user
+
+        if not getattr(current_user, "is_authenticated", False):
+            return None, None
+        first = (getattr(current_user, "first_name", None) or "").strip()
+        last = (getattr(current_user, "last_name", None) or "").strip()
+        name = (
+            f"{first} {last}".strip()
+            or getattr(current_user, "username", None)
+            or getattr(current_user, "email", None)
+        )
+        return str(current_user.id), name
+    except RuntimeError:  # no request: nobody is signed in
+        return None, None
 
 
 class ArchiMateRelationshipService:
@@ -193,11 +213,19 @@ class ArchiMateRelationshipService:
             return None
 
         try:
+            # Where this relationship came from: the person drawing it.
+            person_id, person_name = _signed_in_person()
+            if person_id is None and (properties or {}).get("created_by_id") is not None:
+                person_id = str((properties or {})["created_by_id"])
             relationship = ArchiMateRelationship(
                 type=relationship_type,
                 source_id=source_element.id,
                 target_id=target_element.id,
                 architecture_id=architecture_id,
+                source_kind="manual",
+                source_ref=person_id,
+                source_label=person_name,
+                source_recorded_at=datetime.now(timezone.utc),
             )
             if organization_id is not None:
                 relationship.organization_id = organization_id
