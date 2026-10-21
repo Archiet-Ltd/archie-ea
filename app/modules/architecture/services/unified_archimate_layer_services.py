@@ -28,6 +28,7 @@ from typing import Dict, List, Optional
 from app import db
 from app.models import ArchiMateElement, ArchiMateRelationship
 from app.services.llm_service import LLMService
+from app.models.archimate_element_types import is_application_kind
 
 logger = logging.getLogger(__name__)
 
@@ -122,7 +123,7 @@ class ApplicationLayerService:
             }
         """
         component = db.session.get(ArchiMateElement, component_id)
-        if not component or component.type != "ApplicationComponent":
+        if not component or not is_application_kind(component.type):
             raise ValueError(f"ApplicationComponent {component_id} not found")
 
         prompt = self._build_dependency_analysis_prompt(component, technical_context)
@@ -166,7 +167,7 @@ class ApplicationLayerService:
             List of ApplicationService ArchiMateElements
         """
         component = db.session.get(ArchiMateElement, component_id)
-        if not component or component.type != "ApplicationComponent":
+        if not component or not is_application_kind(component.type):
             raise ValueError(f"ApplicationComponent {component_id} not found")
 
         prompt = self._build_service_identification_prompt(component, api_documentation)
@@ -327,7 +328,7 @@ class ApplicationLayerService:
             ApplicationInterface ArchiMateElement
         """
         component = db.session.get(ArchiMateElement, component_id)
-        if not component or component.type != "ApplicationComponent":
+        if not component or not is_application_kind(component.type):
             raise ValueError(f"ApplicationComponent {component_id} not found")
 
         prompt = self._build_interface_definition_prompt(component, interface_spec)
@@ -377,7 +378,7 @@ class ApplicationLayerService:
         component = db.session.get(ArchiMateElement, component_id)
         process = db.session.get(ArchiMateElement, process_id)
 
-        if not component or component.type != "ApplicationComponent":
+        if not component or not is_application_kind(component.type):
             raise ValueError(f"ApplicationComponent {component_id} not found")
         if not process or process.type != "BusinessProcess":
             raise ValueError(f"BusinessProcess {process_id} not found")
@@ -1444,7 +1445,7 @@ class TechnologyLayerService:
             List of assignment relationships (Node assigned to ApplicationComponent)
         """
         app_component = db.session.get(ArchiMateElement, application_component_id)
-        if not app_component or app_component.type != "ApplicationComponent":
+        if not app_component or not is_application_kind(app_component.type):
             raise ValueError(f"ApplicationComponent {application_component_id} not found")
 
         relationships = []
