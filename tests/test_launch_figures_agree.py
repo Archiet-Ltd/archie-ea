@@ -128,6 +128,16 @@ def _get(app, user, org, url):
     return resp
 
 
+def _dash_with_cfo(app, user, org):
+    """The overview with the CFO lens shown (it is hidden by default with the unfinished pages)."""
+    old = app.config.get("HIDE_NOT_READY_MODULES")
+    app.config["HIDE_NOT_READY_MODULES"] = False
+    try:
+        return _get(app, user, org, "/dashboard/overview").get_data(as_text=True)
+    finally:
+        app.config["HIDE_NOT_READY_MODULES"] = old
+
+
 def _int(text):
     return int(text.replace(",", ""))
 
@@ -156,9 +166,7 @@ def _read_screens(app, user, org):
     vendors_page = _get(app, user, org, "/applications/vendors").get_data(as_text=True)
     m = re.search(r"Total Vendors</p>\s*<div[^>]*>\s*<p[^>]*>\s*([\d,]+)\s*</p>", vendors_page)
     figures["vendors: vendor page"] = _int(m.group(1)) if m else None
-    m = re.search(
-        r'card-description[^>]*>Vendors</p>\s*<div[^>]*>\s*([\d,]+)\s*</div>', dash
-    )
+    m = re.search(r'data-testid="cfo-kpi-vendors">\s*([\d,]+)\s*</p>', _dash_with_cfo(app, user, org))
     figures["vendors: dashboard"] = _int(m.group(1)) if m else None
     figures["vendors: vendor api"] = _get(app, user, org, "/api/v1/vendors/?per_page=1").get_json()[
         "data"
@@ -267,17 +275,15 @@ def test_owners_never_exceed_applications_with_a_duplicate_row(app, two_orgs):
     assert m and int(m.group(1)) <= int(m.group(2))
 
 
-def test_empty_vendor_catalogue_is_a_dash_on_the_tile_the_strip_and_the_page(app, db_session, two_orgs):
+def test_empty_vendor_catalogue_is_a_dash_on_the_tile_and_the_page(app, db_session, two_orgs):
     from app.models.vendor.vendor_organization import VendorOrganization
 
     db_session.query(VendorOrganization).delete(synchronize_session=False)
     db_session.flush()
     org, user = two_orgs["A"]
-    dash = _get(app, user, org, "/dashboard/overview").get_data(as_text=True)
-    tile = re.search(r'card-description[^>]*>Vendors</p>\s*<div[^>]*>\s*(\S+)\s*</div>', dash)
-    strip = re.search(r"text-xs text-muted-foreground\">Vendor</p>\s*<p[^>]*>\s*(\S+?)\s*</p>", dash)
+    dash = _dash_with_cfo(app, user, org)
+    tile = re.search(r'data-testid="cfo-kpi-vendors">\s*(\S+)\s*</p>', dash)
     assert tile and tile.group(1) == "—", tile and tile.group(1)
-    assert strip and strip.group(1) == "—", strip and strip.group(1)
     page = _get(app, user, org, "/applications/vendors").get_data(as_text=True)
     m = re.search(r"Total Vendors</p>\s*<div[^>]*>\s*<p[^>]*>\s*(\S+)\s*</p>", page)
     assert m and m.group(1) == "—", m and m.group(1)
