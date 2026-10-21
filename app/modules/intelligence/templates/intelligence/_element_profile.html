@@ -16,12 +16,12 @@
                 {% elif row.value is not none %}
                     <span class="text-muted-foreground">· {{ row.value }}</span>
                 {% endif %}
-                <span class="text-muted-foreground">· {% if row.reached_by == 'worked_out_link' %}worked out, through a worked-out link to {{ answer.elements.get(answer.params.element_id | string, {}).name or 'this element' }}{% else %}{{ 'worked out' if row.basis == 'worked_out' else 'recorded' }}{% endif %}{% if row.as_of %} · {{ row.as_of[:10] }}{% endif %}</span>
+                <span class="text-muted-foreground">· {% if row.reached_by == 'worked_out_link' %}Cost as entered; this application is linked to {{ answer.elements.get(answer.params.element_id | string, {}).name or 'this element' }} only by a worked-out link.{% else %}{{ 'worked out' if row.basis == 'worked_out' else 'recorded' }}{% endif %}{% if row.as_of %} · {{ row.as_of[:10] }}{% endif %}</span>
             </li>
             {% endfor %}
         </ul>
         {% elif group.status == 'not_shown' %}
-        <p class="text-sm text-muted-foreground">Not shown: more connections than one page.</p>
+        <p class="text-sm text-muted-foreground">Not shown: there were more connections than fit on one page.</p>
         {% else %}
         <p class="text-sm text-muted-foreground">Not recorded.</p>
         {% endif %}

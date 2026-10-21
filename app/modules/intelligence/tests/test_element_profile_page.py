@@ -77,7 +77,7 @@ def test_a_group_cut_short_is_not_shown_as_not_recorded(app, db_session, make_or
     start = html.index('data-profile-group="processes"')
     section = html[start:html.index("</section>", start)]
     assert 'data-status="not_shown"' in section
-    assert "Not shown: more connections than one page." in section
+    assert "Not shown: there were more connections than fit on one page." in section
     assert "Not recorded." not in section
 
 
@@ -106,4 +106,4 @@ def test_a_cost_reached_through_a_worked_out_link_says_so(app, db_session, make_
 
     monkeypatch.setattr(ae, "_profile_connections", worked_out)
     html = _ask_and_open(client, login_as, user, cap.id)
-    assert "worked out, through a worked-out link to Billing capability" in html
+    assert "Cost as entered; this application is linked to Billing capability only by a worked-out link." in html
