@@ -25,10 +25,12 @@ from flask_login import current_user, login_required
 
 from app.utils.role_access import (
     _ZONE_TITLES,
+    LAUNCH_ENDPOINTS,
+    NOT_READY_ENDPOINTS,
+    MORE_TOOLS_FIRST_ENDPOINTS,
     SIDEBAR_ZONES,
     can_access_section,
     get_user_role,
-    is_hidden_not_ready,
     link_requires_satisfied,
 )
 
@@ -93,7 +95,7 @@ def _link_visible(endpoint: str, requires: str | None = None) -> bool:
     `link_requires_satisfied()` (role_access.py) is the single shared predicate
     `get_sidebar_zones()` itself uses, so this page and the sidebar never disagree.
     """
-    if endpoint in _NOT_RENDERED or is_hidden_not_ready(endpoint):
+    if endpoint in _NOT_RENDERED:
         return False
     if endpoint.startswith("procurement.") and not getattr(current_user, "is_platform_admin", False):
         roles = set(_PROCUREMENT_ROLES)
@@ -215,6 +217,8 @@ _MORE_TOOLS = [
     ("Usage Analytics", "usage_analytics.analytics_root", "bar-chart-3"),
     ("Vendor Analysis", "main.vendor_archimate_analysis", "building"),
     ("Integrations", "main.integrations", "cloud"),
+    # One of the eight modules NOT_READY_ENDPOINTS names; it had no link anywhere, so it is listed here.
+    ("Investment Matrix", "strategic.investment_matrix", "grid-3x3"),
     ("Architecture Roadmap", "main.archimate_roadmap", "map"),
     ("Enterprise Dashboard", "enterprise.enterprise_dashboard", "layout-dashboard"),
     # Every signed-in user can already open this from the sidebar footer
@@ -350,7 +354,11 @@ def _resolve(links):
                 link["endpoint"],
             )
             continue
-        resolved.append({**link, "href": href})
+        entry = {**link, "href": href}
+        # The recorded reason a module is not launch-ready is its one-line limit.
+        if link["endpoint"] in NOT_READY_ENDPOINTS:
+            entry["limit"] = NOT_READY_ENDPOINTS[link["endpoint"]]
+        resolved.append(entry)
     return resolved
 
 
@@ -375,6 +383,35 @@ def index():
         if endpoint not in zone_endpoints
         and _link_visible(endpoint, _MORE_TOOLS_REQUIRES.get(endpoint))
     )
+
+    # Launch cut: the twelve launch modules live in the sidebar, so every other
+    # module is listed here (none is removed), each marked as not in the cut.
+    sections = [
+        {"title": section["title"], "links": [entry for entry in section["links"] if entry["endpoint"] not in LAUNCH_ENDPOINTS]}
+        for section in sections
+    ]
+    more_tools = [entry for entry in more_tools if entry["endpoint"] not in LAUNCH_ENDPOINTS]
+
+    # The ArchiMate Composer and the Tech Radar go first: architects reach them most.
+    first = {}
+    for section in sections:
+        for link in section["links"]:
+            if link["endpoint"] in MORE_TOOLS_FIRST_ENDPOINTS:
+                first.setdefault(link["endpoint"], link)
+    for link in more_tools:
+        if link["endpoint"] in MORE_TOOLS_FIRST_ENDPOINTS:
+            first.setdefault(link["endpoint"], link)
+    sections = [
+        {"title": section["title"], "links": [entry for entry in section["links"] if entry["endpoint"] not in first]}
+        for section in sections
+    ]
+    more_tools = [entry for entry in more_tools if entry["endpoint"] not in first]
+    if first:
+        sections.insert(0, {
+            "title": "Architect tools",
+            "links": [first[e] for e in MORE_TOOLS_FIRST_ENDPOINTS if e in first],
+        })
+    sections = [section for section in sections if section["links"]]
     total = sum(len(section["links"]) for section in sections) + len(more_tools)
     return render_template(
         "modules_directory/index.html",

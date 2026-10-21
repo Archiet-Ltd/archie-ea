@@ -471,7 +471,14 @@ def get_all_roles_with_access(section: str) -> List[str]:
 # agent) is a new, genuinely needed platform_admin-only screen, not a
 # duplicate of anything already in the Admin zone. No fold is available for
 # the same reason as above; taking the budget 32 -> 33.
-SIDEBAR_LINK_BUDGET = 33
+#
+# Launch cut (20 Oct 2026): the sidebar shows only the twelve launch modules
+# (LAUNCH_MODULES below) for every role. The budget is the rendered total the
+# ratchet measures: twelve modules + the header logo + the footer "All modules"
+# link + the footer logout link = 15. Nothing was removed: every other module
+# keeps its entry in SIDEBAR_ZONES / the More tools list and is listed on the
+# /modules/ page under "Not in the launch cut".
+SIDEBAR_LINK_BUDGET = 15
 
 _ZONE_TITLES = {
     "home": "Home",
@@ -479,6 +486,7 @@ _ZONE_TITLES = {
     "library": "Library",
     "governance": "Governance",
     "admin": "Admin",
+    "launch": "Modules",
 }
 
 
@@ -1032,11 +1040,43 @@ SIDEBAR_ZONES: Dict[str, List[Dict]] = {
 }
 
 
-# Pages that are not ready for the soft launch. One list, one switch
-# (config HIDE_NOT_READY_MODULES, on by default): while it is on, get_sidebar_zones()
-# drops these links and the All-modules directory and global search (which build
-# on the same link data) leave them out. Nothing is deleted: the routes stay, and
-# switching the setting off lists them again. The value says why each is held back.
+# The launch cut (20 Oct 2026). The twelve modules that serve the first
+# customers' jobs, in sidebar order, identical for every role. SIDEBAR_ZONES
+# above still holds every module's per-role entry (nothing is deleted); the
+# sidebar renders only these (get_launch_sidebar_zones) and the /modules/ page
+# lists everything else under "Not in the launch cut".
+LAUNCH_MODULES: List[Dict] = [
+    _link("Dashboard Overview", "dashboard.overview", "layout-dashboard"),
+    _link("Applications", "unified_applications.application_list", "list"),
+    _link("Capability Map", "capability_map.index", "map"),
+    _ASK_LINK,
+    _link("Impact Analysis", "strategic.impact_analysis", "crosshair"),
+    _link("Traceability Matrix", "architect_ui.traceability_matrix", "git-branch"),
+    _link("Gap Analysis", "enterprise.gap_analysis", "search-x"),
+    _link("Work Packages", "enterprise.work_packages", "package"),
+    _link("Roadmaps", "main.capability_roadmap", "milestone"),
+    _link("Vendors", "unified_applications.vendors", "building"),
+    _link("Risk Register", "risk.risk_register", "alert-triangle"),
+    _link("Import", "architect_ui.import_oef", "upload"),
+]
+LAUNCH_ENDPOINTS = frozenset(link["endpoint"] for link in LAUNCH_MODULES)
+
+# Architects reach these two most, so the /modules/ page lists them first.
+MORE_TOOLS_FIRST_ENDPOINTS = ("archimate.composer_page", "tech_radar.index")
+
+SIDEBAR_LAUNCH_ZONES: List[Dict] = [_zone("launch", LAUNCH_MODULES)]
+
+
+def get_launch_sidebar_zones(user=None) -> List[Dict]:
+    """The sidebar's zones: the one launch zone, the same twelve links for every role."""
+    return SIDEBAR_LAUNCH_ZONES
+
+
+# Pages that are not ready for the soft launch. This list is the one source of the reason shown as
+# the one-line limit under each of these modules on the All modules page. It no longer hides anything
+# from that page or from global search: they list these modules like any other. The setting
+# HIDE_NOT_READY_MODULES (off by default) is kept for an operator and now only affects the legacy
+# per-role get_sidebar_zones(); the sidebar itself renders the launch zone only. The routes stay.
 NOT_READY_ENDPOINTS = {
     "implementation_planning.implementation_dashboard": "not available yet",
     "main.integrations": "refused for the demonstration user",
@@ -1050,15 +1090,15 @@ NOT_READY_ENDPOINTS = {
 
 
 def is_hidden_not_ready(endpoint: str) -> bool:
-    """True when `endpoint` is on NOT_READY_ENDPOINTS and the hide switch is on."""
+    """True when `endpoint` is on NOT_READY_ENDPOINTS and the (default-off) legacy hide switch is on."""
     if endpoint not in NOT_READY_ENDPOINTS:
         return False
     try:
         from flask import current_app
 
-        return bool(current_app.config.get("HIDE_NOT_READY_MODULES", True))
+        return bool(current_app.config.get("HIDE_NOT_READY_MODULES", False))
     except RuntimeError:  # no application context
-        return True
+        return False
 
 
 def get_sidebar_zones(user) -> List[Dict]:
