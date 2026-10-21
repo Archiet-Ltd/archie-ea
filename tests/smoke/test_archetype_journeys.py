@@ -15,6 +15,7 @@ suite was written after finding in production or on the way to it:
 """
 
 import json
+import re
 
 import pytest
 
@@ -295,6 +296,15 @@ def test_motivation_repository_shell_is_accessible_and_responsive(page, live_ser
     )
     errors = [e for e in (page.console_errors + page.page_errors) if "favicon" not in e.lower()]
     assert not errors, "Motivation repository raised JavaScript errors: %s" % errors[:5]
+
+    # R4-2: an empty swim-lane column used to print the literal word "None"
+    # (a static placeholder in _motivation_swimlane.html, not a leaked Python
+    # None) -- indistinguishable on screen from an unrendered template value.
+    main_text = page.locator("main").inner_text()
+    assert not re.search(r"\bNone\b", main_text), (
+        "Motivation repository renders the standalone word 'None': %r"
+        % main_text[:2000]
+    )
 
 
 # ── Write journeys: the two archetypes that gained one ──────────────────────

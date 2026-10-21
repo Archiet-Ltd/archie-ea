@@ -817,6 +817,12 @@
                     if (!results.length) {
                         let el = document.getElementById('entity-search-loading');
                         if (el) el.remove();
+                        const pageOptions = searchResults.querySelectorAll('[role="option"]');
+                        if (!pageOptions.length) {
+                            searchResults.insertAdjacentHTML('beforeend',
+                                '<p class="px-2 py-4 text-center text-sm text-muted-foreground">No pages or names match “' + esc(query) + '”.</p>' +
+                                '<p class="px-2 py-1 text-center text-xs text-muted-foreground">Search finds pages and names. To ask a question, <a href="{{ url_for("intelligence_ui.ask") }}" class="text-primary underline underline-offset-2">Ask</a>.</p>');
+                        }
                         return;
                     }
                     // Group by type
