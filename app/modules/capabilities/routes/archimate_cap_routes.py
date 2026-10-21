@@ -477,7 +477,10 @@ def api_save_archimate_mappings():
     """
     try:
         from app.models.capability_archimate_mapping import CapabilityArchiMateClassification
-        from app.services.apqc_mapping_tenant_fence import capability_owned_by_caller
+        from app.services.apqc_mapping_tenant_fence import (
+            capability_owned_by_caller,
+            archimate_element_owned_by_caller,
+        )
 
         data = request.get_json()
         if not data or "mappings" not in data:
@@ -486,12 +489,23 @@ def api_save_archimate_mappings():
         mappings_data = data["mappings"]
         created = 0
         updated = 0
+        skipped_capability = 0
+        skipped_element = 0
 
         # The mapping has no organisation of its own: only the caller's own
         # capabilities may be read, updated or mapped.
-        mappings_data = [
-            md for md in mappings_data if capability_owned_by_caller(md.get("capability_id"))
-        ]
+        filtered_mappings = []
+        for md in mappings_data:
+            cap_id = md.get("capability_id")
+            elem_id = md.get("archimate_element_id")
+            if not capability_owned_by_caller(cap_id):
+                skipped_capability += 1
+                continue
+            if not archimate_element_owned_by_caller(elem_id):
+                skipped_element += 1
+                continue
+            filtered_mappings.append(md)
+        mappings_data = filtered_mappings
 
         # Batch-prefetch existing mappings to avoid N+1 queries
         _archimate_req_pairs = set()
@@ -551,7 +565,16 @@ def api_save_archimate_mappings():
         db.session.commit()
 
         return jsonify(
-            {"success": True, "created": created, "updated": updated, "total": created + updated}
+            {
+                "success": True,
+                "created": created,
+                "updated": updated,
+                "total": created + updated,
+                "skipped": {
+                    "capability_not_owned": skipped_capability,
+                    "element_not_owned": skipped_element,
+                },
+            }
         )
 
     except SQLAlchemyError as e:
