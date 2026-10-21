@@ -143,7 +143,7 @@
             <i data-lucide="alert-triangle" class="h-5 w-5 text-destructive"></i>
         </div>
         <div>
-            <h3 id="modal-risk-detail-title" class="text-lg font-semibold">Risk Details &amp; Mitigation</h3>
+            <h3 id="modal-risk-detail-title" class="text-base font-semibold text-foreground text-foreground">Risk Details &amp; Mitigation</h3>
             <p class="text-sm text-muted-foreground" x-text="risk ? risk.capability_name : 'Loading...'"></p>
         </div>
     </div>
@@ -189,7 +189,7 @@
                 <div class="flex items-center gap-2">
                     <label class="text-sm font-medium text-muted-foreground">Strategic Importance:</label>
                     <span
-                        class="px-3 py-1 text-xs font-medium rounded-md bg-primary/10 text-primary border border-primary/30"
+                        class="px-3 py-1 text-xs font-medium rounded-md bg-primary/10 text-info-emphasis border border-primary/30"
                         x-text="risk.strategic_importance || 'N/A'"
                     ></span>
                 </div>
@@ -277,7 +277,7 @@
                     <input
                         type="text"
                         x-model="risk_owner"
-                        class="w-full px-3 py-2 border border-input rounded-lg bg-background focus:ring-2 focus:ring-ring focus:border-transparent"
+                        class="w-full px-3 py-2 border border-input rounded-md bg-background focus:ring-2 focus:ring-ring focus:border-transparent"
                         placeholder="Enter risk owner name"
                      aria-label="Enter risk owner name">
                 </div>
@@ -287,7 +287,7 @@
                     <input
                         type="text"
                         x-model="action_owner"
-                        class="w-full px-3 py-2 border border-input rounded-lg bg-background focus:ring-2 focus:ring-ring focus:border-transparent"
+                        class="w-full px-3 py-2 border border-input rounded-md bg-background focus:ring-2 focus:ring-ring focus:border-transparent"
                         placeholder="Enter action owner name"
                      aria-label="Enter action owner name">
                 </div>
@@ -296,7 +296,7 @@
                     <label class="block text-sm font-medium mb-2">Status</label>
                     <select
                         x-model="status"
-                        class="w-full px-3 py-2 border border-input rounded-lg bg-background focus:ring-2 focus:ring-ring focus:border-transparent"
+                        class="w-full px-3 py-2 border border-input rounded-md bg-background focus:ring-2 focus:ring-ring focus:border-transparent"
                      aria-label="Status">
                         <option value="identified">Identified</option>
                         <option value="analyzing">Analyzing</option>
@@ -312,7 +312,7 @@
                     <label class="block text-sm font-medium mb-2">Response Strategy</label>
                     <select
                         x-model="response_strategy"
-                        class="w-full px-3 py-2 border border-input rounded-lg bg-background focus:ring-2 focus:ring-ring focus:border-transparent"
+                        class="w-full px-3 py-2 border border-input rounded-md bg-background focus:ring-2 focus:ring-ring focus:border-transparent"
                      aria-label="Response Strategy">
                         <option value="avoid">Avoid</option>
                         <option value="mitigate">Mitigate</option>
@@ -326,7 +326,7 @@
                     <textarea
                         x-model="mitigation_strategy"
                         rows="4"
-                        class="w-full px-3 py-2 border border-input rounded-lg bg-background focus:ring-2 focus:ring-ring focus:border-transparent"
+                        class="w-full px-3 py-2 border border-input rounded-md bg-background focus:ring-2 focus:ring-ring focus:border-transparent"
                         placeholder="Describe how to reduce probability or impact..."
                      aria-label="Mitigation Strategy"></textarea>
                 </div>
@@ -336,7 +336,7 @@
                     <textarea
                         x-model="contingency_plan"
                         rows="3"
-                        class="w-full px-3 py-2 border border-input rounded-lg bg-background focus:ring-2 focus:ring-ring focus:border-transparent"
+                        class="w-full px-3 py-2 border border-input rounded-md bg-background focus:ring-2 focus:ring-ring focus:border-transparent"
                         placeholder="Plan B if risk materializes..."
                      aria-label="Contingency Plan"></textarea>
                 </div>
@@ -346,7 +346,7 @@
                     <input
                         type="number"
                         x-model="mitigation_cost"
-                        class="w-full px-3 py-2 border border-input rounded-lg bg-background focus:ring-2 focus:ring-ring focus:border-transparent"
+                        class="w-full px-3 py-2 border border-input rounded-md bg-background focus:ring-2 focus:ring-ring focus:border-transparent"
                         placeholder="0"
                         min="0"
                         step="1000"
@@ -357,7 +357,7 @@
                     <label class="block text-sm font-medium mb-2">Mitigation Effort</label>
                     <select
                         x-model="mitigation_effort"
-                        class="w-full px-3 py-2 border border-input rounded-lg bg-background focus:ring-2 focus:ring-ring focus:border-transparent"
+                        class="w-full px-3 py-2 border border-input rounded-md bg-background focus:ring-2 focus:ring-ring focus:border-transparent"
                      aria-label="Mitigation Effort">
                         <option value="low">Low</option>
                         <option value="medium">Medium</option>
@@ -370,7 +370,7 @@
                     <input
                         type="date"
                         x-model="target_date"
-                        class="w-full px-3 py-2 border border-input rounded-lg bg-background focus:ring-2 focus:ring-ring focus:border-transparent"
+                        class="w-full px-3 py-2 border border-input rounded-md bg-background focus:ring-2 focus:ring-ring focus:border-transparent"
                      aria-label="Date field">
                 </div>
 
@@ -378,7 +378,7 @@
                     <label class="block text-sm font-medium mb-2">Residual Probability (1-5)</label>
                     <select
                         x-model="residual_probability"
-                        class="w-full px-3 py-2 border border-input rounded-lg bg-background focus:ring-2 focus:ring-ring focus:border-transparent"
+                        class="w-full px-3 py-2 border border-input rounded-md bg-background focus:ring-2 focus:ring-ring focus:border-transparent"
                         aria-label="Residual probability"
                     >
                         <option value="">Select probability</option>
@@ -394,7 +394,7 @@
                     <label class="block text-sm font-medium mb-2">Residual Impact (1-5)</label>
                     <select
                         x-model="residual_impact"
-                        class="w-full px-3 py-2 border border-input rounded-lg bg-background focus:ring-2 focus:ring-ring focus:border-transparent"
+                        class="w-full px-3 py-2 border border-input rounded-md bg-background focus:ring-2 focus:ring-ring focus:border-transparent"
                         aria-label="Residual impact"
                     >
                         <option value="">Select impact</option>
@@ -414,7 +414,7 @@
         <button type="button"
             @click="createInitiative()"
             x-show="risk && risk.mitigation" x-cloak
-            class="inline-flex items-center gap-2 px-4 py-2 border border-input text-foreground font-medium rounded-lg hover:bg-accent transition-colors"
+            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center"
          aria-label="Create">
             <i data-lucide="briefcase" class="h-4 w-4"></i>
             Create Initiative
@@ -422,14 +422,14 @@
         <button type="button"
             @click="saveMitigation()"
             :disabled="saving"
-            class="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground font-medium rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center"
          aria-label="Save">
             <i data-lucide="save" class="h-4 w-4"></i>
             <span x-text="saving ? 'Saving...' : 'Save Mitigation Plan'"></span>
         </button>
         <button type="button"
             @click="Platform.modal.close('risk-detail')"
-            class="inline-flex items-center gap-2 px-4 py-2 bg-muted text-foreground font-medium rounded-lg hover:bg-muted/80 transition-colors"
+            class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
          aria-label="Close">
             Close
         </button>

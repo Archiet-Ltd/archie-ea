@@ -183,7 +183,7 @@
     {% if show_preview %}
     <div x-show="files.length > 0" x-cloak class="mt-4 space-y-2">
         <template x-for="(file, index) in files" :key="index">
-            <div class="flex items-center gap-3 p-3 border rounded-lg bg-card hover:bg-accent/50 transition-colors">
+            <div class="flex items-center gap-3 p-3 border border-border rounded-lg bg-card hover:bg-accent/50 transition-colors">
                 <!-- File Icon -->
                 <div class="flex-shrink-0">
                     <div class="rounded bg-primary/10 p-2">

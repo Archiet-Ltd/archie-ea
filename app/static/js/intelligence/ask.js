@@ -39,6 +39,7 @@ function askSurface() {
         state: 'idle',
         busy: false,
         centreId: null,
+        centreName: '',
         rows: [],
         notComputed: false,
         stale: false,
@@ -163,6 +164,7 @@ function askSurface() {
                 this.staleNotice = answer.notice;
                 this.state = this.rows.length ? 'ready' : 'empty';
                 var name = Intelligence.nameOf(payload.elements || {}, elementId) || this.term.trim();
+                this.centreName = name;
                 this.statusText = Intelligence.connectionsText(this.rows.length, name, answer.withheld);
             } catch (err) {
                 if (seq !== this._loadSeq) return;
