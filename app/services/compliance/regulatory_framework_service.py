@@ -18,6 +18,7 @@ Frameworks are available as static JSON data in app/data/compliance_frameworks.j
 """
 
 import copy
+import hashlib
 import json
 import logging
 import os
@@ -44,6 +45,10 @@ LIBRARY_DIR = os.path.join(
 # What a control becomes in the model: see ComplianceControl.kind.
 KINDS = ("Requirement", "Constraint")
 DEFAULT_KIND = "Requirement"
+
+# What the seed may write on a shared row, and when: see seed_manufacturing_frameworks.
+LIBRARY_FACT_KEYS = ("total_controls", "content_level", "official_url", "standard_version")
+LIBRARY_TEXT_KEYS = ("title", "description", "category", "subcategory", "official_reference", "kind")
 
 
 class RegulatoryFrameworkService:
@@ -846,6 +851,14 @@ class RegulatoryFrameworkService:
     }
 
     @staticmethod
+    def definition_hash(definition: Dict) -> str:
+        """A fingerprint of one framework definition (its facts, version and every control),
+        independent of key order. The seed records it on the framework row it writes; an
+        unchanged fingerprint means the shared rows are not touched again."""
+        canonical = json.dumps(definition, sort_keys=True, ensure_ascii=False, default=str)
+        return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+    @staticmethod
     def _control_values(raw: Dict, default_kind: str = DEFAULT_KIND) -> Dict:
         """A control definition reduced to ComplianceControl columns. ``kind`` is the
         control's own when it is one of KINDS; a missing or unrecognised value takes the
@@ -873,6 +886,14 @@ class RegulatoryFrameworkService:
         case ignored), a control by its code within the framework, and a second run
         changes nothing.
 
+        Shared rows are written only when they are new or when the library file changed.
+        Each framework row records a fingerprint of the definition it was last written from
+        (``library_hash``, which covers the version and every control). A fingerprint that
+        matches means the framework and its controls are not touched at all. A different
+        one means the file changed, and then shared text is rewritten from the file. A row
+        with no fingerprint (written before it existed) has only its blank fields filled.
+        An organisation's own records are never read or written here.
+
         Library packs (app/data/compliance_library) carry the standards loaded in
         full or as identifiers; the frameworks defined before the library stay as
         sample rows unless a pack covers them.
@@ -898,29 +919,48 @@ class RegulatoryFrameworkService:
         now = datetime.utcnow()
 
         for framework_data in definitions:
+            library_hash = RegulatoryFrameworkService.definition_hash(framework_data)
             controls_data = framework_data.pop("controls", [])
             fields = {k: v for k, v in framework_data.items() if k in framework_columns}
+            fields.pop("library_hash", None)
             framework = existing_by_code.get(normal(fields["code"]))
+            default_kind = framework_data.get("default_kind", DEFAULT_KIND)
 
             if framework is None:
                 framework = RegulatoryFramework(**fields)
                 framework.last_updated = now
                 framework.next_review_date = now + timedelta(days=365)
+                framework.library_hash = library_hash
                 db.session.add(framework)
                 db.session.flush()
                 existing_by_code[normal(framework.code)] = framework
                 seeded_count += 1
+                mode = "new"
+            elif framework.library_hash == library_hash:
+                logger.info(f"Library framework {framework.code}: unchanged, nothing written")
+                continue
+            elif framework.library_hash is None:
+                # Rows written before the library recorded a hash: fill what is blank, change
+                # nothing that holds text, and record the hash so the next run is a no-op.
+                mode = "fill"
             else:
-                # Library facts are kept current; an existing row keeps its code.
-                for key in ("total_controls", "content_level", "official_url", "standard_version"):
-                    if key in fields and getattr(framework, key) != fields[key]:
+                # The library file changed (its version or its content): this is the one
+                # time shared text is rewritten.
+                mode = "rewrite"
+
+            if mode != "new":
+                for key in LIBRARY_FACT_KEYS:
+                    if key not in fields:
+                        continue
+                    current = getattr(framework, key)
+                    if current != fields[key] and (mode == "rewrite" or current in (None, "")):
                         setattr(framework, key, fields[key])
+                framework.library_hash = library_hash
 
             present = {
                 c.control_code: c
                 for c in ComplianceControl.query.filter_by(framework_id=framework.id).all()
             }
-            default_kind = framework_data.get("default_kind", DEFAULT_KIND)
             for raw in controls_data:
                 values = RegulatoryFrameworkService._control_values(raw, default_kind)
                 code = values.get("control_code")
@@ -929,12 +969,15 @@ class RegulatoryFrameworkService:
                 control = present.get(code)
                 if control is None:
                     db.session.add(ComplianceControl(framework_id=framework.id, **values))
-                else:
-                    for key in ("title", "description", "category", "subcategory", "official_reference", "kind"):
-                        if key in values and getattr(control, key) != values[key]:
-                            setattr(control, key, values[key])
+                    continue
+                for key in LIBRARY_TEXT_KEYS:
+                    if key not in values:
+                        continue
+                    current = getattr(control, key)
+                    if current != values[key] and (mode == "rewrite" or current in (None, "")):
+                        setattr(control, key, values[key])
 
-            logger.info(f"Library framework {framework.code}: {len(controls_data)} controls defined")
+            logger.info(f"Library framework {framework.code} ({mode}): {len(controls_data)} controls defined")
 
         db.session.commit()
 

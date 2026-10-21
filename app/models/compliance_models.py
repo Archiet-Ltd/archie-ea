@@ -136,6 +136,9 @@ class RegulatoryFramework(db.Model):
     # link, never licensed wording) or "sample" (a starter set) is loaded.
     total_controls = db.Column(db.Integer, nullable=True)
     content_level = db.Column(db.String(20), nullable=True)
+    # Fingerprint of the library definition this row and its controls were last written from.
+    # The seed writes shared rows only when this is new or differs from the file's.
+    library_hash = db.Column(db.String(64), nullable=True)
     last_updated = db.Column(db.DateTime)
     next_review_date = db.Column(db.DateTime)
 

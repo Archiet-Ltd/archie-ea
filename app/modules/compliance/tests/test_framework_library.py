@@ -153,6 +153,105 @@ def test_a_sample_framework_does_not_claim_a_total(db_session, seeded):
     assert all(row["total"] is None and row["loaded"] >= 0 for row in sample)
 
 
+def _pack(seeded, code):
+    import copy
+
+    return copy.deepcopy(next(p for p in seeded.load_library_packs() if p["code"] == code))
+
+
+def _control_row(db_session, framework_code, control_code):
+    from app.models.compliance_models import ComplianceControl, RegulatoryFramework
+
+    framework = db_session.query(RegulatoryFramework).filter_by(code=framework_code).one()
+    return framework, db_session.query(ComplianceControl).filter_by(
+        framework_id=framework.id, control_code=control_code
+    ).one()
+
+
+def test_an_ordinary_re_seed_leaves_shared_control_text_alone(db_session, seeded):
+    framework, control = _control_row(db_session, "NIST-CSF", "GV.OC-02")
+    control.title = "Edited on the shared row"
+    control.description = "Edited summary"
+    control.kind = "Constraint"
+    db_session.flush()
+
+    seeded.seed_manufacturing_frameworks()
+    seeded.seed_manufacturing_frameworks()
+
+    db_session.refresh(control)
+    assert (control.title, control.description, control.kind) == ("Edited on the shared row", "Edited summary", "Constraint")
+    assert framework.library_hash, "the seed records the fingerprint of what it wrote"
+
+
+def test_a_changed_library_file_rewrites_shared_text_and_never_an_organisations_records(
+    app, db_session, make_org, seeded, monkeypatch
+):
+    from app.models.application_compliance import ApplicationComplianceControl
+    from app.models.regulatory_framework import FrameworkAdoption
+    from app.modules.compliance.services.control_model_service import link_control_to_element
+
+    org = make_org("rewrite")
+    framework, control = _control_row(db_session, "NIST-CSF", "GV.OC-02")
+    fingerprint = framework.library_hash
+
+    # The organisation's own records: an adoption with its notes, a mapping with its evidence
+    # and notes, a model element and the link to the control.
+    adoption = FrameworkAdoption(
+        organization_id=org.id, scope="tenant", framework_id=framework.id, status="active",
+        tailoring_notes="Our own tailoring notes",
+    )
+    db_session.add(adoption)
+    db_session.flush()
+    mapping = ApplicationComplianceControl(
+        organization_id=org.id, adoption_id=adoption.id, control_id=control.id,
+        implementation_status="implemented", evidence_url="https://evidence.example/own",
+        notes="Our own mapping notes",
+    )
+    db_session.add(mapping)
+    node = _element(db_session, org.id, "Our own database host", "Node", "technology")
+    relationship = link_control_to_element(control.id, node.id, org.id)
+    db_session.flush()
+    requirement_name = db_session.get(type(node), relationship.target_id).name
+    before = (adoption.tailoring_notes, mapping.notes, mapping.evidence_url, mapping.implementation_status,
+              node.name, requirement_name)
+
+    changed = _pack(seeded, "NIST-CSF")
+    changed["standard_version"] = "2.0-revised"
+    next(c for c in changed["controls"] if c["control_code"] == "GV.OC-02")["title"] = "A corrected shared title"
+    monkeypatch.setattr(seeded, "load_library_packs", staticmethod(lambda: [changed]))
+    seeded.seed_manufacturing_frameworks()
+
+    db_session.refresh(framework)
+    db_session.refresh(control)
+    assert control.title == "A corrected shared title"
+    assert framework.standard_version == "2.0-revised"
+    assert framework.library_hash != fingerprint
+
+    db_session.refresh(adoption)
+    db_session.refresh(mapping)
+    db_session.refresh(node)
+    after = (adoption.tailoring_notes, mapping.notes, mapping.evidence_url, mapping.implementation_status,
+             node.name, db_session.get(type(node), relationship.target_id).name)
+    assert after == before
+
+
+def test_a_row_written_before_the_fingerprint_existed_is_only_filled_in(db_session, seeded):
+    framework, control = _control_row(db_session, "NIST-CSF", "GV.OC-02")
+    framework.library_hash = None
+    control.title = "Title already on the row"
+    control.kind = None
+    control.description = None
+    db_session.flush()
+
+    seeded.seed_manufacturing_frameworks()
+
+    db_session.refresh(control)
+    db_session.refresh(framework)
+    assert control.title == "Title already on the row", "text that is there is not rewritten"
+    assert control.kind == "Requirement" and control.description, "blanks are filled"
+    assert framework.library_hash, "and the fingerprint is recorded so the next run writes nothing"
+
+
 def test_the_seed_does_not_duplicate_a_framework_already_seeded_under_another_spelling(db_session):
     from app.models.compliance_models import RegulatoryFramework
     from app.services.compliance.regulatory_framework_service import RegulatoryFrameworkService

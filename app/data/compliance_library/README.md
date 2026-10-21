@@ -17,3 +17,10 @@ Each pack also states `default_kind` (`"Requirement"` in all five packs). It app
 control has no `kind`, or a value other than the two above. A control with no kind anywhere
 (a sample framework that has no pack) reads as a Requirement. The kind is never worked out from
 the wording of a control.
+
+## When the seed writes
+
+The seed writes a shared row only when it is new, or when its pack's content hash differs from the
+hash recorded on the framework the last time it was written. A re-seed of an unchanged pack changes
+nothing. An organisation's own records (adoptions and their notes, control mappings, evidence,
+model elements and links) are never read or written by the seed.
