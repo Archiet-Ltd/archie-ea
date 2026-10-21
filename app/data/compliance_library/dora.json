@@ -1,0 +1,597 @@
+{
+ "code": "DORA",
+ "name": "Digital Operational Resilience Act (DORA), Regulation (EU) 2022/2554",
+ "description": "All 64 articles of the Regulation, each with its official heading, chapter and a one-line summary. The article text is not reproduced.",
+ "category": "security",
+ "jurisdiction": "EU",
+ "enforcement_level": "mandatory",
+ "penalty_risk": "high",
+ "applies_to_manufacturing": false,
+ "applies_to_region": "EU",
+ "industry_specific": "financial",
+ "official_url": "https://eur-lex.europa.eu/eli/reg/2022/2554/oj",
+ "standard_version": "2022/2554",
+ "content_level": "full",
+ "source_url": "https://publications.europa.eu/resource/celex/32022R2554",
+ "source_text_date": "2022-12-27",
+ "source_note": "Official Journal L 333, 27 December 2022, as published by the Publications Office of the European Union.",
+ "total_controls": 64,
+ "controls": [
+  {
+   "control_code": "DORA-Art.1",
+   "title": "Subject matter",
+   "description": "Sets the subject matter: uniform requirements on ICT risk management, incident reporting, resilience testing, third-party risk and information sharing for financial entities, plus the oversight of critical ICT third-party providers.",
+   "kind": "Requirement",
+   "category": "Chapter I: General provisions",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2022/2554, Article 1"
+  },
+  {
+   "control_code": "DORA-Art.2",
+   "title": "Scope",
+   "description": "Lists the financial entities in scope (banks, payment and e-money institutions, investment firms, insurers, crypto-asset service providers, trading venues and others) and the entities that are excluded.",
+   "kind": "Requirement",
+   "category": "Chapter I: General provisions",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2022/2554, Article 2"
+  },
+  {
+   "control_code": "DORA-Art.3",
+   "title": "Definitions",
+   "description": "Defines the terms used, including digital operational resilience, ICT risk, ICT-related incident, major incident, critical or important function, TLPT and ICT third-party service provider.",
+   "kind": "Requirement",
+   "category": "Chapter I: General provisions",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2022/2554, Article 3"
+  },
+  {
+   "control_code": "DORA-Art.4",
+   "title": "Proportionality principle",
+   "description": "Requires financial entities to apply the ICT risk rules in proportion to their size, risk profile and the nature, scale and complexity of their services.",
+   "kind": "Requirement",
+   "category": "Chapter I: General provisions",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2022/2554, Article 4"
+  },
+  {
+   "control_code": "DORA-Art.5",
+   "title": "Governance and organisation",
+   "description": "The management body defines, approves and oversees the ICT risk management framework, is accountable for it, sets roles, budget, strategy and reporting lines, and must keep up its own ICT risk knowledge.",
+   "kind": "Requirement",
+   "category": "Chapter II: ICT risk management",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2022/2554, Article 5"
+  },
+  {
+   "control_code": "DORA-Art.6",
+   "title": "ICT risk management framework",
+   "description": "Requires a documented ICT risk management framework with strategies, policies, procedures and tools that protect information and ICT assets, reviewed at least yearly and after major incidents, with an ICT business continuity strategy and a digital resilience strategy.",
+   "kind": "Requirement",
+   "category": "Chapter II: ICT risk management",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2022/2554, Article 6"
+  },
+  {
+   "control_code": "DORA-Art.7",
+   "title": "ICT systems, protocols and tools",
+   "description": "Financial entities use and maintain up-to-date ICT systems, protocols and tools that are appropriate, reliable, resilient under stress and sized for their operations.",
+   "kind": "Requirement",
+   "category": "Chapter II: ICT risk management",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2022/2554, Article 7"
+  },
+  {
+   "control_code": "DORA-Art.8",
+   "title": "Identification",
+   "description": "Identify, classify and document ICT-supported business functions, information assets and ICT assets and their dependencies, keep the inventory current, and assess risks, legacy systems and third-party dependencies.",
+   "kind": "Requirement",
+   "category": "Chapter II: ICT risk management",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2022/2554, Article 8"
+  },
+  {
+   "control_code": "DORA-Art.9",
+   "title": "Protection and prevention",
+   "description": "Continuously monitor and secure ICT systems, minimise ICT risk through security tools and policies, and protect data in transit and at rest with strong authentication, access control, patching and change management.",
+   "kind": "Requirement",
+   "category": "Chapter II: ICT risk management",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2022/2554, Article 9"
+  },
+  {
+   "control_code": "DORA-Art.10",
+   "title": "Detection",
+   "description": "Put in place mechanisms to promptly detect anomalous activity, performance issues and incidents, with defined alert thresholds and criteria that trigger response processes.",
+   "kind": "Requirement",
+   "category": "Chapter II: ICT risk management",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2022/2554, Article 10"
+  },
+  {
+   "control_code": "DORA-Art.11",
+   "title": "Response and recovery",
+   "description": "Maintain an ICT business continuity policy and response and recovery plans, tested at least yearly, covering the activation of response measures, crisis communication and recovery of critical functions.",
+   "kind": "Requirement",
+   "category": "Chapter II: ICT risk management",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2022/2554, Article 11"
+  },
+  {
+   "control_code": "DORA-Art.12",
+   "title": "Backup policies and procedures, restoration and recovery procedures and methods",
+   "description": "Develop backup policies and procedures, restoration and recovery procedures and methods, test them periodically, keep backup systems segregated, and meet recovery time and recovery point objectives.",
+   "kind": "Requirement",
+   "category": "Chapter II: ICT risk management",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2022/2554, Article 12"
+  },
+  {
+   "control_code": "DORA-Art.13",
+   "title": "Learning and evolving",
+   "description": "Gather information on vulnerabilities, threats and incidents, review after major incidents, train staff on digital resilience and learn lessons so the framework keeps evolving.",
+   "kind": "Requirement",
+   "category": "Chapter II: ICT risk management",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2022/2554, Article 13"
+  },
+  {
+   "control_code": "DORA-Art.14",
+   "title": "Communication",
+   "description": "Have crisis communication plans for responsible disclosure of major incidents and vulnerabilities, and a designated person to carry out the public and media function.",
+   "kind": "Requirement",
+   "category": "Chapter II: ICT risk management",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2022/2554, Article 14"
+  },
+  {
+   "control_code": "DORA-Art.15",
+   "title": "Further harmonisation of ICT risk management tools, methods, processes and policies",
+   "description": "The European Supervisory Authorities develop common technical standards that specify further the ICT security policies, procedures, protocols and tools, the risk management framework and the content of the continuity and recovery plans.",
+   "kind": "Requirement",
+   "category": "Chapter II: ICT risk management",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2022/2554, Article 15"
+  },
+  {
+   "control_code": "DORA-Art.16",
+   "title": "Simplified ICT risk management framework",
+   "description": "Gives a simplified ICT risk management framework for small and non-interconnected investment firms, exempted payment and e-money institutions and similar entities, in place of Articles 5 to 15.",
+   "kind": "Requirement",
+   "category": "Chapter II: ICT risk management",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2022/2554, Article 16"
+  },
+  {
+   "control_code": "DORA-Art.17",
+   "title": "ICT-related incident management process",
+   "description": "Define, establish and implement an ICT-related incident management process: record incidents and significant cyber threats, assign roles, escalate, and communicate to management, staff, clients and authorities.",
+   "kind": "Requirement",
+   "category": "Chapter III: ICT-related incident management, classification and reporting",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2022/2554, Article 17"
+  },
+  {
+   "control_code": "DORA-Art.18",
+   "title": "Classification of ICT-related incidents and cyber threats",
+   "description": "Classify ICT-related incidents and cyber threats by clients and transactions affected, duration, geographic spread, data losses, criticality of services and economic impact.",
+   "kind": "Requirement",
+   "category": "Chapter III: ICT-related incident management, classification and reporting",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2022/2554, Article 18"
+  },
+  {
+   "control_code": "DORA-Art.19",
+   "title": "Reporting of major ICT-related incidents and voluntary notification of significant cyber threats",
+   "description": "Report major ICT-related incidents to the competent authority with an initial notification, an intermediate report and a final report, inform affected clients, and allow voluntary notification of significant cyber threats.",
+   "kind": "Requirement",
+   "category": "Chapter III: ICT-related incident management, classification and reporting",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2022/2554, Article 19"
+  },
+  {
+   "control_code": "DORA-Art.20",
+   "title": "Harmonisation of reporting content and templates",
+   "description": "The European Supervisory Authorities develop common technical standards and templates for the content of incident reports and notifications of significant cyber threats.",
+   "kind": "Requirement",
+   "category": "Chapter III: ICT-related incident management, classification and reporting",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2022/2554, Article 20"
+  },
+  {
+   "control_code": "DORA-Art.21",
+   "title": "Centralisation of reporting of major ICT-related incidents",
+   "description": "The European Supervisory Authorities report on the feasibility of centralising major-incident reporting through a single EU hub.",
+   "kind": "Requirement",
+   "category": "Chapter III: ICT-related incident management, classification and reporting",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2022/2554, Article 21"
+  },
+  {
+   "control_code": "DORA-Art.22",
+   "title": "Supervisory feedback",
+   "description": "Competent authorities acknowledge initial notifications and reports and give feedback and guidance, and pass relevant anonymised information to other authorities.",
+   "kind": "Requirement",
+   "category": "Chapter III: ICT-related incident management, classification and reporting",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2022/2554, Article 22"
+  },
+  {
+   "control_code": "DORA-Art.23",
+   "title": "Operational or security payment-related incidents concerning credit institutions, payment institutions, account information service providers, and electronic money institutions",
+   "description": "Extends the incident management, classification and reporting rules to operational or security payment-related incidents at credit institutions, payment institutions, account information service providers and e-money institutions.",
+   "kind": "Requirement",
+   "category": "Chapter III: ICT-related incident management, classification and reporting",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2022/2554, Article 23"
+  },
+  {
+   "control_code": "DORA-Art.24",
+   "title": "General requirements for the performance of digital operational resilience testing",
+   "description": "Financial entities, other than microenterprises, maintain a sound and comprehensive digital operational resilience testing programme as part of the ICT risk management framework, with tests carried out at least yearly on critical systems.",
+   "kind": "Requirement",
+   "category": "Chapter IV: Digital operational resilience testing",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2022/2554, Article 24"
+  },
+  {
+   "control_code": "DORA-Art.25",
+   "title": "Testing of ICT tools and systems",
+   "description": "The testing programme includes appropriate tests such as vulnerability assessments, network security assessments, gap analyses, source code reviews, scenario-based tests and penetration testing, carried out by independent parties.",
+   "kind": "Requirement",
+   "category": "Chapter IV: Digital operational resilience testing",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2022/2554, Article 25"
+  },
+  {
+   "control_code": "DORA-Art.26",
+   "title": "Advanced testing of ICT tools, systems and processes based on TLPT",
+   "description": "Entities identified by authorities carry out advanced threat-led penetration testing at least every three years on live production systems that support critical or important functions, including those of ICT third-party providers.",
+   "kind": "Requirement",
+   "category": "Chapter IV: Digital operational resilience testing",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2022/2554, Article 26"
+  },
+  {
+   "control_code": "DORA-Art.27",
+   "title": "Requirements for testers for the carrying out of TLPT",
+   "description": "Testers for threat-led penetration testing must be suitable and reputable, technically capable, certified or formally accredited, insured and independent, and internal testers are limited to every third test.",
+   "kind": "Constraint",
+   "category": "Chapter IV: Digital operational resilience testing",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2022/2554, Article 27"
+  },
+  {
+   "control_code": "DORA-Art.28",
+   "title": "General principles",
+   "description": "Financial entities manage ICT third-party risk within their risk framework: keep a register of contractual arrangements, assess risk before contracting, require exit strategies, and stay fully responsible for compliance.",
+   "kind": "Requirement",
+   "category": "Chapter V: Managing of ICT third-party risk",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2022/2554, Article 28"
+  },
+  {
+   "control_code": "DORA-Art.29",
+   "title": "Preliminary assessment of ICT concentration risk at entity level",
+   "description": "Before contracting ICT services for critical or important functions, assess whether the arrangement would create concentration risk through substitutability limits or multiple arrangements with the same or closely connected providers.",
+   "kind": "Requirement",
+   "category": "Chapter V: Managing of ICT third-party risk",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2022/2554, Article 29"
+  },
+  {
+   "control_code": "DORA-Art.30",
+   "title": "Key contractual provisions",
+   "description": "ICT service contracts must set out the parties' rights and obligations in writing, with service levels, locations, data protection, access and recovery, incident assistance, audit and termination rights and exit provisions.",
+   "kind": "Requirement",
+   "category": "Chapter V: Managing of ICT third-party risk",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2022/2554, Article 30"
+  },
+  {
+   "control_code": "DORA-Art.31",
+   "title": "Designation of critical ICT third-party service providers",
+   "description": "The European Supervisory Authorities designate the ICT third-party service providers that are critical for financial entities and appoint a Lead Overseer for each.",
+   "kind": "Requirement",
+   "category": "Chapter V: Managing of ICT third-party risk",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2022/2554, Article 31"
+  },
+  {
+   "control_code": "DORA-Art.32",
+   "title": "Structure of the Oversight Framework",
+   "description": "Establishes the Oversight Forum as a sub-committee of the Joint Committee to support the Lead Overseers and the oversight of critical ICT third-party providers.",
+   "kind": "Requirement",
+   "category": "Chapter V: Managing of ICT third-party risk",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2022/2554, Article 32"
+  },
+  {
+   "control_code": "DORA-Art.33",
+   "title": "Tasks of the Lead Overseer",
+   "description": "Sets the tasks of the Lead Overseer: assess whether each critical provider has rules, procedures and mechanisms to manage ICT risk, and issue oversight plans and recommendations.",
+   "kind": "Requirement",
+   "category": "Chapter V: Managing of ICT third-party risk",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2022/2554, Article 33"
+  },
+  {
+   "control_code": "DORA-Art.34",
+   "title": "Operational coordination between Lead Overseers",
+   "description": "Requires the three Lead Overseers to coordinate through a joint oversight network for a consistent approach to oversight of critical providers.",
+   "kind": "Requirement",
+   "category": "Chapter V: Managing of ICT third-party risk",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2022/2554, Article 34"
+  },
+  {
+   "control_code": "DORA-Art.35",
+   "title": "Powers of the Lead Overseer",
+   "description": "Gives the Lead Overseer powers to request information, conduct investigations and inspections, and address recommendations to critical ICT third-party providers.",
+   "kind": "Requirement",
+   "category": "Chapter V: Managing of ICT third-party risk",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2022/2554, Article 35"
+  },
+  {
+   "control_code": "DORA-Art.36",
+   "title": "Exercise of the powers of the Lead Overseer outside the Union",
+   "description": "Allows the Lead Overseer to exercise its powers on premises outside the Union where oversight objectives cannot be met within the Union.",
+   "kind": "Requirement",
+   "category": "Chapter V: Managing of ICT third-party risk",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2022/2554, Article 36"
+  },
+  {
+   "control_code": "DORA-Art.37",
+   "title": "Request for information",
+   "description": "The Lead Overseer may require critical providers to supply all information needed for oversight, by request or by decision, with periodic penalty payments for non-compliance.",
+   "kind": "Requirement",
+   "category": "Chapter V: Managing of ICT third-party risk",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2022/2554, Article 37"
+  },
+  {
+   "control_code": "DORA-Art.38",
+   "title": "General investigations",
+   "description": "The Lead Overseer may conduct general investigations of critical providers, including examining records, taking statements and requesting explanations.",
+   "kind": "Requirement",
+   "category": "Chapter V: Managing of ICT third-party risk",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2022/2554, Article 38"
+  },
+  {
+   "control_code": "DORA-Art.39",
+   "title": "Inspections",
+   "description": "The Lead Overseer may carry out on-site inspections at the premises of critical providers, announced in advance except in urgent cases.",
+   "kind": "Requirement",
+   "category": "Chapter V: Managing of ICT third-party risk",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2022/2554, Article 39"
+  },
+  {
+   "control_code": "DORA-Art.40",
+   "title": "Ongoing oversight",
+   "description": "Joint examination teams from the supervisory authorities and national authorities support the Lead Overseer in continuing oversight of each critical provider.",
+   "kind": "Requirement",
+   "category": "Chapter V: Managing of ICT third-party risk",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2022/2554, Article 40"
+  },
+  {
+   "control_code": "DORA-Art.41",
+   "title": "Harmonisation of conditions enabling the conduct of the oversight activities",
+   "description": "The European Supervisory Authorities develop technical standards on the information critical providers must submit, oversight conduct and the conditions for joint examination teams.",
+   "kind": "Requirement",
+   "category": "Chapter V: Managing of ICT third-party risk",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2022/2554, Article 41"
+  },
+  {
+   "control_code": "DORA-Art.42",
+   "title": "Follow-up by competent authorities",
+   "description": "Critical providers notify the Lead Overseer within 60 days whether they will follow its recommendations, and competent authorities may require financial entities to take measures where they do not.",
+   "kind": "Requirement",
+   "category": "Chapter V: Managing of ICT third-party risk",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2022/2554, Article 42"
+  },
+  {
+   "control_code": "DORA-Art.43",
+   "title": "Oversight fees",
+   "description": "The Lead Overseer charges critical ICT third-party service providers fees that cover the costs of oversight.",
+   "kind": "Requirement",
+   "category": "Chapter V: Managing of ICT third-party risk",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2022/2554, Article 43"
+  },
+  {
+   "control_code": "DORA-Art.44",
+   "title": "International cooperation",
+   "description": "The European Supervisory Authorities may conclude administrative arrangements with third-country authorities to cooperate on ICT third-party risk.",
+   "kind": "Requirement",
+   "category": "Chapter V: Managing of ICT third-party risk",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2022/2554, Article 44"
+  },
+  {
+   "control_code": "DORA-Art.45",
+   "title": "Information-sharing arrangements on cyber threat information and intelligence",
+   "description": "Financial entities may exchange cyber threat information and intelligence among themselves within trusted communities, under conditions that protect personal data and business confidentiality, and must notify authorities of participation.",
+   "kind": "Requirement",
+   "category": "Chapter VI: Information-sharing arrangements",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2022/2554, Article 45"
+  },
+  {
+   "control_code": "DORA-Art.46",
+   "title": "Competent authorities",
+   "description": "Names the competent authorities responsible for ensuring compliance with this Regulation for each type of financial entity.",
+   "kind": "Requirement",
+   "category": "Chapter VII: Competent authorities",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2022/2554, Article 46"
+  },
+  {
+   "control_code": "DORA-Art.47",
+   "title": "Cooperation with structures and authorities established by Directive (EU) 2022/2555",
+   "description": "The authorities cooperate with the structures established under the NIS2 Directive, including the Cooperation Group, CSIRTs and single points of contact.",
+   "kind": "Requirement",
+   "category": "Chapter VII: Competent authorities",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2022/2554, Article 47"
+  },
+  {
+   "control_code": "DORA-Art.48",
+   "title": "Cooperation between authorities",
+   "description": "Competent authorities and the Lead Overseer cooperate closely and exchange information relating to critical ICT third-party service providers.",
+   "kind": "Requirement",
+   "category": "Chapter VII: Competent authorities",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2022/2554, Article 48"
+  },
+  {
+   "control_code": "DORA-Art.49",
+   "title": "Financial cross-sector exercises, communication and cooperation",
+   "description": "The European Supervisory Authorities may organise financial cross-sector exercises, communication and cooperation to test response and recovery.",
+   "kind": "Requirement",
+   "category": "Chapter VII: Competent authorities",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2022/2554, Article 49"
+  },
+  {
+   "control_code": "DORA-Art.50",
+   "title": "Administrative penalties and remedial measures",
+   "description": "Competent authorities hold the supervisory, investigatory and sanctioning powers needed, including access to documents, on-site inspections, orders to cease conduct and administrative penalties.",
+   "kind": "Requirement",
+   "category": "Chapter VII: Competent authorities",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2022/2554, Article 50"
+  },
+  {
+   "control_code": "DORA-Art.51",
+   "title": "Exercise of the power to impose administrative penalties and remedial measures",
+   "description": "Competent authorities exercise their penalty powers directly, in collaboration, by delegation or by application to judicial authorities, taking account of the gravity of the breach.",
+   "kind": "Requirement",
+   "category": "Chapter VII: Competent authorities",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2022/2554, Article 51"
+  },
+  {
+   "control_code": "DORA-Art.52",
+   "title": "Criminal penalties",
+   "description": "Member States may decide not to lay down administrative penalties for breaches that are subject to criminal penalties and must make sure appropriate measures are in place.",
+   "kind": "Requirement",
+   "category": "Chapter VII: Competent authorities",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2022/2554, Article 52"
+  },
+  {
+   "control_code": "DORA-Art.53",
+   "title": "Notification duties",
+   "description": "Member States notify the Commission and the European Supervisory Authorities of the national laws implementing the penalty provisions and of later amendments.",
+   "kind": "Requirement",
+   "category": "Chapter VII: Competent authorities",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2022/2554, Article 53"
+  },
+  {
+   "control_code": "DORA-Art.54",
+   "title": "Publication of administrative penalties",
+   "description": "Competent authorities publish decisions imposing administrative penalties on their official websites, with provision for anonymised or delayed publication where needed.",
+   "kind": "Requirement",
+   "category": "Chapter VII: Competent authorities",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2022/2554, Article 54"
+  },
+  {
+   "control_code": "DORA-Art.55",
+   "title": "Professional secrecy",
+   "description": "Confidential information received under this Regulation is covered by professional secrecy, binding persons who work or have worked for the authorities.",
+   "kind": "Constraint",
+   "category": "Chapter VII: Competent authorities",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2022/2554, Article 55"
+  },
+  {
+   "control_code": "DORA-Art.56",
+   "title": "Data Protection",
+   "description": "The European Supervisory Authorities and competent authorities may process personal data only where necessary to carry out their duties under this Regulation, in line with EU data protection law.",
+   "kind": "Constraint",
+   "category": "Chapter VII: Competent authorities",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2022/2554, Article 56"
+  },
+  {
+   "control_code": "DORA-Art.57",
+   "title": "Exercise of the delegation",
+   "description": "Governs how the Commission exercises its power to adopt delegated acts: five-year period, revocation, notification to Parliament and Council and the objection period.",
+   "kind": "Requirement",
+   "category": "Chapter VIII: Delegated acts",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2022/2554, Article 57"
+  },
+  {
+   "control_code": "DORA-Art.58",
+   "title": "Review clause",
+   "description": "The Commission reviews the Regulation by 17 January 2028 and reports to the European Parliament and Council, covering the designation criteria for critical providers, the testing regime and the interaction with other law.",
+   "kind": "Requirement",
+   "category": "Chapter IX: Transitional and final provisions",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2022/2554, Article 58"
+  },
+  {
+   "control_code": "DORA-Art.59",
+   "title": "Amendments to Regulation (EC) No 1060/2009",
+   "description": "Amends Regulation (EC) No 1060/2009 on credit rating agencies so that their ICT risk is managed under this Regulation.",
+   "kind": "Requirement",
+   "category": "Chapter IX: Transitional and final provisions",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2022/2554, Article 59"
+  },
+  {
+   "control_code": "DORA-Art.60",
+   "title": "Amendments to Regulation (EU) No 648/2012",
+   "description": "Amends Regulation (EU) No 648/2012 (EMIR) so that central counterparties and trade repositories meet this Regulation's ICT requirements.",
+   "kind": "Requirement",
+   "category": "Chapter IX: Transitional and final provisions",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2022/2554, Article 60"
+  },
+  {
+   "control_code": "DORA-Art.61",
+   "title": "Amendments to Regulation (EU) No 909/2014",
+   "description": "Amends Regulation (EU) No 909/2014 so that central securities depositories manage operational and ICT risk under this Regulation.",
+   "kind": "Requirement",
+   "category": "Chapter IX: Transitional and final provisions",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2022/2554, Article 61"
+  },
+  {
+   "control_code": "DORA-Art.62",
+   "title": "Amendments to Regulation (EU) No 600/2014",
+   "description": "Amends Regulation (EU) No 600/2014 so that approved publication arrangements and similar providers meet this Regulation's ICT requirements.",
+   "kind": "Requirement",
+   "category": "Chapter IX: Transitional and final provisions",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2022/2554, Article 62"
+  },
+  {
+   "control_code": "DORA-Art.63",
+   "title": "Amendment to Regulation (EU) 2016/1011",
+   "description": "Amends Regulation (EU) 2016/1011 so that administrators of critical benchmarks manage ICT systems under this Regulation.",
+   "kind": "Requirement",
+   "category": "Chapter IX: Transitional and final provisions",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2022/2554, Article 63"
+  },
+  {
+   "control_code": "DORA-Art.64",
+   "title": "Entry into force and application",
+   "description": "Provides that the Regulation enters into force on the twentieth day after publication and applies from 17 January 2025.",
+   "kind": "Requirement",
+   "category": "Chapter IX: Transitional and final provisions",
+   "subcategory": null,
+   "official_reference": "Regulation (EU) 2022/2554, Article 64"
+  }
+ ]
+}
