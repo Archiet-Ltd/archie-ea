@@ -20,11 +20,11 @@
     <!-- Header -->
     {% macro _ps_actions() %}
             <a href="{{ url_for('architect_ui.impact_analysis', element_id=element.id) }}?hops=1"
-               class="inline-flex items-center justify-center rounded-md text-sm font-medium border border-input bg-background hover:bg-accent hover:text-accent-foreground h-10 px-4 py-2">
+               class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
                 Direct only
             </a>
             <a href="{{ url_for('architect_ui.api_impact_analysis', element_id=element.id) }}"
-               class="inline-flex items-center justify-center rounded-md text-sm font-medium border border-input bg-background hover:bg-accent hover:text-accent-foreground h-10 px-4 py-2"
+               class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center"
                target="_blank">
                 <i data-lucide="code" class="h-4 w-4 mr-2" aria-hidden="true"></i>
                 JSON
@@ -37,7 +37,7 @@
     ) }}
 
     <!-- Root element info -->
-    <div class="border rounded-lg p-4 bg-muted/10 flex items-center gap-4">
+    <div class="border rounded-md px-3 py-2 bg-muted/10 flex items-center gap-4">
         <i data-lucide="box" class="h-8 w-8 text-primary shrink-0" aria-hidden="true"></i>
         <div>
             <div class="font-semibold text-lg">{{ element.name }}</div>
@@ -73,7 +73,7 @@
 
     <!-- Capability Gaps warning -->
     {% if capability_gaps %}
-    <div class="border border-warning bg-warning/10 rounded-lg p-4 flex items-start gap-3">
+    <div class="border border-warning bg-warning/10 rounded-md px-3 py-2 flex items-start gap-3">
         <i data-lucide="alert-triangle" class="h-5 w-5 text-warning shrink-0 mt-0.5" aria-hidden="true"></i>
         <div>
             <div class="font-semibold text-warning-emphasis">Strategy Capabilities at Risk</div>
@@ -160,7 +160,7 @@
         <div x-show="activeTab === 'direct'" x-cloak>
             {% if analysis.direct_impacts %}
             <div class="border rounded-lg overflow-hidden">
-                <table class="w-full text-sm">
+                <table class="dense-table w-full text-sm">
                     <thead class="bg-muted/50">
                         <tr>
                             <th class="text-left p-3 font-medium">Element Name</th>
@@ -183,7 +183,7 @@
                             </td>
                             <td class="p-3">
                                 {% if imp.layer == 'Strategy' %}
-                                    <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-primary/10 text-primary">{{ imp.layer }}</span>
+                                    <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-primary/10 text-info-emphasis">{{ imp.layer }}</span>
                                 {% elif imp.layer == 'Business' %}
                                     <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-success/10 text-success-emphasis">{{ imp.layer }}</span>
                                 {% elif imp.layer == 'Application' %}
@@ -220,7 +220,7 @@
         <!-- All Impact tab -->
         <div x-show="activeTab === 'all'" x-cloak>
             <div class="border rounded-lg overflow-hidden">
-                <table class="w-full text-sm">
+                <table class="dense-table w-full text-sm">
                     <thead class="bg-muted/50">
                         <tr>
                             <th class="text-left p-3 font-medium">Element Name</th>
@@ -237,7 +237,7 @@
                             <td class="p-3 font-medium">{{ imp.name }}</td>
                             <td class="p-3">
                                 {% if imp.layer == 'Strategy' %}
-                                    <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-primary/10 text-primary">{{ imp.layer }}</span>
+                                    <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-primary/10 text-info-emphasis">{{ imp.layer }}</span>
                                 {% elif imp.layer == 'Business' %}
                                     <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-success/10 text-success-emphasis">{{ imp.layer }}</span>
                                 {% elif imp.layer == 'Application' %}

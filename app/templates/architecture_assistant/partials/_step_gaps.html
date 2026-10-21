@@ -7,7 +7,7 @@
     </div>
     <button @click="runGapAnalysis()" type="button"
       :disabled="capabilities.length === 0 || gapAnalysisLoading"
-      class="inline-flex items-center gap-2 h-9 px-4 rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:pointer-events-none">
+      class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
       <i data-lucide="sparkles" class="h-4 w-4" x-show="!gapAnalysisLoading" x-cloak></i>
       <i data-lucide="loader-2" class="h-4 w-4 animate-spin" x-show="gapAnalysisLoading" x-cloak></i>
       <span x-text="gapAnalysisLoading ? 'Analyzing...' : 'Run Gap Analysis'"></span>
@@ -35,7 +35,7 @@
       </span>
     </div>
     <div class="rounded-md border border-border overflow-hidden">
-      <table class="w-full text-sm">
+      <table class="dense-table w-full text-sm">
         <thead class="bg-muted/50">
           <tr>
             <th class="text-left px-4 py-2 font-medium text-muted-foreground">Capability</th>

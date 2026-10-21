@@ -15,7 +15,7 @@
      required_skills) were only settable via direct DB/CLI access. This is
      that missing write path. #}
   <button type="button" @click="openCreate()"
-          class="inline-flex items-center gap-2 h-9 px-4 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors">
+          class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
     <i data-lucide="plus" class="h-4 w-4" aria-hidden="true"></i> Define role transition
   </button>
   {% endmacro %}
@@ -33,7 +33,7 @@
   </div>
 
   {# Error — render it, never a fabricated fallback #}
-  <div x-show="error" x-cloak class="rounded-lg border border-destructive/30 bg-destructive/5 p-6 text-sm text-destructive-emphasis">
+  <div x-show="error" x-cloak class="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive-emphasis">
     <p class="font-medium">Could not load the workforce analysis.</p>
     <p class="mt-1 text-muted-foreground" x-text="error"></p>
   </div>
@@ -69,7 +69,7 @@
               <p class="text-xs text-muted-foreground">Where the workforce moves from an as-is role to its to-be replacement.</p>
             </div>
             <div class="overflow-x-auto">
-              <table class="w-full text-sm">
+              <table class="dense-table w-full text-sm">
                 <thead>
                   <tr class="text-left text-xs text-muted-foreground">
                     <th class="px-6 py-3 font-medium">From (as-is)</th>
@@ -144,7 +144,7 @@
             </template>
             <div class="flex flex-wrap gap-2">
               <template x-for="s in data.skills_gap" :key="s">
-                <span class="inline-flex items-center rounded-md bg-primary/10 text-primary border border-primary/30 px-2.5 py-1 text-xs font-medium" x-text="s"></span>
+                <span class="inline-flex items-center rounded-md bg-primary/10 text-info-emphasis border border-primary/30 px-2.5 py-1 text-xs font-medium" x-text="s"></span>
               </template>
             </div>
           </section>
@@ -196,11 +196,11 @@
   </div>
   <div class="flex justify-end gap-2 mt-4">
     <button type="button" data-modal-close="wt-role-modal"
-            class="inline-flex items-center h-9 px-4 rounded-md border border-input bg-background text-sm font-medium hover:bg-accent">
+            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
       Cancel
     </button>
     <button type="button" @click="submitRole()" :disabled="formSaving"
-            class="inline-flex items-center h-9 px-4 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 disabled:opacity-50">
+            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
       <span x-show="formSaving" x-cloak class="mr-1.5 h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent"></span>
       Save
     </button>

@@ -1,5 +1,5 @@
             {# Vendor Products (TOGAF Phase C) — Information Systems Architecture #}
-            <div id="phase-c-vendor-products" class="bg-card rounded-xl border border-border shadow-sm p-6 transition-all relative mb-6"
+            <div id="phase-c-vendor-products" class="bg-card rounded-lg border border-border p-6 transition-all relative mb-6"
                  x-show="isSectionActive('C') || isSectionActive('E')" x-cloak
                  :class="isSectionActive('C') ? 'ring-1 ring-primary/10' : ''">
                 <div class="flex items-center justify-between mb-4">
@@ -14,7 +14,7 @@
                         <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-muted text-muted-foreground border border-border"
                               x-text="(linkedVendorProducts || []).length + ' linked'"></span>
                         <button type="button" @click="openManageModal('vendor_product')"
-                            class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors">
+                            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                             <i data-lucide="plus" class="w-3.5 h-3.5" aria-hidden="true"></i> Link Product
                         </button>
                         <button type="button" @click="generatePhase('C')"
@@ -30,7 +30,7 @@
 
                 {# Generate Missing Preview Panel (BPP-014) #}
                 <template x-if="generatePreview && generatePreview.phase === 'C'">
-                    <div class="mt-3 rounded-lg border border-warning/30 bg-warning/5 p-4 space-y-3">
+                    <div class="mt-3 rounded-md border border-warning/40 bg-warning/10 px-3 py-2 space-y-3">
                         <div class="flex items-center justify-between">
                             <h4 class="text-sm font-medium text-warning-emphasis">
                                 Would create <span x-text="generatePreview.count"></span> elements
@@ -72,7 +72,7 @@
 
                 <template x-if="linkedVendorProducts && linkedVendorProducts.length > 0">
                     <div class="overflow-x-auto border border-border rounded-lg">
-                        <table class="w-full text-sm">
+                        <table class="dense-table w-full text-sm">
                             <thead class="bg-muted/50 border-b border-border">
                                 <tr>
                                     <th class="text-left px-3 py-2 text-xs font-medium text-muted-foreground">Product</th>
@@ -136,7 +136,7 @@
             </div>
 
             {# ENT-096: Data Access Matrix (Phase C — Information Systems Architecture) #}
-            <div id="phase-c-data-access" class="bg-card rounded-xl border border-border shadow-sm p-6 transition-all relative mb-6"
+            <div id="phase-c-data-access" class="bg-card rounded-lg border border-border p-6 transition-all relative mb-6"
                  x-show="isSectionActive('C') || isSectionActive('E')" x-cloak
                  x-data="{
                      damLoading: false,
@@ -258,12 +258,12 @@
                 </template>
 
                 <template x-if="damError">
-                    <div class="mb-3 p-3 rounded-md bg-destructive/10 text-destructive-emphasis text-sm" x-text="damError"></div>
+                    <div class="mb-3 px-3 py-2 rounded-md bg-destructive/10 text-destructive-emphasis text-sm" x-text="damError"></div>
                 </template>
 
                 <template x-if="damLoaded && appComponents.length > 0 && dataObjects.length > 0">
                     <div class="overflow-x-auto">
-                        <table class="w-full text-sm border border-border rounded-lg">
+                        <table class="dense-table w-full text-sm border border-border rounded-lg">
                             <thead class="bg-muted/50">
                                 <tr>
                                     <th class="text-left px-3 py-2 text-xs font-medium text-muted-foreground border-r border-border">Component</th>
@@ -325,10 +325,10 @@
             </div>
 
             {# Solution Options (TOGAF Phase E) — Alpine-driven CRUD + AI Analysis #}
-            <div id="phase-e" class="bg-card rounded-xl border border-border shadow-sm p-6 transition-all relative "
+            <div id="phase-e" class="bg-card rounded-lg border border-border p-6 transition-all relative"
                  x-show="isSectionActive('E')" x-cloak
                  :class="isSectionActive('E') ? 'ring-1 ring-primary/10' : ''">
-                <div x-show="isSectionFuture('E')" x-cloak class="absolute inset-0 bg-background/60 z-10 flex items-center justify-center rounded-xl">
+                <div x-show="isSectionFuture('E')" x-cloak class="absolute inset-0 z-10 flex items-center justify-center rounded-xl bg-overlay/50">
                     <p class="text-sm text-muted-foreground font-medium">Complete Phase <span x-text="currentPhase"></span> to unlock</p>
                 </div>
                 <div class="flex items-center justify-between mb-4">
@@ -348,7 +348,7 @@
                             <span x-text="suggestingElements && aiSuggestPhase === 'E' ? 'Suggesting...' : 'AI Suggest'"></span>
                         </button>
                         {% endif %}
-                        <button type="button" @click="toggleComments('phase_e')" class="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-accent transition-colors" title="Comments">
+                        <button type="button" @click="toggleComments('phase_e')" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-8 px-2.5 items-center" title="Comments">
                             <i data-lucide="message-square" class="w-3.5 h-3.5" aria-hidden="true"></i>
                             <span x-show="commentCount('phase_e') > 0" x-text="commentCount('phase_e')" class="text-xs bg-primary text-primary-foreground rounded-full px-1 min-w-[16px] text-center" x-cloak></span>
                         </button>
@@ -358,20 +358,20 @@
                             <span class="text-xs text-muted-foreground" x-text="phaseCompleteness('E').label"></span>
                         </div>
                         <button type="button" @click="runOptionsAnalysis()" :disabled="analyzingOptions"
-                            class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors">
+                            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                             <i data-lucide="sparkles" class="w-3.5 h-3.5" aria-hidden="true" x-show="!analyzingOptions" x-cloak></i>
                             <i data-lucide="loader-2" class="w-3.5 h-3.5 animate-spin" aria-hidden="true" x-show="analyzingOptions" x-cloak></i>
                             <span x-text="analyzingOptions ? 'Analyzing...' : 'Run Options Analysis'"></span>
                         </button>
                         <button type="button" @click="loadArchitectureVariants()" :disabled="generatingVariants"
-                            class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium bg-background border border-border hover:bg-accent disabled:opacity-50 transition-colors"
+                            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center"
                             title="Generate cost / timeline / risk variants">
                             <i data-lucide="git-branch" class="w-3.5 h-3.5" aria-hidden="true" x-show="!generatingVariants" x-cloak></i>
                             <i data-lucide="loader-2" class="w-3.5 h-3.5 animate-spin" aria-hidden="true" x-show="generatingVariants" x-cloak></i>
                             <span x-text="generatingVariants ? 'Generating...' : 'Generate Variants'"></span>
                         </button>
                         <button type="button" @click="openEntityModal('option')"
-                            class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors">
+                            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                             <i data-lucide="plus" class="w-3.5 h-3.5" aria-hidden="true"></i> Add Option
                         </button>
                     </div>
@@ -390,12 +390,12 @@
                 </details>
 
                 {# SAD-04: MCDA Solution Options Panel (Phase E) #}
-                <div class="mb-4 border border-border rounded-lg p-4 bg-muted/20"
+                <div class="mb-4 border border-border rounded-md px-3 py-2 bg-muted/20"
                      x-show="solutionOptionsLoaded || solutionOptionsLoading" x-cloak>
                     <div class="flex items-center gap-2 mb-3">
                         <i data-lucide="layers" class="w-4 h-4 text-muted-foreground flex-shrink-0"></i>
                         <h3 class="text-sm font-semibold text-foreground">Solution Options Analysis (MCDA)</h3>
-                        <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-primary/10 text-primary border border-primary/30">Phase E</span>
+                        <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-primary/10 text-info-emphasis border border-primary/30">Phase E</span>
                         <template x-if="solutionOptionsLoading">
                             <i data-lucide="loader-2" class="w-3.5 h-3.5 animate-spin text-muted-foreground"></i>
                         </template>
@@ -404,7 +404,7 @@
                         <div class="flex items-center justify-between">
                             <p class="text-xs text-muted-foreground italic">No evaluated options yet. Use "Add Option" below to score Build / Buy / Reuse alternatives.</p>
                             <button type="button" @click="loadSolutionOptions()"
-                                    class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium bg-muted hover:bg-accent text-foreground transition-colors">
+                                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-8 px-2.5 items-center">
                                 <i data-lucide="bar-chart-2" class="w-3.5 h-3.5"></i> Run MCDA
                             </button>
                         </div>
@@ -418,7 +418,7 @@
                                         <div class="flex items-center gap-2">
                                             <span class="text-sm font-medium text-foreground" x-text="opt.name || opt.option_type"></span>
                                             <template x-if="idx === 0">
-                                                <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium bg-primary/10 text-primary border border-primary/30">
+                                                <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium bg-primary/10 text-info-emphasis border border-primary/30">
                                                     <i data-lucide="star" class="w-3 h-3"></i> Recommended
                                                 </span>
                                             </template>
@@ -474,7 +474,7 @@
 
                 {# AI Suggestion Cards for Phase E (SDX-005) #}
                 <template x-if="aiSuggestions.length > 0 && aiSuggestPhase === 'E'">
-                    <div class="mb-4 p-3 rounded-md border border-primary/20 bg-primary/5">
+                    <div class="mb-4 px-3 py-2 rounded-md border border-primary/40 bg-primary/10">
                         <p class="text-xs font-medium text-primary mb-2">AI Suggested Elements</p>
                         <div class="space-y-2">
                             <template x-for="(s, idx) in aiSuggestions" :key="idx">
@@ -586,7 +586,7 @@
                 {# ENT-006: Vendor/option comparison table (shown when 2+ options exist) #}
                 <template x-if="vendorComparison.length > 1">
                   <div class="mt-4 overflow-x-auto rounded-lg border border-border">
-                    <table class="w-full text-sm">
+                    <table class="dense-table w-full text-sm">
                       <thead class="bg-muted/50">
                         <tr>
                           <th class="px-3 py-2 text-left font-medium text-muted-foreground">Vendor / Option</th>

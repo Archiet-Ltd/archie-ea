@@ -111,7 +111,7 @@
           {% endcall %}
           {% call card_content() %}
             <div class="overflow-x-auto">
-              <table class="w-full text-sm">
+              <table class="dense-table w-full text-sm">
                 <thead>
                   <tr class="border-b border-border">
                     <th class="text-left py-3 px-4 font-medium text-muted-foreground">Name</th>
@@ -127,7 +127,7 @@
                       <td class="py-3 px-4 font-medium" x-text="el.name"></td>
                       <td class="py-3 px-4" x-text="el.type || el.element_type || '—'"></td>
                       <td class="py-3 px-4">
-                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-primary border border-primary/30"
+                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-info-emphasis border border-primary/30"
                               x-text="el.layer || '—'"></span>
                       </td>
                       <td class="py-3 px-4" x-text="el.plateau || '—'"></td>

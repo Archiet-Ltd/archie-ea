@@ -25,6 +25,7 @@ from ..services.archimate.archimate_llm_service import ArchiMateLLMService
 from ..services.archimate_validation_service import ArchiMateValidationService
 from . import application_mgmt
 from .routes import ARCHIMATE_RELATIONSHIP_CHOICES, _redirect_to_detail
+from app.models.archimate_element_types import is_application_kind
 
 logger = logging.getLogger(__name__)
 
@@ -231,7 +232,7 @@ def generate_application_archimate(id):
 
         for elem in elements:
             elem_type = elem.get("type")
-            if elem_type == "ApplicationComponent":
+            if is_application_kind(elem_type):
                 continue
 
             arch_elem = ArchiMateElement(
