@@ -104,7 +104,7 @@ def test_every_viewpoint_that_allows_components_includes_the_application():
         is_element_allowed_in_viewpoint,
     )
 
-    allowing_component = {c for c, vp in VIEWPOINTS.items() if COMP in vp.allowed_elements or "*" in vp.allowed_elements}
+    allowing_component = {vp.code for vp in VIEWPOINTS.values() if COMP in vp.allowed_elements or "*" in vp.allowed_elements}
     assert allowing_component, "expected at least one viewpoint to allow components"
     for code in allowing_component:
         assert is_element_allowed_in_viewpoint(APP, code), code

@@ -30,6 +30,7 @@ from app.modules.architecture.routes.lucidchart_import_routes import (
 from app.modules.architecture.services.archimate_xml_export_service import export_to_xml
 from app.utils.response_helpers import api_error, api_success
 from app.utils.pagination import MAX_PAGE_SIZE, safe_int_arg
+from app.models.archimate_element_types import StandardTypeTable
 
 archimate_bp = Blueprint("archimate", __name__, url_prefix="/archimate")
 register_lucidchart_import_routes(archimate_bp)
@@ -6264,7 +6265,6 @@ def get_matrix_data():
 import threading as _threading
 import time as _time
 import logging
-from app.models.archimate_element_types import StandardTypeTable
 logger = logging.getLogger(__name__)
 _active_editors_lock = _threading.Lock()
 _active_editors: dict = {}   # {diagram_id_str: {user_id_str: float_timestamp}}

@@ -15,6 +15,7 @@ import json
 import logging
 import re
 from datetime import datetime  # dead-code-ok
+from app.models.archimate_element_types import is_application_kind
 
 # Define the logger
 logger = logging.getLogger(__name__)
@@ -1138,7 +1139,6 @@ from ..models.vendor.vendor_organization import (
     application_vendor_products,
 )
 from ..services.archimate_validation_service import ArchiMateValidationService
-from app.models.archimate_element_types import is_application_kind
 
 # ============================================================================
 # Batch Query Helpers - N + 1 Query Prevention
