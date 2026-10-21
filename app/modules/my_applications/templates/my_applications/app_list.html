@@ -12,7 +12,7 @@
     </div>
     {% macro _ps_actions() %}
 <a href="{{ url_for('my_applications.dashboard') }}"
-           class="inline-flex items-center gap-2 px-4 py-2 rounded-md border border-border hover:bg-accent transition-colors">
+           class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-8 px-2.5 items-center">
             <i data-lucide="layout-grid" class="w-4 h-4"></i>
             Dashboard
         </a>
@@ -55,7 +55,7 @@
             <div class="flex-1">
                 <input type="text" name="search" value="{{ search or '' }}"
                        placeholder="Search applications..."
-                       class="w-full px-3 py-2 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring" aria-label="Search applications...">
+                       class="h-9 w-full px-3 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring" aria-label="Search applications...">
             </div>
             <button type="submit" class="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors">
                 Search
@@ -105,6 +105,10 @@
         {% endfor %}
     </div>
 
+    {% elif owned_total == 0 and not search and not ownership_type %}
+    <div class="bg-card border border-border rounded-lg">
+        {% include 'my_applications/_no_owned_applications.html' %}
+    </div>
     {% else %}
     <div class="bg-card border border-border rounded-lg p-12 text-center">
         <div class="w-16 h-16 mx-auto mb-4 bg-muted rounded-full flex items-center justify-center">

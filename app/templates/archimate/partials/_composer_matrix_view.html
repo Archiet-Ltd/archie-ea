@@ -4,8 +4,8 @@
      role="dialog" aria-modal="true" aria-label="Matrix View"
      @keydown.escape.window="matrixViewOpen = false"
      @keydown.tab.prevent>
-    <div class="absolute inset-0 bg-black/50" @click="matrixViewOpen = false"></div>
-    <div class="relative bg-background border border-border rounded-lg shadow-xl w-[90vw] max-w-6xl max-h-[85vh] flex flex-col"
+    <div class="absolute inset-0 bg-overlay/50" @click="matrixViewOpen = false"></div>
+    <div class="relative bg-background border border-border rounded-lg w-[90vw] max-w-6xl max-h-[85vh] flex flex-col"
          @click.stop>
         {# Header #}
         <div class="flex items-center justify-between px-6 py-4 border-b border-border">
@@ -14,11 +14,11 @@
                 <h2 class="text-lg font-semibold text-foreground">Matrix View</h2>
             </div>
             <div class="flex items-center gap-3">
-                <button type="button" class="inline-flex items-center gap-2 px-3 py-1.5 bg-muted text-foreground border border-border rounded-md text-sm font-medium hover:bg-accent transition-colors"
+                <button type="button" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-8 px-2.5 items-center"
                         @click="exportMatrixCsv()">
                     <i data-lucide="download" class="w-3.5 h-3.5"></i> Export CSV
                 </button>
-                <button aria-label="Close matrix view" type="button" class="text-muted-foreground hover:text-foreground" @click="matrixViewOpen = false">
+                <button aria-label="Close matrix view" type="button" class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" @click="matrixViewOpen = false">
                     <i data-lucide="x" class="w-5 h-5"></i>
                 </button>
             </div>
@@ -64,7 +64,7 @@
             </template>
             <template x-if="!matrixLoading && matrixRows.length > 0">
                 <div class="overflow-x-auto">
-                    <table class="min-w-full border-collapse text-sm">
+                    <table class="dense-table min-w-full border-collapse text-sm">
                         <thead>
                             <tr>
                                 <th class="sticky left-0 z-10 bg-muted px-3 py-2 text-left font-semibold text-muted-foreground border border-border min-w-[180px]"

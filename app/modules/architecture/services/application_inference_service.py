@@ -35,6 +35,7 @@ from app.models.apqc_process import APQCProcess, CapabilityProcessMapping, Proce
 from app.models.archimate_core import ArchiMateElement, ArchiMateRelationship
 from app.models.vendor.vendor_organization import VendorProduct
 from app.services.application_architecture_mapper import APQC_KEYWORD_MAP
+from app.models.archimate_element_types import is_application_kind
 
 logger = logging.getLogger(__name__)
 
@@ -343,7 +344,7 @@ class ApplicationInferenceService:
         app_services = [
             e
             for e in application_elements
-            if e.type in ("ApplicationService", "ApplicationComponent")
+            if e.type == "ApplicationService" or is_application_kind(e.type)
         ]
 
         # Filter to get BusinessProcess elements

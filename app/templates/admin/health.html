@@ -5,31 +5,31 @@
 <div class="max-w-5xl mx-auto py-8">
   {{ page_shell(title='Platform Health', subtitle='Live platform status and diagnostics', breadcrumb=[('Home', '/'), ('Platform Health', none)]) }}
   <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-    <div class="bg-background rounded shadow p-6 flex flex-col items-center">
+    <div class="bg-background rounded p-6 flex flex-col items-center">
       <div class="text-lg font-semibold">Uptime</div>
       <div class="text-3xl font-bold text-success">{{ summary.uptime_pct }}%</div>
     </div>
-    <div class="bg-background rounded shadow p-6 flex flex-col items-center">
+    <div class="bg-background rounded p-6 flex flex-col items-center">
       <div class="text-lg font-semibold">Error Rate</div>
       <div class="text-3xl font-bold text-destructive">{{ summary.error_rate }}</div>
       <div class="text-xs text-muted-foreground">per 1000 API calls</div>
     </div>
-    <div class="bg-background rounded shadow p-6 flex flex-col items-center">
+    <div class="bg-background rounded p-6 flex flex-col items-center">
       <div class="text-lg font-semibold">Avg API Latency</div>
       <div class="text-3xl font-bold text-primary">{{ summary.avg_latency_ms }} ms</div>
     </div>
   </div>
   <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-    <div class="bg-background rounded shadow p-6">
+    <div class="bg-background rounded p-6">
       <div class="text-lg font-semibold mb-2">Active Users (24h)</div>
       <div class="text-2xl font-bold">{{ summary.active_users_24h }}</div>
     </div>
-    <div class="bg-background rounded shadow p-6">
+    <div class="bg-background rounded p-6">
       <div class="text-lg font-semibold mb-2">API Calls (24h)</div>
       <div class="text-2xl font-bold">{{ summary.api_calls_24h }}</div>
     </div>
   </div>
-  <div class="bg-background rounded shadow p-6 mb-8">
+  <div class="bg-background rounded p-6 mb-8">
     <div class="text-lg font-semibold mb-4">Component Status</div>
     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
       {% for c in components %}
@@ -52,7 +52,7 @@
       {% endfor %}
     </div>
   </div>
-  <div class="bg-background rounded shadow p-6">
+  <div class="bg-background rounded p-6">
     <div class="text-lg font-semibold mb-4">Error Trend (last 24h)</div>
     <div class="flex flex-row items-end space-x-1 h-32">
       {% for pt in error_trend %}

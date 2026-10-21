@@ -13,6 +13,7 @@ from app.decorators import audit_log
 from app.models.technical_capability import ACMDomain
 from app.services.acm_hybrid_manager import ACMHybridManager
 from app.utils.pagination import safe_int_arg
+from app.middleware.tenant_decorators import platform_admin_required
 
 # Create blueprint
 acm_hybrid_bp = Blueprint("acm_hybrid", __name__, url_prefix="/api/acm-hybrid")
@@ -21,6 +22,7 @@ acm_hybrid_bp = Blueprint("acm_hybrid", __name__, url_prefix="/api/acm-hybrid")
 @acm_hybrid_bp.route("/seed", methods=["POST"])
 @login_required
 @audit_log("acm_seed_capabilities")
+@platform_admin_required
 def seed_capabilities():
     """
     Seed ACM capabilities using hybrid approach.
@@ -278,6 +280,7 @@ def get_capability(code):
 @acm_hybrid_bp.route("/capabilities/<code>", methods=["PUT"])
 @login_required
 @audit_log("acm_update_capability")
+@platform_admin_required
 def update_capability(code):
     """
     Update a specific capability.
@@ -316,6 +319,7 @@ def update_capability(code):
 @acm_hybrid_bp.route("/capabilities/<code>", methods=["DELETE"])
 @login_required
 @audit_log("acm_delete_capability")
+@platform_admin_required
 def delete_capability(code):
     """
     Delete a specific capability.

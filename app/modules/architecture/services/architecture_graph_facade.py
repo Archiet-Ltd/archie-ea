@@ -11,6 +11,7 @@ from typing import Any, Optional
 from app import db
 from app.models.archimate_core import ArchiMateElement, ArchiMateRelationship
 from app.models.architecture_inference_relationship import ArchitectureInferenceRelationship
+from app.models.archimate_element_types import StandardTypeTable
 
 logger = logging.getLogger(__name__)
 
@@ -57,7 +58,7 @@ TYPE_NORMALIZE = {
 TYPE_DENORMALIZE = {v: k for k, v in TYPE_NORMALIZE.items()}
 
 # Layer lookup for each PascalCase type
-_TYPE_LAYER = {
+_TYPE_LAYER = StandardTypeTable({
     "Stakeholder": "motivation", "Driver": "motivation", "Assessment": "motivation",
     "Goal": "motivation", "Outcome": "motivation", "Principle": "motivation",
     "Requirement": "motivation", "Constraint": "motivation",
@@ -74,7 +75,7 @@ _TYPE_LAYER = {
     "Artifact": "technology", "CommunicationNetwork": "technology",
     "Gap": "implementation", "WorkPackage": "implementation",
     "Deliverable": "implementation", "Plateau": "implementation",
-}
+})
 
 
 class ArchitectureGraphFacade:

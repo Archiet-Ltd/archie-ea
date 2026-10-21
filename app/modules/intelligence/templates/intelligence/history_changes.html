@@ -18,30 +18,30 @@
         breadcrumb=[('Home', home_url), ('Intelligence', url_for('intelligence_ui.ask')), ('Changes', none)],
     ) }}
 
-    <section class="rounded-xl border border-border bg-card p-6">
+    <section class="rounded-lg border border-border bg-card p-6">
         <form @submit.prevent="loadChanges" class="space-y-4">
-            <div class="grid gap-4 sm:grid-cols-2">
+            <div class="grid gap-4 grid-cols-1">
                 <div>
-                    <label for="from-date" class="block text-sm font-medium text-foreground mb-1">From date</label>
+                    <label for="from-date" class="block text-sm font-medium text-muted-foreground mb-1">From date</label>
                     <input type="datetime-local" id="from-date" x-model="fromDate"
-                           class="h-10 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                           class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                            required>
                 </div>
                 <div>
-                    <label for="to-date" class="block text-sm font-medium text-foreground mb-1">To date</label>
+                    <label for="to-date" class="block text-sm font-medium text-muted-foreground mb-1">To date</label>
                     <input type="datetime-local" id="to-date" x-model="toDate"
-                           class="h-10 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                           class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                            required>
                 </div>
             </div>
             <div class="flex items-center gap-3">
                 <button type="submit"
                         :disabled="loading"
-                        class="inline-flex h-9 items-center justify-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:opacity-50 disabled:pointer-events-none">
+                        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
                     <template x-if="loading">
                         {{ loading_inline(size='sm', text='Loading...') }}
                     </template>
-                    <template x-if="!loading">Show changes</template>
+                    <span x-show="!loading">Show changes</span>
                 </button>
                 <template x-if="lastLoaded">
                     <span class="text-sm text-muted-foreground" x-text="'Last loaded: ' + formatDateTime(lastLoaded)"></span>
@@ -55,19 +55,19 @@
     </template>
 
     <template x-if="error">
-        <section class="rounded-xl border border-destructive/50 bg-destructive/10 p-6">
+        <section class="rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2">
             <p class="text-sm text-destructive" x-text="error"></p>
         </section>
     </template>
 
     <template x-if="!loading && !error && changes.length === 0">
-        <section class="rounded-xl border border-border bg-card p-6">
+        <section class="rounded-lg border border-border bg-card p-6">
             <p class="text-sm text-muted-foreground">No changes recorded in this date range.</p>
         </section>
     </template>
 
     <template x-if="!loading && !error && changes.length > 0">
-        <section class="rounded-xl border border-border bg-card p-6">
+        <section class="rounded-lg border border-border bg-card p-6">
             <header class="mb-4 flex items-center justify-between">
                 <h2 class="text-lg font-semibold text-foreground" x-text="changes.length + ' change' + (changes.length === 1 ? '' : 's')"></h2>
                 <div class="flex items-center gap-2">
@@ -135,7 +135,7 @@
                                 </button>
                                 <template x-if="openSnapshots.includes(change.table_name + '_' + change.record_id + '_' + change.valid_from)">
                                     <div class="mt-2 overflow-x-auto rounded-md border border-border bg-muted p-3">
-                                        <pre class="text-[11px] font-mono text-foreground" x-text="JSON.stringify(change.snapshot, null, 2)"></pre>
+                                        <pre class="text-2xs font-mono text-foreground" x-text="JSON.stringify(change.snapshot, null, 2)"></pre>
                                     </div>
                                 </template>
                             </div>
@@ -152,11 +152,11 @@
                                         <div class="mt-2 space-y-2">
                                             <div class="rounded-md border border-border bg-muted p-3">
                                                 <p class="text-xs font-medium text-muted-foreground mb-1">Previous version</p>
-                                                <pre class="text-[11px] font-mono text-foreground" x-text="JSON.stringify(change.previous_snapshot, null, 2)"></pre>
+                                                <pre class="text-2xs font-mono text-foreground" x-text="JSON.stringify(change.previous_snapshot, null, 2)"></pre>
                                             </div>
                                             <div class="rounded-md border border-border bg-muted p-3">
                                                 <p class="text-xs font-medium text-muted-foreground mb-1">Current version</p>
-                                                <pre class="text-[11px] font-mono text-foreground" x-text="JSON.stringify(change.snapshot, null, 2)"></pre>
+                                                <pre class="text-2xs font-mono text-foreground" x-text="JSON.stringify(change.snapshot, null, 2)"></pre>
                                             </div>
                                         </div>
                                     </template>
@@ -180,7 +180,7 @@
                                     <article class="rounded-lg border border-border bg-card p-3" role="listitem">
                                         <header class="flex flex-wrap items-start justify-between gap-3 mb-2">
                                             <div class="flex items-center gap-2">
-                                                <span class="inline-flex h-5 items-center rounded-full border border-border px-1.5 text-[10px] font-medium text-foreground"
+                                                <span class="inline-flex h-5 items-center rounded-full border border-border px-1.5 text-10 font-medium text-foreground"
                                                       x-text="change.action.toUpperCase()"></span>
                                                 <span class="text-sm text-foreground" x-text="change.table_name.replace('archimate_', '').replace('_', ' ') + ' #' + change.record_id"></span>
                                             </div>
@@ -193,11 +193,11 @@
                                         <div class="grid gap-1 text-xs sm:grid-cols-3">
                                             <div>
                                                 <dt class="text-muted-foreground">From</dt>
-                                                <dd class="text-foreground font-mono text-[10px]" x-text="formatDateTime(change.valid_from)"></dd>
+                                                <dd class="text-foreground font-mono text-10" x-text="formatDateTime(change.valid_from)"></dd>
                                             </div>
                                             <div>
                                                 <dt class="text-muted-foreground">To</dt>
-                                                <dd class="text-foreground font-mono text-[10px]" x-text="change.valid_to ? formatDateTime(change.valid_to) : 'current'"></dd>
+                                                <dd class="text-foreground font-mono text-10" x-text="change.valid_to ? formatDateTime(change.valid_to) : 'current'"></dd>
                                             </div>
                                             <template x-if="change.changed_by_name">
                                                 <div>
@@ -270,7 +270,7 @@ function changesPage() {
                 this.changes = data.changes || [];
                 this.lastLoaded = new Date().toISOString();
             } catch (e) {
-                this.error = 'Could not load changes: ' + e.message;
+                this.error = 'We could not load the changes for that period. Check the dates and try again in a moment.';
             } finally {
                 this.loading = false;
                 this.$nextTick(() => lucide.createIcons());

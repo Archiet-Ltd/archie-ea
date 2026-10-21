@@ -44,14 +44,14 @@ Parameters:
 
 <div id="{{ container_id }}" class="roadmap-widget" data-endpoint="{{ data_endpoint }}">
     <!-- Roadmap Controls -->
-    <div class="bg-card rounded-lg shadow p-4 mb-6">
+    <div class="bg-card rounded-lg p-4 mb-6">
         <div class="px-6 py-4 border-b border-border">
             <div class="flex flex-wrap items-center justify-between gap-3">
                 <!-- Left Group: View Toggle + Item Count -->
                 <div class="flex flex-wrap items-center gap-3">
                     <!-- View Toggle -->
                     <div class="flex items-center space-x-2 bg-muted rounded-lg p-1" title="Switch between auto-detected gaps and saved roadmap items">
-                        <button type="button" id="roadmap-view-auto-{{ container_id }}" @click="setRoadmapView{{ container_id }}('auto')" class="px-3 py-1.5 text-sm rounded-md bg-card shadow-sm font-medium text-muted-foreground transition-all" aria-label="Action">
+                        <button type="button" id="roadmap-view-auto-{{ container_id }}" @click="setRoadmapView{{ container_id }}('auto')" class="px-3 py-1.5 text-sm rounded-md bg-card font-medium text-muted-foreground transition-all" aria-label="Action">
                             Auto-Detected
                         </button>
                         <button type="button" id="roadmap-view-saved-{{ container_id }}" @click="setRoadmapView{{ container_id }}('saved')" class="px-3 py-1.5 text-sm rounded-md font-medium text-muted-foreground hover:text-foreground transition-all" aria-label="Save">
@@ -72,11 +72,11 @@ Parameters:
                     <!-- Navigation Controls -->
                     <div id="hierarchy-controls-{{ container_id }}" class="flex items-center gap-2">
                         <div class="flex items-center space-x-1 bg-muted rounded-lg p-1">
-                            <button type="button" @click="expandAllRoadmapRows{{ container_id }}()" class="px-3 py-1.5 text-sm rounded-md font-medium text-muted-foreground hover:bg-card hover:shadow-sm transition-all" title="Expand All (Ctrl+E)">
+                            <button type="button" @click="expandAllRoadmapRows{{ container_id }}()" class="px-3 py-1.5 text-sm rounded-md font-medium text-muted-foreground hover:bg-card transition-all" title="Expand All (Ctrl+E)">
                                 <i data-lucide="chevrons-down" class="w-4 h-4 inline mr-1"></i>
                                 Expand All
                             </button>
-                            <button type="button" @click="collapseAllRoadmapRows{{ container_id }}()" class="px-3 py-1.5 text-sm rounded-md font-medium text-muted-foreground hover:bg-card hover:shadow-sm transition-all" title="Collapse All (Ctrl+Shift+E)">
+                            <button type="button" @click="collapseAllRoadmapRows{{ container_id }}()" class="px-3 py-1.5 text-sm rounded-md font-medium text-muted-foreground hover:bg-card transition-all" title="Collapse All (Ctrl+Shift+E)">
                                 <i data-lucide="chevrons-up" class="w-4 h-4 inline mr-1"></i>
                                 Collapse All
                             </button>
@@ -114,7 +114,7 @@ Parameters:
                             Export
                             <i data-lucide="chevron-down" class="w-4 h-4 ml-1"></i>
                         </button>
-                        <div id="roadmap-export-menu-{{ container_id }}" class="hidden absolute right-0 mt-2 w-48 bg-card rounded-md shadow-lg z-50 border border-border">
+                        <div id="roadmap-export-menu-{{ container_id }}" class="hidden absolute right-0 mt-2 w-48 bg-card rounded-md z-50 border border-border">
                             <div class="py-1">
                                 <button type="button" @click="exportRoadmap{{ container_id }}('pdf')" class="w-full text-left px-4 py-2 text-sm text-muted-foreground hover:bg-accent flex items-center" aria-label="Export">
                                     <i data-lucide="file-text" class="w-4 h-4 mr-2"></i>
@@ -140,16 +140,16 @@ Parameters:
 
                     <!-- Timeline Zoom Controls -->
                     <div class="flex items-center space-x-1 bg-muted rounded-lg p-1" title="Change timeline zoom level">
-                        <button type="button" @click="setTimelineZoom{{ container_id }}('day')" id="zoom-day-{{ container_id }}" class="px-2 py-1 text-xs rounded font-medium text-muted-foreground hover:bg-card hover:shadow-sm transition-all" title="View timeline by day">
+                        <button type="button" @click="setTimelineZoom{{ container_id }}('day')" id="zoom-day-{{ container_id }}" class="px-2 py-1 text-xs rounded font-medium text-muted-foreground hover:bg-card transition-all" title="View timeline by day">
                             Day
                         </button>
-                        <button type="button" @click="setTimelineZoom{{ container_id }}('week')" id="zoom-week-{{ container_id }}" class="px-2 py-1 text-xs rounded font-medium text-muted-foreground hover:bg-card hover:shadow-sm transition-all" title="View timeline by week">
+                        <button type="button" @click="setTimelineZoom{{ container_id }}('week')" id="zoom-week-{{ container_id }}" class="px-2 py-1 text-xs rounded font-medium text-muted-foreground hover:bg-card transition-all" title="View timeline by week">
                             Week
                         </button>
-                        <button type="button" @click="setTimelineZoom{{ container_id }}('month')" id="zoom-month-{{ container_id }}" class="px-2 py-1 text-xs rounded bg-card shadow-sm font-medium text-muted-foreground transition-all" title="View timeline by month (default)">
+                        <button type="button" @click="setTimelineZoom{{ container_id }}('month')" id="zoom-month-{{ container_id }}" class="px-2 py-1 text-xs rounded bg-card font-medium text-muted-foreground transition-all" title="View timeline by month (default)">
                             Month
                         </button>
-                        <button type="button" @click="setTimelineZoom{{ container_id }}('quarter')" id="zoom-quarter-{{ container_id }}" class="px-2 py-1 text-xs rounded font-medium text-muted-foreground hover:bg-card hover:shadow-sm transition-all" title="View timeline by quarter">
+                        <button type="button" @click="setTimelineZoom{{ container_id }}('quarter')" id="zoom-quarter-{{ container_id }}" class="px-2 py-1 text-xs rounded font-medium text-muted-foreground hover:bg-card transition-all" title="View timeline by quarter">
                             Quarter
                         </button>
                     </div>
@@ -159,19 +159,19 @@ Parameters:
                     <!-- Timeline Range Controls -->
                     <div class="flex items-center space-x-1 bg-muted rounded-lg p-1" title="Set timeline range (number of years displayed)">
                         <span class="px-1 text-xs font-medium text-muted-foreground">Range:</span>
-                        <button type="button" @click="setTimelineRangeWidget{{ container_id }}(1)" data-timeline-range-{{ container_id }}="1" class="px-2 py-1 text-xs rounded font-medium text-muted-foreground hover:bg-card hover:shadow-sm transition-all" title="Show 1 year">
+                        <button type="button" @click="setTimelineRangeWidget{{ container_id }}(1)" data-timeline-range-{{ container_id }}="1" class="px-2 py-1 text-xs rounded font-medium text-muted-foreground hover:bg-card transition-all" title="Show 1 year">
                             1Y
                         </button>
-                        <button type="button" @click="setTimelineRangeWidget{{ container_id }}(2)" data-timeline-range-{{ container_id }}="2" class="px-2 py-1 text-xs rounded font-medium text-muted-foreground hover:bg-card hover:shadow-sm transition-all" title="Show 2 years">
+                        <button type="button" @click="setTimelineRangeWidget{{ container_id }}(2)" data-timeline-range-{{ container_id }}="2" class="px-2 py-1 text-xs rounded font-medium text-muted-foreground hover:bg-card transition-all" title="Show 2 years">
                             2Y
                         </button>
-                        <button type="button" @click="setTimelineRangeWidget{{ container_id }}(4)" data-timeline-range-{{ container_id }}="4" class="px-2 py-1 text-xs rounded bg-card shadow-sm font-medium text-muted-foreground transition-all" title="Show 4 years (default)">
+                        <button type="button" @click="setTimelineRangeWidget{{ container_id }}(4)" data-timeline-range-{{ container_id }}="4" class="px-2 py-1 text-xs rounded bg-card font-medium text-muted-foreground transition-all" title="Show 4 years (default)">
                             4Y
                         </button>
-                        <button type="button" @click="setTimelineRangeWidget{{ container_id }}(6)" data-timeline-range-{{ container_id }}="6" class="px-2 py-1 text-xs rounded font-medium text-muted-foreground hover:bg-card hover:shadow-sm transition-all" title="Show 6 years">
+                        <button type="button" @click="setTimelineRangeWidget{{ container_id }}(6)" data-timeline-range-{{ container_id }}="6" class="px-2 py-1 text-xs rounded font-medium text-muted-foreground hover:bg-card transition-all" title="Show 6 years">
                             6Y
                         </button>
-                        <button type="button" @click="setTimelineRangeWidget{{ container_id }}(10)" data-timeline-range-{{ container_id }}="10" class="px-2 py-1 text-xs rounded font-medium text-muted-foreground hover:bg-card hover:shadow-sm transition-all" title="Show 10 years">
+                        <button type="button" @click="setTimelineRangeWidget{{ container_id }}(10)" data-timeline-range-{{ container_id }}="10" class="px-2 py-1 text-xs rounded font-medium text-muted-foreground hover:bg-card transition-all" title="Show 10 years">
                             10Y
                         </button>
                     </div>
@@ -182,7 +182,7 @@ Parameters:
 
     {% if show_gap_legend %}
     <!-- Gap Type Legend -->
-    <div class="bg-card rounded-lg shadow p-3 mb-4">
+    <div class="bg-card rounded-lg p-3 mb-4">
         <div class="flex flex-wrap items-center gap-4 text-sm">
             <span class="font-medium text-muted-foreground">Gap Types:</span>
             <span class="flex items-center gap-1">
@@ -208,7 +208,7 @@ Parameters:
     {% if show_gap_types %}
     <!-- Statistics Cards - Row 1: Gap Types -->
     <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-        <div class="bg-card rounded-lg shadow p-4 cursor-pointer hover:shadow-md transition-shadow" @click="setGapTypeFilter{{ container_id }}('coverage')">
+        <div class="bg-card rounded-lg p-4 cursor-pointer transition-shadow" @click="setGapTypeFilter{{ container_id }}('coverage')">
             <div class="flex items-center justify-between">
                 <div>
                     <p class="text-sm text-muted-foreground">Coverage Gaps</p>
@@ -220,7 +220,7 @@ Parameters:
                 </div>
             </div>
         </div>
-        <div class="bg-card rounded-lg shadow p-4 cursor-pointer hover:shadow-md transition-shadow" @click="setGapTypeFilter{{ container_id }}('quality')">
+        <div class="bg-card rounded-lg p-4 cursor-pointer transition-shadow" @click="setGapTypeFilter{{ container_id }}('quality')">
             <div class="flex items-center justify-between">
                 <div>
                     <p class="text-sm text-muted-foreground">Quality Gaps</p>
@@ -232,7 +232,7 @@ Parameters:
                 </div>
             </div>
         </div>
-        <div class="bg-card rounded-lg shadow p-4 cursor-pointer hover:shadow-md transition-shadow" @click="setGapTypeFilter{{ container_id }}('retirement')">
+        <div class="bg-card rounded-lg p-4 cursor-pointer transition-shadow" @click="setGapTypeFilter{{ container_id }}('retirement')">
             <div class="flex items-center justify-between">
                 <div>
                     <p class="text-sm text-muted-foreground">Retirement Gaps</p>
@@ -244,7 +244,7 @@ Parameters:
                 </div>
             </div>
         </div>
-        <div class="bg-card rounded-lg shadow p-4 cursor-pointer hover:shadow-md transition-shadow" @click="setGapTypeFilter{{ container_id }}('modernization')">
+        <div class="bg-card rounded-lg p-4 cursor-pointer transition-shadow" @click="setGapTypeFilter{{ container_id }}('modernization')">
             <div class="flex items-center justify-between">
                 <div>
                     <p class="text-sm text-muted-foreground">Modernization Gaps</p>
@@ -260,7 +260,7 @@ Parameters:
 
     <!-- Statistics Cards - Row 2: Priority & Summary -->
     <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-        <div class="bg-card rounded-lg shadow p-4">
+        <div class="bg-card rounded-lg p-4">
             <div class="flex items-center justify-between">
                 <div>
                     <p class="text-sm text-muted-foreground">Total Gaps</p>
@@ -271,7 +271,7 @@ Parameters:
                 </div>
             </div>
         </div>
-        <div class="bg-card rounded-lg shadow p-4">
+        <div class="bg-card rounded-lg p-4">
             <div class="flex items-center justify-between">
                 <div>
                     <p class="text-sm text-muted-foreground">Critical Priority</p>
@@ -282,7 +282,7 @@ Parameters:
                 </div>
             </div>
         </div>
-        <div class="bg-card rounded-lg shadow p-4">
+        <div class="bg-card rounded-lg p-4">
             <div class="flex items-center justify-between">
                 <div>
                     <p class="text-sm text-muted-foreground">High Priority</p>
@@ -293,7 +293,7 @@ Parameters:
                 </div>
             </div>
         </div>
-        <div class="bg-card rounded-lg shadow p-4">
+        <div class="bg-card rounded-lg p-4">
             <div class="flex items-center justify-between">
                 <div>
                     <p class="text-sm text-muted-foreground">Timeline Range</p>
@@ -308,7 +308,7 @@ Parameters:
     {% endif %}
 
     <!-- Advanced Search & Filter Panel -->
-    <div class="bg-card rounded-lg shadow mb-4">
+    <div class="bg-card rounded-lg mb-4">
         <div class="px-6 py-4 border-b border-border">
             <div class="flex items-center justify-between">
                 <h3 class="text-base font-semibold text-foreground flex items-center">
@@ -420,7 +420,7 @@ Parameters:
     </div>
 
     <!-- Timeline Container -->
-    <div class="bg-card rounded-lg shadow overflow-hidden">
+    <div class="bg-card rounded-lg overflow-hidden">
         <div id="roadmap-timeline-container-{{ container_id }}" class="overflow-x-auto">
             <div id="roadmap-timeline-{{ container_id }}" class="min-w-full">
                 <!-- Timeline will be rendered here -->

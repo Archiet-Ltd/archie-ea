@@ -75,13 +75,13 @@
         <!-- T3-1: Export and print actions (visible on all instances) -->
         <div class="flex items-center gap-2 shrink-0">
             <a href="/api/ea-workflows/instances/{{ instance.id }}/artifacts/export"
-               class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-input bg-background hover:border-primary/50 text-sm font-medium transition-colors"
+               class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center"
                download>
                 <i data-lucide="download" class="h-3.5 w-3.5" aria-hidden="true"></i>
                 Export JSON
             </a>
             <button type="button" @click="window.print()"
-                    class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-input bg-background hover:border-primary/50 text-sm font-medium transition-colors">
+                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                 <i data-lucide="printer" class="h-3.5 w-3.5" aria-hidden="true"></i>
                 Print
             </button>
@@ -134,7 +134,7 @@
                     {{ reject_btn() }}
                     {% endif %}
                     {% if instance.status == 'failed' %}
-                    <button type="button" @click="retryWorkflow()" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary text-primary-foreground font-medium text-sm hover:bg-primary/90 transition-colors">
+                    <button type="button" @click="retryWorkflow()" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                         <i data-lucide="rotate-ccw" class="h-4 w-4" aria-hidden="true"></i> Retry
                     </button>
                     {% endif %}
@@ -176,7 +176,7 @@
 
             {# Critical Findings + Recommendation #}
             {% if sm.critical_findings %}
-            <div class="rounded-lg border border-warning/30 bg-warning/5 p-4">
+            <div class="rounded-md border border-warning/40 bg-warning/10 px-3 py-2">
                 <div class="flex items-start gap-2.5">
                     <i data-lucide="alert-triangle" class="h-5 w-5 text-warning shrink-0 mt-0.5" aria-hidden="true"></i>
                     <div class="flex-1">
@@ -199,7 +199,7 @@
 
     {# ── Error Display ── #}
     {% if instance.error_message %}
-    <div class="rounded-xl border-2 border-destructive/20 bg-destructive/5 p-5" role="alert" aria-live="assertive">
+    <div class="border rounded-md border-2 border-destructive/40 bg-destructive/10 px-3 py-2" role="alert" aria-live="assertive">
         <div class="flex items-start gap-3">
             <i data-lucide="alert-circle" class="h-5 w-5 text-destructive shrink-0 mt-0.5" aria-hidden="true"></i>
             <div class="flex-1">
@@ -273,7 +273,7 @@
                         {{ rr.relationship_gaps.violations|length }} Metamodel Violation{{ 's' if rr.relationship_gaps.violations|length != 1 else '' }}
                     </summary>
                     <div class="overflow-x-auto mt-2">
-                        <table class="w-full text-xs">
+                        <table class="dense-table w-full text-xs">
                             <thead><tr class="border-b text-left text-muted-foreground">
                                 <th class="py-2 pr-3">Source</th><th class="py-2 pr-3">Relationship</th><th class="py-2 pr-3">Target</th><th class="py-2">Issue</th>
                             </tr></thead>
@@ -281,7 +281,7 @@
                             {% for v in rr.relationship_gaps.violations %}
                             <tr class="border-b border-input/30 bg-destructive/[0.03]">
                                 <td class="py-2 pr-3 font-medium">{% set _h = am_href(v.source_layer, v.source_id)|trim %}{% if _h %}<a href="{{ _h }}" class="text-primary hover:underline">{{ v.source_name }}</a>{% else %}{{ v.source_name }}{% endif %}</td>
-                                <td class="py-2 pr-3"><span class="rounded px-1.5 py-0.5 bg-primary/10 text-primary font-medium">{{ v.relationship_type }}</span></td>
+                                <td class="py-2 pr-3"><span class="rounded px-1.5 py-0.5 bg-primary/10 text-info-emphasis font-medium">{{ v.relationship_type }}</span></td>
                                 <td class="py-2 pr-3 font-medium">{% set _h = am_href(v.target_layer, v.target_id)|trim %}{% if _h %}<a href="{{ _h }}" class="text-primary hover:underline">{{ v.target_name }}</a>{% else %}{{ v.target_name }}{% endif %}</td>
                                 <td class="py-2 text-destructive-emphasis">{{ v.issue }}</td>
                             </tr>
@@ -345,15 +345,15 @@
                         <div class="text-xl font-bold">{{ rr.completeness.get('total_checked', 0) }}</div>
                         <div class="text-xs text-muted-foreground">Total Elements</div>
                     </div>
-                    <div class="rounded-lg bg-success/10 p-3 text-center">
+                    <div class="rounded-md bg-success/10 px-3 py-2 text-center">
                         <div class="text-xl font-bold text-success">{{ rr.completeness.get('healthy_count', 0) }}</div>
                         <div class="text-xs text-muted-foreground">Healthy</div>
                     </div>
-                    <div class="rounded-lg bg-warning/10 p-3 text-center">
+                    <div class="rounded-md bg-warning/10 px-3 py-2 text-center">
                         <div class="text-xl font-bold text-warning">{{ sm.orphan_count }}</div>
                         <div class="text-xs text-muted-foreground">Orphans</div>
                     </div>
-                    <div class="rounded-lg bg-destructive/10 p-3 text-center">
+                    <div class="rounded-md bg-destructive/10 px-3 py-2 text-center">
                         <div class="text-xl font-bold text-destructive">{{ sm.undocumented }}</div>
                         <div class="text-xs text-muted-foreground">Undocumented</div>
                     </div>
@@ -368,7 +368,7 @@
                 <details class="text-xs mb-2" open>
                     <summary class="cursor-pointer font-semibold text-warning-emphasis py-1">{{ orphans|length }} Orphan Element{{ 's' if orphans|length != 1 else '' }} (no relationships)</summary>
                     <div class="overflow-x-auto mt-2">
-                        <table class="w-full text-xs">
+                        <table class="dense-table w-full text-xs">
                             <thead><tr class="border-b text-left text-muted-foreground">
                                 <th class="py-1.5 pr-3">Element</th><th class="py-1.5 pr-3">Layer</th><th class="py-1.5 pr-3">Type</th><th class="py-1.5">Suggested Fix</th>
                             </tr></thead>
@@ -391,7 +391,7 @@
                 <details class="text-xs mb-2">
                     <summary class="cursor-pointer font-semibold text-warning-emphasis py-1">{{ undocumented_els|length }} Undocumented Element{{ 's' if undocumented_els|length != 1 else '' }}</summary>
                     <div class="overflow-x-auto mt-2">
-                        <table class="w-full text-xs">
+                        <table class="dense-table w-full text-xs">
                             <thead><tr class="border-b text-left text-muted-foreground">
                                 <th class="py-1.5 pr-3">Element</th><th class="py-1.5 pr-3">Layer</th><th class="py-1.5 pr-3">Type</th><th class="py-1.5">Suggested Fix</th>
                             </tr></thead>
@@ -423,11 +423,11 @@
 
                 {# Priority breakdown #}
                 <div class="grid grid-cols-3 gap-2 mb-4">
-                    <div class="rounded-lg bg-destructive/10 p-3 text-center">
+                    <div class="rounded-md bg-destructive/10 px-3 py-2 text-center">
                         <div class="text-xl font-bold text-destructive">{{ rr.relationship_gaps.get('high_priority_count', 0) }}</div>
                         <div class="text-xs text-muted-foreground">High Priority</div>
                     </div>
-                    <div class="rounded-lg bg-warning/10 p-3 text-center">
+                    <div class="rounded-md bg-warning/10 px-3 py-2 text-center">
                         <div class="text-xl font-bold text-warning">{{ rr.relationship_gaps.get('medium_priority_count', 0) }}</div>
                         <div class="text-xs text-muted-foreground">Medium</div>
                     </div>
@@ -452,7 +452,7 @@
                             <div class="flex items-center gap-2 flex-wrap mb-1.5">
                                 <span class="font-semibold">{{ s.source_name }}</span>
                                 <i data-lucide="arrow-right" class="h-3 w-3 text-muted-foreground" aria-hidden="true"></i>
-                                <span class="inline-flex items-center rounded px-2 py-0.5 text-xs font-semibold bg-primary/10 text-primary">{{ s.relationship_type }}</span>
+                                <span class="inline-flex items-center rounded px-2 py-0.5 text-xs font-semibold bg-primary/10 text-info-emphasis">{{ s.relationship_type }}</span>
                                 <i data-lucide="arrow-right" class="h-3 w-3 text-muted-foreground" aria-hidden="true"></i>
                                 <span class="font-semibold">{{ s.target_name }}</span>
                                 <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ml-auto
@@ -494,7 +494,7 @@
                         <div class="flex items-center gap-2 flex-wrap mb-1.5">
                             <span class="font-semibold">{{ s.source_name }}</span>
                             <i data-lucide="arrow-right" class="h-3 w-3 text-muted-foreground" aria-hidden="true"></i>
-                            <span class="inline-flex items-center rounded px-2 py-0.5 text-xs font-semibold bg-primary/10 text-primary">{{ s.relationship_type }}</span>
+                            <span class="inline-flex items-center rounded px-2 py-0.5 text-xs font-semibold bg-primary/10 text-info-emphasis">{{ s.relationship_type }}</span>
                             <i data-lucide="arrow-right" class="h-3 w-3 text-muted-foreground" aria-hidden="true"></i>
                             <span class="font-semibold">{{ s.target_name }}</span>
                             <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ml-auto
@@ -554,7 +554,7 @@
                     </p>
                     {% if attention_elements %}
                     <div class="overflow-x-auto mb-4">
-                        <table class="w-full text-xs">
+                        <table class="dense-table w-full text-xs">
                             <thead><tr class="border-b text-left text-muted-foreground">
                                 <th class="py-2 pr-2 w-8"><input type="checkbox" @change="toggleAll($event)" aria-label="Select all elements" class="rounded"></th>
                                 <th class="py-2 pr-3">Element</th><th class="py-2 pr-3">Layer</th><th class="py-2 pr-3">Score</th>
@@ -599,7 +599,7 @@
                 <div class="mb-3">
                     <h3 class="text-xs font-semibold text-destructive-emphasis uppercase tracking-wide mb-2">{{ attention_elements|length }} Element{{ 's' if attention_elements|length != 1 else '' }} Below Threshold (score &lt; 50)</h3>
                     <div class="overflow-x-auto">
-                        <table class="w-full text-xs">
+                        <table class="dense-table w-full text-xs">
                             <thead><tr class="border-b text-left text-muted-foreground">
                                 <th class="py-2 pr-3">Element</th><th class="py-2 pr-3">Layer</th><th class="py-2 pr-3">Score</th>
                                 <th class="py-2 pr-2">Desc</th><th class="py-2 pr-2">Connect</th><th class="py-2 pr-2">X-Layer</th><th class="py-2 pr-2">Naming</th><th class="py-2 pr-2">Type</th><th class="py-2 pr-2">Meta</th>
@@ -671,7 +671,7 @@
                 </div>
 
                 <div class="grid grid-cols-3 gap-3 mb-4">
-                    <div class="rounded-lg bg-success/10 p-3 text-center">
+                    <div class="rounded-md bg-success/10 px-3 py-2 text-center">
                         <div class="text-xl font-bold text-success">{{ rr.committed.get('relationships_created', 0) }}</div>
                         <div class="text-xs text-muted-foreground">Created</div>
                     </div>
@@ -679,7 +679,7 @@
                         <div class="text-xl font-bold">{{ rr.committed.get('deferred_count', 0) }}</div>
                         <div class="text-xs text-muted-foreground">Deferred</div>
                     </div>
-                    <div class="rounded-lg bg-destructive/10 p-3 text-center">
+                    <div class="rounded-md bg-destructive/10 px-3 py-2 text-center">
                         <div class="text-xl font-bold text-destructive">{{ rr.committed.get('failed_count', 0) }}</div>
                         <div class="text-xs text-muted-foreground">Failed</div>
                     </div>
@@ -687,7 +687,7 @@
 
                 {% if rr.committed.get('committed') %}
                 <div class="overflow-x-auto">
-                    <table class="w-full text-xs">
+                    <table class="dense-table w-full text-xs">
                         <thead><tr class="border-b text-left text-muted-foreground">
                             <th class="py-2 pr-3 w-6"></th><th class="py-2 pr-3">Source</th><th class="py-2 pr-3">Relationship</th><th class="py-2 pr-3">Target</th><th class="py-2">Status</th>
                         </tr></thead>
@@ -697,7 +697,7 @@
                         <tr class="border-b border-input/30">
                             <td class="py-2 pr-3"><i data-lucide="{% if c.action == 'created' %}plus-circle{% else %}check-circle-2{% endif %}" class="h-3.5 w-3.5 text-success" aria-hidden="true"></i></td>
                             <td class="py-2 pr-3 font-medium">{{ c.get('source_name', '') }}</td>
-                            <td class="py-2 pr-3"><span class="rounded px-1.5 py-0.5 bg-primary/10 text-primary font-medium">{{ c.get('relationship_type', '') }}</span></td>
+                            <td class="py-2 pr-3"><span class="rounded px-1.5 py-0.5 bg-primary/10 text-info-emphasis font-medium">{{ c.get('relationship_type', '') }}</span></td>
                             <td class="py-2 pr-3 font-medium">{{ c.get('target_name', '') }}</td>
                             <td class="py-2"><span class="rounded px-1.5 py-0.5 bg-success/10 text-success-emphasis text-xs font-medium">{{ c.action }}</span></td>
                         </tr>
@@ -716,7 +716,7 @@
                         <i data-lucide="terminal" class="h-5 w-5 text-muted-foreground" aria-hidden="true"></i>
                         <h2 class="text-base font-semibold text-muted-foreground">Execution Log</h2>
                     </div>
-                    <button type="button" @click="showLog = !showLog" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-input hover:bg-muted text-xs font-medium transition-colors">
+                    <button type="button" @click="showLog = !showLog" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                         <i data-lucide="chevron-down" class="h-3 w-3 transition-transform" :class="showLog ? 'rotate-180' : ''" aria-hidden="true"></i>
                         <span x-text="showLog ? 'Hide' : 'Show Steps'"></span>
                     </button>
@@ -817,21 +817,21 @@
                 <h3 class="text-sm font-semibold mb-3">Quick links</h3>
                 <div class="flex flex-wrap gap-2">
                     {% if _ns.app_id %}
-                    <a href="{{ url_for('unified_applications.application_detail', id=_ns.app_id, edit='1') }}" class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border-2 border-input hover:border-primary/40 hover:bg-muted text-xs font-medium transition-colors">
+                    <a href="{{ url_for('unified_applications.application_detail', id=_ns.app_id, edit='1') }}" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                         <i data-lucide="external-link" class="h-3 w-3" aria-hidden="true"></i> Edit application
                     </a>
                     {% endif %}
                     {% if _ns.app_id and _ns.has_elements %}
-                    <a href="{{ url_for('unified_applications.application_detail', id=_ns.app_id, tab='architecture') }}" class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border-2 border-input hover:border-primary/40 hover:bg-muted text-xs font-medium transition-colors">
+                    <a href="{{ url_for('unified_applications.application_detail', id=_ns.app_id, tab='architecture') }}" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                         <i data-lucide="layout-template" class="h-3 w-3" aria-hidden="true"></i> View ArchiMate model
                     </a>
                     {% elif _ns.has_elements %}
-                    <a href="{{ url_for('archimate_crud.dashboard') }}" class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border-2 border-input hover:border-primary/40 hover:bg-muted text-xs font-medium transition-colors">
+                    <a href="{{ url_for('archimate_crud.dashboard') }}" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                         <i data-lucide="layout-template" class="h-3 w-3" aria-hidden="true"></i> View ArchiMate model
                     </a>
                     {% endif %}
                     {% if instance.workflow_code == 'GAP_REMEDIATION' and _ns.wp_ids %}
-                    <a href="{{ url_for('unified_low_priority.capability_map_dashboard', tab='roadmap') }}" class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border-2 border-input hover:border-primary/40 hover:bg-muted text-xs font-medium transition-colors" title="View {{ _ns.wp_ids|length }} remediation work package(s) in roadmap">
+                    <a href="{{ url_for('unified_low_priority.capability_map_dashboard', tab='roadmap') }}" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center" title="View {{ _ns.wp_ids|length }} remediation work package(s) in roadmap">
                         <i data-lucide="map" class="h-3 w-3" aria-hidden="true"></i> View in Roadmap
                     </a>
                     {% endif %}
@@ -843,16 +843,16 @@
             <div class="rounded-xl border-2 border-input bg-background p-5 no-print" x-data="deliverablesPanel()">
                 <h3 class="text-sm font-semibold mb-3">Export & Share</h3>
                 <div class="grid grid-cols-2 gap-1.5 mb-3">
-                    <button type="button" @click="printReport()" class="inline-flex items-center justify-center gap-1.5 px-2.5 py-2 rounded-lg border-2 border-input hover:border-primary/40 hover:bg-muted text-xs font-medium transition-colors" title="Print or save as PDF">
+                    <button type="button" @click="printReport()" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center" title="Print or save as PDF">
                         <i data-lucide="printer" class="h-3.5 w-3.5" aria-hidden="true"></i> Print / PDF
                     </button>
-                    <button type="button" @click="exportJSON()" class="inline-flex items-center justify-center gap-1.5 px-2.5 py-2 rounded-lg border-2 border-input hover:border-primary/40 hover:bg-muted text-xs font-medium transition-colors" title="Export as JSON">
+                    <button type="button" @click="exportJSON()" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center" title="Export as JSON">
                         <i data-lucide="braces" class="h-3.5 w-3.5" aria-hidden="true"></i> JSON
                     </button>
-                    <button type="button" @click="exportCSV()" class="inline-flex items-center justify-center gap-1.5 px-2.5 py-2 rounded-lg border-2 border-input hover:border-primary/40 hover:bg-muted text-xs font-medium transition-colors" title="Export as CSV">
+                    <button type="button" @click="exportCSV()" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center" title="Export as CSV">
                         <i data-lucide="table-2" class="h-3.5 w-3.5" aria-hidden="true"></i> CSV
                     </button>
-                    <button type="button" @click="copyShareLink()" class="inline-flex items-center justify-center gap-1.5 px-2.5 py-2 rounded-lg border-2 border-input hover:border-primary/40 hover:bg-muted text-xs font-medium transition-colors">
+                    <button type="button" @click="copyShareLink()" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
                         <i data-lucide="link" class="h-3.5 w-3.5" aria-hidden="true"></i>
                         <span x-text="copied ? 'Copied!' : 'Share'"></span>
                     </button>
@@ -880,7 +880,7 @@
                 <h3 class="text-sm font-semibold mb-3">ArchiMate Layers</h3>
                 <div class="flex flex-wrap gap-1.5">
                     {% for layer in rr.application.layers_found %}
-                    <span class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium bg-primary/10 text-primary">{{ layer }}</span>
+                    <span class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium bg-primary/10 text-info-emphasis">{{ layer }}</span>
                     {% endfor %}
                 </div>
                 <p class="text-xs text-muted-foreground mt-2">{{ rr.application.get('element_count', 0) }} elements analyzed</p>
@@ -926,7 +926,7 @@
                 <div class="flex flex-wrap items-center justify-end gap-2 shrink-0 no-print">
                     {% if instance.workflow_code == 'ADM_PHASE_A_VISION' and instance.status == 'completed' %}
                     <button type="button" @click="openInSolutionComposer()" :disabled="composerLoading"
-                            class="inline-flex items-center gap-1.5 px-3 py-2 sm:px-4 sm:py-2.5 rounded-lg bg-primary text-primary-foreground font-medium text-sm hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center sm:px-4 sm:py-2.5"
                             title="Create ArchiMate canvas from this Architecture Vision">
                         <i data-lucide="layout-template" class="h-4 w-4" aria-hidden="true" x-show="!composerLoading" x-cloak></i>
                         <i data-lucide="loader-2" class="h-4 w-4 animate-spin" aria-hidden="true" x-show="composerLoading" x-cloak></i>
@@ -945,7 +945,7 @@
                     {{ reject_btn('Reject', size='md', responsive=true) }}
                     {% endif %}
                     {% if instance.status == 'failed' %}
-                    <button type="button" @click="retryWorkflow()" class="inline-flex items-center gap-1.5 px-3 py-2 sm:px-4 sm:py-2.5 rounded-lg bg-primary text-primary-foreground font-medium text-sm hover:bg-primary/90 transition-colors"><i data-lucide="rotate-ccw" class="h-4 w-4" aria-hidden="true"></i><span class="hidden sm:inline">Retry</span></button>
+                    <button type="button" @click="retryWorkflow()" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center sm:px-4 sm:py-2.5"><i data-lucide="rotate-ccw" class="h-4 w-4" aria-hidden="true"></i><span class="hidden sm:inline">Retry</span></button>
                     {% endif %}
                     {% if instance.status in ['running', 'waiting_approval', 'pending'] %}
                     <button type="button" @click="openCancelDialog()" class="inline-flex items-center gap-1.5 px-3 py-2 sm:px-4 sm:py-2.5 rounded-lg border-2 border-destructive/50 text-destructive-emphasis font-medium text-sm hover:bg-destructive/10 transition-colors"><i data-lucide="x" class="h-4 w-4" aria-hidden="true"></i><span class="hidden sm:inline">Cancel</span></button>
@@ -954,7 +954,7 @@
             </div>
             <div class="flex items-center gap-3 flex-wrap">
                 {% if instance.adm_phase %}
-                <span class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium bg-primary/10 text-primary">Phase {{ instance.adm_phase }}{% if instance.adm_phase_name %}: {{ instance.adm_phase_name }}{% endif %}</span>
+                <span class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium bg-primary/10 text-info-emphasis">Phase {{ instance.adm_phase }}{% if instance.adm_phase_name %}: {{ instance.adm_phase_name }}{% endif %}</span>
                 {% endif %}
                 <span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold
                     {% if instance.status == 'completed' %}bg-success/10 text-success-emphasis
@@ -985,7 +985,7 @@
 
     {# Sticky failure banner #}
     <div x-show="showFailureBanner" x-cloak x-transition
-         class="sticky top-0 z-30 rounded-xl border-2 border-destructive/40 bg-destructive/5 p-4 flex items-center gap-3 no-print">
+         class="border sticky top-0 z-30 rounded-md border-2 border-destructive/40 bg-destructive/10 px-3 py-2 flex items-center gap-3 no-print">
         <i data-lucide="alert-triangle" class="h-5 w-5 text-destructive shrink-0" aria-hidden="true"></i>
         <div class="flex-1 min-w-0">
             <p class="text-sm font-medium text-destructive-emphasis" x-text="failureSummary"></p>
@@ -1065,7 +1065,7 @@
         <div class="mb-5">
             <h3 class="text-sm font-semibold text-foreground mb-2">Stakeholders</h3>
             <div class="overflow-x-auto">
-                <table class="w-full text-sm">
+                <table class="dense-table w-full text-sm">
                     <thead>
                         <tr class="border-b border-border">
                             <th class="py-2 pr-4 text-left font-medium text-muted-foreground">Name</th>
@@ -1150,7 +1150,7 @@
         <div class="mb-4">
             <h3 class="text-sm font-semibold text-foreground mb-2">Vendor Comparison</h3>
             <div class="overflow-x-auto">
-                <table class="w-full text-sm">
+                <table class="dense-table w-full text-sm">
                     <thead>
                         <tr class="border-b border-border">
                             <th class="py-2 pr-4 text-left font-medium text-muted-foreground">Vendor</th>
@@ -1230,7 +1230,7 @@
 
     {# ── APP_DISPOSITION: Application Portfolio Decision Record ─── #}
     {% if disposition_record %}
-    <div class="rounded-xl border-2 border-success/20 bg-success/5 p-6 space-y-5" id="disposition-record">
+    <div class="border rounded-md border-2 border-success/40 bg-success/10 px-3 py-2 space-y-5" id="disposition-record">
         <div class="flex items-center gap-3">
             <i data-lucide="split" class="h-6 w-6 text-success" aria-hidden="true"></i>
             <h3 class="text-lg font-semibold">Application Disposition Record</h3>
@@ -1238,7 +1238,7 @@
         </div>
         {% if disposition_record.dispositions %}
         <div class="overflow-x-auto">
-            <table class="w-full text-sm border border-border rounded-lg overflow-hidden">
+            <table class="dense-table w-full text-sm border border-border rounded-lg overflow-hidden">
                 <thead class="bg-muted/60">
                     <tr>
                         <th class="text-left px-4 py-2 font-medium">App ID</th>
@@ -1325,7 +1325,7 @@
 
     {# ── PLATFORM_MIGRATION_SCOPING: Migration Scope Document ─── #}
     {% if migration_scope %}
-    <div class="rounded-xl border-2 border-info/20 bg-info/5 p-6 space-y-5" id="migration-scope">
+    <div class="border rounded-md border-2 border-info/40 bg-info/10 px-3 py-2 space-y-5" id="migration-scope">
         <div class="flex items-center gap-3">
             <i data-lucide="server" class="h-6 w-6 text-primary" aria-hidden="true"></i>
             <h3 class="text-lg font-semibold">Platform Migration Scope</h3>
@@ -1355,7 +1355,7 @@
             <div class="space-y-2">
                 {% for wave in migration_scope.migration_waves %}
                 <div class="flex items-start gap-4 p-3 border border-border rounded-lg">
-                    <span class="inline-flex items-center justify-center w-7 h-7 rounded-full bg-primary/10 text-primary text-xs font-bold shrink-0">{{ wave.get('wave',loop.index) }}</span>
+                    <span class="inline-flex items-center justify-center w-7 h-7 rounded-full bg-primary/10 text-info-emphasis text-xs font-bold shrink-0">{{ wave.get('wave',loop.index) }}</span>
                     <div>
                         <div class="font-medium text-sm">{{ wave.get('label','—') }}</div>
                         <div class="text-xs text-muted-foreground mt-0.5">{{ wave.get('scope','') }}</div>
@@ -1370,7 +1370,7 @@
         <div>
             <h4 class="font-medium text-sm mb-3">Risk Register</h4>
             <div class="overflow-x-auto">
-                <table class="w-full text-sm border border-border rounded-lg overflow-hidden">
+                <table class="dense-table w-full text-sm border border-border rounded-lg overflow-hidden">
                     <thead class="bg-muted/60">
                         <tr>
                             <th class="text-left px-3 py-2 font-medium">Risk</th>
@@ -1401,7 +1401,7 @@
 
     {# ── ARB_PACK_GENERATION: ARB Submission Pack ─── #}
     {% if arb_pack %}
-    <div class="rounded-xl border-2 border-info/20 bg-info/5 p-6 space-y-5" id="arb-pack">
+    <div class="border rounded-md border-2 border-info/40 bg-info/10 px-3 py-2 space-y-5" id="arb-pack">
         <div class="flex items-center gap-3">
             <i data-lucide="file-check" class="h-6 w-6 text-primary" aria-hidden="true"></i>
             <h3 class="text-lg font-semibold">ARB Submission Pack</h3>
@@ -1435,7 +1435,7 @@
             </div>
         </div>
         {% if arb_pack.completeness_gaps %}
-        <div class="rounded-lg border border-warning/30 bg-warning/5 p-4">
+        <div class="rounded-md border border-warning/40 bg-warning/10 px-3 py-2">
             <div class="flex items-start gap-2">
                 <i data-lucide="alert-triangle" class="h-4 w-4 text-warning shrink-0 mt-0.5" aria-hidden="true"></i>
                 <div>
@@ -1467,7 +1467,7 @@
 
     {# ── CAPABILITY_INVESTMENT_PLANNING: Investment Roadmap ─── #}
     {% if investment_plan %}
-    <div class="rounded-xl border-2 border-warning/20 bg-warning/5 p-6 space-y-5" id="investment-plan">
+    <div class="border rounded-md border-2 border-warning/40 bg-warning/10 px-3 py-2 space-y-5" id="investment-plan">
         <div class="flex items-center gap-3">
             <i data-lucide="trending-up" class="h-6 w-6 text-warning" aria-hidden="true"></i>
             <h3 class="text-lg font-semibold">Capability Investment Plan</h3>
@@ -1495,7 +1495,7 @@
         <div>
             <h4 class="font-medium text-sm mb-3">Top Capability Gaps</h4>
             <div class="overflow-x-auto">
-                <table class="w-full text-sm border border-border rounded-lg overflow-hidden">
+                <table class="dense-table w-full text-sm border border-border rounded-lg overflow-hidden">
                     <thead class="bg-muted/60">
                         <tr>
                             <th class="text-left px-3 py-2 font-medium">Capability</th>
@@ -1537,7 +1537,7 @@
 
     {# ── INTEGRATION_IMPACT_ASSESSMENT: Impact Register ─── #}
     {% if impact_register %}
-    <div class="rounded-xl border-2 border-destructive/20 bg-destructive/5 p-6 space-y-5" id="impact-register">
+    <div class="border rounded-md border-2 border-destructive/40 bg-destructive/10 px-3 py-2 space-y-5" id="impact-register">
         <div class="flex items-center gap-3">
             <i data-lucide="git-branch" class="h-6 w-6 text-destructive" aria-hidden="true"></i>
             <h3 class="text-lg font-semibold">Integration Impact Register</h3>
@@ -1570,7 +1570,7 @@
         <div>
             <h4 class="font-medium text-sm mb-3">Remediation Plan</h4>
             <div class="overflow-x-auto">
-                <table class="w-full text-sm border border-border rounded-lg overflow-hidden">
+                <table class="dense-table w-full text-sm border border-border rounded-lg overflow-hidden">
                     <thead class="bg-muted/60">
                         <tr>
                             <th class="text-left px-3 py-2 font-medium">App ID</th>
@@ -1628,7 +1628,7 @@
     </div>
     {% endif %}
     {% if instance.error_message %}
-    <div class="rounded-xl border-2 border-destructive/20 bg-destructive/5 p-5" role="alert" aria-live="assertive">
+    <div class="border rounded-md border-2 border-destructive/40 bg-destructive/10 px-3 py-2" role="alert" aria-live="assertive">
         <div class="flex items-start gap-3">
             <i data-lucide="alert-circle" class="h-5 w-5 text-destructive shrink-0 mt-0.5" aria-hidden="true"></i>
             <div class="flex-1">
@@ -1644,7 +1644,7 @@
     {% set _wft024_caps = instance.workflow_code == 'APP_ONBOARDING' and instance.pending_approval_step_id == 'link_capabilities' %}
     {% set _wft024_items = (instance.context or {}).get('apqc_suggestions', []) if _wft024_apqc else ((instance.context or {}).get('capability_links', []) if _wft024_caps else []) %}
     {% if (_wft024_apqc or _wft024_caps) and _wft024_items %}
-    <div class="rounded-xl border-2 border-warning/30 bg-warning/5 p-5" role="alert" x-data='appOnboardingReview({{ _wft024_items|tojson }}, {{ ("apqc" if _wft024_apqc else "capability") | tojson }})'>
+    <div class="border rounded-md border-2 border-warning/40 bg-warning/10 px-3 py-2" role="alert" x-data='appOnboardingReview({{ _wft024_items|tojson }}, {{ ("apqc" if _wft024_apqc else "capability") | tojson }})'>
         <div class="flex items-start gap-3">
             <i data-lucide="hand" class="h-5 w-5 text-warning shrink-0 mt-0.5" aria-hidden="true"></i>
             <div class="flex-1">
@@ -1678,7 +1678,7 @@
     {% set _vs_rec = _vs_scores.get('recommended_vendor', '') %}
     {% set _vs_scored = _vs_scores.get('scored_vendors', []) %}
     {% set _vs_matched = _vs_shortlist.get('matched_vendors', []) %}
-    <div class="rounded-xl border-2 border-warning/30 bg-warning/5 p-5" role="alert">
+    <div class="border rounded-md border-2 border-warning/40 bg-warning/10 px-3 py-2" role="alert">
         <div class="flex items-start gap-3">
             <i data-lucide="award" class="h-5 w-5 text-warning shrink-0 mt-0.5" aria-hidden="true"></i>
             <div class="flex-1">
@@ -1698,7 +1698,7 @@
                     {# Scored vendors table #}
                     {% if _vs_scored %}
                     <div class="rounded-lg border border-input bg-background overflow-hidden">
-                        <table class="w-full text-sm">
+                        <table class="dense-table w-full text-sm">
                             <thead class="bg-muted/50">
                                 <tr>
                                     <th class="px-3 py-2 text-left font-medium text-muted-foreground">Vendor</th>
@@ -1741,7 +1741,7 @@
     {% elif instance.workflow_code and instance.workflow_code.startswith('ADM_') %}
     {% set _adm_ctx = instance.context or {} %}
     {% set _adm_step_id = instance.pending_approval_step_id or '' %}
-    <div class="rounded-xl border-2 border-warning/30 bg-warning/5 p-5" role="alert">
+    <div class="border rounded-md border-2 border-warning/40 bg-warning/10 px-3 py-2" role="alert">
         <div class="flex items-start gap-3">
             <i data-lucide="hand" class="h-5 w-5 text-warning shrink-0 mt-0.5" aria-hidden="true"></i>
             <div class="flex-1">
@@ -1791,7 +1791,7 @@
 
     {# Generic fallback for other workflows #}
     {% else %}
-    <div class="rounded-xl border-2 border-warning/30 bg-warning/5 p-5" role="alert">
+    <div class="border rounded-md border-2 border-warning/40 bg-warning/10 px-3 py-2" role="alert">
         <div class="flex items-start gap-3">
             <i data-lucide="hand" class="h-5 w-5 text-warning shrink-0 mt-0.5" aria-hidden="true"></i>
             <div class="flex-1">
@@ -1917,7 +1917,7 @@
 
                             {# Failed error detail #}
                             {% if is_failed and exec_step %}
-                            <div class="rounded-lg border border-destructive/30 bg-destructive/5 p-3 space-y-2">
+                            <div class="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 space-y-2">
                                 <p class="text-xs text-destructive-emphasis font-medium">{{ exec_step.error_message or 'Unknown error' }}</p>
                                 {% if exec_step.error_traceback %}
                                 <details class="text-xs">
@@ -1926,7 +1926,7 @@
                                 </details>
                                 {% endif %}
                                 <div class="flex items-center gap-2 pt-1">
-                                    <button type="button" @click="retryWorkflow()" class="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors">
+                                    <button type="button" @click="retryWorkflow()" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                                         <i data-lucide="rotate-ccw" class="h-3 w-3" aria-hidden="true"></i> Retry
                                     </button>
                                     <button type="button" @click="openCancelDialog()" class="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-medium border border-destructive/30 text-destructive-emphasis hover:bg-destructive/10 transition-colors">
@@ -1938,7 +1938,7 @@
 
                             {# Approval gate inline actions #}
                             {% if is_approval and is_waiting %}
-                            <div class="rounded-lg border border-warning/20 bg-warning/5 p-3 space-y-2">
+                            <div class="rounded-md border border-warning/40 bg-warning/10 px-3 py-2 space-y-2">
                                 <div class="flex items-center gap-2 text-xs">
                                     <i data-lucide="user-check" class="h-3.5 w-3.5 text-warning" aria-hidden="true"></i>
                                     <span class="font-medium text-warning-emphasis">Awaiting approval</span>
@@ -2044,7 +2044,7 @@
                         <template x-for="(art, idx) in unexpectedArtifacts" :key="art.id || idx">
                             <div class="rounded-lg border-2 border-input bg-background p-4">
                                 <div class="flex flex-wrap items-center gap-2 mb-2">
-                                    <span class="inline-flex rounded-full px-2 py-1 text-xs font-medium bg-primary/10 text-primary"
+                                    <span class="inline-flex rounded-full px-2 py-1 text-xs font-medium bg-primary/10 text-info-emphasis"
                                           x-text="(art.artifact_type || 'artifact').replace(/_/g, ' ')"></span>
                                     <span class="inline-flex rounded-full px-2 py-1 text-xs font-medium"
                                           :class="art.status === 'approved' ? 'bg-success/10 text-success-emphasis' : 'bg-muted text-muted-foreground'"
@@ -2099,7 +2099,7 @@
                 <div class="flex items-center gap-2 mb-4">
                     <i data-lucide="layers" class="h-4 w-4 text-primary" aria-hidden="true"></i>
                     <h2 class="text-lg font-semibold">ArchiMate Elements</h2>
-                    <span class="ml-auto inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-primary/10 text-primary">{{ archimate_elements|length }}</span>
+                    <span class="ml-auto inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-primary/10 text-info-emphasis">{{ archimate_elements|length }}</span>
                 </div>
                 <div class="flex flex-wrap gap-2">
                     {% for el in archimate_elements %}
@@ -2118,7 +2118,7 @@
                     } %}
                     {% set color = layer_colors.get((el.layer or '').lower(), 'bg-muted text-muted-foreground border-input') %}
                     <a href="{{ url_for('archimate_crud.dashboard') }}#element-{{ el.id }}"
-                       class="inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-all hover:shadow-sm {{ color }}"
+                       class="inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-all {{ color }}"
                        title="{{ el.type | plain_name(current_user) }} · {{ el.layer | plain_layer(current_user) }} · {{ 'Input' if el.element_role == 'input' else 'Output' }}">
                         {% if el.element_role == 'input' %}
                         <i data-lucide="arrow-right-circle" class="h-3 w-3 opacity-60" aria-hidden="true"></i>
@@ -2219,16 +2219,16 @@
                 <h3 class="text-sm font-semibold mb-3">Quick links</h3>
                 <div class="flex flex-wrap gap-2">
                     {% if app_id %}
-                    <a href="{{ url_for('unified_applications.application_detail', id=app_id, edit='1') }}" class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border-2 border-input hover:border-primary/40 hover:bg-muted text-xs font-medium transition-colors">
+                    <a href="{{ url_for('unified_applications.application_detail', id=app_id, edit='1') }}" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                         <i data-lucide="external-link" class="h-3 w-3" aria-hidden="true"></i> Edit application
                     </a>
                     {% endif %}
                     {% if app_id and has_elements %}
-                    <a href="{{ url_for('unified_applications.application_detail', id=app_id, tab='architecture') }}" class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border-2 border-input hover:border-primary/40 hover:bg-muted text-xs font-medium transition-colors">
+                    <a href="{{ url_for('unified_applications.application_detail', id=app_id, tab='architecture') }}" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                         <i data-lucide="layout-template" class="h-3 w-3" aria-hidden="true"></i> View ArchiMate model
                     </a>
                     {% elif has_elements %}
-                    <a href="{{ url_for('archimate_crud.dashboard') }}" class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border-2 border-input hover:border-primary/40 hover:bg-muted text-xs font-medium transition-colors">
+                    <a href="{{ url_for('archimate_crud.dashboard') }}" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                         <i data-lucide="layout-template" class="h-3 w-3" aria-hidden="true"></i> View ArchiMate model
                     </a>
                     {% endif %}
@@ -2650,12 +2650,12 @@ function instancePage() {
 {% call modal(id='reject-workflow', title='Reject Workflow', description='Provide a reason for rejecting this workflow step.', size='sm') %}
 <form @submit.prevent="submitReject()">
     <div class="mb-4">
-        <label for="reject-reason-detail" class="block text-sm font-medium mb-2">Rejection Reason <span class="text-destructive-emphasis">*</span></label>
-        <textarea id="reject-reason-detail" x-model="rejectReason" rows="3" required class="w-full rounded-lg border-2 border-input p-3 text-sm bg-background focus:border-primary focus:outline-none" placeholder="Explain why this workflow step is being rejected..."></textarea>
+        <label for="reject-reason-detail" class="block text-sm font-medium text-muted-foreground mb-1">Rejection Reason <span class="text-destructive-emphasis">*</span></label>
+        <textarea id="reject-reason-detail" x-model="rejectReason" rows="3" required class="w-full rounded-md border-2 border-input p-3 text-sm bg-background focus:border-primary focus:outline-none" placeholder="Explain why this workflow step is being rejected..."></textarea>
     </div>
     <div class="flex justify-end gap-3">
-        <button type="button" data-modal-close="reject-workflow" class="px-4 py-2 rounded-lg border-2 border-input hover:bg-muted transition-colors text-sm">Cancel</button>
-        <button type="submit" class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-destructive text-primary-foreground hover:bg-destructive/90 transition-colors text-sm font-medium" :disabled="!rejectReason.trim()">
+        <button type="button" data-modal-close="reject-workflow" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4">Cancel</button>
+        <button type="submit" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-destructive text-destructive-foreground text-sm font-semibold transition-colors hover:bg-destructive/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center" :disabled="!rejectReason.trim()">
             <i data-lucide="x" class="h-4 w-4" aria-hidden="true"></i> Reject Workflow
         </button>
     </div>
@@ -2665,12 +2665,12 @@ function instancePage() {
 {% call modal(id='cancel-workflow', title='Cancel Workflow', description='This will stop the workflow execution. This action cannot be undone.', size='sm') %}
 <form @submit.prevent="submitCancel()">
     <div class="mb-4">
-        <label for="cancel-reason" class="block text-sm font-medium mb-2">Cancellation Reason <span class="text-destructive-emphasis">*</span></label>
-        <textarea id="cancel-reason" x-model="cancelReason" rows="3" required class="w-full rounded-lg border-2 border-input p-3 text-sm bg-background focus:border-primary focus:outline-none" placeholder="Explain why this workflow is being cancelled..."></textarea>
+        <label for="cancel-reason" class="block text-sm font-medium text-muted-foreground mb-1">Cancellation Reason <span class="text-destructive-emphasis">*</span></label>
+        <textarea id="cancel-reason" x-model="cancelReason" rows="3" required class="w-full rounded-md border-2 border-input p-3 text-sm bg-background focus:border-primary focus:outline-none" placeholder="Explain why this workflow is being cancelled..."></textarea>
     </div>
     <div class="flex justify-end gap-3">
         <button type="button" data-modal-close="cancel-workflow" class="px-4 py-2 rounded-lg border-2 border-input hover:bg-muted transition-colors text-sm">Keep Running</button>
-        <button type="submit" class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-destructive text-primary-foreground hover:bg-destructive/90 transition-colors text-sm font-medium" :disabled="!cancelReason.trim()">
+        <button type="submit" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-destructive text-destructive-foreground text-sm font-semibold transition-colors hover:bg-destructive/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center" :disabled="!cancelReason.trim()">
             <i data-lucide="x" class="h-4 w-4" aria-hidden="true"></i> Cancel Workflow
         </button>
     </div>

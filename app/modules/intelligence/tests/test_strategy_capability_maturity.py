@@ -32,7 +32,10 @@ def _capability(db_session, org_id, name, code, *, current=None, target=None):
 def _initiative(db_session, element_id, name):
     from app.models.enterprise_intelligence import PortfolioInitiative
 
+    from app.models.archimate_core import ArchiMateElement
+
     initiative = PortfolioInitiative(
+        organization_id=db_session.get(ArchiMateElement, element_id).organization_id,
         name=name,
         archimate_element_id=element_id,
         total_budget=10000.0,

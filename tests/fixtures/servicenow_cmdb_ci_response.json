@@ -1,0 +1,28 @@
+{
+  "result": [
+    {
+      "sys_id": "a1b2c3d4e5f60718293a4b5c6d7e8f90",
+      "name": "Payroll Application",
+      "short_description": "Runs the monthly payroll",
+      "operational_status": "1",
+      "install_status": "1",
+      "sys_class_name": "cmdb_ci_application",
+      "parent": "",
+      "u_business_service": "Payroll",
+      "u_technical_owner": "Ada Example",
+      "u_business_owner": "Bo Example"
+    },
+    {
+      "sys_id": "0f9e8d7c6b5a49382716f5e4d3c2b1a0",
+      "name": "app-server-01",
+      "short_description": "Hosts the payroll application",
+      "operational_status": "1",
+      "install_status": "1",
+      "sys_class_name": "cmdb_ci_server",
+      "parent": {"link": "https://example.service-now.com/api/now/table/cmdb_ci/a1b2", "value": "a1b2c3d4e5f60718293a4b5c6d7e8f90"},
+      "u_business_service": "",
+      "u_technical_owner": "",
+      "u_business_owner": ""
+    }
+  ]
+}

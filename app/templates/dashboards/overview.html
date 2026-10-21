@@ -1,40 +1,29 @@
 {% extends 'layouts/admin_base.html' %}
-{% from 'components/metrics_card.html' import metrics_card %}
-{% import 'components/card.html' as card %}
-{% from 'macros/page_shell.html' import page_shell, empty_state, section_card %}
-
+{% from 'components/dense_table.html' import dense_table %}
+{% from 'macros/page_shell.html' import page_shell, section_card %}
+{% from 'components/answer_cascade.html' import answer_cascade %}
 {% block title %}Dashboard{% endblock %}
-
 {% block guided_mode_steps %}
 <script id="guided-mode-steps-data" type="application/json">
 [
-  {"title": "Step 1 — Health Snapshot", "text": "The metric cards at the top show live counts. Low numbers mean data enrichment work is needed."},
-  {"title": "Step 2 — Your Workspace", "text": "The role cards below are your quick-access shortcuts. They change based on your selected role."},
-  {"title": "Step 3 — Next Steps", "text": "Click the Architecture Journey card to start your first blueprint, or Applications to explore the portfolio."}
+  {"title": "Step 1 — Key figures", "text": "The figures at the top show live counts. A low number means data enrichment work is needed."},
+  {"title": "Step 2 — What breaks if it fails", "text": "The answer below follows one application's recorded connections. Open a row to see where each connection comes from."},
+  {"title": "Step 3 — Capability coverage", "text": "The table lists capabilities with the gaps first. Open a row to act on it."}
 ]
 </script>
 {% endblock %}
-
-{# page_hint removed — the "Start here" welcome card below covers first-run
-   guidance; the blue hint was redundant with it. #}
-
-{% block breadcrumb %}
-{% from 'components/breadcrumb_nav.html' import breadcrumb_nav %}
-{{ breadcrumb_nav(items=[
-    {'text': 'Home', 'href': url_for('main.index'), 'icon': 'home'},
-    {'text': 'Dashboard', 'current': true}
-]) }}
+{% block extra_head_js %}
+<script src="{{ url_for('static', filename='js/intelligence/core.js') }}"></script>
+<script src="{{ url_for('static', filename='js/dashboard/overview_cascade.js') }}"></script>
 {% endblock %}
-
 {% block content %}
-{% set role = enterprise_role|default('platform_admin') %}
+{# Overview pattern (design/patterns.json: dashboard-01): page header, KPI
+   band, lens tabs, chart, answer cascade, dense table. No navigation card grid. #}
 {% set mode = dashboard_mode|default('data') %}
-{# Open the dashboard on the lens that matches the signed-in user's role rather
-   than always on Overview — the tabs previously ignored enterprise_role entirely.
-   The architecture tabs are the ArchiMate 3.2 layers (Motivation/Strategy/
-   Business/Application/Technology/Implementation & Migration), which replaced the
-   ambiguous "Architect"/"Business" persona tabs; each role opens on the layer it
-   primarily owns. Overview/CTO/CFO remain executive summary lenses. #}
+{% set role = enterprise_role|default('platform_admin') %}
+{# The dashboard opens on the lens that matches the signed-in user's role. The
+   layer lenses are the ArchiMate 3.2 layers; Overview, CTO and CFO are the
+   executive summary lenses. #}
 {% set _tab_for_role = {
     'business_architect': 'business',
     'enterprise_architect': 'strategy',
@@ -44,19 +33,23 @@
     'cto': 'cto',
 } %}
 {% set default_tab = _tab_for_role.get(role, 'overview') %}
-<div class="space-y-6" x-data="{ activeRole: '{{ default_tab }}' }">
-
+<div class="space-y-8" x-data="{ activeRole: '{{ default_tab }}' }">
     {{ page_shell(
-        title="Dashboard",
-        subtitle="Architecture health, portfolio insights, and actions needed" if mode == 'data' else "Let's get your workspace ready."
+        title='Dashboard',
+        subtitle="Architecture health, portfolio insights, and actions needed" if mode == 'data' else "Let's get your workspace ready.",
+        breadcrumb=[('Home', none), ('Dashboard', none)]
     ) }}
-
-    {# ── Welcome — one dismissible line, persisted server-side per user, once
-       ever (User.welcome_banner_dismissed_at). Deliberately NOT
-       /dashboard/api/onboarding-complete: that endpoint also rewrites
-       enterprise_role, a side effect this plain dismiss click shouldn't carry.
-       Gated server-side (absent from the DOM once dismissed, not CSS-hidden)
-       so a reload never flashes it back. ─────── #}
+    {# Workspace links: a quiet row, not cards. Heading kept for assistive tech. #}
+    {% set my_work_zone = (get_sidebar_zones(current_user) | selectattr('zone', 'equalto', 'my_work') | first) %}
+    {% if my_work_zone and my_work_zone.links %}
+    <nav aria-labelledby="workspace-links-heading" class="-mt-4 flex flex-wrap items-center gap-x-1 gap-y-1 text-13">
+        <h2 id="workspace-links-heading" class="sr-only">Your Workspace</h2>
+        {% for link in (my_work_zone.links | selectattr('endpoint', 'in', flask.current_app.view_functions) | list) %}
+        {% if not loop.first %}<span class="text-muted-foreground/60" aria-hidden="true">&middot;</span>{% endif %}
+        <a href="{{ url_for(link.endpoint, **(link.query_params or {})) }}" class="inline-flex h-6 min-w-6 items-center justify-center rounded px-1 text-muted-foreground transition-colors hover:text-info">{{ link.label }}</a>
+        {% endfor %}
+    </nav>
+    {% endif %}
     {% if not current_user.welcome_banner_dismissed_at %}
     <div x-data="{ show: true, dismiss() {
                 this.show = false;
@@ -70,10 +63,10 @@
              } }"
          x-show="show"
          data-testid="welcome-banner"
-         class="flex items-center justify-between gap-3 rounded-lg border border-primary/20 bg-primary/5 px-4 py-2.5">
+         class="flex h-10 items-center justify-between gap-3 rounded-md border border-border bg-card px-4 text-13">
         <p class="text-sm text-foreground min-w-0">
             <span class="font-medium">Welcome to {{ config.APP_NAME }}</span>
-            <span class="text-muted-foreground"> — <a href="/ai-chat" class="text-primary hover:underline">ask the AI architect</a> anytime, no setup needed.</span>
+            <span class="text-muted-foreground"> — <a href="/ai-chat" class="text-info hover:underline">ask the AI architect</a> anytime, no setup needed.</span>
         </p>
         <button type="button"
                 @click="dismiss()"
@@ -83,7 +76,6 @@
         </button>
     </div>
     {% endif %}
-
     {% if mode == 'guided' %}
     {# ══════════════════════════════════════════════════════════════════════
        GUIDED MODE — sparse org: a setup journey, not a failing report card.
@@ -105,7 +97,7 @@
                     <p class="text-xs text-muted-foreground mt-0.5">{{ step.description }}</p>
                 </div>
                 <a href="{{ step.href }}" class="shrink-0 inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline">
-                    {{ 'Done' if step.done else 'Start' }} <i data-lucide="arrow-right" class="h-3 w-3" aria-hidden="true"></i>
+                    {{ 'Done' if step.done else (step.cta|default('Start')) }} <i data-lucide="arrow-right" class="h-3 w-3" aria-hidden="true"></i>
                 </a>
             </li>
             {% endfor %}
@@ -113,553 +105,399 @@
     </div>
     {% endcall %}
     {% else %}
-    {# ══════════════════════════════════════════════════════════════════════
-       DATA MODE — established org: the data leads.
-       ══════════════════════════════════════════════════════════════════════ #}
 
-    {# ── PLT-040: Your Workspace — role-based quick-access cards.
-       This section used to be skipped for platform_admin, on a comment
-       claiming its cards "duplicate the sidebar's Admin zone verbatim". Read
-       directly against role_access.py's ROLE_PLATFORM_ADMIN _MY_WORK_LINKS
-       entry (2026-09-22): it is Solutions, Portfolio, Architecture Journey,
-       plus the shared Ask link every role gets -- none of the four Admin-zone
-       links (Organizations/Users/API Settings/Governance Gates etc.) are in
-       it. The comment described the OLD, hand-maintained per-role card list
-       this section had before the Wave 2 refactor below switched it onto
-       get_sidebar_zones()'s my_work zone; the exclusion was never revisited
-       against the new data source. Since platform_admin is "the default
-       enterprise_role for every user who has not picked one" (role_access.py's
-       own comment), this stale guard hid Ask -- and every other My-work card
-       -- from most real accounts. Confirmed before removing it: across every
-       role, only one my_work/admin overlap exists at all
-       (admin.governance_gates, in security_architect's zone, already
-       rendered here unexcluded without issue) -- nothing platform_admin-
-       specific would start double-rendering. ─────── #}
-    <div class="space-y-3">
-        <div class="flex items-center gap-2">
-            <i data-lucide="layout-grid" class="h-4 w-4 text-primary" aria-hidden="true"></i>
-            <h2 class="text-sm font-semibold text-foreground">Your Workspace</h2>
+    {# KPI band: four cards, 16px padding, label 11px uppercase, value 28px tabular,
+       optional 12px line beneath, no icons. The Solutions card carries the
+       pipeline sentence (one phase, no phase, or phases active). #}
+    {% set sp = solution_pipeline if solution_pipeline else [] %}
+    {% set sp_total = sp|map(attribute='count')|sum %}
+    {% set sp_phases = sp|selectattr('count', 'gt', 0)|list %}
+    {% if sp_total > 0 and sp_phases|length == 1 and sp_phases[0].phase is none %}
+    {% set sp_line = sp_total ~ ' without a recorded ADM phase' %}
+    {% elif sp_total > 0 and sp_phases|length == 1 %}
+    {% set _sp_parts = (sp_phases[0].label or '').split(': ', 1) %}{% set sp_letter = _sp_parts[0] if _sp_parts|length == 2 else '' %}{% set sp_name = _sp_parts[1] if _sp_parts|length == 2 else (sp_phases[0].label or '') %}
+    {% set sp_line = 'Nothing past ' ~ sp_name ~ ' yet — all ' ~ sp_total ~ ' solution' ~ ('s' if sp_total != 1 else '') ~ ' ' ~ ('are' if sp_total != 1 else 'is') ~ ' in phase ' ~ sp_letter %}
+    {% elif sp_total > 0 %}
+    {% set sp_line = sp_phases|length ~ ' of ' ~ sp|length ~ ' ADM phases active' %}
+    {% else %}
+    {% set sp_line = none %}
+    {% endif %}
+    <section aria-label="Key figures" class="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        {% set kpis = [
+            ('Applications', metrics.applications|dash, 'health-kpi-applications', none),
+            ('Solutions', nav_stats.solutions|dash, 'health-kpi-solutions', sp_line),
+            ('ArchiMate elements', nav_stats.elements|dash, 'health-kpi-elements', none),
+            ('Health score', health_score_text|default('—'), 'health-score-value', none)
+        ] %}
+        {% for label, value, testid, line in kpis %}
+        <div class="rounded-lg border border-border bg-card p-4">
+            <p class="text-2xs font-semibold uppercase tracking-[0.06em] text-muted-foreground">{{ label }}</p>
+            <p class="mt-1 text-28 font-semibold leading-9 tabular-nums text-foreground" data-testid="{{ testid }}">{{ value }}</p>
+            {% if line %}<p class="mt-1 truncate text-xs text-muted-foreground tabular-nums" title="{{ line }}">{{ line }}</p>{% endif %}
         </div>
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {# Shell-overhaul Wave 2 (Task 5): these used to be a hand-maintained
-               per-role card list here, parallel to (and drifting from)
-               get_sidebar_zones()'s "my_work" zone -- the actual single source
-               of truth for a role's primary-work links (app/utils/role_access.py).
-               Render straight from that zone instead so there is exactly one
-               place that defines a role's quick-access links. Zone link dicts
-               carry label/endpoint/icon only (no description) -- render without
-               one rather than inventing per-card copy. #}
-            {% set my_work_zone = (get_sidebar_zones(current_user) | selectattr('zone', 'equalto', 'my_work') | first) %}
-            {% for link in (my_work_zone.links if my_work_zone else []) %}
-            {% if link.endpoint in flask.current_app.view_functions %}
-            <a href="{{ url_for(link.endpoint, **(link.query_params or {})) }}"
-               class="group border border-border rounded-xl bg-card p-5 hover:border-primary/30 transition-colors">
-                <div class="flex items-start gap-3">
-                    <div class="shrink-0 w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center">
-                        <i data-lucide="{{ link.icon }}" class="h-4 w-4 text-primary" aria-hidden="true"></i>
-                    </div>
-                    <div class="min-w-0">
-                        <p class="text-sm font-medium text-foreground group-hover:text-primary transition-colors">{{ link.label }}</p>
-                    </div>
-                </div>
-            </a>
-            {% endif %}
-            {% endfor %}
-        </div>
-    </div>
+        {% endfor %}
+    </section>
 
-    {# ── Persona Tabs ────────────────────────────────────── #}
-    <div class="flex items-center gap-1 rounded-lg border border-border bg-muted/50 p-1 w-fit">
+    {# Lenses: a 32px segmented control on the tokens. Overview, CTO and CFO are
+       the executive summaries; the six ArchiMate 3.2 layers each open their own
+       panel below. #}
+    <div aria-label="Dashboard lens" class="flex w-fit max-w-full flex-wrap items-center gap-0.5 rounded-md bg-muted p-0.5">
         {% for role_key, role_label in [('overview', 'Overview'), ('cto', 'CTO'), ('cfo', 'CFO'), ('motivation', 'Motivation'), ('strategy', 'Strategy'), ('business', 'Business'), ('application', 'Application'), ('technology', 'Technology'), ('implementation', 'Implementation & Migration')] %}
         <button type="button" @click="activeRole = '{{ role_key }}'"
                 data-testid="layer-tab-{{ role_key }}"
-                :class="activeRole === '{{ role_key }}' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'"
-                class="px-3 py-1.5 rounded-md text-xs font-medium transition-all">
+                :aria-pressed="activeRole === '{{ role_key }}' ? 'true' : 'false'"
+                :class="activeRole === '{{ role_key }}' ? 'bg-background text-foreground' : 'text-muted-foreground hover:text-foreground'"
+                class="h-7 rounded px-2.5 text-xs font-medium transition-colors">
             {{ role_label }}
         </button>
         {% endfor %}
     </div>
 
     {# ══════════════════════════════════════════════════════════════════════
-       OVERVIEW TAB — Command Center pattern
+       OVERVIEW LENS
        ══════════════════════════════════════════════════════════════════════ #}
-    <div x-show="activeRole === 'overview'" x-cloak>
-        <div class="space-y-6">
+    <div x-show="activeRole === 'overview'" class="space-y-8">
 
-            {# ── Architecture Health Score ────────────────────────────────────
-               4 Sep 2026, corrected same day: the first pass replaced the
-               bespoke hero (giant 7xl number, rainbow bars) with metrics_card
-               boxes, but kept coloured left-border accents, icons and a
-               description line — still a distinct visual language from the
-               one true flat pattern the user pointed at explicitly (the CTO
-               tab's Executive Summary fragment). This now uses that fragment's
-               EXACT markup (rounded-lg border border-border bg-background p-3,
-               text-xs muted label, text-lg font-bold value, nothing else — no
-               colour, no icon, no bar) so there is one pattern, not a second
-               approximation of it. Also fixes the bg-{{ color }}-500 dynamic-
-               class construction that shipped DESIGN.md-banned raw colours
-               invisible to the design-tokens gate. #}
-            {% call card.card() %}
-                {% call card.card_header(class='pb-2') %}
-                    {% call card.card_title() %}Architecture Health{% endcall %}
-                {% endcall %}
-                {% call card.card_content() %}
-                    <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
-                        <div class="rounded-lg border border-border bg-background p-3">
-                            <p class="text-xs text-muted-foreground">Health Score</p>
-                            <p class="text-lg font-bold text-foreground" data-testid="health-score-value">{{ health_score_text|default("—") }}</p>
-                        </div>
-                        {% for key, label in [
-                            ('phase_maturity', 'Phase Maturity'),
-                            ('risk_health', 'Risk Posture'),
-                            ('capability_coverage', 'Capability Coverage'),
-                            ('governance', 'Governance'),
-                        ] %}
-                        {# .get(key, 0) reported "not measured" as a confident 0%. #}
-                        {% set val = (health_components or {}).get(key) %}
-                        <div class="rounded-lg border border-border bg-background p-3">
-                            <p class="text-xs text-muted-foreground">{{ label }}</p>
-                            <p class="text-lg font-bold text-foreground">{{ (val ~ "%") if val is not none else "—" }}</p>
-                            {% if key == 'phase_maturity' %}
-                            <p class="mt-1 text-xs text-muted-foreground">Share of solutions with a recorded ADM phase that are in phase C or later</p>
-                            {% endif %}
-                        </div>
-                        {% endfor %}
-                    </div>
-                {% endcall %}
-            {% endcall %}
-
-            {# ── Data Coverage ───────────────────────────────────────────── #}
-            {% call card.card() %}
-                {% call card.card_header(class='pb-2') %}
-                    {% call card.card_title() %}Data Coverage{% endcall %}
-                {% endcall %}
-                {% call card.card_content() %}
-                    {% if data_coverage is defined and data_coverage.query_error is defined %}
-                    <p class="text-xs text-destructive-emphasis mb-2">Coverage error: {{ data_coverage.query_error }}</p>
-                    {% endif %}
-                    <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
-                        {% for field, label in [('owner', 'Owner'), ('vendor', 'Vendor'), ('cost', 'Cost'), ('risk', 'Risk'), ('criticality', 'Criticality')] %}
-                        {% set pct = data_coverage[field] if data_coverage is defined and data_coverage[field] is defined else 0 %}
-                        <div class="rounded-lg border border-border bg-background p-3">
-                            <p class="text-xs text-muted-foreground">{{ label }}</p>
-                            <p class="text-lg font-bold text-foreground">{{ pct }}%</p>
-                        </div>
-                        {% endfor %}
-                    </div>
-                {% endcall %}
-            {% endcall %}
-
-            {# ── Architecture Overview — Layered Viewpoint ───────────────────────
-               Was a live ComposerRenderer/JointJS render in view mode: the same
-               renderer the interactive composer uses, retaining its default
-               selection-handle chrome (there is no separate static/pre-rendered
-               preview mechanism — grepped api/archimate/viewpoints/layered — so
-               per the Task 5 brief this becomes real counts + a link, not a
-               thumbnail. #}
-            {% call section_card() %}
-                <div class="flex items-center justify-between gap-4">
-                    <div>
-                        <h2 class="text-sm font-semibold text-foreground">Architecture Overview — Layered Viewpoint</h2>
-                        <p class="text-xs text-muted-foreground mt-1">
-                            {{ '{:,}'.format(nav_stats.elements) if nav_stats and nav_stats.elements else '0' }} elements ·
-                            {{ '{:,}'.format(nav_stats.relationships) if nav_stats and nav_stats.relationships else '0' }} relationships across all ArchiMate layers
-                        </p>
-                    </div>
-                    <a href="/archimate/composer?viewpoint=layered"
-                       class="shrink-0 inline-flex items-center gap-1.5 rounded-md bg-primary px-3.5 py-2 text-xs font-medium text-primary-foreground hover:bg-primary/90 transition-colors">
-                        Open Composer <i data-lucide="arrow-right" class="h-3.5 w-3.5" aria-hidden="true"></i>
-                    </a>
-                </div>
-            {% endcall %}
-
-            {# ── KPI Strip (4-up) ────────────────────────────────────────────── #}
-            <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                {{ metrics_card(
-                    title='Applications',
-                    value=(metrics.applications or 0)|string,
-                    icon='package',
-                    description='Active applications in portfolio',
-                    href='/applications/'
-                ) }}
-                {{ metrics_card(
-                    title='Vendors',
-                    value=(metrics.vendors or 0)|string,
-                    icon='building',
-                    description='Registered vendor organizations',
-                    href='/applications/vendors'
-                ) }}
-                {{ metrics_card(
-                    title='Solutions',
-                    value=(nav_stats.solutions or 0)|string,
-                    icon='puzzle',
-                    description='Solution designs in portfolio',
-                    href='/solutions/'
-                ) }}
-                {{ metrics_card(
-                    title='ArchiMate Elements',
-                    value=(nav_stats.elements or 0)|string,
-                    icon='boxes',
-                    description='Architecture elements catalogued',
-                    href='/architecture/dashboard'
-                ) }}
-            </div>
-
-            {# ── AI governance alerts (PROG-019) ─────────────────────────────── #}
-            {% if governance_alerts %}
-            <div class="border border-border rounded-xl bg-card overflow-hidden" data-testid="governance-alerts">
-                <div class="flex items-center justify-between px-5 py-3 border-b border-border">
-                    <div class="flex items-center gap-2">
-                        <i data-lucide="shield-alert" class="h-4 w-4 text-primary"></i>
-                        <h2 class="text-sm font-semibold text-foreground">AI governance</h2>
-                    </div>
-                    {% if governance_alerts.briefing_flagged %}
-                    <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-xs font-medium bg-warning/10 text-warning-emphasis border border-warning/30">
-                        <i data-lucide="alert-triangle" class="h-3 w-3"></i> {{ governance_alerts.briefing_flagged }} need attention
-                    </span>
-                    {% else %}
-                    <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-xs font-medium bg-success/10 text-success-emphasis border border-success/30">
-                        <i data-lucide="check" class="h-3 w-3"></i> No flagged findings
-                    </span>
-                    {% endif %}
-                </div>
-                <div class="grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-border">
-                    <a href="/solutions/briefings" class="p-4 hover:bg-accent/40 transition-colors block">
-                        <p class="text-xs uppercase tracking-wider text-muted-foreground">EA briefing — flagged</p>
-                        <p class="text-2xl font-bold mt-1 {% if governance_alerts.briefing_flagged %}text-warning-emphasis{% else %}text-foreground{% endif %}">{{ governance_alerts.briefing_flagged }}</p>
-                        <p class="text-xs text-muted-foreground mt-0.5">of {{ governance_alerts.briefing_findings }} findings · view briefings →</p>
-                    </a>
-                    <a href="/solutions/data-stewardship" class="p-4 hover:bg-accent/40 transition-colors block">
-                        <p class="text-xs uppercase tracking-wider text-muted-foreground">Data stewardship</p>
-                        <p class="text-2xl font-bold mt-1 text-foreground">Review</p>
-                        <p class="text-xs text-muted-foreground mt-0.5">PII · canonical · lineage →</p>
-                    </a>
-                    <a href="/solutions/architect-synthesis" class="p-4 hover:bg-accent/40 transition-colors block">
-                        <p class="text-xs uppercase tracking-wider text-muted-foreground">Chief Architect</p>
-                        <p class="text-2xl font-bold mt-1 text-foreground">Synthesis</p>
-                        <p class="text-xs text-muted-foreground mt-0.5">portfolio conformance →</p>
-                    </a>
-                </div>
-            </div>
-            {% endif %}
-
-            {# ── Insight Grid: Lifecycle + Pipeline ──────────────────────────── #}
-            <div class="grid gap-4 md:grid-cols-2">
-                {# Lifecycle Distribution #}
-                {% call card.card() %}
-                    {% call card.card_header(class='pb-2') %}
-                        {% call card.card_title() %}Application Lifecycle{% endcall %}
-                    {% endcall %}
-                    {% call card.card_content() %}
-                        {% if lifecycle_distribution %}
-                        <div class="space-y-2" data-testid="lifecycle-distribution">
-                            {% for item in lifecycle_distribution %}
-                            <div class="flex items-center gap-3">
-                                <span class="text-xs text-muted-foreground w-[140px] truncate shrink-0" title="{{ item.status }}">{{ item.status }}</span>
-                                <div class="flex-1 h-5 bg-muted rounded-full overflow-hidden">
-                                    <div class="h-full rounded-full {% if '5.' in item.status or 'DECOM' in item.status or 'SUNSET' in item.status or 'STOPPED' in item.status or 'READ' in item.status %}bg-destructive/60{% elif 'STRATEGIC' in item.status %}bg-success{% elif 'TACTICAL' in item.status %}bg-warning{% else %}bg-primary{% endif %}"
-                                         style="width: {{ item.pct }}%"></div><!-- inline-style-ok -->
-                                </div>
-                                <span class="text-xs font-semibold text-foreground w-[50px] text-right">{{ item.count }}</span>
-                            </div>
-                            {% endfor %}
-                        </div>
-                        {% else %}
-                        {# PLT-040: role-aware empty state #}
-                        {% if current_user.enterprise_role == 'platform_admin' or current_user.is_admin() %}
-                        <p class="text-sm text-muted-foreground">No application data yet. <a href="/admin/abacus-settings" class="text-primary hover:underline">Import from Abacus</a> to get started.</p>
-                        {% else %}
-                        <p class="text-sm text-muted-foreground">No application data available. Ask your admin to sync the portfolio from Abacus.</p>
-                        {% endif %}
-                        {% endif %}
-                    {% endcall %}
-                {% endcall %}
-
-                {# Solution Pipeline by ADM Phase #}
-                {% call card.card() %}
-                    {% call card.card_header(class='pb-2') %}
-                        {% call card.card_title() %}Solution Pipeline{% endcall %}
-                    {% endcall %}
-                    {% call card.card_content() %}
-                        {# solution_pipeline always has one row per ADM phase A-H (see the
-                           route); the defect was drawing all 8 as zero-width bars when the
-                           org simply has no solutions yet -- gate on the total, not list
-                           truthiness. A second, related defect: a portfolio bunched entirely
-                           in one phase is 7 more zero-width bars plus one full one, which
-                           reads the same way -- collapse that case too (spec 3's own example:
-                           "Nothing past Vision yet — 70 solutions are in phase A"). #}
-                        {% set solution_pipeline_total = solution_pipeline|map(attribute='count')|sum if solution_pipeline else 0 %}
-                        {% set nonzero_phases = solution_pipeline|selectattr('count', 'gt', 0)|list if solution_pipeline else [] %}
-                        {% if solution_pipeline is none %}
-                        {{ empty_state('workflow', 'Pipeline unavailable', 'Solution phase data could not be loaded. Reload the page to try again.') }}
-                        {% elif solution_pipeline_total > 0 and nonzero_phases|length > 1 %}
-                        {% set max_count = solution_pipeline|map(attribute='count')|max or 1 %}
-                        <div class="space-y-2">
-                            {% for item in solution_pipeline %}
-                            <div class="flex items-center gap-3">
-                                <span class="text-xs font-medium text-muted-foreground w-[100px] shrink-0">{{ item.label }}</span>
-                                <div class="flex-1 h-5 bg-muted rounded-full overflow-hidden">
-                                    <div class="h-full rounded-full bg-primary"
-                                         style="width: {{ (item.count / max_count * 100)|round }}%"></div><!-- inline-style-ok -->
-                                </div>
-                                <span class="text-xs font-semibold text-foreground w-[30px] text-right">{{ item.count }}</span>
-                            </div>
-                            {% endfor %}
-                        </div>
-                        {% elif solution_pipeline_total > 0 %}
-                        {# Concentrated in a single ADM phase — one sentence, not 8 bars. #}
-                        {% set concentrated = nonzero_phases[0] %}
-                        {% if concentrated.phase is none %}
-                        {{ empty_state(
-                            'workflow', 'ADM phase not recorded',
-                            solution_pipeline_total ~ ' solution' ~ ('s' if solution_pipeline_total != 1 else '') ~ ' without a recorded ADM phase. Open the pipeline to review them.',
-                            cta_label='Open the pipeline', cta_href=url_for('solution_design.list_solutions')
-                        ) }}
-                        {% else %}
-                        {% set phase_letter, phase_name = concentrated.label.split(': ', 1) %}
-                        {{ empty_state(
-                            'workflow',
-                            'Nothing past ' ~ phase_name ~ ' yet',
-                            'All ' ~ solution_pipeline_total ~ ' solution' ~ ('s' if solution_pipeline_total != 1 else '') ~ ' ' ~ ('are' if solution_pipeline_total != 1 else 'is') ~ ' in phase ' ~ phase_letter ~ ' — nothing further yet.',
-                            cta_label='Open the pipeline',
-                            cta_href=url_for('solution_design.list_solutions')
-                        ) }}
-                        {% endif %}
-                        {% elif current_user.enterprise_role in ('solution_architect', 'enterprise_architect', 'platform_admin') %}
-                        {# PLT-040: role-aware empty state #}
-                        {{ empty_state('workflow', 'No solutions yet', 'Blueprint your first initiative to start tracking ADM phase progress.', cta_label='Create your first solution', cta_href='/solutions/') }}
-                        {% else %}
-                        {# The branch immediately above gives solution/enterprise architects and
-                           platform admins the "Create your first solution" CTA (PLT-040); this
-                           branch is everyone else, who cannot start one. Pointing them at a
-                           route they are not the persona for is a dead end wearing a button.
-                           empty-state-ok: role-scoped, non-architects cannot create solutions #}
-                        {{ empty_state('workflow', 'No solutions in pipeline yet', 'Architects have not blueprinted any solutions yet. Phase progress will appear here once they do.') }}
-                        {% endif %}
-                    {% endcall %}
-                {% endcall %}
-            </div>
-
-            {# ── Capability Health ───────────────────────────────────────────── #}
-            {% if capability_health %}
-            {% call card.card() %}
-                {% call card.card_header(class='pb-3') %}
-                    <div class="flex items-center justify-between">
-                        {% call card.card_title() %}Capability Health{% endcall %}
-                        {% set covered_count = capability_health | selectattr('coverage_status', 'equalto', 'covered') | list | length %}
-                        {% set partial_count = capability_health | selectattr('coverage_status', 'equalto', 'partial') | list | length %}
-                        {% set gap_count = capability_health | selectattr('coverage_status', 'equalto', 'gap') | list | length %}
-                        <div class="flex items-center gap-3 text-xs" data-testid="capability-health-widget">
-                            <span class="text-success-emphasis font-medium">{{ covered_count }} covered</span>
-                            <span class="text-warning-emphasis font-medium">{{ partial_count }} partial</span>
-                            <span class="text-destructive-emphasis font-medium">{{ gap_count }} gaps</span>
-                        </div>
-                    </div>
-                {% endcall %}
-                {% call card.card_content() %}
-                    <div class="flex flex-wrap gap-2">
-                        {% for cap in capability_health %}
-                        <a href="{{ url_for('capability_map.index') }}?cap={{ cap.id }}"
-                           class="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium border transition-colors
-                                  {% if cap.coverage_status == 'covered' %}bg-success/10 text-success-emphasis border-success/30 hover:bg-success/20{% elif cap.coverage_status == 'partial' %}bg-warning/10 text-warning-emphasis border-warning/30 hover:bg-warning/20{% else %}bg-destructive/10 text-destructive-emphasis border-destructive/30 hover:bg-destructive/20{% endif %}"
-                           title="{{ cap.app_count }} application{{ 's' if cap.app_count != 1 else '' }}">
-                            {{ cap.name }}
-                        </a>
-                        {% endfor %}
-                    </div>
-                {% endcall %}
-            {% endcall %}
-            {% endif %}
-
+    {# Architecture overview: the layered viewpoint as counts and a link, one
+       quiet row (there is no static preview of the composer). #}
+    <div class="flex items-center justify-between gap-4 rounded-lg border border-border bg-card px-4 py-3" data-testid="architecture-overview">
+        <div class="min-w-0">
+            <h2 class="text-sm font-semibold text-foreground">Architecture Overview — Layered Viewpoint</h2>
+            <p class="mt-0.5 text-xs text-muted-foreground tabular-nums">
+                {{ '{:,}'.format(nav_stats.elements) if nav_stats and nav_stats.elements is not none else '—' }} elements ·
+                {{ '{:,}'.format(nav_stats.relationships) if nav_stats and nav_stats.relationships is not none else '—' }} relationships across all ArchiMate layers
+            </p>
         </div>
+        <a href="/archimate/composer?viewpoint=layered" class="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90">
+            Open Composer <i data-lucide="arrow-right" class="h-3.5 w-3.5" aria-hidden="true"></i>
+        </a>
+    </div>
+
+    {# What the health score was weighted from. A component that was not
+       measured reads as an em dash, never as a confident zero. #}
+    <section aria-labelledby="architecture-health-heading" class="rounded-lg border border-border bg-card" data-testid="architecture-health">
+        <div class="flex items-center justify-between border-b border-border px-4 py-2">
+            <h2 id="architecture-health-heading" class="text-base font-semibold text-foreground">Architecture health</h2>
+            <span class="text-2xs font-semibold uppercase tracking-[0.06em] text-muted-foreground">What the score is weighted from</span>
+        </div>
+        <div class="grid grid-cols-2 gap-px bg-border md:grid-cols-4">
+            {% for key, label in [
+                ('phase_maturity', 'Phase Maturity'),
+                ('risk_health', 'Risk Posture'),
+                ('capability_coverage', 'Capability Coverage'),
+                ('governance', 'Governance'),
+            ] %}
+            {% set val = (health_components or {}).get(key) %}
+            <div class="bg-card px-4 py-3">
+                <p class="text-xs text-muted-foreground">{{ label }}</p>
+                <p class="mt-1 text-lg font-semibold tabular-nums text-foreground">{{ (val ~ "%") if val is not none else "—" }}</p>
+                {% if key == 'phase_maturity' %}
+                <p class="mt-1 text-xs text-muted-foreground">Share of solutions with a recorded ADM phase that are in phase C or later</p>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+    </section>
+
+    {# Chart: application lifecycle, one series, hairline container, no vertical grid. #}
+    <section aria-labelledby="lifecycle-chart-heading" class="rounded-lg border border-border bg-card" data-testid="lifecycle-distribution">
+        <div class="flex items-center justify-between border-b border-border px-4 py-2">
+            <h2 id="lifecycle-chart-heading" class="text-base font-semibold text-foreground">Applications by lifecycle</h2>
+            <span class="text-2xs font-semibold uppercase tracking-[0.06em] text-muted-foreground tabular-nums">{{ metrics.applications|dash }} in portfolio</span>
+        </div>
+        {% set lc = lifecycle_distribution|default([]) %}
+        {% if lc %}
+        {% set maxc = (lc | map(attribute='count') | max) or 1 %}
+        {% set n = lc|length %}
+        {% set W = 960 %}{% set H = 320 %}{% set top = 24 %}{% set bottom = 48 %}{% set left = 56 %}{% set right = 16 %}
+        {% set plot_h = H - top - bottom %}{% set plot_w = W - left - right %}
+        {% set slot = plot_w / n %}
+        <svg viewBox="0 0 {{ W }} {{ H }}" class="block h-[320px] w-full" role="img" aria-label="Applications by lifecycle stage">
+            {% for g in [0, 1, 2, 3, 4] %}
+            {% set y = top + plot_h - (plot_h * g / 4) %}
+            <line x1="{{ left }}" y1="{{ y }}" x2="{{ W - right }}" y2="{{ y }}" class="stroke-slate-100 dark:stroke-slate-800" stroke-width="1" />
+            <text x="{{ left - 8 }}" y="{{ y + 4 }}" text-anchor="end" class="fill-muted-foreground tabular-nums" font-size="11">{{ ((maxc * g / 4) | round | int) }}</text>
+            {% endfor %}
+            {% for item in lc %}
+            {% set bh = (plot_h * item.count / maxc) if item.count else 0 %}
+            {% set bw = (slot * 0.56) %}
+            {% set x = left + loop.index0 * slot + (slot - bw) / 2 %}
+            <rect x="{{ x }}" y="{{ top + plot_h - bh }}" width="{{ bw }}" height="{{ bh }}" rx="2" class="fill-primary" />
+            <text x="{{ x + bw / 2 }}" y="{{ top + plot_h - bh - 6 }}" text-anchor="middle" class="fill-foreground tabular-nums" font-size="11" font-weight="600">{{ item.count }}</text>
+            <text x="{{ x + bw / 2 }}" y="{{ H - bottom + 20 }}" text-anchor="middle" class="fill-muted-foreground" font-size="11" font-weight="600" letter-spacing="0.06em">{{ (item.label or item.status or '')|upper|truncate(18, true, '…') }}</text>
+            {% endfor %}
+        </svg>
+        {% else %}
+        <p class="px-4 py-12 text-center text-sm text-muted-foreground">No lifecycle data recorded yet.</p>
+        {% endif %}
+    </section>
+
+    {# Solution pipeline by ADM phase: one row per phase, hairline bars, the
+       empty and unavailable states as quiet lines. #}
+    {% call section_card(title='Solution Pipeline') %}
+    {# solution_pipeline always has one row per ADM phase A-H (see the route) and
+       arrives as None when the query failed. Gate on the total, not list
+       truthiness: an org with no solutions is an empty state, not eight empty
+       bars; a portfolio bunched in one phase is one sentence, not seven empty
+       bars and one full one. #}
+    {% set sp_rows = solution_pipeline if solution_pipeline else [] %}
+    {% set sp_sum = sp_rows|map(attribute='count')|sum %}
+    {% set sp_active = sp_rows|selectattr('count', 'gt', 0)|list %}
+    {% if solution_pipeline is none %}
+    <p role="status" class="text-sm text-muted-foreground">Pipeline unavailable — solution phase data could not be loaded. Reload the page to try again.</p>
+    {% elif sp_sum > 0 and sp_active|length > 1 %}
+    {% set sp_max = sp_rows|map(attribute='count')|max or 1 %}
+    <ol class="divide-y divide-border">
+        {% for item in sp_rows %}
+        <li class="flex h-10 items-center gap-4">
+            <span class="w-44 shrink-0 truncate text-sm text-foreground">{{ item.label }}</span>
+            <svg class="h-1.5 min-w-0 flex-1" viewBox="0 0 100 4" preserveAspectRatio="none" aria-hidden="true">
+                <rect width="100" height="4" rx="2" class="fill-muted" />
+                <rect width="{{ (item.count / sp_max * 100)|round|int }}" height="4" rx="2" class="fill-primary" />
+            </svg>
+            <span class="w-10 shrink-0 text-right text-sm tabular-nums text-foreground">{{ item.count }}</span>
+        </li>
+        {% endfor %}
+    </ol>
+    <p class="mt-3 text-sm"><a href="{{ url_for('solution_design.list_solutions') }}" class="text-info hover:underline">Open the pipeline</a></p>
+    {% elif sp_sum > 0 %}
+    {% set sp_one = sp_active[0] %}
+    {% if sp_one.phase is none %}
+    <p class="text-sm text-foreground">{{ sp_sum }} solution{{ 's' if sp_sum != 1 else '' }} without a recorded ADM phase.</p>
+    <p class="mt-1 text-sm text-muted-foreground">Set the ADM phase on each solution to see the pipeline. <a href="{{ url_for('solution_design.list_solutions') }}" class="text-info hover:underline">Open the pipeline</a></p>
+    {% else %}
+    {% set _sp_parts = (sp_one.label or '').split(': ', 1) %}{% set sp_letter = _sp_parts[0] if _sp_parts|length == 2 else '' %}{% set sp_name = _sp_parts[1] if _sp_parts|length == 2 else (sp_one.label or '') %}
+    <p class="text-sm text-foreground">Nothing past {{ sp_name }} yet — all {{ sp_sum }} solution{{ 's' if sp_sum != 1 else '' }} {{ 'are' if sp_sum != 1 else 'is' }} in phase {{ sp_letter }}.</p>
+    <p class="mt-1 text-sm text-muted-foreground">Nothing further yet. <a href="{{ url_for('solution_design.list_solutions') }}" class="text-info hover:underline">Open the pipeline</a></p>
+    {% endif %}
+    {% elif current_user.enterprise_role in ('solution_architect', 'enterprise_architect', 'platform_admin') %}
+    <p class="text-sm text-muted-foreground">No solutions yet. <a href="/solutions/" class="text-info hover:underline">Create your first solution</a> to start tracking ADM phase progress.</p>
+    {% else %}
+    {# Non-architects cannot start a solution, so no call to action here.
+       empty-state-ok: role-scoped #}
+    <p class="text-sm text-muted-foreground">No solutions in pipeline yet. Phase progress appears here once an architect blueprints one.</p>
+    {% endif %}
+    {% endcall %}
+
+    {# Answer cascade: one high-impact answer, full width. #}
+    <section aria-labelledby="impact-answer-heading" x-data="overviewCascade()" data-testid="overview-cascade">
+        <h2 id="impact-answer-heading" class="mb-3 text-base font-semibold text-foreground">What breaks if it fails</h2>
+        <div x-show="state === 'loading'" class="space-y-2" aria-busy="true">
+            <div class="h-5 w-2/3 max-w-[640px] rounded bg-muted"></div>
+            <div class="h-10 rounded-md border border-border bg-card"></div>
+            <div class="ml-5 h-10 rounded-md border border-border bg-card"></div>
+        </div>
+        <div x-show="state === 'ready'" x-cloak>
+            {{ answer_cascade('overview-answer-cascade', question='questionText', rows='rows', ask='load(node.elementId)', root='centreName') }}
+        </div>
+        <p x-show="state === 'empty'" x-cloak class="text-sm text-muted-foreground">No connections recorded yet. <a href="{{ url_for('intelligence_ui.ask') }}" class="text-info hover:underline">Ask about anything you depend on</a>.</p>
+        <p x-show="state === 'error'" x-cloak role="status" class="text-sm text-muted-foreground">We could not load an answer just now. <a href="{{ url_for('intelligence_ui.ask') }}" class="text-info hover:underline">Open Ask</a>.</p>
+
+        {# Dense table: capability coverage, 48px rows, sticky header, tabular
+           figures, hover-revealed action. Gaps are the at-risk rows. #}
+        {% set ch = capability_health|default([]) %}
+        {% set gap_count = ch | selectattr('coverage_status', 'equalto', 'gap') | list | length %}
+        <section aria-labelledby="capability-coverage-heading" class="mt-8 rounded-lg border border-border bg-card" data-testid="capability-health-widget">
+            <div class="flex items-center justify-between border-b border-border px-4 py-2">
+                <h2 id="capability-coverage-heading" class="text-base font-semibold text-foreground">Capability coverage</h2>
+                <span class="text-2xs font-semibold uppercase tracking-[0.06em] text-muted-foreground tabular-nums">{{ gap_count }} gap{{ 's' if gap_count != 1 else '' }} of {{ ch|length }}</span>
+            </div>
+{% call dense_table(columns=[('Capability', ''), ('Applications', 'text-right'), ('Coverage', ''), ('', 'text-right')], rows=(ch)|length, empty_text='No capabilities recorded yet.', max_height='480px', flush=true) %}{% for cap in ch %}
+                        <tr class="group transition-colors hover:bg-muted/50">
+                            <td class="px-2 align-middle font-medium text-foreground">{{ cap.name }}</td>
+                            <td class="px-2 text-right align-middle tabular-nums text-muted-foreground">{{ cap.app_count }}</td>
+                            <td class="px-2 align-middle">
+                                {% if cap.coverage_status == 'covered' %}<span class="text-success-emphasis">Covered</span>
+                                {% elif cap.coverage_status == 'partial' %}<span class="text-warning-emphasis">Partial</span>
+                                {% else %}<span class="text-destructive-emphasis">Gap</span>{% endif %}
+                            </td>
+                            <td class="px-2 text-right align-middle">
+                                <a href="{{ url_for('capability_map.index') }}?cap={{ cap.id }}" class="inline-flex h-8 items-center rounded-md px-2.5 text-13 font-medium text-muted-foreground opacity-0 transition-opacity hover:bg-accent hover:text-info group-hover:opacity-100 focus-visible:opacity-100">View</a>
+                            </td>
+                        </tr>
+                        {% endfor %}{% endcall %}
+        </section>
+    </section>
     </div>
 
     {# ══════════════════════════════════════════════════════════════════════
-       CTO TAB — Risk & Governance focus
+       CTO LENS — risk and governance
        ══════════════════════════════════════════════════════════════════════ #}
-    <div x-show="activeRole === 'cto'" x-cloak>
-        <div class="space-y-6">
-            {# CTO sees the health score hero too #}
-            
-            {# FRAG-035: Executive Summary (lazy-loaded) #}
-            <div x-data="{ execData: null, execLoading: true, execError: '' }" x-init="
-                Platform.fetch.get('/dashboard/api/executive-summary')
+    {% set cto = (persona_metrics or {}).get('cto') or {} %}
+    <div x-show="activeRole === 'cto'" x-cloak class="space-y-8" data-testid="lens-cto">
+        {# Executive summary, lazily loaded; a value the API sends as null is an em dash. #}
+        <section aria-labelledby="executive-summary-heading" class="rounded-lg border border-border bg-card"
+                 x-data="{ execData: null, execLoading: true, execError: '' }"
+                 x-init="Platform.fetch.get('/dashboard/api/executive-summary')
                     .then(data => { execData = data.data; })
                     .catch(() => { execError = 'Executive summary is currently unavailable.'; })
-                    .finally(() => { execLoading = false; })
-            ">
-            <p x-show="execError" x-cloak class="rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive" x-text="execError"></p>
+                    .finally(() => { execLoading = false; })">
+            <div>
+            <header class="flex items-center justify-between border-b border-border px-4 py-2">
+                <h2 id="executive-summary-heading" class="text-base font-semibold text-foreground">Executive Summary</h2>
+                <span class="text-2xs font-semibold uppercase tracking-[0.06em] text-muted-foreground">Portfolio at a glance</span>
+            </header>
+            <p x-show="execLoading" class="px-4 py-3 text-sm text-muted-foreground" aria-busy="true">Loading the summary…</p>
+            <p x-show="execError" x-cloak role="status" class="px-4 py-3 text-sm text-destructive-emphasis" x-text="execError"></p>
             <template x-if="execData">
-                <div class="rounded-xl border border-border bg-card p-5 mb-6">
-                    <h3 class="text-sm font-semibold text-foreground mb-3">Executive Summary</h3>  <!-- frontend-quality-ok -->
-                    <div class="grid grid-cols-2 md:grid-cols-3 gap-3">
-                        <template x-for="(val, key) in execData" :key="key">
-                            <div class="rounded-lg border border-border bg-background p-3">
-                                <p class="text-xs text-muted-foreground capitalize" x-text="key.replace(/_/g, ' ')"></p>
-                                <p class="text-lg font-bold text-foreground" x-text="typeof val === 'number' ? val.toLocaleString() : (val ?? '—')"></p>
-                            </div>
-                        </template>
-                    </div>
+                <div class="-mb-px -mr-px grid grid-cols-2 overflow-hidden md:grid-cols-3">
+                    <template x-for="(val, key) in execData" :key="key">
+                        <div class="border-b border-r border-border bg-card px-4 py-3">
+                            <p class="text-xs capitalize text-muted-foreground" x-text="key.replace(/_/g, ' ')"></p>
+                            <p class="mt-1 text-lg font-semibold tabular-nums text-foreground" x-text="typeof val === 'number' ? val.toLocaleString() : (val ?? '—')"></p>
+                        </div>
+                    </template>
                 </div>
             </template>
             </div>
+        </section>
 
-<div class="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                {{ metrics_card(title='Applications', value=(metrics.applications or 0)|string, icon='package', description='In portfolio', href='/applications/') }}
-                {{ metrics_card(title='Health Score', value=health_score_text|default('—'), value_testid='cto-health-score-value', icon='heart-pulse', description='Architecture health', href='/dashboard/health') }}
-                {{ metrics_card(title='Solutions', value=(nav_stats.solutions or 0)|string, icon='puzzle', description='Active designs', href='/solutions/') }}
-                {{ metrics_card(title='ArchiMate', value=(nav_stats.elements or 0)|string, icon='boxes', description='Elements catalogued', href='/architecture/dashboard') }}
+        <section aria-label="CTO key figures" class="grid grid-cols-2 gap-4 lg:grid-cols-4">
+            {% for label, value, testid, href in [
+                ('Applications', metrics.applications|dash, 'cto-kpi-applications', '/applications/'),
+                ('Health score', health_score_text|default('—'), 'cto-health-score-value', '/dashboard/health'),
+                ('Solutions', nav_stats.solutions|dash, 'cto-kpi-solutions', '/solutions/'),
+                ('ArchiMate elements', nav_stats.elements|dash, 'cto-kpi-elements', '/architecture/dashboard')
+            ] %}
+            <a href="{{ href }}" data-slot="card" class="rounded-lg border border-border bg-card p-4 transition-colors hover:border-ring">
+                <p data-slot="card-description" class="text-2xs font-semibold uppercase tracking-[0.06em] text-muted-foreground">{{ label }}</p>
+                <p data-slot="card-title" class="mt-1 text-28 font-semibold leading-9 tabular-nums text-foreground" data-testid="{{ testid }}">{{ value }}</p>
+            </a>
+            {% endfor %}
+        </section>
+
+        <section aria-labelledby="risk-arb-heading" class="rounded-lg border border-border bg-card">
+            <div class="flex items-center justify-between border-b border-border px-4 py-2">
+                <h2 id="risk-arb-heading" class="text-base font-semibold text-foreground">Portfolio risk and ARB pipeline</h2>
+                <span class="text-2xs font-semibold uppercase tracking-[0.06em] text-muted-foreground">Open items by level and status</span>
             </div>
-            {% call card.card() %}
-                {% call card.card_header(class='pb-3') %}
-                    {% call card.card_title(class='text-lg') %}Portfolio Risk &amp; ARB Pipeline{% endcall %}
-                {% endcall %}
-                {% call card.card_content() %}
-                    <h4 class="text-sm font-semibold text-foreground mb-3">Risk by Impact Level</h4>
-                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
-                        {% for level, bg, text in [
-                            ('critical', 'bg-destructive/10 border-destructive/30', 'text-destructive'),
-                            ('high', 'bg-warning/10 border-warning/30', 'text-warning-emphasis'),
-                            ('medium', 'bg-info/10 border-info/30', 'text-primary'),
-                            ('low', 'bg-success/10 border-success/30', 'text-success-emphasis'),
-                        ] %}
-                        {% set count = (persona_metrics.get('cto') or {}).get('risk_counts', {}).get(level, 0) %}
-                        <div class="rounded-lg border p-4 {{ bg }}">
-                            <p class="text-xs font-medium capitalize {{ text }}">{{ level }}</p>
-                            <p class="text-3xl font-bold {{ text }}">{{ count }}</p>
-                        </div>
-                        {% endfor %}
-                    </div>
-                    <h4 class="text-sm font-semibold text-foreground mb-3">ARB Pipeline</h4>
-                    <div class="grid grid-cols-3 gap-3">
-                        {% for status_key, label, bg, text in [
-                            ('pending', 'Pending', 'bg-warning/10 border-warning/30', 'text-warning-emphasis'),
-                            ('approved', 'Approved', 'bg-success/10 border-success/30', 'text-success-emphasis'),
-                            ('rejected', 'Rejected', 'bg-destructive/10 border-destructive/30', 'text-destructive'),
-                        ] %}
-                        {% set count = (persona_metrics.get('cto') or {}).get('arb_pipeline', {}).get(status_key, 0) %}
-                        <div class="rounded-lg border p-4 {{ bg }}">
-                            <p class="text-xs font-medium {{ text }}">{{ label }}</p>
-                            <p class="text-3xl font-bold {{ text }}">{{ count }}</p>
-                        </div>
-                        {% endfor %}
-                    </div>
-                {% endcall %}
-            {% endcall %}
-        </div>
+            <div class="grid grid-cols-1 gap-px bg-border md:grid-cols-2">
+                <div class="bg-card">
+                    <table class="dense-table w-full border-collapse text-sm" data-testid="cto-risk-by-impact">
+                        <caption class="sr-only">Risks by impact level</caption>
+                        <thead class="bg-card">
+                            <tr class="border-b border-border">
+                                <th scope="col" class="h-10 px-4 text-left align-middle">Risk by impact</th>
+                                <th scope="col" class="h-10 px-4 text-right align-middle">Open</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for level, tone in [('critical', 'text-destructive-emphasis'), ('high', 'text-warning-emphasis'), ('medium', 'text-info'), ('low', 'text-success-emphasis')] %}
+                            <tr class="h-10 border-b border-border last:border-b-0">
+                                <td class="px-4 align-middle capitalize {{ tone }}">{{ level }}</td>
+                                <td class="px-4 text-right align-middle tabular-nums text-foreground">{{ ((cto.get('risk_counts') or {}).get(level))|dash }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                <div class="bg-card">
+                    <table class="dense-table w-full border-collapse text-sm" data-testid="cto-arb-pipeline">
+                        <caption class="sr-only">ARB pipeline by status</caption>
+                        <thead class="bg-card">
+                            <tr class="border-b border-border">
+                                <th scope="col" class="h-10 px-4 text-left align-middle">ARB pipeline</th>
+                                <th scope="col" class="h-10 px-4 text-right align-middle">Reviews</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for status_key, label, tone in [('pending', 'Pending', 'text-warning-emphasis'), ('approved', 'Approved', 'text-success-emphasis'), ('rejected', 'Rejected', 'text-destructive-emphasis')] %}
+                            <tr class="h-10 border-b border-border last:border-b-0">
+                                <td class="px-4 align-middle {{ tone }}">{{ label }}</td>
+                                <td class="px-4 text-right align-middle tabular-nums text-foreground">{{ ((cto.get('arb_pipeline') or {}).get(status_key))|dash }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
     </div>
 
     {# ══════════════════════════════════════════════════════════════════════
-       CFO TAB — Cost focus
+       CFO LENS — cost
        ══════════════════════════════════════════════════════════════════════ #}
-    <div x-show="activeRole === 'cfo'" x-cloak>
-        <div class="space-y-6">
-            <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                {{ metrics_card(title='Applications', value=(metrics.applications or 0)|string, icon='package', description='In portfolio', href='/applications/') }}
-                {{ metrics_card(title='Vendors', value=(metrics.vendors or 0)|string, icon='building', description='Vendor organizations', href='/applications/vendors') }}
-                {{ metrics_card(title='Health Score', value=health_score_text|default('—'), value_testid='cfo-health-score-value', icon='heart-pulse', description='Architecture health', href='/dashboard/health') }}
-                {{ metrics_card(title='Solutions', value=(nav_stats.solutions or 0)|string, icon='puzzle', description='Active designs', href='/solutions/') }}
+    {% set cfo = (persona_metrics or {}).get('cfo') or {} %}
+    <div x-show="activeRole === 'cfo'" x-cloak class="space-y-8" data-testid="lens-cfo">
+        <section aria-label="CFO key figures" class="grid grid-cols-2 gap-4 lg:grid-cols-4">
+            {% for label, value, testid, href in [
+                ('Applications', metrics.applications|dash, 'cfo-kpi-applications', '/applications/'),
+                ('Vendors', metrics.vendors|dash, 'cfo-kpi-vendors', '/applications/vendors'),
+                ('Health score', health_score_text|default('—'), 'cfo-health-score-value', '/dashboard/health'),
+                ('Solutions', nav_stats.solutions|dash, 'cfo-kpi-solutions', '/solutions/')
+            ] %}
+            <a href="{{ href }}" data-slot="card" class="rounded-lg border border-border bg-card p-4 transition-colors hover:border-ring">
+                <p data-slot="card-description" class="text-2xs font-semibold uppercase tracking-[0.06em] text-muted-foreground">{{ label }}</p>
+                <p data-slot="card-title" class="mt-1 text-28 font-semibold leading-9 tabular-nums text-foreground" data-testid="{{ testid }}">{{ value }}</p>
+            </a>
+            {% endfor %}
+        </section>
+
+        <section aria-labelledby="tco-heading" class="rounded-lg border border-border bg-card">
+            <div class="flex items-center justify-between border-b border-border px-4 py-2">
+                <h2 id="tco-heading" class="text-base font-semibold text-foreground">Total cost of ownership</h2>
+                {% if cfo.get('total_tco') %}
+                <span class="text-2xs font-semibold uppercase tracking-[0.06em] text-muted-foreground tabular-nums">Total ${{ '{:,.0f}'.format(cfo.get('total_tco')) }}</span>
+                {% endif %}
             </div>
-            {% call card.card() %}
-                {% call card.card_header(class='pb-3') %}
-                    {% call card.card_title(class='text-lg') %}Total Cost of Ownership{% endcall %}
-                {% endcall %}
-                {% call card.card_content() %}
-                    {# Guard: persona_metrics may arrive partial (e.g. a metrics query
-                       failed) — degrade to an empty TCO table instead of 500-ing the
-                       whole Enterprise Architect landing page. #}
-                    {% set cfo = (persona_metrics or {}).get('cfo') or {} %}
-                    <div class="rounded-lg border border-border bg-background overflow-hidden">
-                        <table class="w-full text-sm">
-                            <thead class="bg-muted/50">
-                                <tr>
-                                    <th class="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Category</th>
-                                    <th class="px-4 py-2 text-right text-xs font-medium text-muted-foreground">Total Cost</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for cat, amount in (cfo.get('tco_by_category') or {}).items() %}
-                                <tr class="border-t border-border">
-                                    <td class="px-4 py-2 text-foreground capitalize">{{ cat }}</td>
-                                    <td class="px-4 py-2 text-right text-foreground font-medium">${{ '{:,.0f}'.format(amount) }}</td>
-                                </tr>
-                                {% else %}
-                                <tr>
-                                    <td colspan="2" class="px-4 py-3 text-center text-muted-foreground text-sm">No TCO data recorded yet</td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
-                    {% if cfo.get('total_tco') %}
-                    <div class="mt-3 flex justify-end">
-                        <span class="text-sm font-semibold text-foreground">Total: ${{ '{:,.0f}'.format(cfo.get('total_tco')) }}</span>
-                    </div>
-                    {% endif %}
-                {% endcall %}
-            {% endcall %}
-        </div>
+            <table class="dense-table w-full border-collapse text-sm" data-testid="cfo-tco-by-category">
+                <caption class="sr-only">Total cost of ownership by category</caption>
+                <thead class="bg-card">
+                    <tr class="border-b border-border">
+                        <th scope="col" class="h-10 px-4 text-left align-middle">Category</th>
+                        <th scope="col" class="h-10 px-4 text-right align-middle">Total cost</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for cat, amount in (cfo.get('tco_by_category') or {}).items() %}
+                    <tr class="h-12 border-b border-border last:border-b-0">
+                        <td class="px-4 align-middle capitalize text-foreground">{{ cat }}</td>
+                        <td class="px-4 text-right align-middle font-medium tabular-nums text-foreground">${{ '{:,.0f}'.format(amount) }}</td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="2" class="h-12 px-4 text-sm text-muted-foreground">No TCO data recorded yet.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </section>
     </div>
 
     {# ══════════════════════════════════════════════════════════════════════
-       ARCHITECT TAB — Coverage focus
+       LAYER LENSES — the six ArchiMate 3.2 layers, one panel driven by the
+       active key; per-layer element counts come from layer_breakdown (route).
        ══════════════════════════════════════════════════════════════════════ #}
-    {# ── Architecture by ArchiMate 3.2 layer ─────────────────────────────
-       Replaces the ambiguous "Architect"/"Business" persona tabs with the
-       canonical ArchiMate 3.2 layer decomposition. One panel, driven by the
-       active layer key; per-layer element counts come from `layer_breakdown`
-       (route). ArchiMate 3.2 folds Physical into Technology, so six layers. #}
-    <div x-show="Object.keys(_layers).includes(activeRole)" x-cloak
+    <div x-show="Object.keys(_layers).includes(activeRole)" x-cloak data-testid="lens-layer"
          x-data="{
            _layers: {
-             motivation:     { label: 'Motivation',   count: {{ layer_breakdown.motivation|default(0) }},     blurb: 'Drivers, goals, outcomes, requirements, constraints and principles — WHY the architecture changes.' },
-             strategy:       { label: 'Strategy',     count: {{ layer_breakdown.strategy|default(0) }},         blurb: 'Capabilities, value streams, resources and courses of action — WHAT the enterprise must be able to do.' },
-             business:       { label: 'Business',     count: {{ layer_breakdown.business|default(0) }},         blurb: 'Actors, roles, processes, services and business objects — HOW the business operates.' },
-             application:    { label: 'Application',  count: {{ layer_breakdown.application|default(0) }},      blurb: 'Application components, services, interfaces and data objects — the software realizing the business.' },
-             technology:     { label: 'Technology',  count: {{ layer_breakdown.technology|default(0) }},       blurb: 'Nodes, system software, technology services and physical equipment — the platform the software runs on.' },
-             implementation: { label: 'Implementation & Migration', count: {{ layer_breakdown.implementation|default(0) }}, blurb: 'Work packages, deliverables, plateaus and gaps — the transition from the as-is to the to-be architecture.' }
+             motivation:     { label: 'Motivation',   count: {{ layer_breakdown.motivation if layer_breakdown and layer_breakdown.motivation is not none else 'null' }},     blurb: 'Drivers, goals, outcomes, requirements, constraints and principles — why the architecture changes.' },
+             strategy:       { label: 'Strategy',     count: {{ layer_breakdown.strategy if layer_breakdown and layer_breakdown.strategy is not none else 'null' }},         blurb: 'Capabilities, value streams, resources and courses of action — what the enterprise must be able to do.' },
+             business:       { label: 'Business',     count: {{ layer_breakdown.business if layer_breakdown and layer_breakdown.business is not none else 'null' }},         blurb: 'Actors, roles, processes, services and business objects — how the business operates.' },
+             application:    { label: 'Application',  count: {{ layer_breakdown.application if layer_breakdown and layer_breakdown.application is not none else 'null' }},      blurb: 'Application components, services, interfaces and data objects — the software realising the business.' },
+             technology:     { label: 'Technology',   count: {{ layer_breakdown.technology if layer_breakdown and layer_breakdown.technology is not none else 'null' }},       blurb: 'Nodes, system software, technology services and physical equipment — the platform the software runs on.' },
+             implementation: { label: 'Implementation & Migration', count: {{ layer_breakdown.implementation if layer_breakdown and layer_breakdown.implementation is not none else 'null' }}, blurb: 'Work packages, deliverables, plateaus and gaps — the transition from the as-is to the to-be architecture.' }
            }
          }">
-        <div class="space-y-6">
-            <div class="rounded-lg border border-border bg-card p-6">
-                <div class="flex items-start justify-between gap-4">
-                    <div>
-                        <h2 class="text-lg font-semibold text-foreground" x-text="(_layers[activeRole]||{label:''}).label + ' layer'"></h2>
-                        <p class="mt-1 max-w-2xl text-sm text-muted-foreground" x-text="(_layers[activeRole]||{blurb:''}).blurb"></p>
-                    </div>
-                    <div class="shrink-0 text-right">
-                        <div class="text-3xl font-bold text-foreground" x-text="((_layers[activeRole]||{count:0}).count).toLocaleString()"></div>
-                        <div class="text-xs text-muted-foreground">elements</div>
-                    </div>
-                </div>
-                <div class="mt-5 flex flex-wrap gap-2">
-                    <a :href="'/archimate/composer?viewpoint=layered&layer=' + activeRole" class="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:opacity-90">
-                        Open in composer <i data-lucide="pen-tool" class="h-3.5 w-3.5"></i>
+        <section aria-labelledby="layer-heading" class="rounded-lg border border-border bg-card">
+            <div class="flex items-center justify-between border-b border-border px-4 py-2">
+                <h2 id="layer-heading" class="text-base font-semibold text-foreground" x-text="(_layers[activeRole]||{label:''}).label + ' layer'"></h2>
+                <span class="text-2xs font-semibold uppercase tracking-[0.06em] text-muted-foreground tabular-nums"><span x-text="((c) => c == null ? '—' : c.toLocaleString())((_layers[activeRole]||{}).count)"></span> elements</span>
+            </div>
+            <div class="px-4 py-3">
+                <p class="max-w-2xl text-sm text-muted-foreground" x-text="(_layers[activeRole]||{blurb:''}).blurb"></p>
+                <div class="mt-4 flex flex-wrap gap-2">
+                    <a :href="'/archimate/composer?viewpoint=layered&layer=' + activeRole" class="inline-flex h-8 items-center gap-1.5 rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90">
+                        Open in composer <i data-lucide="pen-tool" class="h-3.5 w-3.5" aria-hidden="true"></i>
                     </a>
-                    <a href="/architecture/dashboard" class="inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-xs font-medium hover:bg-muted">
-                        Browse elements <i data-lucide="boxes" class="h-3.5 w-3.5"></i>
+                    <a href="/architecture/dashboard" class="inline-flex h-8 items-center gap-1.5 rounded-md border border-border px-3 text-xs font-medium text-foreground transition-colors hover:bg-muted">
+                        Browse elements <i data-lucide="boxes" class="h-3.5 w-3.5" aria-hidden="true"></i>
                     </a>
-                    <a href="/capability-map/" x-show="activeRole === 'strategy' || activeRole === 'business'" class="inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-xs font-medium hover:bg-muted">
-                        Capability map <i data-lucide="layers" class="h-3.5 w-3.5"></i>
+                    <a href="/capability-map/" x-show="activeRole === 'strategy' || activeRole === 'business'" class="inline-flex h-8 items-center gap-1.5 rounded-md border border-border px-3 text-xs font-medium text-foreground transition-colors hover:bg-muted">
+                        Capability map <i data-lucide="layers" class="h-3.5 w-3.5" aria-hidden="true"></i>
                     </a>
                 </div>
             </div>
-        </div>
+        </section>
     </div>
-
-    {% endif %}{# mode == 'guided' / 'data' #}
-
+    {% endif %}
 </div>
-{% endblock %}
-
-{% block extra_js %}
-<!-- JointJS peer deps (jQuery → Lodash → Backbone) MUST load before joint.min.js,
-     otherwise joint throws "Cannot read properties of undefined (reading 'Model')"
-     and the Layered Viewpoint diagram silently fails to render. -->
-<script src="/static/vendor/jquery.min.js" crossorigin="anonymous"></script>
-<script src="/static/vendor/lodash.min.js" crossorigin="anonymous"></script>
-<script src="/static/vendor/backbone-min.js" crossorigin="anonymous"></script>
-<script src="/static/vendor/joint.min.js" crossorigin="anonymous"></script>
-<link rel="stylesheet" href="/static/vendor/joint.min.css" crossorigin="anonymous">
-<script src="{{ url_for('static', filename='js/archimate/composer_renderer.js') }}"></script>
 {% endblock %}

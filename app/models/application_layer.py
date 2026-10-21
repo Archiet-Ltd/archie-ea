@@ -26,6 +26,7 @@ from sqlalchemy.orm import relationship, validates
 
 from .. import db
 from .mixins import TenantMixin
+from .mixins.core import _default_org_id
 
 logger = logging.getLogger(__name__)
 
@@ -527,7 +528,7 @@ class ApplicationEvent(TenantMixin, db.Model):
 # ============================================================================
 
 
-class ApplicationCollaboration(db.Model):
+class ApplicationCollaboration(TenantMixin, db.Model):
     """
     ArchiMate 3.2 Application Collaboration - Aggregate of application components working together
 
@@ -565,6 +566,20 @@ class ApplicationCollaboration(db.Model):
     # Application association
     application_component_id = db.Column(
         db.Integer, db.ForeignKey("application_components.id"), nullable=True, index=True
+    )
+
+    # Override TenantMixin's normally non-nullable column for an ADD-only
+    # rollout: the 20261018_typed_tables_org_id migration adds this to an
+    # existing table and leaves a row NULL when no organisation is derivable
+    # from its linked parents. The mixin is still essential: tenant
+    # middleware identifies tenant-owned models by it and applies the
+    # automatic query fence.
+    organization_id = db.Column(
+        db.Integer,
+        db.ForeignKey("organizations.id", ondelete="CASCADE"),
+        nullable=True,
+        index=True,
+        default=_default_org_id,
     )
 
     # Collaboration Classification
@@ -842,7 +857,7 @@ class ApplicationProcess(TenantMixin, db.Model):
 # ============================================================================
 
 
-class ApplicationInteraction(db.Model):
+class ApplicationInteraction(TenantMixin, db.Model):
     """
     ArchiMate 3.2 Application Interaction - Collaboration between application components
 
@@ -879,6 +894,20 @@ class ApplicationInteraction(db.Model):
     )
     target_component_id = db.Column(
         db.Integer, db.ForeignKey("application_components.id"), nullable=True
+    )
+
+    # Override TenantMixin's normally non-nullable column for an ADD-only
+    # rollout: the 20261018_typed_tables_org_id migration adds this to an
+    # existing table and leaves a row NULL when no organisation is derivable
+    # from its linked parents. The mixin is still essential: tenant
+    # middleware identifies tenant-owned models by it and applies the
+    # automatic query fence.
+    organization_id = db.Column(
+        db.Integer,
+        db.ForeignKey("organizations.id", ondelete="CASCADE"),
+        nullable=True,
+        index=True,
+        default=_default_org_id,
     )
 
     # Performance
@@ -1102,7 +1131,7 @@ def create_dataobject_archimate_element(mapper, connection, target):
         target.archimate_element_id = result.inserted_primary_key[0]
 
 
-class ApplicationService(db.Model):
+class ApplicationService(TenantMixin, db.Model):
     """
     ArchiMate 3.2 Application Service
     """
@@ -1122,6 +1151,20 @@ class ApplicationService(db.Model):
 
     # Minimal metadata used by application management UI
     service_type = db.Column(db.String(50), default="Shared")
+
+    # Override TenantMixin's normally non-nullable column for an ADD-only
+    # rollout: the 20261018_typed_tables_org_id migration adds this to an
+    # existing table and leaves a row NULL when no organisation is derivable
+    # from its linked parents. The mixin is still essential: tenant
+    # middleware identifies tenant-owned models by it and applies the
+    # automatic query fence.
+    organization_id = db.Column(
+        db.Integer,
+        db.ForeignKey("organizations.id", ondelete="CASCADE"),
+        nullable=True,
+        index=True,
+        default=_default_org_id,
+    )
 
     # Relationships
     archimate_element = db.relationship(

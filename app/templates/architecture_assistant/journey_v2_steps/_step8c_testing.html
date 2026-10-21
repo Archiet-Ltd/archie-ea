@@ -19,7 +19,7 @@
             </h3>
             <button type="button" @click="generateScenarios()"
                     :disabled="scenariosLoading"
-                    class="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 disabled:opacity-50">
+                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                 <i data-lucide="sparkles" class="w-4 h-4" aria-hidden="true"></i>
                 <span x-text="scenariosLoading ? 'Generating...' : 'Generate Scenarios'"></span>
             </button>
@@ -90,7 +90,7 @@
             </h3>
             <button type="button" @click="compareProcess()"
                     :disabled="comparisonLoading"
-                    class="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 disabled:opacity-50">
+                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                 <i data-lucide="arrow-left-right" class="w-4 h-4" aria-hidden="true"></i>
                 <span x-text="comparisonLoading ? 'Comparing...' : 'Compare Old vs New'"></span>
             </button>
@@ -99,7 +99,7 @@
         <template x-if="processComparison && processComparison.steps && processComparison.steps.length > 0">
             <div class="space-y-3">
                 <div class="overflow-x-auto">
-                    <table class="w-full text-sm">
+                    <table class="dense-table w-full text-sm">
                         <thead>
                             <tr class="border-b border-border">
                                 <th class="text-left py-2 px-3 text-xs font-medium text-muted-foreground">Step</th>
@@ -145,7 +145,7 @@
             </h3>
             <button type="button" @click="runAcceptanceTests()"
                     :disabled="testsRunning"
-                    class="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 disabled:opacity-50">
+                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                 <i data-lucide="play" class="w-4 h-4" aria-hidden="true"></i>
                 <span x-text="testsRunning ? 'Running...' : 'Run Tests'"></span>
             </button>

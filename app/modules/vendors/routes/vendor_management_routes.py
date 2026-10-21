@@ -22,6 +22,7 @@ from app.decorators import audit_log, require_roles  # dead-code-ok
 from app.extensions import db
 from app.models.vendor_organization import VendorOrganization
 from app.utils.pagination import safe_int_arg
+from app.middleware.tenant_decorators import platform_admin_required
 
 # Allowlist for vendor updates (security: prevent mass assignment)
 VENDOR_UPDATE_ALLOWLIST = ["name", "vendor_type", "country", "description", "website"]
@@ -58,6 +59,7 @@ def vendor_dashboard():
 @login_required
 @require_roles("admin", "architect")
 @audit_log("vendor_create")
+@platform_admin_required
 def create_vendor():
     """Create new vendor (admin/architect only) with validation."""
     if request.method == "GET":
@@ -143,6 +145,7 @@ def vendor_analytics():
 @login_required
 @require_roles("admin")
 @audit_log("vendor_import")
+@platform_admin_required
 def import_vendors():
     """
     Bulk import vendors from CSV/Excel (admin only).
@@ -368,6 +371,7 @@ def api_list_vendors():
 @login_required
 @require_roles("admin", "architect")
 @audit_log("vendor_api_create")
+@platform_admin_required
 def api_create_vendor():
     """API: Create vendor with validation and duplicate prevention."""
     data = request.get_json() or {}
@@ -444,6 +448,7 @@ def api_get_vendor(vendor_id):
 @login_required
 @require_roles("admin", "architect")
 @audit_log("vendor_api_update")
+@platform_admin_required
 def api_update_vendor(vendor_id):
     """API: Update vendor (with allowlist protection)."""
     vendor = VendorOrganization.query.get_or_404(vendor_id)
@@ -469,6 +474,7 @@ def api_update_vendor(vendor_id):
 @login_required
 @require_roles("admin")
 @audit_log("vendor_api_delete")
+@platform_admin_required
 def api_delete_vendor(vendor_id):
     """
     API: Delete vendor (admin only).

@@ -12,7 +12,7 @@
     </div>
     {% macro _ps_actions() %}
 <a href="{{ url_for('my_applications.app_list') }}"
-           class="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors">
+           class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
             <i data-lucide="list" class="w-4 h-4"></i>
             View All
         </a>
@@ -103,17 +103,7 @@
             <p class="text-sm text-muted-foreground mt-3">Showing {{ recent_apps|length }} of {{ ownership_summary.total }}.</p>
             {% endif %}
             {% else %}
-            <div class="text-center py-8">
-                <div class="w-12 h-12 mx-auto mb-3 bg-muted rounded-full flex items-center justify-center">
-                    <i data-lucide="package" class="w-6 h-6 text-muted-foreground"></i>
-                </div>
-                <p class="text-muted-foreground">No applications assigned yet</p>
-                <p class="text-sm text-muted-foreground mt-1">Applications assigned to you as owner are listed here.</p>
-                <a href="{{ url_for('unified_applications.application_list') }}"
-                   class="inline-flex items-center px-4 py-2 mt-4 bg-primary hover:bg-primary/90 text-primary-foreground text-sm font-medium rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-ring transition-colors">
-                    Browse all applications
-                </a>
-            </div>
+            {% include 'my_applications/_no_owned_applications.html' %}
             {% endif %}
         </div>
 
