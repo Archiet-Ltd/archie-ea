@@ -173,7 +173,11 @@ def _on_after_flush(session, flush_context):
             payload["layer"] = target.layer
 
         try:
-            extra = describe_change(session, entity_type, action, target, org_id)
+            # Reading owners must not autoflush: that would flush the outbox
+            # rows queued so far, run every flush listener a second time over
+            # the same dirty objects, and double the invalidation UPDATE.
+            with session.no_autoflush:
+                extra = describe_change(session, entity_type, action, target, org_id)
             if entity_type in _NEEDS_A_CHANGE and not extra["changes"]:
                 continue
             payload.update(extra)
@@ -233,8 +237,13 @@ def install_archimate_outbox_sync():
     _TARGET_MODELS[CostFact] = "cost_fact"
     _TARGET_MODELS[Risk] = "risk"
 
+    # Only the types whose event depends on what changed. Keeping the old value
+    # makes the first assignment to an unloaded field read it from the database,
+    # which autoflushes; elements and relationships emit on every write whatever
+    # changed, and a flush that touches many of them must stay one flush.
     for model_cls, entity_type in _TARGET_MODELS.items():
-        _record_old_values(model_cls, entity_type)
+        if entity_type in _NEEDS_A_CHANGE:
+            _record_old_values(model_cls, entity_type)
 
     logger.info("Outbox sync installed for elements, relationships, applications, owners, costs and risks")
 
