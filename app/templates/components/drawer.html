@@ -52,8 +52,7 @@
         x-transition:leave-start="opacity-100"
         x-transition:leave-end="opacity-0"
         @click="drawerOpen = false"
-        class="modal-backdrop fixed inset-0 transition-opacity duration-200 overflow-y-auto bg-overlay/50"
-        style="z-index: var(--modal-z, 1000);" aria-hidden="true"
+        class="modal-backdrop fixed inset-0 transition-opacity duration-200 overflow-y-auto bg-overlay/50" aria-hidden="true"
     ></div>
 
     <!-- Panel -->
@@ -75,7 +74,6 @@
         x-transition:leave-start="translate-x-0"
         x-transition:leave-end="translate-x-full"
         class="modal-panel fixed right-0 top-0 h-full w-full {{ width_class }} bg-background border-l border-border flex flex-col"
-        style="z-index: calc(var(--modal-z, 1000) + 1);"
         role="dialog"
         aria-modal="true"
         aria-labelledby="drawer-title-{{ id }}"

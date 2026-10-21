@@ -1,23 +1,17 @@
 {# Unified Mapping Modal Component
-   smoke-coverage-ok: CSP inline style fix; the z-index scale is set by a
-   nonce'd <style> block (same mechanism as layouts/admin_base.html and
-   partials/_head.html) instead of a static style= attribute, so
-   style-src-elem stays satisfied; covered by tests/test_capability_map_a11y_csp.py
+   smoke-coverage-ok: CSP inline style fix; the z-index scale comes from the stylesheet
+   rules on modal-root and modal-panel (app/static/css/tailwind-input.css), so no inline
+   style or nonce'd block is needed; covered by tests/test_capability_map_a11y_csp.py
    and tests/test_modal_shell_consistency.py
      Context modes: 'capability' (default), 'archimate', 'apqc', 'vendor'
      Supports two-step workflow:
        Step 1: Target Selection (browse/search vendors or APQC processes)
        Step 2: Application Mapping (detailed field mapping)
-
      Usage:
        - Direct mapping: openUnifiedMappingModal(targetId, targetName, { context: 'vendor' })
        - Discovery mode: openUnifiedMappingModalDiscovery({ context: 'vendor' })
 #}
 
-<style nonce="{{ csp_nonce }}">
-#unified-mapping-modal { z-index: var(--modal-z, 1000); }
-#unified-mapping-modal [data-modal-panel] { z-index: calc(var(--modal-z, 1000) + 1); }
-</style>
 <div id="unified-mapping-modal" hidden aria-hidden="true" class="modal-root fixed inset-0 items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="unified-modal-heading">
     <!-- Backdrop -->
     <div data-modal-backdrop="unified-mapping-modal" aria-hidden="true"

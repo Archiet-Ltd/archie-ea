@@ -74,6 +74,18 @@
 }
 
 @layer components {
+  /* The one modal z-index scale, as stylesheet rules: an inline style attribute and a nonce-scoped
+     <style> block are both refused by the content security policy when a template imports the
+     modal without context, which left the backdrop below the sidebar. Every modal shell carries
+     modal-root or modal-backdrop on its base layer and modal-panel one above it. */
+  .modal-root,
+  .modal-backdrop {
+    z-index: var(--modal-z, 1000);
+  }
+  .modal-panel {
+    z-index: calc(var(--modal-z, 1000) + 1);
+  }
+
   .tabular {
     font-variant-numeric: tabular-nums;
   }

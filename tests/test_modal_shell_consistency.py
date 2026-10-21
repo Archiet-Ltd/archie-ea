@@ -58,18 +58,29 @@ def test_backdrop_uses_the_canonical_token(rel):
     assert "rgba(" not in src, f"{rel} still uses an inline rgba() backdrop"
 
 
+STYLESHEET = "app/static/css/tailwind-input.css"
+
+
+def test_the_single_z_index_scale_lives_in_the_stylesheet():
+    """The one modal scale is the `--modal-z` custom property, applied by stylesheet rules on
+    the shell classes, so no template needs an inline style or a nonce to set it."""
+    css = _read(STYLESHEET)
+    assert re.search(r"\.modal-root,\s*\.modal-backdrop\s*\{\s*z-index:\s*var\(--modal-z, 1000\);", css)
+    assert re.search(r"\.modal-panel\s*\{\s*z-index:\s*calc\(var\(--modal-z, 1000\) \+ 1\);", css)
+
+
 @pytest.mark.parametrize("rel", MODAL_FILES)
 def test_z_index_comes_from_the_single_scale(rel):
-    """tailwind.config.js defines no zIndex scale and `z-[1000]` is not compiled,
-    so the one scale that exists is the `--modal-z` custom property used by
-    components/modal.html. No component may re-introduce `z-50` or an arbitrary
-    `z-[...]` on its modal chrome."""
+    """Each modal shell takes its layer from the stylesheet scale: a base-layer class
+    (modal-root or modal-backdrop) and modal-panel, with no inline z-index and no
+    <style> block, both of which the content security policy can refuse. No
+    component may re-introduce `z-50` or an arbitrary `z-[...]` on its modal chrome."""
     src = _read(rel)
-    assert "var(--modal-z" in src, f"{rel} does not use the --modal-z scale"
-    assert "calc(var(--modal-z, 1000) + 1)" in src, (
-        f"{rel} does not raise its panel above its own backdrop"
-    )
-    stray = re.findall(r'class="[^"]*\bz-(?:50|\[[^\]]+\])', src)
+    assert "modal-root" in src or "modal-backdrop" in src, f"{rel} has no base-layer shell class"
+    assert "modal-panel" in src, f"{rel} does not mark its panel to sit above its own backdrop"
+    assert "z-index" not in src, f"{rel} still sets a z-index inline"
+    assert "<style" not in src, f"{rel} still carries a <style> block the policy can refuse"
+    stray = re.findall(r'class="[^"]*z-(?:50|\[[^\]]+\])', src)
     assert not stray, f"{rel} still carries an off-scale z-index class: {stray}"
 
 
