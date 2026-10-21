@@ -84,7 +84,7 @@
     {% endfor %}
 
     <div id="ask-results" aria-busy="false" :aria-busy="busy ? 'true' : 'false'" x-show="answeredKey === 'impact' && state !== 'idle'" x-cloak class="space-y-4">
-        <h2 id="ask-results-heading" x-ref="resultsHeading" tabindex="-1" class="text-lg font-semibold text-foreground focus:outline-none">Results</h2>
+        <h2 id="ask-results-heading" x-ref="resultsHeading" tabindex="-1" class="text-lg font-semibold text-foreground focus:outline-none" x-text="headingText()"></h2>
         {{ impact_states("state === 'loading'") }}
         <ul class="space-y-3" x-show="state === 'ready'" x-cloak>
             <template x-for="row in rows" :key="row.key">
@@ -113,7 +113,7 @@
        blast-radius rows -- a distinct shape from L1's flat row list, so a
        separate result block rather than overloading `rows`. #}
     <div id="ask-risk-results" aria-busy="false" :aria-busy="riskBusy ? 'true' : 'false'" x-show="answeredKey === 'risk' && riskState !== 'idle'" x-cloak class="space-y-4">
-        <h2 id="ask-risk-results-heading" x-ref="riskResultsHeading" tabindex="-1" class="text-lg font-semibold text-foreground focus:outline-none">Results</h2>
+        <h2 id="ask-risk-results-heading" x-ref="riskResultsHeading" tabindex="-1" class="text-lg font-semibold text-foreground focus:outline-none" x-text="headingText()"></h2>
         <template x-if="riskState === 'loading'">
             <div role="status" aria-label="Loading" class="h-16 animate-pulse rounded-lg border border-border bg-muted/30"></div>
         </template>
@@ -149,7 +149,7 @@
        why duplicate-detection and TCO are not offered here (neither has a
        per-application HTML page today). #}
     <div id="ask-portfolio-results" aria-busy="false" :aria-busy="portfolioBusy ? 'true' : 'false'" x-show="answeredKey === 'portfolio' && portfolioState !== 'idle'" x-cloak class="space-y-4">
-        <h2 id="ask-portfolio-results-heading" x-ref="portfolioResultsHeading" tabindex="-1" class="text-lg font-semibold text-foreground focus:outline-none">Results</h2>
+        <h2 id="ask-portfolio-results-heading" x-ref="portfolioResultsHeading" tabindex="-1" class="text-lg font-semibold text-foreground focus:outline-none" x-text="headingText()"></h2>
         <template x-if="portfolioState === 'loading'">
             <div role="status" aria-label="Loading" class="h-16 animate-pulse rounded-lg border border-border bg-muted/30"></div>
         </template>
@@ -173,7 +173,7 @@
     {# L5: one card per work package seeded on the picked element, each with
        its own blast-radius rows -- same shape as L6's risk cards. #}
     <div id="ask-programme-results" aria-busy="false" :aria-busy="programmeBusy ? 'true' : 'false'" x-show="answeredKey === 'programme' && programmeState !== 'idle'" x-cloak class="space-y-4">
-        <h2 id="ask-programme-results-heading" x-ref="programmeResultsHeading" tabindex="-1" class="text-lg font-semibold text-foreground focus:outline-none">Results</h2>
+        <h2 id="ask-programme-results-heading" x-ref="programmeResultsHeading" tabindex="-1" class="text-lg font-semibold text-foreground focus:outline-none" x-text="headingText()"></h2>
         <template x-if="programmeState === 'loading'">
             <div role="status" aria-label="Loading" class="h-16 animate-pulse rounded-lg border border-border bg-muted/30"></div>
         </template>
@@ -217,7 +217,7 @@
        its own blast-radius rows and a nested success-metrics list -- same
        shape as L5's work-package cards. #}
     <div id="ask-strategy-results" aria-busy="false" :aria-busy="strategyBusy ? 'true' : 'false'" x-show="answeredKey === 'strategy' && strategyState !== 'idle'" x-cloak class="space-y-4">
-        <h2 id="ask-strategy-results-heading" x-ref="strategyResultsHeading" tabindex="-1" class="text-lg font-semibold text-foreground focus:outline-none">Results</h2>
+        <h2 id="ask-strategy-results-heading" x-ref="strategyResultsHeading" tabindex="-1" class="text-lg font-semibold text-foreground focus:outline-none" x-text="headingText()"></h2>
         <template x-if="strategyState === 'loading'">
             <div role="status" aria-label="Loading" class="h-16 animate-pulse rounded-lg border border-border bg-muted/30"></div>
         </template>
@@ -271,7 +271,7 @@
        inside any loading/error/empty state gate, since it is true on
        every single response regardless of ownership data. #}
     <div id="ask-accountability-results" aria-busy="false" :aria-busy="accountabilityBusy ? 'true' : 'false'" x-show="answeredKey === 'accountability' && accountabilityState !== 'idle'" x-cloak class="space-y-4">
-        <h2 id="ask-accountability-results-heading" x-ref="accountabilityResultsHeading" tabindex="-1" class="text-lg font-semibold text-foreground focus:outline-none">Results</h2>
+        <h2 id="ask-accountability-results-heading" x-ref="accountabilityResultsHeading" tabindex="-1" class="text-lg font-semibold text-foreground focus:outline-none" x-text="headingText()"></h2>
         <template x-if="accountabilityState === 'loading'">
             <div role="status" aria-label="Loading" class="h-16 animate-pulse rounded-lg border border-border bg-muted/30"></div>
         </template>
@@ -307,7 +307,7 @@
        the lineage flows. Steward and owner are free text as recorded, never a
        person; anything missing says "not recorded" (no blank, no zero). #}
     <div id="ask-data-results" aria-busy="false" :aria-busy="dataBusy ? 'true' : 'false'" x-show="answeredKey === 'data' && dataState !== 'idle'" x-cloak class="space-y-4">
-        <h2 id="ask-data-results-heading" x-ref="dataResultsHeading" tabindex="-1" class="text-lg font-semibold text-foreground focus:outline-none">Results</h2>
+        <h2 id="ask-data-results-heading" x-ref="dataResultsHeading" tabindex="-1" class="text-lg font-semibold text-foreground focus:outline-none" x-text="headingText()"></h2>
         <template x-if="dataState === 'loading'">
             <div role="status" aria-label="Loading" class="h-16 animate-pulse rounded-lg border border-border bg-muted/30"></div>
         </template>
@@ -353,7 +353,7 @@
        so. The last scan time is shown only when one exists; nothing is shown as
        a percentage or a zero. #}
     <div id="ask-compliance-results" aria-busy="false" :aria-busy="complianceBusy ? 'true' : 'false'" x-show="answeredKey === 'compliance' && complianceState !== 'idle'" x-cloak class="space-y-4">
-        <h2 id="ask-compliance-results-heading" x-ref="complianceResultsHeading" tabindex="-1" class="text-lg font-semibold text-foreground focus:outline-none">Results</h2>
+        <h2 id="ask-compliance-results-heading" x-ref="complianceResultsHeading" tabindex="-1" class="text-lg font-semibold text-foreground focus:outline-none" x-text="headingText()"></h2>
         <template x-if="complianceState === 'loading'">
             <div role="status" aria-label="Loading" class="h-16 animate-pulse rounded-lg border border-border bg-muted/30"></div>
         </template>

@@ -1,0 +1,7 @@
+{
+  "result": [
+    {"sys_id": "11111111111111111111111111111111", "name": "Billing Application", "sys_class_name": "cmdb_ci_application"},
+    {"sys_id": "22222222222222222222222222222222", "short_description": "A record with no name", "sys_class_name": "cmdb_ci_server"},
+    {"name": "A record with no sys_id", "sys_class_name": "cmdb_ci_server"}
+  ]
+}
