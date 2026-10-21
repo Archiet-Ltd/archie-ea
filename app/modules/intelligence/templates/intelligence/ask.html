@@ -85,7 +85,8 @@
             <button type="button" id="ask-question-{{ question.key }}" data-question="{{ question.key }}"
                     class="inline-flex h-8 items-center rounded-md border px-3 text-13 font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     :class="(openKey || 'impact') === '{{ question.key }}' ? 'border-ring bg-muted text-info dark:bg-card' : 'border-input bg-background text-muted-foreground hover:bg-muted/50 hover:text-foreground'"
-                    :aria-pressed="(openKey || 'impact') === '{{ question.key }}' ? 'true' : 'false'"
+                    aria-expanded="false" :aria-expanded="openKey === '{{ question.key }}' ? 'true' : 'false'"
+                    aria-controls="ask-question-panel-{{ question.key }}"
                     @click="openKey === '{{ question.key }}' || toggleQuestion('{{ question.key }}')">
                 {{ chip_labels[question.key] }}
             </button>
