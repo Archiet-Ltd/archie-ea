@@ -1,799 +1,650 @@
+# The reuse register: one canonical implementation per concept, and what must not be created beside it.
+# Checked by scripts/check_reuse_register.py (gate: reuse-register, tag: static). Read it BEFORE writing a helper:
+#     python scripts/check_reuse_register.py --entries
+#
+# status:
+#   active        canonical.path exists and defines every canonical.symbols item (checked on every run).
+#   pending       the canonical implementation is merged in another pull request (pending_branch); only the
+#                 must_not_create patterns are enforced until it lands, then promote the entry to active.
+#   undetermined  several implementations compete and no owner has been chosen. Nothing is enforced; the
+#                 candidates are listed so the choice can be made once, by the role that owns the concept.
+#
+# canonical.symbols:  `name` (module-level function or class), `Class.method`, or a Jinja `macro` name.
+# pending_symbols:    symbols expected in canonical.path once the pending pull request merges.
+# must_not_create:    regexes run line by line over `scope` (default app/) and `suffixes` (default .py). A match
+#                     outside canonical.path and known_exceptions is a hit. Hits that existed when the register
+#                     was introduced are recorded per file in scripts/reuse_register_baseline.json, which can
+#                     only fall; any further hit fails the gate and prints this entry.
+# known_exceptions:   a file (or a directory ending in /) that legitimately holds a look-alike, with a reason.
+#                     Add one only with a reason a reviewer accepts. A line marker `reuse-ok: <reason>` also works.
+#
+# Adding a concept: find the existing implementation first (grep), name it here, then add the patterns that
+# describe the second copy a builder would otherwise write. Do not register a canonical that is not the
+# one the product uses: mark the concept undetermined instead.
+
 version: 1
 entries:
-- id: design-tokens
-  concept: Colour, radius and type tokens for every page (one token file; the public
-    marketing palette is a scoped class in it)
-  status: active
-  canonical:
-    path: app/static/css/shadcn_tokens.css
-    symbols:
-    - --background
-    - --foreground
-    - --primary
-    - --muted
-    - --border
-    - --radius
-  reuse: 'Add or change a colour, radius or type token only in shadcn_tokens.css,
-    inside @layer base. To scope a different palette to one page family, add a class
-    in that same file (see .theme-marketing) and set it on <body> via a template block;
-    do not declare --background / --primary / --border / --info / --success / --warning
-    / any -foreground or -emphasis variant etc. a second time in another stylesheet,
-    a template''s inline <style>, a brand-new file anywhere in the tree, or an inline
-    style="--token: ..." attribute -- one token source means no second declaration
-    in any form, on one line or many. Do not fall back to a literal colour with var(--any-token,
-    #hex), var(--any-token, rgb(...)/rgba(...)/hsl(...)/hsla(...)), an HSL-triplet
-    fallback (var(--any-token, 0 0% 0%)), a named colour (var(--any-token, blue))
-    or a keyword (var(--any-token, transparent)) either, on a --color-* name or a
-    real token name: no var() fallback has ever been needed, because every token above
-    is always defined in :root.
 
-    '
-  must_not_create:
-  - id: token-declaration
-    regex: '(?:^|[{;''"])[ \t]*--(background|foreground|card|popover|primary|secondary|muted|accent|destructive|border|input|ring|radius|info|success|warning|layer-motivation|layer-strategy|layer-business|layer-application|layer-technology|layer-implementation|layer-risk|font-sans)(-foreground|-emphasis)?\s*:'
-    scope:
-    - .
-    suffixes:
-    - .css
-    - .scss
-    - .html
-  - id: hex-fallback
-    regex: var\(\s*--[\w-]+\s*,\s*(#[0-9a-fA-F]{3,8}|rgba?\()|var\(\s*--(background|foreground|card|popover|primary|secondary|muted|accent|destructive|border|input|ring|radius|info|success|warning|layer-motivation|layer-strategy|layer-business|layer-application|layer-technology|layer-implementation|layer-risk|font-sans)(-foreground|-emphasis)?\s*,\s*(hsla?\(|\d[\d.]*\s+\d[\d.]*%\s+\d[\d.]*%|[a-zA-Z]+\s*\))
-    scope:
-    - .
-    suffixes:
-    - .css
-    - .scss
-    - .html
-  known_exceptions:
-  - path: app/templates/errors/400.html
-    reason: self-contained error page that must render without the application stylesheet
-  - path: app/templates/errors/401.html
-    reason: self-contained error page that must render without the application stylesheet
-  - path: app/templates/errors/403.html
-    reason: self-contained error page that must render without the application stylesheet
-  - path: app/templates/errors/404.html
-    reason: self-contained error page that must render without the application stylesheet
-  - path: app/templates/errors/429.html
-    reason: self-contained error page that must render without the application stylesheet
-  - path: app/templates/errors/500.html
-    reason: self-contained error page that must render without the application stylesheet
-  - path: app/templates/errors/503.html
-    reason: self-contained error page that must render without the application stylesheet
-  - path: app/templates/solutions/export_blueprint.html
-    reason: standalone downloadable document with its own styles
-  - path: app/templates/solutions/export_sad.html
-    reason: standalone downloadable document with its own styles
-  - path: app/templates/solutions/export_executive.html
-    reason: standalone document rendered server-side to PDF (WeasyPrint) with its
-      own styles, the same category as export_blueprint.html and export_sad.html;
-      not named in the task that added this entry, found by running the gate
-- id: badge
-  concept: Badges, status pills and the category pill above a public-page heading
-  status: active
-  canonical:
-    path: app/templates/components/badge.html
-    symbols:
-    - badge
-  reuse: 'import `badge` from components/badge.html; status values use components/status_badge.html;
-    do not hand-roll a rounded-full bordered label or define a pill/chip/eyebrow macro
+  - id: design-tokens
+    concept: Colour, radius and type tokens for every page (one token file; the public marketing
+      palette is a scoped class in it)
+    status: active
+    canonical:
+      path: app/static/css/shadcn_tokens.css
+      symbols: ["--background", "--foreground", "--primary", "--muted", "--border", "--radius"]
+    reuse: >
+      Add or change a colour, radius or type token only in shadcn_tokens.css, inside @layer base. To
+      scope a different palette to one page family, add a class in that same file (see .theme-marketing)
+      and set it on <body> via a template block; do not declare --background / --primary / --border /
+      --info / --success / --warning / any -foreground or -emphasis variant etc. a second time in another
+      stylesheet, a template's inline <style>, a brand-new file anywhere in the tree, or an inline
+      style="--token: ..." attribute -- one token source means no second declaration in any form, on one
+      line or many. Do not fall back to a literal colour with var(--any-token, #hex),
+      var(--any-token, rgb(...)/rgba(...)/hsl(...)/hsla(...)), an HSL-triplet fallback
+      (var(--any-token, 0 0% 0%)), a named colour (var(--any-token, blue)) or a keyword
+      (var(--any-token, transparent)) either, on a --color-* name or a real token name: no var()
+      fallback has ever been needed, because every token above is always defined in :root.
+    must_not_create:
+      - id: token-declaration
+        regex: '(?:^|[{;''"])[ \t]*--(background|foreground|card|popover|primary|secondary|muted|accent|destructive|border|input|ring|radius|info|success|warning|layer-motivation|layer-strategy|layer-business|layer-application|layer-technology|layer-implementation|layer-risk|font-sans)(-foreground|-emphasis)?\s*:'
+        scope: ["."]
+        suffixes: [.css, .scss, .html]
+      - id: hex-fallback
+        regex: 'var\(\s*--[\w-]+\s*,\s*(#[0-9a-fA-F]{3,8}|rgba?\()|var\(\s*--(background|foreground|card|popover|primary|secondary|muted|accent|destructive|border|input|ring|radius|info|success|warning|layer-motivation|layer-strategy|layer-business|layer-application|layer-technology|layer-implementation|layer-risk|font-sans)(-foreground|-emphasis)?\s*,\s*(hsla?\(|\d[\d.]*\s+\d[\d.]*%\s+\d[\d.]*%|[a-zA-Z]+\s*\))'
+        scope: ["."]
+        suffixes: [.css, .scss, .html]
+    known_exceptions:
+      - path: app/templates/errors/400.html
+        reason: self-contained error page that must render without the application stylesheet
+      - path: app/templates/errors/401.html
+        reason: self-contained error page that must render without the application stylesheet
+      - path: app/templates/errors/403.html
+        reason: self-contained error page that must render without the application stylesheet
+      - path: app/templates/errors/404.html
+        reason: self-contained error page that must render without the application stylesheet
+      - path: app/templates/errors/429.html
+        reason: self-contained error page that must render without the application stylesheet
+      - path: app/templates/errors/500.html
+        reason: self-contained error page that must render without the application stylesheet
+      - path: app/templates/errors/503.html
+        reason: self-contained error page that must render without the application stylesheet
+      - path: app/templates/solutions/export_blueprint.html
+        reason: standalone downloadable document with its own styles
+      - path: app/templates/solutions/export_sad.html
+        reason: standalone downloadable document with its own styles
+      - path: app/templates/solutions/export_executive.html
+        reason: standalone document rendered server-side to PDF (WeasyPrint) with its own styles, the same
+          category as export_blueprint.html and export_sad.html; not named in the task that added this
+          entry, found by running the gate
+  - id: badge
+    concept: Badges, status pills and the category pill above a public-page heading
+    status: active
+    canonical:
+      path: app/templates/components/badge.html
+      symbols: [badge]
+    reuse: >
+      import `badge` from components/badge.html; status values use components/status_badge.html; do not
+      hand-roll a rounded-full bordered label or define a pill/chip/eyebrow macro
+    must_not_create:
+      - id: pill-macro
+        regex: '{%-?\s*macro\s+(\w*pill\w*|\w*chip\w*|\w*eyebrow\w*)\s*\('
+        scope: [app/templates]
+        suffixes: [.html]
+    known_exceptions:
+      - path: app/templates/macros/nav_macros_shadcn.html
+        reason: pill_tabs is a tab bar, not a label
+      - path: app/templates/capability_maturity/line_of_sight.html
+        reason: authenticated page's local pill macro, predates the register; repointing it is outside the
+          public-page scope
 
-    '
-  must_not_create:
-  - id: pill-macro
-    regex: '{%-?\s*macro\s+(\w*pill\w*|\w*chip\w*|\w*eyebrow\w*)\s*\('
-    scope:
-    - app/templates
-    suffixes:
-    - .html
-  known_exceptions:
-  - path: app/templates/macros/nav_macros_shadcn.html
-    reason: pill_tabs is a tab bar, not a label
-  - path: app/templates/capability_maturity/line_of_sight.html
-    reason: authenticated page's local pill macro, predates the register; repointing
-      it is outside the public-page scope
-- id: capability-visibility
-  concept: A capability looked up by id and caller's organisation
-  status: active
-  canonical:
-    path: app/models/unified_capability.py
-    symbols:
-    - UnifiedCapability.visible_to_organization
-  reuse: 'Call UnifiedCapability.visible_to_organization(capability_id, organization_id).
-    It returns the capability only when the caller''s organisation can see it (own
-    row, or shared reference row) and None otherwise, including when the organisation
-    is None. Do not write another visibility lookup or inline the filter.
+  - id: capability-visibility
+    concept: A capability looked up by id and caller's organisation
+    status: active
+    canonical:
+      path: app/models/unified_capability.py
+      symbols: [UnifiedCapability.visible_to_organization]
+    reuse: >
+      Call UnifiedCapability.visible_to_organization(capability_id, organization_id). It returns the capability
+      only when the caller's organisation can see it (own row, or shared reference row) and None otherwise,
+      including when the organisation is None. Do not write another visibility lookup or inline the filter.
+    must_not_create:
+      - id: visibility-helper
+        regex: 'def\s+_?(get_|find_|load_)?(visible|accessible)_(capabilit\w*|to_org\w*)\s*\('
 
-    '
-  must_not_create:
-  - id: visibility-helper
-    regex: def\s+_?(get_|find_|load_)?(visible|accessible)_(capabilit\w*|to_org\w*)\s*\(
-- id: name-matching
-  concept: Name and code matching for duplicates (normaliser, SQL folding, duplicate
-    lookup)
-  status: active
-  canonical:
-    path: app/utils/duplicate_guard.py
-    symbols:
-    - normalize_name
-    - folded_column
-    - find_duplicate_by_name
-  reuse: 'Python side: duplicate_guard.normalize_name. SQL side: duplicate_guard.folded_column(column),
-    the one folding expression, so the preview, the 409 and the code lookup agree
-    on what "the same" means. Look up an existing record with find_duplicate_by_name.
-    Do not write a second normaliser, casefold helper or lower(btrim(...)) expression.
+  - id: name-matching
+    concept: Name and code matching for duplicates (normaliser, SQL folding, duplicate lookup)
+    status: active
+    canonical:
+      path: app/utils/duplicate_guard.py
+      symbols: [normalize_name, folded_column, find_duplicate_by_name]
+    reuse: >
+      Python side: duplicate_guard.normalize_name. SQL side: duplicate_guard.folded_column(column), the one
+      folding expression, so the preview, the 409 and the code lookup agree on what "the same" means. Look up
+      an existing record with find_duplicate_by_name. Do not write a second normaliser, casefold helper or
+      lower(btrim(...)) expression.
+    must_not_create:
+      - id: normaliser
+        regex: 'def\s+_?(normali[sz]e|casefold|fold|canonical)_?(name|code|label|title|text|key)s?\s*\('
+      - id: sql-fold
+        regex: 'def\s+_?folded?_(column|name|expr\w*)\s*\('
+      - id: duplicate-lookup
+        regex: 'def\s+_?(find|get|lookup)_(existing_|duplicate_|similar_)?(duplicate|dupe)\w*\s*\('
+    known_exceptions:
+      - path: app/modules/intelligence/services/matcher_service.py
+        reason: MatcherService is the canonical entity matcher (entity-matching entry); its _normalise_name is its own candidate-key helper
 
-    '
-  must_not_create:
-  - id: normaliser
-    regex: def\s+_?(normali[sz]e|casefold|fold|canonical)_?(name|code|label|title|text|key)s?\s*\(
-  - id: sql-fold
-    regex: def\s+_?folded?_(column|name|expr\w*)\s*\(
-  - id: duplicate-lookup
-    regex: def\s+_?(find|get|lookup)_(existing_|duplicate_|similar_)?(duplicate|dupe)\w*\s*\(
-  known_exceptions:
-  - path: app/modules/intelligence/services/matcher_service.py
-    reason: MatcherService is the canonical entity matcher (entity-matching entry);
-      its _normalise_name is its own candidate-key helper
-- id: ai-system-profile
-  concept: Is an element an AI system, and who owns it
-  status: active
-  canonical:
-    path: app/modules/enterprise_genome/services/ai_system_profile.py
-    symbols:
-    - is_ai_system
-    - _read_owner
-  reuse: 'is_ai_system(element) decides whether an element is an AI system; _read_owner(element)
-    is the one reader of an AI system''s recorded owner. Import them; do not recompute
-    the classification or re-read the owner property in a new helper.
+  - id: ai-system-profile
+    concept: Is an element an AI system, and who owns it
+    status: active
+    canonical:
+      path: app/modules/enterprise_genome/services/ai_system_profile.py
+      symbols: [is_ai_system, _read_owner]
+    reuse: >
+      is_ai_system(element) decides whether an element is an AI system; _read_owner(element) is the one reader
+      of an AI system's recorded owner. Import them; do not recompute the classification or re-read the owner
+      property in a new helper.
+    must_not_create:
+      - id: ai-system-test
+        regex: 'def\s+_?is_ai_(system|element|component)\w*\s*\('
+      - id: ai-owner-reader
+        regex: 'def\s+_?(read|get|load|resolve)_(ai_(system_)?)?owner\s*\('
 
-    '
-  must_not_create:
-  - id: ai-system-test
-    regex: def\s+_?is_ai_(system|element|component)\w*\s*\(
-  - id: ai-owner-reader
-    regex: def\s+_?(read|get|load|resolve)_(ai_(system_)?)?owner\s*\(
-- id: owner-display
-  concept: Owner records shown as display rows (name, email, role) for an application
-    or element
-  status: active
-  canonical:
-    path: app/models/application_owner.py
-    symbols:
-    - ApplicationOwner.get_display_rows_for_applications
-    - ApplicationOwner.get_display_rows_for_application
-    - ApplicationOwner.get_display_rows_for_element
-    - ApplicationOwner.display_rows_for_owner_rows
-  reuse: 'Read owners through ApplicationOwner''s display-row readers (batch for lists,
-    never one query per row). A user with no name shows a dash, never an email address.
-    Do not write another owner-row converter, and look an owner up by the id its writer
-    stores (element, capability, data entity and application ids are different numbers
-    that overlap).
+  - id: owner-display
+    concept: Owner records shown as display rows (name, email, role) for an application or element
+    status: active
+    canonical:
+      path: app/models/application_owner.py
+      symbols:
+        - ApplicationOwner.get_display_rows_for_applications
+        - ApplicationOwner.get_display_rows_for_application
+        - ApplicationOwner.get_display_rows_for_element
+        - ApplicationOwner.display_rows_for_owner_rows
+    reuse: >
+      Read owners through ApplicationOwner's display-row readers (batch for lists, never one query per row).
+      A user with no name shows a dash, never an email address. Do not write another owner-row converter,
+      and look an owner up by the id its writer stores (element, capability, data entity and application
+      ids are different numbers that overlap).
+    must_not_create:
+      - id: owner-row-converter
+        regex: 'def\s+_?(owner|owners)_(display|rows?|to_dict|as_dict|view)\w*\s*\('
+      - id: display-rows-reader
+        regex: 'def\s+_?(get_)?display_rows_for\w*\s*\('
+    known_exceptions:
+      - path: app/services/work_package_service.py
+        reason: >
+          reproduces the nameless-owner dash rule through User.full_name();
+          follow-up: route through ApplicationOwner.display_rows_for_owner_rows
 
-    '
-  must_not_create:
-  - id: owner-row-converter
-    regex: def\s+_?(owner|owners)_(display|rows?|to_dict|as_dict|view)\w*\s*\(
-  - id: display-rows-reader
-    regex: def\s+_?(get_)?display_rows_for\w*\s*\(
-  known_exceptions:
-  - path: app/services/work_package_service.py
-    reason: 'reproduces the nameless-owner dash rule through User.full_name(); follow-up:
-      route through ApplicationOwner.display_rows_for_owner_rows
+  - id: ai-chat-approval
+    concept: Approving or rejecting an AI chat change request (the approval gate)
+    status: active
+    canonical:
+      path: app/modules/ai_chat/services/ai_chat_approval_service.py
+      symbols:
+        - AIChatApprovalService.approve_and_execute
+        - AIChatApprovalService.reject_approval
+    reuse: >
+      Every approval goes through AIChatApprovalService.approve_and_execute / reject_approval so the approver is
+      recorded, the audit log is written, only a PENDING request can be claimed and self-approval is refused.
+      Never call approval.approve(...) or approval.reject(...) on the model from a route or another service.
+    must_not_create:
+      - id: approval-path
+        regex: 'def\s+_?(approve_and_execute|reject_approval|approve_and_run|execute_approval\w*|approve_pending\w*)\s*\('
+      - id: model-approve-call
+        regex: 'approval\.(approve|reject)\('
+    known_exceptions:
+      - path: app/models/ai_chat_crud_approval.py
+        reason: defines the model methods the service calls; the service is the only intended caller
 
-      '
-- id: ai-chat-approval
-  concept: Approving or rejecting an AI chat change request (the approval gate)
-  status: active
-  canonical:
-    path: app/modules/ai_chat/services/ai_chat_approval_service.py
-    symbols:
-    - AIChatApprovalService.approve_and_execute
-    - AIChatApprovalService.reject_approval
-  reuse: 'Every approval goes through AIChatApprovalService.approve_and_execute /
-    reject_approval so the approver is recorded, the audit log is written, only a
-    PENDING request can be claimed and self-approval is refused. Never call approval.approve(...)
-    or approval.reject(...) on the model from a route or another service.
+  - id: current-org-id
+    concept: The caller's active organisation id
+    status: active
+    canonical:
+      path: app/middleware/tenant_context.py
+      symbols: [current_org_id]
+    reuse: >
+      from app.middleware.tenant_context import current_org_id. It is the ACTIVE organisation (switched-organisation
+      users included), never current_user.organization_id. It is None outside a tenant request: a read then
+      returns nothing and a write refuses. Do not write a per-module _org_id / _current_org_id helper.
+    must_not_create:
+      - id: org-id-helper
+        regex: 'def\s+(?:_?(?:get_|resolve_|caller_|active_|current_|request_)(?:current_|active_|caller_)?|_(?:current_|active_|caller_)?)org(?:anization)?_id\s*\('
+    known_exceptions:
+      - path: app/utils/tenant_sql.py
+        reason: raw-SQL variant that returns None with no application context at all (getattr on flask.g raises when unbound); org_scope builds on it
 
-    '
-  must_not_create:
-  - id: approval-path
-    regex: def\s+_?(approve_and_execute|reject_approval|approve_and_run|execute_approval\w*|approve_pending\w*)\s*\(
-  - id: model-approve-call
-    regex: approval\.(approve|reject)\(
-  known_exceptions:
-  - path: app/models/ai_chat_crud_approval.py
-    reason: defines the model methods the service calls; the service is the only intended
-      caller
-- id: current-org-id
-  concept: The caller's active organisation id
-  status: active
-  canonical:
-    path: app/middleware/tenant_context.py
-    symbols:
-    - current_org_id
-  reuse: 'from app.middleware.tenant_context import current_org_id. It is the ACTIVE
-    organisation (switched-organisation users included), never current_user.organization_id.
-    It is None outside a tenant request: a read then returns nothing and a write refuses.
-    Do not write a per-module _org_id / _current_org_id helper.
+  - id: archimate-element-writer
+    concept: Creating an ArchiMate element (the one element writer)
+    status: active
+    canonical:
+      path: app/services/archimate_backbone.py
+      symbols: [create_backbone_element, sync_archimate_element, ensure_archimate_element]
+    reuse: >
+      Create or find an element through archimate_backbone (create_backbone_element, sync_archimate_element) so
+      the organisation, layer and provenance are set in one place. Do not construct ArchiMateElement(...) in a
+      route or service, and do not add another ensure/create element helper.
+    must_not_create:
+      - id: element-helper
+        regex: 'def\s+_?(ensure|create|get_or_create|make|upsert)_(archimate_|backbone_)?element\w*\s*\('
+      - id: element-construction
+        regex: 'ArchiMateElement\s*\('
+    known_exceptions:
+      - path: app/models/archimate_core.py
+        reason: defines the model
+      - path: app/models/process_data.py
+        reason: DataEntity and process model methods ensure_archimate_element predate the backbone writer
 
-    '
-  must_not_create:
-  - id: org-id-helper
-    regex: def\s+(?:_?(?:get_|resolve_|caller_|active_|current_|request_)(?:current_|active_|caller_)?|_(?:current_|active_|caller_)?)org(?:anization)?_id\s*\(
-  known_exceptions:
-  - path: app/utils/tenant_sql.py
-    reason: raw-SQL variant that returns None with no application context at all (getattr
-      on flask.g raises when unbound); org_scope builds on it
-- id: archimate-element-writer
-  concept: Creating an ArchiMate element (the one element writer)
-  status: active
-  canonical:
-    path: app/services/archimate_backbone.py
-    symbols:
-    - create_backbone_element
-    - sync_archimate_element
-    - ensure_archimate_element
-  reuse: 'Create or find an element through archimate_backbone (create_backbone_element,
-    sync_archimate_element) so the organisation, layer and provenance are set in one
-    place. Do not construct ArchiMateElement(...) in a route or service, and do not
-    add another ensure/create element helper.
+  - id: critical-path
+    concept: Critical path over the unified work package store
+    status: active
+    canonical:
+      path: app/services/work_package_service.py
+      symbols: [critical_path_for_plateau]
+    reuse: >
+      One critical path over the unified store: work_package_service.critical_path_for_plateau. Do not add another
+      critical-path walk or cycle detector over work packages. Older copies in roadmap_builder_service and
+      roadmap_automation read the retired store and are listed below as known exceptions.
+    must_not_create:
+      - id: critical-path-walk
+        regex: 'def\s+_?(compute_|calculate_|find_|get_|identify_|build_)?critical_path\w*\s*\('
+    known_exceptions:
+      - path: app/modules/solutions_strategic/v2/services/roadmap_builder_service.py
+        reason: retired-store legacy copy, to be removed with the store
+      - path: app/modules/solutions_strategic/v2/services/roadmap_automation.py
+        reason: retired-store legacy copy, to be removed with the store
 
-    '
-  must_not_create:
-  - id: element-helper
-    regex: def\s+_?(ensure|create|get_or_create|make|upsert)_(archimate_|backbone_)?element\w*\s*\(
-  - id: element-construction
-    regex: ArchiMateElement\s*\(
-  known_exceptions:
-  - path: app/models/archimate_core.py
-    reason: defines the model
-  - path: app/models/process_data.py
-    reason: DataEntity and process model methods ensure_archimate_element predate
-      the backbone writer
-- id: critical-path
-  concept: Critical path over the unified work package store
-  status: active
-  canonical:
-    path: app/services/work_package_service.py
-    symbols:
-    - critical_path_for_plateau
-  reuse: 'One critical path over the unified store: work_package_service.critical_path_for_plateau.
-    Do not add another critical-path walk or cycle detector over work packages. Older
-    copies in roadmap_builder_service and roadmap_automation read the retired store
-    and are listed below as known exceptions.
+  - id: entity-matching
+    concept: Matching an incoming record to an existing one by identifier or name
+    status: active
+    canonical:
+      path: app/modules/intelligence/services/matcher_service.py
+      symbols: [MatcherService.match_by_name, MatcherService.match_by_identifier, MatcherService.match]
+    reuse: >
+      MatcherService.match / match_by_name / match_by_identifier take the organisation explicitly and return
+      candidates with a reason. Do not write another find-by-name matcher for imports or proposals.
+    must_not_create:
+      - id: name-matcher
+        regex: 'def\s+_?(match|find|lookup|resolve)_(\w+_)?by_name\s*\('
+    known_exceptions:
+      - path: app/utils/duplicate_guard.py
+        reason: find_duplicate_by_name is the canonical duplicate lookup of the name-matching entry
 
-    '
-  must_not_create:
-  - id: critical-path-walk
-    regex: def\s+_?(compute_|calculate_|find_|get_|identify_|build_)?critical_path\w*\s*\(
-  known_exceptions:
-  - path: app/modules/solutions_strategic/v2/services/roadmap_builder_service.py
-    reason: retired-store legacy copy, to be removed with the store
-  - path: app/modules/solutions_strategic/v2/services/roadmap_automation.py
-    reason: retired-store legacy copy, to be removed with the store
-- id: entity-matching
-  concept: Matching an incoming record to an existing one by identifier or name
-  status: active
-  canonical:
-    path: app/modules/intelligence/services/matcher_service.py
-    symbols:
-    - MatcherService.match_by_name
-    - MatcherService.match_by_identifier
-    - MatcherService.match
-  reuse: 'MatcherService.match / match_by_name / match_by_identifier take the organisation
-    explicitly and return candidates with a reason. Do not write another find-by-name
-    matcher for imports or proposals.
+  - id: impact-answer
+    concept: What breaks if this element changes or fails (impact answer)
+    status: active
+    canonical:
+      path: app/modules/intelligence/services/query_service.py
+      symbols: [IntelligenceQueryService.cross_layer_impact]
+    reuse: >
+      IntelligenceQueryService.cross_layer_impact is the one tenant-fenced impact walk. Reshape its rows for your
+      screen (see ArchiMateImpactService) instead of writing a second traversal over relationships.
+    must_not_create:
+      - id: impact-walk
+        regex: 'def\s+_?(compute|calculate|get|find|build|walk|trace)_(downstream_|upstream_|cross_layer_)?(impact|blast_radius|dependents)\w*\s*\('
+    known_exceptions:
+      - path: app/services/archimate_impact_service.py
+        reason: delegates to cross_layer_impact and reshapes the rows for its callers
+      - path: app/services/architecture_change_impact_service.py
+        reason: delegates the walk to cross_layer_impact
 
-    '
-  must_not_create:
-  - id: name-matcher
-    regex: def\s+_?(match|find|lookup|resolve)_(\w+_)?by_name\s*\(
-  known_exceptions:
-  - path: app/utils/duplicate_guard.py
-    reason: find_duplicate_by_name is the canonical duplicate lookup of the name-matching
-      entry
-- id: impact-answer
-  concept: What breaks if this element changes or fails (impact answer)
-  status: active
-  canonical:
-    path: app/modules/intelligence/services/query_service.py
-    symbols:
-    - IntelligenceQueryService.cross_layer_impact
-  reuse: 'IntelligenceQueryService.cross_layer_impact is the one tenant-fenced impact
-    walk. Reshape its rows for your screen (see ArchiMateImpactService) instead of
-    writing a second traversal over relationships.
+  - id: capability-maturity
+    concept: A capability's current and target maturity
+    status: active
+    canonical:
+      path: app/models/unified_capability.py
+      symbols:
+        - UnifiedCapability.maturity_for_source
+        - UnifiedCapability.maturity_for_sources
+        - UnifiedCapability.maturity_for_capability_ids
+    reuse: >
+      Read current maturity through the UnifiedCapability maturity accessors, which return the no_maturity_recorded
+      reason code (never 0) when nothing was assessed. Do not read a source model's superseded maturity columns
+      or compute a new maturity score.
+    must_not_create:
+      - id: maturity-accessor
+        regex: 'def\s+_?(get_|read_|current_)?(capability_)?maturity_(for|of|level|score)\w*\s*\('
+      - id: maturity-score
+        regex: 'def\s+_?(calculate|compute)_(\w+_)?maturity\w*\s*\('
 
-    '
-  must_not_create:
-  - id: impact-walk
-    regex: def\s+_?(compute|calculate|get|find|build|walk|trace)_(downstream_|upstream_|cross_layer_)?(impact|blast_radius|dependents)\w*\s*\(
-  known_exceptions:
-  - path: app/services/archimate_impact_service.py
-    reason: delegates to cross_layer_impact and reshapes the rows for its callers
-  - path: app/services/architecture_change_impact_service.py
-    reason: delegates the walk to cross_layer_impact
-- id: capability-maturity
-  concept: A capability's current and target maturity
-  status: active
-  canonical:
-    path: app/models/unified_capability.py
-    symbols:
-    - UnifiedCapability.maturity_for_source
-    - UnifiedCapability.maturity_for_sources
-    - UnifiedCapability.maturity_for_capability_ids
-  reuse: 'Read current maturity through the UnifiedCapability maturity accessors,
-    which return the no_maturity_recorded reason code (never 0) when nothing was assessed.
-    Do not read a source model''s superseded maturity columns or compute a new maturity
-    score.
+  - id: applications-list
+    concept: The active organisation's application list (single tenant-scoped reader)
+    status: active
+    canonical:
+      path: app/modules/applications/routes/list_views.py
+      symbols: [api_list]
+    reuse: >
+      Read the organisation's applications through api_list (GET /applications/api/list),
+      the single tenant-scoped applications list reader. Do not add a second list
+      endpoint or a second applications reader; call this one and shape its
+      ``applications`` payload for the caller.
+    must_not_create:
+      - id: second-applications-list-endpoint
+        regex: 'def\s+_?(applications|apps)_(list|all|index|reader)\s*\('
 
-    '
-  must_not_create:
-  - id: maturity-accessor
-    regex: def\s+_?(get_|read_|current_)?(capability_)?maturity_(for|of|level|score)\w*\s*\(
-  - id: maturity-score
-    regex: def\s+_?(calculate|compute)_(\w+_)?maturity\w*\s*\(
-- id: applications-list
-  concept: The active organisation's application list (single tenant-scoped reader)
-  status: active
-  canonical:
-    path: app/modules/applications/routes/list_views.py
-    symbols:
-    - api_list
-  reuse: 'Read the organisation''s applications through api_list (GET /applications/api/list),
-    the single tenant-scoped applications list reader. Do not add a second list endpoint
-    or a second applications reader; call this one and shape its ``applications``
-    payload for the caller.
+  - id: empty-state
+    concept: Empty state shown when a list or page has no data
+    status: active
+    canonical:
+      path: app/templates/components/empty_state.html
+      symbols: [empty_state]
+    reuse: >
+      {% from 'components/empty_state.html' import empty_state %} (see DESIGN.md). Do not define another
+      empty_state macro or inline an empty-state block; two macros with incompatible signatures 500 the page
+      that imports the wrong one.
+    must_not_create:
+      - id: empty-state-macro
+        regex: '{%-?\s*macro\s+(empty_state\w*|render_empty\w*|no_data\w*)\s*\('
+        scope: [app/templates]
+        suffixes: [.html]
+    known_exceptions:
+      - path: app/templates/macros/page_shell.html
+        reason: second empty_state macro (icon, headline, body) predating the register; to be merged into the canonical one
 
-    '
-  must_not_create:
-  - id: second-applications-list-endpoint
-    regex: def\s+_?(applications|apps)_(list|all|index|reader)\s*\(
-- id: empty-state
-  concept: Empty state shown when a list or page has no data
-  status: active
-  canonical:
-    path: app/templates/components/empty_state.html
-    symbols:
-    - empty_state
-  reuse: '{% from ''components/empty_state.html'' import empty_state %} (see DESIGN.md).
-    Do not define another empty_state macro or inline an empty-state block; two macros
-    with incompatible signatures 500 the page that imports the wrong one.
+  - id: loading-state
+    concept: Loading and skeleton states
+    status: active
+    canonical:
+      path: app/templates/components/loading_state.html
+      symbols: [loading_inline, loading_overlay, loading_skeleton]
+    reuse: >
+      Use components/loading_state.html (inline, overlay, skeleton) and components/skeleton.html (table, list, card,
+      text, avatar). Do not define another loading or skeleton macro.
+    must_not_create:
+      - id: loading-macro
+        regex: '{%-?\s*macro\s+(loading\w*|skeleton\w*|spinner\w*)\s*\('
+        scope: [app/templates]
+        suffixes: [.html]
+    known_exceptions:
+      - path: app/templates/components/skeleton.html
+        reason: the skeleton family (table, list, card, text, avatar) is the companion canonical file
 
-    '
-  must_not_create:
-  - id: empty-state-macro
-    regex: '{%-?\s*macro\s+(empty_state\w*|render_empty\w*|no_data\w*)\s*\('
-    scope:
-    - app/templates
-    suffixes:
-    - .html
-  known_exceptions:
-  - path: app/templates/macros/page_shell.html
-    reason: second empty_state macro (icon, headline, body) predating the register;
-      to be merged into the canonical one
-- id: loading-state
-  concept: Loading and skeleton states
-  status: active
-  canonical:
-    path: app/templates/components/loading_state.html
-    symbols:
-    - loading_inline
-    - loading_overlay
-    - loading_skeleton
-  reuse: 'Use components/loading_state.html (inline, overlay, skeleton) and components/skeleton.html
-    (table, list, card, text, avatar). Do not define another loading or skeleton macro.
+  - id: outbox-test-cleanup
+    concept: Purging outbox events between tests
+    status: active
+    canonical:
+      path: tests/_outbox_cleanup.py
+      symbols: [purge_outbox_events]
+    reuse: >
+      Import purge_outbox_events from tests/_outbox_cleanup.py in test fixtures and teardown. Do not write another
+      outbox-purging helper in a test module.
+    must_not_create:
+      - id: outbox-purge
+        regex: 'def\s+_?(purge|clean|clear|delete|reset|flush)_?(\w+_)?outbox\w*\s*\('
+        scope: [tests]
 
-    '
-  must_not_create:
-  - id: loading-macro
-    regex: '{%-?\s*macro\s+(loading\w*|skeleton\w*|spinner\w*)\s*\('
-    scope:
-    - app/templates
-    suffixes:
-    - .html
-  known_exceptions:
-  - path: app/templates/components/skeleton.html
-    reason: the skeleton family (table, list, card, text, avatar) is the companion
-      canonical file
-- id: outbox-test-cleanup
-  concept: Purging outbox events between tests
-  status: active
-  canonical:
-    path: tests/_outbox_cleanup.py
-    symbols:
-    - purge_outbox_events
-  reuse: 'Import purge_outbox_events from tests/_outbox_cleanup.py in test fixtures
-    and teardown. Do not write another outbox-purging helper in a test module.
+  - id: health-score
+    concept: Health score (architecture, capability, initiative, executive dashboard)
+    status: undetermined
+    candidates:
+      - app/modules/capabilities/services/capability_health_service.py (capability health with applications)
+      - app/modules/architecture/services/archimate_metrics_service.py (calculate_overall_health_score)
+      - app/modules/architecture/services/unified_archimate_services.py (two calculate_overall_health_score)
+      - app/modules/dashboard/v2/services/executive_dashboard_service.py (_get_health_score, format_health_score)
+      - app/modules/solutions_strategic/v2/services/gap_analysis_service.py (calculate_health_score)
+      - app/modules/solutions_strategic/v2/services/execution_tracking_service.py (_calculate_health_score)
+    note: six computations of "health" with different inputs and scales; the product-manager picks the owner.
 
-    '
-  must_not_create:
-  - id: outbox-purge
-    regex: def\s+_?(purge|clean|clear|delete|reset|flush)_?(\w+_)?outbox\w*\s*\(
-    scope:
-    - tests
-- id: health-score
-  concept: Health score (architecture, capability, initiative, executive dashboard)
-  status: undetermined
-  candidates:
-  - app/modules/capabilities/services/capability_health_service.py (capability health
-    with applications)
-  - app/modules/architecture/services/archimate_metrics_service.py (calculate_overall_health_score)
-  - app/modules/architecture/services/unified_archimate_services.py (two calculate_overall_health_score)
-  - app/modules/dashboard/v2/services/executive_dashboard_service.py (_get_health_score,
-    format_health_score)
-  - app/modules/solutions_strategic/v2/services/gap_analysis_service.py (calculate_health_score)
-  - app/modules/solutions_strategic/v2/services/execution_tracking_service.py (_calculate_health_score)
-  note: six computations of "health" with different inputs and scales; the product-manager
-    picks the owner.
-- id: search
-  concept: Search across the model
-  status: undetermined
-  candidates:
-  - app/services/enterprise_search_service.py (EnterpriseSearchService.search, used
-    by one route module)
-  - app/services/apqc_hierarchy_service.py (search_processes)
-  - app/services/conversation_history.py (search_conversations)
-  - app/services/faiss_apqc_service.py and chromadb_apqc_service.py (similarity search)
-  note: only EnterpriseSearchService spans entity types, but it is wired to one route
-    module, so it is not yet shown to be the product's search.
-- id: export
-  concept: Exporting a model or view (file formats)
-  status: undetermined
-  candidates:
-  - app/services/composer_export_formats.py (Mermaid, Lucid, Archi, canvas viewpoint
-    export)
-  - app/services/archimate_export_service.py (saved viewpoint export)
-  - app/services/archimate_xml_export_service.py (export_to_xml)
-  note: three export services by format family; one dispatcher has not been chosen.
-- id: owner-record
-  concept: The owner of an application, capability or element (the record itself,
-    as opposed to its display rows)
-  status: undetermined
-  candidates:
-  - app/models/application_owner.py (ApplicationOwner; row-level owner of an element
-    or application)
-  - ApplicationOwnership (organisation-unit ownership; a separate model)
-  - an owner text column on the element
-  note: the store-agreement gate already reports these disagreeing; the consolidation
-    branch decides.
-- id: archimate-drawing-engine
-  concept: Drawing an ArchiMate model as a diagram (nodes, links, layers, bands),
-    editable or read-only
-  status: active
-  canonical:
-    path: app/static/js/archimate/composer_renderer.js
-    symbols:
-    - ComposerRenderer
-  reuse: 'Draw ArchiMate elements and relationships with ComposerRenderer.create(container,
-    options) and its methods (loadElements, update, setSelected, setCentre, setHighlightedEdges,
-    getNodeBounds, resize, fitToContent, destroy). Layer bands, provenance styling
-    (recorded and worked-out connections), compact nodes and token colours are options
-    on that one engine, all off unless asked for. Do not add a second JointJS or D3
-    diagram renderer for ArchiMate content: extend this one, or add a sibling module
-    it loads.
+  - id: search
+    concept: Search across the model
+    status: undetermined
+    candidates:
+      - app/services/enterprise_search_service.py (EnterpriseSearchService.search, used by one route module)
+      - app/services/apqc_hierarchy_service.py (search_processes)
+      - app/services/conversation_history.py (search_conversations)
+      - app/services/faiss_apqc_service.py and chromadb_apqc_service.py (similarity search)
+    note: only EnterpriseSearchService spans entity types, but it is wired to one route module, so it is not yet shown to be the product's search.
 
-    '
-  must_not_create:
-  - id: second-archimate-renderer
-    regex: (?i)(?:let|const|var|function|class)\s+\w*archimate\w*(?:renderer|diagramengine)\b
-    scope:
-    - app/static/js
-    - app/templates
-    suffixes:
-    - .js
-    - .html
-  known_exceptions:
-  - path: app/static/js/intelligence/graph.js
-    reason: known duplicate pending migration -- pull request 701 ports Twin Map onto
-      this renderer and removes this file; not a fresh violation until that migration
-      lands
-- id: public-button
-  concept: The public site button (primary and outline, 40px, 2px solid focus outline)
-  status: active
-  canonical:
-    path: app/static/css/public_site.css
-    symbols:
-    - .public-btn
-    - .public-btn--primary
-    - .public-btn--outline
-    - .public-btn--lg
-  reuse: 'Public pages (the homepage, the pricing page and any new marketing page)
-    use these classes from public_site.css; the authenticated app uses components/button.html.
-    Neither side defines a copy of the other. Do not write a second rule for this
-    component in another stylesheet or an inline <style>; a page-specific layout is
-    a rule on the page''s own wrapper that does not restyle the shared component.
-    The gate flags a class rule whose name contains the component word, bare or prefixed,
-    other than the canonical class; and any rule outside public_site.css whose selector
-    names the canonical class and sets padding, border, radius, font, line height,
-    letter spacing, text transform or decoration, colour, background, shadow, outline,
-    height or opacity (layout properties such as display, grid, flex, width, margin,
-    position and overflow are allowed). Not seen by the gate: attribute selectors;
-    review catches those.
+  - id: export
+    concept: Exporting a model or view (file formats)
+    status: undetermined
+    candidates:
+      - app/services/composer_export_formats.py (Mermaid, Lucid, Archi, canvas viewpoint export)
+      - app/services/archimate_export_service.py (saved viewpoint export)
+      - app/services/archimate_xml_export_service.py (export_to_xml)
+    note: three export services by format family; one dispatcher has not been chosen.
 
-    '
-  must_not_create:
-  - id: second-button-rule
-    regex: ^(?:[^\n{}]*[{}])*?[^\n{}]*?(?<![\w-])(?:(?:a|button|div|span|li|ul|ol|article|section|details|summary|table|thead|tbody|tr|td|th|p|h[1-6]|aside|dl|dt|dd|figure)(?![\w-]))?\.(?!(?:public-btn(?:--[\w]+)?)(?![\w-]))(?:[\w-]*[-_])?(?:btn|button)(?![a-zA-Z0-9])[^\n{}]*(?:\{|,\s*$)
-    scope:
-    - app/static/css
-    - app/templates
-    suffixes:
-    - .css
-    - .html
-  - id: restyled-button
-    regex: '^(?:[^\n{}]*[{}])*?[^\n{}]*?(?<![\w-])(?:(?:a|button|div|span|li|ul|ol|article|section|details|summary|table|thead|tbody|tr|td|th|p|h[1-6]|aside|dl|dt|dd|figure)(?![\w-]))?\.public-(?:btn)(?![a-zA-Z0-9])[^{}]*\{[^{}]*?(?<![\w-])(?:padding|border(?!-(?:collapse|spacing))|font|line-height|letter-spacing|text-transform|text-decoration|color|background|box-shadow|outline|height|min-height|opacity)[\w-]*\s*:'
-    scope:
-    - app/static/css
-    - app/templates
-    suffixes:
-    - .css
-    - .html
-  known_exceptions:
-  - path: app/static/css/vendor/
-    reason: third-party stylesheets, not ours to change
-  - path: app/static/css/tailwind-output*
-    reason: generated Tailwind utility output (minified), rebuilt from templates by
-      scripts/build_css.py
-- id: public-link
-  concept: The public site inline link (underlined, 4px offset, solid focus outline)
-  status: active
-  canonical:
-    path: app/static/css/public_site.css
-    symbols:
-    - .public-link
-  reuse: 'Public pages (the homepage, the pricing page and any new marketing page)
-    use this class from public_site.css for inline links; the authenticated app has
-    its own link styles. Do not write a second inline-link rule in another stylesheet
-    or an inline <style>. The focus indicator is a 2px solid outline in the foreground
-    colour, which survives forced-colours mode; do not replace it with a shadow-only
-    ring.
+  - id: owner-record
+    concept: The owner of an application, capability or element (the record itself, as opposed to its display rows)
+    status: undetermined
+    candidates:
+      - app/models/application_owner.py (ApplicationOwner; row-level owner of an element or application)
+      - ApplicationOwnership (organisation-unit ownership; a separate model)
+      - an owner text column on the element
+    note: the store-agreement gate already reports these disagreeing; the consolidation branch decides.
 
-    '
-  must_not_create:
-  - id: second-link-rule
-    regex: ^(?:[^\n{}]*[{}])*?[^\n{}]*?(?<![\w-])(?:(?:a|button|div|span|li|ul|ol|article|section|details|summary|table|thead|tbody|tr|td|th|p|h[1-6]|aside|dl|dt|dd|figure)(?![\w-]))?\.(?!(?:public-link)(?![\w-]))(?:[\w-]*[-_])?link(?![a-zA-Z0-9])[^\n{}]*(?:\{|,\s*$)
-    scope:
-    - app/static/css
-    - app/templates/public
-    - app/templates/main
-    - app/templates/layouts
-    suffixes:
-    - .css
-    - .html
-  - id: restyled-link
-    regex: '^(?:[^\n{}]*[{}])*?[^\n{}]*?(?<![\w-])(?:(?:a|button|div|span|li|ul|ol|article|section|details|summary|table|thead|tbody|tr|td|th|p|h[1-6]|aside|dl|dt|dd|figure)(?![\w-]))?\.public-link(?![a-zA-Z0-9])[^{}]*\{[^{}]*?(?<![\w-])(?:padding|border(?!-(?:collapse|spacing))|font|line-height|letter-spacing|text-transform|text-decoration|color|background|box-shadow|outline)[\w-]*\s*:'
-    scope:
-    - app/static/css
-    - app/templates/public
-    - app/templates/main
-    - app/templates/layouts
-    suffixes:
-    - .css
-    - .html
-  known_exceptions:
-  - path: app/static/css/accessibility.css
-    reason: authenticated-app skip-link and focus styles, not the public inline link
-  - path: app/static/css/app.css
-    reason: authenticated-app link styles, not the public inline link
-  - path: app/static/css/vendor/
-    reason: third-party stylesheets, not ours to change
-  - path: app/static/css/tailwind-output*
-    reason: generated Tailwind utility output (minified), rebuilt from templates by
-      scripts/build_css.py
-- id: public-card
-  concept: The public site card, with its title and body
-  status: active
-  canonical:
-    path: app/static/css/public_site.css
-    symbols:
-    - .public-card
-    - .public-card-title
-    - .public-card-body
-  reuse: 'Public pages (the homepage, the pricing page and any new marketing page)
-    use these classes from public_site.css; the authenticated app uses components/card.html.
-    Neither side defines a copy of the other. Do not write a second rule for this
-    component in another stylesheet or an inline <style>; a page-specific layout is
-    a rule on the page''s own wrapper that does not restyle the shared component.
-    The gate flags a class rule whose name contains the component word, bare or prefixed,
-    other than the canonical class; and any rule outside public_site.css whose selector
-    names the canonical class and sets padding, border, radius, font, line height,
-    letter spacing, text transform or decoration, colour, background, shadow, outline,
-    height or opacity (layout properties such as display, grid, flex, width, margin,
-    position and overflow are allowed). Not seen by the gate: attribute selectors;
-    review catches those.
+  - id: archimate-drawing-engine
+    concept: Drawing an ArchiMate model as a diagram (nodes, links, layers, bands), editable or read-only
+    status: active
+    canonical:
+      path: app/static/js/archimate/composer_renderer.js
+      symbols: [ComposerRenderer]
+    reuse: >
+      Draw ArchiMate elements and relationships with ComposerRenderer.create(container, options) and its
+      methods (loadElements, update, setSelected, setCentre, setHighlightedEdges, getNodeBounds, resize,
+      fitToContent, destroy). Layer bands, provenance styling (recorded and worked-out connections), compact
+      nodes and token colours are options on that one engine, all off unless asked for. Do not add a second
+      JointJS or D3 diagram renderer for ArchiMate content: extend this one, or add a sibling module it loads.
+    must_not_create:
+      - id: second-archimate-renderer
+        regex: '(?i)(?:let|const|var|function|class)\s+\w*archimate\w*(?:renderer|diagramengine)\b'
+        scope: [app/static/js, app/templates]
+        suffixes: [.js, .html]
+    known_exceptions:
+      - path: app/static/js/intelligence/graph.js
+        reason: known duplicate pending migration -- pull request 701 ports Twin Map onto this renderer and
+          removes this file; not a fresh violation until that migration lands
 
-    '
-  must_not_create:
-  - id: second-card-rule
-    regex: ^(?:[^\n{}]*[{}])*?[^\n{}]*?(?<![\w-])(?:(?:a|button|div|span|li|ul|ol|article|section|details|summary|table|thead|tbody|tr|td|th|p|h[1-6]|aside|dl|dt|dd|figure)(?![\w-]))?\.(?!(?:public-card(?:--[\w]+|-title|-body|-eyebrow)?)(?![\w-]))(?:[\w-]*[-_])?(?:card)(?![a-zA-Z0-9])[^\n{}]*(?:\{|,\s*$)
-    scope:
-    - app/static/css
-    - app/templates
-    suffixes:
-    - .css
-    - .html
-  - id: restyled-card
-    regex: '^(?:[^\n{}]*[{}])*?[^\n{}]*?(?<![\w-])(?:(?:a|button|div|span|li|ul|ol|article|section|details|summary|table|thead|tbody|tr|td|th|p|h[1-6]|aside|dl|dt|dd|figure)(?![\w-]))?\.public-(?:card)(?![a-zA-Z0-9])[^{}]*\{[^{}]*?(?<![\w-])(?:padding|border(?!-(?:collapse|spacing))|font|line-height|letter-spacing|text-transform|text-decoration|color|background|box-shadow|outline|height|min-height|opacity)[\w-]*\s*:'
-    scope:
-    - app/static/css
-    - app/templates
-    suffixes:
-    - .css
-    - .html
-  known_exceptions:
-  - path: app/static/css/vendor/
-    reason: third-party stylesheets, not ours to change
-  - path: app/static/css/tailwind-output*
-    reason: generated Tailwind utility output (minified), rebuilt from templates by
-      scripts/build_css.py
-- id: public-table
-  concept: The public site data table (fits its container or scrolls in a wrapper)
-  status: active
-  canonical:
-    path: app/static/css/public_site.css
-    symbols:
-    - .public-table
-  reuse: 'Public pages (the homepage, the pricing page and any new marketing page)
-    use these classes from public_site.css; the authenticated app uses components/table.html.
-    Neither side defines a copy of the other. Do not write a second rule for this
-    component in another stylesheet or an inline <style>; a page-specific layout is
-    a rule on the page''s own wrapper that does not restyle the shared component.
-    The gate flags a class rule whose name contains the component word, bare or prefixed,
-    other than the canonical class; and any rule outside public_site.css whose selector
-    names the canonical class and sets padding, border, radius, font, line height,
-    letter spacing, text transform or decoration, colour, background, shadow, outline,
-    height or opacity (layout properties such as display, grid, flex, width, margin,
-    position and overflow are allowed). Not seen by the gate: attribute selectors
-    and the bare Tailwind utility names .table*; review catches those.
+  - id: public-button
+    concept: The public site button (primary and outline, 40px, 2px solid focus outline)
+    status: active
+    canonical:
+      path: app/static/css/public_site.css
+      symbols: [".public-btn", ".public-btn--primary", ".public-btn--outline", ".public-btn--lg"]
+    reuse: >
+      Public pages (the homepage, the pricing page and any new marketing page) use these classes from
+      public_site.css; the authenticated app uses components/button.html. Neither side defines a copy of the
+      other. Do not write a second rule for this component in another stylesheet or an inline <style>; a
+      page-specific layout is a rule on the page's own wrapper that does not restyle the shared component.
+      The gate flags a class rule whose name contains the component word, bare or prefixed, other than the
+      canonical class; and any rule outside public_site.css whose selector names the canonical class and
+      sets padding, border, radius, font, line height, letter spacing, text transform or decoration, colour,
+      background, shadow, outline, height or opacity (layout properties such as display, grid, flex, width,
+      margin, position and overflow are allowed). Not seen by the gate: attribute selectors; review catches
+      those.
+    must_not_create:
+      - id: second-button-rule
+        regex: '^(?:[^\n{}]*[{}])*?[^\n{}]*?(?<![\w-])(?:(?:a|button|div|span|li|ul|ol|article|section|details|summary|table|thead|tbody|tr|td|th|p|h[1-6]|aside|dl|dt|dd|figure)(?![\w-]))?\.(?!(?:public-btn(?:--[\w]+)?)(?![\w-]))(?:[\w-]*[-_])?(?:btn|button)(?![a-zA-Z0-9])[^\n{}]*(?:\{|,\s*$)'
+        scope: [app/static/css, app/templates]
+        suffixes: [.css, .html]
+      - id: restyled-button
+        regex: '^(?:[^\n{}]*[{}])*?[^\n{}]*?(?<![\w-])(?:(?:a|button|div|span|li|ul|ol|article|section|details|summary|table|thead|tbody|tr|td|th|p|h[1-6]|aside|dl|dt|dd|figure)(?![\w-]))?\.public-(?:btn)(?![a-zA-Z0-9])[^{}]*\{[^{}]*?(?<![\w-])(?:padding|border(?!-(?:collapse|spacing))|font|line-height|letter-spacing|text-transform|text-decoration|color|background|box-shadow|outline|height|min-height|opacity)[\w-]*\s*:'
+        scope: [app/static/css, app/templates]
+        suffixes: [.css, .html]
+    known_exceptions:
+      - path: app/static/css/vendor/
+        reason: third-party stylesheets, not ours to change
+      - path: app/static/css/tailwind-output*
+        reason: generated Tailwind utility output (minified), rebuilt from templates by scripts/build_css.py
 
-    '
-  must_not_create:
-  - id: second-table-rule
-    regex: ^(?:[^\n{}]*[{}])*?[^\n{}]*?(?<![\w-])(?:(?:a|button|div|span|li|ul|ol|article|section|details|summary|table|thead|tbody|tr|td|th|p|h[1-6]|aside|dl|dt|dd|figure)(?![\w-]))?\.(?!(?:public-table(?:--[\w]+)?|table|table-(?:auto|fixed|cell|row|row-group|column|column-group|caption|header-group|footer-group)|inline-table)(?![\w-]))(?:[\w-]*[-_])?(?:table|table-wrap)(?![a-zA-Z0-9])[^\n{}]*(?:\{|,\s*$)
-    scope:
-    - app/static/css
-    - app/templates
-    suffixes:
-    - .css
-    - .html
-  - id: restyled-table
-    regex: '^(?:[^\n{}]*[{}])*?[^\n{}]*?(?<![\w-])(?:(?:a|button|div|span|li|ul|ol|article|section|details|summary|table|thead|tbody|tr|td|th|p|h[1-6]|aside|dl|dt|dd|figure)(?![\w-]))?\.public-(?:table)(?![a-zA-Z0-9])[^{}]*\{[^{}]*?(?<![\w-])(?:padding|border(?!-(?:collapse|spacing))|font|line-height|letter-spacing|text-transform|text-decoration|color|background|box-shadow|outline|height|min-height|opacity)[\w-]*\s*:'
-    scope:
-    - app/static/css
-    - app/templates
-    suffixes:
-    - .css
-    - .html
-  known_exceptions:
-  - path: app/static/css/vendor/
-    reason: third-party stylesheets, not ours to change
-  - path: app/static/css/tailwind-output*
-    reason: generated Tailwind utility output (minified), rebuilt from templates by
-      scripts/build_css.py
-- id: public-faq
-  concept: The public site FAQ (details and summary with a rotating chevron)
-  status: active
-  canonical:
-    path: app/static/css/public_site.css
-    symbols:
-    - .public-faq
-  reuse: 'Public pages (the homepage, the pricing page and any new marketing page)
-    use these classes from public_site.css; the authenticated app has no FAQ component
-    and does not use this class. Neither side defines a copy of the other. The chevron
-    icon is the faq_chevron macro in components/public_faq.html. Do not write a second
-    rule for this component in another stylesheet or an inline <style>; a page- specific
-    layout is a rule on the page''s own wrapper that does not restyle the shared component.
-    The gate flags a class rule whose name contains the component word, bare or prefixed,
-    other than the canonical class; and any rule outside public_site.css whose selector
-    names the canonical class and sets padding, border, radius, font, line height,
-    letter spacing, text transform or decoration, colour, background, shadow, outline,
-    height or opacity (layout properties such as display, grid, flex, width, margin,
-    position and overflow are allowed); for this entry also any summary selector.
-    Not seen by the gate: attribute selectors and :is()/:where() wrappers before summary;
-    review catches those.
+  - id: public-link
+    concept: The public site inline link (underlined, 4px offset, solid focus outline)
+    status: active
+    canonical:
+      path: app/static/css/public_site.css
+      symbols: [".public-link"]
+    reuse: >
+      Public pages (the homepage, the pricing page and any new marketing page) use this class from
+      public_site.css for inline links; the authenticated app has its own link styles. Do not write a second
+      inline-link rule in another stylesheet or an inline <style>. The focus indicator is a 2px solid
+      outline in the foreground colour, which survives forced-colours mode; do not replace it with a
+      shadow-only ring.
+    must_not_create:
+      - id: second-link-rule
+        regex: '^(?:[^\n{}]*[{}])*?[^\n{}]*?(?<![\w-])(?:(?:a|button|div|span|li|ul|ol|article|section|details|summary|table|thead|tbody|tr|td|th|p|h[1-6]|aside|dl|dt|dd|figure)(?![\w-]))?\.(?!(?:public-link)(?![\w-]))(?:[\w-]*[-_])?link(?![a-zA-Z0-9])[^\n{}]*(?:\{|,\s*$)'
+        scope: [app/static/css, app/templates/public, app/templates/main, app/templates/layouts]
+        suffixes: [.css, .html]
+      - id: restyled-link
+        regex: '^(?:[^\n{}]*[{}])*?[^\n{}]*?(?<![\w-])(?:(?:a|button|div|span|li|ul|ol|article|section|details|summary|table|thead|tbody|tr|td|th|p|h[1-6]|aside|dl|dt|dd|figure)(?![\w-]))?\.public-link(?![a-zA-Z0-9])[^{}]*\{[^{}]*?(?<![\w-])(?:padding|border(?!-(?:collapse|spacing))|font|line-height|letter-spacing|text-transform|text-decoration|color|background|box-shadow|outline)[\w-]*\s*:'
+        scope: [app/static/css, app/templates/public, app/templates/main, app/templates/layouts]
+        suffixes: [.css, .html]
+    known_exceptions:
+      - path: app/static/css/accessibility.css
+        reason: authenticated-app skip-link and focus styles, not the public inline link
+      - path: app/static/css/app.css
+        reason: authenticated-app link styles, not the public inline link
+      - path: app/static/css/vendor/
+        reason: third-party stylesheets, not ours to change
+      - path: app/static/css/tailwind-output*
+        reason: generated Tailwind utility output (minified), rebuilt from templates by scripts/build_css.py
 
-    '
-  must_not_create:
-  - id: second-faq-rule
-    regex: ^(?:[^\n{}]*[{}])*?[^\n{}]*?(?<![\w-])(?:(?:a|button|div|span|li|ul|ol|article|section|details|summary|table|thead|tbody|tr|td|th|p|h[1-6]|aside|dl|dt|dd|figure)(?![\w-]))?\.(?!(?:public-faq)(?![\w-]))(?:[\w-]*[-_])?(?:faq|accordion)(?![a-zA-Z0-9])[^\n{}]*(?:\{|,\s*$)
-    scope:
-    - app/static/css
-    - app/templates
-    suffixes:
-    - .css
-    - .html
-  - id: restyled-faq
-    regex: '^(?:[^\n{}]*[{}])*?[^\n{}]*?(?<![\w-])(?:(?:a|button|div|span|li|ul|ol|article|section|details|summary|table|thead|tbody|tr|td|th|p|h[1-6]|aside|dl|dt|dd|figure)(?![\w-]))?\.public-(?:faq)(?![a-zA-Z0-9])[^{}]*\{[^{}]*?(?<![\w-])(?:padding|border(?!-(?:collapse|spacing))|font|line-height|letter-spacing|text-transform|text-decoration|color|background|box-shadow|outline|height|min-height|opacity)[\w-]*\s*:'
-    scope:
-    - app/static/css
-    - app/templates
-    suffixes:
-    - .css
-    - .html
-  - id: second-details-marker
-    regex: summary::-webkit-details-marker
-    scope:
-    - app/static/css
-    - app/templates
-    suffixes:
-    - .css
-    - .html
-  - id: second-summary-rule
-    regex: ^[ \t]*(?:[^\n{}<=;'"()]*[\s>+~,])?summary(?=\s*[{,>+~\[]|::?[a-z])[^\n{}<=;'"]*(?:\{|,[
-      \t]*$)
-    scope:
-    - app/static/css
-    - app/templates
-    suffixes:
-    - .css
-    - .html
-  known_exceptions:
-  - path: app/static/css/vendor/
-    reason: third-party stylesheets, not ours to change
-  - path: app/static/css/tailwind-output*
-    reason: generated Tailwind utility output (minified), rebuilt from templates by
-      scripts/build_css.py
-- id: public-stepper
-  concept: The public site roadmap stepper (a row of stages with a line and a dot)
-  status: active
-  canonical:
-    path: app/static/css/public_site.css
-    symbols:
-    - .public-stepper
-  reuse: 'Public pages (the homepage, the pricing page and any new marketing page)
-    use these classes from public_site.css; the authenticated app uses components/stepper.html.
-    Neither side defines a copy of the other. Do not write a second rule for this
-    component in another stylesheet or an inline <style>; a page-specific layout is
-    a rule on the page''s own wrapper that does not restyle the shared component.
-    The gate flags a class rule whose name contains the component word, bare or prefixed,
-    other than the canonical class; and any rule outside public_site.css whose selector
-    names the canonical class and sets padding, border, radius, font, line height,
-    letter spacing, text transform or decoration, colour, background, shadow, outline,
-    height or opacity (layout properties such as display, grid, flex, width, margin,
-    position and overflow are allowed). Not seen by the gate: attribute selectors
-    and the bare Tailwind utility name .grow; review catches those.
+  - id: public-card
+    concept: The public site card, with its title and body
+    status: active
+    canonical:
+      path: app/static/css/public_site.css
+      symbols: [".public-card", ".public-card-title", ".public-card-body"]
+    reuse: >
+      Public pages (the homepage, the pricing page and any new marketing page) use these classes from
+      public_site.css; the authenticated app uses components/card.html. Neither side defines a copy of the
+      other. Do not write a second rule for this component in another stylesheet or an inline <style>; a
+      page-specific layout is a rule on the page's own wrapper that does not restyle the shared component.
+      The gate flags a class rule whose name contains the component word, bare or prefixed, other than the
+      canonical class; and any rule outside public_site.css whose selector names the canonical class and
+      sets padding, border, radius, font, line height, letter spacing, text transform or decoration, colour,
+      background, shadow, outline, height or opacity (layout properties such as display, grid, flex, width,
+      margin, position and overflow are allowed). Not seen by the gate: attribute selectors; review catches
+      those.
+    must_not_create:
+      - id: second-card-rule
+        regex: '^(?:[^\n{}]*[{}])*?[^\n{}]*?(?<![\w-])(?:(?:a|button|div|span|li|ul|ol|article|section|details|summary|table|thead|tbody|tr|td|th|p|h[1-6]|aside|dl|dt|dd|figure)(?![\w-]))?\.(?!(?:public-card(?:--[\w]+|-title|-body|-eyebrow)?)(?![\w-]))(?:[\w-]*[-_])?(?:card)(?![a-zA-Z0-9])[^\n{}]*(?:\{|,\s*$)'
+        scope: [app/static/css, app/templates]
+        suffixes: [.css, .html]
+      - id: restyled-card
+        regex: '^(?:[^\n{}]*[{}])*?[^\n{}]*?(?<![\w-])(?:(?:a|button|div|span|li|ul|ol|article|section|details|summary|table|thead|tbody|tr|td|th|p|h[1-6]|aside|dl|dt|dd|figure)(?![\w-]))?\.public-(?:card)(?![a-zA-Z0-9])[^{}]*\{[^{}]*?(?<![\w-])(?:padding|border(?!-(?:collapse|spacing))|font|line-height|letter-spacing|text-transform|text-decoration|color|background|box-shadow|outline|height|min-height|opacity)[\w-]*\s*:'
+        scope: [app/static/css, app/templates]
+        suffixes: [.css, .html]
+    known_exceptions:
+      - path: app/static/css/vendor/
+        reason: third-party stylesheets, not ours to change
+      - path: app/static/css/tailwind-output*
+        reason: generated Tailwind utility output (minified), rebuilt from templates by scripts/build_css.py
 
-    '
-  must_not_create:
-  - id: second-stepper-rule
-    regex: ^(?:[^\n{}]*[{}])*?[^\n{}]*?(?<![\w-])(?:(?:a|button|div|span|li|ul|ol|article|section|details|summary|table|thead|tbody|tr|td|th|p|h[1-6]|aside|dl|dt|dd|figure)(?![\w-]))?\.(?!(?:public-stepper(?:__[\w]+)?|grow(?:-0)?|flex-grow(?:-0)?)(?![\w-]))(?:[\w-]*[-_])?(?:stepper|steps|roadmap|grow|timeline)(?![a-zA-Z0-9])[^\n{}]*(?:\{|,\s*$)
-    scope:
-    - app/static/css
-    - app/templates
-    suffixes:
-    - .css
-    - .html
-  - id: restyled-stepper
-    regex: '^(?:[^\n{}]*[{}])*?[^\n{}]*?(?<![\w-])(?:(?:a|button|div|span|li|ul|ol|article|section|details|summary|table|thead|tbody|tr|td|th|p|h[1-6]|aside|dl|dt|dd|figure)(?![\w-]))?\.public-(?:stepper)(?![a-zA-Z0-9])[^{}]*\{[^{}]*?(?<![\w-])(?:padding|border(?!-(?:collapse|spacing))|font|line-height|letter-spacing|text-transform|text-decoration|color|background|box-shadow|outline|height|min-height|opacity)[\w-]*\s*:'
-    scope:
-    - app/static/css
-    - app/templates
-    suffixes:
-    - .css
-    - .html
-  known_exceptions:
-  - path: app/static/css/vendor/
-    reason: third-party stylesheets, not ours to change
-  - path: app/static/css/tailwind-output*
-    reason: generated Tailwind utility output (minified), rebuilt from templates by
-      scripts/build_css.py
-- id: permission-check
-  concept: One home for the permission matrix require_permission decorator
-  status: active
-  canonical:
-    path: app/core/auth/decorators.py
-    symbols:
-    - require_permission
-    - can
-  reuse: Use the matrix decorator ``require_permission(action, object_type)`` from
-    ``app.core.auth.decorators``. The ``can`` function from ``app.core.auth.permissions``
-    is the underlying permission checker. Do not write a second ``def require_permission``
-    or ``def has_permission`` outside the canonical file.
-  must_not_create:
-  - id: new-permission-helper
-    regex: def\s+(require_permission|has_permission)\s*\(
-    scope:
-    - app
-    suffixes:
-    - .py
+  - id: public-table
+    concept: The public site data table (fits its container or scrolls in a wrapper)
+    status: active
+    canonical:
+      path: app/static/css/public_site.css
+      symbols: [".public-table"]
+    reuse: >
+      Public pages (the homepage, the pricing page and any new marketing page) use these classes from
+      public_site.css; the authenticated app uses components/table.html. Neither side defines a copy of the
+      other. Do not write a second rule for this component in another stylesheet or an inline <style>; a
+      page-specific layout is a rule on the page's own wrapper that does not restyle the shared component.
+      The gate flags a class rule whose name contains the component word, bare or prefixed, other than the
+      canonical class; and any rule outside public_site.css whose selector names the canonical class and
+      sets padding, border, radius, font, line height, letter spacing, text transform or decoration, colour,
+      background, shadow, outline, height or opacity (layout properties such as display, grid, flex, width,
+      margin, position and overflow are allowed). Not seen by the gate: attribute selectors and the bare
+      Tailwind utility names .table*; review catches those.
+    must_not_create:
+      - id: second-table-rule
+        regex: '^(?:[^\n{}]*[{}])*?[^\n{}]*?(?<![\w-])(?:(?:a|button|div|span|li|ul|ol|article|section|details|summary|table|thead|tbody|tr|td|th|p|h[1-6]|aside|dl|dt|dd|figure)(?![\w-]))?\.(?!(?:public-table(?:--[\w]+)?|table|table-(?:auto|fixed|cell|row|row-group|column|column-group|caption|header-group|footer-group)|inline-table)(?![\w-]))(?:[\w-]*[-_])?(?:table|table-wrap)(?![a-zA-Z0-9])[^\n{}]*(?:\{|,\s*$)'
+        scope: [app/static/css, app/templates]
+        suffixes: [.css, .html]
+      - id: restyled-table
+        regex: '^(?:[^\n{}]*[{}])*?[^\n{}]*?(?<![\w-])(?:(?:a|button|div|span|li|ul|ol|article|section|details|summary|table|thead|tbody|tr|td|th|p|h[1-6]|aside|dl|dt|dd|figure)(?![\w-]))?\.public-(?:table)(?![a-zA-Z0-9])[^{}]*\{[^{}]*?(?<![\w-])(?:padding|border(?!-(?:collapse|spacing))|font|line-height|letter-spacing|text-transform|text-decoration|color|background|box-shadow|outline|height|min-height|opacity)[\w-]*\s*:'
+        scope: [app/static/css, app/templates]
+        suffixes: [.css, .html]
+    known_exceptions:
+      - path: app/static/css/vendor/
+        reason: third-party stylesheets, not ours to change
+      - path: app/static/css/tailwind-output*
+        reason: generated Tailwind utility output (minified), rebuilt from templates by scripts/build_css.py
+
+  - id: public-faq
+    concept: The public site FAQ (details and summary with a rotating chevron)
+    status: active
+    canonical:
+      path: app/static/css/public_site.css
+      symbols: [".public-faq"]
+    reuse: >
+      Public pages (the homepage, the pricing page and any new marketing page) use these classes from
+      public_site.css; the authenticated app has no FAQ component and does not use this class. Neither side
+      defines a copy of the other. The chevron icon is the faq_chevron macro in components/public_faq.html.
+      Do not write a second rule for this component in another stylesheet or an inline <style>; a page-
+      specific layout is a rule on the page's own wrapper that does not restyle the shared component. The
+      gate flags a class rule whose name contains the component word, bare or prefixed, other than the
+      canonical class; and any rule outside public_site.css whose selector names the canonical class and
+      sets padding, border, radius, font, line height, letter spacing, text transform or decoration, colour,
+      background, shadow, outline, height or opacity (layout properties such as display, grid, flex, width,
+      margin, position and overflow are allowed); for this entry also any summary selector. Not seen by the
+      gate: attribute selectors and :is()/:where() wrappers before summary; review catches those.
+    must_not_create:
+      - id: second-faq-rule
+        regex: '^(?:[^\n{}]*[{}])*?[^\n{}]*?(?<![\w-])(?:(?:a|button|div|span|li|ul|ol|article|section|details|summary|table|thead|tbody|tr|td|th|p|h[1-6]|aside|dl|dt|dd|figure)(?![\w-]))?\.(?!(?:public-faq)(?![\w-]))(?:[\w-]*[-_])?(?:faq|accordion)(?![a-zA-Z0-9])[^\n{}]*(?:\{|,\s*$)'
+        scope: [app/static/css, app/templates]
+        suffixes: [.css, .html]
+      - id: restyled-faq
+        regex: '^(?:[^\n{}]*[{}])*?[^\n{}]*?(?<![\w-])(?:(?:a|button|div|span|li|ul|ol|article|section|details|summary|table|thead|tbody|tr|td|th|p|h[1-6]|aside|dl|dt|dd|figure)(?![\w-]))?\.public-(?:faq)(?![a-zA-Z0-9])[^{}]*\{[^{}]*?(?<![\w-])(?:padding|border(?!-(?:collapse|spacing))|font|line-height|letter-spacing|text-transform|text-decoration|color|background|box-shadow|outline|height|min-height|opacity)[\w-]*\s*:'
+        scope: [app/static/css, app/templates]
+        suffixes: [.css, .html]
+      - id: second-details-marker
+        regex: 'summary::-webkit-details-marker'
+        scope: [app/static/css, app/templates]
+        suffixes: [.css, .html]
+      - id: second-summary-rule
+        regex: '^[ \t]*(?:[^\n{}<=;''"()]*[\s>+~,])?summary(?=\s*[{,>+~\[]|::?[a-z])[^\n{}<=;''"]*(?:\{|,[ \t]*$)'
+        scope: [app/static/css, app/templates]
+        suffixes: [.css, .html]
+    known_exceptions:
+      - path: app/static/css/vendor/
+        reason: third-party stylesheets, not ours to change
+      - path: app/static/css/tailwind-output*
+        reason: generated Tailwind utility output (minified), rebuilt from templates by scripts/build_css.py
+
+  - id: public-stepper
+    concept: The public site roadmap stepper (a row of stages with a line and a dot)
+    status: active
+    canonical:
+      path: app/static/css/public_site.css
+      symbols: [".public-stepper"]
+    reuse: >
+      Public pages (the homepage, the pricing page and any new marketing page) use these classes from
+      public_site.css; the authenticated app uses components/stepper.html. Neither side defines a copy of
+      the other. Do not write a second rule for this component in another stylesheet or an inline <style>; a
+      page-specific layout is a rule on the page's own wrapper that does not restyle the shared component.
+      The gate flags a class rule whose name contains the component word, bare or prefixed, other than the
+      canonical class; and any rule outside public_site.css whose selector names the canonical class and
+      sets padding, border, radius, font, line height, letter spacing, text transform or decoration, colour,
+      background, shadow, outline, height or opacity (layout properties such as display, grid, flex, width,
+      margin, position and overflow are allowed). Not seen by the gate: attribute selectors and the bare
+      Tailwind utility name .grow; review catches those.
+    must_not_create:
+      - id: second-stepper-rule
+        regex: '^(?:[^\n{}]*[{}])*?[^\n{}]*?(?<![\w-])(?:(?:a|button|div|span|li|ul|ol|article|section|details|summary|table|thead|tbody|tr|td|th|p|h[1-6]|aside|dl|dt|dd|figure)(?![\w-]))?\.(?!(?:public-stepper(?:__[\w]+)?|grow(?:-0)?|flex-grow(?:-0)?)(?![\w-]))(?:[\w-]*[-_])?(?:stepper|steps|roadmap|grow|timeline)(?![a-zA-Z0-9])[^\n{}]*(?:\{|,\s*$)'
+        scope: [app/static/css, app/templates]
+        suffixes: [.css, .html]
+      - id: restyled-stepper
+        regex: '^(?:[^\n{}]*[{}])*?[^\n{}]*?(?<![\w-])(?:(?:a|button|div|span|li|ul|ol|article|section|details|summary|table|thead|tbody|tr|td|th|p|h[1-6]|aside|dl|dt|dd|figure)(?![\w-]))?\.public-(?:stepper)(?![a-zA-Z0-9])[^{}]*\{[^{}]*?(?<![\w-])(?:padding|border(?!-(?:collapse|spacing))|font|line-height|letter-spacing|text-transform|text-decoration|color|background|box-shadow|outline|height|min-height|opacity)[\w-]*\s*:'
+        scope: [app/static/css, app/templates]
+        suffixes: [.css, .html]
+    known_exceptions:
+      - path: app/static/css/vendor/
+        reason: third-party stylesheets, not ours to change
+      - path: app/static/css/tailwind-output*
+        reason: generated Tailwind utility output (minified), rebuilt from templates by scripts/build_css.py
+
+  - id: permission-check
+    concept: May this user do this to this kind of object (the permission matrix decorator)
+    status: active
+    canonical:
+      path: app/core/auth/decorators.py
+      symbols: [require_permission]
+    reuse: >
+      Guard a route with require_permission(action, object_type) from app.core.auth.decorators; it asks
+      can() in app.core.auth.permissions, the one answer the templates also read. A new kind of object is a
+      new entry in OBJECT_TYPES and DEFAULTS there, equal to today's behaviour. Do not write a second
+      require_permission or has_permission, and do not gate a write route with require_roles or login_required alone.
+    must_not_create:
+      - id: new-permission-helper
+        regex: 'def\s+(require_permission|has_permission)\s*\('

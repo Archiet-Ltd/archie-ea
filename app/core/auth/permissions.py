@@ -22,7 +22,7 @@ from __future__ import annotations
 from typing import Optional
 
 ACTIONS = ("create", "read", "edit", "delete", "bulk_delete")
-OBJECT_TYPES = ("application", "relationship")
+OBJECT_TYPES = ("application", "relationship", "enterprise_record", "review_workflow")
 
 _ALL = frozenset(ACTIONS)
 # Architects create, read, edit and delete one application at a time; deleting
@@ -55,6 +55,25 @@ DEFAULTS = {
         "administrator": _ALL,
         "admin": _ALL,
         "architect": _ARCHITECT,
+        "viewer": _READ,
+    },
+    # The knowledge graph, ArchiMate models, capabilities, vendors and roadmap
+    # read through /api/v2/enterprise. The retired RBAC decorator gave every
+    # signed-in account read on these and administrators everything.
+    "enterprise_record": {
+        "org_admin": _ALL,
+        "administrator": _ALL,
+        "admin": _ALL,
+        "architect": _ARCHITECT,
+        "viewer": _READ,
+    },
+    # Architecture review board workflows. The retired decorator let only
+    # administrators create one; every other account could read.
+    "review_workflow": {
+        "org_admin": _ALL,
+        "administrator": _ALL,
+        "admin": _ALL,
+        "architect": _READ,
         "viewer": _READ,
     },
 }

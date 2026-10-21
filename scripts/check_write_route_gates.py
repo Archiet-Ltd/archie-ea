@@ -74,7 +74,7 @@ class RouteVisitor(ast.NodeVisitor):
         for dec in decorators:
             # Check for route decorator: @bp.route(...) or @app.route(...)
             if isinstance(dec, ast.Call) and isinstance(dec.func, ast.Attribute):
-                if dec.func.attr == "route":
+                if dec.func.attr in ("route", "post", "put", "patch", "delete"):
                     route_decorator = dec
             # Check for auth decorators
             elif isinstance(dec, ast.Call):
@@ -135,10 +135,13 @@ class RouteVisitor(ast.NodeVisitor):
         }
 
     def _extract_methods(self, route_decorator: ast.Call) -> set[str]:
-        """Extract HTTP methods from @bp.route(..., methods=[...])"""
+        """Extract HTTP methods from @bp.route(..., methods=[...]) or @bp.post(...)"""
         methods = set()
+        shorthand = route_decorator.func.attr.upper()
+        if shorthand in WRITE_METHODS:
+            methods.add(shorthand)
         for kw in route_decorator.keywords:
-            if kw.arg == "methods" and isinstance(kw.value, ast.List):
+            if kw.arg == "methods" and isinstance(kw.value, (ast.List, ast.Tuple, ast.Set)):
                 for elt in kw.value.elts:
                     if isinstance(elt, ast.Constant) and isinstance(elt.value, str):
                         methods.add(elt.value.upper())

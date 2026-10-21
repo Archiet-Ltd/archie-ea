@@ -1862,9 +1862,8 @@ def build_gates(baseline: dict) -> list[Gate]:
              "No write route guarded only by require_roles or login_required (matrix require_permission required)",
              "ratchet",
              lambda: gate_write_route_gates(baseline.get("write_route_gates", 1997)),
-             remediation="add @require_permission(action, object_type) from app.core.auth.decorators, "
-                          "or mark a deliberate exception",
-             tags=["static", "security"]),
+             remediation="add @require_permission(action, object_type) from app.core.auth.decorators",
+             tags=["static"]),
         Gate("raw-fetch-sites",
              "No new raw fetch() sites bypassing Platform.fetch",
              "ratchet",

@@ -20,8 +20,8 @@ from flask import Blueprint, jsonify, request
 from flask_login import current_user, login_required
 
 from app import db
+from app.core.auth.decorators import require_permission
 from app.decorators import audit_log
-from app.core.auth.decorators import require_permission, ResourceDomain, Permission
 from app.services.application_capability_catalog import ApplicationCapabilityCatalogService
 from app.services.archimate.archimate_service import ArchiMateService
 from app.services.capability_mapping_service import CapabilityMappingService
@@ -66,7 +66,7 @@ enterprise_api_bp = Blueprint("enterprise_api", __name__, url_prefix="/api/v2/en
 
 @enterprise_api_bp.route("/kg/elements", methods=["GET"])
 @login_required
-@require_permission(ResourceDomain.ARCHITECTURE, Permission.READ)
+@require_permission("read", "enterprise_record")
 def get_kg_elements():
     """
     Get ArchiMate elements from knowledge graph
@@ -104,7 +104,7 @@ def get_kg_elements():
 
 @enterprise_api_bp.route("/kg/relationships", methods=["GET"])
 @login_required
-@require_permission(ResourceDomain.ARCHITECTURE, Permission.READ)
+@require_permission("read", "enterprise_record")
 def get_kg_relationships():
     """
     Get ArchiMate relationships from knowledge graph
@@ -132,7 +132,7 @@ def get_kg_relationships():
 
 @enterprise_api_bp.route("/kg/search", methods=["GET"])
 @login_required
-@require_permission(ResourceDomain.ARCHITECTURE, Permission.READ)
+@require_permission("read", "enterprise_record")
 def search_kg():
     """
     Search knowledge graph elements
@@ -174,7 +174,7 @@ def search_kg():
 
 @enterprise_api_bp.route("/archimate/models", methods=["GET"])
 @login_required
-@require_permission(ResourceDomain.ARCHITECTURE, Permission.READ)
+@require_permission("read", "enterprise_record")
 def get_archimate_models():
     """
     Get available ArchiMate models
@@ -198,7 +198,7 @@ def get_archimate_models():
 
 @enterprise_api_bp.route("/archimate/models/<model_id>", methods=["GET"])
 @login_required
-@require_permission(ResourceDomain.ARCHITECTURE, Permission.READ)
+@require_permission("read", "enterprise_record")
 def get_archimate_model(model_id):
     """
     Get specific ArchiMate model with full details
@@ -217,7 +217,7 @@ def get_archimate_model(model_id):
 
 @enterprise_api_bp.route("/archimate/export/<model_id>", methods=["GET"])
 @login_required
-@require_permission(ResourceDomain.ARCHITECTURE, Permission.READ)
+@require_permission("read", "enterprise_record")
 def export_archimate_model(model_id):
     """
     Export ArchiMate model in ArchiMate exchange format
@@ -245,7 +245,7 @@ def export_archimate_model(model_id):
 
 @enterprise_api_bp.route("/capabilities/analysis", methods=["POST"])
 @login_required
-@require_permission(ResourceDomain.CAPABILITIES, Permission.READ)
+@require_permission("read", "enterprise_record")
 @audit_log("enterprise_capabilities_analyze")
 def analyze_capabilities():
     """
@@ -294,7 +294,7 @@ def analyze_capabilities():
 
 @enterprise_api_bp.route("/capabilities/mapping", methods=["GET"])
 @login_required
-@require_permission(ResourceDomain.CAPABILITIES, Permission.READ)
+@require_permission("read", "enterprise_record")
 def get_capability_mappings():
     """
     Get capability mappings for applications
@@ -327,7 +327,7 @@ def get_capability_mappings():
 
 @enterprise_api_bp.route("/vendors/analysis", methods=["POST"])
 @login_required
-@require_permission(ResourceDomain.VENDORS, Permission.READ)
+@require_permission("read", "enterprise_record")
 @audit_log("enterprise_vendors_analyze")
 def analyze_vendors():
     """
@@ -380,7 +380,7 @@ def analyze_vendors():
 
 @enterprise_api_bp.route("/vendors/products", methods=["GET"])
 @login_required
-@require_permission(ResourceDomain.VENDORS, Permission.READ)
+@require_permission("read", "enterprise_record")
 def get_vendor_products():
     """
     Get vendor products with capabilities
@@ -413,7 +413,7 @@ def get_vendor_products():
 
 @enterprise_api_bp.route("/applications/portfolio", methods=["GET"])
 @login_required
-@require_permission(ResourceDomain.APPLICATIONS, Permission.READ)
+@require_permission("read", "application")
 def get_application_portfolio():
     """
     Get application portfolio with capabilities
@@ -441,7 +441,7 @@ def get_application_portfolio():
 
 @enterprise_api_bp.route("/applications/capabilities/<app_id>", methods=["GET"])
 @login_required
-@require_permission(ResourceDomain.APPLICATIONS, Permission.READ)
+@require_permission("read", "application")
 def get_application_capabilities(app_id):
     """
     Get capabilities mapped to specific application
@@ -463,7 +463,7 @@ def get_application_capabilities(app_id):
 
 @enterprise_api_bp.route("/options/analysis", methods=["POST"])
 @login_required
-@require_permission(ResourceDomain.ROADMAP, Permission.READ)
+@require_permission("read", "enterprise_record")
 @audit_log("enterprise_options_analyze")
 def analyze_options():
     """
@@ -524,7 +524,7 @@ def analyze_options():
 
 @enterprise_api_bp.route("/workflows/arb", methods=["POST"])
 @login_required
-@require_permission(ResourceDomain.COMPLIANCE, Permission.WRITE)
+@require_permission("create", "review_workflow")
 @audit_log("enterprise_arb_workflow_create")
 def create_arb_workflow():
     """
@@ -580,7 +580,7 @@ def create_arb_workflow():
 
 @enterprise_api_bp.route("/workflows/arb/<workflow_id>", methods=["GET"])
 @login_required
-@require_permission(ResourceDomain.COMPLIANCE, Permission.READ)
+@require_permission("read", "review_workflow")
 def get_arb_workflow(workflow_id):
     """
     Get ARB workflow details
