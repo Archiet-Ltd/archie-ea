@@ -68,57 +68,91 @@ def _v2_dashboard_owner_coverage(app, user, org, monkeypatch):
     return captured["data_coverage"]
 
 
-def test_both_screens_report_two_owned_and_two_unowned(app, db_session, make_org, monkeypatch, client, login_as):
-    from app.modules.intelligence.services.query_catalogue import _applications_without_owner
+def _every_surface(app, db_session, org, user, monkeypatch, client, login_as):
+    """What every surface that counts owned applications says for *org*."""
+    from flask import g
+    from flask_login import login_user
 
-    org = make_org("owned-one-def")
-    user, with_record, with_text, technical_only, nothing = _four_applications(db_session, org)
+    from app.modules.intelligence.services.query_catalogue import _applications_without_owner
+    from app.services.gap_analysis_service import ArchitecturalGapAnalyzer
 
     answer = _applications_without_owner(org.id)
     unowned = {row["id"] for group in answer["groups"] for row in group["rows"]}
-    assert unowned == {technical_only.id, nothing.id}, answer
-    assert answer["total"] == 2
 
-    # 2 of 4 applications owned = 50% on both dashboards.
-    assert _dashboard_owner_coverage(app, user, org)["owner"] == 50
-    assert _v2_dashboard_owner_coverage(app, user, org, monkeypatch)["owner"] == 50
-
-    # My Applications portfolio banner: 2 owned, 4 total.
     login_as(client, user)
     response = client.get("/applications/")
     assert response.status_code == 200
-    soup = BeautifulSoup(response.get_data(as_text=True), "html.parser")
-    text = " ".join(soup.get_text().split())
+    text = " ".join(BeautifulSoup(response.get_data(as_text=True), "html.parser").get_text().split())
     m = re.search(r"(\d+) of (\d+) applications in the portfolio have a named owner", text)
     assert m is not None, "portfolio banner not found"
-    owned, total = int(m.group(1)), int(m.group(2))
-    assert owned == 2
-    assert total == 4
 
-    # Coverage debug endpoint: 2 owned, 4 total.
     login_as(client, user)
     response = client.get("/dashboard/api/coverage-debug")
     assert response.status_code == 200
-    data = json.loads(response.get_data(as_text=True))
-    assert data["ok"] is True
-    assert data["owner"] == 2
-    assert data["total"] == 4
-
-    # Gap analysis: the two unowned apps (technical_only, nothing) have no capabilities/processes,
-    # so they should be reported as orphaned.
-    from app.services.gap_analysis_service import ArchitecturalGapAnalyzer
-    from flask import g
-    from flask_login import login_user
+    debug = json.loads(response.get_data(as_text=True))
+    assert debug["ok"] is True
 
     with app.test_request_context("/"):
         login_user(user)
         g.current_org_id = org.id
-        analyzer = ArchitecturalGapAnalyzer()
-        gaps = analyzer.analyze_portfolio_gaps()
-        orphaned = gaps.get("orphaned_applications", [])
-        orphaned_ids = {o["application_id"] for o in orphaned}
-        assert len(orphaned) == 2
-        assert orphaned_ids == {technical_only.id, nothing.id}
+        orphaned_ids = {o["application_id"] for o in ArchitecturalGapAnalyzer().analyze_portfolio_gaps()
+                        .get("orphaned_applications", [])}
+
+    return {
+        "ask_unowned": unowned,
+        "ask_total": answer["total"],
+        "dashboard_percent": _dashboard_owner_coverage(app, user, org)["owner"],
+        "dashboard_v2_percent": _v2_dashboard_owner_coverage(app, user, org, monkeypatch)["owner"],
+        "banner": (int(m.group(1)), int(m.group(2))),
+        "debug": (debug["owner"], debug["total"]),
+        "gap_orphaned": orphaned_ids,
+    }
+
+
+def test_both_screens_report_two_owned_and_two_unowned(app, db_session, make_org, monkeypatch, client, login_as):
+    org = make_org("owned-one-def")
+    user, with_record, with_text, technical_only, nothing = _four_applications(db_session, org)
+
+    seen = _every_surface(app, db_session, org, user, monkeypatch, client, login_as)
+
+    # 2 of 4 applications owned: the Ask question, both dashboards (50%), the
+    # My Applications portfolio banner, the coverage debug endpoint and gap
+    # analysis (the two unowned have no capabilities or processes) all agree.
+    assert seen["ask_unowned"] == {technical_only.id, nothing.id}
+    assert seen["ask_total"] == 2
+    assert seen["dashboard_percent"] == 50
+    assert seen["dashboard_v2_percent"] == 50
+    assert seen["banner"] == (2, 4)
+    assert seen["debug"] == (2, 4)
+    assert seen["gap_orphaned"] == {technical_only.id, nothing.id}
+
+
+def test_an_owner_record_naming_a_user_of_another_organisation_is_unowned_everywhere(
+        app, db_session, make_org, monkeypatch, client, login_as):
+    """The record is in the application's organisation, but the user it names is not."""
+    from app.models.application_owner import ApplicationOwner
+
+    org = make_org("owned-one-def-here")
+    elsewhere = make_org("owned-one-def-elsewhere")
+    user, with_record, with_text, technical_only, nothing = _four_applications(db_session, org)
+    stranger = _person(db_session, elsewhere, "strangerowner")
+    foreign_user = _make_app(db_session, org, "OwnedByAStranger")
+    db_session.add(ApplicationOwner(
+        application_id=foreign_user.id, user_id=stranger.id, organization_id=org.id,
+        ownership_type="primary",
+    ))
+    db_session.flush()
+
+    seen = _every_surface(app, db_session, org, user, monkeypatch, client, login_as)
+
+    # 2 of 5 owned. The stranger's record counts on no surface.
+    assert seen["ask_unowned"] == {technical_only.id, nothing.id, foreign_user.id}
+    assert seen["ask_total"] == 3
+    assert seen["dashboard_percent"] == 40
+    assert seen["dashboard_v2_percent"] == 40
+    assert seen["banner"] == (2, 5)
+    assert seen["debug"] == (2, 5)
+    assert seen["gap_orphaned"] == {technical_only.id, nothing.id, foreign_user.id}
 
 
 def test_python_predicate_agrees_with_the_sql(app, db_session, make_org):
@@ -128,3 +162,19 @@ def test_python_predicate_agrees_with_the_sql(app, db_session, make_org):
     _user, with_record, with_text, technical_only, nothing = _four_applications(db_session, org)
     assert [application_is_owned(a) for a in (with_record, with_text, technical_only, nothing)] == [
         True, True, False, False]
+
+
+def test_python_predicate_refuses_a_user_of_another_organisation(app, db_session, make_org):
+    from app.models.application_owner import ApplicationOwner
+    from app.services.element_ownership_service import application_is_owned
+
+    org = make_org("owned-one-def-py-here")
+    elsewhere = make_org("owned-one-def-py-elsewhere")
+    stranger = _person(db_session, elsewhere, "strangerpy")
+    application = _make_app(db_session, org, "OwnedByAStrangerPy")
+    db_session.add(ApplicationOwner(
+        application_id=application.id, user_id=stranger.id, organization_id=org.id,
+        ownership_type="primary",
+    ))
+    db_session.flush()
+    assert application_is_owned(application) is False
