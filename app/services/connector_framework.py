@@ -1220,6 +1220,30 @@ def _write_touched_crosswalk_links(connector_type: str, touched, org_id: int) ->
     return written
 
 
+def run_coroutine_sync(coro):
+    """Run a coroutine to its result from synchronous code.
+
+    With no event loop running in this thread this is asyncio.run. When a loop is
+    already running here (a web worker, a job runner, a browser driver in the same
+    process) asyncio.run refuses. This thread is inside a synchronous call, so the
+    outer loop cannot run until the call returns: the outer loop is set aside, the
+    coroutine runs to its end on a fresh loop in this same thread, and the outer loop
+    is put back. Nothing else is started, so the application context, the database
+    session and the organisation scope are the caller's own.
+    """
+    import asyncio
+    from asyncio import events
+
+    outer = events._get_running_loop()
+    if outer is None:
+        return asyncio.run(coro)
+    events._set_running_loop(None)
+    try:
+        return asyncio.run(coro)
+    finally:
+        events._set_running_loop(outer)
+
+
 def run_connector_sync(
     *,
     org_id: int,
@@ -1272,7 +1296,7 @@ def run_connector_sync(
 
     try:
         call = connector.batch_sync()
-        result = asyncio.run(call) if asyncio.iscoroutine(call) else call
+        result = run_coroutine_sync(call) if asyncio.iscoroutine(call) else call
     except Exception as exc:
         logger.error("Connector sync failed for %s org %s: %s", cfg.id, resolved, exc)
         sync_log.status = "error"

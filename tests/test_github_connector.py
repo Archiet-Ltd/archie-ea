@@ -730,15 +730,14 @@ def test_a_base_address_that_is_not_allowed_is_refused_before_any_request(
 def test_a_connector_with_no_organisation_writes_nothing(db_session, org_a, estate_a, github):
     from app.connectors.github import GitHubConnector
     from app.models.connector_config import ConnectorConfig
-    from app.services.connector_framework import ConnectorWriteRefused
-    import asyncio
+    from app.services.connector_framework import ConnectorWriteRefused, run_coroutine_sync
 
     runtime = ConnectorConfig(
         id="x", connector_type="github", name="x", organization_id=None,
         config={"organization": "acme", "api_token": SECRET},
     )
     with pytest.raises(ConnectorWriteRefused):
-        asyncio.run(GitHubConnector(runtime).batch_sync())
+        run_coroutine_sync(GitHubConnector(runtime).batch_sync())
     assert github.calls == []
 
 

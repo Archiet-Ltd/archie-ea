@@ -111,6 +111,11 @@ def remove_organisations(app, org_ids):
     from app import db
 
     with app.app_context():
+        # A row another connection still holds (a server process left by an earlier killed run, a
+        # transaction left open) must fail this clean-up in seconds, with the reason, not stall the
+        # run for as long as the holder lives.
+        db.session.execute(text("SET lock_timeout = '30s'"))
+        db.session.commit()
         # Tables that hold rows of an organisation, by the column that says whose they are.
         tables = [
             row[0]
@@ -166,6 +171,8 @@ def remove_organisations(app, org_ids):
         db.session.execute(text("DELETE FROM organizations WHERE id = ANY(:ids)"), ids)
         db.session.commit()
         left = db.session.execute(text("SELECT count(*) FROM organizations WHERE id = ANY(:ids)"), ids).scalar_one()
+        db.session.execute(text("RESET lock_timeout"))
+        db.session.commit()
         db.session.remove()
         assert left == 0 and not pending, "the journey left rows behind in: %s" % pending
 
