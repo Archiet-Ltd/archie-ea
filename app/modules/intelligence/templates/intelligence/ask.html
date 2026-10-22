@@ -1,4 +1,5 @@
 {% extends 'layouts/admin_base.html' %}
+{% from 'components/dense_table.html' import dense_table %}
 {% from 'macros/page_shell.html' import page_shell %}
 {% from 'intelligence/_workspace_gate.html' import workspace_gate with context %}
 {% from 'intelligence/_entity_picker.html' import entity_picker with context %}
@@ -48,7 +49,7 @@
 ] %}
 {% macro _ps_actions() %}
 <a href="{{ url_for('intelligence_ui.twin_map') }}"
-   class="inline-flex h-8 items-center justify-center rounded-md border border-input bg-background px-3 text-[13px] font-medium text-foreground transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+   class="inline-flex h-8 items-center justify-center rounded-md border border-input bg-background px-3 text-13 font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
     <i data-lucide="network" class="mr-2 h-4 w-4" aria-hidden="true"></i>Twin map
 </a>
 {% endmacro %}
@@ -64,10 +65,11 @@
     {% call workspace_gate(home_url) %}
     {# Command pattern (design/patterns.json: focused_task): one large input, the
        question lenses as chips beneath it, the answer cascade below. The picker
-       is rendered once and always; a chip sets openKey, which onSelect() in
-       ask.js dispatches on. Chip ids are the contract the smoke journeys drive. #}
+       is rendered once and always; a chip calls toggleQuestion() in ask.js, which
+       sets openKey and answers straight away when an element is already chosen
+       (clicking the chip already chosen keeps it chosen). Chip ids are the contract the smoke journeys drive. #}
     <div class="mx-auto max-w-[760px] space-y-3">
-        <div class="ask-large-input">{{ entity_picker('ask', prompt='Type a team, service or system name', input_class='h-12 w-full rounded-md border border-input bg-background px-4 text-base') }}</div>
+        <div class="ask-large-input" id="ask-question-panel">{{ entity_picker('ask', prompt='Type a team, service or system name', input_class='h-12 w-full rounded-md border border-input bg-background px-4 text-base') }}</div>
         <div class="flex flex-wrap items-center gap-2" role="group" aria-label="Question">
             {% set chip_labels = {
                 'impact': 'What breaks if it fails?',
@@ -81,35 +83,34 @@
             } %}
             {% for question in questions %}
             <button type="button" id="ask-question-{{ question.key }}" data-question="{{ question.key }}"
-                    class="inline-flex h-8 items-center rounded-md border px-3 text-[13px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                    :class="(openKey || 'impact') === '{{ question.key }}' ? 'border-ring bg-slate-100 text-info dark:bg-slate-800' : 'border-input bg-background text-muted-foreground hover:bg-slate-50 hover:text-foreground dark:hover:bg-slate-800'"
-                    :aria-pressed="(openKey || 'impact') === '{{ question.key }}' ? 'true' : 'false'"
-                    @click="openKey = '{{ question.key }}'; $nextTick(() => $refs.pickerInput && $refs.pickerInput.focus())">
+                    class="inline-flex h-8 items-center rounded-md border px-3 text-13 font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    :class="(openKey || 'impact') === '{{ question.key }}' ? 'border-ring bg-muted text-info dark:bg-card' : 'border-input bg-background text-muted-foreground hover:bg-muted/50 hover:text-foreground'"
+                    aria-expanded="false" aria-describedby="ask-sentence-{{ question.key }}"
+                    :aria-expanded="openKey === '{{ question.key }}' ? 'true' : 'false'"
+                    aria-controls="ask-question-panel"
+                    @click="openKey === '{{ question.key }}' || toggleQuestion('{{ question.key }}')">
                 {{ chip_labels[question.key] }}
             </button>
             {% endfor %}
         </div>
         {% for question in questions %}
-        <p class="text-xs text-muted-foreground" x-show="(openKey || 'impact') === '{{ question.key }}'"{% if question.key != 'impact' %} x-cloak{% endif %}>{{ question.before }} <span class="font-mono text-foreground">___</span> {{ question.after }}</p>
+        {# The chosen question's sentence is drawn; each chip is described by its own. #}
+        <p id="ask-sentence-{{ question.key }}" class="text-xs text-muted-foreground" x-show="(openKey || 'impact') === '{{ question.key }}'"{% if question.key != 'impact' %} x-cloak{% endif %}>{{ question.before }} <span class="font-mono text-foreground">___</span> {{ question.after }}</p>
         {% endfor %}
     </div>
     <div id="ask-results" aria-busy="false" :aria-busy="busy ? 'true' : 'false'" x-show="answeredKey === 'impact' && state !== 'idle'" x-cloak class="space-y-4">
-        <h2 id="ask-results-heading" x-ref="resultsHeading" tabindex="-1" class="text-xl font-semibold tracking-[-0.01em] text-foreground focus:outline-none focus-visible:outline-none">Results</h2>
+        <h2 id="ask-results-heading" x-ref="resultsHeading" tabindex="-1" class="text-xl font-semibold tracking-[-0.01em] text-foreground focus:outline-none focus-visible:outline-none" x-text="headingText()"></h2>
         {{ impact_states("state === 'loading'") }}
         <div x-show="state === 'ready'" x-cloak>
-            {% call answer_cascade('ask-cascade', question="'What breaks if ' + (centreName || '…') + ' fails or is under-resourced?'", rows='rows', ask='load(node.elementId)', save="Platform.fetch('/api/v1/intelligence/answers', { method: 'POST', body: { question: 'impact', element_id: centreId }, silent: true }).catch(function () {})", row_attrs='data-ask-row', root='centreName') %}
-                {{ derived_note('node.derived') }}
-                {{ why_button('node.key') }}
-                <a :href="twinMapHref(node)" class="inline-flex h-8 items-center justify-center rounded-md px-2 text-[13px] font-medium text-muted-foreground transition-colors hover:bg-slate-50 hover:text-info dark:hover:bg-slate-800">Map</a>
+            {% call answer_cascade('ask-cascade', question="'What breaks if ' + (centreName || '…') + ' fails or is under-resourced?'", rows='rows', ask='load(node.elementId)', save="Platform.fetch('/api/v1/intelligence/answers', { method: 'POST', body: { question: 'impact', element_id: centreId }, silent: true }).catch(function () {})", row_attrs='data-ask-row', root='centreName', rich=True) %}
+                <div class="flex basis-full flex-wrap items-center gap-3">
+                    {{ derived_note('node.derived') }}
+                    {{ why_button('node.key') }}
+                    <a :href="twinMapHref(node)" class="inline-flex h-8 items-center justify-center rounded-md px-2 text-13 font-medium text-muted-foreground transition-colors hover:bg-muted/50 hover:text-info">View on twin map</a>
+                </div>
+                <div class="basis-full text-xs text-muted-foreground">{{ stale_line('node.staleLine') }}</div>
+                <div class="basis-full">{{ full_detail({'detail': 'node.detail', 'uid': 'node.key'}) }}</div>
             {% endcall %}
-            <div class="mt-4 space-y-2">
-                <template x-for="row in rows" :key="'detail-' + row.key">
-                    <div>
-                        <div class="text-xs text-muted-foreground">{{ stale_line('row.staleLine') }}</div>
-                        {{ full_detail({'detail': 'row.detail', 'uid': 'row.key'}) }}
-                    </div>
-                </template>
-            </div>
         </div>
     </div>
 
@@ -117,7 +118,7 @@
        blast-radius rows -- a distinct shape from L1's flat row list, so a
        separate result block rather than overloading `rows`. #}
     <div id="ask-risk-results" aria-busy="false" :aria-busy="riskBusy ? 'true' : 'false'" x-show="answeredKey === 'risk' && riskState !== 'idle'" x-cloak class="space-y-4">
-        <h2 id="ask-risk-results-heading" x-ref="riskResultsHeading" tabindex="-1" class="text-xl font-semibold tracking-[-0.01em] text-foreground focus:outline-none focus-visible:outline-none">Results</h2>
+        <h2 id="ask-risk-results-heading" x-ref="riskResultsHeading" tabindex="-1" class="text-xl font-semibold tracking-[-0.01em] text-foreground focus:outline-none focus-visible:outline-none" x-text="headingText()"></h2>
         <template x-if="riskState === 'loading'">
             <div role="status" aria-label="Loading" class="h-16 animate-pulse rounded-lg border border-border bg-muted/30"></div>
         </template>
@@ -153,7 +154,7 @@
        why duplicate-detection and TCO are not offered here (neither has a
        per-application HTML page today). #}
     <div id="ask-portfolio-results" aria-busy="false" :aria-busy="portfolioBusy ? 'true' : 'false'" x-show="answeredKey === 'portfolio' && portfolioState !== 'idle'" x-cloak class="space-y-4">
-        <h2 id="ask-portfolio-results-heading" x-ref="portfolioResultsHeading" tabindex="-1" class="text-xl font-semibold tracking-[-0.01em] text-foreground focus:outline-none focus-visible:outline-none">Results</h2>
+        <h2 id="ask-portfolio-results-heading" x-ref="portfolioResultsHeading" tabindex="-1" class="text-xl font-semibold tracking-[-0.01em] text-foreground focus:outline-none focus-visible:outline-none" x-text="headingText()"></h2>
         <template x-if="portfolioState === 'loading'">
             <div role="status" aria-label="Loading" class="h-16 animate-pulse rounded-lg border border-border bg-muted/30"></div>
         </template>
@@ -177,7 +178,7 @@
     {# L5: one card per work package seeded on the picked element, each with
        its own blast-radius rows -- same shape as L6's risk cards. #}
     <div id="ask-programme-results" aria-busy="false" :aria-busy="programmeBusy ? 'true' : 'false'" x-show="answeredKey === 'programme' && programmeState !== 'idle'" x-cloak class="space-y-4">
-        <h2 id="ask-programme-results-heading" x-ref="programmeResultsHeading" tabindex="-1" class="text-xl font-semibold tracking-[-0.01em] text-foreground focus:outline-none focus-visible:outline-none">Results</h2>
+        <h2 id="ask-programme-results-heading" x-ref="programmeResultsHeading" tabindex="-1" class="text-xl font-semibold tracking-[-0.01em] text-foreground focus:outline-none focus-visible:outline-none" x-text="headingText()"></h2>
         <template x-if="programmeState === 'loading'">
             <div role="status" aria-label="Loading" class="h-16 animate-pulse rounded-lg border border-border bg-muted/30"></div>
         </template>
@@ -221,7 +222,7 @@
        its own blast-radius rows and a nested success-metrics list -- same
        shape as L5's work-package cards. #}
     <div id="ask-strategy-results" aria-busy="false" :aria-busy="strategyBusy ? 'true' : 'false'" x-show="answeredKey === 'strategy' && strategyState !== 'idle'" x-cloak class="space-y-4">
-        <h2 id="ask-strategy-results-heading" x-ref="strategyResultsHeading" tabindex="-1" class="text-xl font-semibold tracking-[-0.01em] text-foreground focus:outline-none focus-visible:outline-none">Results</h2>
+        <h2 id="ask-strategy-results-heading" x-ref="strategyResultsHeading" tabindex="-1" class="text-xl font-semibold tracking-[-0.01em] text-foreground focus:outline-none focus-visible:outline-none" x-text="headingText()"></h2>
         <template x-if="strategyState === 'loading'">
             <div role="status" aria-label="Loading" class="h-16 animate-pulse rounded-lg border border-border bg-muted/30"></div>
         </template>
@@ -275,7 +276,7 @@
        inside any loading/error/empty state gate, since it is true on
        every single response regardless of ownership data. #}
     <div id="ask-accountability-results" aria-busy="false" :aria-busy="accountabilityBusy ? 'true' : 'false'" x-show="answeredKey === 'accountability' && accountabilityState !== 'idle'" x-cloak class="space-y-4">
-        <h2 id="ask-accountability-results-heading" x-ref="accountabilityResultsHeading" tabindex="-1" class="text-xl font-semibold tracking-[-0.01em] text-foreground focus:outline-none focus-visible:outline-none">Results</h2>
+        <h2 id="ask-accountability-results-heading" x-ref="accountabilityResultsHeading" tabindex="-1" class="text-xl font-semibold tracking-[-0.01em] text-foreground focus:outline-none focus-visible:outline-none" x-text="headingText()"></h2>
         <template x-if="accountabilityState === 'loading'">
             <div role="status" aria-label="Loading" class="h-16 animate-pulse rounded-lg border border-border bg-muted/30"></div>
         </template>
@@ -311,7 +312,7 @@
        the lineage flows. Steward and owner are free text as recorded, never a
        person; anything missing says "not recorded" (no blank, no zero). #}
     <div id="ask-data-results" aria-busy="false" :aria-busy="dataBusy ? 'true' : 'false'" x-show="answeredKey === 'data' && dataState !== 'idle'" x-cloak class="space-y-4">
-        <h2 id="ask-data-results-heading" x-ref="dataResultsHeading" tabindex="-1" class="text-xl font-semibold tracking-[-0.01em] text-foreground focus:outline-none focus-visible:outline-none">Results</h2>
+        <h2 id="ask-data-results-heading" x-ref="dataResultsHeading" tabindex="-1" class="text-xl font-semibold tracking-[-0.01em] text-foreground focus:outline-none focus-visible:outline-none" x-text="headingText()"></h2>
         <template x-if="dataState === 'loading'">
             <div role="status" aria-label="Loading" class="h-16 animate-pulse rounded-lg border border-border bg-muted/30"></div>
         </template>
@@ -357,7 +358,7 @@
        so. The last scan time is shown only when one exists; nothing is shown as
        a percentage or a zero. #}
     <div id="ask-compliance-results" aria-busy="false" :aria-busy="complianceBusy ? 'true' : 'false'" x-show="answeredKey === 'compliance' && complianceState !== 'idle'" x-cloak class="space-y-4">
-        <h2 id="ask-compliance-results-heading" x-ref="complianceResultsHeading" tabindex="-1" class="text-xl font-semibold tracking-[-0.01em] text-foreground focus:outline-none focus-visible:outline-none">Results</h2>
+        <h2 id="ask-compliance-results-heading" x-ref="complianceResultsHeading" tabindex="-1" class="text-xl font-semibold tracking-[-0.01em] text-foreground focus:outline-none focus-visible:outline-none" x-text="headingText()"></h2>
         <template x-if="complianceState === 'loading'">
             <div role="status" aria-label="Loading" class="h-16 animate-pulse rounded-lg border border-border bg-muted/30"></div>
         </template>
@@ -439,31 +440,17 @@
         </ul>
         {% endif %}
         {% if derivation_status.runs %}
-        <div class="mt-4 overflow-x-auto">
-            <table class="w-full text-sm" data-derivation-runs>
-                <caption class="sr-only">Recent runs</caption>
-                <thead>
-                    <tr class="border-b border-border text-left text-muted-foreground">
-                        <th scope="col" class="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground py-2 pr-4">Finished</th>
-                        <th scope="col" class="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground py-2 pr-4">Started by</th>
-                        <th scope="col" class="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground py-2 pr-4">Relationships read</th>
-                        <th scope="col" class="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground py-2 pr-4">Connections found</th>
-                        <th scope="col" class="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground py-2 pr-4">Time taken</th>
-                    </tr>
-                </thead>
-                <tbody>
+{% call dense_table(columns=[('Finished', ''), ('Started by', ''), ('Relationships read', ''), ('Connections found', ''), ('Time taken', '')], caption='Recent runs', attrs={'data-derivation-runs': ''}, flush=true) %}
                     {% for run in derivation_status.runs %}
-                    <tr class="border-b border-border last:border-0" data-derivation-run>
-                        <td class="py-2 pr-4">{{ run.finished_at | format_datetime if run.finished_at else '—' }}</td>
-                        <td class="py-2 pr-4">{{ {'on_demand': 'A person', 'scheduled': 'The schedule'}.get(run.trigger, '—') }}</td>
-                        <td class="py-2 pr-4">{{ run.explicit_count if run.explicit_count is not none else '—' }}</td>
-                        <td class="py-2 pr-4">{{ run.derived_count if run.derived_count is not none else '—' }}</td>
-                        <td class="py-2 pr-4">{{ (run.duration_ms ~ ' ms') if run.duration_ms is not none else '—' }}</td>
+                    <tr class="last:border-0" data-derivation-run>
+                        <td class="px-2">{{ run.finished_at | format_datetime if run.finished_at else '—' }}</td>
+                        <td class="px-2">{{ {'on_demand': 'A person', 'scheduled': 'The schedule'}.get(run.trigger, '—') }}</td>
+                        <td class="px-2">{{ run.explicit_count if run.explicit_count is not none else '—' }}</td>
+                        <td class="px-2">{{ run.derived_count if run.derived_count is not none else '—' }}</td>
+                        <td class="px-2">{{ (run.duration_ms ~ ' ms') if run.duration_ms is not none else '—' }}</td>
                     </tr>
                     {% endfor %}
-                </tbody>
-            </table>
-        </div>
+                {% endcall %}
         {% else %}
         <p class="mt-3 text-sm text-muted-foreground" data-derivation-never-run>Not worked out yet.</p>
         {% endif %}

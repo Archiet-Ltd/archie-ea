@@ -69,7 +69,7 @@
         breadcrumb=[('Home', home_url), ('Answers', url_for('intelligence_ui.answers_page')), ('Answer', none)]
     ) }}
 
-    <section class="rounded-xl border border-border bg-card p-6 space-y-3" aria-labelledby="answer-facts-heading">
+    <section class="rounded-lg border border-border bg-card p-6 space-y-3" aria-labelledby="answer-facts-heading">
         <h2 id="answer-facts-heading" class="text-lg font-semibold text-foreground">About this answer</h2>
         <dl class="grid gap-3 text-sm sm:grid-cols-2">
             <div>
@@ -181,7 +181,7 @@
     {% else %}
     {% call section_card(title='Affected') %}
         <div class="overflow-x-auto">
-            <table class="w-full text-sm" data-answer-rows>
+            <table class="dense-table w-full text-sm" data-answer-rows>
                 <caption class="sr-only">Everything affected, ranked by how many of the failing elements reach it</caption>
                 <thead>
                     <tr class="text-left text-muted-foreground">

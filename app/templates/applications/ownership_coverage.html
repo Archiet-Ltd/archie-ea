@@ -17,22 +17,22 @@
   ) }}
 
   {% if forbidden %}
-  <div data-slot="card" class="rounded-xl border border-border bg-card shadow-sm p-6">
+  <div data-slot="card" class="rounded-lg border border-border bg-card p-6">
     <p class="text-center text-muted-foreground py-8">You do not have access to this page.</p>
   </div>
   {% else %}
 
   {# Overview summary #}
   <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-    <div data-slot="card" class="rounded-xl border border-border bg-card shadow-sm p-6">
+    <div data-slot="card" class="rounded-lg border border-border bg-card p-6">
       <p class="text-sm text-muted-foreground">Total applications</p>
       <p class="text-3xl font-bold text-foreground mt-1">{{ total_apps }}</p>
     </div>
-    <div data-slot="card" class="rounded-xl border border-border bg-card shadow-sm p-6">
+    <div data-slot="card" class="rounded-lg border border-border bg-card p-6">
       <p class="text-sm text-muted-foreground">With named owner</p>
       <p class="text-3xl font-bold text-foreground mt-1">{{ total_owned }}</p>
     </div>
-    <div data-slot="card" class="rounded-xl border border-border bg-card shadow-sm p-6">
+    <div data-slot="card" class="rounded-lg border border-border bg-card p-6">
       <p class="text-sm text-muted-foreground">Coverage</p>
       <p class="text-3xl font-bold mt-1
         {%- if overall_pct is none %} text-muted-foreground
@@ -44,9 +44,9 @@
   </div>
 
   {# Table #}
-  <div data-slot="card" class="rounded-xl border border-border bg-card shadow-sm overflow-hidden">
+  <div data-slot="card" class="rounded-lg border border-border bg-card overflow-hidden">
     <div class="overflow-x-auto">
-      <table class="w-full text-sm">
+      <table class="dense-table w-full text-sm">
         <thead>
           <tr class="border-b border-border bg-muted/50">
             <th class="text-left px-6 py-3 font-medium text-muted-foreground">Business unit</th>

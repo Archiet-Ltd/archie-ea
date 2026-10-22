@@ -24,7 +24,7 @@
     {# ── Summary Statistics (6-card grid) ── #}
     <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
         <template x-for="(card, ci) in summaryCards()" :key="ci">
-            <div class="bg-card rounded-lg p-4 border">
+            <div class="bg-card rounded-lg p-4 border border-border">
                 <p class="text-xs font-medium text-muted-foreground" x-text="card.label"></p>
                 <p class="text-xl font-bold mt-1" :class="card.color" x-text="card.value"></p>
                 <p class="text-xs text-muted-foreground mt-0.5" x-show="card.subtitle" x-text="card.subtitle" x-cloak></p>
@@ -33,7 +33,7 @@
     </div>
 
     {# ── Filters and Actions ── #}
-    <div data-slot="card" class="rounded-xl border bg-card shadow-sm mb-6">
+    <div data-slot="card" class="rounded-lg border border-border bg-card mb-6">
         {{ filter_bar(
             search_id='consolidation-search',
             search_placeholder='Search by name, owner...',
@@ -57,10 +57,10 @@
             ]
         ) }}
         <div class="px-4 pb-4 flex flex-wrap items-center gap-2">
-            <button type="button" @click="openAddApps()" class="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-primary text-primary-foreground hover:bg-primary/90 text-sm font-medium transition-colors" aria-label="Add Applications">
+            <button type="button" @click="openAddApps()" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center" aria-label="Add Applications">
                 <i data-lucide="plus" class="h-4 w-4" aria-hidden="true"></i> Add Applications
             </button>
-            <button type="button" @click="scoreAll()" :disabled="scoringInProgress" class="inline-flex items-center gap-2 px-4 py-2 rounded-md border border-primary bg-primary/10 hover:bg-primary/20 text-primary text-sm font-medium transition-colors disabled:opacity-50" aria-label="Score all entries using TIME framework">
+            <button type="button" @click="scoreAll()" :disabled="scoringInProgress" class="inline-flex items-center gap-2 px-4 py-2 rounded-md border border-primary bg-primary/10 hover:bg-primary/20 text-info-emphasis text-sm font-medium transition-colors disabled:opacity-50" aria-label="Score all entries using TIME framework">
                 <i data-lucide="bar-chart-3" class="h-4 w-4" aria-hidden="true"></i>
                 <span x-text="scoringInProgress ? 'Scoring...' : 'Score All (TIME)'"></span>
             </button>
@@ -68,19 +68,19 @@
                 <i data-lucide="calculator" class="h-4 w-4" aria-hidden="true"></i>
                 <span x-text="recalcInProgress ? 'Recalculating...' : 'Recalculate Savings'"></span>
             </button>
-            <button type="button" @click="bulkAction('decommission')" class="inline-flex items-center gap-2 px-4 py-2 rounded-md border border-input bg-background hover:bg-accent text-sm font-medium transition-colors" aria-label="Bulk decommission selected entries">
+            <button type="button" @click="bulkAction('decommission')" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center" aria-label="Bulk decommission selected entries">
                 Bulk: Decommission
             </button>
-            <button type="button" @click="bulkAction('retire')" class="inline-flex items-center gap-2 px-4 py-2 rounded-md border border-input bg-background hover:bg-accent text-sm font-medium transition-colors" aria-label="Bulk retire selected entries">
+            <button type="button" @click="bulkAction('retire')" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center" aria-label="Bulk retire selected entries">
                 Bulk: Retire
             </button>
-            <button type="button" @click="bulkAction('add_to_roadmap')" class="inline-flex items-center gap-2 px-4 py-2 rounded-md border border-input bg-background hover:bg-accent text-sm font-medium transition-colors" aria-label="Bulk add selected entries to roadmap">
+            <button type="button" @click="bulkAction('add_to_roadmap')" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center" aria-label="Bulk add selected entries to roadmap">
                 Bulk: Add to Roadmap
             </button>
-            <button type="button" @click="bulkAction('set_wave')" class="inline-flex items-center gap-2 px-4 py-2 rounded-md border border-input bg-background hover:bg-accent text-sm font-medium transition-colors" aria-label="Set wave for selected entries">
+            <button type="button" @click="bulkAction('set_wave')" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center" aria-label="Set wave for selected entries">
                 Bulk: Set Wave
             </button>
-            <button type="button" @click="bulkAction('assign_owner')" class="inline-flex items-center gap-2 px-4 py-2 rounded-md border border-input bg-background hover:bg-accent text-sm font-medium transition-colors" aria-label="Assign owner to selected entries">
+            <button type="button" @click="bulkAction('assign_owner')" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center" aria-label="Assign owner to selected entries">
                 Bulk: Assign Owner
             </button>
             <div class="flex items-center gap-2 ml-auto">
@@ -98,7 +98,7 @@
     </div>
 
     {# ── Status Pipeline ── #}
-    <div class="mb-6 bg-card rounded-lg border p-4">
+    <div class="mb-6 bg-card rounded-lg border border-border p-4">
         <div class="flex items-center justify-between mb-2">
             <h3 class="text-sm font-semibold text-foreground">Pipeline</h3>
             <button type="button" x-show="pipelineStatusFilter" x-cloak @click="clearPipelineFilter()" class="text-xs text-muted-foreground hover:text-foreground">Clear filter</button>
@@ -128,7 +128,7 @@
     </div>
 
     {# ── Consolidation List Table ── #}
-    <div class="bg-card rounded-lg border overflow-hidden">
+    <div class="bg-card rounded-lg border border-border overflow-hidden">
 
         {# Cross-page selection banner #}
         <div class="bg-muted/50 text-center py-2 text-sm border-b"
@@ -163,7 +163,7 @@
         </div>
 
         <div class="overflow-x-auto">
-            <table class="w-full" role="grid">
+            <table class="dense-table w-full" role="grid">
                 <thead>
                     <tr class="border-b bg-muted/50">
                         <th class="w-12 px-4 py-3">
@@ -241,7 +241,7 @@
                                         <p class="text-sm font-medium text-foreground">No consolidation entries yet</p>
                                         <p class="text-sm text-muted-foreground mt-1">Run duplicate detection to find consolidation candidates, or add applications manually.</p>
                                     </div>
-                                    <button type="button" class="mt-2 inline-flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+                                    <button type="button" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 mt-2 items-center"
                                             @click="openAddApps()">
                                         <i data-lucide="plus" class="h-4 w-4" aria-hidden="true"></i> Add Applications
                                     </button>
@@ -353,7 +353,7 @@
                             {# Wave #}
                             <td class="px-4 py-3 hidden sm:table-cell">
                                 <template x-if="entry.wave">
-                                    <span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-primary/10 text-primary text-xs font-semibold border border-primary/20" x-text="entry.wave"></span>
+                                    <span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-primary/10 text-info-emphasis text-xs font-semibold border border-primary/20" x-text="entry.wave"></span>
                                 </template>
                                 <span x-show="!entry.wave" class="text-muted-foreground text-xs" x-cloak>&mdash;</span>
                             </td>
@@ -377,7 +377,7 @@
 
         {# ── Expanded detail panels (outside table for clean rendering) ── #}
         <template x-for="entry in items.filter(e => isExpanded(e.id))" :key="'detail-' + entry.id">
-            <div class="border-t bg-muted/20 px-6 py-4" x-show="isExpanded(entry.id)" x-cloak>
+            <div class="border border-t bg-muted/20 px-6 py-2" x-show="isExpanded(entry.id)" x-cloak>
                 <div class="flex items-center gap-2 mb-3">
                     <h4 class="text-sm font-semibold text-foreground" x-text="entry.application_name + ' — Details'"></h4>
                     <button type="button" class="text-xs text-muted-foreground hover:text-foreground" @click="toggleExpand(entry.id)">Close</button>
@@ -493,7 +493,7 @@
                                     <i data-lucide="alert-circle" class="h-3.5 w-3.5" aria-hidden="true"></i>
                                     <span x-text="getMissingFields(entry).length + ' Missing Field' + (getMissingFields(entry).length !== 1 ? 's' : '')"></span>
                                 </h5>
-                                <button type="button" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-primary text-primary-foreground text-xs font-medium hover:bg-primary/90 transition-colors disabled:opacity-50"
+                                <button type="button" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center"
                                         :disabled="isQuickSaving(entry.id)"
                                         @click="quickSave(entry.id)">
                                     <i data-lucide="save" class="h-3 w-3" aria-hidden="true"></i>
@@ -563,7 +563,7 @@
 
                 {# duplicate-breadcrumb-ok: table-pagination nav, not a breadcrumb -- flagged only because its Prev/Next buttons use chevron icons, the same shape heuristic keys on; real breadcrumb is the header-arg above. #}
                 <nav class="flex items-center gap-1" aria-label="Pagination">
-                    <button type="button" class="inline-flex items-center justify-center h-8 px-2.5 rounded-md border border-input bg-background hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed"
+                    <button type="button" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center"
                             :disabled="!hasPrev" @click="prevPage()" aria-label="Previous page">
                         <i data-lucide="chevron-left" class="h-4 w-4" aria-hidden="true"></i>
                     </button>
@@ -578,7 +578,7 @@
                         </span>
                     </template>
 
-                    <button type="button" class="inline-flex items-center justify-center h-8 px-2.5 rounded-md border border-input bg-background hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed"
+                    <button type="button" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center"
                             :disabled="!hasNext" @click="nextPage()" aria-label="Next page">
                         <i data-lucide="chevron-right" class="h-4 w-4" aria-hidden="true"></i>
                     </button>

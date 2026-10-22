@@ -111,6 +111,7 @@ from app.models.technology_layer import (
 from app.models.unified_capability import ValueStream
 import logging
 from app.utils.pagination import safe_int_arg
+from app.models.archimate_element_types import StandardTypeTable
 
 logger = logging.getLogger(__name__)
 
@@ -120,7 +121,7 @@ logger = logging.getLogger(__name__)
 write_role_required = require_roles("admin", "architect")
 
 # Model registry mapping element types to model classes
-MODEL_REGISTRY = {
+MODEL_REGISTRY = StandardTypeTable({
     # Motivation Layer
     "Stakeholder": Stakeholder,
     "Driver": Driver,
@@ -186,7 +187,7 @@ MODEL_REGISTRY = {
     "ImplementationEvent": ImplementationEvent,
     "Plateau": Plateau,
     "Gap": Gap,
-}
+})
 
 # Layer configuration
 # Accepted stored spellings per layer key. ArchiMate 3.2 names two layers with

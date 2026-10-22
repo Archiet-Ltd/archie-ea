@@ -56,7 +56,7 @@
         {% if change_requests %}
         <!-- Change Requests Table -->
         <div class="bg-card border border-border rounded-lg overflow-hidden">
-            <table class="w-full text-sm">
+            <table class="dense-table w-full text-sm">
                 <thead class="bg-muted/50 border-b border-border">
                     <tr>
                         <th class="px-4 py-3 text-left font-medium text-muted-foreground">Reference</th>
@@ -123,7 +123,7 @@
                 <p class="text-sm font-medium">No change requests yet</p>
                 <p class="text-xs">Raise a new change request to start the Phase H process.</p>
                 <a href="{{ url_for('arb.change_request_new') }}"
-                   class="mt-2 inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90 transition-colors">
+                   class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 mt-2 items-center">
                     New Change Request
                 </a>
             </div>

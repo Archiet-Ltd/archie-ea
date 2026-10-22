@@ -50,6 +50,7 @@ from app.decorators import audit_log
 
 from . import unified_applications_bp
 from ._helpers import _sanitize_csv_value
+from app.models.archimate_element_types import is_application_kind
 
 logger = logging.getLogger(__name__)
 
@@ -1671,8 +1672,7 @@ def application_import():
                                             ai_results["total_archimate_created"] += 1
                                             # Link first ApplicationComponent element to app
                                             if (
-                                                elem_data.get("type")
-                                                == "ApplicationComponent"
+                                                is_application_kind(elem_data.get("type"))
                                                 and not app.archimate_element_id
                                             ):
                                                 app.archimate_element_id = elem.id
@@ -2011,8 +2011,7 @@ def application_import():
                                         if elem:
                                             ai_results["total_archimate_created"] += 1
                                             if (
-                                                elem_data.get("type")
-                                                == "ApplicationComponent"
+                                                is_application_kind(elem_data.get("type"))
                                                 and not app.archimate_element_id
                                             ):
                                                 app.archimate_element_id = elem.id
