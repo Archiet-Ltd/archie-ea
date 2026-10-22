@@ -303,3 +303,31 @@ def test_demo_seed_projects_capabilities_without_the_provenance_migration(app, d
                 "WHERE source_table IS NOT NULL AND source_id IS NOT NULL" % PROVENANCE_INDEX))
             db.session.commit()
             _provenance_index_cache.clear()
+
+
+def test_compare_scenarios_fills_a_comparison_without_an_error(page, live_server, demo_org):
+    """Choosing two capabilities in Compare Scenarios fills the table and raises nothing."""
+    problems = []
+    page.on("console", lambda m: problems.append("console: " + m.text) if m.type == "error" else None)
+    page.on("pageerror", lambda e: problems.append("page error: %s" % e))
+    _login(page, live_server, DEMO_EMAIL)
+    page.goto(live_server + "/architecture/investment-priorities",
+              wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    page.get_by_role("button", name="Compare Scenarios").click()
+    dialog = page.locator("[role='dialog']:visible").filter(has_text="Investment Scenario Comparison")
+    selects = dialog.locator("select")
+    expect(selects).to_have_count(3, timeout=PAGE_TIMEOUT)
+    expect(selects.first.locator("option", has_text="Order Fulfilment")).to_be_attached(timeout=PAGE_TIMEOUT)
+    selects.nth(0).select_option(label="Order Fulfilment")
+    selects.nth(1).select_option(label="Sensor Calibration")
+    table = dialog.locator("table.dense-table")
+    expect(table).to_be_visible(timeout=PAGE_TIMEOUT)
+    expect(table.locator("tr", has_text="Capability").first).to_contain_text("Order Fulfilment")
+    expect(table.locator("tr", has_text="Capability").first).to_contain_text("Sensor Calibration")
+    for metric in ("Initial Investment", "ROI %", "Payback Period", "Strategic Score", "Risk Score"):
+        cells = table.locator("tr", has_text=metric).first.locator("td:visible")
+        assert cells.count() == 3, "%s should have a value for both scenarios" % metric
+        for text in cells.all_inner_texts()[1:]:
+            assert text.strip() not in ("", "N/A"), "%s is empty" % metric
+    page.wait_for_timeout(500)
+    assert problems == [], problems
