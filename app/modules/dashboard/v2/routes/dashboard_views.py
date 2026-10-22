@@ -1130,38 +1130,3 @@ def ai_executive_briefing():
         return jsonify({"error": f"AI executive briefing failed: {e}"}), 502
 
     return jsonify({"briefing": briefing})
-
-
-@dashboard_bp_v2.route("/api/coverage-debug")
-@login_required
-def api_coverage_debug():
-    """Coverage debug endpoint using the canonical ownership helper."""
-    try:
-        from sqlalchemy import text
-        from flask import g as _g
-        _org = getattr(_g, "current_org_id", None)
-        _org_where = " WHERE organization_id = :org" if _org is not None else ""
-        row = db.session.execute(text(f"""
-            SELECT
-                COUNT(*) FILTER (WHERE vendor_product_id IS NOT NULL OR vendor_name IS NOT NULL) AS vendor_n,
-                COUNT(*) FILTER (WHERE total_cost_of_ownership IS NOT NULL OR license_cost IS NOT NULL OR maintenance_cost IS NOT NULL) AS cost_n,
-                COUNT(*) FILTER (WHERE business_criticality IS NOT NULL) AS crit_n,
-                COUNT(*) AS total_n
-            FROM application_components{_org_where}
-        """), ({"org": _org} if _org is not None else {})).fetchone()
-        vendor_n, cost_n, crit_n, total_n = row[0], row[1], row[2], row[3]
-        owner_n = 0
-        if _org is not None:
-            from app.models.application_portfolio import ApplicationComponent
-            from app.services.element_ownership_service import application_is_owned_expression
-
-            owner_n = db.session.execute(
-                db.select(db.func.count(ApplicationComponent.id))
-                .where(ApplicationComponent.organization_id == _org)
-                .where(application_is_owned_expression(ApplicationComponent))
-            ).scalar_one()
-        return jsonify({"ok": True, "owner": owner_n, "vendor": vendor_n, "cost": cost_n, "crit": crit_n, "total": total_n})
-    except Exception:
-        db.session.rollback()
-        current_app.logger.exception("dashboard coverage counts query failed")
-        return jsonify({"ok": False, "error": "Could not load coverage counts"}), 500
