@@ -22,7 +22,7 @@ from __future__ import annotations
 from typing import Optional
 
 ACTIONS = ("create", "read", "edit", "delete", "bulk_delete")
-OBJECT_TYPES = ("application", "relationship")
+OBJECT_TYPES = ("application", "relationship", "motivation_element")
 
 _ALL = frozenset(ACTIONS)
 # Architects create, read, edit and delete one application at a time; deleting
@@ -51,6 +51,15 @@ DEFAULTS = {
     # Relationships between elements: administrators and architects create and
     # edit, everyone else reads (the route carried only a sign-in check before).
     "relationship": {
+        "org_admin": _ALL,
+        "administrator": _ALL,
+        "admin": _ALL,
+        "architect": _ARCHITECT,
+        "viewer": _READ,
+    },
+    # Goals, drivers, requirements and other motivation elements: administrators and
+    # architects create, edit and delete them, everyone else reads.
+    "motivation_element": {
         "org_admin": _ALL,
         "administrator": _ALL,
         "admin": _ALL,

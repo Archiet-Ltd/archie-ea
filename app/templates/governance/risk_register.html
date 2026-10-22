@@ -79,19 +79,28 @@
                     <div class="flex flex-wrap items-center gap-2">
                         <a href="{{ url_for('risk.risk_page', risk_id=r.risk_id) }}" class="text-sm font-medium text-foreground hover:underline">{{ r.title }}</a>
                         <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-muted text-muted-foreground capitalize">{{ r.status }}</span>
-                        <span class="text-xs text-muted-foreground">Reaches <span class="tabular-nums">{{ r.exposure if r.exposure is not none else '—' }}</span></span>
                     </div>
                     <p class="text-xs text-muted-foreground mt-0.5" data-risk-reason>{{ r.reason }}</p>
                     {% if r.touches %}
-                    <p class="text-xs text-muted-foreground mt-1">Touches:
-                        {% for t in r.touches %}
-                        {% if t.kind == 'application' and 'unified_applications.application_fact_sheet' in flask.current_app.view_functions %}
-                        <a href="{{ url_for('unified_applications.application_fact_sheet', id=t.id) }}" class="text-primary hover:underline">{{ t.name }}</a>{{ ',' if not loop.last }}
-                        {% elif 'archimate.element_impact_graph_page' in flask.current_app.view_functions %}
-                        <a href="{{ url_for('archimate.element_impact_graph_page', element_id=t.element_id) }}" class="text-primary hover:underline">{{ t.name }}</a>{{ ',' if not loop.last }}
-                        {% else %}{{ t.name }}{{ ',' if not loop.last }}{% endif %}
-                        {% endfor %}
+                    {% set _linked = r.touches | selectattr('kind', 'equalto', 'application') | list %}
+                    {% set _reached = r.touches | rejectattr('kind', 'equalto', 'application') | list %}
+                    <p class="text-xs text-muted-foreground mt-1" data-risk-touches>
+                        {% macro _touch(t) -%}
+                        {% if t.kind == 'application' and 'unified_applications.application_fact_sheet' in flask.current_app.view_functions -%}
+                        <a href="{{ url_for('unified_applications.application_fact_sheet', id=t.id) }}" class="text-primary hover:underline">{{ t.name }}</a>
+                        {%- elif 'archimate.element_impact_graph_page' in flask.current_app.view_functions -%}
+                        <a href="{{ url_for('archimate.element_impact_graph_page', element_id=t.element_id) }}" class="text-primary hover:underline">{{ t.name }}</a>
+                        {%- else -%}{{ t.name }}{%- endif %}
+                        {%- endmacro %}
+                        {% if _linked %}<span data-risk-linked>Linked to {% for t in _linked %}{{ _touch(t) }}{{ ', ' if not loop.last }}{% endfor %}{% if _reached %};{% endif %}</span>{% endif %}
+                        {% if _reached %}<span data-risk-reached>{{ 'reaches' if _linked else 'Reaches' }} <span class="tabular-nums">{{ r.reached_total }}</span>{{ ' more' if _linked }}{{ ', including' if r.reached_total > _reached | length }}: {% for t in _reached %}{{ _touch(t) }}{{ ', ' if not loop.last }}{% endfor %}</span>{% endif %}
                     </p>
+                    {% elif r.worked_out %}
+                    <p class="text-xs text-muted-foreground mt-1" data-risk-unlinked>Not linked to any application, solution or programme yet.
+                        <button type="button" @click="openMap({{ r.risk_id }})" class="text-primary hover:underline">Link it</button>
+                    </p>
+                    {% else %}
+                    <p class="text-xs text-muted-foreground mt-1">What this risk touches could not be worked out.</p>
                     {% endif %}
                 </div>
             </li>
@@ -429,13 +438,14 @@
                     </div>
                     <template x-if="selectedRisk && selectedRisk.entity_links && selectedRisk.entity_links.length">
                         <ul class="space-y-1.5">
-                            <template x-for="link in selectedRisk.entity_links" :key="link.id">
+                            <template x-for="(link, linkIdx) in selectedRisk.entity_links" :key="link.id || ('element-' + linkIdx)">
                                 <li class="flex items-center justify-between gap-2 rounded-md border border-border px-2.5 py-1.5 text-sm">
                                     <span class="min-w-0">
                                         <span class="inline-flex items-center px-1.5 py-0 rounded text-2xs font-medium bg-muted text-muted-foreground capitalize mr-1.5" x-text="link.entity_type"></span>
                                         <span :class="link.entity_label ? 'text-foreground' : 'text-destructive-emphasis'" x-text="link.entity_label || ('Deleted ' + link.entity_type + ' (#' + link.entity_id + ')')"></span>
+                                        <span x-show="link.via === 'element'" class="ml-1.5 text-xs text-muted-foreground">(linked through the risk's element)</span>
                                     </span>
-                                    <button type="button" @click="removeLink(link.id)" aria-label="Unmap" class="text-xs text-muted-foreground hover:text-destructive-emphasis shrink-0">Unmap</button>
+                                    <button type="button" x-show="link.id" @click="removeLink(link.id)" aria-label="Unmap" class="text-xs text-muted-foreground hover:text-destructive-emphasis shrink-0">Unmap</button>
                                 </li>
                             </template>
                         </ul>
@@ -501,6 +511,13 @@ function riskRegister() {
 
         updatingId: null,
 
+        // A link from the prioritised action list (?risk=<id>) opens that risk's panel.
+        init() {
+            const wanted = new URLSearchParams(window.location.search).get('risk');
+            const match = (window.RISK_ROWS || []).find(function (r) { return String(r.id) === wanted; });
+            if (match) this.openView(match, false);
+        },
+
         // PATCH /api/risks/<id> takes {status} and returns the updated risk.
         setStatus(id, status) {
             if (this.updatingId) return;
@@ -563,6 +580,13 @@ function riskRegister() {
             this.linkSearch = '';
             this.linkResults = [];
             this.panelOpen = true;
+        },
+
+        // From the ranked list: the same slide-over and picker as the row's
+        // "Map to…" action, opened for the risk with this id.
+        openMap(riskId) {
+            const row = (window.RISK_ROWS || []).find(function (r) { return r.id === riskId; });
+            this.openView(row, true);
         },
 
         confirmDelete(row) {

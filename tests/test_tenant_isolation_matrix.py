@@ -54,6 +54,18 @@ INTENTIONALLY_GLOBAL = {
         "reach the row regardless of the tenant filter; every query is keyed by "
         "sid or user_id and organization_id is kept for attribution only"
     ),
+    # These two are NOT shared: their rows are organisation-scoped through organization_id and filtered by the active organisation; they are listed here only because this matrix has no category yet for scoping without TenantMixin.
+    "ConversationThreadRecord": (
+        "a chat thread is keyed to its user and to the organisation active when it "
+        "was made; the chat service scopes its raw SQL by both user_id and "
+        "organization_id, and the column is nullable for a user with no home organisation"
+    ),
+    "ChatMessageEmbedding": (
+        "chat history, saved sessions and page-guide history are keyed to their user "
+        "and to the organisation active when written; every read goes through "
+        "ChatMessageEmbedding.in_active_org(), and the column is nullable for a "
+        "user with no home organisation"
+    ),
     # Child rows reached only through a TenantMixin parent, which scopes them.
     "ApplicationCapabilityMapping": "reached via ApplicationComponent, which is scoped",
     "ApplicationVersioning": "reached via ApplicationComponent, which is scoped",
@@ -435,7 +447,6 @@ KNOWN_LEAKS = {
     # PR 421 (one work package store) scoped the deliverable update and delete
     # through the organisation's own work packages; test_known_leak_is_still_open
     # went XPASS(strict) on both, so their entries come out.
-    "DELETE /capability-map/api/archimate-mappings/<int:mapping_id>": "capability store brief",
 }
 
 # Parameters whose record the codebase reading no longer finds, because the lookup moved
