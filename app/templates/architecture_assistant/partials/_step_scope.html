@@ -11,13 +11,13 @@
     <div>
       <label class="block text-sm font-medium text-foreground mb-1.5">Solution Name <span class="text-destructive-emphasis">*</span></label>
       <input type="text" x-model="scope.name" required
-        class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+        class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
         placeholder="e.g. Enterprise CRM Consolidation" aria-label="Solution Name">
     </div>
     <div>
       <label class="block text-sm font-medium text-foreground mb-1.5">Business Domain <span class="text-destructive-emphasis">*</span></label>
       <select x-model="scope.business_domain"
-        class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" aria-label="Business Domain">
+        class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" aria-label="Business Domain">
         <option value="">Select domain...</option>
         <option value="Customer Management">Customer Management</option>
         <option value="Finance">Finance</option>
@@ -40,10 +40,10 @@
     </label>
     <div class="relative">
       <input type="text" x-model="appSearch" @input.debounce.300ms="searchApplications()"
-        class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+        class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
         placeholder="Search applications..." aria-label="Linked Applications (link existing apps for brownfield redesign)">
       <div x-show="appSearchResults.length > 0" x-cloak
-        class="absolute z-10 mt-1 w-full rounded-md border border-border bg-background shadow-lg max-h-48 overflow-y-auto">
+        class="absolute z-10 mt-1 w-full rounded-md border border-border bg-background max-h-48 overflow-y-auto">
         <template x-for="app in appSearchResults" :key="app.id">
           <button @click="linkApplication(app)" type="button"
             class="w-full text-left px-3 py-2 text-sm hover:bg-accent transition-colors">
@@ -84,12 +84,12 @@
     </div>
     <div class="relative">
       <textarea x-model="scope.business_problem" rows="3" @input="onScopeEdited()"
-        class="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+        class="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
         placeholder="Describe the business problem this solution addresses..." aria-label="Describe the business problem this solution addresses..."></textarea>
       <button @click="generateProblemStatement()" type="button"
         :disabled="!llmAvailable || problemLoading"
         :title="llmAvailable ? 'Generate with AI' : 'Requires LLM configuration'"
-        class="absolute top-2 right-2 inline-flex items-center gap-1 h-7 px-2 rounded-md text-xs font-medium border border-input bg-background hover:bg-accent disabled:opacity-50 disabled:pointer-events-none">
+        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 absolute top-2 right-2 items-center">
         <i data-lucide="sparkles" class="h-3 w-3" x-show="!problemLoading" x-cloak></i>
         <i data-lucide="loader-2" class="h-3 w-3 animate-spin" x-show="problemLoading" x-cloak></i>
         <span x-text="problemLoading ? 'Generating...' : 'AI Generate'"></span>
@@ -98,7 +98,7 @@
 
     {# ENH-004: Review & Approve Scope — shown after AI generates scope content #}
     <div x-show="scopeReviewPending && !scopeApproved" x-cloak
-      class="mt-3 rounded-md border border-warning/30 bg-warning/5 p-3">
+      class="mt-3 rounded-md border border-warning/40 bg-warning/10 px-3 py-2">
       <div class="flex items-start gap-2">
         <i data-lucide="alert-triangle" class="h-4 w-4 text-warning mt-0.5 shrink-0"></i>
         <div class="flex-1">
@@ -122,10 +122,10 @@
     </label>
     <div class="relative">
       <input type="text" x-model="driverSearch" @input.debounce.300ms="searchMotivationElements('Driver')"
-        class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+        class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
         placeholder="Search existing drivers or type to create..." aria-label="Drivers ArchiMate: Driver">
       <div x-show="driverResults.length > 0" x-cloak
-        class="absolute z-10 mt-1 w-full rounded-md border border-border bg-background shadow-lg max-h-48 overflow-y-auto">
+        class="absolute z-10 mt-1 w-full rounded-md border border-border bg-background max-h-48 overflow-y-auto">
         <template x-for="el in driverResults" :key="el.id">
           <button @click="addMotivationElement('drivers', el)" type="button"
             class="w-full text-left px-3 py-2 text-sm hover:bg-accent transition-colors">
@@ -159,10 +159,10 @@
     </label>
     <div class="relative">
       <input type="text" x-model="goalSearch" @input.debounce.300ms="searchMotivationElements('Goal')"
-        class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+        class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
         placeholder="Search existing goals or type to create..." aria-label="Goals ArchiMate: Goal">
       <div x-show="goalResults.length > 0" x-cloak
-        class="absolute z-10 mt-1 w-full rounded-md border border-border bg-background shadow-lg max-h-48 overflow-y-auto">
+        class="absolute z-10 mt-1 w-full rounded-md border border-border bg-background max-h-48 overflow-y-auto">
         <template x-for="el in goalResults" :key="el.id">
           <button @click="addMotivationElement('goals', el)" type="button"
             class="w-full text-left px-3 py-2 text-sm hover:bg-accent transition-colors">
@@ -193,10 +193,10 @@
     </label>
     <div class="relative">
       <input type="text" x-model="constraintSearch" @input.debounce.300ms="searchMotivationElements('Constraint')"
-        class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+        class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
         placeholder="Search existing constraints or type to create..." aria-label="Constraints ArchiMate: Constraint">
       <div x-show="constraintResults.length > 0" x-cloak
-        class="absolute z-10 mt-1 w-full rounded-md border border-border bg-background shadow-lg max-h-48 overflow-y-auto">
+        class="absolute z-10 mt-1 w-full rounded-md border border-border bg-background max-h-48 overflow-y-auto">
         <template x-for="el in constraintResults" :key="el.id">
           <button @click="addMotivationElement('constraints', el)" type="button"
             class="w-full text-left px-3 py-2 text-sm hover:bg-accent transition-colors">
@@ -227,10 +227,10 @@
     </label>
     <div class="relative">
       <input type="text" x-model="stakeholderSearch" @input.debounce.300ms="searchMotivationElements('Stakeholder')"
-        class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+        class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
         placeholder="Search existing stakeholders or type to create..." aria-label="Stakeholders ArchiMate: Stakeholder">
       <div x-show="stakeholderResults.length > 0" x-cloak
-        class="absolute z-10 mt-1 w-full rounded-md border border-border bg-background shadow-lg max-h-48 overflow-y-auto">
+        class="absolute z-10 mt-1 w-full rounded-md border border-border bg-background max-h-48 overflow-y-auto">
         <template x-for="el in stakeholderResults" :key="el.id">
           <button @click="addMotivationElement('stakeholders', el)" type="button"
             class="w-full text-left px-3 py-2 text-sm hover:bg-accent transition-colors">
@@ -261,10 +261,10 @@
     </label>
     <div class="relative">
       <input type="text" x-model="archimateSearch" @input.debounce.300ms="searchArchimateElements()"
-        class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+        class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
         placeholder="Search any ArchiMate element (e.g. ApplicationService, BusinessProcess, Node)..." aria-label="Search any ArchiMate element (e.g. ApplicationService, BusinessProcess, Node)...">
       <div x-show="archimateSearchResults.length > 0 || (archimateSearch.trim().length >= 2 && !showCreateElementForm)" x-cloak
-        class="absolute z-10 mt-1 w-full rounded-md border border-border bg-background shadow-lg max-h-60 overflow-y-auto">
+        class="absolute z-10 mt-1 w-full rounded-md border border-border bg-background max-h-60 overflow-y-auto">
         <template x-for="el in archimateSearchResults" :key="el.id">
           <button @click="linkArchimateElement(el)" type="button"
             class="w-full text-left px-3 py-2 text-sm hover:bg-accent transition-colors flex items-center justify-between">
@@ -292,7 +292,7 @@
       </div>
       {# Inline create panel — replaces dropdown when creating #}
       <div x-show="showCreateElementForm" x-cloak
-        class="absolute z-10 mt-1 w-full rounded-md border border-border bg-background shadow-lg p-3 space-y-2">
+        class="absolute z-10 mt-1 w-full rounded-md border border-border bg-background p-3 space-y-2">
         <div class="text-xs font-medium text-muted-foreground mb-1">Create new ArchiMate element</div>
         <input type="text" x-model="newElement.name"
           class="flex h-8 w-full rounded-md border border-input bg-transparent px-2 py-1 text-sm"
@@ -316,7 +316,7 @@
         <div class="flex items-center gap-2">
           <button @click="createArchimateElement()" type="button"
             :disabled="!newElement.name.trim() || !newElement.type || !newElement.layer || creatingElement"
-            class="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:pointer-events-none">
+            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
             <span x-text="creatingElement ? 'Creating...' : 'Create & Link'"></span>
           </button>
           <button @click="showCreateElementForm = false; archimateSearch = ''" type="button"

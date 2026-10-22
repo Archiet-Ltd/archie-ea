@@ -21,7 +21,7 @@
           <p class="text-xs text-muted-foreground">{{ m.normalization_level | dash }}</p>
         </div>
         <a href="{{ url_for('data_governance.model_standards', model_id=m.id) }}" data-testid="check-model-{{ m.id }}"
-           class="inline-flex items-center justify-center rounded-md text-sm font-medium border border-input bg-transparent hover:bg-accent hover:text-accent-foreground h-9 px-3 shrink-0">
+           class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center shrink-0">
           Check against standards
         </a>
       </li>

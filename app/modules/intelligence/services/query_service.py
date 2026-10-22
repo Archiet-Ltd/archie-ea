@@ -28,6 +28,7 @@ from app.modules.intelligence.services.derived_facts import list_derived_facts
 from app.modules.intelligence.services.latency_probe import record_query_latency
 from app.modules.intelligence.services.plain_terms import plain_terms_sentence
 from app.modules.intelligence.services.reason_codes import validate_reason_code
+from app.models.archimate_element_types import is_application_kind
 
 VALID_DIRECTIONS = {"downstream", "upstream", "both"}
 
@@ -306,7 +307,7 @@ def _resolve_application_owners_batch(
     element_type_ids: Dict[str, List[int]] = {}
     for eid in distinct_ids:
         el_type = (elements.get(str(eid)) or {}).get("type")
-        if el_type == "ApplicationComponent":
+        if is_application_kind(el_type):
             app_component_ids.append(eid)
         elif el_type and el_type.lower() in ApplicationOwner.ELEMENT_TYPES:
             element_type_ids.setdefault(el_type.lower(), []).append(eid)
@@ -1886,7 +1887,7 @@ class IntelligenceQueryService:
         component = None
         if getattr(element, "application_component_id", None):
             component = db.session.get(ApplicationComponent, element.application_component_id)
-        if component is None and (element.type or "") == "ApplicationComponent":
+        if component is None and is_application_kind(element.type):
             component = ApplicationComponent.query.filter_by(archimate_element_id=element.id).first()
 
         if component is None:

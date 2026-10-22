@@ -150,7 +150,7 @@ def test_sidebar_button_carries_a_static_aria_label(_nonce_regress_client, path)
     assert resp.status_code == 200, f"{path} -> {resp.status_code}"
 
     body = resp.get_data(as_text=True)
-    assert 'class="hidden lg:flex h-9 w-9 items-center justify-center rounded-md' in body, (
+    assert 'class="hidden lg:flex h-8 w-8 items-center justify-center rounded-md' in body, (
         f"{path}: the sidebar-collapse button itself is missing from the response"
     )
     assert 'aria-label="Toggle sidebar"' in body, (

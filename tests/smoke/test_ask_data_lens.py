@@ -90,12 +90,15 @@ def test_the_data_question_shows_objects_steward_and_flows_but_not_sensitive_fie
     page.goto(live_server + "/intelligence/ask", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
     _ready(page, "askSurface")
 
-    card = page.locator("#ask-question-data")
+    # The chips replace the accordion that showed every sentence: choose the
+    # lens, then its sentence is on screen.
+    card = page.get_by_role("button", name="What data does it hold?")
     expect(card).to_be_visible()
-    expect(page.get_by_text("What data does")).to_be_visible()
-    expect(page.get_by_text("hold or produce, who stewards it, and where does it flow?")).to_be_visible()
-
     card.click()
+    sentence = page.locator("#ask-sentence-data")
+    expect(sentence).to_be_visible()
+    expect(sentence).to_contain_text("What data does")
+    expect(sentence).to_contain_text("hold or produce, who stewards it, and where does it flow?")
     expect(page.locator("#ask-picker-input")).to_be_focused()
     _pick(page, data_graph["noun"], "Service")
 

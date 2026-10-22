@@ -18,7 +18,7 @@
 {% endmacro %}
 
 {% macro panel(title, icon) %}
-<section data-slot="card" class="rounded-xl border border-border bg-card shadow-sm">
+<section data-slot="card" class="rounded-lg border border-border bg-card">
   <header class="flex items-center gap-2 px-6 py-4 border-b border-border">
     <i data-lucide="{{ icon }}" class="h-4 w-4 text-primary" aria-hidden="true"></i>
     <h2 class="text-sm font-semibold text-foreground tracking-tight">{{ title }}</h2>
@@ -44,7 +44,7 @@
   <div class="grid grid-cols-1 lg:grid-cols-4 gap-4 mb-6">
 
     {# Completeness ring — the score that shames the gaps #}
-    <div data-slot="card" class="rounded-xl border border-border bg-card shadow-sm p-6 flex items-center gap-5">
+    <div data-slot="card" class="rounded-lg border border-border bg-card p-6 flex items-center gap-5">
       {% set ring = 'text-success' if completeness.band == 'good' else 'text-warning' if completeness.band == 'warn' else 'text-destructive' %}
       <div class="relative shrink-0" style="width:76px;height:76px"> {# inline-style-ok: fixed ring geometry #}
         <svg viewBox="0 0 36 36" class="w-full h-full -rotate-90">
@@ -78,8 +78,8 @@
 
     {# Lifecycle / end-of-life signal #}
     {% set lc = lifecycle %}
-    <div data-slot="card" class="rounded-xl border shadow-sm p-6
-        {{ 'border-destructive/40 bg-destructive/5' if lc.tone == 'crit' else 'border-warning/40 bg-warning/5' if lc.tone == 'warn' else 'border-border bg-card' }}">
+    <div data-slot="card" class="rounded-xl border p-6
+ {{ 'border-destructive/40 bg-destructive/5' if lc.tone == 'crit' else 'border-warning/40 bg-warning/5' if lc.tone == 'warn' else 'border-border bg-card' }}">
       <div class="flex items-center gap-2">
         <i data-lucide="{{ 'alarm-clock' if lc.is_sunset else 'circle-check' }}" class="h-4 w-4 {{ 'text-destructive' if lc.tone == 'crit' else 'text-warning' if lc.tone == 'warn' else 'text-success' }}" aria-hidden="true"></i>
         <p class="text-sm font-medium text-foreground">Lifecycle</p>
@@ -96,7 +96,7 @@
 
   {# ── Gaps to fill — only when the record is incomplete ───────────────── #}
   {% if completeness.missing %}
-  <div class="rounded-xl border border-warning/40 bg-warning/5 px-5 py-4 mb-6 flex items-start gap-3">
+  <div class="rounded-md border border-warning/40 bg-warning/10 px-5 py-2 mb-6 flex items-start gap-3">
     <i data-lucide="clipboard-list" class="h-4 w-4 text-warning shrink-0 mt-0.5" aria-hidden="true"></i>
     <div>
       <p class="text-sm font-medium text-foreground">Missing to reach a complete record</p>
@@ -267,7 +267,7 @@
     {% if app.archimate_element_id %}
     <div class="flex justify-end mb-3">
       <a href="{{ url_for('archimate.element_impact_graph_page', element_id=app.archimate_element_id) }}"
-         class="inline-flex items-center gap-1.5 rounded-md border border-input bg-background px-3 py-1.5 text-sm font-medium hover:bg-accent transition-colors">
+         class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
         <i data-lucide="git-fork" class="h-3.5 w-3.5" aria-hidden="true"></i>
         View impact graph
       </a>
@@ -313,7 +313,7 @@
     <div class="flex flex-wrap gap-2">
       {% for d in diagrams %}
       <a href="{{ url_for('archimate.composer_page') }}?viewpoint_id={{ d.id }}"
-         class="inline-flex items-center gap-2 text-sm text-foreground bg-muted hover:bg-accent border border-border rounded-lg px-3 py-1.5 transition-colors">
+         class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-8 px-2.5 items-center">
         <i data-lucide="workflow" class="h-3.5 w-3.5 text-primary" aria-hidden="true"></i>
         {{ d.name }}
       </a>

@@ -7,6 +7,7 @@ It provides a data-driven approach to form generation, replacing template condit
 
 from typing import Dict, List, Any, Optional
 from dataclasses import dataclass, field
+from app.models.archimate_element_types import StandardTypeTable
 
 
 @dataclass
@@ -125,7 +126,7 @@ STAKEHOLDER_TYPES = [
 ]
 
 # Element type configurations
-ELEMENT_TYPE_CONFIGS: Dict[str, ElementTypeConfig] = {
+ELEMENT_TYPE_CONFIGS: Dict[str, ElementTypeConfig] = StandardTypeTable({
     'Driver': ElementTypeConfig(
         element_type='Driver',
         layer='motivation',
@@ -525,7 +526,7 @@ ELEMENT_TYPE_CONFIGS: Dict[str, ElementTypeConfig] = {
                          FieldOption('retire','Retire'), FieldOption('tolerate','Tolerate')], grid_column=1),
         ]
     ),
-}
+})
 
 
 def get_element_config(element_type: str) -> Optional[ElementTypeConfig]:
