@@ -28,7 +28,7 @@ def chat(launch):
 def assert_one_reply(page, payloads, message, initial_url):
     expect(page.locator('#messages-container .message-content').last).to_contain_text('Fixture response.')
     assert payloads == [{'message': message, 'domain': 'general', 'element_id': None,
-                         'context_type': None, 'persona': None, 'model': None, 'thread_id': None}]
+                         'context_type': None, 'persona': None, 'model': None, 'thread_id': None, 'starter': None}]
     assert page.url == initial_url
 
 
