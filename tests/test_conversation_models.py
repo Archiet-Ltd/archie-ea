@@ -38,6 +38,8 @@ THREAD_COLUMNS = [
     ("created_at", DateTime, None, False),
     ("updated_at", DateTime, None, False),
     ("message_count", Integer, None, True),
+    # Added by 20261021_chat_records_org: the organisation active when the thread was made.
+    ("organization_id", Integer, None, True),
 ]
 
 MESSAGE_COLUMNS = [
@@ -101,14 +103,18 @@ def test_indexes_match_the_migration(metadata):
     assert by_name.get("idx_messages_thread_created") == ["thread_id", "created_at"]
 
 
-@pytest.mark.parametrize("table_name", ["conversation_threads", "conversation_messages"])
-def test_no_organization_id_column(metadata, table_name):
-    """These tables must NOT carry TenantMixin.
+def test_threads_carry_their_organisation_without_the_mixin(metadata):
+    """A thread records the organisation it was made in (nullable, indexed, FK).
 
-    Production has no ``organization_id`` on either table. Adding the mixin would
-    (a) make ``reconcile-schema`` ALTER a populated production table and (b) make
-    the isolation middleware inject ``WHERE organization_id = ...`` against a
-    column that does not exist. Tenancy comes from ``user_id``: a user belongs to
-    one organisation, and ``app/services/conversation_history.py`` filters on it.
+    It still does not use ``TenantMixin``: the service scopes its raw SQL by
+    ``user_id`` and ``organization_id`` itself, and a user with no home
+    organisation can still chat, so the column stays nullable.
     """
-    assert "organization_id" not in metadata.tables[table_name].columns
+    col = metadata.tables["conversation_threads"].columns["organization_id"]
+    assert col.nullable is True
+    assert {fk.target_fullname for fk in col.foreign_keys} == {"organizations.id"}
+
+
+def test_messages_have_no_organization_column(metadata):
+    """Messages are reached only through their thread and carry no column of their own."""
+    assert "organization_id" not in metadata.tables["conversation_messages"].columns
