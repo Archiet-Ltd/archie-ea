@@ -548,7 +548,7 @@ def overview():
     # Single aggregate query; percentages match DATA_REALITY.md definitions.
     data_coverage = {}
     try:
-        from app.modules.dashboard.v2.services.owned_applications_v2 import application_is_owned_expression
+        from app.services.element_ownership_service import application_is_owned_expression
 
         _nonempty = lambda col: db.func.sum(  # noqa: E731
             db.case((db.and_(col.isnot(None), col != ""), 1), else_=0)
