@@ -21,7 +21,7 @@ import sqlalchemy as sa
 from alembic import op
 
 revision = "20261022_erole_no_default"
-down_revision = "20261020_change_feed_offsets"
+down_revision = "20261021_chat_records_org"
 branch_labels = None
 depends_on = None
 
