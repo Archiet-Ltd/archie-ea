@@ -11,7 +11,7 @@ Persona-specific dashboards and views for the unified vendor module.
 """
 
 from flask import render_template, request, redirect, url_for, flash, jsonify
-from app.utils.tenant_sql import org_scope
+from app.utils.tenant_sql import org_scope, current_org_id
 from flask_login import login_required, current_user
 from flask import current_app, Blueprint
 from datetime import datetime
@@ -27,23 +27,30 @@ from app.extensions import db
 from app.modules.vendors.services.vendor_onboarding_service import (
     VendorOnboardingService,
 )
+from app.middleware.tenant_decorators import platform_admin_required
 
 
 def _get_vendor_list_context():
     """Return real vendor list data for the vendors/list.html template."""
     try:
+        org_id = current_org_id()
+        if org_id is None:
+            # No organization context: return None stats as per spec
+            return {"total": None, "active": None, "strategic": None, "total_products": None, "total_linked_apps": None, "total_acv": None, "renewals_due": None}, []
         rows = db.session.execute(text("""
             SELECT vo.id, vo.name,
                    COUNT(DISTINCT vp.id) AS product_count,
-                   COUNT(DISTINCT m.application_component_id) AS app_count,
+                   COUNT(DISTINCT ac.id) AS app_count,
                    COALESCE(vo.contract_value_annual, 0) AS contract_value_annual,
                    vo.contract_end_date
             FROM vendor_organizations vo
             LEFT JOIN vendor_products vp ON vp.vendor_organization_id = vo.id
             LEFT JOIN application_vendor_product_mappings m ON m.vendor_product_id = vp.id
+            LEFT JOIN application_components ac ON ac.id = m.application_component_id
+                AND ac.organization_id = :org_id
             GROUP BY vo.id, vo.name, vo.contract_value_annual, vo.contract_end_date
             ORDER BY app_count DESC, vo.name
-        """)).fetchall()
+        """), {"org_id": org_id}).fetchall()
         from datetime import datetime, timedelta
         cutoff = datetime.utcnow() + timedelta(days=90)
         vendors = [
@@ -366,6 +373,7 @@ def vendor_catalog():
 @unified_vendors_bp.route("/create", methods=["GET", "POST"])
 @login_required
 @require_roles("admin", "architect")
+@platform_admin_required
 def create_vendor():
     """Create new vendor - renders simple create form."""
     return render_template(
@@ -384,6 +392,7 @@ def vendor_detail(vendor_id):
 @login_required
 @require_roles("admin", "architect")
 @audit_log("vendor_edit")
+@platform_admin_required
 def edit_vendor(vendor_id):
     """Edit vendor organization - real implementation."""
     from app.modules.vendors.forms import CreateVendorForm
@@ -432,6 +441,7 @@ def edit_vendor(vendor_id):
 @login_required
 @require_roles("admin", "architect")
 @audit_log("vendor_activate")
+@platform_admin_required
 def activate_vendor(vendor_id):
     """Activate a vendor from catalog to contracted status."""
     try:
@@ -480,6 +490,7 @@ def activate_vendor(vendor_id):
 @login_required
 @require_roles("admin", "architect")
 @audit_log("vendor_product_deploy")
+@platform_admin_required
 def deploy_vendor_product(vendor_id, product_id):
     """Deploy a vendor product as an application (canonical flask-base-master flow)."""
     try:
@@ -548,6 +559,7 @@ def vendor_deployment_portfolio(vendor_id):
 @login_required
 @require_roles("admin")
 @audit_log("vendor_delete")
+@platform_admin_required
 def delete_vendor(vendor_id):
     """Delete vendor - directly deletes and shows success message."""
     vendor = VendorOrganization.query.get_or_404(vendor_id)
@@ -574,6 +586,7 @@ def delete_vendor(vendor_id):
 @login_required
 @require_roles("admin")
 @audit_log("vendor_import")
+@platform_admin_required
 def import_vendors():
     """
     Bulk import vendors from CSV/Excel.

@@ -2,7 +2,7 @@
 {# Included in job_detail.html when show_preview is True #}
 
 <!-- Import Preview Section -->
-<div class="rounded-lg border bg-card text-card-foreground shadow-sm">
+<div class="rounded-lg border border-border bg-card text-card-foreground">
     <div class="p-6">
         <div class="flex items-center justify-between mb-4">
             <div class="flex items-center gap-3">
@@ -17,7 +17,7 @@
             <button type="button"
                 @click="loadPreview()"
                 :disabled="previewLoading"
-                class="inline-flex items-center justify-center rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary disabled:opacity-50 h-10 px-4 py-2 transition-colors"
+                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center"
              aria-label="Action">
                 <i data-lucide="scan-search" class="mr-2 h-4 w-4" :class="{ 'animate-spin': previewLoading }"></i>
                 <span x-text="previewLoading ? 'Analyzing...' : 'Analyze Import'"></span>
@@ -69,7 +69,7 @@
                           x-text="(previewData?.validation?.summary?.total_errors || 0) + (previewData?.validation?.summary?.total_warnings || 0) + ' issues'"></span>
                 </div>
                 <div class="rounded-md border overflow-hidden">
-                    <table class="w-full text-sm">
+                    <table class="dense-table w-full text-sm">
                         <thead>
                             <tr class="border-b bg-muted/50">
                                 <th class="px-4 py-2 text-left font-medium">Row</th>
@@ -152,7 +152,7 @@
 
                 <!-- Column mapping summary -->
                 <div class="rounded-md border overflow-hidden mb-3">
-                    <table class="w-full text-sm">
+                    <table class="dense-table w-full text-sm">
                         <thead>
                             <tr class="border-b bg-muted/50">
                                 <th class="px-4 py-2 text-left font-medium">Field</th>
@@ -172,7 +172,7 @@
 
                 <!-- Per-row cost preview -->
                 <div class="rounded-md border overflow-hidden">
-                    <table class="w-full text-sm">
+                    <table class="dense-table w-full text-sm">
                         <thead>
                             <tr class="border-b bg-muted/50">
                                 <th class="px-4 py-2 text-left font-medium">Row</th>

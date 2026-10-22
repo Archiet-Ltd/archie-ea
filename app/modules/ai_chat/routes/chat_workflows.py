@@ -13,6 +13,8 @@ from flask import current_app, jsonify, request
 from flask_login import current_user, login_required
 
 from app import db
+from app.core.auth.decorators import require_permission
+from app.core.auth.permissions import can
 from app.decorators import audit_log
 from app.services.rate_limiter import rate_limit
 from app.models.application_portfolio import ApplicationComponent
@@ -53,6 +55,10 @@ def generate_archimate_for_application():
             return jsonify(
                 {"success": False, "error": "application_id is required"}
             ), 400
+
+        # A preview writes nothing; saving elements is a model write.
+        if not preview_only and not can(current_user, "create", "relationship"):
+            return jsonify({"success": False, "error": "You do not have permission to change the model."}), 403
 
         # Get application
         app = ApplicationComponent.query.get(application_id)
@@ -156,6 +162,10 @@ def map_apqc_for_application():
         application_id = data.get("application_id")
         preview_only = data.get("preview_only", True)
         apply_high_confidence = data.get("apply_high_confidence", False)
+
+        # Applying mappings writes model records; a preview does not.
+        if (not preview_only or apply_high_confidence) and not can(current_user, "create", "relationship"):
+            return jsonify({"success": False, "error": "You do not have permission to change the model."}), 403
 
         if not application_id:
             return jsonify(
@@ -296,6 +306,7 @@ def map_apqc_for_application():
 
 @unified_ai_chat_bp.route("/chat/save-insights", methods=["POST"])
 @login_required
+@require_permission("edit", "application")
 @audit_log("save_chat_insights_to_application")
 def save_chat_insights_to_application():
     """
@@ -406,6 +417,18 @@ def bulk_process_applications():
         data = request.json or {}
         data.get("application_ids")
         max_applications = data.get("max_applications", 50)
+
+        # Process mapping (on by default), auto_create, ArchiMate generation and
+        # vendor cloning each write model records; only a run with all of them
+        # off is read-only.
+        writes_model = (
+            data.get("map_processes", True)
+            or data.get("auto_create")
+            or data.get("generate_archimate")
+            or data.get("clone_vendor_archimate")
+        )
+        if writes_model and not can(current_user, "create", "relationship"):
+            return jsonify({"success": False, "error": "You do not have permission to change the model."}), 403
 
         result = ApplicationArchitectureMapperService.bulk_auto_map(
             max_applications=max_applications,
@@ -1568,6 +1591,59 @@ def generate_archimate_from_description():
 
 
 # ============================================================================
+# Workflow route gates: write permission + workspace ownership
+# ============================================================================
+
+def _refuse_unless_can_write():
+    """403 for a caller without write permission, else None.
+
+    Same predicate every non-AI write route uses (``Permission.GENERAL``); a
+    Viewer carries permissions=0 and fails it.
+    """
+    from app.models.user import Permission
+
+    if not current_user.can(Permission.GENERAL):
+        return jsonify({"success": False, "error": "You do not have permission to modify workspaces."}), 403
+    return None
+
+
+def _owned_workspace(workspace_id):
+    """The caller's own workspace in the active organisation, else None.
+
+    Same rule as ``chat_core._bind_trusted_workbench``: organisation match AND
+    creator match. A foreign, cross-organisation or non-numeric id answers
+    None, which the routes report as 404 (no existence oracle).
+    """
+    from flask import g
+    from app.models.solution_architect_models import SolutionAnalysisSession
+
+    try:
+        workspace_id = int(workspace_id)
+    except (ValueError, TypeError):
+        return None
+    return db.session.execute(
+        db.select(SolutionAnalysisSession).where(
+            SolutionAnalysisSession.id == workspace_id,
+            SolutionAnalysisSession.organization_id == getattr(g, "current_org_id", None),
+            SolutionAnalysisSession.created_by_id == current_user.id,
+        )
+    ).scalar_one_or_none()
+
+
+def _solution_in_active_org(solution_id):
+    """True when the solution exists in the caller's active organisation."""
+    from flask import g
+    from app.models.solution_models import Solution
+
+    return db.session.execute(
+        db.select(Solution.id).where(
+            Solution.id == solution_id,
+            Solution.organization_id == getattr(g, "current_org_id", None),
+        )
+    ).first() is not None
+
+
+# ============================================================================
 # AIC-313: Greenfield solution blueprint workflow routes
 # ============================================================================
 
@@ -1583,6 +1659,10 @@ def greenfield_workflow_start():
     Body: {"brief": "...", "solution_id": 123 (optional), "model": "..." (optional)}
     Returns: {"success": true, "workspace_id": N, "step": "BRIEF", "response": "..."}
     """
+    refusal = _refuse_unless_can_write()
+    if refusal:
+        return refusal
+
     data = request.get_json(silent=True) or {}
     brief = (data.get("brief") or "").strip()
     if not brief:
@@ -1594,11 +1674,13 @@ def greenfield_workflow_start():
             context["solution_id"] = int(data["solution_id"])
         except (ValueError, TypeError):
             return jsonify({"success": False, "error": "solution_id must be an integer"}), 400
+        if not _solution_in_active_org(context["solution_id"]):
+            return jsonify({"success": False, "error": "Solution not found"}), 404
 
     try:
         from app.modules.ai_chat.services.workbench_kernel import WorkbenchKernel, GreenfieldWorkflow
 
-        kernel = WorkbenchKernel()
+        kernel = WorkbenchKernel(user_id=current_user.id)
         wf_obj = GreenfieldWorkflow(kernel, user_id=current_user.id)
         result = wf_obj.start(brief, context=context or None)
 
@@ -1635,6 +1717,10 @@ def greenfield_workflow_confirm(step_name):
     Body: {"workspace_id": N, "model": "..." (optional)}
     Returns: {"success": true, "workspace_id": N, "step": "NEXT_STEP", "response": "..."}
     """
+    refusal = _refuse_unless_can_write()
+    if refusal:
+        return refusal
+
     data = request.get_json(silent=True) or {}
     workspace_id = data.get("workspace_id")
     if not workspace_id:
@@ -1642,10 +1728,9 @@ def greenfield_workflow_confirm(step_name):
 
     try:
         from app.modules.ai_chat.services.workbench_kernel import WorkbenchKernel, GreenfieldWorkflow
-        from app.models.solution_architect_models import SolutionAnalysisSession
 
-        kernel = WorkbenchKernel()
-        session = SolutionAnalysisSession.query.get(workspace_id)
+        kernel = WorkbenchKernel(user_id=current_user.id)
+        session = _owned_workspace(workspace_id)
         if not session:
             return jsonify({"success": False, "error": "Workspace not found"}), 404
 
@@ -1690,6 +1775,10 @@ def greenfield_workflow_skip(step_name):
     Body: {"workspace_id": N, "model": "..." (optional)}
     Returns: {"success": true, "workspace_id": N, "step": "NEXT_STEP", "response": "..."}
     """
+    refusal = _refuse_unless_can_write()
+    if refusal:
+        return refusal
+
     data = request.get_json(silent=True) or {}
     workspace_id = data.get("workspace_id")
     if not workspace_id:
@@ -1697,10 +1786,9 @@ def greenfield_workflow_skip(step_name):
 
     try:
         from app.modules.ai_chat.services.workbench_kernel import WorkbenchKernel, GreenfieldWorkflow
-        from app.models.solution_architect_models import SolutionAnalysisSession
 
-        kernel = WorkbenchKernel()
-        session = SolutionAnalysisSession.query.get(workspace_id)
+        kernel = WorkbenchKernel(user_id=current_user.id)
+        session = _owned_workspace(workspace_id)
         if not session:
             return jsonify({"success": False, "error": "Workspace not found"}), 404
 
@@ -1794,6 +1882,10 @@ def brownfield_workflow_start():
     Body: {"target_domain": "...", "solution_id": 123 (optional), "model": "..." (optional)}
     Returns: {"success": true, "workspace_id": N, "step": "CONTEXT_LOAD", "response": "..."}
     """
+    refusal = _refuse_unless_can_write()
+    if refusal:
+        return refusal
+
     data = request.get_json(silent=True) or {}
     target_domain = (data.get("target_domain") or "").strip()
     if not target_domain:
@@ -1805,11 +1897,13 @@ def brownfield_workflow_start():
             context["solution_id"] = int(data["solution_id"])
         except (ValueError, TypeError):
             return jsonify({"success": False, "error": "solution_id must be an integer"}), 400
+        if not _solution_in_active_org(context["solution_id"]):
+            return jsonify({"success": False, "error": "Solution not found"}), 404
 
     try:
         from app.modules.ai_chat.services.workbench_kernel import WorkbenchKernel, BrownfieldWorkflow
 
-        kernel = WorkbenchKernel()
+        kernel = WorkbenchKernel(user_id=current_user.id)
         wf_obj = BrownfieldWorkflow(kernel, user_id=current_user.id)
         result = wf_obj.start(target_domain, context=context or None)
 
@@ -1845,6 +1939,10 @@ def brownfield_workflow_confirm(step_name):
     Body: {"workspace_id": N, "model": "..." (optional)}
     Returns: {"success": true, "workspace_id": N, "step": "NEXT_STEP", "response": "..."}
     """
+    refusal = _refuse_unless_can_write()
+    if refusal:
+        return refusal
+
     data = request.get_json(silent=True) or {}
     workspace_id = data.get("workspace_id")
     if not workspace_id:
@@ -1852,10 +1950,9 @@ def brownfield_workflow_confirm(step_name):
 
     try:
         from app.modules.ai_chat.services.workbench_kernel import WorkbenchKernel, BrownfieldWorkflow
-        from app.models.solution_architect_models import SolutionAnalysisSession
 
-        kernel = WorkbenchKernel()
-        session = SolutionAnalysisSession.query.get(workspace_id)
+        kernel = WorkbenchKernel(user_id=current_user.id)
+        session = _owned_workspace(workspace_id)
         if not session:
             return jsonify({"success": False, "error": "Workspace not found"}), 404
 
@@ -1900,6 +1997,10 @@ def brownfield_workflow_skip(step_name):
     Body: {"workspace_id": N, "model": "..." (optional)}
     Returns: {"success": true, "workspace_id": N, "step": "NEXT_STEP", "response": "..."}
     """
+    refusal = _refuse_unless_can_write()
+    if refusal:
+        return refusal
+
     data = request.get_json(silent=True) or {}
     workspace_id = data.get("workspace_id")
     if not workspace_id:
@@ -1907,10 +2008,9 @@ def brownfield_workflow_skip(step_name):
 
     try:
         from app.modules.ai_chat.services.workbench_kernel import WorkbenchKernel, BrownfieldWorkflow
-        from app.models.solution_architect_models import SolutionAnalysisSession
 
-        kernel = WorkbenchKernel()
-        session = SolutionAnalysisSession.query.get(workspace_id)
+        kernel = WorkbenchKernel(user_id=current_user.id)
+        session = _owned_workspace(workspace_id)
         if not session:
             return jsonify({"success": False, "error": "Workspace not found"}), 404
 

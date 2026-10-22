@@ -12,7 +12,7 @@ from datetime import date
 from flask import render_template, request
 from flask_login import current_user, login_required
 
-from app.decorators import requires_application_owner
+from app.core.auth.decorators import require_permission
 from app.models.application_owner import ApplicationOwner
 from app.models.application_portfolio import ApplicationComponent
 from app.utils.pagination import safe_int_arg
@@ -60,7 +60,7 @@ def get_owned_apps():
 
 @my_applications_bp.route("/")
 @login_required
-@requires_application_owner
+@require_permission("read", "application")
 def dashboard():
     """Application manager dashboard - overview of owned applications."""
     # Total Apps, the health tiles and the panel rows are all read from the one
@@ -77,7 +77,7 @@ def dashboard():
 
 @my_applications_bp.route("/list")
 @login_required
-@requires_application_owner
+@require_permission("read", "application")
 def app_list():
     """List applications owned by current user."""
     # app_list.html iterates item.application.name / item.ownership_type /
@@ -129,7 +129,7 @@ def app_list():
 
 @my_applications_bp.route("/app/<int:app_id>")
 @login_required
-@requires_application_owner
+@require_permission("read", "application")
 def app_detail(app_id):
     """View details of an owned application."""
     # Verify ownership
@@ -154,7 +154,7 @@ def app_detail(app_id):
 
 @my_applications_bp.route("/health")
 @login_required
-@requires_application_owner
+@require_permission("read", "application")
 def health_overview():
     """Health overview of owned applications."""
     apps = get_owned_apps()
@@ -180,7 +180,7 @@ def health_overview():
 
 @my_applications_bp.route("/roadmap")
 @login_required
-@requires_application_owner
+@require_permission("read", "application")
 def roadmap_impact():
     """View roadmap items affecting owned applications."""
     apps = get_owned_apps()
@@ -191,9 +191,9 @@ def roadmap_impact():
         sunset = getattr(app, 'sunset_date', None)
         if sunset and sunset > date.today():
             upcoming_changes.append({
-                'app': app,
+                'application': app,
                 'date': sunset,
-                'type': 'Sunset',
+                'impact_type': 'Sunset',
             })
 
     # Sort by date
@@ -202,7 +202,7 @@ def roadmap_impact():
     return render_template(
         "my_applications/roadmap_impact.html",
         apps=apps,
-        upcoming_changes=upcoming_changes,
+        impacts=upcoming_changes,
         today=date.today(),
         ownership_summary=get_ownership_summary(current_user.id),
     )

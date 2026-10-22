@@ -20,6 +20,8 @@ from app.decorators import audit_log
 from app.utils.duplicate_guard import find_similar_entities
 from . import unified_ai_chat_bp
 from app.utils.pagination import MAX_PAGE_SIZE, safe_int_arg
+from app.middleware.tenant_decorators import is_platform_admin
+from app.models.archimate_element_types import is_application_kind
 
 logger = logging.getLogger(__name__)
 
@@ -1261,6 +1263,24 @@ def create_elements():
             except (ValueError, TypeError):
                 target_vendor_id = None
 
+        # Vendor-context creation writes VendorProduct rows into the global
+        # vendor catalogue, so it is platform-admin only. Application and
+        # general-context creation stays open to ordinary users.
+        if (
+            target_vendor_id
+            and analysis_context == "vendor"
+            and not is_platform_admin(current_user)
+        ):
+            return (
+                jsonify(
+                    {
+                        "success": False,
+                        "error": "Platform admin access required to create vendor elements",
+                    }
+                ),
+                403,
+            )
+
         user_id = current_user.id if current_user.is_authenticated else None
 
         current_app.logger.info(
@@ -1402,8 +1422,7 @@ def create_elements():
                         linked_to = {"type": "vendor", "id": target_vendor_id}
                     # For vendor products
                     try:
-                        if element_type in [
-                            "ApplicationComponent",
+                        if is_application_kind(element_type) or element_type in [
                             "TechnologyService",
                             "Product",
                         ]:

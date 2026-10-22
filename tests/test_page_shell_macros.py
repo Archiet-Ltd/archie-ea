@@ -178,7 +178,7 @@ def test_page_shell_without_new_slots_is_unchanged(app):
         {{ page_shell('Applications', subtitle='Portfolio') }}
         """,
     )
-    assert '<h1 class="text-2xl font-bold text-foreground">Applications</h1>' in html
+    assert '<h1 class="text-3xl font-bold tracking-[-0.02em] text-foreground">Applications</h1>' in html
     assert '<p class="mt-1 text-sm text-muted-foreground">Portfolio</p>' in html
     assert "data-lucide" not in html
 

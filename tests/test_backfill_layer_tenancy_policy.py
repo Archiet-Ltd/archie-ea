@@ -403,6 +403,10 @@ def test_provenance_only_quarantines_every_table_with_no_single_resolvable_owner
     assert hasattr(b, "_PROVENANCE_ONLY")
     assert b._PROVENANCE_ONLY == {
         "application_ownership", "options_analysis", "organization_units", "stakeholder_inputs",
+        "vendor_options", "analysis_recommendations", "analysis_scenarios",
+        "required_capabilities", "analysis_audit_logs",
+        "tasks", "portfolio_initiatives", "system_boundaries", "compliance_requirements",
+        "vendor_capability_hierarchy", "vendor_process_hierarchy",
         "drivers", "goals", "meanings", "values", "assessments", "stakeholders", "requirements",
         "strategic_recommendations", "enterprise_briefings",
         "monitoring_alerts", "monitoring_baselines",

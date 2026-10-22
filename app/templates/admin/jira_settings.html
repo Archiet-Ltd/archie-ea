@@ -25,7 +25,7 @@
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <!-- Status Panel -->
         <div class="lg:col-span-1">
-            <div data-slot="card" class="rounded-xl border-2 border-input bg-card">
+            <div data-slot="card" class="rounded-lg border border-input bg-card">
                 <div class="p-4 sm:p-6 border-b">
                     <h3 class="text-lg font-semibold">Connection Status</h3>
                 </div>
@@ -59,7 +59,7 @@
                         </div>
 
                         {% if jira_config.last_error %}
-                            <div class="p-3 bg-destructive/10 border border-destructive/20 rounded-md">
+                            <div class="px-3 py-2 bg-destructive/10 border border-destructive/40 rounded-md">
                                 <p class="text-sm text-destructive-emphasis font-medium mb-1">Last Error:</p>
                                 <p class="text-xs text-destructive-emphasis/80">{{ jira_config.last_error }}</p>
                             </div>
@@ -89,7 +89,7 @@
                                 <span class="font-medium text-foreground">Configured via .env</span>
                             </div>
                         </div>
-                        <div class="p-3 bg-warning/10 border border-warning/20 rounded-md">
+                        <div class="px-3 py-2 bg-warning/10 border border-warning/40 rounded-md">
                             <p class="text-xs text-warning-emphasis">Credentials loaded from environment variables. Save settings to persist to database for full management.</p>
                         </div>
                         <!-- Save to Database -->
@@ -117,7 +117,7 @@
             </div>
 
             <!-- Push Status Summary -->
-            <div data-slot="card" class="mt-6 rounded-xl border-2 border-input bg-card">
+            <div data-slot="card" class="mt-6 rounded-lg border border-input bg-card">
                 <div class="p-4 sm:p-6 border-b">
                     <h3 class="text-lg font-semibold">Push Status</h3>
                 </div>
@@ -131,7 +131,7 @@
                             </div>
                             <div class="flex items-center justify-between">
                                 <span class="text-sm text-muted-foreground">Pushed</span>
-                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-primary border border-primary/30" id="ps-pushed">{{ push_status.pushed }}</span>
+                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-info-emphasis border border-primary/30" id="ps-pushed">{{ push_status.pushed }}</span>
                             </div>
                             <div class="flex items-center justify-between">
                                 <span class="text-sm text-muted-foreground">Pending</span>
@@ -160,7 +160,7 @@
             </div>
 
             <!-- Job Status -->
-            <div data-slot="card" class="mt-6 rounded-xl border-2 border-input bg-card">
+            <div data-slot="card" class="mt-6 rounded-lg border border-input bg-card">
                 <div class="p-4 sm:p-6 border-b">
                     <h3 class="text-lg font-semibold">Latest Job</h3>
                 </div>
@@ -176,7 +176,7 @@
             </div>
 
             <!-- Kanban Tasks Push Status -->
-            <div data-slot="card" class="mt-6 rounded-xl border-2 border-input bg-card">
+            <div data-slot="card" class="mt-6 rounded-lg border border-input bg-card">
                 <div class="p-4 sm:p-6 border-b">
                     <h3 class="text-lg font-semibold">Kanban Tasks</h3>
                 </div>
@@ -185,7 +185,7 @@
                         <div class="space-y-3">
                             <div class="flex items-center justify-between">
                                 <span class="text-sm text-muted-foreground">Pushed</span>
-                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-primary border border-primary/30" id="kps-pushed">—</span>
+                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-info-emphasis border border-primary/30" id="kps-pushed">—</span>
                             </div>
                             <div class="flex items-center justify-between">
                                 <span class="text-sm text-muted-foreground">Pending</span>
@@ -224,7 +224,7 @@
             </div>
 
             <!-- Application Components Section -->
-            <div data-slot="card" class="mt-6 rounded-xl border-2 border-input bg-card">
+            <div data-slot="card" class="mt-6 rounded-lg border border-input bg-card">
                 <div class="p-4 sm:p-6 border-b">
                     <h3 class="text-lg font-semibold">Application Components</h3>
                     <p class="text-sm text-muted-foreground mt-1">ArchiMate Application Layer — Phase C/D</p>
@@ -245,7 +245,7 @@
 
         <!-- Configuration Form -->
         <div class="lg:col-span-2">
-            <div data-slot="card" class="rounded-xl border-2 border-input bg-card">
+            <div data-slot="card" class="rounded-lg border border-input bg-card">
                 <div class="p-4 sm:p-6 border-b">
                     <h3 class="text-lg font-semibold">Configuration</h3>
                 </div>
@@ -258,7 +258,7 @@
                             <h4 class="text-sm font-medium mb-4">Connection Settings</h4>
                             <div class="space-y-4">
                                 <div>
-                                    <label for="base_url" class="block text-sm font-medium mb-2">
+                                    <label for="base_url" class="block text-sm font-medium text-muted-foreground mb-1">
                                         Jira Base URL <span class="text-destructive-emphasis">*</span>
                                     </label>
                                     <input type="text"
@@ -266,13 +266,13 @@
                                            name="base_url"
                                            value="{{ form.base_url.data or '' }}"
                                            placeholder="https://your-org.atlassian.net"
-                                           class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                           class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                                            required>
                                     <p class="text-xs text-muted-foreground mt-1">Your Jira Cloud or Data Center URL</p>
                                 </div>
 
                                 <div>
-                                    <label for="username" class="block text-sm font-medium mb-2">
+                                    <label for="username" class="block text-sm font-medium text-muted-foreground mb-1">
                                         Username / Email <span class="text-destructive-emphasis">*</span>
                                     </label>
                                     <input type="text"
@@ -280,13 +280,13 @@
                                            name="username"
                                            value="{{ form.username.data or '' }}"
                                            placeholder="user@example.com"
-                                           class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                           class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                                            required>
                                     <p class="text-xs text-muted-foreground mt-1">Jira account email used for API authentication</p>
                                 </div>
 
                                 <div>
-                                    <label for="api_token" class="block text-sm font-medium mb-2">
+                                    <label for="api_token" class="block text-sm font-medium text-muted-foreground mb-1">
                                         API Token {% if not jira_config %}<span class="text-destructive-emphasis">*</span>{% endif %}
                                     </label>
                                     <input type="password"
@@ -294,7 +294,7 @@
                                            name="api_token"
                                            value=""
                                            placeholder="{% if jira_config %}Leave blank to keep existing{% else %}Your Jira API token{% endif %}"
-                                           class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                           class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                                            {% if not jira_config %}required{% endif %} autocomplete="new-password">
                                     <p class="text-xs text-muted-foreground mt-1">Generate at <a href="https://id.atlassian.com/manage-profile/security/api-tokens" target="_blank" rel="noopener" class="text-primary hover:underline">Atlassian API tokens</a></p>
                                 </div>
@@ -305,9 +305,9 @@
                         <div>
                             <h4 class="text-sm font-medium mb-4">Project Settings</h4>
                             <div class="space-y-4">
-                                <div class="grid grid-cols-2 gap-4">
+                                <div class="grid grid-cols-1 gap-4">
                                     <div>
-                                        <label for="project_key" class="block text-sm font-medium mb-2">
+                                        <label for="project_key" class="block text-sm font-medium text-muted-foreground mb-1">
                                             Project Key <span class="text-destructive-emphasis">*</span>
                                         </label>
                                         <input type="text"
@@ -315,12 +315,12 @@
                                                name="project_key"
                                                value="{{ form.project_key.data or '' }}"
                                                placeholder="EA"
-                                               class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                               class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                                                required>
                                         <p class="text-xs text-muted-foreground mt-1">Jira project key to push issues to</p>
                                     </div>
                                     <div>
-                                        <label for="issue_type" class="block text-sm font-medium mb-2">
+                                        <label for="issue_type" class="block text-sm font-medium text-muted-foreground mb-1">
                                             Issue Type
                                         </label>
                                         <input type="text"
@@ -328,7 +328,7 @@
                                                name="issue_type"
                                                value="{{ form.issue_type.data or 'Task' }}"
                                                placeholder="Task"
-                                               class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                                               class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                                         <p class="text-xs text-muted-foreground mt-1">Jira issue type (default: Task)</p>
                                     </div>
                                 </div>
@@ -341,7 +341,7 @@
                             <div class="space-y-4">
                                 <div class="p-3 bg-accent/50 rounded-md space-y-3">
                                     <div>
-                                        <label for="filter_countries" class="text-sm font-medium">Country Filter</label>
+                                        <label for="filter_countries" class="block text-sm font-medium text-muted-foreground mb-1">Country Filter</label>
                                         <p class="text-xs text-muted-foreground">Comma-separated list of countries to include in push scope</p>
                                     </div>
                                     <input type="text"
@@ -349,7 +349,7 @@
                                            name="filter_countries"
                                            value="{{ form.filter_countries.data or '' }}"
                                            placeholder="United Kingdom, Ireland"
-                                           class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring">
+                                           class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring">
                                 </div>
                             </div>
                         </div>
@@ -358,7 +358,7 @@
                         <div>
                             <div class="flex items-center justify-between p-3 bg-accent/50 rounded-md">
                                 <div>
-                                    <label for="enabled" class="text-sm font-medium">Enable Integration</label>
+                                    <label for="enabled" class="block text-sm font-medium text-muted-foreground mb-1">Enable Integration</label>
                                     <p class="text-xs text-muted-foreground">Allow pushing data to Jira</p>
                                 </div>
                                 <label class="relative inline-flex items-center cursor-pointer">
@@ -375,11 +375,11 @@
 
                         <!-- Submit -->
                         <div class="flex items-center gap-3 pt-4 border-t">
-                            <button type="submit" class="inline-flex items-center gap-2 rounded-md bg-primary text-primary-foreground px-4 py-2 text-sm font-medium hover:bg-primary/90 transition-colors" aria-label="Save settings">
+                            <button type="submit" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center" aria-label="Save settings">
                                 <i data-lucide="save" class="w-4 h-4" aria-hidden="true"></i>
                                 Save Settings
                             </button>
-                            <a href="{{ url_for('admin.index') }}" class="inline-flex items-center gap-2 rounded-md border border-input bg-background px-4 py-2 text-sm font-medium hover:bg-accent hover:text-accent-foreground transition-colors">
+                            <a href="{{ url_for('admin.index') }}" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                                 Cancel
                             </a>
                         </div>
@@ -388,14 +388,14 @@
             </div>
 
             <!-- Field Mapping Reference -->
-            <div data-slot="card" class="mt-6 rounded-xl border-2 border-input bg-card">
+            <div data-slot="card" class="mt-6 rounded-lg border border-input bg-card">
                 <div class="p-4 sm:p-6 border-b">
                     <h3 class="text-lg font-semibold">Field Mapping</h3>
                     <p class="text-sm text-muted-foreground mt-1">How A.R.C.I.E fields map to Jira issue fields</p>
                 </div>
                 <div class="p-4 sm:p-6">
                     <div class="overflow-x-auto">
-                        <table class="w-full text-sm">
+                        <table class="dense-table w-full text-sm">
                             <thead>
                                 <tr class="border-b">
                                     <th class="text-left py-2 px-3 font-medium text-muted-foreground">A.R.C.I.E Field</th>
@@ -404,20 +404,20 @@
                                 </tr>
                             </thead>
                             <tbody>
-                                <tr class="border-b"><td class="py-2 px-3">name</td><td class="py-2 px-3">summary</td><td class="py-2 px-3"><span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-primary border border-primary/30">Abacus</span></td></tr>
-                                <tr class="border-b"><td class="py-2 px-3">description</td><td class="py-2 px-3">description (ADF)</td><td class="py-2 px-3"><span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-primary border border-primary/30">Abacus</span></td></tr>
-                                <tr class="border-b"><td class="py-2 px-3">business_criticality</td><td class="py-2 px-3">priority</td><td class="py-2 px-3"><span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-primary border border-primary/30">A.R.C.I.E</span></td></tr>
-                                <tr class="border-b"><td class="py-2 px-3">lifecycle_status</td><td class="py-2 px-3">labels</td><td class="py-2 px-3"><span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-primary border border-primary/30">Abacus</span></td></tr>
-                                <tr class="border-b"><td class="py-2 px-3">business_domain</td><td class="py-2 px-3">component</td><td class="py-2 px-3"><span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-primary border border-primary/30">Abacus</span></td></tr>
-                                <tr class="border-b"><td class="py-2 px-3">business_owner</td><td class="py-2 px-3">custom field</td><td class="py-2 px-3"><span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-primary border border-primary/30">Abacus</span></td></tr>
-                                <tr class="border-b"><td class="py-2 px-3">vendor_name</td><td class="py-2 px-3">custom field</td><td class="py-2 px-3"><span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-primary border border-primary/30">A.R.C.I.E</span></td></tr>
+                                <tr class="border-b"><td class="py-2 px-3">name</td><td class="py-2 px-3">summary</td><td class="py-2 px-3"><span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-info-emphasis border border-primary/30">Abacus</span></td></tr>
+                                <tr class="border-b"><td class="py-2 px-3">description</td><td class="py-2 px-3">description (ADF)</td><td class="py-2 px-3"><span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-info-emphasis border border-primary/30">Abacus</span></td></tr>
+                                <tr class="border-b"><td class="py-2 px-3">business_criticality</td><td class="py-2 px-3">priority</td><td class="py-2 px-3"><span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-info-emphasis border border-primary/30">A.R.C.I.E</span></td></tr>
+                                <tr class="border-b"><td class="py-2 px-3">lifecycle_status</td><td class="py-2 px-3">labels</td><td class="py-2 px-3"><span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-info-emphasis border border-primary/30">Abacus</span></td></tr>
+                                <tr class="border-b"><td class="py-2 px-3">business_domain</td><td class="py-2 px-3">component</td><td class="py-2 px-3"><span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-info-emphasis border border-primary/30">Abacus</span></td></tr>
+                                <tr class="border-b"><td class="py-2 px-3">business_owner</td><td class="py-2 px-3">custom field</td><td class="py-2 px-3"><span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-info-emphasis border border-primary/30">Abacus</span></td></tr>
+                                <tr class="border-b"><td class="py-2 px-3">vendor_name</td><td class="py-2 px-3">custom field</td><td class="py-2 px-3"><span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-info-emphasis border border-primary/30">A.R.C.I.E</span></td></tr>
                                 <tr><td class="py-2 px-3 text-muted-foreground" colspan="3">+ 8 more custom fields (TCO, rationalization score, etc.)</td></tr>
                             </tbody>
                         </table>
                     </div>
                     <div class="mt-4">
                         <button type="button" id="discover-fields-btn"
-                                class="inline-flex items-center gap-2 rounded-md border border-input bg-background px-3 py-2 text-sm font-medium hover:bg-accent hover:text-accent-foreground transition-colors"
+                                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center"
                                 aria-label="Discover Jira fields">
                             <i data-lucide="search" class="w-4 h-4" aria-hidden="true"></i>
                             Discover Jira Custom Fields
@@ -431,18 +431,18 @@
 
     <!-- 3-System Authority Info -->
     <div class="mt-8">
-        <div data-slot="card" class="rounded-xl border-2 border-input bg-card p-4 sm:p-6">
+        <div data-slot="card" class="rounded-lg border border-input bg-card p-4 sm:p-6">
             <h3 class="text-lg font-semibold mb-4">3-System Authority Model</h3>
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div class="p-4 rounded-md bg-primary/5 border border-primary/20">
+                <div class="px-3 py-2 rounded-md bg-primary/10 border border-primary/40">
                     <h4 class="font-medium text-primary mb-2">Abacus Wins</h4>
                     <p class="text-sm text-muted-foreground">Asset identity: name, description, lifecycle, owners, country, business domain</p>
                 </div>
-                <div class="p-4 rounded-md bg-primary/5 border border-primary/20">
+                <div class="px-3 py-2 rounded-md bg-primary/10 border border-primary/40">
                     <h4 class="font-medium text-primary mb-2">A.R.C.I.E Wins</h4>
                     <p class="text-sm text-muted-foreground">Enrichment: criticality, TCO, rationalization score, vendor, technology stack</p>
                 </div>
-                <div class="p-4 rounded-md bg-warning/5 border border-warning/20">
+                <div class="px-3 py-2 rounded-md bg-warning/10 border border-warning/40">
                     <h4 class="font-medium text-warning-emphasis mb-2">Jira Wins</h4>
                     <p class="text-sm text-muted-foreground">Workflow: status, assignee, sprint, resolution (never overwritten by push)</p>
                 </div>

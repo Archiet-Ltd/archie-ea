@@ -20,12 +20,26 @@
  */
 function askSurface() {
     var Intelligence = window.Intelligence;
+    var questionHeadings = {
+        'impact': 'What breaks if ___ fails or is under-resourced?',
+        'strategy': 'What are we trying to achieve at ___ and how is it tracking?',
+        'risk': 'What could hurt ___ and what does it touch?',
+        'portfolio': 'What is the rationalization status of ___?',
+        'programme': "What's changing at ___ and is it on track?",
+        'data': 'What data does ___ hold or produce, who stewards it, and where does it flow?',
+        'compliance': 'Which regulations and controls apply to ___ and which controls have no evidence of being met?',
+        'accountability': "Who's accountable for ___ and can they take on more?"
+    };
     return Object.assign(Intelligence.picker('ask'), Intelligence.drawerState(), {
         openKey: null,
         answeredKey: null,
+        selected: null,
+        answeredName: '',
+        questionHeadings: questionHeadings,
         state: 'idle',
         busy: false,
         centreId: null,
+        centreName: '',
         rows: [],
         notComputed: false,
         stale: false,
@@ -76,6 +90,13 @@ function askSurface() {
             if (this.openKey) {
                 var self = this;
                 this.$nextTick(function () { self.$refs.pickerInput.focus(); });
+                // An element is already chosen: the question just opened is
+                // answered for it straight away, so the results always match
+                // the question the person last chose.
+                if (this.selected && this.answeredKey !== this.openKey) {
+                    this.term = this.selected.name;
+                    this.dispatchAnswer(this.selected);
+                }
             }
         },
 
@@ -88,6 +109,20 @@ function askSurface() {
         },
 
         onSelect(option) {
+            this.selected = option;
+            this.dispatchAnswer(option);
+        },
+
+        /* The heading of the answer on screen: the chosen question with the
+           chosen element's name in place of the blank. */
+        headingText() {
+            var text = questionHeadings[this.answeredKey];
+            if (!text) return 'Results';
+            return this.answeredName ? text.replace('___', this.answeredName) : text;
+        },
+
+        dispatchAnswer(option) {
+            this.answeredName = option.name || '';
             if (this.openKey === 'risk') {
                 this.loadRisk(option.id);
             } else if (this.openKey === 'portfolio') {
@@ -129,6 +164,7 @@ function askSurface() {
                 this.staleNotice = answer.notice;
                 this.state = this.rows.length ? 'ready' : 'empty';
                 var name = Intelligence.nameOf(payload.elements || {}, elementId) || this.term.trim();
+                this.centreName = name;
                 this.statusText = Intelligence.connectionsText(this.rows.length, name, answer.withheld);
             } catch (err) {
                 if (seq !== this._loadSeq) return;

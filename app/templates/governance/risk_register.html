@@ -1,4 +1,6 @@
 {% extends 'layouts/admin_base.html' %}
+{% from 'components/form_field.html' import form_group, form_footer %}
+{% from 'components/dense_table.html' import dense_table %}
 {% from 'macros/page_shell.html' import page_shell %}
 {% from 'components/modal.html' import modal %}
 {% from 'components/data_table.html' import data_table, data_table_script with context %}
@@ -29,7 +31,7 @@
 <div class="p-6 space-y-6 mx-auto" x-data="riskRegister()" x-cloak>
     {% macro _ps_actions() %}
         <button type="button" @click="openCreate()"
-                class="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors">
+                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
             <i data-lucide="plus" class="h-4 w-4" aria-hidden="true"></i> Add Risk
         </button>
     {% endmacro %}
@@ -63,11 +65,58 @@
         </div>
     </div>
 
+    {# Ranked list: exposure comes from the one impact answer, see risk_service.ranked_risks. #}
+    {% if ranked is defined and ranked %}
+    <div class="rounded-lg border border-border bg-card p-4" id="ranked-risks">
+        <h2 class="text-sm font-semibold text-foreground">Top risks ({{ ranked.total }})</h2>
+        <p class="text-xs text-muted-foreground mt-0.5 mb-3" id="ranked-risks-rule">{{ ranked.rule }}</p>
+        {% if ranked.rows %}
+        <ol class="divide-y divide-border">
+            {% for r in ranked.rows %}
+            <li class="py-3 flex gap-3" data-risk-row="{{ r.risk_id }}">
+                <span class="text-lg font-semibold tabular-nums text-foreground w-8 shrink-0">{{ r.rank }}</span>
+                <div class="min-w-0 flex-1">
+                    <div class="flex flex-wrap items-center gap-2">
+                        <a href="{{ url_for('risk.risk_page', risk_id=r.risk_id) }}" class="text-sm font-medium text-foreground hover:underline">{{ r.title }}</a>
+                        <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-muted text-muted-foreground capitalize">{{ r.status }}</span>
+                    </div>
+                    <p class="text-xs text-muted-foreground mt-0.5" data-risk-reason>{{ r.reason }}</p>
+                    {% if r.touches %}
+                    {% set _linked = r.touches | selectattr('kind', 'equalto', 'application') | list %}
+                    {% set _reached = r.touches | rejectattr('kind', 'equalto', 'application') | list %}
+                    <p class="text-xs text-muted-foreground mt-1" data-risk-touches>
+                        {% macro _touch(t) -%}
+                        {% if t.kind == 'application' and 'unified_applications.application_fact_sheet' in flask.current_app.view_functions -%}
+                        <a href="{{ url_for('unified_applications.application_fact_sheet', id=t.id) }}" class="text-primary hover:underline">{{ t.name }}</a>
+                        {%- elif 'archimate.element_impact_graph_page' in flask.current_app.view_functions -%}
+                        <a href="{{ url_for('archimate.element_impact_graph_page', element_id=t.element_id) }}" class="text-primary hover:underline">{{ t.name }}</a>
+                        {%- else -%}{{ t.name }}{%- endif %}
+                        {%- endmacro %}
+                        {% if _linked %}<span data-risk-linked>Linked to {% for t in _linked %}{{ _touch(t) }}{{ ', ' if not loop.last }}{% endfor %}{% if _reached %};{% endif %}</span>{% endif %}
+                        {% if _reached %}<span data-risk-reached>{{ 'reaches' if _linked else 'Reaches' }} <span class="tabular-nums">{{ r.reached_total }}</span>{{ ' more' if _linked }}{{ ', including' if r.reached_total > _reached | length }}: {% for t in _reached %}{{ _touch(t) }}{{ ', ' if not loop.last }}{% endfor %}</span>{% endif %}
+                    </p>
+                    {% elif r.worked_out %}
+                    <p class="text-xs text-muted-foreground mt-1" data-risk-unlinked>Not linked to any application, solution or programme yet.
+                        <button type="button" @click="openMap({{ r.risk_id }})" class="text-primary hover:underline">Link it</button>
+                    </p>
+                    {% else %}
+                    <p class="text-xs text-muted-foreground mt-1">What this risk touches could not be worked out.</p>
+                    {% endif %}
+                </div>
+            </li>
+            {% endfor %}
+        </ol>
+        {% else %}
+        <p class="text-sm text-muted-foreground">No risks recorded yet.</p>
+        {% endif %}
+    </div>
+    {% endif %}
+
     <div class="rounded-lg border border-border bg-card p-4">
-        <h2 class="text-sm font-semibold text-foreground mb-3">Risks</h2>
+        <h2 class="text-sm font-semibold text-foreground mb-3">All risks</h2>
 
         {# Migrated onto the shared data_table component (components/data_table.html)
-           instead of a hand-rolled <table> — it already had search, sort, a
+           instead of a hand-rolled <table class="dense-table"> — it already had search, sort, a
            correct overflow-auto wrapper and a consistent empty state, but had
            no adopters anywhere in the app, so every list page (including this
            one's clipped STATUS column, E2E-O) reinvented the same layout with
@@ -151,41 +200,28 @@
                     </template>
                 </div>
                 <button type="button" @click="openCreate()"
-                        class="inline-flex items-center gap-1.5 h-8 px-3 rounded-md bg-primary text-primary-foreground text-xs font-medium hover:bg-primary/90 transition-colors">
+                        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                     <i data-lucide="plus" class="h-3.5 w-3.5" aria-hidden="true"></i> Add item
                 </button>
             </div>
         </div>
         {% if raid_items %}
-        <div class="overflow-x-auto">
-            <table class="w-full text-sm">
-                <thead>
-                    <tr class="border-b border-border text-left text-xs uppercase tracking-wide text-muted-foreground">
-                        <th class="px-4 py-2 font-medium">Kind</th>
-                        <th class="px-4 py-2 font-medium">Title</th>
-                        <th class="px-4 py-2 font-medium">Programme</th>
-                        <th class="px-4 py-2 font-medium">Owner</th>
-                        <th class="px-4 py-2 font-medium">Target date</th>
-                        <th class="px-4 py-2 font-medium">Status</th>
-                        <th class="px-4 py-2 font-medium text-right">Action</th>
-                    </tr>
-                </thead>
-                <tbody class="divide-y divide-border">
+{% call dense_table(columns=[('Kind', ''), ('Title', ''), ('Programme', ''), ('Owner', ''), ('Target date', ''), ('Status', ''), ('Action', 'text-right')], flush=true) %}
                     {% for item in raid_items %}
                     <tr class="hover:bg-accent/40 transition-colors" x-show='!kindFilter || kindFilter === {{ item.kind.value | tojson }}'>
-                        <td class="px-4 py-2">
+                        <td class="px-2">
                             <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-muted text-muted-foreground capitalize">{{ item.kind.value }}</span>
                         </td>
-                        <td class="px-4 py-2">
+                        <td class="px-2">
                             <div class="font-medium text-foreground">{{ item.title }}</div>
                             {% if item.description %}
                             <div class="text-xs text-muted-foreground">{{ item.description | truncate(90) }}</div>
                             {% endif %}
                         </td>
-                        <td class="px-4 py-2 text-muted-foreground">{{ item.strategic_initiative.name if item.strategic_initiative else (item.programme_name or '—') }}</td>
-                        <td class="px-4 py-2 text-muted-foreground">{{ item.owner or '—' }}</td>
-                        <td class="px-4 py-2 tabular-nums text-muted-foreground">{{ item.target_date.isoformat() if item.target_date else '—' }}</td>
-                        <td class="px-4 py-2">
+                        <td class="px-2 text-muted-foreground">{{ item.strategic_initiative.name if item.strategic_initiative else (item.programme_name or '—') }}</td>
+                        <td class="px-2 text-muted-foreground">{{ item.owner or '—' }}</td>
+                        <td class="px-2 tabular-nums text-muted-foreground">{{ item.target_date.isoformat() if item.target_date else '—' }}</td>
+                        <td class="px-2">
                             <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium
                                 {% if item.status.value == 'open' %}bg-warning/10 text-warning-emphasis
                                 {% elif item.status.value == 'resolved' %}bg-info/10 text-info-emphasis
@@ -193,7 +229,7 @@
                                 {{ item.status.value | title }}
                             </span>
                         </td>
-                        <td class="px-4 py-2 text-right whitespace-nowrap">
+                        <td class="px-2 text-right whitespace-nowrap">
                             {% if item.status.value != 'closed' %}
                             {# DEF-068, Capgemini dry-run pass 3: the ternary's
                                output ('resolved'/'closed') rendered as a bare
@@ -211,7 +247,7 @@
                             <button type="button"
                                     @click='setStatus({{ item.id }}, {{ ("resolved" if item.status.value == "open" else "closed")|tojson }})'
                                     :disabled="updatingId === {{ item.id }}"
-                                    class="inline-flex items-center rounded-md border border-input bg-background px-2 py-1 text-xs font-medium hover:bg-accent hover:text-accent-foreground disabled:opacity-50">
+                                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                                 {{ 'Resolve' if item.status.value == 'open' else 'Close' }}
                             </button>
                             {% else %}
@@ -220,9 +256,7 @@
                         </td>
                     </tr>
                     {% endfor %}
-                </tbody>
-            </table>
-        </div>
+                {% endcall %}
         {% else %}
         <div class="px-4 py-10 text-center">
             <p class="text-sm text-muted-foreground">No assumptions, issues or dependencies recorded yet.</p>
@@ -238,36 +272,31 @@
        directly and never noticed). #}
     {% call modal(id='create-raid-modal', title='Add RAID Item', description='Record an assumption, issue or dependency.', size='lg') %}
     <div class="space-y-4">
-        <div>
-            <label for="raid-kind" class="block text-sm font-medium mb-1">Kind <span class="text-destructive-emphasis">*</span></label>
+        {% call form_group(id='raid-kind', label='Kind', required=true) %}
             <select id="raid-kind" x-model="raidForm.kind"
                     class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm capitalize">
                 <template x-for="k in kinds" :key="k">
                     <option :value="k" x-text="k" class="capitalize"></option>
                 </template>
             </select>
-        </div>
-        <div>
-            <label for="raid-title" class="block text-sm font-medium mb-1">Title <span class="text-destructive-emphasis">*</span></label>
+        {% endcall %}
+        {% call form_group(id='raid-title', label='Title', required=true) %}
             <input id="raid-title" type="text" x-model="raidForm.title"
                    class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-        </div>
-        <div>
-            <label for="raid-description" class="block text-sm font-medium mb-1">Description</label>
+        {% endcall %}
+        {% call form_group(id='raid-description', label='Description') %}
             <textarea id="raid-description" x-model="raidForm.description" rows="3"
                       class="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm"></textarea>
-        </div>
+        {% endcall %}
         <div class="grid grid-cols-2 gap-3">
-            <div>
-                <label for="raid-owner" class="block text-sm font-medium mb-1">Owner</label>
+            {% call form_group(id='raid-owner', label='Owner') %}
                 <input id="raid-owner" type="text" x-model="raidForm.owner"
                        class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
-            </div>
-            <div>
-                <label for="raid-target-date" class="block text-sm font-medium mb-1">Target date</label>
+            {% endcall %}
+            {% call form_group(id='raid-target-date', label='Target date') %}
                 <input id="raid-target-date" type="date" x-model="raidForm.target_date"
                        class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
-            </div>
+            {% endcall %}
         </div>
         <div>
             <label for="raid-programme" class="block text-sm font-medium mb-1">Programme</label>
@@ -283,11 +312,11 @@
     </div>
     <div class="flex justify-end gap-2 mt-4">
         <button type="button" data-modal-close="create-raid-modal"
-                class="inline-flex items-center h-9 px-4 rounded-md border border-input bg-background text-sm font-medium hover:bg-accent">
+                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
             Cancel
         </button>
         <button type="button" @click="submitRaid()" :disabled="raidSaving"
-                class="inline-flex items-center h-9 px-4 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 disabled:opacity-50">
+                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
             <span x-show="raidSaving" x-cloak class="mr-1.5 h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent"></span>
             Save
         </button>
@@ -298,21 +327,18 @@
     {% call modal(id='create-risk-modal', title='Add Risk', description='Record an enterprise architecture risk.', size='lg') %}
     <div class="space-y-4">
         <p x-show="editingId" x-cloak class="text-xs font-medium text-primary -mt-1">Editing risk #<span x-text="editingId"></span> — use Map to… on the risk's own row to link it to an Application, Solution or Programme.</p>
-        <div>
-            <label for="risk-title" class="block text-sm font-medium mb-1">Title <span class="text-destructive-emphasis">*</span></label>
+        {% call form_group(id='risk-title', label='Title', required=true) %}
             <input id="risk-title" type="text" x-model="form.title"
                    class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                    placeholder="What could go wrong?">
-        </div>
-        <div>
-            <label for="risk-description" class="block text-sm font-medium mb-1">Description</label>
+        {% endcall %}
+        {% call form_group(id='risk-description', label='Description') %}
             <textarea id="risk-description" rows="2" x-model="form.description"
                       class="flex min-h-[64px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                       placeholder="Context and consequence"></textarea>
-        </div>
+        {% endcall %}
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-                <label for="risk-likelihood" class="block text-sm font-medium mb-1">Likelihood (1-5) <span class="text-destructive-emphasis">*</span></label>
+            {% call form_group(id='risk-likelihood', label='Likelihood (1-5)', required=true) %}
                 <select id="risk-likelihood" x-model="form.likelihood"
                         class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
                     <option value="1">1</option>
@@ -321,9 +347,8 @@
                     <option value="4">4</option>
                     <option value="5">5</option>
                 </select>
-            </div>
-            <div>
-                <label for="risk-impact" class="block text-sm font-medium mb-1">Impact (1-5) <span class="text-destructive-emphasis">*</span></label>
+            {% endcall %}
+            {% call form_group(id='risk-impact', label='Impact (1-5)', required=true) %}
                 <select id="risk-impact" x-model="form.impact"
                         class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
                     <option value="1">1</option>
@@ -332,29 +357,27 @@
                     <option value="4">4</option>
                     <option value="5">5</option>
                 </select>
-            </div>
+            {% endcall %}
         </div>
-        <div>
-            <label for="risk-owner" class="block text-sm font-medium mb-1">Owner</label>
+        {% call form_group(id='risk-owner', label='Owner') %}
             <input id="risk-owner" type="text" x-model="form.owner"
                    class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                    placeholder="Who carries this risk?">
-        </div>
-        <div>
-            <label for="risk-mitigation" class="block text-sm font-medium mb-1">Mitigation plan</label>
+        {% endcall %}
+        {% call form_group(id='risk-mitigation', label='Mitigation plan') %}
             <textarea id="risk-mitigation" rows="2" x-model="form.mitigation_plan"
                       class="flex min-h-[64px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                       placeholder="What reduces it?"></textarea>
-        </div>
+        {% endcall %}
         <div x-show="error" x-cloak role="alert"
              class="rounded-md bg-destructive/10 border border-destructive/20 px-3 py-2 text-sm text-destructive-emphasis"
              x-text="error"></div>
     </div>
     <div class="flex justify-end gap-3 mt-6 pt-4 border-t border-border">
         <button type="button" data-modal-close="create-risk-modal"
-                class="inline-flex h-9 items-center justify-center rounded-md border border-input bg-background px-4 text-sm font-medium hover:bg-accent transition-colors">Cancel</button>
+                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">Cancel</button>
         <button type="button" @click="submit()" :disabled="saving"
-                class="inline-flex h-9 items-center justify-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:pointer-events-none">
+                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
             <span x-text="saving ? 'Saving' : (editingId ? 'Save Changes' : 'Add Risk')"></span>
         </button>
     </div>
@@ -375,18 +398,18 @@
              x-transition:leave="transition ease-in duration-150"
              x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0"
              @click.self="panelOpen = false"
-             class="fixed inset-0 bg-black/30 z-40"></div>
+             class="fixed inset-0 z-40 bg-overlay/50"></div>
 
         <div x-show="panelOpen" x-cloak role="dialog" aria-modal="true" aria-label="Risk detail"
              x-transition:enter="transition ease-out duration-200"
              x-transition:enter-start="translate-x-full" x-transition:enter-end="translate-x-0"
              x-transition:leave="transition ease-in duration-150"
              x-transition:leave-start="translate-x-0" x-transition:leave-end="translate-x-full"
-             class="fixed right-0 top-0 h-full w-full sm:w-[28rem] bg-background border-l border-border shadow-xl z-50 flex flex-col">
+             class="fixed right-0 top-0 h-full w-full sm:w-[28rem] bg-background border-l border-border z-50 flex flex-col">
 
             <div class="flex items-center justify-between px-4 py-3 border-b border-border">
                 <h2 class="text-sm font-semibold text-foreground truncate" x-text="selectedRisk ? selectedRisk.title : 'Risk detail'"></h2>
-                <button type="button" @click="panelOpen = false" class="text-muted-foreground hover:text-foreground transition-colors" aria-label="Close risk detail">
+                <button type="button" @click="panelOpen = false" class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Close risk detail">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
                 </button>
             </div>
@@ -415,15 +438,14 @@
                     </div>
                     <template x-if="selectedRisk && selectedRisk.entity_links && selectedRisk.entity_links.length">
                         <ul class="space-y-1.5">
-                            <template x-for="link in selectedRisk.entity_links" :key="link.id">
+                            <template x-for="(link, linkIdx) in selectedRisk.entity_links" :key="link.id || ('element-' + linkIdx)">
                                 <li class="flex items-center justify-between gap-2 rounded-md border border-border px-2.5 py-1.5 text-sm">
                                     <span class="min-w-0">
                                         <span class="inline-flex items-center px-1.5 py-0 rounded text-2xs font-medium bg-muted text-muted-foreground capitalize mr-1.5" x-text="link.entity_type"></span>
                                         <span :class="link.entity_label ? 'text-foreground' : 'text-destructive-emphasis'" x-text="link.entity_label || ('Deleted ' + link.entity_type + ' (#' + link.entity_id + ')')"></span>
+                                        <span x-show="link.via === 'element'" class="ml-1.5 text-xs text-muted-foreground">(linked through the risk's element)</span>
                                     </span>
-                                    <button type="button" @click="removeLink(link.id)" aria-label="Unmap" class="text-muted-foreground hover:text-destructive-emphasis shrink-0">
-                                        <i data-lucide="x" class="h-3.5 w-3.5" aria-hidden="true"></i>
-                                    </button>
+                                    <button type="button" x-show="link.id" @click="removeLink(link.id)" aria-label="Unmap" class="text-xs text-muted-foreground hover:text-destructive-emphasis shrink-0">Unmap</button>
                                 </li>
                             </template>
                         </ul>
@@ -452,10 +474,10 @@
             </div>
 
             <div class="flex items-center gap-2 px-4 py-3 border-t border-border" x-show="selectedRisk">
-                <button type="button" @click="openEdit(selectedRisk)" class="inline-flex h-8 items-center gap-1.5 rounded-md border border-input bg-background px-3 text-xs font-medium hover:bg-accent transition-colors">
+                <button type="button" @click="openEdit(selectedRisk)" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                     <i data-lucide="pencil" class="h-3.5 w-3.5" aria-hidden="true"></i> Edit
                 </button>
-                <button type="button" @click="confirmDelete(selectedRisk)" class="inline-flex h-8 items-center gap-1.5 rounded-md border border-destructive/30 bg-background px-3 text-xs font-medium text-destructive-emphasis hover:bg-destructive/10 transition-colors">
+                <button type="button" @click="confirmDelete(selectedRisk)" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                     <i data-lucide="trash-2" class="h-3.5 w-3.5" aria-hidden="true"></i> Delete
                 </button>
             </div>
@@ -488,6 +510,13 @@ function riskRegister() {
         linkResults: [],
 
         updatingId: null,
+
+        // A link from the prioritised action list (?risk=<id>) opens that risk's panel.
+        init() {
+            const wanted = new URLSearchParams(window.location.search).get('risk');
+            const match = (window.RISK_ROWS || []).find(function (r) { return String(r.id) === wanted; });
+            if (match) this.openView(match, false);
+        },
 
         // PATCH /api/risks/<id> takes {status} and returns the updated risk.
         setStatus(id, status) {
@@ -553,6 +582,13 @@ function riskRegister() {
             this.panelOpen = true;
         },
 
+        // From the ranked list: the same slide-over and picker as the row's
+        // "Map to…" action, opened for the risk with this id.
+        openMap(riskId) {
+            const row = (window.RISK_ROWS || []).find(function (r) { return r.id === riskId; });
+            this.openView(row, true);
+        },
+
         confirmDelete(row) {
             if (!row) return;
             const self = this;
@@ -612,10 +648,25 @@ function riskRegister() {
                     self.linkSearch = '';
                     self.linkResults = [];
                     Platform.toast.success('Risk mapped to ' + (link.entity_label || entity.name) + '.');
+                    self.refreshRanked();
                 })
                 .catch(function (err) {
                     Platform.toast.error('Could not map this risk.');
                     throw err;
+                });
+        },
+
+        // The ranked card is drawn on the server: after a link is added or
+        // removed, fetch the page again and swap in the new card.
+        refreshRanked() {
+            Platform.fetch(window.location.pathname + window.location.search, { silent: true })
+                .then(function (html) {
+                    const fresh = new DOMParser().parseFromString(html, 'text/html').getElementById('ranked-risks');
+                    const current = document.getElementById('ranked-risks');
+                    if (fresh && current) { current.innerHTML = fresh.innerHTML; }
+                })
+                .catch(function () {
+                    Platform.toast.error('The ranked list could not be refreshed. Reload the page to see it.');
                 });
         },
 
@@ -630,6 +681,7 @@ function riskRegister() {
                     self.selectedRisk.entity_links = (self.selectedRisk.entity_links || [])
                         .filter(function (l) { return l.id !== linkId; });
                     Platform.toast.success('Link removed.');
+                    self.refreshRanked();
                 })
                 .catch(function (err) {
                     Platform.toast.error('Could not remove that link.');

@@ -12,6 +12,7 @@ from sqlalchemy.orm import validates
 from .. import db  # main SQLAlchemy object
 from .constants import ArchiMateLayer
 from .mixins import TenantMixin
+from .mixins.core import _default_org_id
 
 _key_log = logging.getLogger(__name__)
 
@@ -354,6 +355,18 @@ else:
         superseded_at = db.Column(db.DateTime, nullable=True)
         last_confirmed = db.Column(db.DateTime, nullable=True)
 
+        # Provenance origin: where this element came from.
+        # source_kind: 'manual', 'import', 'connector', 'derived'
+        # source_ref: import batch id, connector run id, or user id as text
+        # source_label: file name, connector name, or person's display name
+        # source_recorded_at: when the origin was recorded
+        # Nullable so every existing row stays valid; existing rows read as
+        # 'manual' with created_by_id when columns are null (no backfill).
+        source_kind = db.Column(db.String(20), nullable=True)
+        source_ref = db.Column(db.Text, nullable=True)
+        source_label = db.Column(db.Text, nullable=True)
+        source_recorded_at = db.Column(db.DateTime, nullable=True)
+
         # Relationship tracking
         parent_id = db.Column(db.Integer, db.ForeignKey("archimate_elements.id"), nullable=True)
 
@@ -569,6 +582,20 @@ else:
         # so every pre-existing relationship still renders instead of being
         # dropped for lacking a value reconcile-schema cannot backfill.
         sequence_order = db.Column(db.Integer, nullable=True)
+
+        # Provenance origin: where this relationship came from.
+        # source_kind: 'manual', 'import', 'connector', 'derived'
+        # source_ref: import batch id, connector run id, or user id as text
+        # source_label: file name, connector name, or person's display name
+        # source_recorded_at: when the origin was recorded
+        # Nullable so every existing row stays valid; existing rows read as
+        # 'manual' with created_by_id when columns are null (no backfill).
+        source_kind = db.Column(db.String(20), nullable=True)
+        source_ref = db.Column(db.Text, nullable=True)
+        source_label = db.Column(db.Text, nullable=True)
+        source_recorded_at = db.Column(db.DateTime, nullable=True)
+        # Properties read from the exchange file for this relationship.
+        custom_properties = db.Column(db.JSON, nullable=True)
 
         architecture = db.relationship("ArchitectureModel", backref="archimate_relationships")
         source = db.relationship(
@@ -1827,7 +1854,7 @@ class Principle(TenantMixin, db.Model):
         return f"<Principle {self.name} [{self.enforcement_level}]>"
 
 
-class ConstraintElement(db.Model):
+class ConstraintElement(TenantMixin, db.Model):
     """
     ArchiMate 3.2 Constraint element.
 
@@ -1885,6 +1912,20 @@ class ConstraintElement(db.Model):
 
     # Relationships
     architecture_id = db.Column(db.Integer, db.ForeignKey("architecture_models.id"))
+
+    # Override TenantMixin's normally non-nullable column for an ADD-only
+    # rollout: the 20261018_typed_tables_org_id migration adds this to an
+    # existing table and leaves a row NULL when no organisation is derivable
+    # from its linked parents. The mixin is still essential: tenant
+    # middleware identifies tenant-owned models by it and applies the
+    # automatic query fence.
+    organization_id = db.Column(
+        db.Integer,
+        db.ForeignKey("organizations.id", ondelete="CASCADE"),
+        nullable=True,
+        index=True,
+        default=_default_org_id,
+    )
 
     created_at = db.Column(db.DateTime, default=db.func.now())
     updated_at = db.Column(db.DateTime, default=db.func.now(), onupdate=db.func.now())

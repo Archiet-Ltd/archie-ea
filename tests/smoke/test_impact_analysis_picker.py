@@ -70,9 +70,9 @@ GEOMETRY = """() => {
   const cards = [...document.querySelectorAll('[data-slot="card"]')];
   const gridBottom = Math.max(...cards.map(c => c.getBoundingClientRect().bottom));
   const rec = [...document.querySelectorAll('h3')].find(h => h.textContent.includes('AI-Powered Recommendations'))
-      .closest('.rounded-xl').getBoundingClientRect();
+      .closest('[data-block]').getBoundingClientRect();
   const histBtn = [...document.querySelectorAll('button')].find(b => b.textContent.includes('Recent Analyses'));
-  const hist = histBtn ? histBtn.closest('.rounded-xl') : null;
+  const hist = histBtn ? histBtn.closest('[data-block]') : null;
   const histShown = !!hist && getComputedStyle(hist).display !== 'none' && hist.getBoundingClientRect().height > 0;
   return {
     gridToRecs: rec.top - gridBottom,

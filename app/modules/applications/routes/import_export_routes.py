@@ -50,6 +50,7 @@ from app.decorators import audit_log
 
 from . import unified_applications_bp
 from ._helpers import _sanitize_csv_value
+from app.models.archimate_element_types import is_application_kind
 
 logger = logging.getLogger(__name__)
 
@@ -1126,6 +1127,12 @@ def application_import():
                 return value or None
             return value
 
+        def _set_if_present(record, attr, incoming):
+            """Merge rule: only a non-empty incoming value may overwrite."""
+            if incoming is None or incoming == "":
+                return
+            setattr(record, attr, incoming)
+
         def _parse_user_count(raw_value):
             if raw_value in (None, ""):
                 return None
@@ -1174,8 +1181,65 @@ def application_import():
             if not reader.fieldnames:
                 raise ValueError("CSV file is missing headers.")
 
+            # Column mapping sent by the import page: {file header: target field}.
+            mapped_header_by_target = {}
+            mappings_sent = False
+            _raw_mappings = request.form.get("field_mappings")
+            if _raw_mappings:
+                mappings_sent = True  # the page's mapping is then the complete one
+                try:
+                    _mappings = json.loads(_raw_mappings)
+                except json.JSONDecodeError:
+                    raise ValueError("The column mapping could not be read.")
+                if not isinstance(_mappings, dict):
+                    raise ValueError("The column mapping must be an object.")
+                # Only fields this import actually reads can be mapped; anything
+                # else would be accepted and silently dropped.
+                _readable_targets = {
+                    "name",
+                    "component_type",
+                    "application_category",
+                    "technology_stack",
+                    "version",
+                    "deployment_status",
+                    "business_domain",
+                    "business_owner",
+                    "development_team",
+                    "user_base_size",
+                    "business_criticality",
+                    "description",
+                    "lifecycle_status",
+                    "vendor_name",
+                    "cloud_provider",
+                    "imported_capabilities",
+                    "application_services",
+                    "application_functions_text",
+                    "imported_apqc_codes",
+                }
+                _file_headers = {h for h in reader.fieldnames if h}
+                _bad = []
+                for _header, _target in _mappings.items():
+                    if not _target:
+                        continue  # "Skip column"
+                    if _target not in _readable_targets:
+                        _bad.append(
+                            f"column '{_header}' is mapped to field '{_target}', "
+                            "which this import cannot fill"
+                        )
+                    elif _header not in _file_headers:
+                        _bad.append(f"mapped column '{_header}' is not in the file")
+                    elif _target in mapped_header_by_target:
+                        _bad.append(
+                            f"columns '{mapped_header_by_target[_target]}' and "
+                            f"'{_header}' are both mapped to '{_target}'"
+                        )
+                    else:
+                        mapped_header_by_target[_target] = _header
+                if _bad:
+                    raise ValueError("; ".join(_bad))
+
             # Find the name column (flexible matching)
-            name_column = None
+            name_column = mapped_header_by_target.get("name")
             name_variants = [
                 "name",
                 "application name",
@@ -1184,7 +1248,7 @@ def application_import():
                 "app_name",
                 "appname",
             ]
-            for field in reader.fieldnames:
+            for field in reader.fieldnames if not (name_column or mappings_sent) else ():
                 if field and field.lower().strip() in name_variants:
                     name_column = field
                     break
@@ -1198,6 +1262,12 @@ def application_import():
             def get_csv_field(row, *variants):
                 """Get field value trying multiple column name variants"""
                 for variant in variants:
+                    target = variant.lower().strip().replace(" ", "_")
+                    if target in mapped_header_by_target:
+                        return row.get(mapped_header_by_target[target])
+                for variant in variants:
+                    if mappings_sent:
+                        break  # not named in the mapping, so not imported
                     for key in row.keys():
                         if key and key.lower().strip() == variant.lower():
                             return row[key]
@@ -1261,7 +1331,7 @@ def application_import():
                     continue
                 elif existing_app and import_mode == "update":
                     # Update existing record with flexible column matching
-                    existing_app.component_type = _clean(
+                    _set_if_present(existing_app, "component_type", _clean(
                         get_csv_field(
                             row,
                             "Type",
@@ -1270,13 +1340,13 @@ def application_import():
                             "App Type",
                             "Application Type",
                         )
-                    )
-                    existing_app.application_category = _clean(
+                    ))
+                    _set_if_present(existing_app, "application_category", _clean(
                         get_csv_field(
                             row, "Category", "application_category", "App Category"
                         )
-                    )
-                    existing_app.technology_stack = _clean(
+                    ))
+                    _set_if_present(existing_app, "technology_stack", _clean(
                         get_csv_field(
                             row,
                             "Technology Stack",
@@ -1285,10 +1355,9 @@ def application_import():
                             "Tech Stack",
                             "Stack",
                         )
-                    )
-                    existing_app.version = _clean(get_csv_field(row, "Version"))
-                    existing_app.deployment_status = (
-                        _clean(
+                    ))
+                    _set_if_present(existing_app, "version", _clean(get_csv_field(row, "Version")))
+                    _set_if_present(existing_app, "deployment_status", _clean(
                             get_csv_field(
                                 row,
                                 "Status",
@@ -1297,15 +1366,13 @@ def application_import():
                                 "App Status",
                                 "Application Status",
                             )
-                        )
-                        or "planned"
-                    )
-                    existing_app.business_domain = _clean(
+                        ))
+                    _set_if_present(existing_app, "business_domain", _clean(
                         get_csv_field(
                             row, "Business Domain", "business_domain", "Domain"
                         )
-                    )
-                    existing_app.business_owner = _clean(
+                    ))
+                    _set_if_present(existing_app, "business_owner", _clean(
                         get_csv_field(
                             row,
                             "Owner",
@@ -1313,8 +1380,8 @@ def application_import():
                             "Business Owner",
                             "App Owner",
                         )
-                    )
-                    existing_app.development_team = _clean(
+                    ))
+                    _set_if_present(existing_app, "development_team", _clean(
                         get_csv_field(
                             row,
                             "Team",
@@ -1322,31 +1389,47 @@ def application_import():
                             "Development Team",
                             "Dev Team",
                         )
-                    )
-                    existing_app.user_base_size = _parse_user_count(
+                    ))
+                    _set_if_present(existing_app, "user_base_size", _parse_user_count(
                         get_csv_field(
-                            row, "Users", "user_count", "User Count", "Number of Users"
+                            row,
+                            "Users",
+                            "user_count",
+                            "User Count",
+                            "Number of Users",
+                            "user_base_size",
                         )
-                    )
-                    existing_app.business_criticality = _clean(
+                    ))
+                    _set_if_present(existing_app, "business_criticality", _clean(
                         get_csv_field(
                             row,
                             "Criticality",
                             "business_criticality",
                             "Business Criticality",
                         )
-                    )
-                    existing_app.description = _clean(
+                    ))
+                    _set_if_present(existing_app, "description", _clean(
                         get_csv_field(row, "Description", "App Description")
-                    )
-                    existing_app.lifecycle_status = _clean(
+                    ))
+                    _set_if_present(existing_app, "lifecycle_status", _clean(
                         get_csv_field(
                             row, "Lifecycle Status", "lifecycle_status", "Lifecycle"
                         )
+                    ))
+                    # Vendor and hosting: a blank cell never erases what is stored.
+                    _vendor = _clean(
+                        get_csv_field(row, "Package Vendor", "Vendor", "vendor_name")
                     )
+                    if _vendor is not None:
+                        existing_app.vendor_name = _vendor
+                    _hosting = _clean(
+                        get_csv_field(row, "Public Cloud Provider", "cloud_provider")
+                    )
+                    if _hosting is not None:
+                        existing_app.cloud_provider = _hosting
 
                     # Add import fields for auto-mapping functionality
-                    existing_app.imported_capabilities = _clean(
+                    _set_if_present(existing_app, "imported_capabilities", _clean(
                         get_csv_field(
                             row,
                             "Capabilities",
@@ -1354,8 +1437,8 @@ def application_import():
                             "Business Capabilities",
                             "Capability List",
                         )
-                    )
-                    existing_app.application_services = _clean(
+                    ))
+                    _set_if_present(existing_app, "application_services", _clean(
                         get_csv_field(
                             row,
                             "Services",
@@ -1363,8 +1446,8 @@ def application_import():
                             "Application Services",
                             "Service List",
                         )
-                    )
-                    existing_app.application_functions_text = _clean(
+                    ))
+                    _set_if_present(existing_app, "application_functions_text", _clean(
                         get_csv_field(
                             row,
                             "Functions",
@@ -1372,8 +1455,8 @@ def application_import():
                             "Application Functions",
                             "Function List",
                         )
-                    )
-                    existing_app.imported_apqc_codes = _clean(
+                    ))
+                    _set_if_present(existing_app, "imported_apqc_codes", _clean(
                         get_csv_field(
                             row,
                             "APQC Codes",
@@ -1381,8 +1464,7 @@ def application_import():
                             "APQC",
                             "Process Codes",
                         )
-                    )
-
+                    ))
                     updated += 1
                     processed_names.add(name_lower)  # Track that we've seen this name
                 else:
@@ -1456,6 +1538,7 @@ def application_import():
                                 "user_count",
                                 "User Count",
                                 "Number of Users",
+                                "user_base_size",
                             )
                         ),
                         business_criticality=_clean(
@@ -1473,6 +1556,14 @@ def application_import():
                             get_csv_field(
                                 row, "Lifecycle Status", "lifecycle_status", "Lifecycle"
                             )
+                        ),
+                        vendor_name=_clean(
+                            get_csv_field(
+                                row, "Package Vendor", "Vendor", "vendor_name"
+                            )
+                        ),
+                        cloud_provider=_clean(
+                            get_csv_field(row, "Public Cloud Provider", "cloud_provider")
                         ),
                         # Add import fields for auto-mapping functionality
                         imported_capabilities=_clean(
@@ -1671,8 +1762,7 @@ def application_import():
                                             ai_results["total_archimate_created"] += 1
                                             # Link first ApplicationComponent element to app
                                             if (
-                                                elem_data.get("type")
-                                                == "ApplicationComponent"
+                                                is_application_kind(elem_data.get("type"))
                                                 and not app.archimate_element_id
                                             ):
                                                 app.archimate_element_id = elem.id
@@ -1785,39 +1875,36 @@ def application_import():
                     continue
                 elif existing_app and import_mode == "update":
                     # Update existing record
-                    existing_app.component_type = _clean(item.get("component_type"))
-                    existing_app.application_category = _clean(
+                    _set_if_present(existing_app, "component_type", _clean(item.get("component_type")))
+                    _set_if_present(existing_app, "application_category", _clean(
                         item.get("application_category")
-                    )
-                    existing_app.technology_stack = _clean(item.get("technology_stack"))
-                    existing_app.version = _clean(item.get("version"))
-                    existing_app.deployment_status = (
-                        _clean(item.get("deployment_status")) or "planned"
-                    )
-                    existing_app.business_domain = _clean(item.get("business_domain"))
-                    existing_app.business_owner = _clean(item.get("business_owner"))
-                    existing_app.development_team = _clean(item.get("development_team"))
-                    existing_app.user_base_size = _parse_user_count(
+                    ))
+                    _set_if_present(existing_app, "technology_stack", _clean(item.get("technology_stack")))
+                    _set_if_present(existing_app, "version", _clean(item.get("version")))
+                    _set_if_present(existing_app, "deployment_status", _clean(item.get("deployment_status")))
+                    _set_if_present(existing_app, "business_domain", _clean(item.get("business_domain")))
+                    _set_if_present(existing_app, "business_owner", _clean(item.get("business_owner")))
+                    _set_if_present(existing_app, "development_team", _clean(item.get("development_team")))
+                    _set_if_present(existing_app, "user_base_size", _parse_user_count(
                         item.get("user_count")
-                    )
-                    existing_app.business_criticality = _clean(
+                    ))
+                    _set_if_present(existing_app, "business_criticality", _clean(
                         item.get("business_criticality")
-                    )
+                    ))
 
                     # Add import fields for auto-mapping functionality
-                    existing_app.imported_capabilities = _clean(
+                    _set_if_present(existing_app, "imported_capabilities", _clean(
                         item.get("imported_capabilities")
-                    )
-                    existing_app.application_services = _clean(
+                    ))
+                    _set_if_present(existing_app, "application_services", _clean(
                         item.get("application_services")
-                    )
-                    existing_app.application_functions_text = _clean(
+                    ))
+                    _set_if_present(existing_app, "application_functions_text", _clean(
                         item.get("application_functions_text")
-                    )
-                    existing_app.imported_apqc_codes = _clean(
+                    ))
+                    _set_if_present(existing_app, "imported_apqc_codes", _clean(
                         item.get("imported_apqc_codes")
-                    )
-
+                    ))
                     updated += 1
                     processed_names.add(name_lower)  # Track that we've seen this name
                 else:
@@ -2011,8 +2098,7 @@ def application_import():
                                         if elem:
                                             ai_results["total_archimate_created"] += 1
                                             if (
-                                                elem_data.get("type")
-                                                == "ApplicationComponent"
+                                                is_application_kind(elem_data.get("type"))
                                                 and not app.archimate_element_id
                                             ):
                                                 app.archimate_element_id = elem.id
@@ -2189,59 +2275,56 @@ def application_import():
                     continue
                 elif existing_app and import_mode == "update":
                     # Update existing record with your template column names
-                    existing_app.description = _clean(get_field("Description"))
-                    existing_app.application_category = _clean(
+                    _set_if_present(existing_app, "description", _clean(get_field("Description")))
+                    _set_if_present(existing_app, "application_category", _clean(
                         get_field("Category", "application_category")
-                    )
-                    existing_app.business_criticality = _clean(
+                    ))
+                    _set_if_present(existing_app, "business_criticality", _clean(
                         get_field("Business Criticality", "business_criticality")
-                    )
-                    existing_app.deployment_status = (
-                        _clean(
+                    ))
+                    _set_if_present(existing_app, "deployment_status", _clean(
                             get_field(
                                 "Application Status", "Status", "deployment_status"
                             )
-                        )
-                        or "planned"
-                    )
-                    existing_app.lifecycle_status = _clean(
+                        ))
+                    _set_if_present(existing_app, "lifecycle_status", _clean(
                         get_field("Lifecycle Status", "lifecycle_status")
-                    )
-                    existing_app.business_owner = _clean(
+                    ))
+                    _set_if_present(existing_app, "business_owner", _clean(
                         get_field(
                             "App Business Owner", "Business Owner", "business_owner"
                         )
-                    )
-                    existing_app.application_owner = _clean(
+                    ))
+                    _set_if_present(existing_app, "application_owner", _clean(
                         get_field("Application Manager", "application_owner")
-                    )
-                    existing_app.user_types = _clean(
+                    ))
+                    _set_if_present(existing_app, "user_types", _clean(
                         get_field("Target Users", "user_types")
-                    )
-                    existing_app.programming_languages = _clean(
+                    ))
+                    _set_if_present(existing_app, "programming_languages", _clean(
                         get_field("Programming Languages", "programming_languages")
-                    )
-                    existing_app.support_level = _clean(
+                    ))
+                    _set_if_present(existing_app, "support_level", _clean(
                         get_field("Support Level", "support_level")
-                    )
-                    existing_app.vendor_name = _clean(
+                    ))
+                    _set_if_present(existing_app, "vendor_name", _clean(
                         get_field("Package Vendor", "Vendor", "vendor_name")
-                    )
-                    existing_app.technical_risk = _clean(
+                    ))
+                    _set_if_present(existing_app, "technical_risk", _clean(
                         get_field("Risk Level", "technical_risk")
-                    )
-                    existing_app.number_of_integrations = _parse_user_count(
+                    ))
+                    _set_if_present(existing_app, "number_of_integrations", _parse_user_count(
                         get_field("Interfaces - Number", "number_of_integrations")
-                    )
-                    existing_app.cloud_provider = _clean(
+                    ))
+                    _set_if_present(existing_app, "cloud_provider", _clean(
                         get_field("Public Cloud Provider", "cloud_provider")
-                    )
-                    existing_app.rpo_hours = _parse_user_count(
+                    ))
+                    _set_if_present(existing_app, "rpo_hours", _parse_user_count(
                         get_field("RPO", "rpo_hours")
-                    )
-                    existing_app.rto_hours = _parse_user_count(
+                    ))
+                    _set_if_present(existing_app, "rto_hours", _parse_user_count(
                         get_field("RTO", "rto_hours")
-                    )
+                    ))
                     updated += 1
                     processed_names.add(name_lower)
                 else:

@@ -35,7 +35,7 @@
         {% endif %}
       </div>
       <button type="button"
-              class="inline-flex items-center justify-center gap-2 rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 h-9 px-4 py-2 disabled:opacity-50 disabled:pointer-events-none"
+              class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center"
               :disabled="busy === '{{ artefact.key }}'"
               @click="createLink('{{ artefact.key }}')">
         <i data-lucide="link" class="h-4 w-4"></i>
@@ -68,13 +68,13 @@
               </template>
               <button type="button"
                       x-cloak x-show="link.is_active"
-                      class="inline-flex items-center justify-center gap-2 rounded-md text-sm font-medium border border-input bg-background hover:bg-accent hover:text-accent-foreground h-8 px-3 text-xs"
+                      class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center"
                       @click="copyLink(link)">
                 <i data-lucide="copy" class="h-3.5 w-3.5"></i> Copy
               </button>
               <button type="button"
                       x-cloak x-show="link.is_active"
-                      class="inline-flex items-center justify-center gap-2 rounded-md text-sm font-medium bg-destructive text-destructive-foreground hover:bg-destructive/90 h-8 px-3 text-xs disabled:opacity-50 disabled:pointer-events-none"
+                      class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-destructive text-destructive-foreground text-sm font-semibold transition-colors hover:bg-destructive/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center"
                       :disabled="busy === 'revoke-' + link.id"
                       @click="revokeLink(link)">
                 <i data-lucide="ban" class="h-3.5 w-3.5"></i> Revoke

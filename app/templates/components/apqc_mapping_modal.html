@@ -14,7 +14,6 @@
      aria-hidden="true"
      :aria-busy="loading"
      class="modal-root fixed inset-0 items-center justify-center p-4"
-     style="z-index: var(--modal-z, 1000);"
      role="dialog"
      aria-modal="true"
      aria-labelledby="apqc-modal-title"
@@ -22,16 +21,15 @@
 
     <!-- Backdrop -->
     <div data-modal-backdrop="apqc-mapping-modal" aria-hidden="true"
-         class="modal-backdrop absolute inset-0 bg-background/80 transition-opacity duration-200"></div>
+         class="modal-backdrop absolute inset-0 transition-opacity duration-200 bg-overlay/50"></div>
 
     <div data-modal-panel
-         class="modal-panel relative w-full max-w-5xl p-6 border border-border shadow-lg rounded-lg bg-background max-h-[90vh] overflow-y-auto"
-         style="z-index: calc(var(--modal-z, 1000) + 1);">
+         class="modal-panel relative w-full max-w-5xl p-6 border border-border rounded-lg bg-background max-h-[90vh] overflow-y-auto">
         
         <!-- Header -->
         <div class="flex justify-between items-center mb-6 pb-4 border-b">
             <div>
-                <h3 id="apqc-modal-title" class="text-xl font-bold text-foreground flex items-center">
+                <h3 id="apqc-modal-title" class="text-base font-semibold text-foreground text-foreground text-foreground flex items-center">
                     <i data-lucide="git-branch" class="w-5 h-5 mr-2 text-primary" aria-hidden="true"></i>
                     Map to APQC Process Framework
                 </h3>
@@ -39,7 +37,7 @@
                     Capability: <span class="font-semibold text-primary" x-text="capabilityName"></span>
                 </p>
             </div>
-            <button @click="closeMappingModal()" class="text-muted-foreground hover:text-muted-foreground transition-colors" type="button" aria-label="Close APQC mapping dialog">
+            <button @click="closeMappingModal()" class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" type="button" aria-label="Close APQC mapping dialog">
                 <i data-lucide="x" class="w-6 h-6" aria-hidden="true"></i>
             </button>
         </div>
@@ -151,7 +149,7 @@
                 </p>
                 <div class="flex flex-wrap gap-2">
                     <template x-for="process in selectedProcesses" :key="process.id">
-                        <div class="inline-flex items-center bg-primary/10 text-primary text-xs px-3 py-1 rounded-full">
+                        <div class="inline-flex items-center bg-primary/10 text-info-emphasis text-xs px-3 py-1 rounded-full">
                             <span x-text="process.process_code + ' - ' + process.process_name" class="max-w-xs truncate"></span>
                             <button type="button" @click="toggleProcessSelection(process)" class="ml-2 hover:text-primary" aria-label="Remove process">
                                 <i data-lucide="x" class="w-3 h-3"></i>
@@ -198,7 +196,7 @@
             <button type="button" @click="saveMappings()" 
                     :disabled="selectedProcesses.length === 0 || saving"
                     :class="selectedProcesses.length === 0 || saving ? 'opacity-50 cursor-not-allowed' : 'hover:bg-primary'"
-                    class="px-6 py-2 text-sm text-primary-foreground bg-primary rounded-md transition-colors flex items-center" aria-label="Save APQC mappings">
+                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center" aria-label="Save APQC mappings">
                 <i data-lucide="save" class="w-4 h-4 mr-2"></i>
                 <span x-text="saving ? 'Saving...' : 'Save Mappings'"></span>
             </button>
