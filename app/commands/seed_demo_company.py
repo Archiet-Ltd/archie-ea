@@ -2029,6 +2029,7 @@ def seed_demo_company() -> dict:
             for wp in db.session.query(UnifiedWorkPackage)
             .filter(UnifiedWorkPackage.organization_id == org_id)
         }
+        work_packages_placed = 0
         for gap in db.session.query(Gap).filter(Gap.organization_id == org_id):
             placement = _GAP_PLACEMENT.get(gap.name)
             if placement is None:
@@ -2052,6 +2053,8 @@ def seed_demo_company() -> dict:
                 if not placed["plateau_ids"] and target in plateau_by_name:
                     work_package_service.update_work_package(
                         wp.id, organization_id=org_id, plateau_id=plateau_by_name[target].id)
+                    work_packages_placed += 1
+        stats["work_packages_placed"] = work_packages_placed
         db.session.flush()
 
         db.session.commit()
