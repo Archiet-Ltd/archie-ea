@@ -48,9 +48,23 @@ class ApplicabilityService:
     }
 
     @classmethod
+    def rules_for(cls, framework_code: str) -> List[Dict[str, Any]]:
+        """The scope rules for *framework_code*, found through any spelling of the code:
+        "ISO - 27001", "ISO-27001" and "ISO27001" are the same framework, so a row seeded
+        under an older spelling still finds its rules."""
+        from app.services.compliance.regulatory_framework_service import RegulatoryFrameworkService
+
+        normal = RegulatoryFrameworkService._normal_code
+        wanted = normal(framework_code)
+        for code, rules in cls.FRAMEWORK_RULES.items():
+            if code == framework_code or normal(code) == wanted:
+                return rules
+        return []
+
+    @classmethod
     def evaluate_node(cls, node: Node, framework_code: str) -> bool:
         """Return True if *node* is in scope for *framework_code*."""
-        rules = cls.FRAMEWORK_RULES.get(framework_code, [])
+        rules = cls.rules_for(framework_code)
         if not rules:
             return True  # no rules = everything in scope
 
@@ -88,7 +102,7 @@ class ApplicabilityService:
                     "name": node.name,
                     "node_type": node.node_type,
                     "deployment_model": node.deployment_model,
-                    "rule_applied": str(cls.FRAMEWORK_RULES.get(framework_code, [])),
+                    "rule_applied": str(cls.rules_for(framework_code)),
                 })
         return in_scope
 
@@ -121,17 +135,38 @@ class ApplicabilityService:
         db.session.add(adoption)
         db.session.flush()
 
-        for control in framework.controls:
-            adopted = ApplicationComplianceControl(
-                organization_id=organization_id,
-                adoption_id=adoption.id,
-                control_id=control.id,
-                implementation_status="planned",
-            )
-            db.session.add(adopted)
+        cls.plan_controls(adoption, framework.controls)
 
         db.session.commit()
         return adoption
+
+    @staticmethod
+    def plan_controls(adoption: FrameworkAdoption, controls) -> int:
+        """Give *controls* to *adoption* as "planned", under the adoption's own organisation.
+        A control the adoption already holds is left alone, so recorded work is never touched.
+        The one place a control joins an adoption: adopting a framework and the seeder's top-up
+        for organisations that adopted before a control existed both come through here."""
+        held = {
+            control_id
+            for (control_id,) in db.session.query(ApplicationComplianceControl.control_id).filter(
+                ApplicationComplianceControl.adoption_id == adoption.id
+            )
+        }
+        added = 0
+        for control in controls:
+            if control.id in held:
+                continue
+            db.session.add(
+                ApplicationComplianceControl(
+                    organization_id=adoption.organization_id,
+                    adoption_id=adoption.id,
+                    control_id=control.id,
+                    implementation_status="planned",
+                )
+            )
+            held.add(control.id)
+            added += 1
+        return added
 
     @classmethod
     def propose_harmonization(

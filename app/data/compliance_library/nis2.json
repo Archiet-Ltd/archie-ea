@@ -1,0 +1,615 @@
+{
+ "code": "NIS2",
+ "name": "Directive (EU) 2022/2555 on measures for a high common level of cybersecurity across the Union (NIS2)",
+ "description": "All 46 articles of the Directive, each with its official heading, chapter and a one-line summary, plus 15 controls for the individual points of Article 21(2) and Article 23, which carry short-form titles because the Directive gives those points no heading. The article text is not reproduced.",
+ "category": "security",
+ "jurisdiction": "EU",
+ "enforcement_level": "mandatory",
+ "applies_to_manufacturing": true,
+ "applies_to_region": "EU",
+ "industry_specific": "general",
+ "official_url": "https://eur-lex.europa.eu/eli/dir/2022/2555/oj",
+ "standard_version": "2022/2555",
+ "content_level": "full",
+ "article_count": 46,
+ "source_url": "https://publications.europa.eu/resource/celex/32022L2555",
+ "source_text_date": "2022-12-27",
+ "source_note": "Official Journal L 333, 27 December 2022, as published by the Publications Office of the European Union.",
+ "total_controls": 61,
+ "controls": [
+  {
+   "control_code": "NIS2-Art.1",
+   "title": "Subject matter",
+   "description": "Sets the subject matter: measures to reach a high common level of cybersecurity across the Union, including national strategies, risk-management and reporting obligations, information sharing and supervision.",
+   "kind": "Requirement",
+   "category": "Chapter I: General provisions",
+   "subcategory": null,
+   "official_reference": "Directive (EU) 2022/2555, Article 1"
+  },
+  {
+   "control_code": "NIS2-Art.2",
+   "title": "Scope",
+   "description": "Applies to public and private entities of the types listed in Annexes I and II that are at least medium-sized, with specific cases that apply regardless of size, and excludes defence, national security and similar activities.",
+   "kind": "Requirement",
+   "category": "Chapter I: General provisions",
+   "subcategory": null,
+   "official_reference": "Directive (EU) 2022/2555, Article 2"
+  },
+  {
+   "control_code": "NIS2-Art.3",
+   "title": "Essential and important entities",
+   "description": "Defines essential and important entities by sector and size, and requires Member States to list them and to review the list at least every two years.",
+   "kind": "Requirement",
+   "category": "Chapter I: General provisions",
+   "subcategory": null,
+   "official_reference": "Directive (EU) 2022/2555, Article 3"
+  },
+  {
+   "control_code": "NIS2-Art.4",
+   "title": "Sector-specific Union legal acts",
+   "description": "Where a sector-specific Union act imposes risk-management or incident-notification requirements of at least equivalent effect, those requirements apply instead of the matching NIS2 ones.",
+   "kind": "Requirement",
+   "category": "Chapter I: General provisions",
+   "subcategory": null,
+   "official_reference": "Directive (EU) 2022/2555, Article 4"
+  },
+  {
+   "control_code": "NIS2-Art.5",
+   "title": "Minimum harmonisation",
+   "description": "Allows Member States to adopt or keep provisions that give a higher level of cybersecurity, if consistent with Union law.",
+   "kind": "Requirement",
+   "category": "Chapter I: General provisions",
+   "subcategory": null,
+   "official_reference": "Directive (EU) 2022/2555, Article 5"
+  },
+  {
+   "control_code": "NIS2-Art.6",
+   "title": "Definitions",
+   "description": "Defines the terms used, including network and information system, incident, significant cyber threat, vulnerability, managed service provider, and ICT product, service and process.",
+   "kind": "Requirement",
+   "category": "Chapter I: General provisions",
+   "subcategory": null,
+   "official_reference": "Directive (EU) 2022/2555, Article 6"
+  },
+  {
+   "control_code": "NIS2-Art.7",
+   "title": "National cybersecurity strategy",
+   "description": "Each Member State adopts a national cybersecurity strategy with objectives, governance, policies on supply chain, vulnerability handling, skills and information sharing, and reviews it at least every five years.",
+   "kind": "Requirement",
+   "category": "Chapter II: Coordinated cybersecurity frameworks",
+   "subcategory": null,
+   "official_reference": "Directive (EU) 2022/2555, Article 7"
+  },
+  {
+   "control_code": "NIS2-Art.8",
+   "title": "Competent authorities and single points of contact",
+   "description": "Each Member State designates competent authorities for cybersecurity and supervision and a single point of contact, with adequate resources.",
+   "kind": "Requirement",
+   "category": "Chapter II: Coordinated cybersecurity frameworks",
+   "subcategory": null,
+   "official_reference": "Directive (EU) 2022/2555, Article 8"
+  },
+  {
+   "control_code": "NIS2-Art.9",
+   "title": "National cyber crisis management frameworks",
+   "description": "Each Member State designates cyber crisis management authorities and adopts a national large-scale incident and crisis response plan.",
+   "kind": "Requirement",
+   "category": "Chapter II: Coordinated cybersecurity frameworks",
+   "subcategory": null,
+   "official_reference": "Directive (EU) 2022/2555, Article 9"
+  },
+  {
+   "control_code": "NIS2-Art.10",
+   "title": "Computer security incident response teams (CSIRTs)",
+   "description": "Each Member State designates or establishes one or more computer security incident response teams (CSIRTs) covering the sectors in the Annexes.",
+   "kind": "Requirement",
+   "category": "Chapter II: Coordinated cybersecurity frameworks",
+   "subcategory": null,
+   "official_reference": "Directive (EU) 2022/2555, Article 10"
+  },
+  {
+   "control_code": "NIS2-Art.11",
+   "title": "Requirements, technical capabilities and tasks of CSIRTs",
+   "description": "Sets the requirements, technical capabilities and tasks of CSIRTs, including monitoring, early warnings, incident response and proactive scanning.",
+   "kind": "Requirement",
+   "category": "Chapter II: Coordinated cybersecurity frameworks",
+   "subcategory": null,
+   "official_reference": "Directive (EU) 2022/2555, Article 11"
+  },
+  {
+   "control_code": "NIS2-Art.12",
+   "title": "Coordinated vulnerability disclosure and a European vulnerability database",
+   "description": "Each Member State designates a CSIRT as coordinator for coordinated vulnerability disclosure, and ENISA develops and maintains a European vulnerability database.",
+   "kind": "Requirement",
+   "category": "Chapter II: Coordinated cybersecurity frameworks",
+   "subcategory": null,
+   "official_reference": "Directive (EU) 2022/2555, Article 12"
+  },
+  {
+   "control_code": "NIS2-Art.13",
+   "title": "Cooperation at national level",
+   "description": "Competent authorities, the single point of contact and CSIRTs of a Member State cooperate and exchange information on incidents and threats.",
+   "kind": "Requirement",
+   "category": "Chapter II: Coordinated cybersecurity frameworks",
+   "subcategory": null,
+   "official_reference": "Directive (EU) 2022/2555, Article 13"
+  },
+  {
+   "control_code": "NIS2-Art.14",
+   "title": "Cooperation Group",
+   "description": "Establishes the Cooperation Group to support strategic cooperation and the exchange of information among Member States.",
+   "kind": "Requirement",
+   "category": "Chapter III: Cooperation at Union and international level",
+   "subcategory": null,
+   "official_reference": "Directive (EU) 2022/2555, Article 14"
+  },
+  {
+   "control_code": "NIS2-Art.15",
+   "title": "CSIRTs network",
+   "description": "Establishes the CSIRTs network of national CSIRTs to promote swift and effective operational cooperation.",
+   "kind": "Requirement",
+   "category": "Chapter III: Cooperation at Union and international level",
+   "subcategory": null,
+   "official_reference": "Directive (EU) 2022/2555, Article 15"
+  },
+  {
+   "control_code": "NIS2-Art.16",
+   "title": "European cyber crisis liaison organisation network (EU-CyCLONe)",
+   "description": "Establishes EU-CyCLONe to support coordinated management of large-scale cybersecurity incidents and crises at operational level.",
+   "kind": "Requirement",
+   "category": "Chapter III: Cooperation at Union and international level",
+   "subcategory": null,
+   "official_reference": "Directive (EU) 2022/2555, Article 16"
+  },
+  {
+   "control_code": "NIS2-Art.17",
+   "title": "International cooperation",
+   "description": "The Union may conclude international agreements with third countries or organisations that allow their participation in the Cooperation Group, the CSIRTs network and EU-CyCLONe.",
+   "kind": "Requirement",
+   "category": "Chapter III: Cooperation at Union and international level",
+   "subcategory": null,
+   "official_reference": "Directive (EU) 2022/2555, Article 17"
+  },
+  {
+   "control_code": "NIS2-Art.18",
+   "title": "Report on the state of cybersecurity in the Union",
+   "description": "ENISA, with the Commission and the Cooperation Group, adopts a biennial report on the state of cybersecurity in the Union.",
+   "kind": "Requirement",
+   "category": "Chapter III: Cooperation at Union and international level",
+   "subcategory": null,
+   "official_reference": "Directive (EU) 2022/2555, Article 18"
+  },
+  {
+   "control_code": "NIS2-Art.19",
+   "title": "Peer reviews",
+   "description": "The Cooperation Group sets up voluntary peer reviews of Member States' cybersecurity policies, capabilities and implementation, with the help of ENISA.",
+   "kind": "Requirement",
+   "category": "Chapter III: Cooperation at Union and international level",
+   "subcategory": null,
+   "official_reference": "Directive (EU) 2022/2555, Article 19"
+  },
+  {
+   "control_code": "NIS2-Art.20",
+   "title": "Governance",
+   "description": "Management bodies of essential and important entities approve the cybersecurity risk-management measures, oversee their implementation, can be held liable for infringements, and must follow cybersecurity training.",
+   "kind": "Requirement",
+   "category": "Chapter IV: Cybersecurity risk-management measures and reporting obligations",
+   "subcategory": null,
+   "official_reference": "Directive (EU) 2022/2555, Article 20"
+  },
+  {
+   "control_code": "NIS2-Art.21",
+   "title": "Cybersecurity risk-management measures",
+   "description": "Essential and important entities take appropriate and proportionate technical, operational and organisational measures to manage the risks to their network and information systems, covering at least the ten areas listed in paragraph 2.",
+   "kind": "Requirement",
+   "category": "Chapter IV: Cybersecurity risk-management measures and reporting obligations",
+   "subcategory": null,
+   "official_reference": "Directive (EU) 2022/2555, Article 21"
+  },
+  {
+   "control_code": "NIS2-Art.21(2)(a)",
+   "title": "Risk analysis and information system security policies",
+   "description": "Policies on risk analysis and information system security.",
+   "kind": "Requirement",
+   "category": "Chapter IV: Cybersecurity risk-management measures and reporting obligations",
+   "subcategory": null,
+   "official_reference": "Directive (EU) 2022/2555, Article 21(2)(a)",
+   "parent_control_code": "NIS2-Art.21",
+   "level": 2,
+   "title_note": "Short form written for this library; the Directive gives this provision no heading."
+  },
+  {
+   "control_code": "NIS2-Art.21(2)(b)",
+   "title": "Incident handling",
+   "description": "Measures for handling incidents.",
+   "kind": "Requirement",
+   "category": "Chapter IV: Cybersecurity risk-management measures and reporting obligations",
+   "subcategory": null,
+   "official_reference": "Directive (EU) 2022/2555, Article 21(2)(b)",
+   "parent_control_code": "NIS2-Art.21",
+   "level": 2,
+   "title_note": "Short form written for this library; the Directive gives this provision no heading."
+  },
+  {
+   "control_code": "NIS2-Art.21(2)(c)",
+   "title": "Business continuity, backup, disaster recovery and crisis management",
+   "description": "Business continuity, such as backup management and disaster recovery, and crisis management.",
+   "kind": "Requirement",
+   "category": "Chapter IV: Cybersecurity risk-management measures and reporting obligations",
+   "subcategory": null,
+   "official_reference": "Directive (EU) 2022/2555, Article 21(2)(c)",
+   "parent_control_code": "NIS2-Art.21",
+   "level": 2,
+   "title_note": "Short form written for this library; the Directive gives this provision no heading."
+  },
+  {
+   "control_code": "NIS2-Art.21(2)(d)",
+   "title": "Supply chain security",
+   "description": "Supply chain security, including security-related aspects of the relationships with direct suppliers and service providers.",
+   "kind": "Requirement",
+   "category": "Chapter IV: Cybersecurity risk-management measures and reporting obligations",
+   "subcategory": null,
+   "official_reference": "Directive (EU) 2022/2555, Article 21(2)(d)",
+   "parent_control_code": "NIS2-Art.21",
+   "level": 2,
+   "title_note": "Short form written for this library; the Directive gives this provision no heading."
+  },
+  {
+   "control_code": "NIS2-Art.21(2)(e)",
+   "title": "Security in acquisition, development and maintenance, including vulnerability handling",
+   "description": "Security in network and information systems acquisition, development and maintenance, including vulnerability handling and disclosure.",
+   "kind": "Requirement",
+   "category": "Chapter IV: Cybersecurity risk-management measures and reporting obligations",
+   "subcategory": null,
+   "official_reference": "Directive (EU) 2022/2555, Article 21(2)(e)",
+   "parent_control_code": "NIS2-Art.21",
+   "level": 2,
+   "title_note": "Short form written for this library; the Directive gives this provision no heading."
+  },
+  {
+   "control_code": "NIS2-Art.21(2)(f)",
+   "title": "Policies to assess the effectiveness of risk-management measures",
+   "description": "Policies and procedures to assess the effectiveness of cybersecurity risk-management measures.",
+   "kind": "Requirement",
+   "category": "Chapter IV: Cybersecurity risk-management measures and reporting obligations",
+   "subcategory": null,
+   "official_reference": "Directive (EU) 2022/2555, Article 21(2)(f)",
+   "parent_control_code": "NIS2-Art.21",
+   "level": 2,
+   "title_note": "Short form written for this library; the Directive gives this provision no heading."
+  },
+  {
+   "control_code": "NIS2-Art.21(2)(g)",
+   "title": "Basic cyber hygiene practices and cybersecurity training",
+   "description": "Basic cyber hygiene practices and cybersecurity training.",
+   "kind": "Requirement",
+   "category": "Chapter IV: Cybersecurity risk-management measures and reporting obligations",
+   "subcategory": null,
+   "official_reference": "Directive (EU) 2022/2555, Article 21(2)(g)",
+   "parent_control_code": "NIS2-Art.21",
+   "level": 2,
+   "title_note": "Short form written for this library; the Directive gives this provision no heading."
+  },
+  {
+   "control_code": "NIS2-Art.21(2)(h)",
+   "title": "Policies on cryptography and encryption",
+   "description": "Policies and procedures regarding the use of cryptography and, where appropriate, encryption.",
+   "kind": "Requirement",
+   "category": "Chapter IV: Cybersecurity risk-management measures and reporting obligations",
+   "subcategory": null,
+   "official_reference": "Directive (EU) 2022/2555, Article 21(2)(h)",
+   "parent_control_code": "NIS2-Art.21",
+   "level": 2,
+   "title_note": "Short form written for this library; the Directive gives this provision no heading."
+  },
+  {
+   "control_code": "NIS2-Art.21(2)(i)",
+   "title": "Human resources security, access control and asset management",
+   "description": "Human resources security, access control policies and asset management.",
+   "kind": "Requirement",
+   "category": "Chapter IV: Cybersecurity risk-management measures and reporting obligations",
+   "subcategory": null,
+   "official_reference": "Directive (EU) 2022/2555, Article 21(2)(i)",
+   "parent_control_code": "NIS2-Art.21",
+   "level": 2,
+   "title_note": "Short form written for this library; the Directive gives this provision no heading."
+  },
+  {
+   "control_code": "NIS2-Art.21(2)(j)",
+   "title": "Multi-factor authentication, secured communications and emergency communications",
+   "description": "Use of multi-factor or continuous authentication solutions, secured voice, video and text communications and secured emergency communication systems, where appropriate.",
+   "kind": "Requirement",
+   "category": "Chapter IV: Cybersecurity risk-management measures and reporting obligations",
+   "subcategory": null,
+   "official_reference": "Directive (EU) 2022/2555, Article 21(2)(j)",
+   "parent_control_code": "NIS2-Art.21",
+   "level": 2,
+   "title_note": "Short form written for this library; the Directive gives this provision no heading."
+  },
+  {
+   "control_code": "NIS2-Art.22",
+   "title": "Union level coordinated security risk assessments of critical supply chains",
+   "description": "The Cooperation Group, with the Commission and ENISA, may carry out coordinated security risk assessments of critical ICT service, system or product supply chains.",
+   "kind": "Requirement",
+   "category": "Chapter IV: Cybersecurity risk-management measures and reporting obligations",
+   "subcategory": null,
+   "official_reference": "Directive (EU) 2022/2555, Article 22"
+  },
+  {
+   "control_code": "NIS2-Art.23",
+   "title": "Reporting obligations",
+   "description": "Essential and important entities notify their CSIRT or authority of significant incidents with an early warning within 24 hours, an incident notification within 72 hours, an intermediate report on request and a final report within one month, and inform recipients where needed.",
+   "kind": "Requirement",
+   "category": "Chapter IV: Cybersecurity risk-management measures and reporting obligations",
+   "subcategory": null,
+   "official_reference": "Directive (EU) 2022/2555, Article 23"
+  },
+  {
+   "control_code": "NIS2-Art.23(1)",
+   "title": "Notification of significant incidents to the CSIRT or authority",
+   "description": "Notify, without undue delay, the CSIRT or competent authority of any incident that has a significant impact on the provision of the entity's services.",
+   "kind": "Requirement",
+   "category": "Chapter IV: Cybersecurity risk-management measures and reporting obligations",
+   "subcategory": null,
+   "official_reference": "Directive (EU) 2022/2555, Article 23(1)",
+   "parent_control_code": "NIS2-Art.23",
+   "level": 2,
+   "title_note": "Short form written for this library; the Directive gives this provision no heading."
+  },
+  {
+   "control_code": "NIS2-Art.23(4)(a)",
+   "title": "Early warning within 24 hours of awareness",
+   "description": "Submit an early warning within 24 hours of becoming aware of a significant incident, indicating whether it is suspected to be caused by unlawful or malicious acts or could have a cross-border impact.",
+   "kind": "Requirement",
+   "category": "Chapter IV: Cybersecurity risk-management measures and reporting obligations",
+   "subcategory": null,
+   "official_reference": "Directive (EU) 2022/2555, Article 23(4)(a)",
+   "parent_control_code": "NIS2-Art.23",
+   "level": 2,
+   "title_note": "Short form written for this library; the Directive gives this provision no heading."
+  },
+  {
+   "control_code": "NIS2-Art.23(4)(b)",
+   "title": "Incident notification within 72 hours of awareness",
+   "description": "Submit an incident notification within 72 hours of becoming aware, updating the early warning and giving an initial assessment of severity, impact and indicators of compromise.",
+   "kind": "Requirement",
+   "category": "Chapter IV: Cybersecurity risk-management measures and reporting obligations",
+   "subcategory": null,
+   "official_reference": "Directive (EU) 2022/2555, Article 23(4)(b)",
+   "parent_control_code": "NIS2-Art.23",
+   "level": 2,
+   "title_note": "Short form written for this library; the Directive gives this provision no heading."
+  },
+  {
+   "control_code": "NIS2-Art.23(4)(c)",
+   "title": "Intermediate report on request",
+   "description": "Provide an intermediate report on relevant status updates when requested by the CSIRT or competent authority.",
+   "kind": "Requirement",
+   "category": "Chapter IV: Cybersecurity risk-management measures and reporting obligations",
+   "subcategory": null,
+   "official_reference": "Directive (EU) 2022/2555, Article 23(4)(c)",
+   "parent_control_code": "NIS2-Art.23",
+   "level": 2,
+   "title_note": "Short form written for this library; the Directive gives this provision no heading."
+  },
+  {
+   "control_code": "NIS2-Art.23(4)(d)",
+   "title": "Final report within one month of the incident notification",
+   "description": "Submit a final report not later than one month after the incident notification, with a detailed description, root cause, mitigation applied and cross-border impact.",
+   "kind": "Requirement",
+   "category": "Chapter IV: Cybersecurity risk-management measures and reporting obligations",
+   "subcategory": null,
+   "official_reference": "Directive (EU) 2022/2555, Article 23(4)(d)",
+   "parent_control_code": "NIS2-Art.23",
+   "level": 2,
+   "title_note": "Short form written for this library; the Directive gives this provision no heading."
+  },
+  {
+   "control_code": "NIS2-Art.24",
+   "title": "Use of European cybersecurity certification schemes",
+   "description": "Member States may require use of ICT products, services and processes certified under European cybersecurity certification schemes to show compliance with Article 21.",
+   "kind": "Requirement",
+   "category": "Chapter IV: Cybersecurity risk-management measures and reporting obligations",
+   "subcategory": null,
+   "official_reference": "Directive (EU) 2022/2555, Article 24"
+  },
+  {
+   "control_code": "NIS2-Art.25",
+   "title": "Standardisation",
+   "description": "Member States encourage use of European and international standards and technical specifications for network and information system security, without imposing or favouring a particular technology.",
+   "kind": "Constraint",
+   "category": "Chapter IV: Cybersecurity risk-management measures and reporting obligations",
+   "subcategory": null,
+   "official_reference": "Directive (EU) 2022/2555, Article 25"
+  },
+  {
+   "control_code": "NIS2-Art.26",
+   "title": "Jurisdiction and territoriality",
+   "description": "Entities fall under the jurisdiction of the Member State of establishment, with specific rules for providers of electronic communications, DNS, cloud, data centre and other digital services.",
+   "kind": "Requirement",
+   "category": "Chapter V: Jurisdiction and registration",
+   "subcategory": null,
+   "official_reference": "Directive (EU) 2022/2555, Article 26"
+  },
+  {
+   "control_code": "NIS2-Art.27",
+   "title": "Registry of entities",
+   "description": "ENISA creates and maintains a registry of DNS service providers, TLD registries, cloud and data centre providers, managed service providers and other listed entities, and those entities submit their details.",
+   "kind": "Requirement",
+   "category": "Chapter V: Jurisdiction and registration",
+   "subcategory": null,
+   "official_reference": "Directive (EU) 2022/2555, Article 27"
+  },
+  {
+   "control_code": "NIS2-Art.28",
+   "title": "Database of domain name registration data",
+   "description": "TLD name registries and domain registration services collect and maintain accurate domain name registration data, and give lawful access to it on request.",
+   "kind": "Requirement",
+   "category": "Chapter V: Jurisdiction and registration",
+   "subcategory": null,
+   "official_reference": "Directive (EU) 2022/2555, Article 28"
+  },
+  {
+   "control_code": "NIS2-Art.29",
+   "title": "Cybersecurity information-sharing arrangements",
+   "description": "Member States make sure entities can exchange cybersecurity information voluntarily within trusted communities, and notify authorities of their participation.",
+   "kind": "Requirement",
+   "category": "Chapter VI: Information sharing",
+   "subcategory": null,
+   "official_reference": "Directive (EU) 2022/2555, Article 29"
+  },
+  {
+   "control_code": "NIS2-Art.30",
+   "title": "Voluntary notification of relevant information",
+   "description": "CSIRTs and authorities accept voluntary notifications of incidents, cyber threats and near misses from entities in and outside scope.",
+   "kind": "Requirement",
+   "category": "Chapter VI: Information sharing",
+   "subcategory": null,
+   "official_reference": "Directive (EU) 2022/2555, Article 30"
+  },
+  {
+   "control_code": "NIS2-Art.31",
+   "title": "General aspects concerning supervision and enforcement",
+   "description": "Member States ensure that competent authorities effectively supervise compliance and may use risk-based prioritisation, cooperating with data protection authorities.",
+   "kind": "Requirement",
+   "category": "Chapter VII: Supervision and enforcement",
+   "subcategory": null,
+   "official_reference": "Directive (EU) 2022/2555, Article 31"
+  },
+  {
+   "control_code": "NIS2-Art.32",
+   "title": "Supervisory and enforcement measures in relation to essential entities",
+   "description": "Supervisory and enforcement measures for essential entities, including on-site inspections, security audits, information requests, binding instructions and temporary suspension of certification or management functions.",
+   "kind": "Requirement",
+   "category": "Chapter VII: Supervision and enforcement",
+   "subcategory": null,
+   "official_reference": "Directive (EU) 2022/2555, Article 32"
+  },
+  {
+   "control_code": "NIS2-Art.33",
+   "title": "Supervisory and enforcement measures in relation to important entities",
+   "description": "Supervisory and enforcement measures for important entities, applied after the fact on evidence of non-compliance and on a lighter, reactive basis than for essential entities.",
+   "kind": "Requirement",
+   "category": "Chapter VII: Supervision and enforcement",
+   "subcategory": null,
+   "official_reference": "Directive (EU) 2022/2555, Article 33"
+  },
+  {
+   "control_code": "NIS2-Art.34",
+   "title": "General conditions for imposing administrative fines on essential and important entities",
+   "description": "Sets the general conditions for administrative fines, with maximums of at least EUR 10 million or 2% of worldwide turnover for essential entities and EUR 7 million or 1.4% for important entities.",
+   "kind": "Requirement",
+   "category": "Chapter VII: Supervision and enforcement",
+   "subcategory": null,
+   "official_reference": "Directive (EU) 2022/2555, Article 34"
+  },
+  {
+   "control_code": "NIS2-Art.35",
+   "title": "Infringements entailing a personal data breach",
+   "description": "Where an infringement can entail a personal data breach, the competent authority informs the data protection supervisory authorities.",
+   "kind": "Requirement",
+   "category": "Chapter VII: Supervision and enforcement",
+   "subcategory": null,
+   "official_reference": "Directive (EU) 2022/2555, Article 35"
+  },
+  {
+   "control_code": "NIS2-Art.36",
+   "title": "Penalties",
+   "description": "Member States lay down effective, proportionate and dissuasive penalties for infringements of national measures adopted under this Directive.",
+   "kind": "Requirement",
+   "category": "Chapter VII: Supervision and enforcement",
+   "subcategory": null,
+   "official_reference": "Directive (EU) 2022/2555, Article 36"
+  },
+  {
+   "control_code": "NIS2-Art.37",
+   "title": "Mutual assistance",
+   "description": "Competent authorities of different Member States give each other mutual assistance where an entity operates in more than one Member State.",
+   "kind": "Requirement",
+   "category": "Chapter VII: Supervision and enforcement",
+   "subcategory": null,
+   "official_reference": "Directive (EU) 2022/2555, Article 37"
+  },
+  {
+   "control_code": "NIS2-Art.38",
+   "title": "Exercise of the delegation",
+   "description": "Governs how the Commission exercises its power to adopt delegated acts under this Directive.",
+   "kind": "Requirement",
+   "category": "Chapter VIII: Delegated and implementing acts",
+   "subcategory": null,
+   "official_reference": "Directive (EU) 2022/2555, Article 38"
+  },
+  {
+   "control_code": "NIS2-Art.39",
+   "title": "Committee procedure",
+   "description": "Establishes the committee procedure by which the Commission is assisted when adopting implementing acts.",
+   "kind": "Requirement",
+   "category": "Chapter VIII: Delegated and implementing acts",
+   "subcategory": null,
+   "official_reference": "Directive (EU) 2022/2555, Article 39"
+  },
+  {
+   "control_code": "NIS2-Art.40",
+   "title": "Review",
+   "description": "The Commission reviews the functioning of the Directive by 17 October 2027 and every 36 months afterwards and reports to the Parliament and Council.",
+   "kind": "Requirement",
+   "category": "Chapter IX: Final provisions",
+   "subcategory": null,
+   "official_reference": "Directive (EU) 2022/2555, Article 40"
+  },
+  {
+   "control_code": "NIS2-Art.41",
+   "title": "Transposition",
+   "description": "Member States adopt and publish the measures needed to comply by 17 October 2024 and apply them from 18 October 2024.",
+   "kind": "Requirement",
+   "category": "Chapter IX: Final provisions",
+   "subcategory": null,
+   "official_reference": "Directive (EU) 2022/2555, Article 41"
+  },
+  {
+   "control_code": "NIS2-Art.42",
+   "title": "Amendment of Regulation (EU) No 910/2014",
+   "description": "Amends Regulation (EU) No 910/2014 (eIDAS) by deleting Article 19 from 18 October 2024.",
+   "kind": "Requirement",
+   "category": "Chapter IX: Final provisions",
+   "subcategory": null,
+   "official_reference": "Directive (EU) 2022/2555, Article 42"
+  },
+  {
+   "control_code": "NIS2-Art.43",
+   "title": "Amendment of Directive (EU) 2018/1972",
+   "description": "Amends Directive (EU) 2018/1972 by deleting Articles 40 and 41 from 18 October 2024.",
+   "kind": "Requirement",
+   "category": "Chapter IX: Final provisions",
+   "subcategory": null,
+   "official_reference": "Directive (EU) 2022/2555, Article 43"
+  },
+  {
+   "control_code": "NIS2-Art.44",
+   "title": "Repeal",
+   "description": "Repeals Directive (EU) 2016/1148 (the original NIS Directive) from 18 October 2024.",
+   "kind": "Requirement",
+   "category": "Chapter IX: Final provisions",
+   "subcategory": null,
+   "official_reference": "Directive (EU) 2022/2555, Article 44"
+  },
+  {
+   "control_code": "NIS2-Art.45",
+   "title": "Entry into force",
+   "description": "Provides that the Directive enters into force on the twentieth day after publication in the Official Journal.",
+   "kind": "Requirement",
+   "category": "Chapter IX: Final provisions",
+   "subcategory": null,
+   "official_reference": "Directive (EU) 2022/2555, Article 45"
+  },
+  {
+   "control_code": "NIS2-Art.46",
+   "title": "Addressees",
+   "description": "States that the Directive is addressed to the Member States.",
+   "kind": "Requirement",
+   "category": "Chapter IX: Final provisions",
+   "subcategory": null,
+   "official_reference": "Directive (EU) 2022/2555, Article 46"
+  }
+ ]
+}

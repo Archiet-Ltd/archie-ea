@@ -1,0 +1,790 @@
+{
+ "code": "UK-GDPR",
+ "name": "UK General Data Protection Regulation (Regulation (EU) 2016/679 as it forms part of the law of the United Kingdom)",
+ "description": "All 81 articles of the UK GDPR in force, each with its heading, chapter and a one-line summary, including the articles added by later UK legislation (such as 4A, 8ZA, 22A to 22D, 44A, 45A to 45C and 84A to 84D). 38 article numbers from the original Regulation are omitted in the UK text and are not loaded. The article text is not reproduced.",
+ "category": "privacy",
+ "jurisdiction": "UK",
+ "enforcement_level": "mandatory",
+ "penalty_risk": "critical",
+ "applies_to_manufacturing": true,
+ "applies_to_region": "UK",
+ "industry_specific": "general",
+ "official_url": "https://www.legislation.gov.uk/eur/2016/679/contents",
+ "standard_version": "2016/679 (UK, as amended)",
+ "total_controls": 81,
+ "content_level": "full",
+ "source_url": "https://www.legislation.gov.uk/eur/2016/679/data.xml",
+ "source_text_date": "2026-10-05",
+ "source_note": "legislation.gov.uk revised text, latest available version, last modified 5 October 2026, in force from 30 September 2026.",
+ "omitted_article_numbers": [
+  "22",
+  "44",
+  "45",
+  "48",
+  "53",
+  "54",
+  "55",
+  "56",
+  "59",
+  "60",
+  "61",
+  "62",
+  "63",
+  "64",
+  "65",
+  "66",
+  "67",
+  "68",
+  "69",
+  "70",
+  "71",
+  "72",
+  "73",
+  "74",
+  "75",
+  "76",
+  "77",
+  "81",
+  "87",
+  "88",
+  "89",
+  "90",
+  "91",
+  "92",
+  "93",
+  "97",
+  "98",
+  "99"
+ ],
+ "controls": [
+  {
+   "control_code": "Art. 1",
+   "title": "Subject-matter and objectives",
+   "description": "States the subject matter: rules on protecting individuals with regard to the processing of personal data and on the free movement of personal data, protecting fundamental rights and freedoms.",
+   "kind": "Requirement",
+   "category": "Chapter I: General provisions",
+   "subcategory": null,
+   "official_reference": "UK GDPR (Regulation (EU) 2016/679 as it forms part of the law of the United Kingdom), Article 1"
+  },
+  {
+   "control_code": "Art. 2",
+   "title": "Material scope",
+   "description": "Applies to the automated or structured processing of personal data, including activities that fell outside EU law before IP completion day, and to certain manual unstructured processing by public bodies.",
+   "kind": "Requirement",
+   "category": "Chapter I: General provisions",
+   "subcategory": null,
+   "official_reference": "UK GDPR (Regulation (EU) 2016/679 as it forms part of the law of the United Kingdom), Article 2"
+  },
+  {
+   "control_code": "Art. 3",
+   "title": "Territorial scope",
+   "description": "Sets territorial scope: processing in the context of a UK establishment of a controller or processor, and processing relating to offering goods or services to, or monitoring the behaviour of, people in the UK.",
+   "kind": "Requirement",
+   "category": "Chapter I: General provisions",
+   "subcategory": null,
+   "official_reference": "UK GDPR (Regulation (EU) 2016/679 as it forms part of the law of the United Kingdom), Article 3"
+  },
+  {
+   "control_code": "Art. 4",
+   "title": "Definitions",
+   "description": "Defines the terms used, including personal data, processing, controller, processor, consent and personal data breach, and identifies the Information Commission as the Commission.",
+   "kind": "Requirement",
+   "category": "Chapter I: General provisions",
+   "subcategory": null,
+   "official_reference": "UK GDPR (Regulation (EU) 2016/679 as it forms part of the law of the United Kingdom), Article 4"
+  },
+  {
+   "control_code": "Art. 4A",
+   "title": "Periods of time",
+   "description": "Provides how references to periods of hours, days, weeks, months or years are to be interpreted.",
+   "kind": "Requirement",
+   "category": "Chapter I: General provisions",
+   "subcategory": null,
+   "official_reference": "UK GDPR (Regulation (EU) 2016/679 as it forms part of the law of the United Kingdom), Article 4A"
+  },
+  {
+   "control_code": "Art. 5",
+   "title": "Principles relating to processing of personal data",
+   "description": "Sets the principles for processing: lawfulness, fairness and transparency, purpose limitation, data minimisation, accuracy, storage limitation, integrity and confidentiality, and accountability.",
+   "kind": "Requirement",
+   "category": "Chapter II: Principles",
+   "subcategory": null,
+   "official_reference": "UK GDPR (Regulation (EU) 2016/679 as it forms part of the law of the United Kingdom), Article 5"
+  },
+  {
+   "control_code": "Art. 6",
+   "title": "Lawfulness of processing",
+   "description": "Processing is lawful only if at least one legal basis applies, such as consent, contract, legal obligation, vital interests, public task or legitimate interests (including recognised legitimate interests).",
+   "kind": "Requirement",
+   "category": "Chapter II: Principles",
+   "subcategory": null,
+   "official_reference": "UK GDPR (Regulation (EU) 2016/679 as it forms part of the law of the United Kingdom), Article 6"
+  },
+  {
+   "control_code": "Art. 7",
+   "title": "Conditions for consent",
+   "description": "Sets the conditions for consent: the controller can demonstrate it, it is clearly distinguishable, can be withdrawn as easily as given, and is freely given.",
+   "kind": "Requirement",
+   "category": "Chapter II: Principles",
+   "subcategory": null,
+   "official_reference": "UK GDPR (Regulation (EU) 2016/679 as it forms part of the law of the United Kingdom), Article 7"
+  },
+  {
+   "control_code": "Art. 8",
+   "title": "Conditions applicable to child's consent in relation to information society services",
+   "description": "Sets the conditions for a child's consent to information society services, with a minimum age of 13 and parental authorisation below it.",
+   "kind": "Requirement",
+   "category": "Chapter II: Principles",
+   "subcategory": null,
+   "official_reference": "UK GDPR (Regulation (EU) 2016/679 as it forms part of the law of the United Kingdom), Article 8"
+  },
+  {
+   "control_code": "Art. 8ZA",
+   "title": "Child’s consent in relation to information society services: age verification",
+   "description": "Allows the Secretary of State to make regulations about verifying that a person who gave consent for an information society service is old enough, or that consent was given or authorised by the holder of parental responsibility.",
+   "kind": "Requirement",
+   "category": "Chapter II: Principles",
+   "subcategory": null,
+   "official_reference": "UK GDPR (Regulation (EU) 2016/679 as it forms part of the law of the United Kingdom), Article 8ZA"
+  },
+  {
+   "control_code": "Art. 8A",
+   "title": "Purpose limitation: further processing",
+   "description": "Sets how to decide whether further processing for a new purpose is compatible with the purpose for which the data was collected.",
+   "kind": "Requirement",
+   "category": "Chapter II: Principles",
+   "subcategory": null,
+   "official_reference": "UK GDPR (Regulation (EU) 2016/679 as it forms part of the law of the United Kingdom), Article 8A"
+  },
+  {
+   "control_code": "Art. 9",
+   "title": "Processing of special categories of personal data",
+   "description": "Prohibits processing of special categories of personal data, such as health, biometric, genetic, racial or ethnic origin and religious belief, unless a listed condition applies.",
+   "kind": "Constraint",
+   "category": "Chapter II: Principles",
+   "subcategory": null,
+   "official_reference": "UK GDPR (Regulation (EU) 2016/679 as it forms part of the law of the United Kingdom), Article 9"
+  },
+  {
+   "control_code": "Art. 10",
+   "title": "Processing of personal data relating to criminal convictions and offences",
+   "description": "Processing of criminal convictions and offences data under Article 6(1) is carried out only under official authority or when authorised by domestic law with safeguards.",
+   "kind": "Constraint",
+   "category": "Chapter II: Principles",
+   "subcategory": null,
+   "official_reference": "UK GDPR (Regulation (EU) 2016/679 as it forms part of the law of the United Kingdom), Article 10"
+  },
+  {
+   "control_code": "Art. 11",
+   "title": "Processing which does not require identification",
+   "description": "Where a purpose does not require identifying a data subject, the controller is not obliged to keep or obtain additional information just to identify them.",
+   "kind": "Requirement",
+   "category": "Chapter II: Principles",
+   "subcategory": null,
+   "official_reference": "UK GDPR (Regulation (EU) 2016/679 as it forms part of the law of the United Kingdom), Article 11"
+  },
+  {
+   "control_code": "Art. 11A",
+   "title": "Further provision about processing of special categories of personal data",
+   "description": "Allows the Secretary of State to make regulations that add descriptions of processing to, or alter, the rules for special categories of personal data.",
+   "kind": "Requirement",
+   "category": "Chapter II: Principles",
+   "subcategory": null,
+   "official_reference": "UK GDPR (Regulation (EU) 2016/679 as it forms part of the law of the United Kingdom), Article 11A"
+  },
+  {
+   "control_code": "Art. 12",
+   "title": "Transparent information, communication and modalities for the exercise of the rights of the data subject",
+   "description": "Controllers give information and communications to data subjects in a concise, transparent, intelligible and easily accessible form, and facilitate the exercise of their rights, normally within one month.",
+   "kind": "Requirement",
+   "category": "Chapter III: Rights of the data subject",
+   "subcategory": null,
+   "official_reference": "UK GDPR (Regulation (EU) 2016/679 as it forms part of the law of the United Kingdom), Article 12"
+  },
+  {
+   "control_code": "Art. 13",
+   "title": "Information to be provided where personal data are collected from the data subject",
+   "description": "Sets the information a controller gives the data subject when personal data is collected from them, such as identity, purposes, legal basis, recipients, transfers and retention.",
+   "kind": "Requirement",
+   "category": "Chapter III: Rights of the data subject",
+   "subcategory": null,
+   "official_reference": "UK GDPR (Regulation (EU) 2016/679 as it forms part of the law of the United Kingdom), Article 13"
+  },
+  {
+   "control_code": "Art. 14",
+   "title": "Information to be provided where personal data have not been obtained from the data subject",
+   "description": "Sets the information a controller gives the data subject when personal data was not obtained from them, including its source, and the time limits for providing it.",
+   "kind": "Requirement",
+   "category": "Chapter III: Rights of the data subject",
+   "subcategory": null,
+   "official_reference": "UK GDPR (Regulation (EU) 2016/679 as it forms part of the law of the United Kingdom), Article 14"
+  },
+  {
+   "control_code": "Art. 15",
+   "title": "Right of access by the data subject",
+   "description": "Gives the data subject the right to confirmation of processing, access to their personal data and supplementary information about it.",
+   "kind": "Requirement",
+   "category": "Chapter III: Rights of the data subject",
+   "subcategory": null,
+   "official_reference": "UK GDPR (Regulation (EU) 2016/679 as it forms part of the law of the United Kingdom), Article 15"
+  },
+  {
+   "control_code": "Art. 16",
+   "title": "Right to rectification",
+   "description": "Gives the data subject the right to have inaccurate personal data rectified and incomplete data completed without undue delay.",
+   "kind": "Requirement",
+   "category": "Chapter III: Rights of the data subject",
+   "subcategory": null,
+   "official_reference": "UK GDPR (Regulation (EU) 2016/679 as it forms part of the law of the United Kingdom), Article 16"
+  },
+  {
+   "control_code": "Art. 17",
+   "title": "Right to erasure (‘right to be forgotten’)",
+   "description": "Gives the data subject the right to erasure of personal data without undue delay in listed circumstances, with exceptions such as legal claims and freedom of expression.",
+   "kind": "Requirement",
+   "category": "Chapter III: Rights of the data subject",
+   "subcategory": null,
+   "official_reference": "UK GDPR (Regulation (EU) 2016/679 as it forms part of the law of the United Kingdom), Article 17"
+  },
+  {
+   "control_code": "Art. 18",
+   "title": "Right to restriction of processing",
+   "description": "Gives the data subject the right to restriction of processing where accuracy is contested, processing is unlawful, data is no longer needed or an objection is pending.",
+   "kind": "Requirement",
+   "category": "Chapter III: Rights of the data subject",
+   "subcategory": null,
+   "official_reference": "UK GDPR (Regulation (EU) 2016/679 as it forms part of the law of the United Kingdom), Article 18"
+  },
+  {
+   "control_code": "Art. 19",
+   "title": "Notification obligation regarding rectification or erasure of personal data or restriction of processing",
+   "description": "The controller communicates any rectification, erasure or restriction to each recipient to whom the data was disclosed, unless impossible or disproportionate.",
+   "kind": "Requirement",
+   "category": "Chapter III: Rights of the data subject",
+   "subcategory": null,
+   "official_reference": "UK GDPR (Regulation (EU) 2016/679 as it forms part of the law of the United Kingdom), Article 19"
+  },
+  {
+   "control_code": "Art. 20",
+   "title": "Right to data portability",
+   "description": "Gives the data subject the right to receive their data in a structured, commonly used and machine-readable format and to transmit it to another controller.",
+   "kind": "Requirement",
+   "category": "Chapter III: Rights of the data subject",
+   "subcategory": null,
+   "official_reference": "UK GDPR (Regulation (EU) 2016/679 as it forms part of the law of the United Kingdom), Article 20"
+  },
+  {
+   "control_code": "Art. 21",
+   "title": "Right to object",
+   "description": "Gives the data subject the right to object to processing based on public task or legitimate interests and to direct marketing, which must then stop.",
+   "kind": "Requirement",
+   "category": "Chapter III: Rights of the data subject",
+   "subcategory": null,
+   "official_reference": "UK GDPR (Regulation (EU) 2016/679 as it forms part of the law of the United Kingdom), Article 21"
+  },
+  {
+   "control_code": "Art. 22A",
+   "title": "Automated processing and significant decisions",
+   "description": "Defines when a decision is based solely on automated processing and when a decision is a significant decision, for the purposes of Articles 22B and 22C.",
+   "kind": "Requirement",
+   "category": "Chapter III: Rights of the data subject",
+   "subcategory": null,
+   "official_reference": "UK GDPR (Regulation (EU) 2016/679 as it forms part of the law of the United Kingdom), Article 22A"
+  },
+  {
+   "control_code": "Art. 22B",
+   "title": "Restrictions on automated decision-making",
+   "description": "Restricts significant decisions based entirely or partly on special category data, allowing them only with explicit consent, or where necessary for a contract or required or authorised by law and supported by a substantial public interest condition.",
+   "kind": "Constraint",
+   "category": "Chapter III: Rights of the data subject",
+   "subcategory": null,
+   "official_reference": "UK GDPR (Regulation (EU) 2016/679 as it forms part of the law of the United Kingdom), Article 22B"
+  },
+  {
+   "control_code": "Art. 22C",
+   "title": "Safeguards for automated decision-making",
+   "description": "Requires safeguards for significant decisions based solely on automated processing: information to the data subject, ability to make representations, human intervention and to contest the decision.",
+   "kind": "Requirement",
+   "category": "Chapter III: Rights of the data subject",
+   "subcategory": null,
+   "official_reference": "UK GDPR (Regulation (EU) 2016/679 as it forms part of the law of the United Kingdom), Article 22C"
+  },
+  {
+   "control_code": "Art. 22D",
+   "title": "Further provision about automated decision-making",
+   "description": "Allows the Secretary of State to make regulations on when there is or is not meaningful human involvement in a decision, and on significant decisions.",
+   "kind": "Requirement",
+   "category": "Chapter III: Rights of the data subject",
+   "subcategory": null,
+   "official_reference": "UK GDPR (Regulation (EU) 2016/679 as it forms part of the law of the United Kingdom), Article 22D"
+  },
+  {
+   "control_code": "Art. 23",
+   "title": "Restrictions",
+   "description": "Allows the Secretary of State to restrict the scope of data subject rights and controller obligations by regulations for listed important public interest objectives.",
+   "kind": "Requirement",
+   "category": "Chapter III: Rights of the data subject",
+   "subcategory": null,
+   "official_reference": "UK GDPR (Regulation (EU) 2016/679 as it forms part of the law of the United Kingdom), Article 23"
+  },
+  {
+   "control_code": "Art. 24",
+   "title": "Responsibility of the controller",
+   "description": "The controller implements appropriate technical and organisational measures to ensure and demonstrate that processing complies with the Regulation.",
+   "kind": "Requirement",
+   "category": "Chapter IV: Controller and processor",
+   "subcategory": null,
+   "official_reference": "UK GDPR (Regulation (EU) 2016/679 as it forms part of the law of the United Kingdom), Article 24"
+  },
+  {
+   "control_code": "Art. 25",
+   "title": "Data protection by design and by default",
+   "description": "Controllers implement data protection by design and by default, so that by default only the personal data necessary for each purpose is processed.",
+   "kind": "Requirement",
+   "category": "Chapter IV: Controller and processor",
+   "subcategory": null,
+   "official_reference": "UK GDPR (Regulation (EU) 2016/679 as it forms part of the law of the United Kingdom), Article 25"
+  },
+  {
+   "control_code": "Art. 26",
+   "title": "Joint controllers",
+   "description": "Joint controllers set out their respective responsibilities in a transparent arrangement, and data subjects can exercise their rights against each.",
+   "kind": "Requirement",
+   "category": "Chapter IV: Controller and processor",
+   "subcategory": null,
+   "official_reference": "UK GDPR (Regulation (EU) 2016/679 as it forms part of the law of the United Kingdom), Article 26"
+  },
+  {
+   "control_code": "Art. 27",
+   "title": "Representatives of controllers or processors not established in the United Kingdom",
+   "description": "A controller or processor subject to the Regulation through offering goods or services or monitoring in the UK, but not established there, designates a representative in the United Kingdom.",
+   "kind": "Requirement",
+   "category": "Chapter IV: Controller and processor",
+   "subcategory": null,
+   "official_reference": "UK GDPR (Regulation (EU) 2016/679 as it forms part of the law of the United Kingdom), Article 27"
+  },
+  {
+   "control_code": "Art. 28",
+   "title": "Processor",
+   "description": "Controllers use only processors that give sufficient guarantees, and processing by a processor is governed by a contract with the mandatory terms.",
+   "kind": "Requirement",
+   "category": "Chapter IV: Controller and processor",
+   "subcategory": null,
+   "official_reference": "UK GDPR (Regulation (EU) 2016/679 as it forms part of the law of the United Kingdom), Article 28"
+  },
+  {
+   "control_code": "Art. 29",
+   "title": "Processing under the authority of the controller or processor",
+   "description": "A processor, and anyone acting under its authority with access to personal data, processes it only on the controller's instructions unless required by law.",
+   "kind": "Constraint",
+   "category": "Chapter IV: Controller and processor",
+   "subcategory": null,
+   "official_reference": "UK GDPR (Regulation (EU) 2016/679 as it forms part of the law of the United Kingdom), Article 29"
+  },
+  {
+   "control_code": "Art. 30",
+   "title": "Records of processing activities",
+   "description": "Controllers and processors keep records of processing activities and make them available to the Commission on request, with an exemption for small organisations that process occasionally and at low risk.",
+   "kind": "Requirement",
+   "category": "Chapter IV: Controller and processor",
+   "subcategory": null,
+   "official_reference": "UK GDPR (Regulation (EU) 2016/679 as it forms part of the law of the United Kingdom), Article 30"
+  },
+  {
+   "control_code": "Art. 31",
+   "title": "Cooperation with the Commission",
+   "description": "Controllers and processors, and their representatives, cooperate on request with the Commission in the performance of its tasks.",
+   "kind": "Requirement",
+   "category": "Chapter IV: Controller and processor",
+   "subcategory": null,
+   "official_reference": "UK GDPR (Regulation (EU) 2016/679 as it forms part of the law of the United Kingdom), Article 31"
+  },
+  {
+   "control_code": "Art. 32",
+   "title": "Security of processing",
+   "description": "Controllers and processors implement appropriate technical and organisational security measures, which can include pseudonymisation, encryption, resilience, recovery and regular testing.",
+   "kind": "Requirement",
+   "category": "Chapter IV: Controller and processor",
+   "subcategory": null,
+   "official_reference": "UK GDPR (Regulation (EU) 2016/679 as it forms part of the law of the United Kingdom), Article 32"
+  },
+  {
+   "control_code": "Art. 33",
+   "title": "Notification of a personal data breach to the Commission",
+   "description": "The controller notifies the Commission of a personal data breach without undue delay and where feasible within 72 hours, unless it is unlikely to result in risk, and processors notify the controller.",
+   "kind": "Requirement",
+   "category": "Chapter IV: Controller and processor",
+   "subcategory": null,
+   "official_reference": "UK GDPR (Regulation (EU) 2016/679 as it forms part of the law of the United Kingdom), Article 33"
+  },
+  {
+   "control_code": "Art. 34",
+   "title": "Communication of a personal data breach to the data subject",
+   "description": "The controller tells the data subject without undue delay when a breach is likely to result in a high risk to their rights and freedoms, subject to exceptions.",
+   "kind": "Requirement",
+   "category": "Chapter IV: Controller and processor",
+   "subcategory": null,
+   "official_reference": "UK GDPR (Regulation (EU) 2016/679 as it forms part of the law of the United Kingdom), Article 34"
+  },
+  {
+   "control_code": "Art. 35",
+   "title": "Data protection impact assessment",
+   "description": "Controllers carry out a data protection impact assessment before processing that is likely to result in a high risk, such as large-scale special category data or systematic monitoring.",
+   "kind": "Requirement",
+   "category": "Chapter IV: Controller and processor",
+   "subcategory": null,
+   "official_reference": "UK GDPR (Regulation (EU) 2016/679 as it forms part of the law of the United Kingdom), Article 35"
+  },
+  {
+   "control_code": "Art. 36",
+   "title": "Prior consultation",
+   "description": "The controller consults the Commission before processing where an impact assessment shows a high risk that is not mitigated.",
+   "kind": "Requirement",
+   "category": "Chapter IV: Controller and processor",
+   "subcategory": null,
+   "official_reference": "UK GDPR (Regulation (EU) 2016/679 as it forms part of the law of the United Kingdom), Article 36"
+  },
+  {
+   "control_code": "Art. 37",
+   "title": "Designation of the data protection officer",
+   "description": "Controllers and processors designate a data protection officer where required, such as for public authorities and large-scale regular monitoring or special category processing.",
+   "kind": "Requirement",
+   "category": "Chapter IV: Controller and processor",
+   "subcategory": null,
+   "official_reference": "UK GDPR (Regulation (EU) 2016/679 as it forms part of the law of the United Kingdom), Article 37"
+  },
+  {
+   "control_code": "Art. 38",
+   "title": "Position of the data protection officer",
+   "description": "The data protection officer is involved in all data protection issues, is supported with resources, reports to the highest management level and is not instructed or penalised for their tasks.",
+   "kind": "Requirement",
+   "category": "Chapter IV: Controller and processor",
+   "subcategory": null,
+   "official_reference": "UK GDPR (Regulation (EU) 2016/679 as it forms part of the law of the United Kingdom), Article 38"
+  },
+  {
+   "control_code": "Art. 39",
+   "title": "Tasks of the data protection officer",
+   "description": "Sets the data protection officer's tasks: informing and advising, monitoring compliance, advising on impact assessments and cooperating with the Commission.",
+   "kind": "Requirement",
+   "category": "Chapter IV: Controller and processor",
+   "subcategory": null,
+   "official_reference": "UK GDPR (Regulation (EU) 2016/679 as it forms part of the law of the United Kingdom), Article 39"
+  },
+  {
+   "control_code": "Art. 40",
+   "title": "Codes of conduct",
+   "description": "The Commission encourages codes of conduct to contribute to the proper application of the Regulation.",
+   "kind": "Requirement",
+   "category": "Chapter IV: Controller and processor",
+   "subcategory": null,
+   "official_reference": "UK GDPR (Regulation (EU) 2016/679 as it forms part of the law of the United Kingdom), Article 40"
+  },
+  {
+   "control_code": "Art. 41",
+   "title": "Monitoring of approved codes of conduct",
+   "description": "Sets how compliance with an approved code of conduct is monitored by an accredited body.",
+   "kind": "Requirement",
+   "category": "Chapter IV: Controller and processor",
+   "subcategory": null,
+   "official_reference": "UK GDPR (Regulation (EU) 2016/679 as it forms part of the law of the United Kingdom), Article 41"
+  },
+  {
+   "control_code": "Art. 42",
+   "title": "Certification",
+   "description": "The Commission encourages data protection certification mechanisms, seals and marks to demonstrate compliance, which remain voluntary.",
+   "kind": "Requirement",
+   "category": "Chapter IV: Controller and processor",
+   "subcategory": null,
+   "official_reference": "UK GDPR (Regulation (EU) 2016/679 as it forms part of the law of the United Kingdom), Article 42"
+  },
+  {
+   "control_code": "Art. 43",
+   "title": "Certification bodies",
+   "description": "Sets the rules for certification bodies, their accreditation and their responsibilities.",
+   "kind": "Requirement",
+   "category": "Chapter IV: Controller and processor",
+   "subcategory": null,
+   "official_reference": "UK GDPR (Regulation (EU) 2016/679 as it forms part of the law of the United Kingdom), Article 43"
+  },
+  {
+   "control_code": "Art. 44A",
+   "title": "General principles for transfers",
+   "description": "Allows a controller or processor to transfer personal data to a third country or international organisation only if the transfer is approved by regulations or is subject to appropriate safeguards or a specific derogation, and the data protection test is met.",
+   "kind": "Constraint",
+   "category": "Chapter V: Transfers of personal data to third countries or international organisations",
+   "subcategory": null,
+   "official_reference": "UK GDPR (Regulation (EU) 2016/679 as it forms part of the law of the United Kingdom), Article 44A"
+  },
+  {
+   "control_code": "Art. 45A",
+   "title": "Transfers approved by regulations",
+   "description": "Allows the Secretary of State to approve transfers of personal data to a third country, an international organisation, or a description of them, by regulations.",
+   "kind": "Requirement",
+   "category": "Chapter V: Transfers of personal data to third countries or international organisations",
+   "subcategory": null,
+   "official_reference": "UK GDPR (Regulation (EU) 2016/679 as it forms part of the law of the United Kingdom), Article 45A"
+  },
+  {
+   "control_code": "Art. 45B",
+   "title": "The data protection test",
+   "description": "Sets the data protection test: the standard of protection must not be materially lower than in the United Kingdom, taking account of listed factors.",
+   "kind": "Requirement",
+   "category": "Chapter V: Transfers of personal data to third countries or international organisations",
+   "subcategory": null,
+   "official_reference": "UK GDPR (Regulation (EU) 2016/679 as it forms part of the law of the United Kingdom), Article 45B"
+  },
+  {
+   "control_code": "Art. 45C",
+   "title": "Transfers approved by regulations: monitoring",
+   "description": "The Secretary of State monitors developments in third countries and international organisations that could affect approved transfers, and keeps approvals under review.",
+   "kind": "Requirement",
+   "category": "Chapter V: Transfers of personal data to third countries or international organisations",
+   "subcategory": null,
+   "official_reference": "UK GDPR (Regulation (EU) 2016/679 as it forms part of the law of the United Kingdom), Article 45C"
+  },
+  {
+   "control_code": "Art. 46",
+   "title": "Transfers subject to appropriate safeguards",
+   "description": "Allows transfers subject to appropriate safeguards, such as standard data protection clauses, binding corporate rules and approved codes or certifications, provided the data protection test is met.",
+   "kind": "Requirement",
+   "category": "Chapter V: Transfers of personal data to third countries or international organisations",
+   "subcategory": null,
+   "official_reference": "UK GDPR (Regulation (EU) 2016/679 as it forms part of the law of the United Kingdom), Article 46"
+  },
+  {
+   "control_code": "Art. 47",
+   "title": "Transfers subject to appropriate safeguards: Binding corporate rules",
+   "description": "The Commission approves binding corporate rules for transfers within a group of undertakings if they are legally binding, enforceable and contain the specified content.",
+   "kind": "Requirement",
+   "category": "Chapter V: Transfers of personal data to third countries or international organisations",
+   "subcategory": null,
+   "official_reference": "UK GDPR (Regulation (EU) 2016/679 as it forms part of the law of the United Kingdom), Article 47"
+  },
+  {
+   "control_code": "Art. 47A",
+   "title": "Transfers subject to appropriate safeguards: further provision",
+   "description": "Allows the Secretary of State to specify standard data protection clauses that are capable of securing that the data protection test is met.",
+   "kind": "Requirement",
+   "category": "Chapter V: Transfers of personal data to third countries or international organisations",
+   "subcategory": null,
+   "official_reference": "UK GDPR (Regulation (EU) 2016/679 as it forms part of the law of the United Kingdom), Article 47A"
+  },
+  {
+   "control_code": "Art. 49",
+   "title": "Derogations for specific situations",
+   "description": "Sets the derogations for specific situations in which a transfer may take place without approval or safeguards, such as explicit consent, contract necessity, important public interest and legal claims.",
+   "kind": "Constraint",
+   "category": "Chapter V: Transfers of personal data to third countries or international organisations",
+   "subcategory": null,
+   "official_reference": "UK GDPR (Regulation (EU) 2016/679 as it forms part of the law of the United Kingdom), Article 49"
+  },
+  {
+   "control_code": "Art. 49A",
+   "title": "Restriction in the public interest",
+   "description": "Allows the Secretary of State to restrict by regulations the transfer of a category of personal data to a third country for important reasons of public interest.",
+   "kind": "Constraint",
+   "category": "Chapter V: Transfers of personal data to third countries or international organisations",
+   "subcategory": null,
+   "official_reference": "UK GDPR (Regulation (EU) 2016/679 as it forms part of the law of the United Kingdom), Article 49A"
+  },
+  {
+   "control_code": "Art. 50",
+   "title": "International cooperation for the protection of personal data",
+   "description": "In relation to third countries and international organisations, the Commission takes steps to develop international cooperation and mutual assistance on personal data protection.",
+   "kind": "Requirement",
+   "category": "Chapter V: Transfers of personal data to third countries or international organisations",
+   "subcategory": null,
+   "official_reference": "UK GDPR (Regulation (EU) 2016/679 as it forms part of the law of the United Kingdom), Article 50"
+  },
+  {
+   "control_code": "Art. 51",
+   "title": "Monitoring the application of this Regulation",
+   "description": "The Commission is responsible for monitoring the application of the Regulation to protect fundamental rights and to facilitate the free flow of personal data.",
+   "kind": "Requirement",
+   "category": "Chapter VI: The Commission",
+   "subcategory": null,
+   "official_reference": "UK GDPR (Regulation (EU) 2016/679 as it forms part of the law of the United Kingdom), Article 51"
+  },
+  {
+   "control_code": "Art. 52",
+   "title": "Independence",
+   "description": "The Commission acts with complete independence in performing its tasks and exercising its powers and remains free from external influence.",
+   "kind": "Requirement",
+   "category": "Chapter VI: The Commission",
+   "subcategory": null,
+   "official_reference": "UK GDPR (Regulation (EU) 2016/679 as it forms part of the law of the United Kingdom), Article 52"
+  },
+  {
+   "control_code": "Art. 57",
+   "title": "Tasks",
+   "description": "Sets the Commission's tasks, including monitoring and enforcing the Regulation, promoting awareness, advising, handling complaints and cooperating with other authorities.",
+   "kind": "Requirement",
+   "category": "Chapter VI: The Commission",
+   "subcategory": null,
+   "official_reference": "UK GDPR (Regulation (EU) 2016/679 as it forms part of the law of the United Kingdom), Article 57"
+  },
+  {
+   "control_code": "Art. 58",
+   "title": "Powers",
+   "description": "Sets the Commission's powers, including investigative powers, corrective powers such as warnings, orders and fines, and authorisation and advisory powers.",
+   "kind": "Requirement",
+   "category": "Chapter VI: The Commission",
+   "subcategory": null,
+   "official_reference": "UK GDPR (Regulation (EU) 2016/679 as it forms part of the law of the United Kingdom), Article 58"
+  },
+  {
+   "control_code": "Art. 78",
+   "title": "Right to an effective judicial remedy against the Commission",
+   "description": "Gives each person the right to an effective judicial remedy against a legally binding decision of the Commission concerning them.",
+   "kind": "Requirement",
+   "category": "Chapter VIII: Remedies, liability and penalties",
+   "subcategory": null,
+   "official_reference": "UK GDPR (Regulation (EU) 2016/679 as it forms part of the law of the United Kingdom), Article 78"
+  },
+  {
+   "control_code": "Art. 79",
+   "title": "Right to an effective judicial remedy against a controller or processor",
+   "description": "Gives a data subject the right to an effective judicial remedy against a controller or processor where their rights have been infringed.",
+   "kind": "Requirement",
+   "category": "Chapter VIII: Remedies, liability and penalties",
+   "subcategory": null,
+   "official_reference": "UK GDPR (Regulation (EU) 2016/679 as it forms part of the law of the United Kingdom), Article 79"
+  },
+  {
+   "control_code": "Art. 80",
+   "title": "Representation of data subjects",
+   "description": "Gives the data subject the right to mandate a not-for-profit body to lodge a complaint and exercise rights on their behalf.",
+   "kind": "Requirement",
+   "category": "Chapter VIII: Remedies, liability and penalties",
+   "subcategory": null,
+   "official_reference": "UK GDPR (Regulation (EU) 2016/679 as it forms part of the law of the United Kingdom), Article 80"
+  },
+  {
+   "control_code": "Art. 82",
+   "title": "Right to compensation and liability",
+   "description": "Gives any person who has suffered material or non-material damage from an infringement the right to compensation from the controller or processor.",
+   "kind": "Requirement",
+   "category": "Chapter VIII: Remedies, liability and penalties",
+   "subcategory": null,
+   "official_reference": "UK GDPR (Regulation (EU) 2016/679 as it forms part of the law of the United Kingdom), Article 82"
+  },
+  {
+   "control_code": "Art. 83",
+   "title": "General conditions for imposing administrative fines",
+   "description": "Sets the general conditions for administrative fines, which must be effective, proportionate and dissuasive, with the factors to consider and the maximum amounts.",
+   "kind": "Requirement",
+   "category": "Chapter VIII: Remedies, liability and penalties",
+   "subcategory": null,
+   "official_reference": "UK GDPR (Regulation (EU) 2016/679 as it forms part of the law of the United Kingdom), Article 83"
+  },
+  {
+   "control_code": "Art. 84",
+   "title": "Penalties",
+   "description": "Provides that Part 6 of the Data Protection Act 2018 makes further provision about penalties for infringements of the Regulation.",
+   "kind": "Requirement",
+   "category": "Chapter VIII: Remedies, liability and penalties",
+   "subcategory": null,
+   "official_reference": "UK GDPR (Regulation (EU) 2016/679 as it forms part of the law of the United Kingdom), Article 84"
+  },
+  {
+   "control_code": "Art. 84A",
+   "title": "Research, archives and statistics",
+   "description": "Introduces the Chapter on processing for scientific or historical research, archiving in the public interest or statistical purposes, referred to as RAS purposes.",
+   "kind": "Requirement",
+   "category": "Chapter 8A: Safeguards for processing for research, archiving or statistical purposes",
+   "subcategory": null,
+   "official_reference": "UK GDPR (Regulation (EU) 2016/679 as it forms part of the law of the United Kingdom), Article 84A"
+  },
+  {
+   "control_code": "Art. 84B",
+   "title": "Additional requirements when processing for RAS purposes",
+   "description": "Personal data may be processed for RAS purposes only if the processing is for those purposes, meets the specified conditions and is carried out subject to appropriate safeguards.",
+   "kind": "Constraint",
+   "category": "Chapter 8A: Safeguards for processing for research, archiving or statistical purposes",
+   "subcategory": null,
+   "official_reference": "UK GDPR (Regulation (EU) 2016/679 as it forms part of the law of the United Kingdom), Article 84B"
+  },
+  {
+   "control_code": "Art. 84C",
+   "title": "Appropriate safeguards",
+   "description": "Explains when the safeguards requirement for RAS processing is not satisfied: where processing is likely to cause substantial damage or distress, or is for measures or decisions about a particular person, with limited exceptions.",
+   "kind": "Requirement",
+   "category": "Chapter 8A: Safeguards for processing for research, archiving or statistical purposes",
+   "subcategory": null,
+   "official_reference": "UK GDPR (Regulation (EU) 2016/679 as it forms part of the law of the United Kingdom), Article 84C"
+  },
+  {
+   "control_code": "Art. 84D",
+   "title": "Appropriate safeguards: further provision",
+   "description": "Allows the Secretary of State to make regulations with further provision about when the safeguards requirement for RAS processing is, or is not, met.",
+   "kind": "Requirement",
+   "category": "Chapter 8A: Safeguards for processing for research, archiving or statistical purposes",
+   "subcategory": null,
+   "official_reference": "UK GDPR (Regulation (EU) 2016/679 as it forms part of the law of the United Kingdom), Article 84D"
+  },
+  {
+   "control_code": "Art. 85",
+   "title": "Processing and freedom of expression and information",
+   "description": "Provides for exemptions and derogations for processing carried out for journalistic purposes or for academic, artistic or literary expression, reconciling data protection with freedom of expression.",
+   "kind": "Requirement",
+   "category": "Chapter IX: Provisions relating to other specific processing situations",
+   "subcategory": null,
+   "official_reference": "UK GDPR (Regulation (EU) 2016/679 as it forms part of the law of the United Kingdom), Article 85"
+  },
+  {
+   "control_code": "Art. 86",
+   "title": "Processing and public access to official documents",
+   "description": "Personal data in official documents held by a public authority or body may be disclosed in accordance with domestic law, to reconcile public access to official documents with data protection.",
+   "kind": "Requirement",
+   "category": "Chapter IX: Provisions relating to other specific processing situations",
+   "subcategory": null,
+   "official_reference": "UK GDPR (Regulation (EU) 2016/679 as it forms part of the law of the United Kingdom), Article 86"
+  },
+  {
+   "control_code": "Art. 86A",
+   "title": "Processing and national security and defence",
+   "description": "Points to Chapter 3 of Part 2 of the 2018 Act, which makes provision for the application of the Regulation to processing for national security and defence purposes.",
+   "kind": "Requirement",
+   "category": "Chapter IX: Provisions relating to other specific processing situations",
+   "subcategory": null,
+   "official_reference": "UK GDPR (Regulation (EU) 2016/679 as it forms part of the law of the United Kingdom), Article 86A"
+  },
+  {
+   "control_code": "Art. 91A",
+   "title": "Regulations made by Secretary of State",
+   "description": "Sets the procedure for regulations made by the Secretary of State under the Regulation, including consultation with the Commission and the Parliamentary procedure.",
+   "kind": "Requirement",
+   "category": "Chapter 9A: Regulations",
+   "subcategory": null,
+   "official_reference": "UK GDPR (Regulation (EU) 2016/679 as it forms part of the law of the United Kingdom), Article 91A"
+  },
+  {
+   "control_code": "Art. 94",
+   "title": "Repeal of Directive 95/46/EC",
+   "description": "Provides that references to Directive 95/46/EC, which ceased to have effect on 25 May 2018, are construed as references to this Regulation.",
+   "kind": "Requirement",
+   "category": "Chapter XI: Final provisions",
+   "subcategory": null,
+   "official_reference": "UK GDPR (Regulation (EU) 2016/679 as it forms part of the law of the United Kingdom), Article 94"
+  },
+  {
+   "control_code": "Art. 95",
+   "title": "Relationship with domestic law made before IP completion day implementing Directive 2002/58/EC of the European Parliament and of the Council of 12th July 2002 concerning the processing of personal data and the protection of privacy in the electronic communications sector",
+   "description": "The Regulation does not impose additional obligations on persons in connection with the provision of public electronic communications services where they are subject to specific obligations with the same objective under the ePrivacy rules.",
+   "kind": "Constraint",
+   "category": "Chapter XI: Final provisions",
+   "subcategory": null,
+   "official_reference": "UK GDPR (Regulation (EU) 2016/679 as it forms part of the law of the United Kingdom), Article 95"
+  },
+  {
+   "control_code": "Art. 96",
+   "title": "Relationship with previously concluded Agreements",
+   "description": "International agreements on the transfer of personal data concluded by the United Kingdom or the Commissioner before 24 May 2016, and compliant with domestic law at that date, remain in force until amended, replaced or revoked.",
+   "kind": "Requirement",
+   "category": "Chapter XI: Final provisions",
+   "subcategory": null,
+   "official_reference": "UK GDPR (Regulation (EU) 2016/679 as it forms part of the law of the United Kingdom), Article 96"
+  }
+ ]
+}

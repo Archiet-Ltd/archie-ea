@@ -665,67 +665,6 @@ class RegulatoryFrameworkService:
                  "category": "Confidentiality", "priority": "high"},
             ],
         },
-        {
-            "code": "DORA",
-            "name": "EU Digital Operational Resilience Act (DORA)",
-            "description": "EU regulation on digital operational resilience for the financial sector, covering ICT risk management, incident reporting, digital operational resilience testing and third-party risk.",
-            "category": "security",
-            "jurisdiction": "EU",
-            "enforcement_level": "mandatory",
-            "penalty_risk": "high",
-            "applies_to_manufacturing": False,
-            "applies_to_region": "EU",
-            "industry_specific": "financial",
-            "official_url": "https://eur-lex.europa.eu/eli/reg/2022/2554",
-            "standard_version": "2022",
-            "controls": [
-                {"control_code": "DORA-Art.5", "title": "ICT governance and organisation",
-                 "description": "The management body shall define and oversee the ICT risk management framework.",
-                 "category": "ICT Risk Management", "priority": "critical"},
-                {"control_code": "DORA-Art.6", "title": "ICT risk management framework",
-                 "description": "A sound ICT risk management framework shall be established as part of the overall risk management system.",
-                 "category": "ICT Risk Management", "priority": "critical"},
-                {"control_code": "DORA-Art.7", "title": "ICT systems, protocols and tools",
-                 "description": "ICT systems and tools shall be identified, classified and adequately protected.",
-                 "category": "ICT Risk Management", "priority": "high"},
-                {"control_code": "DORA-Art.8", "title": "Identification of ICT-related incidents",
-                 "description": "Mechanisms to promptly detect anomalous activities and ICT-related incidents shall be in place.",
-                 "category": "ICT Risk Management", "priority": "high"},
-                {"control_code": "DORA-Art.9", "title": "Protection and prevention",
-                 "description": "Measures shall be in place to protect ICT systems and prevent incidents.",
-                 "category": "ICT Risk Management", "priority": "high"},
-                {"control_code": "DORA-Art.10", "title": "Detection",
-                 "description": "Mechanisms to promptly detect anomalous activities shall be in place.",
-                 "category": "ICT Risk Management", "priority": "high"},
-                {"control_code": "DORA-Art.11", "title": "Response and recovery",
-                 "description": "Comprehensive ICT business continuity policies and disaster recovery plans shall be in place.",
-                 "category": "ICT Risk Management", "priority": "critical"},
-                {"control_code": "DORA-Art.12", "title": "Backup policies and restoration",
-                 "description": "Backup policies and restoration and recovery procedures shall be established.",
-                 "category": "ICT Risk Management", "priority": "high"},
-                {"control_code": "DORA-Art.13", "title": "Learning and evolving",
-                 "description": "Capabilities and staff shall be kept up to date with evolving ICT risk.",
-                 "category": "ICT Risk Management", "priority": "medium"},
-                {"control_code": "DORA-Art.15", "title": "ICT incident management process",
-                 "description": "An ICT incident management process shall be established to detect, manage and notify ICT-related incidents.",
-                 "category": "Incident Reporting", "priority": "critical"},
-                {"control_code": "DORA-Art.17", "title": "Classification of ICT-related incidents",
-                 "description": "ICT-related incidents shall be classified based on criteria including impact and duration.",
-                 "category": "Incident Reporting", "priority": "high"},
-                {"control_code": "DORA-Art.19", "title": "Reporting of major incidents",
-                 "description": "Major ICT-related incidents shall be reported to the competent authority.",
-                 "category": "Incident Reporting", "priority": "critical"},
-                {"control_code": "DORA-Art.24", "title": "Digital operational resilience testing",
-                 "description": "A comprehensive digital operational resilience testing programme shall be established.",
-                 "category": "Resilience Testing", "priority": "high"},
-                {"control_code": "DORA-Art.26", "title": "Threat-led penetration testing",
-                 "description": "Advanced threat-led penetration testing shall be carried out at least every three years.",
-                 "category": "Resilience Testing", "priority": "high"},
-                {"control_code": "DORA-Art.28", "title": "Third-party ICT risk strategy",
-                 "description": "A strategy on ICT third-party risk shall be established and regularly reviewed.",
-                 "category": "Third-Party Risk", "priority": "critical"},
-            ],
-        },
     ]
 
     @staticmethod
@@ -851,6 +790,62 @@ class RegulatoryFrameworkService:
                 values[key] = value
         return values
 
+    # Control codes earlier releases stored, by normalised framework code, and the pack code each
+    # one folds onto. The old row keeps its id (and so its adoptions and links); it takes the
+    # pack's code instead of sitting beside it as a second row.
+    LEGACY_CONTROL_CODES = {
+        "GDPR": {"Article - 32": "Art. 32", "Article - 33": "Art. 33"},
+        "PCIDSS": {"3.2.1": "Req. 3", "8.2.1": "Req. 8"},
+    }
+
+    @staticmethod
+    def _fold_legacy_codes(framework_code: str, present: Dict[str, "ComplianceControl"]) -> int:
+        """Move rows stored under an old spelling of a control code onto the pack's code.
+        If the pack's code already has a row, the old row is flagged inactive (never deleted)
+        so the framework does not hold two rows for one control. Returns rows moved or flagged."""
+        legacy = RegulatoryFrameworkService.LEGACY_CONTROL_CODES.get(
+            RegulatoryFrameworkService._normal_code(framework_code), {}
+        )
+        changed = 0
+        for old_code, new_code in legacy.items():
+            row = present.get(old_code)
+            if row is None:
+                continue
+            if new_code in present:
+                if row.is_active is not False:
+                    row.is_active = False
+                    changed += 1
+                continue
+            row.control_code = new_code
+            present[new_code] = row
+            del present[old_code]
+            changed += 1
+        return changed
+
+    @staticmethod
+    def _top_up_adoptions(framework, new_controls) -> int:
+        """Give controls added to a framework to every organisation that already adopted it, as
+        "planned" under that organisation. Work already recorded is not touched, and no
+        organisation is given a framework it did not adopt. Reads every organisation's adoptions,
+        so it runs as a platform job."""
+        if not new_controls:
+            return 0
+        from app.jobs.tenant_safe_job import platform_scope
+        from app.models.regulatory_framework import FrameworkAdoption
+        from app.modules.compliance.services.applicability_service import ApplicabilityService
+
+        added = 0
+        with platform_scope("reference library: top up adopted frameworks with new controls"):
+            adoptions = (
+                FrameworkAdoption.query.filter_by(framework_id=framework.id)
+                .filter(FrameworkAdoption.organization_id.isnot(None))
+                .all()
+            )
+            for adoption in adoptions:
+                added += ApplicabilityService.plan_controls(adoption, new_controls)
+            db.session.flush()
+        return added
+
     @staticmethod
     def seed_manufacturing_frameworks():
         """Seed the platform-wide reference library of frameworks and controls.
@@ -864,6 +859,10 @@ class RegulatoryFrameworkService:
         Library packs (app/data/compliance_library) carry the standards loaded in
         full or as identifiers; the frameworks defined before the library stay as
         sample rows unless a pack covers them.
+
+        A control added to a pack after an organisation adopted the framework is given to that
+        adoption as "planned" (the seed itself never creates an adoption). A control stored
+        under an old spelling of its code is moved onto the pack's code rather than duplicated.
 
         Returns:
             Number of frameworks added
@@ -908,6 +907,10 @@ class RegulatoryFrameworkService:
                 c.control_code: c
                 for c in ComplianceControl.query.filter_by(framework_id=framework.id).all()
             }
+            folded = RegulatoryFrameworkService._fold_legacy_codes(framework.code, present)
+            if folded:
+                db.session.flush()
+            new_controls = []
             for raw in controls_data:
                 values = RegulatoryFrameworkService._control_values(raw)
                 code = values.get("control_code")
@@ -915,11 +918,22 @@ class RegulatoryFrameworkService:
                     continue
                 control = present.get(code)
                 if control is None:
-                    db.session.add(ComplianceControl(framework_id=framework.id, **values))
+                    control = ComplianceControl(framework_id=framework.id, **values)
+                    db.session.add(control)
+                    present[code] = control
+                    new_controls.append(control)
                 else:
                     for key in ("title", "description", "category", "subcategory", "official_reference"):
                         if key in values and getattr(control, key) != values[key]:
                             setattr(control, key, values[key])
+
+            if new_controls:
+                db.session.flush()
+                topped_up = RegulatoryFrameworkService._top_up_adoptions(framework, new_controls)
+                if topped_up:
+                    logger.info(
+                        f"Library framework {framework.code}: {topped_up} planned controls added to existing adoptions"
+                    )
 
             logger.info(f"Library framework {framework.code}: {len(controls_data)} controls defined")
 
