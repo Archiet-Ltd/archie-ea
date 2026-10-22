@@ -7,7 +7,11 @@ technical owner on its own does not make it owned.
 """
 from __future__ import annotations
 
+import json
+import re
+
 import pytest
+from bs4 import BeautifulSoup
 
 from tests.test_application_owner_one_store import _person
 from tests.test_application_owner_writer import _make_app
@@ -64,7 +68,7 @@ def _v2_dashboard_owner_coverage(app, user, org, monkeypatch):
     return captured["data_coverage"]
 
 
-def test_both_screens_report_two_owned_and_two_unowned(app, db_session, make_org, monkeypatch):
+def test_both_screens_report_two_owned_and_two_unowned(app, db_session, make_org, monkeypatch, client, login_as):
     from app.modules.intelligence.services.query_catalogue import _applications_without_owner
 
     org = make_org("owned-one-def")
@@ -78,6 +82,43 @@ def test_both_screens_report_two_owned_and_two_unowned(app, db_session, make_org
     # 2 of 4 applications owned = 50% on both dashboards.
     assert _dashboard_owner_coverage(app, user, org)["owner"] == 50
     assert _v2_dashboard_owner_coverage(app, user, org, monkeypatch)["owner"] == 50
+
+    # My Applications portfolio banner: 2 owned, 4 total.
+    login_as(client, user)
+    response = client.get("/applications/")
+    assert response.status_code == 200
+    soup = BeautifulSoup(response.get_data(as_text=True), "html.parser")
+    text = " ".join(soup.get_text().split())
+    m = re.search(r"(\d+) of (\d+) applications in the portfolio have a named owner", text)
+    assert m is not None, "portfolio banner not found"
+    owned, total = int(m.group(1)), int(m.group(2))
+    assert owned == 2
+    assert total == 4
+
+    # Coverage debug endpoint: 2 owned, 4 total.
+    login_as(client, user)
+    response = client.get("/dashboard/api/coverage-debug")
+    assert response.status_code == 200
+    data = json.loads(response.get_data(as_text=True))
+    assert data["ok"] is True
+    assert data["owner"] == 2
+    assert data["total"] == 4
+
+    # Gap analysis: the two unowned apps (technical_only, nothing) have no capabilities/processes,
+    # so they should be reported as orphaned.
+    from app.services.gap_analysis_service import ArchitecturalGapAnalyzer
+    from flask import g
+    from flask_login import login_user
+
+    with app.test_request_context("/"):
+        login_user(user)
+        g.current_org_id = org.id
+        analyzer = ArchitecturalGapAnalyzer()
+        gaps = analyzer.analyze_portfolio_gaps()
+        orphaned = gaps.get("orphaned_applications", [])
+        orphaned_ids = {o["application_id"] for o in orphaned}
+        assert len(orphaned) == 2
+        assert orphaned_ids == {technical_only.id, nothing.id}
 
 
 def test_python_predicate_agrees_with_the_sql(app, db_session, make_org):

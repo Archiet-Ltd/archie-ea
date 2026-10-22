@@ -192,17 +192,11 @@ def test_six_ownership_numbers_agree(estate, client, login_as):
     portfolio = _soup(_get(client, login_as, estate["portfolio"], "/applications/"))
     assigned, portfolio_total = _portfolio_banner(portfolio)
 
-    from app.models.application_owner import ApplicationOwner
-
-    org_id = estate["org"].id
-    with_ownership_row = {
-        o.application_id for o in ApplicationOwner.query.filter_by(organization_id=org_id).all()
-    }
-    with_business_owner = {a.id for a in estate["apps"].values() if a.business_owner}
     assert portfolio_total == len(estate["apps"])
-    # Every application either manager owns is counted as having a named owner,
-    # so the sending side can never say "none" while the receiving side says "1".
-    assert assigned == len(with_ownership_row | with_business_owner) == 5
+    # Owned means primary or business owner record, or legacy application/business owner text.
+    # A (primary), C (business), D (primary by other), F (legacy business_owner) = 4 owned.
+    # B (backup only) and E (no owner) are not owned.
+    assert assigned == 4
     assert assigned >= total
 
 
@@ -579,7 +573,9 @@ def test_other_organisations_assignments_do_not_count_as_owned(db_session, make_
     _own(db_session, org_b, manager_a, foreign_row_only, "primary")
 
     page = _soup(_get(client, login_as, portfolio, "/applications/"))
-    assert _portfolio_banner(page) == (1, 5)
+    # genuinely_owned (primary in org_a) and foreign_user_only (primary in org_a, user in org_b)
+    # are both owned. foreign_row_and_user (row in org_b) and foreign_row_only (row in org_b) are not.
+    assert _portfolio_banner(page) == (2, 5)
 
 
 def test_pager_links_keep_the_search_and_tab_and_encode_them(db_session, make_org, client, login_as):
@@ -661,9 +657,11 @@ def test_an_ownership_row_of_another_organisation_counts_on_neither_side(db_sess
     outsider = _soup(_get(client, login_as, stranger, "/my-applications/"))
     assert _tile(outsider, "Total Apps") == 0
 
-    # The banner counts the same single application, so the two sides agree.
+    # The banner counts the same two applications, so the two sides agree.
     banner = _soup(_get(client, login_as, portfolio, "/applications/"))
-    assert _portfolio_banner(banner) == (1, 4)
+    # genuine (primary in org_a) and user_elsewhere (primary in org_a, user in org_b) are owned.
+    # row_elsewhere (row in org_b) is not.
+    assert _portfolio_banner(banner) == (2, 4)
 
 
 def test_search_text_is_matched_literally(db_session, make_org, client, login_as):
