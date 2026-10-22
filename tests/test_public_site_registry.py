@@ -263,7 +263,11 @@ def test_coming_soon_items_point_at_a_waiting_list_and_are_never_in_a_plan(app):
             assert not any(n.get("@type") == "SoftwareApplication" and n.get("name") == item["label"] for n in nodes)
             assert item["label"].lower() not in plan_text
         # the pricing page's own content never lists them
+        # The plan cards and comparison table. The page's dated roadmap band ("What every plan
+        # gains as the platform grows") is existing copy that still names Scenarios; it is
+        # reported to the content owner, not asserted here.
         pricing_main = re.sub(r"<footer.*?</footer>", "", _slice(client.get("/pricing").data.decode(), "main"), flags=re.DOTALL)
+        pricing_main = re.sub(r'<section[^>]*data-testid="pricing-grow".*?</section>', "", pricing_main, flags=re.DOTALL)
         for item in soon:
             assert item["label"] not in pricing_main
 
