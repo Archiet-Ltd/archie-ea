@@ -375,6 +375,8 @@ class TestDashboardV2ServiceInlining:
         "app.services.archimate_viewpoint_service",
         "app.services.feature_flag_service",
         "app.services.application_cost_accessor",
+        # The owner store is the ownership system of record; the one definition of owned lives there.
+        "app.services.element_ownership_service",
     }
 
     def test_no_direct_app_services_imports(self):

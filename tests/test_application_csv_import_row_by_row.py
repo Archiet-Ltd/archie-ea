@@ -280,3 +280,39 @@ def test_database_errors_are_described_by_type_not_by_text():
     assert "row 4" in other
     for reason in (unique, missing, toolong, other):
         _no_internals(reason)
+
+
+def test_update_mode_names_the_refused_row_and_a_blank_cell_never_blanks_the_good_row(
+    client, db_session, make_org, login_as
+):
+    from app.models.application_layer import ApplicationComponent
+
+    org = make_org("rbre")
+    user = _admin(db_session, org)
+    a, b, _ = _names()
+    for n in (a, b):
+        db_session.add(ApplicationComponent(
+            name=n, organization_id=org.id, deployment_status="production",
+            lifecycle_status="2.2 tactical", description="kept description",
+            business_owner="Pat Owner", version="1.0",
+        ))
+    db_session.flush()
+    _post(
+        client, login_as, user,
+        "Name,Lifecycle Status,Description,Owner,Status,Version\n"
+        f"{a},{'y' * 40},new,new owner,retired,9.9\n"
+        f"{b},,,,,2.0\n",
+        mode="update",
+    )
+    apps = _apps(db_session, org, [a, b])
+    # The good row saved its new version and kept every value its blank cells left out.
+    assert apps[b].version == "2.0"
+    assert apps[b].description == "kept description"
+    assert apps[b].business_owner == "Pat Owner"
+    assert apps[b].deployment_status == "production"
+    assert apps[b].lifecycle_status == "2.2 tactical"
+    # The refused row changed nothing and is named with its reason.
+    assert (apps[a].version, apps[a].business_owner) == ("1.0", "Pat Owner")
+    text = _text(_flashes(client))
+    assert "Row 2" in text and a in text, text
+    assert "1 updated" in text and "1 refused" in text, text

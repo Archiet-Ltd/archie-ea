@@ -575,12 +575,17 @@ jobs:
             -p scripts.route_verification_audit -p scripts.ci.quarantine -p scripts.ci.test_sharding
       - name: Run the assistant connector tests (connector switched on)
         # These need MCP_ENABLED and PUBLIC_BASE_URL at app creation, which the
-        # sharded run leaves off; one shard runs them in their own pytest session.
+        # sharded run leaves off (it deselects them); one shard runs every one of
+        # them, once, in their own pytest session. The list lives in
+        # scripts/ci/mcp_selection.py; tests/test_ci_mcp_selection.py fails when a
+        # test that needs the connector is outside it.
         if: matrix.shard == 0
         env:
           MCP_ENABLED: "true"
           PUBLIC_BASE_URL: https://mcp-test.example
-        run: pytest -q app/modules/mcp app/modules/oauth_provider
+        run: |
+          mapfile -t mcp_paths < <(python -I scripts/ci/mcp_selection.py --paths)
+          pytest -q "${mcp_paths[@]}"
       # if: always() -- a failing shard (real test failures) must still upload
       # its junit/coverage/route evidence, so the combine job can report which
       # tests failed rather than only "a shard's artifact never arrived".
@@ -757,12 +762,30 @@ jobs:
           if [ "$status" -ne 0 ] && [ "$status" -ne 5 ]; then
             exit "$status"
           fi
+      - name: Run the selected assistant connector tests (connector switched on)
+        if: ${{ steps.select.outputs.any == 'true' }}
+        # The session above leaves the connector off and deselects the tests that
+        # need it (scripts/ci/mcp_selection.py); this one runs those among the
+        # selected files with it on. Exit 5 means none of the selected files hold
+        # one, which is a pass.
+        env:
+          MCP_ENABLED: "true"
+          PUBLIC_BASE_URL: https://mcp-test.example
+        run: |
+          mapfile -t files < fast-tests.txt
+          status=0
+          pytest -q --maxfail=20 -o xfail_strict=true             --junitxml=fast-tests-mcp.xml -p scripts.ci.quarantine "${files[@]}" || status=$?
+          if [ "$status" -ne 0 ] && [ "$status" -ne 5 ]; then
+            exit "$status"
+          fi
       - uses: actions/upload-artifact@v6
         continue-on-error: true
         if: always()
         with:
           name: fast-tests-junit
-          path: fast-tests.xml
+          path: |
+            fast-tests.xml
+            fast-tests-mcp.xml
           if-no-files-found: ignore
 
   # Quarantined tests (scripts/ci/quarantine.txt): deselected from the blocking
