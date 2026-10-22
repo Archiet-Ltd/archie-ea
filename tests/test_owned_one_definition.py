@@ -68,6 +68,23 @@ def _v2_dashboard_owner_coverage(app, user, org, monkeypatch):
     return captured["data_coverage"]
 
 
+def _v1_coverage_debug(app, user, org):
+    """The v1 coverage debug view. Only the v1 dashboard serves it (the v2 module,
+    which is the one registered by default, has no such route), so it is called
+    directly rather than over HTTP."""
+    from flask import g
+    from flask_login import login_user
+
+    from app.modules.dashboard.routes.dashboard_views import api_coverage_debug
+
+    with app.test_request_context("/dashboard/api/coverage-debug"):
+        login_user(user)
+        g.current_org_id = org.id
+        response = api_coverage_debug.__wrapped__() if hasattr(api_coverage_debug, "__wrapped__") else api_coverage_debug()
+        assert response.status_code == 200
+        return json.loads(response.get_data(as_text=True))
+
+
 def _every_surface(app, db_session, org, user, monkeypatch, client, login_as):
     """What every surface that counts owned applications says for *org*."""
     from flask import g
@@ -86,10 +103,7 @@ def _every_surface(app, db_session, org, user, monkeypatch, client, login_as):
     m = re.search(r"(\d+) of (\d+) applications in the portfolio have a named owner", text)
     assert m is not None, "portfolio banner not found"
 
-    login_as(client, user)
-    response = client.get("/dashboard/api/coverage-debug")
-    assert response.status_code == 200
-    debug = json.loads(response.get_data(as_text=True))
+    debug = _v1_coverage_debug(app, user, org)
     assert debug["ok"] is True
 
     with app.test_request_context("/"):
