@@ -1076,14 +1076,21 @@ class _RepositoryEvidence:
         repository_id = repo.get("repository_id")
         if not isinstance(repository_id, int):
             raise ValueError("the repository has no id")
-        marker = f'"repository_id": {repository_id},'
         earlier = AIChatCRUDApproval.query.filter(
             AIChatCRUDApproval.organization_id == self.org_id,
             AIChatCRUDApproval.source_table == PROPOSAL_SOURCE,
             AIChatCRUDApproval.operation_type == OP_CLASSIFY,
-            AIChatCRUDApproval.operation_payload.contains(marker, autoescape=True),
         ).all()
-        proposed_paths = {json.loads(a.operation_payload or "{}").get("path") for a in earlier}
+        # source_id cannot hold a repository id (its unique key spans organisations and a
+        # monorepo has several proposals), so the id is compared as a parsed value, never as text.
+        proposed_paths = set()
+        for earlier_proposal in earlier:
+            try:
+                earlier_payload = json.loads(earlier_proposal.operation_payload or "{}")
+            except (TypeError, ValueError):
+                continue
+            if earlier_payload.get("repository_id") == repository_id:
+                proposed_paths.add(earlier_payload.get("path"))
 
         info = self._derive(full_name)
         classification, reason = info["classification"], info["reason"]

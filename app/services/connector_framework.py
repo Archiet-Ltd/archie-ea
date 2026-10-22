@@ -1234,6 +1234,8 @@ def run_coroutine_sync(coro):
     import asyncio
     from asyncio import events
 
+    # events._set_running_loop is private asyncio API; checked on Python 3.12.3
+    # (the build machine venv). Re-check here when the Python version is upgraded.
     outer = events._get_running_loop()
     if outer is None:
         return asyncio.run(coro)

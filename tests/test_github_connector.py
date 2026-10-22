@@ -479,6 +479,25 @@ def test_a_decided_proposal_is_not_proposed_again(db_session, org_a, estate_a, g
     assert len(_proposals(org_a.id)) == 7
 
 
+def test_an_earlier_proposal_with_the_repository_id_last_is_found_by_its_parsed_id(
+    db_session, org_a, estate_a, github, connect, sync
+):
+    """Found by the parsed repository id, whatever the payload's key order or separators."""
+    cfg = connect(org_a)
+    sync(org_a, cfg)
+    before = _proposals(org_a.id)
+    assert before
+    for a in before:
+        payload = _payload(a)
+        repository_id = payload.pop("repository_id")
+        payload["repository_id"] = repository_id  # last key: no trailing comma
+        a.operation_payload = json.dumps(payload, separators=(",", ":"))
+    db_session.flush()
+    second = sync(org_a, cfg)
+    assert second["records_proposed"] == 0
+    assert len(_proposals(org_a.id)) == len(before)
+
+
 def test_classification_rules(app):
     from app.connectors.github import classify_repository
 
