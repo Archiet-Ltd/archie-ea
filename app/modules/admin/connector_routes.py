@@ -817,3 +817,228 @@ def jira_config_test():
     result = JiraConnectorService().test_connection(instance_url, email, api_token)
     code = 200 if result.get("status") == "ok" else 400
     return jsonify(result), code
+
+
+# ---------------------------------------------------------------------------
+# GitHub: connect, first read, review (builds a first model of the organisation)
+# ---------------------------------------------------------------------------
+
+
+def _github_state(org_id: int) -> dict:
+    """What the connect page and its status route report: the connection, the latest read and the counts.
+    Never the token, only whether one is stored."""
+    from app.connectors import github as gh
+    from app.models.job import JobStatus
+    from app.modules.codegen.services.credential_vault import OrgCredentialVault
+    from app.services.connector_framework import _load_org_connector
+    from app.services.job_queue_service import get_job_queue_service
+
+    cfg = _load_org_connector(org_id, connector_type="github")
+    if cfg is None:
+        return {"state": "not_connected", "organization": None, "has_token": False, "counts": {}, "job": None}
+    jobs = get_job_queue_service().list_jobs(org_id, limit=1, task=gh.FIRST_SYNC_TASK)
+    job = jobs[0] if jobs else None
+    state = {
+        None: "connected",
+        JobStatus.PENDING.value: "waiting",
+        JobStatus.IN_PROGRESS.value: "reading",
+        JobStatus.COMPLETED.value: "done",
+        JobStatus.FAILED.value: "failed",
+        JobStatus.CANCELLED.value: "failed",
+    }.get(job.status if job else None, "connected")
+    result = (job.result or {}) if job else {}
+    if state == "done" and result.get("success") is False:
+        state = "failed"
+    counts = {"repositories": result.get("repositories", 0), "pending": gh.pending_total(org_id), **gh.model_counts(org_id)}
+    return {
+        "state": state,
+        "organization": (cfg.config or {}).get("organization"),
+        "has_token": OrgCredentialVault().get_masked(org_id, "github", "api_token") is not None,
+        "counts": counts,
+        "job": {
+            "id": job.id,
+            "started_at": job.created_at.isoformat() if job.created_at else None,
+            "finished_at": job.finished_at.isoformat() if job.finished_at else None,
+            "error": (result.get("error") or job.error or "The read did not finish; try again.") if state == "failed" else None,
+        } if job else None,
+    }
+
+
+@m365_connector_bp.route("/github", methods=["GET"])
+@login_required
+@admin_required
+def github_connect():
+    """The one page that connects GitHub: paste a read-only token, and the first read starts at once."""
+    org_id = _require_active_org()
+    return render_template(
+        "admin/connectors/github.html",
+        status=_github_state(org_id),
+        review_url=url_for("m365_connector.github_review"),
+        status_url=url_for("m365_connector.github_status"),
+    )
+
+
+@m365_connector_bp.route("/github/status", methods=["GET"])
+@login_required
+@admin_required
+def github_status():
+    """JSON for the connect page to poll while the first read runs."""
+    return jsonify(_github_state(_require_active_org()))
+
+
+@m365_connector_bp.route("/github", methods=["POST"])
+@login_required
+@admin_required
+def github_connect_save():
+    """Store the read-only token in the organisation's vault, save the connection and start the first read.
+
+    The admin who pastes the token on this page is the authority for it, so the connection is saved and
+    the read started now. What the read finds is only ever proposals: nothing is in the model until it
+    is approved (one action approves them all). The token goes to the vault and nowhere else: not into
+    the connector's settings, a flash message or a response.
+    """
+    from app.connectors import github as gh
+    from app.extensions import db
+    from app.modules.codegen.services.credential_vault import OrgCredentialVault
+    from app.services.connector_framework import (
+        CONNECTOR_ACTION_CREATE,
+        CONNECTOR_ACTION_UPDATE,
+        _load_org_connector,
+        apply_connector_change,
+    )
+    from app.services.job_queue_service import get_job_queue_service
+
+    org_id = _require_active_org()
+    organization = (request.form.get("organization") or "").strip()
+    token = (request.form.get("api_token") or "").strip()
+    existing = _load_org_connector(org_id, connector_type="github")
+    has_token = OrgCredentialVault().get_masked(org_id, "github", "api_token") is not None
+
+    if not gh.is_valid_organization(organization):
+        flash("Enter your GitHub organisation name exactly as it appears in github.com/<name>.", "error")
+        return redirect(url_for("m365_connector.github_connect"))
+    if not token and not has_token:
+        flash("Paste a read-only GitHub token to connect.", "error")
+        return redirect(url_for("m365_connector.github_connect"))
+    if token and (len(token) > 255 or any(ch.isspace() for ch in token)):
+        flash("That does not look like a GitHub token.", "error")
+        return redirect(url_for("m365_connector.github_connect"))
+
+    config = dict((existing.config or {}) if existing else {})
+    config["organization"] = organization
+    payload = {
+        "connector_type": "github",
+        "connector_id": existing.id if existing else None,
+        "name": "GitHub",
+        "config": config,
+        "status": "active",
+        "credential_provided": bool(token),
+    }
+    cfg = apply_connector_change(
+        org_id=org_id,
+        action=CONNECTOR_ACTION_UPDATE if existing else CONNECTOR_ACTION_CREATE,
+        payload=payload,
+        delegated=True,
+    )
+    if token:
+        OrgCredentialVault().store(org_id=org_id, connector_type="github", credential_type="api_token", value=token)
+    db.session.commit()
+    get_job_queue_service().create_job(
+        "GitHub: read repositories",
+        gh.FIRST_SYNC_TASK,
+        {"connector_id": cfg.id},
+        organization_id=org_id,
+    )
+    flash("Connected. Reading your repositories now; this page shows when it is done.", "success")
+    return redirect(url_for("m365_connector.github_connect"))
+
+
+@m365_connector_bp.route("/github/sync", methods=["POST"])
+@login_required
+@admin_required
+def github_resync():
+    """Read the repositories again: adds what is new and changes nothing a person edited."""
+    from app.connectors import github as gh
+    from app.services.connector_framework import _load_org_connector
+    from app.services.job_queue_service import get_job_queue_service
+
+    org_id = _require_active_org()
+    cfg = _load_org_connector(org_id, connector_type="github")
+    if cfg is None:
+        flash("Connect GitHub first.", "error")
+        return redirect(url_for("m365_connector.github_connect"))
+    get_job_queue_service().create_job(
+        "GitHub: read repositories", gh.FIRST_SYNC_TASK, {"connector_id": cfg.id}, organization_id=org_id
+    )
+    flash("Reading your repositories again.", "success")
+    return redirect(url_for("m365_connector.github_connect"))
+
+
+@m365_connector_bp.route("/github/review", methods=["GET"])
+@login_required
+@admin_required
+def github_review():
+    """The review screen: every proposal the read made, grouped, with one Approve all."""
+    from app.connectors import github as gh
+
+    org_id = _require_active_org()
+    return render_template(
+        "admin/connectors/github_review.html",
+        review=gh.pending_review(org_id),
+        status=_github_state(org_id),
+        classifications=gh.CLASSIFICATIONS,
+    )
+
+
+@m365_connector_bp.route("/github/review/approve-all", methods=["POST"])
+@login_required
+@admin_required
+def github_review_approve_all():
+    from app.connectors import github as gh
+
+    org_id = _require_active_org()
+    outcome = gh.approve_all_proposals(org_id, current_user_id())
+    if outcome["failed"]:
+        flash(
+            f"Added {outcome['approved']} of {outcome['total']} to your model. "
+            f"{len(outcome['failed'])} could not be added yet; they are still in the list.",
+            "warning",
+        )
+    elif outcome["total"]:
+        flash(f"Added {outcome['approved']} items to your model.", "success")
+    else:
+        flash("Nothing is waiting for review.", "info")
+    return redirect(url_for("m365_connector.github_review"))
+
+
+@m365_connector_bp.route("/github/review/<int:approval_id>/classify", methods=["POST"])
+@login_required
+@admin_required
+def github_review_classify(approval_id):
+    from app.connectors import github as gh
+    from app.extensions import db
+
+    org_id = _require_active_org()
+    try:
+        gh.change_classification(org_id, approval_id, (request.form.get("classification") or "").strip(), current_user_id())
+        db.session.commit()
+        flash("Changed.", "success")
+    except (ValueError, LookupError) as exc:
+        db.session.rollback()
+        flash(str(exc), "error")
+    return redirect(url_for("m365_connector.github_review"))
+
+
+@m365_connector_bp.route("/github/review/<int:approval_id>/skip", methods=["POST"])
+@login_required
+@admin_required
+def github_review_skip(approval_id):
+    from app.connectors import github as gh
+
+    org_id = _require_active_org()
+    try:
+        outcome = gh.skip_proposal(org_id, approval_id, current_user_id())
+        flash("Skipped." if outcome.get("success") else (outcome.get("error") or "Could not skip that."), "info")
+    except LookupError as exc:
+        flash(str(exc), "error")
+    return redirect(url_for("m365_connector.github_review"))

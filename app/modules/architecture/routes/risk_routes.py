@@ -383,14 +383,88 @@ def _entity_label(entity_type, entity_id):
         return None
 
 
-def serialize_risk_row(risk):
+_ELEMENT_TYPE_WORD = {"ApplicationComponent": "application"}
+
+
+def _prefetch_risk_context(risks):
+    """Everything serialize_risk_row needs for a page of risks, in a fixed
+    number of queries: their entity links, the elements held through the
+    element field, and the element each linked entity mirrors."""
+    from app.models.application_portfolio import ApplicationComponent
+    from app.models.archimate_core import ArchiMateElement
+    from app.models.risk_entity_link import RiskEntityLink
+    from app.models.solution_models import Solution
+    from app.models.strategic import StrategicInitiative
+
+    risk_ids = [r.id for r in risks]
+    links_by_risk = {rid: [] for rid in risk_ids}
+    if risk_ids:
+        for link in (
+            RiskEntityLink.query.filter(RiskEntityLink.risk_id.in_(risk_ids))
+            .order_by(RiskEntityLink.id).all()
+        ):
+            links_by_risk[link.risk_id].append(link)
+    element_ids = {r.archimate_element_id for r in risks if r.archimate_element_id}
+    elements = {}
+    if element_ids:
+        elements = {
+            e.id: e for e in
+            ArchiMateElement.query.filter(ArchiMateElement.id.in_(element_ids)).all()
+        }
+    mirrors = {}
+    models = {"application": ApplicationComponent, "solution": Solution,
+              "programme": StrategicInitiative}
+    for kind, model in models.items():
+        ids = {lk.entity_id for ls in links_by_risk.values() for lk in ls
+               if lk.entity_type == kind}
+        if ids and element_ids:
+            for row in model.query.filter(model.id.in_(ids)).all():
+                mirrors[(kind, row.id)] = getattr(row, "archimate_element_id", None)
+    return {"links": links_by_risk, "elements": elements, "mirrors": mirrors}
+
+
+def _is_own_backbone_mirror(element):
+    """True when the element was created as a Risk's backbone mirror: the
+    backbone stamps custom_properties["source_model"] with the model name."""
+    props = element.custom_properties or {}
+    return props.get("source_model") == "Risk"
+
+
+def _risk_element_touch(risk, links, ctx):
+    """The element a risk holds through its element field, as a read-only
+    "what it touches" entry. None when there is none, when it is a Risk's own
+    backbone mirror, when it belongs to another organisation, or when an entity
+    link already shows it."""
+    element_id = risk.archimate_element_id
+    if not element_id:
+        return None
+    element = ctx["elements"].get(element_id)
+    if element is None or element.organization_id != risk.organization_id:
+        return None
+    if _is_own_backbone_mirror(element):
+        return None
+    for link in links:
+        if ctx["mirrors"].get((link.entity_type, link.entity_id)) == element_id:
+            return None
+    return {
+        "id": None,
+        "entity_type": _ELEMENT_TYPE_WORD.get(element.type, element.type),
+        "entity_id": element.id,
+        "entity_label": element.name,
+        "via": "element",
+    }
+
+
+def serialize_risk_row(risk, ctx=None):
     """The one place a Risk becomes a row for the shared data_table component.
 
     Shared with tests so a test asserting what the table shows builds its
     expectation from the same serialization the route actually renders,
     rather than a second, independently-maintained copy that can drift.
     """
-    links = risk_service.list_risk_links(risk.id)
+    ctx = ctx or _prefetch_risk_context([risk])
+    links = ctx["links"].get(risk.id, [])
+    touch = _risk_element_touch(risk, links, ctx)
     return {
         "id": risk.id,
         "title": risk.title,
@@ -419,7 +493,7 @@ def serialize_risk_row(risk):
                 "entity_label": _entity_label(link.entity_type, link.entity_id),
             }
             for link in links
-        ],
+        ] + ([touch] if touch else []),
     }
 
 
@@ -453,7 +527,8 @@ def risk_register():
         .order_by(StrategicInitiative.name)
         .all()
     )
-    risk_rows = [serialize_risk_row(r) for r in risks]
+    ctx = _prefetch_risk_context(risks)
+    risk_rows = [serialize_risk_row(r, ctx) for r in risks]
     ranked = risk_service.ranked_risks()
     return render_template(
         "governance/risk_register.html",

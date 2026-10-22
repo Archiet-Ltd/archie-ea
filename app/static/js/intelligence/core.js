@@ -48,8 +48,8 @@
 
     // ── requests ──────────────────────────────────────────────────────────
 
-    function searchElements(term) {
-        return Platform.fetch.get(SEARCH_URL, { q: term, limit: 10 }, { silent: true }).then(function (resp) {
+    function searchElements(term, signal) {
+        return Platform.fetch.get(SEARCH_URL, { q: term, limit: 10 }, { silent: true, signal: signal }).then(function (resp) {
             return resp && Array.isArray(resp.data) ? resp.data : [];
         });
     }
@@ -64,7 +64,7 @@
             include_stale: options.includeDerived ? 'true' : 'false',
             max_depth: options.maxDepth,
             with_owner: 'true'
-        }, { silent: true }).then(function (resp) {
+        }, { silent: true, signal: options.signal }).then(function (resp) {
             return resp && resp.data ? resp.data : {};
         });
     }
@@ -489,6 +489,20 @@
         };
     }
 
+    /* Where each connector-written link of a row was read: repository, file, short commit and
+       the address the server built. Several links can come from one file, so each is listed once. */
+    function originsOf(map) {
+        var seen = {}, out = [];
+        Object.keys(map || {}).forEach(function (id) {
+            var o = map[id] || {};
+            var label = [o.repository, o.file, o.commit ? String(o.commit).slice(0, 7) : null].join('|');
+            if (!o.repository || seen[label]) { return; }
+            seen[label] = true;
+            out.push({ repository: o.repository, file: o.file || null, short: o.commit ? String(o.commit).slice(0, 7) : null, url: o.url || null });
+        });
+        return out;
+    }
+
     function rowModel(row, elements, centreId) {
         var relation = row.relation || {};
         var derived = relation.kind === 'derived';
@@ -516,6 +530,7 @@
             ownerName: ownerName,
             stale: stale,
             staleLine: stale ? (computed ? 'Last worked out ' + computed + ' \u2014 may be out of date.' : STALE_UNDATED) : null,
+            origins: originsOf(relation.origins),
             plainTerms: typeof relation.plain_terms === 'string' && relation.plain_terms ? relation.plain_terms : null,
             detail: detailOf(row, elements)
         };

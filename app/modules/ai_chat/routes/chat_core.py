@@ -1463,9 +1463,12 @@ def _conv_dict(obj):
 def list_conversation_threads():
     """List the current user's conversations, newest first, for the rail."""
     try:
+        from app.middleware.tenant_context import current_org_id
         from app.services.conversation_history import get_history_service
 
-        threads = get_history_service().get_user_threads(current_user.id, limit=100)
+        threads = get_history_service().get_user_threads(
+            current_user.id, limit=100, organization_id=current_org_id()
+        )
         return jsonify({"success": True, "threads": [_conv_dict(t) for t in threads]})
     except Exception as e:
         current_app.logger.exception("list_conversation_threads failed: %s", e)
