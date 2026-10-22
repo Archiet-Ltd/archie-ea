@@ -148,6 +148,18 @@ def _build_overview_context():
         data_coverage["vendor"] = round(row[1] / total_apps * 100)
         data_coverage["cost"] = round(row[2] / total_apps * 100)
         data_coverage["criticality"] = round(row[3] / total_apps * 100)
+        if _org is not None:
+            # An owner is recorded as an ApplicationOwner row; the owner text
+            # columns counted above only hold a name that matched no user.
+            from app.models.application_portfolio import ApplicationComponent
+            from app.services.element_ownership_service import application_is_owned_expression
+
+            owned = db.session.execute(
+                db.select(db.func.count(ApplicationComponent.id))
+                .where(ApplicationComponent.organization_id == _org)
+                .where(application_is_owned_expression(ApplicationComponent))
+            ).scalar_one()
+            data_coverage["owner"] = round(owned / total_apps * 100)
     except Exception as e:
         db.session.rollback()
         data_coverage["query_error"] = str(e)
