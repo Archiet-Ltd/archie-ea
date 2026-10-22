@@ -12,7 +12,7 @@ with no persona are set to platform_admin first, which is why a downgrade
 should only follow a deliberate decision).
 
 Revision ID: 20261022_erole_no_default
-Revises: 20261020_change_feed_offsets
+Revises: 20261021_chat_records_org
 Create Date: 2026-10-22
 """
 from __future__ import annotations
