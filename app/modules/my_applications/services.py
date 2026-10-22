@@ -9,11 +9,12 @@ ADR Reference: docs/adr/0011-application-manager-persona.md
 
 from typing import Dict, List, Optional, Tuple
 
-from sqlalchemy import and_, or_, select
+from sqlalchemy import or_
 
 from app.models.application_owner import ApplicationOwner
 from app.models.application_portfolio import APPLICATION_HEALTH_STATUSES, ApplicationComponent
 from app.models.user import User
+from app.services.element_ownership_service import application_is_owned_expression
 from app.utils.tenant_users import escape_like_literal
 
 
@@ -59,32 +60,13 @@ def get_owned_applications(user_id: int) -> List[ApplicationComponent]:
 
 
 def has_assigned_owner(organization_id: int):
-    """SQL predicate over ApplicationComponent: someone is named as its owner.
+    """SQL predicate over ApplicationComponent: the application has an accountable owner.
 
-    True when a business owner is recorded on the application, or when an
-    application manager of the given organisation is assigned to it. An assignment
-    only counts when both the assignment and the assigned user belong to that
-    organisation, so another organisation's rows never make an application look
-    owned. The portfolio's owner count uses this, so its assignment half is the
-    same ownership the My Applications screens count for a user.
+    An application is owned when it has a primary or business ownership record,
+    or a non-empty legacy application_owner or business_owner text. This uses
+    the single canonical definition from element_ownership_service.
     """
-    assigned_here = (
-        select(ApplicationOwner.id)
-        .join(User, User.id == ApplicationOwner.user_id)
-        .where(
-            ApplicationOwner.application_id == ApplicationComponent.id,
-            ApplicationOwner.organization_id == organization_id,
-            User.organization_id == organization_id,
-        )
-        .exists()
-    )
-    return or_(
-        and_(
-            ApplicationComponent.business_owner.isnot(None),
-            ApplicationComponent.business_owner != "",
-        ),
-        assigned_here,
-    )
+    return application_is_owned_expression(ApplicationComponent)
 
 
 def _search_clause(search: str):
