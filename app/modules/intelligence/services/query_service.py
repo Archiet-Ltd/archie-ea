@@ -659,7 +659,7 @@ def _walk_explicit(root_id: int, max_depth: int, direction: str) -> List[Dict[st
     return rows
 
 
-def _attach_origins(rows: List[Dict[str, Any]], org_id: Optional[int]) -> None:
+def _attach_connector_origins(rows: List[Dict[str, Any]], org_id: Optional[int]) -> None:
     """Say where each connector-written link of an explicit chain came from.
 
     A link a connector wrote carries its origin (``source_kind`` ``connector``):
@@ -1052,7 +1052,7 @@ class IntelligenceQueryService:
                         derived_rows = [_derived_row(fact, element_id) for fact in matching]
 
                     rows = explicit_rows + derived_rows
-                    _attach_origins(explicit_rows, org_id)
+                    _attach_connector_origins(explicit_rows, org_id)
 
                     # Resolve every element id the result set can name in ONE
                     # batched select, INSIDE the latency scope so
