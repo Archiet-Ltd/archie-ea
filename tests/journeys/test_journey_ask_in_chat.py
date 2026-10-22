@@ -147,7 +147,7 @@ def test_a_starter_in_the_chat_answers_with_a_cited_card_and_the_ask_address_lan
         pg.get_by_role("option", name=person["element_name"]).first.click()
 
         card = _card(pg)
-        address = _assert_a_cited_answer(card, person["element_name"])
+        _assert_a_cited_answer(card, person["element_name"])
         assert "Ledger Core" in pg.locator("#messages-container").inner_text(), \
             "the question put to the chat does not name the system"
 
