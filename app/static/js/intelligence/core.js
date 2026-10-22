@@ -475,7 +475,7 @@
         var chain = (relation.chain_elements || []).map(function (id) {
             return nameOf(elements, id);
         });
-        return {
+        var detail = {
             derived: relation.kind === 'derived',
             type: entry ? entry.type : null,
             layer: entry ? entry.layer : null,
@@ -487,6 +487,12 @@
             engineVersion: relation.engine_version,
             derivedId: relation.derived_id
         };
+        // For explicit (recorded) rows, include provenance so the drawer can show
+        // where the link came from, who recorded it and when.
+        if (relation.kind === 'explicit' && relation.provenance) {
+            detail.provenance = relation.provenance;
+        }
+        return detail;
     }
 
     function rowModel(row, elements, centreId) {
