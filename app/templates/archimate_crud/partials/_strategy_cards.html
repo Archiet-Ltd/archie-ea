@@ -2,7 +2,7 @@
 <div class="space-y-4">
     <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
         <template x-for="el in elements.filter(e => !searchQuery || e.name.toLowerCase().indexOf(searchQuery.toLowerCase()) >= 0)" :key="el.id + ':' + el.element_type">
-            <div class="bg-card border border-border rounded-lg p-5 space-y-3 flex flex-col hover:shadow-sm transition-shadow">
+            <div class="bg-card border border-border rounded-lg p-5 space-y-3 flex flex-col transition-shadow">
                 <div class="flex items-start justify-between gap-2">
                     <a :href="detailUrl(el)" class="text-lg font-semibold leading-tight hover:text-primary transition-colors" x-text="el.name"></a>
                     <span class="shrink-0 text-xs bg-info/10 text-info-emphasis border border-info/20 rounded-full px-2 py-0.5"

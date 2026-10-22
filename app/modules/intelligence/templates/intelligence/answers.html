@@ -32,7 +32,7 @@
     ) }}
 
     {% call workspace_gate(home_url) %}
-    <section class="rounded-xl border border-border bg-card p-6 space-y-4" aria-labelledby="answers-ask-heading">
+    <section class="rounded-lg border border-border bg-card p-6 space-y-4" aria-labelledby="answers-ask-heading">
         <h2 id="answers-ask-heading" class="text-lg font-semibold text-foreground">Ask a question</h2>
         <fieldset class="space-y-2">
             <legend class="text-sm font-medium text-foreground">Question</legend>
@@ -61,7 +61,7 @@
         <p role="alert" x-show="askError" x-cloak x-text="askError"
            class="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive"></p>
         <button type="button" id="answers-ask-button" @click="ask()" :disabled="cannotAsk()"
-                class="inline-flex h-10 items-center justify-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:pointer-events-none disabled:opacity-50">
+                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
             Ask and keep the answer
         </button>
     </section>

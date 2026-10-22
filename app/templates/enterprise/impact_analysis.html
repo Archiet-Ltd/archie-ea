@@ -28,15 +28,15 @@
     ) }}
 
     <!-- Filter Form -->
-    <div data-slot="card" class="rounded-xl border bg-card shadow-sm p-6 mb-6">
+    <div data-slot="card" class="rounded-lg border border-border bg-card p-6 mb-6">
         <h3 class="text-base font-semibold text-foreground mb-4">Filter by Element</h3>
-        <form method="GET" action="{{ url_for('enterprise.impact_analysis') }}" class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <form method="GET" action="{{ url_for('enterprise.impact_analysis') }}" class="grid grid-cols-1 gap-4">
             <div>
-                <label for="element_type" class="block text-sm font-medium text-foreground mb-2">Element Type</label>
+                <label for="element_type" class="block text-sm font-medium text-muted-foreground mb-1">Element Type</label>
                 <select 
                     id="element_type" 
                     name="element_type" 
-                    class="w-full px-3 py-2 border border-input bg-background rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                    class="h-9 w-full px-3 border border-input bg-background rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                     @change="toggleElementSelect(this.value)"
                 >
                     <option value="">All Types</option>
@@ -46,11 +46,11 @@
             </div>
 
             <div id="application_select_wrapper" {% if selected_element_type != 'application' %} class="hidden" {% endif %}>
-                <label for="application_id" class="block text-sm font-medium text-foreground mb-2">Application</label>
+                <label for="application_id" class="block text-sm font-medium text-muted-foreground mb-1">Application</label>
                 <select 
                     id="application_id" 
                     name="element_id" 
-                    class="w-full px-3 py-2 border border-input bg-background rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                    class="h-9 w-full px-3 border border-input bg-background rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                 >
                     <option value="">Select Application</option>
                     {% for app in applications %}
@@ -62,11 +62,11 @@
             </div>
 
             <div id="capability_select_wrapper" {% if selected_element_type != 'capability' %} class="hidden" {% endif %}>
-                <label for="capability_id" class="block text-sm font-medium text-foreground mb-2">Capability</label>
+                <label for="capability_id" class="block text-sm font-medium text-muted-foreground mb-1">Capability</label>
                 <select 
                     id="capability_id" 
                     name="element_id" 
-                    class="w-full px-3 py-2 border border-input bg-background rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                    class="h-9 w-full px-3 border border-input bg-background rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                 >
                     <option value="">Select Capability</option>
                     {% for cap in capabilities %}
@@ -92,49 +92,49 @@
 
     <!-- Summary Metrics -->
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <div data-slot="card" class="rounded-xl border bg-card shadow-sm p-6">
+        <div data-slot="card" class="rounded-lg border border-border bg-card p-6">
             <div class="flex items-center justify-between">
                 <div>
                     <p class="text-sm font-medium text-muted-foreground">Total Analyses Run</p>
                     <p class="text-2xl font-bold text-foreground mt-1">{{ total_analyses }}</p>
                 </div>
-                <div class="rounded-lg bg-primary/10 p-3">
+                <div class="rounded-md bg-primary/10 px-3 py-2">
                     <i data-lucide="activity" class="w-5 h-5 text-primary" aria-hidden="true"></i>
                 </div>
             </div>
         </div>
 
-        <div data-slot="card" class="rounded-xl border bg-card shadow-sm p-6">
+        <div data-slot="card" class="rounded-lg border border-border bg-card p-6">
             <div class="flex items-center justify-between">
                 <div>
                     <p class="text-sm font-medium text-muted-foreground">Critical Impact</p>
                     <p class="text-2xl font-bold text-foreground mt-1">{{ critical_count }}</p>
                 </div>
-                <div class="rounded-lg bg-destructive/10 p-3">
+                <div class="rounded-md bg-destructive/10 px-3 py-2">
                     <i data-lucide="alert-triangle" class="w-5 h-5 text-destructive" aria-hidden="true"></i>
                 </div>
             </div>
         </div>
 
-        <div data-slot="card" class="rounded-xl border bg-card shadow-sm p-6">
+        <div data-slot="card" class="rounded-lg border border-border bg-card p-6">
             <div class="flex items-center justify-between">
                 <div>
                     <p class="text-sm font-medium text-muted-foreground">High Impact</p>
                     <p class="text-2xl font-bold text-foreground mt-1">{{ high_count }}</p>
                 </div>
-                <div class="rounded-lg bg-warning/10 p-3">
+                <div class="rounded-md bg-warning/10 px-3 py-2">
                     <i data-lucide="alert-circle" class="w-5 h-5 text-warning" aria-hidden="true"></i>
                 </div>
             </div>
         </div>
 
-        <div data-slot="card" class="rounded-xl border bg-card shadow-sm p-6">
+        <div data-slot="card" class="rounded-lg border border-border bg-card p-6">
             <div class="flex items-center justify-between">
                 <div>
                     <p class="text-sm font-medium text-muted-foreground">Avg Affected Apps</p>
                     <p class="text-2xl font-bold text-foreground mt-1">{{ avg_affected_applications }}</p>
                 </div>
-                <div class="rounded-lg bg-primary/10 p-3">
+                <div class="rounded-md bg-primary/10 px-3 py-2">
                     <i data-lucide="layers" class="w-5 h-5 text-primary" aria-hidden="true"></i>
                 </div>
             </div>
@@ -142,7 +142,7 @@
     </div>
 
     <!-- Results Table -->
-    <div data-slot="card" class="rounded-xl border bg-card shadow-sm overflow-hidden">
+    <div data-slot="card" class="rounded-lg border border-border bg-card overflow-hidden">
         <div class="p-6 border-b border-border">
             <h3 class="text-base font-semibold text-foreground">
                 {% if filtered_analyses is not none %}
@@ -157,7 +157,7 @@
 
         {% if analyses_to_display %}
         <div class="overflow-x-auto">
-            <table class="w-full">
+            <table class="dense-table w-full">
                 <thead class="bg-muted/50">
                     <tr>
                         <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Date</th>

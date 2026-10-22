@@ -10,12 +10,10 @@ ApplicationComponent.
 import logging
 
 from flask import current_app, flash, redirect, request, url_for
-from flask_login import login_required
-from app.decorators import WORK_PACKAGE_WRITE_ROLES, require_roles
-from app.services import work_package_service
-
+from app.core.auth.decorators import require_permission
 from app import db
 from app.decorators import audit_log
+from app.services import work_package_service
 from app.models.application_layer import (
     ApplicationInterface,
     ApplicationService,
@@ -47,7 +45,7 @@ logger = logging.getLogger(__name__)
 
 
 @unified_applications_bp.route("/<int:id>/requirements/add", methods=["POST"])
-@login_required
+@require_permission("edit", "application")
 @audit_log("element_link")
 def application_requirement_add(id):
     """Link existing Requirement to Application (direct FK)"""
@@ -69,19 +67,19 @@ def application_requirement_add(id):
     ):
         other_app = ApplicationComponent.query.get(requirement.application_component_id)
         flash(
-            f'Requirement "{requirement.name}" is already linked to "{other_app.name if other_app else "another application"}"',
+            f'Requirement "{requirement.display_title}" is already linked to "{other_app.name if other_app else "another application"}"',
             "warning",
         )
     elif requirement.application_component_id == app.id:
         flash(
-            f'Requirement "{requirement.name}" is already linked to this application',
+            f'Requirement "{requirement.display_title}" is already linked to this application',
             "warning",
         )
     else:
         try:
             requirement.application_component_id = app.id
             db.session.commit()
-            flash(f'Requirement "{requirement.name}" linked successfully!', "success")
+            flash(f'Requirement "{requirement.display_title}" linked successfully!', "success")
         except Exception as e:
             db.session.rollback()
             current_app.logger.error(
@@ -95,7 +93,7 @@ def application_requirement_add(id):
 
 
 @unified_applications_bp.route("/<int:id>/business-processes/add", methods=["POST"])
-@login_required
+@require_permission("edit", "application")
 @audit_log("element_link")
 def application_business_process_add(id):
     """Link existing Business Process to Application (many-to-many)"""
@@ -147,7 +145,7 @@ def application_business_process_add(id):
 
 
 @unified_applications_bp.route("/<int:id>/business-actors/add", methods=["POST"])
-@login_required
+@require_permission("edit", "application")
 @audit_log("element_link")
 def application_business_actor_add(id):
     """Link existing Business Actor to Application (many-to-many)"""
@@ -198,7 +196,7 @@ def application_business_actor_add(id):
 
 
 @unified_applications_bp.route("/<int:id>/business-services/add", methods=["POST"])
-@login_required
+@require_permission("edit", "application")
 @audit_log("element_link")
 def application_business_service_add(id):
     """Link existing Business Service to Application (direct FK)"""
@@ -245,7 +243,7 @@ def application_business_service_add(id):
 
 
 @unified_applications_bp.route("/<int:id>/business-roles/add", methods=["POST"])
-@login_required
+@require_permission("edit", "application")
 @audit_log("element_link")
 def application_business_role_add(id):
     """Link existing Business Role to Application (direct FK)"""
@@ -292,7 +290,7 @@ def application_business_role_add(id):
 
 
 @unified_applications_bp.route("/<int:id>/interfaces/add", methods=["POST"])
-@login_required
+@require_permission("edit", "application")
 @audit_log("element_link")
 def application_interface_add(id):
     """Link existing Application Interface to Application (direct FK)"""
@@ -345,7 +343,7 @@ def application_interface_add(id):
 
 
 @unified_applications_bp.route("/<int:id>/services/add", methods=["POST"])
-@login_required
+@require_permission("edit", "application")
 @audit_log("element_link")
 def application_service_add(id):
     """Link existing Application Service to Application (direct FK)"""
@@ -394,7 +392,7 @@ def application_service_add(id):
 
 
 @unified_applications_bp.route("/<int:id>/data-objects/add", methods=["POST"])
-@login_required
+@require_permission("edit", "application")
 @audit_log("element_link")
 def data_object_add(id):
     """Link existing Data Object to Application (many-to-many)"""
@@ -445,7 +443,7 @@ def data_object_add(id):
 
 
 @unified_applications_bp.route("/<int:id>/technology-nodes/add", methods=["POST"])
-@login_required
+@require_permission("edit", "application")
 @audit_log("element_link")
 def technology_node_add(id):
     """Link existing Technology Node to Application (direct FK)"""
@@ -492,7 +490,7 @@ def technology_node_add(id):
 
 
 @unified_applications_bp.route("/<int:id>/technology-devices/add", methods=["POST"])
-@login_required
+@require_permission("edit", "application")
 @audit_log("element_link")
 def technology_device_add(id):
     """Link existing Technology Device to Application (direct FK)"""
@@ -539,7 +537,7 @@ def technology_device_add(id):
 
 
 @unified_applications_bp.route("/<int:id>/system-software/add", methods=["POST"])
-@login_required
+@require_permission("edit", "application")
 @audit_log("element_link")
 def system_software_add(id):
     """Link existing System Software to Application (direct FK)"""
@@ -589,7 +587,7 @@ def system_software_add(id):
 
 
 @unified_applications_bp.route("/<int:id>/goals/add", methods=["POST"])
-@login_required
+@require_permission("edit", "application")
 @audit_log("element_link")
 def goal_add(id):
     """Link existing Goal to Application (direct FK)"""
@@ -631,7 +629,7 @@ def goal_add(id):
 
 
 @unified_applications_bp.route("/<int:id>/drivers/add", methods=["POST"])
-@login_required
+@require_permission("edit", "application")
 @audit_log("element_link")
 def driver_add(id):
     """Link existing Driver to Application (direct FK)"""
@@ -677,8 +675,7 @@ def driver_add(id):
 
 
 @unified_applications_bp.route("/<int:id>/work-packages/add", methods=["POST"])
-@login_required
-@require_roles(*WORK_PACKAGE_WRITE_ROLES)
+@require_permission("edit", "application")
 @audit_log("element_link")
 def work_package_add(id):
     """Link existing Work Package to Application (direct FK)"""
@@ -727,8 +724,7 @@ def work_package_add(id):
 
 
 @unified_applications_bp.route("/<int:id>/deliverables/add", methods=["POST"])
-@login_required
-@require_roles(*WORK_PACKAGE_WRITE_ROLES)
+@require_permission("edit", "application")
 @audit_log("element_link")
 def deliverable_add(id):
     """Link existing Deliverable to Application (direct FK)"""
@@ -775,8 +771,7 @@ def deliverable_add(id):
 
 
 @unified_applications_bp.route("/<int:id>/plateaus/add", methods=["POST"])
-@login_required
-@require_roles(*WORK_PACKAGE_WRITE_ROLES)
+@require_permission("edit", "application")
 @audit_log("element_link")
 def plateau_add(id):
     """Link existing Plateau to Application (direct FK)"""

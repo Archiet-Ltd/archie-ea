@@ -22,7 +22,9 @@ from flask import Blueprint, Response, current_app, flash, jsonify, redirect, re
 from flask_login import current_user, login_required
 
 from app import db
+from app.core.auth.decorators import require_permission
 from app.utils.pagination import safe_int_arg
+from app.models.archimate_element_types import is_application_kind
 # ArchiMateHealthService import removed — architecture_health route deleted
 
 architect_ui_bp = Blueprint("architect_ui", __name__)
@@ -300,6 +302,7 @@ def _oef_wants_json():
 
 @architect_ui_bp.route("/architecture/import/oef", methods=["GET", "POST"])
 @login_required
+@require_permission("create", "relationship")
 def import_oef():
     """The model-import screen, over the one OEF import engine.
 
@@ -339,8 +342,16 @@ def import_oef():
             "No file uploaded. POST multipart/form-data with a field named 'oef_file'.", 400
         )
 
+    # The uploaded file name is the origin recorded on each row
+    source_label = None
+    for field in ("oef_file", "file"):
+        uploaded = request.files.get(field) if request.files else None
+        if uploaded is not None and uploaded.filename:
+            source_label = uploaded.filename
+            break
+
     try:
-        result = ArchiMateImportService().import_xml(content, strategy=strategy)
+        result = ArchiMateImportService().import_xml(content, strategy=strategy, source_label=source_label)
     except ImportRequestError as exc:
         return _refuse(str(exc), exc.status_code)
 
@@ -357,6 +368,7 @@ def import_oef():
 
 @architect_ui_bp.route("/architecture/import/oef/preview", methods=["POST"])
 @login_required
+@require_permission("create", "relationship")
 def import_oef_preview():
     """What an import of this document would do, writing nothing (JSON).
 
@@ -661,7 +673,7 @@ def traceability_matrix():
     # dropdown read (archimate_elements + archimate_relationships), so the three
     # surfaces on this page agree instead of counting three different stores.
     gap_analysis = get_archimate_gap_analysis()
-    if direction == 'forward' and pivot_type == "ApplicationComponent" and not plateau and not search and page == 1 and (
+    if direction == 'forward' and is_application_kind(pivot_type) and not plateau and not search and page == 1 and (
         not matrix or not _has_aligned_traceability_rows(matrix)
     ):
         fallback_matrix = _build_solution_traceability_fallback_matrix(limit=50)
@@ -696,7 +708,7 @@ def export_traceability_csv():
     service = ArchiMateTraceabilityService()
     pivot_type = request.args.get('pivot_type', 'ApplicationComponent')
     matrix = _normalize_traceability_matrix(service.get_full_matrix(pivot_type=pivot_type, limit=None))
-    if pivot_type == "ApplicationComponent" and (not matrix or not _has_aligned_traceability_rows(matrix)):
+    if is_application_kind(pivot_type) and (not matrix or not _has_aligned_traceability_rows(matrix)):
         fallback_matrix = _build_solution_traceability_fallback_matrix(limit=None)
         if fallback_matrix:
             matrix = fallback_matrix

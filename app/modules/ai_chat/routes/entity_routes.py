@@ -310,6 +310,11 @@ def entity_matching_message():
             {"success": False, "error": f"Entity matching failed: {e}"}
         ), 500
 
+    if result.get("permission_denied"):
+        return jsonify(
+            {"success": False, "error": result["error"], "code": "PERMISSION_DENIED"}
+        ), 403
+
     if not result.get("success"):
         error_text = str(result.get("error") or "Entity matching failed")
         if _is_llm_not_configured_error(error_text):

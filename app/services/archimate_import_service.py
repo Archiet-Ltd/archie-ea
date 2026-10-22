@@ -22,7 +22,9 @@ against the ``archimate_elements`` table.
 """
 
 from app.utils import safe_xml  # untrusted XML: entity-expansion safe
+import re
 import logging
+import uuid
 import xml.etree.ElementTree as ET
 from typing import Any, Dict, List, Optional, Union
 
@@ -76,6 +78,16 @@ def read_xml_from_request(req, file_fields=("oef_file", "file")) -> Optional[Uni
             return raw
 
     return None
+
+
+_MODELLED_NOTE = re.compile(r"As modelled: ([A-Za-z]+)\.")
+
+
+def _modelled_note_type(description):
+    """The relationship type recorded in an "As modelled: <Type>." note, lower
+    case, or None when the description carries no such note."""
+    match = _MODELLED_NOTE.search(description or "")
+    return match.group(1).lower() if match else None
 
 
 class ArchiMateImportService:
@@ -153,13 +165,20 @@ class ArchiMateImportService:
         "ImplementationEvent": "Implementation",
         "Plateau": "Implementation",
         "Gap": "Implementation",
+        # Concepts that belong to no layer. They are known types; the layer
+        # "Other" is their stored layer, so no unknown-type warning is logged.
+        "Grouping": "Other",
+        "Location": "Other",
+        "Junction": "Other",
     }
 
     # Column widths on ``archimate_elements`` (app/models/archimate_core.py).
     # DOGFOOD-001: the parser checks these so preview reports what execute
     # will refuse, instead of one over-long name aborting the whole import
     # with a raw ``StringDataRightTruncation`` from the database.
-    MAX_NAME_LENGTH = 100
+    # The element name column holds 500 characters; 255 is the import limit so a
+    # long Open Exchange name no longer blocks its element.
+    MAX_NAME_LENGTH = 255
     MAX_TYPE_LENGTH = 50
 
     # DOGFOOD-003 (relationship-validity authority audit): this class used to
@@ -211,22 +230,32 @@ class ArchiMateImportService:
         except ValueError as exc:
             raise ImportRequestError(str(exc)) from exc
 
-    def preview_xml(self, content: Union[bytes, str]) -> Dict[str, Any]:
+    def preview_xml(
+        self, content: Union[bytes, str], organization_id: Optional[int] = None
+    ) -> Dict[str, Any]:
         """What ``import_xml`` would do with this document, writing nothing."""
         parsed = self.load(content)
-        preview = self.preview_import(parsed)
+        preview = self.preview_import(parsed, organization_id=organization_id)
         return {"model_name": parsed.get("model_name", ""), **preview}
 
     def import_xml(
         self,
         content: Union[bytes, str],
         strategy: str = "skip_duplicates",
+        organization_id: Optional[int] = None,
+        *,
+        source_ref: Optional[str] = None,
+        source_label: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Import an OEF document under ``strategy``.
 
         Raises ``ImportRequestError`` for an unknown strategy, an oversized,
         empty or malformed document, or one with no importable elements --
         all before anything is written.
+
+        Provenance parameters:
+        - source_ref: import batch or run id (e.g., ArchitectureModel id)
+        - source_label: uploaded file name
         """
         if strategy not in STRATEGIES:
             raise ImportRequestError(
@@ -235,7 +264,13 @@ class ArchiMateImportService:
         parsed = self.load(content)
         if not parsed["elements"]:
             raise ImportRequestError("No valid elements found in the XML file.")
-        result = self.execute_import(parsed, strategy=strategy)
+        result = self.execute_import(
+            parsed,
+            strategy=strategy,
+            organization_id=organization_id,
+            source_ref=source_ref or uuid.uuid4().hex,
+            source_label=source_label,
+        )
         return {"model_name": parsed.get("model_name", ""), **result}
 
     # ------------------------------------------------------------------
@@ -257,7 +292,7 @@ class ArchiMateImportService:
                         "layer": "Business",
                         "description": "..." | None,
                         "properties": {"status": "RULED", ...},
-                        "invalid": "name_too_long (269 chars > 100)",  # only when present
+                        "invalid": "name_too_long (269 chars > 255)",  # only when present
                     }, ...
                 ],
                 "relationships": [
@@ -441,12 +476,28 @@ class ArchiMateImportService:
                     else None
                 )
 
+                rel_props: Dict[str, str] = {}
+                rel_props_container = rel.find(_tag("properties"))
+                if rel_props_container is not None:
+                    for prop in rel_props_container.findall(_tag("property")):
+                        pd_ref = prop.get("propertyDefinitionRef", "")
+                        value_el = prop.find(_tag("value"))
+                        value = (
+                            value_el.text.strip()
+                            if value_el is not None and value_el.text
+                            else ""
+                        )
+                        key = property_defs.get(pd_ref, pd_ref)
+                        if key:
+                            rel_props[key] = value
+
                 relationships.append({
                     "identifier": identifier,
                     "type": rel_type,
                     "source": source,
                     "target": target,
                     "description": rel_description,
+                    "properties": rel_props,
                 })
 
         return {
@@ -463,6 +514,26 @@ class ArchiMateImportService:
     # authority consulted is RelationshipValidator, backed by the
     # element-type-keyed matrix in app/config/archimate_relationship_matrix.py.
     # ------------------------------------------------------------------
+
+    @staticmethod
+    def _can_keep_as_association(validator, source_type, target_type, rel_type):
+        """True when only the pairing is refused: both element types and the
+        relationship type are known, and Association is allowed for the pair."""
+        from app.config.archimate_relationship_matrix import RELATIONSHIP_TYPES
+
+        # Composition, aggregation and specialization assert that one thing is
+        # part of, or a kind of, another. Softening a wrong one to a plain
+        # association would hide a modelling error, so those stay refused.
+        if (
+            not rel_type
+            or rel_type == "association"
+            or rel_type not in RELATIONSHIP_TYPES
+            or rel_type in ("composition", "aggregation", "specialization")
+        ):
+            return False
+        return validator.validate_relationship(
+            source_type, target_type, "association"
+        ).is_valid
 
     def _classify_relationships(
         self,
@@ -509,6 +580,7 @@ class ArchiMateImportService:
                 "source": source_ref,
                 "target": target_ref,
                 "description": rel.get("description"),
+                "properties": rel.get("properties") or {},
             }
 
             if source_type is None or target_type is None:
@@ -523,9 +595,32 @@ class ArchiMateImportService:
 
             normalized_type = _normalize_rel_type(rel_type_raw)
             entry["type"] = normalized_type
+            entry["modelled_type"] = normalized_type
             result = validator.validate_relationship(
                 source_type, target_type, normalized_type
             )
+
+            if not result.is_valid and self._can_keep_as_association(
+                validator, source_type, target_type, normalized_type
+            ):
+                # The pair is known and the type is a real ArchiMate type, but
+                # the matrix has no entry for it. Association is permitted
+                # between any two elements (ArchiMate 3.2 section 5.4.3), so
+                # keep the relationship and record what was modelled.
+                modelled = normalized_type.capitalize()
+                note = f"As modelled: {modelled}."
+                prior = (entry.get("description") or "").strip()
+                entry["description"] = f"{prior} {note}".strip()
+                entry["type"] = "association"
+                entry["softened"] = True
+                entry["notice"] = (
+                    f"{modelled} between {source_type} and {target_type} is not "
+                    f"in the ArchiMate 3.2 matrix; stored as Association "
+                    f"(identifier={identifier or 'n/a'})."
+                )
+                result = validator.validate_relationship(
+                    source_type, target_type, "association"
+                )
 
             if not result.is_valid:
                 entry["status"] = "invalid"
@@ -553,8 +648,46 @@ class ArchiMateImportService:
     # Preview (diff against existing DB)
     # ------------------------------------------------------------------
 
+    @staticmethod
+    def _importing_organization_id(explicit: Optional[int]) -> Optional[int]:
+        """The organisation a run reads and writes.
+
+        An explicit id wins (CLI and programme setup have no ambient tenant);
+        then the request's tenant; then the single organisation of a
+        single-tenant install. ``None`` only when none of these exist.
+        """
+        if explicit is not None:
+            return int(explicit)
+        try:
+            from app.utils.tenant import current_organization_id
+
+            ambient = current_organization_id()
+            if ambient is not None:
+                return ambient
+        except Exception:
+            pass
+        from app.models.mixins.core import _default_org_id
+
+        return _default_org_id()
+
+    @classmethod
+    def _require_organization_id(cls, explicit: Optional[int]) -> int:
+        org_id = cls._importing_organization_id(explicit)
+        if org_id is None:
+            raise ImportRequestError(
+                "Name the organisation to import into: several exist and none was given."
+            )
+        return org_id
+
+    @staticmethod
+    def _in_organization(model_cls, org_id: Optional[int]) -> list:
+        """Explicit organisation predicate; the ORM fence is a no-op with no
+        ambient tenant (CLI), so every read here states its own."""
+        assert org_id is not None, "an import always names its organisation"
+        return [model_cls.organization_id == org_id]
+
     def preview_import(
-        self, parsed_data: Dict[str, Any]
+        self, parsed_data: Dict[str, Any], organization_id: Optional[int] = None
     ) -> Dict[str, Any]:
         """Compare parsed elements against the DB and classify each element.
 
@@ -580,6 +713,7 @@ class ArchiMateImportService:
         """
         from app.models.archimate_core import ArchiMateElement
 
+        org_id = self._require_organization_id(organization_id)
         elements = parsed_data.get("elements", [])
         preview_elements: List[Dict[str, Any]] = []
         counts = {"new": 0, "exists": 0, "conflict": 0, "invalid": 0}
@@ -602,6 +736,7 @@ class ArchiMateImportService:
             existing = ArchiMateElement.query.filter(  # model-safety-ok: bounded by XML element count
                 db.func.lower(ArchiMateElement.name) == name_lower,
                 ArchiMateElement.type == elem_type,
+                *self._in_organization(ArchiMateElement, org_id),
             ).first()
 
             entry = {**elem}
@@ -662,6 +797,10 @@ class ArchiMateImportService:
         self,
         parsed_data: Dict[str, Any],
         strategy: str = "skip_duplicates",
+        organization_id: Optional[int] = None,
+        *,
+        source_ref: Optional[str] = None,
+        source_label: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Create/update ArchiMate elements from parsed OEF data.
 
@@ -728,6 +867,8 @@ class ArchiMateImportService:
         if strategy not in STRATEGIES:
             raise ValueError(f"Invalid strategy: {strategy}")
 
+        org_id = self._require_organization_id(organization_id)
+        org_kw = {} if org_id is None else {"organization_id": org_id}
         elements = parsed_data.get("elements", [])
         created = 0
         updated = 0
@@ -751,7 +892,7 @@ class ArchiMateImportService:
         snapshot = import_snapshot_service.begin(
             strategy=strategy, model_name=(parsed_data.get("model_name") or "")[:100]
         )
-        model_id = self._record_model(ArchitectureModel, parsed_data)
+        model_id = self._record_model(ArchitectureModel, parsed_data, org_id)
         if snapshot is not None:
             snapshot.note_model(model_id)
         created_relationship_ids: List[int] = []
@@ -814,6 +955,7 @@ class ArchiMateImportService:
                         existing = ArchiMateElement.query.filter(  # model-safety-ok: bounded by XML element count
                             db.func.lower(ArchiMateElement.name) == name_lower,
                             ArchiMateElement.type == elem_type,
+                            *self._in_organization(ArchiMateElement, org_id),
                         ).first()
 
                     if existing is None:
@@ -823,6 +965,11 @@ class ArchiMateImportService:
                             layer=layer,
                             description=description,
                             architecture_id=model_id,
+                            **org_kw,
+                            source_kind="import",
+                            source_ref=source_ref,
+                            source_label=source_label,
+                            source_recorded_at=datetime.now(timezone.utc),
                         )
                         db.session.add(new_elem)
                         _write_properties(new_elem, props, merge=False)
@@ -841,6 +988,10 @@ class ArchiMateImportService:
                         if description is not None:
                             existing.description = description
                         _write_properties(existing, props, merge=True)
+                        existing.source_kind = "import"
+                        existing.source_ref = source_ref
+                        existing.source_label = source_label
+                        existing.source_recorded_at = datetime.now(timezone.utc)
                         db.session.flush()
                         if identifier:
                             id_map[identifier] = {"db_id": existing.id, "type": existing.type}
@@ -894,7 +1045,9 @@ class ArchiMateImportService:
 
         relationships_created = 0
         relationships_skipped = 0
+        relationships_softened = 0
         relationships_failed: List[Dict[str, Any]] = []
+        relationship_notices: List[str] = []
 
         for rel in classified:
             if rel["status"] == "invalid":
@@ -925,11 +1078,34 @@ class ArchiMateImportService:
                 # takes the rest of the relationships (or the elements
                 # already flushed) down with it.
                 with db.session.begin_nested():
-                    existing_rel = ArchiMateRelationship.query.filter_by(
-                        source_id=source_db_id, target_id=target_db_id, type=rel["type"],
-                    ).first()
+                    # Identity is (source, target, modelled type), checked
+                    # before softening. The modelled type is read the same way
+                    # on both sides, from the "As modelled: <Type>." note in
+                    # the description that is (or would be) stored, so a
+                    # relationship whose own documentation already carries the
+                    # note matches itself on a second import, and a plain
+                    # Association stays distinct from a softened Serving.
+                    incoming_note = _modelled_note_type(rel.get("description"))
+                    existing_rel = None
+                    for cand in ArchiMateRelationship.query.filter(
+                        ArchiMateRelationship.source_id == source_db_id,
+                        ArchiMateRelationship.target_id == target_db_id,
+                        ArchiMateRelationship.type == rel["type"],
+                        *self._in_organization(ArchiMateRelationship, org_id),
+                    ).all():
+                        if _modelled_note_type(cand.description) == incoming_note:
+                            existing_rel = cand
+                            break
                     if existing_rel is not None:
                         relationships_skipped += 1
+                        if strategy == "update_existing":
+                            existing_rel.source_kind = "import"
+                            existing_rel.source_ref = source_ref
+                            existing_rel.source_label = source_label
+                            existing_rel.source_recorded_at = datetime.now(timezone.utc)
+                            _write_properties(
+                                existing_rel, rel.get("properties") or {}, merge=True
+                            )
                         stored_rel, rel_status = existing_rel, "skipped"
                     else:
                         new_rel = ArchiMateRelationship(
@@ -941,12 +1117,23 @@ class ArchiMateImportService:
                             # exists, and it must survive the import.
                             description=rel.get("description"),
                             architecture_id=model_id,
+                            **org_kw,
+                            source_kind="import",
+                            source_ref=source_ref,
+                            source_label=source_label,
+                            source_recorded_at=datetime.now(timezone.utc),
+                        )
+                        _write_properties(
+                            new_rel, rel.get("properties") or {}, merge=False
                         )
                         db.session.add(new_rel)
                         db.session.flush()
                         relationships_created += 1
                         created_relationship_ids.append(new_rel.id)
                         stored_rel, rel_status = new_rel, "created"
+                        if rel.get("notice"):
+                            relationships_softened += 1
+                            relationship_notices.append(rel["notice"])
                 relationship_results.append({
                     "identifier": rel["identifier"],
                     "id": stored_rel.id,
@@ -1009,7 +1196,9 @@ class ArchiMateImportService:
             "errors": errors,
             "relationships_created": relationships_created,
             "relationships_skipped": relationships_skipped,
+            "relationships_softened": relationships_softened,
             "relationships_failed": relationships_failed,
+            "relationship_notices": relationship_notices,
             "created_ids": created_ids,
             "model_id": model_id,
             "element_results": element_results,
@@ -1021,7 +1210,9 @@ class ArchiMateImportService:
     # ------------------------------------------------------------------
 
     @staticmethod
-    def _record_model(model_cls, parsed_data: Dict[str, Any]) -> Optional[int]:
+    def _record_model(
+        model_cls, parsed_data: Dict[str, Any], org_id: Optional[int] = None
+    ) -> Optional[int]:
         """Record this import run as an ArchitectureModel; return its id.
 
         A refused row costs the provenance record only, never the import.
@@ -1037,6 +1228,7 @@ class ArchiMateImportService:
                     name=name[:100],
                     version="1.0",
                     model_data=parsed_data.get("source_xml"),
+                    **({} if org_id is None else {"organization_id": org_id}),
                 )
                 db.session.add(record)
                 db.session.flush()
@@ -1123,6 +1315,7 @@ class ArchiMateImportService:
                         name=element.name,
                         description=element.description,
                         archimate_element_id=element.id,
+                        organization_id=org_id,
                     )
                 else:
                     row = cls(

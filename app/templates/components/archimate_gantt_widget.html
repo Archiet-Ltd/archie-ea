@@ -209,7 +209,7 @@ that can only ever fail.
 
 <div id="{{ container_id }}" class="archimate-gantt-widget">
     <!-- Header -->
-    <div class="bg-card rounded-lg shadow p-4 mb-6">
+    <div class="bg-card rounded-lg p-4 mb-6">
         <div class="flex flex-wrap items-center justify-between gap-3">
             <div>
                 <h2 class="text-xl font-bold text-foreground">{{ title }}</h2>
@@ -226,7 +226,7 @@ that can only ever fail.
                     <button type="button" @click="$el.nextElementSibling.classList.toggle('hidden')" class="px-4 py-2 bg-success text-primary-foreground rounded-md hover:bg-success text-sm font-medium flex items-center" aria-label="Export options">
                         <i data-lucide="download" class="w-4 h-4 mr-1"></i>Export
                     </button>
-                    <div class="hidden absolute right-0 mt-2 w-48 bg-card rounded-md shadow-lg z-50 border border-border">
+                    <div class="hidden absolute right-0 mt-2 w-48 bg-card rounded-md z-50 border border-border">
                         <button type="button" @click="exportArchimateGantt{{ container_id }}('pdf')" class="w-full text-left px-4 py-2 text-sm hover:bg-accent" aria-label="Export as PDF">Export as PDF</button>
                         <button type="button" @click="exportArchimateGantt{{ container_id }}('csv')" class="w-full text-left px-4 py-2 text-sm hover:bg-accent" aria-label="Export as CSV">Export as CSV</button>
                     </div>
@@ -237,26 +237,26 @@ that can only ever fail.
 
     <!-- Stats -->
     <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-        <div class="bg-card rounded-lg shadow p-4">
+        <div class="bg-card rounded-lg p-4">
             <p class="text-sm text-muted-foreground">Work Packages</p>
             <p class="text-2xl font-bold text-foreground" id="archimate-wp-count-{{ container_id }}">0</p>
         </div>
-        <div class="bg-card rounded-lg shadow p-4">
+        <div class="bg-card rounded-lg p-4">
             <p class="text-sm text-muted-foreground">Plateaus</p>
             <p class="text-2xl font-bold text-foreground" id="archimate-plateau-count-{{ container_id }}">0</p>
         </div>
-        <div class="bg-card rounded-lg shadow p-4">
+        <div class="bg-card rounded-lg p-4">
             <p class="text-sm text-muted-foreground">In Progress</p>
             <p class="text-2xl font-bold text-warning" id="archimate-inprogress-count-{{ container_id }}">0</p>
         </div>
-        <div class="bg-card rounded-lg shadow p-4">
+        <div class="bg-card rounded-lg p-4">
             <p class="text-sm text-muted-foreground">Completed</p>
             <p class="text-2xl font-bold text-success" id="archimate-completed-count-{{ container_id }}">0</p>
         </div>
     </div>
 
     <!-- Filters -->
-    <div class="bg-card rounded-lg shadow p-4 mb-4">
+    <div class="bg-card rounded-lg p-4 mb-4">
         <div class="flex flex-wrap items-center gap-4">
             <div class="flex-1 min-w-[200px]">
                 <input type="text" id="archimate-search-{{ container_id }}" placeholder="Search work packages..."
@@ -274,7 +274,7 @@ that can only ever fail.
     </div>
 
     <!-- Timeline -->
-    <div class="bg-card rounded-lg shadow overflow-hidden">
+    <div class="bg-card rounded-lg overflow-hidden">
         <div id="archimate-timeline-{{ container_id }}" class="p-4">
             <div class="flex items-center justify-center h-64">
                 <i data-lucide="loader-2" class="w-8 h-8 animate-spin text-primary mr-3"></i>

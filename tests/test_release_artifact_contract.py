@@ -46,6 +46,7 @@ def test_ci_builds_once_after_every_release_gate_and_exports_the_digest():
         "boot-health",
         "tests",
         "db-gates",
+        "store-agreement",
         "security-sast",
         "smoke",
         "browser-compatibility",

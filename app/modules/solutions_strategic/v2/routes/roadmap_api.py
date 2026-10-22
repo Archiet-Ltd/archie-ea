@@ -79,10 +79,10 @@ sync_service = RoadmapDataSync()
 
 def handle_error(error: Exception, context: str) -> Dict[str, Any]:
     """Standard error handling for API endpoints"""
-    logger.error(f"Error in {context}: {str(error)}")
+    logger.error(f"Error in {context}: {str(error)}", exc_info=error)
     return {
-        "error": str(error),
-        "context": context,
+        "error": "Something went wrong on our side. Please try again.",
+        "code": "SERVER_ERROR",
         "timestamp": datetime.utcnow().isoformat(),
     }, 500
 
@@ -293,7 +293,7 @@ def create_work_package():
         data = request.get_json()
 
         # Validate business rules
-        validation_result = validator.validate_work_package_data(data)
+        validation_result = validator.validate_work_package_data(data).to_dict()
         if not validation_result["valid"]:
             return api_error(
                 "Validation failed",
@@ -523,7 +523,7 @@ def update_work_package(work_package_id: int):
             return {"error": "No data provided"}, 400
 
         # Validate business rules
-        validation_result = validator.validate_work_package_update(work_package, data)
+        validation_result = validator.validate_work_package_update(work_package, data).to_dict()
         if not validation_result["valid"]:
             return api_error(
                 "Validation failed",

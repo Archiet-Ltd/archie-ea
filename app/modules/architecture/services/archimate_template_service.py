@@ -8,6 +8,7 @@ import logging
 import re
 from datetime import datetime
 from typing import Dict, List, Optional
+from app.models.archimate_element_types import is_application_kind
 
 logger = logging.getLogger(__name__)
 
@@ -617,7 +618,7 @@ class ArchiMateTemplateService:
         rel_id = 1
 
         # Group elements by layer and type
-        app_components = [e for e in elements if e["type"] == "ApplicationComponent"]
+        app_components = [e for e in elements if is_application_kind(e["type"])]
         app_services = [e for e in elements if e["type"] == "ApplicationService"]
         data_objects = [e for e in elements if e["type"] == "DataObject"]
         tech_nodes = [e for e in elements if e["layer"] == "technology"]
