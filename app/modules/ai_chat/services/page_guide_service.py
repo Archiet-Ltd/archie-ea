@@ -11,6 +11,7 @@ from sqlalchemy import text
 
 from app import db
 from app.models.vector_embeddings import ChatMessageEmbedding
+from app.middleware.tenant_context import current_org_id
 from app.modules.ai_chat.services.llm_service_impl import LLMService
 from app.modules.ai_chat.services.page_guide_registry import get_entry_for_page_key
 
@@ -104,6 +105,7 @@ class PageGuideService:
             ChatMessageEmbedding.query.filter(
                 ChatMessageEmbedding.chat_session_id == session_id,
                 ChatMessageEmbedding.user_id == self.user_id,
+                ChatMessageEmbedding.in_org(current_org_id()),
             )
             .order_by(ChatMessageEmbedding.created_at.asc())
             .all()
@@ -123,7 +125,8 @@ class PageGuideService:
         cleared = ChatMessageEmbedding.query.filter(
             ChatMessageEmbedding.chat_session_id == session_id,
             ChatMessageEmbedding.user_id == self.user_id,
-        ).delete()
+            ChatMessageEmbedding.in_org(current_org_id()),
+        ).delete(synchronize_session=False)
         db.session.commit()
         return {"success": True, "cleared_count": cleared}
 
