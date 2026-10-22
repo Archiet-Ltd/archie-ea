@@ -11,6 +11,8 @@ a database value.
 
 from __future__ import annotations
 
+from app.models.archimate_element_types import base_type
+
 # Relationship, in words, as seen from the element on the page. (outgoing, incoming)
 RELATIONSHIP_WORDS = {
     "Composition": ("Is made up of", "Is part of"),
@@ -104,7 +106,7 @@ def _noun(element_type, user, plain_name, many):
 
 
 def subtitle_for(element_type, user, plain_name):
-    profile = PROFILES.get(element_type)
+    profile = PROFILES.get(base_type(element_type))
     if profile:
         return profile["subtitle"]
     return "%s in your architecture model." % _noun(element_type, user, plain_name, False).capitalize()
@@ -222,11 +224,11 @@ def build_connections(ae_id, relationships, *, user, plain_name, plain_layer, la
 def answer_lines(element_type, connections, *, user, plain_name):
     """Lines for the "what this answers" card: lead-in, count, noun, then the names as links."""
     rows = connections["depends_on"] + connections["used_by"] + connections["other"]
-    profile = PROFILES.get(element_type, {"groups": []})
+    profile = PROFILES.get(base_type(element_type), {"groups": []})
     claimed = set()
     lines = []
     for types, lead in profile["groups"]:
-        match = [r for r in rows if r["id"] not in claimed and ("*" in types or r["type"] in types)]
+        match = [r for r in rows if r["id"] not in claimed and ("*" in types or base_type(r["type"]) in types)]
         if not match:
             continue
         claimed.update(r["id"] for r in match)

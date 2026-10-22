@@ -48,3 +48,11 @@ def test_select_bare_omits_id_and_honours_size_classes(render):
 def test_call_body_sees_enclosing_loop_variable(render):
     out = render("{% for o in ['a','b'] %}{% call shadcn_select('p', bare=true) %}<option>{{ o }}</option>{% endcall %}{% endfor %}")
     assert "<option>a</option>" in out and "<option>b</option>" in out
+
+
+def test_select_attrs_are_escaped_not_trusted(render):
+    payload = '"><script>alert(1)</script>'
+    out = render("{{ shadcn_select('p', 'Persona', attrs={'data-x': payload, 'x-model': 'relType'}) }}", payload=payload)
+    assert "<script>" not in out
+    assert "&#34;&gt;&lt;script&gt;" in out
+    assert 'x-model="relType"' in out

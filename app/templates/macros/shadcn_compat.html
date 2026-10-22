@@ -139,10 +139,10 @@
 
 {# shadcn_select: native <select> with label, help text and error state.
    Options come from `options` (list of (value, label) pairs) or from a {% call %} body of <option> elements.
-   `attrs` is a literal attribute string for the select (data-*, hx-*, @change); author-controlled, not escaped.
+   `attrs` is a dict of extra attributes for the select (data-*, hx-*, x-model, @change); keys and values are escaped by xmlattr.
    bare=true renders only the control (for toolbar filters that supply their own label) and adds an id only when one is passed.
    A class containing h-* or w-* / flex-1 replaces the default height / width. #}
-{% macro shadcn_select(name, label="", options=None, selected=None, help_text="", error="", id=None, required=false, disabled=false, placeholder=None, bare=false, class="", attrs="") %}
+{% macro shadcn_select(name, label="", options=None, selected=None, help_text="", error="", id=None, required=false, disabled=false, placeholder=None, bare=false, class="", attrs=None) %}
 {% set _id = id if bare else (id or name) %}
 {% set _desc = (_id ~ "-error") if (error and _id) else ((_id ~ "-help") if (help_text and _id) else "") %}
 {% set _cls = " " ~ class %}
@@ -152,7 +152,7 @@
     {% if disabled %}disabled{% endif %}
     {% if error %}aria-invalid="true"{% endif %}
     {% if _desc %}aria-describedby="{{ _desc }}"{% endif %}
-    {{ attrs|safe }}
+    {% if attrs %}{{ attrs|xmlattr }}{% endif %}
     class="flex {{ '' if ' h-' in _cls else 'h-10' }} {{ '' if (' w-' in _cls or ' flex-1' in _cls) else 'w-full' }} rounded-md border {{ 'border-destructive' if error else 'border-input' }} bg-background px-3 py-2 text-sm text-foreground ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 {{ class }}">
     {% if placeholder is not none %}<option value="">{{ placeholder }}</option>{% endif %}
     {% if options %}

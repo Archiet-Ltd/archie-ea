@@ -369,7 +369,7 @@
             </p>
         </div>
         <div x-show="selectedTarget" x-cloak>
-            {% call shadcn_select('relationship_type', label='Relationship type', id='rel-type-select', placeholder='Select a type…', attrs='x-model="relType"') %}
+            {% call shadcn_select('relationship_type', label='Relationship type', id='rel-type-select', placeholder='Select a type…', attrs={'x-model': 'relType'}) %}
             <template x-for="t in validTypes" :key="t.type">
                 <option :value="t.type" x-text="t.type"></option>
             </template>

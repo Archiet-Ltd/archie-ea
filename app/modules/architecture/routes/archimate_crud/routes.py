@@ -111,7 +111,7 @@ from app.models.technology_layer import (
 from app.models.unified_capability import ValueStream
 import logging
 from app.utils.pagination import safe_int_arg
-from app.models.archimate_element_types import StandardTypeTable
+from app.models.archimate_element_types import StandardTypeTable, is_application_kind
 
 logger = logging.getLogger(__name__)
 
@@ -493,7 +493,7 @@ def _element_owner_rows(element, element_type, organization_id):
 
     if organization_id is None:
         return []
-    if element_type == "ApplicationComponent" and element.__class__.__name__ == "ApplicationComponent":
+    if is_application_kind(element_type) and isinstance(element, ApplicationComponent):
         return ApplicationOwner.get_display_rows_for_application(element.id, organization_id)
     slug = {"Capability": "capability"}.get(element_type)
     if slug in ApplicationOwner.ELEMENT_TYPES:
@@ -1291,7 +1291,7 @@ def detail_element(layer, element_type, element_id):
     external_links = CrosswalkService.get_links_for_element(ae_id or element.id)
     owner_rows = _element_owner_rows(element, element_type, getattr(element, "organization_id", None))
     owner_assign_url = None
-    if element.__class__.__name__ == "ApplicationComponent":
+    if isinstance(element, ApplicationComponent):
         owner_assign_url = url_for("unified_applications.application_detail", id=element.id)
     elif element_type == "Capability":
         owner_assign_url = url_for("capability_map.index", cap=element.id)
