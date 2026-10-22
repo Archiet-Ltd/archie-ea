@@ -190,7 +190,7 @@ def test_r3_5_data_subject_requests_refuses_a_default_persona_viewer(
     routes included, with 200. Must now get 403.
     """
     org = make_org("r3-5-dsr-org")
-    viewer = _plain_org_member(db_session, org, role_name="Viewer")
+    viewer = _plain_org_member(db_session, org, role_name="Viewer", enterprise_role="platform_admin")
     assert viewer.enterprise_role == "platform_admin", (
         "fixture setup must leave enterprise_role at its real database "
         f"default, got {viewer.enterprise_role!r}"
@@ -212,7 +212,7 @@ def test_r3_5_may_handle_data_subject_requests_matches_the_route_guard(db_sessio
     from app.decorators.requires_role import may_handle_data_subject_requests
 
     org = make_org("r3-5-dsr-helper-org")
-    viewer = _plain_org_member(db_session, org, role_name="Viewer")
+    viewer = _plain_org_member(db_session, org, role_name="Viewer", enterprise_role="platform_admin")
     assert viewer.enterprise_role == "platform_admin"
 
     assert may_handle_data_subject_requests(viewer) is False

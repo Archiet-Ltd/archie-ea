@@ -832,6 +832,71 @@ _APP_OWNERS = [
     ("Data Warehouse", "System Administrator", "technical"),
 ]
 
+# ── application cost: the total is derived from its components ─────────────
+
+_APP_LICENSE_ANNUAL = 12000
+_APP_INFRASTRUCTURE_MONTHLY = 2500
+# The one place the annual total is computed; the applications below are
+# created with it and an earlier seed's blanket figure is brought back to it.
+_APP_TOTAL_COST = _APP_LICENSE_ANNUAL + 12 * _APP_INFRASTRUCTURE_MONTHLY
+
+# Organisation units that own the applications (one per owner role).
+_OWNER_UNITS = [
+    # (code, name)
+    ("LQ-OU-OPS", "Operations"),
+    ("LQ-OU-FIELD", "Field Services"),
+    ("LQ-OU-QC", "Quality and Compliance"),
+    ("LQ-OU-IT", "IT Operations"),
+    ("LQ-OU-SHARED", "Shared Services"),
+]
+_OWNER_UNIT_OF = {
+    "Ivo Reed": "LQ-OU-SHARED",
+    "Calibration Specialist": "LQ-OU-OPS",
+    "Logistics Planner": "LQ-OU-OPS",
+    "Inventory Controller": "LQ-OU-OPS",
+    "Field Service Engineer": "LQ-OU-FIELD",
+    "Regulatory Compliance Officer": "LQ-OU-QC",
+    "Procurement Officer": "LQ-OU-SHARED",
+    "Production Supervisor": "LQ-OU-OPS",
+    "Quality Assurance Lead": "LQ-OU-QC",
+    "Data Analyst": "LQ-OU-IT",
+    "IT Operations Lead": "LQ-OU-IT",
+    "Support Team Lead": "LQ-OU-FIELD",
+    "Shared Services Director": "LQ-OU-SHARED",
+    "Data Steward": "LQ-OU-IT",
+    "System Administrator": "LQ-OU-IT",
+    "Network Engineer": "LQ-OU-IT",
+}
+
+# ── capability owners (roles already named as application owners) ──────────
+
+_CAPABILITY_OWNERS = {
+    "LQ-CAP-CALIBRATION": "Calibration Specialist",
+    "LQ-CAP-WATER-QUALITY": "Quality Assurance Lead",
+    "LQ-CAP-FIELD-SERVICE": "Field Service Engineer",
+    "LQ-CAP-INVENTORY": "Inventory Controller",
+    "LQ-CAP-FULFILMENT": "Logistics Planner",
+    "LQ-CAP-SUPPLIER": "Procurement Officer",
+    "LQ-CAP-COMPLIANCE": "Regulatory Compliance Officer",
+    "LQ-CAP-WORKFORCE": "Production Supervisor",
+    "LQ-CAP-ASSET-LIFECYCLE": "Ivo Reed",
+    "LQ-CAP-INCIDENT": "Support Team Lead",
+    "LQ-CAP-DEMAND": "Logistics Planner",
+    "LQ-CAP-QUALITY": "Quality Assurance Lead",
+    "LQ-CAP-EVENT-PROCESSING": "IT Operations Lead",
+    "LQ-CAP-ANALYTICS": "Data Analyst",
+    "LQ-CAP-INTEGRATION": "Network Engineer",
+    "LQ-CAP-IDENTITY": "System Administrator",
+    "LQ-CAP-DOCUMENT": "Data Steward",
+    "LQ-CAP-MONITORING": "IT Operations Lead",
+    "LQ-CAP-DEVICE-MGMT": "IT Operations Lead",
+    "LQ-CAP-FIRMWARE": "IT Operations Lead",
+    "LQ-CAP-NETWORK": "Network Engineer",
+    "LQ-CAP-BACKUP": "System Administrator",
+    "LQ-CAP-CAPACITY": "IT Operations Lead",
+    "LQ-CAP-SECURITY": "System Administrator",
+}
+
 # ── capabilities with maturity ─────────────────────────────────────────────
 
 _CAPABILITIES = [
@@ -1096,12 +1161,12 @@ _WORK_PACKAGES = [
 # ── plateaus ───────────────────────────────────────────────────────────────
 
 _PLATEAUS = [
-    # (name, sequence_order, archimate_element_name)
-    ("Baseline Architecture", 1, "Baseline Architecture"),
-    ("Transition State 1", 2, "Transition State 1"),
-    ("Target Architecture", 3, "Target Architecture"),
-    ("Current State", 1, "Current State"),
-    ("Future State", 2, "Future State"),
+    # (name, sequence_order, archimate_element_name, target_date)
+    ("Baseline Architecture", 1, "Baseline Architecture", _dt.date(2025, 3, 31)),
+    ("Transition State 1", 2, "Transition State 1", _dt.date(2026, 6, 30)),
+    ("Target Architecture", 3, "Target Architecture", _dt.date(2027, 3, 31)),
+    ("Current State", 1, "Current State", _dt.date(2025, 3, 31)),
+    ("Future State", 2, "Future State", _dt.date(2027, 3, 31)),
 ]
 
 # ── gaps ───────────────────────────────────────────────────────────────────
@@ -1119,6 +1184,21 @@ _GAPS = [
     ("Monitoring coverage gap", "capability_shortfall", "medium", "Monitoring coverage gap"),
     ("Documentation currency gap", "capability_shortfall", "low", "Documentation currency gap"),
 ]
+
+# Where each gap sits and the work package that closes it:
+# gap name -> (originating plateau, target plateau, work package name).
+_GAP_PLACEMENT = {
+    "Calibration throughput gap": ("Baseline Architecture", "Transition State 1", "Deploy automated calibration rigs"),
+    "Field service coverage gap": ("Baseline Architecture", "Transition State 1", "Deploy mobile field app"),
+    "Inventory visibility gap": ("Baseline Architecture", "Transition State 1", "Deploy inventory reconciliation tool"),
+    "Supplier performance gap": ("Baseline Architecture", "Target Architecture", "Implement supplier scorecard"),
+    "Event backbone resilience gap": ("Baseline Architecture", "Transition State 1", "Establish redundant event relay"),
+    "Data quality gap": ("Current State", "Future State", "Build predictive maintenance model"),
+    "Integration coverage gap": ("Current State", "Future State", "Integrate calibration ledger with rigs"),
+    "Skills shortage gap": ("Current State", "Future State", "Build digital twin of calibration lab"),
+    "Monitoring coverage gap": ("Current State", "Future State", "Migrate event backbone to cloud"),
+    "Documentation currency gap": ("Current State", "Future State", "Upgrade compliance reporting module"),
+}
 
 
 # ═════════════════════════════════════════════════════════════════════════════
@@ -1310,9 +1390,9 @@ def seed_demo_company() -> dict:
                 application_code=f"LQ-{app_name.upper().replace(' ', '-')[:20]}",
                 implementation_date=_dt.date(2022, 3, 15),
                 go_live_date=_dt.date(2022, 6, 1),
-                total_cost_of_ownership=85000,
-                license_cost_annual=12000,
-                infrastructure_cost_monthly=2500,
+                total_cost_of_ownership=_APP_TOTAL_COST,
+                license_cost_annual=_APP_LICENSE_ANNUAL,
+                infrastructure_cost_monthly=_APP_INFRASTRUCTURE_MONTHLY,
                 business_criticality="high",
                 strategic_importance="high",
             )
@@ -1404,6 +1484,81 @@ def seed_demo_company() -> dict:
             db.session.flush()
         stats["application_owners_created"] = owners_created
 
+        # ── 6b. owner text, owning units, and recorded annual cost ──────
+        # Every live store that answers "which applications have an owner" and
+        # "which have a recorded annual cost" is written from the same facts,
+        # so the screens agree. The retired application_costs table is not
+        # written. Idempotent: only fills or corrects.
+        from app.models.enterprise_intelligence import (
+            ApplicationOwnership, OrganizationUnit,
+        )
+        from app.services.application_cost_accessor import sync_cost_fact
+
+        units = {
+            u.code: u
+            for u in db.session.query(OrganizationUnit)
+            .filter(OrganizationUnit.organization_id == org_id)
+            .all()
+        }
+        for code, unit_name in _OWNER_UNITS:
+            if code not in units:
+                units[code] = OrganizationUnit(
+                    organization_id=org_id, name=unit_name, code=code,
+                    unit_type="Department", status="Active",
+                )
+                db.session.add(units[code])
+        db.session.flush()
+
+        owner_text = {}
+        technical_text = {}
+        for app_name, owner_display_name, owner_type in _APP_OWNERS:
+            if owner_type == "primary":
+                owner_text.setdefault(app_name, owner_display_name)
+            else:
+                technical_text.setdefault(app_name, owner_display_name)
+
+        held = {
+            (o.application_id, o.organization_unit_id, o.ownership_type)
+            for o in db.session.query(ApplicationOwnership)
+            .filter(ApplicationOwnership.organization_id == org_id)
+            .all()
+        }
+        agreed = 0
+        for app_name, app in _resolve_apps(org_id).items():
+            changed = False
+            if app_name in owner_text and not app.application_owner:
+                app.application_owner = owner_text[app_name]
+                app.business_owner = owner_text[app_name]
+                changed = True
+            if app_name in technical_text and not app.technical_owner:
+                app.technical_owner = technical_text[app_name]
+                changed = True
+            unit = units.get(_OWNER_UNIT_OF.get(owner_text.get(app_name)))
+            if unit is not None and (app.id, unit.id, "Business Owner") not in held:
+                db.session.add(ApplicationOwnership(
+                    organization_id=org_id, application_id=app.id,
+                    organization_unit_id=unit.id, ownership_type="Business Owner",
+                    ownership_percentage=100,
+                    primary_contact=owner_text[app_name],
+                ))
+                held.add((app.id, unit.id, "Business Owner"))
+                changed = True
+            # The total is the sum of its components, whatever an earlier
+            # seed wrote.
+            if (app.license_cost_annual == _APP_LICENSE_ANNUAL
+                    and app.infrastructure_cost_monthly == _APP_INFRASTRUCTURE_MONTHLY
+                    and app.total_cost_of_ownership != _APP_TOTAL_COST):
+                app.total_cost_of_ownership = _APP_TOTAL_COST
+                changed = True
+            agreed += changed
+        db.session.flush()
+        for app in _resolve_apps(org_id).values():
+            for column in ("total_cost_of_ownership", "license_cost_annual",
+                           "infrastructure_cost_monthly"):
+                sync_cost_fact(app, column, "USD")
+        db.session.flush()
+        stats["application_figures_agreed"] = agreed
+
         # ── 7. capabilities ─────────────────────────────────────────────
         # The application-to-capability mapping table (what the Applications
         # screen's Capability column reads) points at business_capability, and
@@ -1427,10 +1582,17 @@ def seed_demo_company() -> dict:
         for name, code, current, target, level in _CAPABILITIES:
             if code in existing_caps or code in existing_bcs:
                 continue
+            seeded_element = elements.get(name)
+            if seeded_element is not None and seeded_element.type != "Capability":
+                seeded_element = None
             bc = BusinessCapability(
                 name=name,
                 code=code,
                 organization_id=org_id,
+                # The seeded element of the same name is this capability's
+                # element, so it is not mirrored a second time.
+                archimate_element_id=seeded_element.id if seeded_element else None,
+                business_owner=_CAPABILITY_OWNERS.get(code),
                 level=level,
                 current_maturity_level=current,
                 target_maturity_level=target,
@@ -1442,6 +1604,15 @@ def seed_demo_company() -> dict:
         if caps_created:
             db.session.flush()
         stats["capabilities_created"] = caps_created
+
+        # Owners for capabilities seeded before they carried one.
+        from app.models.unified_capability import UnifiedCapability
+
+        for model in (BusinessCapability, UnifiedCapability):
+            for cap in db.session.query(model).filter(model.organization_id == org_id):
+                if not cap.business_owner and cap.code in _CAPABILITY_OWNERS:
+                    cap.business_owner = _CAPABILITY_OWNERS[cap.code]
+        db.session.flush()
 
         # ── 7b. application-to-capability mappings ──────────────────────
         from app.models.application_capability import ApplicationCapabilityMapping
@@ -1747,7 +1918,7 @@ def seed_demo_company() -> dict:
             .all()
         }
         plateaus_created = 0
-        for name, seq, el_name in _PLATEAUS:
+        for name, seq, el_name, target_date in _PLATEAUS:
             if name in existing_plateaus:
                 continue
             el = elements.get(el_name)
@@ -1756,11 +1927,17 @@ def seed_demo_company() -> dict:
                 sequence_order=seq,
                 organization_id=org_id,
                 archimate_element_id=el.id if el else None,
+                target_date=target_date,
             )
             db.session.add(plateau)
             plateaus_created += 1
         if plateaus_created:
             db.session.flush()
+        for plateau in db.session.query(Plateau).filter(Plateau.organization_id == org_id):
+            for name, _seq, _el, target_date in _PLATEAUS:
+                if plateau.name == name and plateau.target_date is None:
+                    plateau.target_date = target_date
+        db.session.flush()
         stats["plateaus_created"] = plateaus_created
 
         # ── 12. gaps ────────────────────────────────────────────────────
@@ -1787,6 +1964,33 @@ def seed_demo_company() -> dict:
         if gaps_created:
             db.session.flush()
         stats["gaps_created"] = gaps_created
+
+        # Each gap sits between two plateaus and has the work package that
+        # closes it. Idempotent: existing links are kept, none is doubled.
+        plateau_by_name = {
+            p.name: p
+            for p in db.session.query(Plateau).filter(Plateau.organization_id == org_id)
+        }
+        wp_by_name = {
+            wp.name: wp
+            for wp in db.session.query(UnifiedWorkPackage)
+            .filter(UnifiedWorkPackage.organization_id == org_id)
+        }
+        for gap in db.session.query(Gap).filter(Gap.organization_id == org_id):
+            placement = _GAP_PLACEMENT.get(gap.name)
+            if placement is None:
+                continue
+            origin, target, wp_name = placement
+            if gap.originating_plateau_id is None and origin in plateau_by_name:
+                gap.originating_plateau_id = plateau_by_name[origin].id
+            if gap.target_plateau_id is None and target in plateau_by_name:
+                gap.target_plateau_id = plateau_by_name[target].id
+            if target in plateau_by_name and plateau_by_name[target] not in gap.plateaus:
+                gap.plateaus.append(plateau_by_name[target])
+            if wp_name in wp_by_name:
+                work_package_service.link_gap(
+                    wp_by_name[wp_name].id, gap.id, organization_id=org_id)
+        db.session.flush()
 
         # ── 13. solution development chain ──────────────────────────────
         _seed_solution_chain(org_id, stats)
