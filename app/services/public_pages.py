@@ -109,6 +109,17 @@ ROLE_CAPTURES: list[tuple[str, str, str, str, str]] = [
     _role_capture("cto-and-cio", "CTO or CIO"),
     _role_capture("it-portfolio-managers", "IT portfolio manager"),
     _role_capture("solution-architects", "solution architect"),
+    # Roles whose primary screen is not Ask: the path is the screen the page's own
+    # text names first, and capture_role photographs the top of it.
+    ("business-architects", "/capability-maturity/heatmap", DEMO_PERSONA,
+     "The capability maturity heat map as a business architect sees it: current against target maturity for each capability, the gap and the date it was assessed.",
+     "Screenshot of the capability maturity heat map signed in as a business architect, listing capabilities with current and target maturity, the gap and the assessment date."),
+    ("security-architects", "/risks/", DEMO_PERSONA,
+     "The risk register as a security architect sees it: the top risks ranked by how many elements each reaches, with the elements it touches.",
+     "Screenshot of the risk register signed in as a security architect, with the top risks ranked by the number of elements each reaches."),
+    ("data-architects", "/architecture/data-lineage", DEMO_PERSONA,
+     "Data lineage as a data architect sees it: data objects, recorded lineage edges and the form for recording a flow between two modelled data objects.",
+     "Screenshot of the data lineage screen signed in as a data architect, with counts of data objects and recorded lineage edges above the form for recording a lineage flow."),
 ]
 
 
@@ -541,6 +552,7 @@ TWO_X_MODULE_IMAGES = frozenset({"applications", "arb"})
 # The four role-page captures are 2x as well (capture_role in the same script).
 TWO_X_ROLE_IMAGES = frozenset({
     "enterprise-architects", "cto-and-cio", "it-portfolio-managers", "solution-architects",
+    "business-architects", "security-architects", "data-architects",
 })
 
 
