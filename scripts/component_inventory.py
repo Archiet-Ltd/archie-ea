@@ -14,6 +14,7 @@ import inspect
 import json
 import re
 import subprocess
+import textwrap
 import sys
 from collections import defaultdict
 from datetime import datetime, timezone
@@ -325,6 +326,20 @@ def rebuild_html_from_lex(template_source: str, macro_calls: list, url_for_calls
 # HTML element extraction with macro call context
 # ---------------------------------------------------------------------------
 
+def _click_handler(attrs):
+    """The click handler of an element: onclick, Alpine @click / x-on:click, or an htmx request."""
+    for key in ("onclick", "@click", "x-on:click", "@click.prevent", "hx-post", "hx-delete", "hx-put", "hx-get"):
+        if attrs.get(key):
+            return attrs[key]
+    return None
+
+
+def _is_destructive_class(class_attr):
+    """A destructive button style (bg-destructive, btn-destructive), not a destructive-coloured icon or border."""
+    return any("destructive" in t and not t.startswith(("text-", "border-", "hover:text-", "focus"))
+               for t in str(class_attr or "").split())
+
+
 class TemplateElementExtractor(HTMLParser):
     """Extract buttons, forms, tables, and modals from cleaned HTML source."""
 
@@ -341,60 +356,129 @@ class TemplateElementExtractor(HTMLParser):
         self._tag_stack = []
         self._tag_attrs_stack = []
         self._tag_data = ""
+        self.links = []
+        self.testids = []
+        self._text_stack = []
+        self._form_stack = []
         self._in_script = False
         self._in_style = False
         self._macro_call_iter = iter(macro_calls)
         self._current_macro_call = None
 
+    VOID = {"br", "hr", "img", "input", "meta", "link", "source", "wbr", "col", "area",
+            "base", "embed", "param", "track"}
+
+    def _maybe_modal(self, tag_l, attrs_d):
+        if tag_l == "dialog" or attrs_d.get("role") in ("dialog", "alertdialog") or attrs_d.get("aria-modal") == "true":
+            self.modals.append({
+                "id": self._resolve_placeholder(attrs_d.get("id") or ""),
+                "title": self._resolve_placeholder(attrs_d.get("aria-label") or ""),
+                "buttons": [],
+                "submit_handler": None,
+                "source_template": self.template_path,
+                "via_macro": None,
+            })
+
+    def handle_startendtag(self, tag, attrs):
+        self.handle_starttag(tag, attrs)
+        if tag.lower() not in self.VOID:
+            self.handle_endtag(tag)
+
     def handle_starttag(self, tag, attrs):
         tag_l = tag.lower()
+        attrs_d = dict(attrs)
+        if "data-testid" in attrs_d:
+            self.testids.append({
+                "tag": tag_l,
+                "testid": self._resolve_placeholder(attrs_d["data-testid"] or ""),
+                "source_template": self.template_path,
+            })
+        self._maybe_modal(tag_l, attrs_d)
+        if tag_l == "input" and self._form_stack:
+            name = attrs_d.get("name")
+            if name:
+                self._form_stack[-1]["fields"].append(self._resolve_placeholder(name))
+        if tag_l in self.VOID:
+            return
         self._tag_stack.append(tag_l)
-        self._tag_attrs_stack.append(dict(attrs))
-        self._tag_data = ""
-
-        if tag_l == "script":
+        self._tag_attrs_stack.append(attrs_d)
+        self._text_stack.append("")
+        if tag_l == "form":
+            self._form_stack.append({"fields": [], "method": (attrs_d.get("method") or "GET").upper()})
+        elif tag_l == "script":
             self._in_script = True
         elif tag_l == "style":
             self._in_style = True
 
     def handle_endtag(self, tag):
         tag_l = tag.lower()
-        found = False
+        if tag_l not in self._tag_stack:
+            return
         while self._tag_stack:
             top = self._tag_stack.pop()
+            popped_attrs = self._tag_attrs_stack.pop()
+            text = self._text_stack.pop()
+            if self._text_stack:
+                self._text_stack[-1] += text
             if top == tag_l:
-                if self._tag_attrs_stack:
-                    popped_attrs = self._tag_attrs_stack.pop()
-                else:
-                    popped_attrs = {}
-                found = True
+                self._tag_data = text
                 self._process_tag(tag_l, popped_attrs)
                 break
-        if not found and self._tag_attrs_stack:
-            self._tag_attrs_stack = []
-        if self._in_script and tag_l == "script":
+        if tag_l == "script":
             self._in_script = False
-        elif self._in_style and tag_l == "style":
+        elif tag_l == "style":
             self._in_style = False
 
     def handle_data(self, data):
+        if self._in_script or self._in_style:
+            return
+        if self._text_stack:
+            self._text_stack[-1] += data
         self._tag_data += data
 
     def _process_tag(self, tag_l, attrs):
         if tag_l == "button":
+            if self._form_stack:
+                attrs = dict(attrs, **{"__form_method": self._form_stack[-1]["method"]})
             self._extract_button(attrs)
         elif tag_l == "form":
-            self._extract_form(attrs)
+            fm = self._form_stack.pop() if self._form_stack else {"fields": []}
+            self._extract_form(attrs, fm["fields"])
         elif tag_l == "table":
             self._extract_table(attrs)
         elif tag_l == "a":
+            self._extract_link(attrs)
             class_attr = attrs.get("class", "")
             if isinstance(class_attr, str) and "public-btn" in class_attr:
                 self._extract_button_as_link(attrs)
 
+    def _extract_link(self, attrs):
+        href = attrs.get("href")
+        label = re.sub(r"\s+", " ", self._resolve_placeholder(self._tag_data.strip()))[:100]
+        testid = attrs.get("data-testid")
+        if href is None and not testid:
+            return
+        link = {
+            "label": label,
+            "href": self._resolve_placeholder(href) if href is not None else None,
+            "testid": self._resolve_placeholder(testid) if testid else None,
+            "modal_id": attrs.get("data-modal-open"),
+            "onclick": attrs.get("onclick"),
+            "source_template": self.template_path,
+        }
+        self.links.append(link)
+
     def _resolve_placeholder(self, value: str) -> str:
         """Resolve placeholder to expression text if it's a placeholder."""
-        return self.placeholder_map.get(value, value)
+        if value in self.placeholder_map:
+            return self.placeholder_map[value]
+        if "__JINJA_EXPR_" in value:
+            return re.sub(
+                r"__JINJA_EXPR_\d+__",
+                lambda m: "{{ " + self.placeholder_map.get(m.group(0), m.group(0)) + " }}",
+                value,
+            )
+        return value
 
     def _extract_button(self, attrs):
         btn_attrs = dict(attrs) if not isinstance(attrs, dict) else attrs
@@ -414,6 +498,9 @@ class TemplateElementExtractor(HTMLParser):
             "download": False,
             "resolved": True,
             "source_template": self.template_path,
+            "button_type": btn_attrs.get("type", "submit" if btn_attrs.get("__form_method") else "button"),
+            "form_method": btn_attrs.get("__form_method"),
+            "testid": btn_attrs.get("data-testid"),
         }
 
         # Check for data-action
@@ -434,14 +521,14 @@ class TemplateElementExtractor(HTMLParser):
             btn["resolved"] = False
 
         # Determine type based on class, onclick, etc.
-        on_click = btn_attrs.get("onclick")
+        on_click = _click_handler(btn_attrs)
         class_attr = btn_attrs.get("class", "")
 
         # Check for modal opener attributes
         data_modal_open = btn_attrs.get("data-modal-open")
 
         # 1. destructive
-        if "destructive" in class_attr.lower() or re.search(r"Platform\.modal\.confirm", on_click or ""):
+        if _is_destructive_class(class_attr) or re.search(r"Platform\.modal\.confirm", on_click or ""):
             btn["type"] = "destructive"
         # 2. download
         elif btn["download"]:
@@ -481,6 +568,7 @@ class TemplateElementExtractor(HTMLParser):
             if "id" in btn_attrs:
                 btn["modal_id"] = btn_attrs["id"]
 
+        btn["label"] = re.sub(r"\s+", " ", btn["label"])
         self.buttons.append(btn)
 
     def _extract_button_as_link(self, attrs):
@@ -494,6 +582,7 @@ class TemplateElementExtractor(HTMLParser):
             "download": False,
             "resolved": False,
             "source_template": self.template_path,
+            "from_anchor": True,
         }
 
         for key, val in attrs.items():
@@ -514,10 +603,10 @@ class TemplateElementExtractor(HTMLParser):
                 btn["type"] = "download"
 
         class_attr = attrs.get("class", "")
-        on_click = attrs.get("onclick")
+        on_click = _click_handler(attrs)
         data_modal_open = attrs.get("data-modal-open")
 
-        if isinstance(class_attr, str) and "destructive" in class_attr.lower():
+        if isinstance(class_attr, str) and _is_destructive_class(class_attr):
             btn["type"] = "destructive"
         elif btn["download"]:
             btn["type"] = "download"
@@ -547,7 +636,7 @@ class TemplateElementExtractor(HTMLParser):
 
         self.buttons.append(btn)
 
-    def _extract_form(self, attrs):
+    def _extract_form(self, attrs, fields=None):
         btn_attrs = dict(attrs) if not isinstance(attrs, dict) else attrs
         for key, val in btn_attrs.items():
             if isinstance(val, str):
@@ -555,13 +644,12 @@ class TemplateElementExtractor(HTMLParser):
 
         form = {
             "action": btn_attrs.get("action", ""),
-            "method": btn_attrs.get("method", "GET").upper(),
-            "fields": [],
+            "method": (btn_attrs.get("method") or "GET").upper(),
+            "fields": sorted(set(fields or [])),
+            "testid": btn_attrs.get("data-testid"),
             "source_template": self.template_path,
         }
-
-        if form["action"] or form["method"] != "GET":
-            self.forms.append(form)
+        self.forms.append(form)
 
     def _extract_table(self, attrs):
         btn_attrs = dict(attrs) if not isinstance(attrs, dict) else attrs
@@ -576,7 +664,7 @@ class TemplateElementExtractor(HTMLParser):
         self.tables.append(table)
 
 
-def extract_elements_from_template(template_path: str, template_source: str, macro_signatures: dict):
+def extract_elements_from_template(template_path: str, template_source: str, macro_signatures: dict, extra: dict | None = None):
     """Extract all elements from a template using Jinja AST walk + HTML reconstruction."""
     # Walk AST for macro calls, url_for, template refs
     walker = JinjaASTWalker(template_path, template_source, macro_signatures)
@@ -596,6 +684,10 @@ def extract_elements_from_template(template_path: str, template_source: str, mac
         parser.feed(cleaned_html)
     except Exception as e:
         return [], [], [], [], [str(e)], walker.template_refs, walker.macro_calls, walker.url_for_calls
+
+    if extra is not None:
+        extra["links"] = parser.links
+        extra["testids"] = parser.testids
 
     # Now process macro calls to add macro-generated elements
     buttons, forms, tables, modals = process_macro_calls(
@@ -762,11 +854,13 @@ def process_table_macro(macro_name, source_file, kwargs, template_path, lineno):
 
 def get_route_templates(application):
     """Map each route to its rendered template(s) using _render_target on unwrapped view functions."""
-    route_templates = {}  # rule_str -> list of (template, template_unresolved)
+    route_templates = {}  # endpoint -> list of (template, template_unresolved)
 
     for rule in application.url_map.iter_rules():
-        rule_str = str(rule)
         endpoint = rule.endpoint
+        rule_str = endpoint
+        if rule_str in route_templates:
+            continue
         view_func = application.view_functions.get(endpoint)
         if view_func is None:
             route_templates[rule_str] = [(None, None)]
@@ -786,7 +880,7 @@ def get_route_templates(application):
         targets = set()
         unresolved_targets = set()
         try:
-            tree = _ast.parse(view_src)
+            tree = _ast.parse(textwrap.dedent(view_src))
             for node in _ast.walk(tree):
                 if not isinstance(node, _ast.Call):
                     continue
@@ -856,298 +950,294 @@ def extract_endpoints_with_refs(rules, all_url_for_calls):
     return endpoints
 
 
+
 # ---------------------------------------------------------------------------
-# Generated at timestamp (committer date of last commit touching template dirs)
+# Inventory assembly (schema version 2)
+#
+# Counting rules, stated once so the counts mean one thing:
+#   routes   one entry per rule in the Flask url_map (static included), never per template
+#   pages    routes that answer GET and render a template
+#   controls one entry per link, button, form, modal, table or data-testid in a template
+#            (macro-made buttons and modals count once, at the call site)
 # ---------------------------------------------------------------------------
 
-def get_generated_at():
-    """Get committer date of last commit touching template directories."""
+SCHEMA_VERSION = 2
+SHARED_PAGE_LIMIT = 15
+URL_FOR_RE = re.compile(r"""url_for\(\s*['"]([^'"]+)['"]""")
+GUARD_RE = re.compile(r"(?:^|_)(?:required|require|requires|permission|permissions)(?:_|$)|^(?:admin|is_org_admin)$|login_required")
+MUTATING_WORDS = re.compile(
+    r"\b(delete|remove|approve|reject|submit|save|create|confirm|archive|publish|revoke|reset|"
+    r"disconnect|sign[ -]?out|log[ -]?out|logout|invite|send|update|apply|accept|decline|upgrade|"
+    r"purchase|subscribe|pay|cancel subscription|deactivate|activate|promote|merge|restore)\b",
+    re.I,
+)
+MUTATING_PATH = re.compile(r"/(delete|remove|logout|signout|sign-out|approve|reject|revoke|disconnect|archive|deactivate)(/|$|\?)", re.I)
+
+
+def template_index(template_files_list):
+    """name as Jinja resolves it (path under its templates root) -> repo-relative path."""
+    index = {}
+    for root, path in template_files_list:
+        key = Path(path).relative_to(Path(root)).as_posix()
+        rel = Path(path).relative_to(ROOT).as_posix()
+        index.setdefault(key, rel)
+    return index
+
+
+def view_guards(view_func):
+    """Names of the decorators on a view that gate access (login, role, permission)."""
+    import textwrap
     try:
-        result = subprocess.run(
-            ["git", "log", "-1", "--format=%ci", "--", "app/templates", "app/modules"],
-            cwd=ROOT,
-            capture_output=True,
-            text=True,
-            timeout=10,
+        src = textwrap.dedent(inspect.getsource(inspect.unwrap(view_func)))
+        tree = _ast.parse(src)
+    except (TypeError, OSError, SyntaxError):
+        return []
+    guards = []
+    for node in _ast.walk(tree):
+        if isinstance(node, (_ast.FunctionDef, _ast.AsyncFunctionDef)):
+            for dec in node.decorator_list:
+                target = dec.func if isinstance(dec, _ast.Call) else dec
+                name = target.attr if isinstance(target, _ast.Attribute) else getattr(target, "id", "")
+                if name and GUARD_RE.search(name):
+                    guards.append(name)
+            break
+    return sorted(set(guards))
+
+
+def _endpoint_of(*texts):
+    for t in texts:
+        if isinstance(t, str):
+            m = URL_FOR_RE.search(t)
+            if m:
+                return m.group(1)
+    return None
+
+
+def _is_mutating(kind, c, methods_by_endpoint):
+    t = c.get("target", {})
+    if kind == "form":
+        return t.get("method", "GET") != "GET"
+    if kind == "button":
+        if c.get("type") == "destructive":
+            return True
+        if t.get("form_method") and t["form_method"] != "GET" and t.get("button_type") != "button":
+            return True
+        text = " ".join(str(x or "") for x in (c.get("label"), t.get("handler"), t.get("data_action"), c.get("testid")))
+        if t.get("href") is None and MUTATING_WORDS.search(text):
+            return True
+    href = t.get("href") or ""
+    ep = t.get("endpoint")
+    if kind in ("link", "button") and href:
+        if ep and ep in methods_by_endpoint and "GET" not in methods_by_endpoint[ep]:
+            return True
+        if MUTATING_PATH.search(href):
+            return True
+    return False
+
+
+def build_template_inventory(template_files_list=None):
+    """The template half of the inventory: needs no running app, so a test can regenerate it in seconds."""
+    if template_files_list is None:
+        template_files_list = list(template_files())
+    macro_signatures = collect_signatures(str(ROOT))
+    index = template_index(template_files_list)
+    rel_to_key = {v: k for k, v in index.items()}
+
+    per_template = {}
+    contents = []
+    for root, path in sorted(template_files_list, key=lambda rp: Path(rp[1]).relative_to(ROOT).as_posix()):
+        rel = Path(path).relative_to(ROOT).as_posix()
+        try:
+            with open(path, encoding="utf-8", errors="replace") as f:
+                src = f.read()
+        except OSError:
+            continue
+        contents.append((rel, src))
+        extra = {}
+        buttons, forms, tables, modals, errors, refs, macro_calls, url_for_calls = extract_elements_from_template(
+            rel, src, macro_signatures, extra
         )
-        if result.returncode == 0 and result.stdout.strip():
-            return result.stdout.strip()
-    except Exception:
-        pass
-    return datetime.now(timezone.utc).isoformat()
+        per_template[rel] = {
+            "buttons": buttons, "forms": forms, "tables": tables, "modals": modals,
+            "links": extra.get("links", []), "testids": extra.get("testids", []),
+            "refs": refs, "errors": errors,
+        }
+    templates_sha256 = hashlib.sha256("".join(c for _, c in sorted(contents)).encode("utf-8")).hexdigest()
+
+    controls = []
+    for rel in sorted(per_template):
+        d = per_template[rel]
+        counters = defaultdict(int)
+
+        def add(kind, c, target):
+            n = counters[kind]
+            counters[kind] += 1
+            controls.append({
+                "id": f"{rel}::{kind}::{n}",
+                "kind": kind,
+                "template": rel,
+                "label": c.get("label") or c.get("title") or "",
+                "testid": c.get("testid"),
+                "type": c.get("type"),
+                "via_macro": c.get("via_macro"),
+                "line": c.get("line"),
+                "target": {k: v for k, v in target.items() if v not in (None, "", [])},
+            })
+
+        for c in d["links"]:
+            add("link", c, {"href": c["href"], "endpoint": _endpoint_of(c["href"]),
+                            "modal_id": c.get("modal_id"), "handler": c.get("onclick")})
+        for c in d["buttons"]:
+            if c.get("from_anchor"):
+                continue
+            add("button", c, {"href": c.get("href"), "endpoint": _endpoint_of(c.get("href"), c.get("data_action")),
+                              "modal_id": c.get("modal_id"), "handler": c.get("handler"),
+                              "data_action": c.get("data_action"), "form_method": c.get("form_method"),
+                              "button_type": c.get("button_type")})
+        for c in d["forms"]:
+            add("form", c, {"action": c.get("action"), "endpoint": _endpoint_of(c.get("action")),
+                            "method": c.get("method"), "fields": c.get("fields")})
+        for c in d["modals"]:
+            add("modal", c, {"modal_id": c.get("id"), "handler": c.get("submit_handler")})
+        for c in d["tables"]:
+            add("table", c, {"endpoint": _endpoint_of(c.get("source_endpoint")), "href": c.get("source_endpoint")})
+        for c in d["testids"]:
+            if c["tag"] in ("a", "button", "form"):
+                continue  # the link, button or form control already carries its testid
+            add("testid", {"label": c["tag"], "testid": c["testid"]}, {})
+
+    templates = {}
+    for rel, d in sorted(per_template.items()):
+        refs = d["refs"]
+        every_ref = refs["extends"] | refs["includes"] | refs["imports"] | refs["from_imports"]
+        templates[rel] = {
+            "name": rel_to_key.get(rel),
+            "extends": sorted(i for i in (index.get(x) for x in refs["extends"]) if i),
+            "includes": sorted(i for i in (index.get(x) for x in refs["includes"]) if i),
+            "imports": sorted(i for i in (index.get(x) for x in (refs["imports"] | refs["from_imports"])) if i),
+            "unresolved_refs": sorted(x for x in every_ref if isinstance(x, str) and x not in index),
+            "parse_errors": d["errors"],
+        }
+    return {"templates_sha256": templates_sha256, "controls": controls, "templates": templates, "_index": index}
 
 
-# ---------------------------------------------------------------------------
-# Main build function
-# ---------------------------------------------------------------------------
+def _closure(rel, templates):
+    seen, stack = set(), [rel]
+    while stack:
+        t = stack.pop()
+        if t in seen or t not in templates:
+            continue
+        seen.add(t)
+        info = templates[t]
+        stack.extend(info["extends"] + info["includes"] + info["imports"])
+    return sorted(seen)
 
-def build_inventory(template_files_list=None):
-    """Build the component inventory dict.
 
-    Pure function: build_inventory(template_files) -> dict
+def build_inventory(template_files_list=None, application=None):
+    """Build the whole inventory dict (routes need the app booted; controls do not).
 
-    Returns:
-        dict suitable for json.dump with sort_keys=True, lists sorted,
-        two-space indent, trailing newline.
+    Deterministic: sorted keys and lists, no timestamps. Same tree -> same bytes.
     """
     if template_files_list is None:
         template_files_list = list(template_files())
+    tpl = build_template_inventory(template_files_list)
+    index = tpl.pop("_index")
+    controls, templates = tpl["controls"], tpl["templates"]
 
-    # Collect macro signatures from all templates
-    macro_signatures = collect_signatures(str(ROOT))
+    if application is None:
+        sys.path.insert(0, str(ROOT))
+        from app import create_app
+        application = create_app("testing")
 
-    # Step 1: Process each template file
-    template_data = {}  # path -> {buttons, forms, tables, modals, refs, macro_calls, url_for_calls, parse_errors}
-    template_names = set()
-    all_macro_calls = []
-    all_url_for_calls = []
-
-    for root, path in template_files_list:
-        rel_path = Path(path).relative_to(ROOT).as_posix()
-        basename = Path(path).name
-        name = Path(basename).stem
-        template_names.add(name)
-
-        try:
-            with open(path, encoding="utf-8", errors="replace") as f:
-                tpl_src = f.read()
-        except OSError:
-            template_data[rel_path] = {
-                "buttons": [], "forms": [], "tables": [], "modals": [],
-                "refs": {"includes": set(), "extends": set(), "imports": set(), "from_imports": set()},
-                "macro_calls": [], "url_for_calls": [], "parse_errors": ["read_error"],
-            }
-            continue
-
-        buttons, forms, tables, modals, parse_errors, refs, macro_calls, url_for_calls = extract_elements_from_template(
-            rel_path, tpl_src, macro_signatures
-        )
-
-        template_data[rel_path] = {
-            "buttons": buttons,
-            "forms": forms,
-            "tables": tables,
-            "modals": modals,
-            "refs": refs,
-            "macro_calls": macro_calls,
-            "url_for_calls": url_for_calls,
-            "parse_errors": parse_errors,
-        }
-
-        all_macro_calls.extend([(rel_path, *mc) for mc in macro_calls])
-        all_url_for_calls.extend([(rel_path, *uc) for uc in url_for_calls])
-
-    # Step 2: Compute templates_sha256
-    template_contents = []
-    for root, path in template_files_list:
-        try:
-            with open(path, encoding="utf-8", errors="replace") as f:
-                template_contents.append((Path(path).relative_to(ROOT).as_posix(), f.read()))
-        except OSError:
-            pass
-    template_contents.sort(key=lambda x: x[0])
-    sorted_conts = "".join(c for _, c in template_contents)
-    templates_sha256 = hashlib.sha256(sorted_conts.encode("utf-8")).hexdigest()
-
-    # Step 3: Build reference graph (reached_from)
-    reached_from = defaultdict(set)
-    for rel_path, data in template_data.items():
-        refs = data["refs"]
-        for inc in refs["includes"]:
-            inc_name = Path(inc).stem
-            reached_from[inc_name].add(rel_path)
-        for ext in refs["extends"]:
-            ext_name = Path(ext).stem
-            reached_from[ext_name].add(rel_path)
-        for imp in refs["imports"]:
-            imp_name = Path(imp).stem
-            reached_from[imp_name].add(rel_path)
-        for ftarget in refs["from_imports"]:
-            reached_from[ftarget].add(rel_path)
-
-    # Step 4: Boot app and get rules + route templates
-    sys.path.insert(0, str(ROOT))
-    from app import create_app
-
-    application = create_app("testing")
-    rules = list(application.url_map.iter_rules())
     route_templates = get_route_templates(application)
+    methods_by_endpoint = defaultdict(set)
+    for rule in application.url_map.iter_rules():
+        methods_by_endpoint[rule.endpoint] |= set(rule.methods or ())
 
-    # Step 5: Build route entries
-    route_templates_rendered = set()
     routes = []
+    rendered_on = defaultdict(set)
+    reached = set()
+    for rule in application.url_map.iter_rules():
+        methods = sorted((rule.methods or {"GET"}) - {"HEAD", "OPTIONS"})
+        found = route_templates.get(rule.endpoint, [(None, None)])
+        names = sorted({t for t, _ in found if t})
+        unresolved = sorted({u for _, u in found if u})
+        primary = sorted({index[n] for n in names if n in index})
+        closure = sorted({c for p in primary for c in _closure(p, templates)})
+        reached.update(closure)
+        for c in closure:
+            rendered_on[c].add(rule.rule)
+        view = application.view_functions.get(rule.endpoint)
+        guards = view_guards(view) if view else []
+        routes.append({
+            "id": f"{rule.endpoint} {rule.rule}",
+            "rule": rule.rule,
+            "endpoint": rule.endpoint,
+            "blueprint": rule.endpoint.rsplit(".", 1)[0] if "." in rule.endpoint else None,
+            "methods": methods,
+            "login_required": bool(guards),
+            "guards": guards,
+            "templates": primary,
+            "templates_missing": sorted(n for n in names if n not in index),
+            "template_unresolved": unresolved,
+            "closure": closure,
+            "page": "GET" in methods and bool(primary),
+            "has_parameters": "<" in rule.rule,
+        })
+    routes.sort(key=lambda r: r["id"])
 
-    for rule in rules:
-        rule_str = str(rule)
-        rendered_info = route_templates.get(rule_str, [(None, None)])
+    for c in controls:
+        t = c["target"]
+        c["mutating"] = _is_mutating(c["kind"], c, methods_by_endpoint)
+        pages = sorted(rendered_on.get(c["template"], ()))
+        c["rendered_on_count"] = len(pages)
+        c["rendered_on"] = pages if len(pages) <= SHARED_PAGE_LIMIT else None
+        if t.get("endpoint") and t["endpoint"] not in methods_by_endpoint:
+            t["endpoint_registered"] = False
+    for rel, info in templates.items():
+        info["rendered_on_count"] = len(rendered_on.get(rel, ()))
+    unreached = sorted(rel for rel in templates if rel not in reached)
 
-        for template, template_unresolved in rendered_info:
-            route_entry = {
-                "route": rule_str,
-                "template": template,
-                "template_unresolved": template_unresolved,
-                "buttons": [],
-                "forms": [],
-                "tables": [],
-                "modals": [],
-            }
-
-            if template:
-                route_templates_rendered.add(template)
-                # Find template file
-                tf = None
-                for root, path in template_files_list:
-                    rel = Path(path).relative_to(ROOT).as_posix()
-                    normalized_rel = rel
-                    if rel.startswith("app/templates/"):
-                        normalized_rel = rel[len("app/templates/"):]
-                    elif rel.startswith("app/modules/"):
-                        idx = rel.find("/templates/")
-                        if idx >= 0:
-                            normalized_rel = rel[idx + len("/templates/"):]
-                    basename = Path(path).name
-                    tpl_name_noext = Path(basename).stem
-                    if normalized_rel == template or tpl_name_noext == template or basename == template:
-                        tf = (root, path)
-                        break
-
-                if tf:
-                    _, tpl_path = tf
-                    rel_tpl = Path(tpl_path).relative_to(ROOT).as_posix()
-                    if rel_tpl in template_data:
-                        tpl_data = template_data[rel_tpl]
-                        route_entry["buttons"].extend(tpl_data["buttons"])
-                        route_entry["forms"].extend(tpl_data["forms"])
-                        route_entry["tables"].extend(tpl_data["tables"])
-                        route_entry["modals"].extend(tpl_data["modals"])
-
-            # Mark modal_missing for opener buttons
-            modal_ids = {m.get("id") for m in route_entry["modals"] if m.get("id")}
-            for btn in route_entry["buttons"]:
-                if btn.get("type") == "modal" and btn.get("modal_id"):
-                    if btn["modal_id"] not in modal_ids:
-                        btn["modal_missing"] = True
-
-            # Deduplicate
-            for key in ["buttons", "forms", "tables", "modals"]:
-                seen = set()
-                deduped = []
-                for item in route_entry[key]:
-                    identifier = item.get("id") or item.get("label") or item.get("action") or item.get("source_endpoint") or str(item)
-                    if identifier not in seen:
-                        seen.add(identifier)
-                        deduped.append(item)
-                route_entry[key] = deduped
-
-            routes.append(route_entry)
-
-    # Step 6: Add unrouted templates (templates not rendered by any route)
-    reached_set = set(reached_from.keys())
-    for name in sorted(template_names):
-        if name not in route_templates_rendered and name not in reached_set:
-            # Find the template file
-            tf = None
-            for root, path in template_files_list:
-                basename = Path(path).name
-                tpl_name_noext = Path(basename).stem
-                if tpl_name_noext == name:
-                    tf = (root, path)
-                    break
-
-            route_entry = {
-                "route": None,
-                "template": name,
-                "template_unresolved": None,
-                "buttons": [],
-                "forms": [],
-                "tables": [],
-                "modals": [],
-                "reached_from": sorted(reached_from.get(name, [])),
-                "unrouted": True,
-            }
-
-            if tf:
-                _, tpl_path = tf
-                rel_tpl = Path(tpl_path).relative_to(ROOT).as_posix()
-                if rel_tpl in template_data:
-                    tpl_data = template_data[rel_tpl]
-                    route_entry["buttons"].extend(tpl_data["buttons"])
-                    route_entry["forms"].extend(tpl_data["forms"])
-                    route_entry["tables"].extend(tpl_data["tables"])
-                    route_entry["modals"].extend(tpl_data["modals"])
-
-            # Mark modal_missing for opener buttons
-            modal_ids = {m.get("id") for m in route_entry["modals"] if m.get("id")}
-            for btn in route_entry["buttons"]:
-                if btn.get("type") == "modal" and btn.get("modal_id"):
-                    if btn["modal_id"] not in modal_ids:
-                        btn["modal_missing"] = True
-
-            # Deduplicate
-            for key in ["buttons", "forms", "tables", "modals"]:
-                seen = set()
-                deduped = []
-                for item in route_entry[key]:
-                    identifier = item.get("id") or item.get("label") or item.get("action") or item.get("source_endpoint") or str(item)
-                    if identifier not in seen:
-                        seen.add(identifier)
-                        deduped.append(item)
-                route_entry[key] = deduped
-
-            routes.append(route_entry)
-
-    # Step 7: Extract endpoints with references
-    endpoints = extract_endpoints_with_refs(rules, [uc[1:] for uc in all_url_for_calls])
-
-    # Step 8: Assemble inventory
-    inventory = {
-        "generated_at": get_generated_at(),
-        "templates_sha256": templates_sha256,
+    kinds = defaultdict(int)
+    for c in controls:
+        kinds[c["kind"]] += 1
+    counts = {
+        "routes": len(routes),
+        "pages": sum(1 for r in routes if r["page"]),
+        "pages_without_parameters": sum(1 for r in routes if r["page"] and not r["has_parameters"]),
+        "controls": len(controls),
+        "controls_by_kind": dict(sorted(kinds.items())),
+        "controls_mutating": sum(1 for c in controls if c["mutating"]),
+        "templates": len(templates),
+        "templates_not_reached_by_a_route": len(unreached),
+    }
+    return {
+        "schema": SCHEMA_VERSION,
+        "templates_sha256": tpl["templates_sha256"],
+        "counts": counts,
         "routes": routes,
-        "endpoints": endpoints,
+        "controls": controls,
+        "templates": templates,
+        "templates_not_reached_by_a_route": unreached,
     }
 
-    return inventory
 
+def write_inventory(inventory, output_path=None):
+    output_path = Path(output_path) if output_path else STATIC_DIR / "component-inventory.json"
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(output_path, "w", encoding="utf-8", newline="\n") as f:
+        json.dump(inventory, f, indent=1, sort_keys=True)
+        f.write("\n")
+    return output_path
 
-# ---------------------------------------------------------------------------
-# main()
-# ---------------------------------------------------------------------------
 
 def main():
     """Boot the app, build the inventory, write docs/component-inventory.json."""
-    templates = list(template_files())
-    inventory = build_inventory(template_files_list=templates)
-
-    output_path = STATIC_DIR / "component-inventory.json"
-    STATIC_DIR.mkdir(exist_ok=True)
-
-    with open(output_path, "w", encoding="utf-8") as f:
-        json.dump(inventory, f, indent=2, sort_keys=True)
-        f.write("\n")
-
-    print(f"Component inventory written to {output_path}")
-    print(f"Routes: {len(inventory['routes'])}")
-    print(f"Endpoints: {len(inventory['endpoints'])}")
-    print(f"Templates SHA256: {inventory['templates_sha256']}")
-
-    # Count totals for report
-    total_buttons = sum(len(r.get("buttons", [])) for r in inventory["routes"])
-    total_forms = sum(len(r.get("forms", [])) for r in inventory["routes"])
-    total_tables = sum(len(r.get("tables", [])) for r in inventory["routes"])
-    total_modals = sum(len(r.get("modals", [])) for r in inventory["routes"])
-    print(f"Buttons: {total_buttons}")
-    print(f"Forms: {total_forms}")
-    print(f"Tables: {total_tables}")
-    print(f"Modals: {total_modals}")
-
-    unrouted = [r for r in inventory["routes"] if r.get("unrouted")]
-    if unrouted:
-        print(f"Unrouted templates: {len(unrouted)}")
-
-    parse_errors = sum(1 for r in inventory["routes"] if r.get("parse_error"))
-    if parse_errors:
-        print(f"Parse errors: {parse_errors}")
+    inventory = build_inventory()
+    path = write_inventory(inventory)
+    print(f"Component inventory written to {path}")
+    for k, v in inventory["counts"].items():
+        print(f"{k}: {v}")
 
 
 if __name__ == "__main__":

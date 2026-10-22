@@ -24,7 +24,11 @@ from component_inventory import (
     process_table_macro,
     get_route_templates,
     extract_endpoints_with_refs,
-    get_generated_at,
+    _is_mutating,
+    template_index,
+    view_guards,
+    build_template_inventory,
+    write_inventory,
 )
 
 
