@@ -420,7 +420,7 @@ def main(argv=None):
             rendered_paths = [inventory_path(t) or t for t in got["templates"]]
             base["templates_repo_paths"] = rendered_paths
             base["uncovered_templates"] = [p for p, t in zip(rendered_paths, got["templates"])
-                                           if p not in closure and template_has_controls(t) and not t.endswith(("_macros.html",))] if inv else []
+                                           if p not in closure and template_has_controls(t) and not t.endswith(("_macros.html",)) and "/errors/" not in p] if inv else []
             base["template"] = next((p for p in rendered_paths if "/components/" not in p and "/layouts/" not in p and "/partials/" not in p), rendered_paths[0] if rendered_paths else None)
         else:
             base["path"] = base["candidates"][0]
