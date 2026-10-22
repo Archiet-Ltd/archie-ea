@@ -19,7 +19,7 @@
 
     <!-- Prerequisites -->
     {% if not config.m365_configured %}
-    <div class="mb-6 rounded-md border border-warning/30 bg-warning/10 text-warning-emphasis p-4 text-sm">
+    <div class="mb-6 rounded-md border border-warning/40 bg-warning/10 text-warning-emphasis px-3 py-2 text-sm">
         <strong>M365 not configured.</strong>
         Teams Meeting Intelligence requires the Microsoft 365 connector to be set up first.
         <a href="{{ url_for('connectors.dashboard') }}" class="underline font-medium">Configure M365 →</a>
@@ -27,7 +27,7 @@
     {% endif %}
 
     <!-- Config card -->
-    <div class="rounded-lg border border-border bg-card text-card-foreground shadow-sm mb-6">
+    <div class="rounded-lg border border-border bg-card text-card-foreground mb-6">
         <div class="flex items-center justify-between px-6 py-4 border-b border-border">
             <div>
                 <h2 class="text-base font-semibold">Graph Subscription Settings</h2>
@@ -58,13 +58,11 @@
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
 
                 <div class="flex flex-col gap-1.5">
-                    <label for="notification_url" class="text-sm font-medium">Notification URL</label>
+                    <label for="notification_url" class="block text-sm font-medium text-muted-foreground mb-1">Notification URL</label>
                     <input id="notification_url" name="notification_url" type="url"
                            value="{{ config.notification_url or '' }}"
                            placeholder="https://your-public-url.com/api/webhooks/teams/notifications"
-                           class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm
-                                  shadow-sm transition-colors placeholder:text-muted-foreground
-                                  focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" />
+                           class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" />
                     <p class="text-xs text-muted-foreground">
                         Must be a publicly reachable HTTPS URL. Microsoft Graph will POST to this URL when a meeting ends.
                         Point it at <code class="font-mono">/api/webhooks/teams/notifications</code> on your production host.
@@ -97,16 +95,12 @@
 
                 <div class="flex items-center gap-3">
                     <button type="submit"
-                            class="inline-flex items-center justify-center rounded-md text-sm font-medium
-                                   bg-primary text-primary-foreground shadow hover:bg-primary/90
-                                   h-9 px-4 py-2 transition-colors">
+                            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
                         Save settings
                     </button>
                     <button type="button" id="subscribe-btn"
                             {% if not config.m365_configured %}disabled{% endif %}
-                            class="inline-flex items-center justify-center rounded-md text-sm font-medium
-                                   border border-input bg-background shadow-sm hover:bg-accent
-                                   h-9 px-4 py-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
                         Subscribe to call records
                     </button>
                 </div>
@@ -116,7 +110,7 @@
 
     <!-- Subscription status -->
     {% if config.subscription_id %}
-    <div class="rounded-lg border border-border bg-card text-card-foreground shadow-sm mb-6">
+    <div class="rounded-lg border border-border bg-card text-card-foreground mb-6">
         <div class="px-6 py-4 border-b border-border">
             <h2 class="text-base font-semibold">Active Subscription</h2>
         </div>
@@ -137,7 +131,7 @@
     {% endif %}
 
     <!-- How it works -->
-    <div class="rounded-lg border border-border bg-card text-card-foreground shadow-sm">
+    <div class="rounded-lg border border-border bg-card text-card-foreground">
         <div class="px-6 py-4 border-b border-border">
             <h2 class="text-base font-semibold">How it works</h2>
         </div>

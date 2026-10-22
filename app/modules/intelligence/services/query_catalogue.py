@@ -59,26 +59,19 @@ def _applications_without_owner(organization_id: int, **_: Any) -> Dict[str, Any
     criticality (the one grouping dimension ApplicationComponent actually
     carries; there is no business-unit column to group by, and inventing
     one would be exactly the fabrication CLAUDE.md forbids)."""
-    from app.models.application_owner import ApplicationOwner
     from app.models.application_portfolio import ApplicationComponent
+    from app.services.element_ownership_service import application_is_owned_expression
 
-    owned_ids = {
-        row[0]
-        for row in db.session.query(ApplicationOwner.application_id)
-        .filter(
-            ApplicationOwner.organization_id == organization_id,
-            ApplicationOwner.application_id.isnot(None),
-        )
-        .all()
-    }
-
+    # "Owned" is defined once, beside the owner store, and the dashboard's
+    # owner coverage reads the same rule. An owner named at import that matches
+    # no user is held as text on the application and still counts.
     unowned = (
         ApplicationComponent.query.filter(
             ApplicationComponent.organization_id == organization_id,
+            db.not_(application_is_owned_expression(ApplicationComponent)),
         )
         .all()
     )
-    unowned = [a for a in unowned if a.id not in owned_ids]
 
     groups: Dict[str, List[Dict[str, Any]]] = {}
     for app in unowned:

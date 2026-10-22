@@ -4,14 +4,14 @@
 {% block content %}
 <div class="max-w-3xl mx-auto py-8">
   {{ page_shell(title='Security Dashboard', breadcrumb=[('Home', '/'), ('Security Dashboard', none)]) }}
-  <div class="bg-background shadow rounded p-6 mb-6">
+  <div class="bg-background rounded p-6 mb-6">
     <h2 class="text-lg font-semibold mb-2">Response Headers</h2>
     {% if headers %}
     <p class="text-sm text-muted-foreground mb-3">
       The headers this page's own response carries, read from the live
       after-request handler.
     </p>
-    <table class="min-w-full text-sm">
+    <table class="dense-table min-w-full text-sm">
       <thead><tr><th class="text-left">Header name</th><th class="text-left">Header name</th></tr></thead>
       <tbody>
         {% for k, v in headers.items() %}
@@ -26,7 +26,7 @@
     </p>
     {% endif %}
   </div>
-  <div class="bg-background shadow rounded p-6 mb-6">
+  <div class="bg-background rounded p-6 mb-6">
     <h2 class="text-lg font-semibold mb-2">Rate Limit Stats</h2>
     {% if rate_limit_stats is none %}
     <p class="text-sm text-muted-foreground">
@@ -35,7 +35,7 @@
       was rate limited".
     </p>
     {% elif rate_limit_stats %}
-    <table class="min-w-full text-sm">
+    <table class="dense-table min-w-full text-sm">
       <thead><tr><th class="text-left">Key</th><th class="text-left">Count, Timestamp</th></tr></thead>
       <tbody>
         {% for key, val in rate_limit_stats %}

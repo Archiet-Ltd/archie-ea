@@ -111,8 +111,7 @@
         x-transition:leave-start="opacity-100"
         x-transition:leave-end="opacity-0"
         @click="open = false"
-        class="modal-backdrop fixed inset-0 bg-background/80 transition-opacity duration-200"
-        style="z-index: var(--modal-z, 1000);"
+        class="modal-backdrop fixed inset-0 transition-opacity duration-200 bg-overlay/50"
     ></div>
     
     <!-- Modal -->
@@ -128,7 +127,6 @@
         aria-modal="true"
         aria-label="Global search"
         class="modal-panel fixed top-[15vh] left-1/2 -translate-x-1/2 w-full max-w-2xl px-4"
-        style="z-index: calc(var(--modal-z, 1000) + 1);"
     >
         <div class="cmd-palette overflow-hidden">
             <!-- Search Input -->
@@ -152,7 +150,7 @@
                 {# ARCH-101: Escape and backdrop-click were the only ways out —
                    no visible close control, unlike every other dialog. #}
                 <button type="button" @click="closeSearch()" aria-label="Close search"
-                        class="h-6 w-6 rounded-sm flex items-center justify-center text-muted-foreground hover:text-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-colors">
+                        class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                     <i data-lucide="x" class="h-4 w-4" aria-hidden="true"></i>
                 </button>
             </div>

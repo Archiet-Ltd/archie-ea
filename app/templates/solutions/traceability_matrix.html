@@ -23,26 +23,26 @@
 
     {# ── Summary stats ── #}
     <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-6">
-        <div class="rounded-lg border border-border bg-card p-4 shadow-sm">
+        <div class="rounded-lg border border-border bg-card p-4">
             <p class="text-xs font-medium text-muted-foreground uppercase tracking-wider">Total Entities</p>
             <p class="mt-1 text-2xl font-bold text-foreground">{{ matrix.summary.total_entities }}</p>
         </div>
-        <div class="rounded-lg border border-border bg-card p-4 shadow-sm">
+        <div class="rounded-lg border border-border bg-card p-4">
             <p class="text-xs font-medium text-muted-foreground uppercase tracking-wider">Columns Populated</p>
             <p class="mt-1 text-2xl font-bold text-foreground">{{ matrix.summary.populated_columns }} / {{ matrix.summary.total_columns }}</p>
         </div>
-        <div class="rounded-lg border border-border bg-card p-4 shadow-sm">
+        <div class="rounded-lg border border-border bg-card p-4">
             <p class="text-xs font-medium text-muted-foreground uppercase tracking-wider">Overall Coverage</p>
             <p class="mt-1 text-2xl font-bold text-foreground">{{ matrix.coverage.overall }}%</p>
         </div>
-        <div class="rounded-lg border border-border bg-card p-4 shadow-sm">
+        <div class="rounded-lg border border-border bg-card p-4">
             <p class="text-xs font-medium text-muted-foreground uppercase tracking-wider">Gaps Found</p>
             <p class="mt-1 text-2xl font-bold {% if matrix.gaps %}text-destructive{% else %}text-foreground{% endif %}">{{ matrix.gaps | length }}</p>
         </div>
     </div>
 
     {# ── Coverage bars ── #}
-    <div class="mt-6 rounded-lg border border-border bg-card p-4 shadow-sm">
+    <div class="mt-6 rounded-lg border border-border bg-card p-4">
         <h3 class="text-sm font-semibold text-foreground mb-3">Coverage by Category</h3>
         <div class="space-y-2">
             {% for key, label in [('drivers', 'Drivers'), ('goals', 'Goals'), ('capabilities', 'Capabilities'), ('requirements', 'Requirements'), ('applications', 'Applications'), ('vendor_products', 'Vendor Products'), ('technology', 'Technology')] %}
@@ -62,7 +62,7 @@
 
     {# ── Gaps ── #}
     {% if matrix.gaps %}
-    <div class="mt-4 rounded-lg border border-destructive/30 bg-destructive/5 p-4">
+    <div class="mt-4 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2">
         <h3 class="text-sm font-semibold text-destructive-emphasis mb-2">Traceability Gaps</h3>
         <ul class="space-y-1">
             {% for gap in matrix.gaps %}
@@ -83,7 +83,7 @@
     <div class="mt-4 flex justify-end">
         <a
             href="{{ url_for('solution_design.solution_traceability_export', solution_id=solution.id) }}"
-            class="inline-flex items-center gap-2 rounded-md border border-border bg-card px-3 py-2 text-sm font-medium text-foreground shadow-sm hover:bg-muted transition-colors"
+            class="inline-flex items-center gap-2 rounded-md border border-border bg-card px-3 py-2 text-sm font-medium text-foreground hover:bg-muted transition-colors"
         >
             <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
@@ -93,12 +93,12 @@
     </div>
 
     {# ── Capability traceability section ── #}
-    <div data-testid="capability-traceability-section" class="mt-6 rounded-lg border border-border bg-card shadow-sm">
+    <div data-testid="capability-traceability-section" class="mt-6 rounded-lg border border-border bg-card">
         <div class="px-4 py-3 border-b border-border">
             <h3 class="text-sm font-semibold text-foreground">Capability Coverage</h3>
         </div>
         <div class="overflow-x-auto">
-            <table class="table-auto w-full text-sm">
+            <table class="dense-table table-auto w-full text-sm">
                 <thead class="bg-muted/50">
                     <tr>
                         <th scope="col" class="px-4 py-3 text-left font-semibold text-foreground">Capability</th>
@@ -115,7 +115,7 @@
                         <td class="px-4 py-3 text-sm text-foreground">{{ row.capability.name }}</td>
                         <td class="px-4 py-3 text-sm">
                             {% if row.capability.support_level %}
-                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-primary border border-primary/30">
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-info-emphasis border border-primary/30">
                                 {{ row.capability.support_level }}
                             </span>
                             {% else %}
@@ -166,10 +166,10 @@
     </div>
 
     {# ── Matrix table ── #}
-    <div class="mt-4 overflow-x-auto rounded-lg border border-border bg-card shadow-sm">
+    <div class="mt-4 overflow-x-auto rounded-lg border border-border bg-card">
         <table
             aria-label="Traceability Matrix"
-            class="min-w-full divide-y divide-border text-sm"
+            class="dense-table min-w-full divide-y divide-border text-sm"
         >
             <thead class="bg-muted/50">
                 <tr>
@@ -186,7 +186,7 @@
                     {# Driver #}
                     <td class="px-4 py-3 align-top">
                         {% if row.driver %}
-                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-primary border border-primary/30">
+                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-info-emphasis border border-primary/30">
                             {{ row.driver.name }}
                         </span>
                         {% else %}

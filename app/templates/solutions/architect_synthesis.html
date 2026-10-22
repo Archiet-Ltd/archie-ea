@@ -27,7 +27,7 @@
     <section aria-label="Reporting scope" class="mb-6 rounded-lg border border-border bg-muted/30 p-4">
         <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div class="flex items-start gap-3">
-                <span class="mt-0.5 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
+                <span class="mt-0.5 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-primary/10 text-info-emphasis">
                     <i data-lucide="radar" class="h-4 w-4" aria-hidden="true"></i>
                 </span>
                 <div>
@@ -41,13 +41,13 @@
             </div>
             <div class="flex flex-wrap items-center gap-2">
                 <a href="{{ url_for('solution_design.programmes_list') }}"
-                   class="inline-flex h-9 items-center justify-center rounded-md border border-input bg-background px-4 py-2 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
+                   class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
                     <i data-lucide="layers" class="mr-2 h-4 w-4" aria-hidden="true"></i>
                     View programmes
                 </a>
                 {% if 'arb.reviews' in flask.current_app.view_functions %}
                 <a href="{{ url_for('arb.reviews') }}"
-                   class="inline-flex h-9 items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
+                   class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
                     <i data-lucide="gavel" class="mr-2 h-4 w-4" aria-hidden="true"></i>
                     Open ARB queue
                 </a>
@@ -171,7 +171,7 @@
                         Review evidence
                     </a>
                     <a href="{{ item.action_url }}"
-                       class="inline-flex h-9 items-center justify-center rounded-md border border-input bg-background px-3 text-xs font-medium transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
+                       class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
                         {{ item.next_action }}
                         <i data-lucide="arrow-right" class="ml-2 h-3.5 w-3.5" aria-hidden="true"></i>
                     </a>
@@ -229,7 +229,7 @@
        and permanently badged. The panel starts empty: a briefing appears only
        when the reader asks for one, so nothing on first paint can be mistaken
        for a measurement. #}
-    <section class="mb-6 rounded-xl border border-primary/30 bg-primary/5 p-5"
+    <section class="mb-6 rounded-md border border-primary/40 bg-primary/10 px-3 py-2"
              aria-labelledby="ai-briefing-heading"
              x-data="chiefArchitectBriefing()">
         <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -245,7 +245,7 @@
                 </p>
             </div>
             <button type="button" @click="generate()" :disabled="loading"
-                    class="inline-flex h-9 shrink-0 items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50 disabled:pointer-events-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
+                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 shrink-0 items-center justify-center">
                 <span x-show="loading" x-cloak class="mr-2 inline-block h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" aria-hidden="true"></span>
                 <span x-text="loading ? 'Generating…' : (briefing ? 'Regenerate briefing' : 'Generate briefing')">Generate briefing</span>
             </button>

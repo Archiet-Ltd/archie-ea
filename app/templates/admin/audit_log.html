@@ -18,27 +18,27 @@
 
     <!-- Filters -->
     <form method="get" action="{{ url_for('admin.audit_log_viewer') }}" class="mt-6 rounded-xl border bg-card p-4">
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
+        <div class="grid grid-cols-1 gap-3">
             <div>
-                <label for="date_from" class="block text-xs font-medium text-muted-foreground mb-1">From Date</label>
+                <label for="date_from" class="block text-sm font-medium text-muted-foreground mb-1">From Date</label>
                 <input type="date" id="date_from" name="date_from" value="{{ date_from }}"
-                       class="w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm">
+                       class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm">
             </div>
             <div>
-                <label for="date_to" class="block text-xs font-medium text-muted-foreground mb-1">To Date</label>
+                <label for="date_to" class="block text-sm font-medium text-muted-foreground mb-1">To Date</label>
                 <input type="date" id="date_to" name="date_to" value="{{ date_to }}"
-                       class="w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm">
+                       class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm">
             </div>
             <div>
-                <label for="user_email" class="block text-xs font-medium text-muted-foreground mb-1">User Email</label>
+                <label for="user_email" class="block text-sm font-medium text-muted-foreground mb-1">User Email</label>
                 <!-- entity-picker-ok: search filter, not entity creation -->
                 <input type="text" id="user_email" name="user_email" value="{{ user_email }}" placeholder="Search by email"
-                       class="w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm">
+                       class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm">
             </div>
             <div>
-                <label for="action" class="block text-xs font-medium text-muted-foreground mb-1">Action</label>
+                <label for="action" class="block text-sm font-medium text-muted-foreground mb-1">Action</label>
                 <select id="action" name="action"
-                        class="w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm">
+                        class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm">
                     <option value="">All Actions</option>
                     {% for a in action_types %}
                     <option value="{{ a }}" {{ 'selected' if action_filter == a else '' }}>{{ a }}</option>
@@ -46,9 +46,9 @@
                 </select>
             </div>
             <div>
-                <label for="entity_type" class="block text-xs font-medium text-muted-foreground mb-1">Entity Type</label>
+                <label for="entity_type" class="block text-sm font-medium text-muted-foreground mb-1">Entity Type</label>
                 <select id="entity_type" name="entity_type"
-                        class="w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm">
+                        class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm">
                     <option value="">All Types</option>
                     {% for et in entity_types %}
                     <option value="{{ et }}" {{ 'selected' if entity_type_filter == et else '' }}>{{ et }}</option>
@@ -56,18 +56,18 @@
                 </select>
             </div>
             <div>
-                <label for="q" class="block text-xs font-medium text-muted-foreground mb-1">Search</label>
+                <label for="q" class="block text-sm font-medium text-muted-foreground mb-1">Search</label>
                 <input type="text" id="q" name="q" value="{{ search_q }}" placeholder="Search description..."
-                       class="w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm">
+                       class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm">
             </div>
         </div>
         <div class="flex items-center gap-3 mt-3">
             <button type="submit"
-                    class="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors">
+                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
                 <i data-lucide="search" class="h-4 w-4 mr-1.5"></i> Filter
             </button>
             <a href="{{ url_for('admin.audit_log_viewer') }}"
-               class="inline-flex items-center justify-center rounded-md border border-input bg-background px-4 py-2 text-sm font-medium hover:bg-accent transition-colors">
+               class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
                 Clear
             </a>
             <a href="{{ url_for('admin.audit_log_viewer', action='tool_refused') }}" data-testid="audit-refused-tool-calls"
@@ -76,14 +76,14 @@
                 <i data-lucide="shield-x" class="h-4 w-4 mr-1.5" aria-hidden="true"></i> Refused AI tool calls
             </a>
             <a id="audit-export" href="{{ url_for('admin.audit_log_viewer', date_from=date_from, date_to=date_to, user_email=user_email, action=action_filter, entity_type=entity_type_filter, q=search_q, export='csv') }}"
-               class="inline-flex items-center justify-center rounded-md border border-input bg-background px-4 py-2 text-sm font-medium hover:bg-accent transition-colors ml-auto">
+               class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center ml-auto">
                 <i data-lucide="download" class="h-4 w-4 mr-1.5"></i> Export CSV
             </a>
         </div>
     </form>
 
     <!-- Integrity: the organisation's hash chain and its last recorded check -->
-    <section class="mt-6 rounded-xl border bg-card p-4" aria-labelledby="audit-integrity-heading">
+    <section class="mt-6 rounded-lg border border-border bg-card p-4" aria-labelledby="audit-integrity-heading">
         <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div class="min-w-0 space-y-1">
                 <h2 id="audit-integrity-heading" class="text-sm font-semibold text-foreground">Integrity</h2>
@@ -112,7 +112,7 @@
             <form method="post" action="{{ url_for('admin.audit_log_viewer', date_from=date_from, date_to=date_to, user_email=user_email, action=action_filter, entity_type=entity_type_filter, q=search_q) }}" class="shrink-0">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <button id="audit-verify" type="submit"
-                        class="inline-flex items-center justify-center rounded-md text-sm font-medium border border-input bg-background hover:bg-accent hover:text-accent-foreground h-9 px-4 py-2 disabled:opacity-50 disabled:pointer-events-none">
+                        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
                     <i data-lucide="shield-check" class="h-4 w-4 mr-1.5"></i> Verify integrity
                 </button>
             </form>
@@ -120,7 +120,7 @@
     </section>
 
     {% if load_error %}
-    <div role="alert" class="mt-6 rounded-xl border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive-emphasis">
+    <div role="alert" class="mt-6 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive-emphasis">
         The audit log could not be read. No entries are shown because none could be loaded; reload to try again.
     </div>
     {% endif %}
@@ -135,9 +135,9 @@
     </div>
 
     <!-- Results table -->
-    <div class="rounded-xl border bg-card overflow-hidden" x-data="{ expanded: {} }">
+    <div class="rounded-lg border border-border bg-card overflow-hidden" x-data="{ expanded: {} }">
         <div class="overflow-x-auto">
-            <table class="w-full text-sm">
+            <table class="dense-table w-full text-sm">
                 <thead>
                     <tr class="border-b bg-muted/50">
                         <th class="px-4 py-3 text-left font-medium text-muted-foreground w-8"></th>
@@ -266,14 +266,14 @@
     <nav class="flex items-center justify-center gap-1 mt-6" aria-label="Audit log pagination">
         {% if page > 1 %}
         <a href="{{ url_for('admin.audit_log_viewer', page=page-1, date_from=date_from, date_to=date_to, user_email=user_email, action=action_filter, entity_type=entity_type_filter, q=search_q) }}"
-           class="inline-flex items-center justify-center rounded-md border border-input bg-background px-3 py-1.5 text-sm hover:bg-accent transition-colors">
+           class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
             Previous
         </a>
         {% endif %}
         <span class="px-3 py-1.5 text-sm text-muted-foreground">Page {{ page }} of {{ total_pages }}</span>
         {% if page < total_pages %}
         <a href="{{ url_for('admin.audit_log_viewer', page=page+1, date_from=date_from, date_to=date_to, user_email=user_email, action=action_filter, entity_type=entity_type_filter, q=search_q) }}"
-           class="inline-flex items-center justify-center rounded-md border border-input bg-background px-3 py-1.5 text-sm hover:bg-accent transition-colors">
+           class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
             Next
         </a>
         {% endif %}

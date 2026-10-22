@@ -12,7 +12,7 @@
   <form method="post" action="{{ url_for('genome_data.generate_ropa') }}" class="mb-6">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <button type="submit"
-            class="inline-flex items-center px-4 py-2 rounded-md bg-primary text-primary-foreground font-medium hover:opacity-90">
+            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
       Generate RoPA
     </button>
   </form>

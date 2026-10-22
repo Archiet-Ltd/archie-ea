@@ -63,7 +63,7 @@
         {% set colors = color_map.get(framework_data.color, color_map['blue']) %}
         {% if True %}
         <a href="{{ url_for('maturity_management.framework_dashboard', framework_key=framework_key) }}"
-           class="block bg-card rounded-lg shadow hover:shadow-lg transition-shadow duration-200 border border-border">
+           class="block bg-card rounded-lg transition-shadow duration-200 border border-border">
             <div class="p-6">
                 <!-- Framework Header -->
                 <div class="flex items-center mb-4">
@@ -147,13 +147,13 @@
     {% endif %}
 
     <!-- Framework Comparison -->
-    <div class="bg-card rounded-lg shadow border border-border">
+    <div class="bg-card rounded-lg border border-border">
         <div class="px-6 py-4 border-b border-border">
             <h2 class="text-lg font-semibold text-foreground">Framework Comparison</h2>
         </div>
         <div class="p-6">
             <div class="overflow-x-auto">
-                <table class="min-w-full divide-y divide-border">
+                <table class="dense-table min-w-full divide-y divide-border">
                     <thead class="bg-muted/50">
                         <tr>
                             <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Framework</th>
@@ -186,7 +186,7 @@
                             <td class="px-6 py-4 whitespace-nowrap text-sm text-foreground">{{ stats[1] }}</td>
                             <td class="px-6 py-4 whitespace-nowrap text-sm text-foreground">{{ stats[2] }}</td>
                             <td class="px-6 py-4 whitespace-nowrap">
-                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary">
+                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-info-emphasis">
                                     {{ "%.1f"|format(stats[4]) if stats[4] is not none else "—" }}
                                 </span>
                             </td>
