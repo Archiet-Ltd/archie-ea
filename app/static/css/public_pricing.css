@@ -28,7 +28,7 @@
 .pricing-page .pp-toggle label { display: inline-flex; align-items: center; min-height: 2.75rem; padding: 0 1.25rem; border-radius: 0.5rem; font-size: 0.9375rem; font-weight: 500; cursor: pointer; color: var(--pp-muted); }
 .pricing-page .pp-toggle .pp-save { margin-left: 0.5rem; font-size: 0.8125rem; font-weight: 600; color: hsl(var(--success-emphasis)); }
 #pp-bill-year:checked ~ .pp-toggle label[for="pp-bill-year"],
-#pp-bill-month:checked ~ .pp-toggle label[for="pp-bill-month"] { background: hsl(var(--background)); color: var(--pp-fg); box-shadow: 0 1px 2px hsl(var(--foreground) / .12); }
+#pp-bill-month:checked ~ .pp-toggle label[for="pp-bill-month"] { background: hsl(var(--background)); color: var(--pp-fg); }
 .pricing-page [data-interval] { display: none; }
 #pp-bill-year:checked ~ .pp-plans [data-interval="year"],
 #pp-bill-month:checked ~ .pp-plans [data-interval="month"],
