@@ -131,15 +131,11 @@
 
 
 {# ------------------------------------------------------------------------------------------------
-   Component substrate: select, dialog, card, badge.
-   These four are the entry points the pattern briefs build from. Where the repository already has
-   an implementation they delegate to it (components/modal.html, components/badge.html,
-   components/status_badge.html) instead of keeping a second copy. Colours come from the token
+   Component substrate: the native select.
+   Dialog, card and badge are not repeated here: use components/modal.html (modal), page_shell.html
+   (section_card) and components/badge.html (badge), which already ship. Colours come from the token
    classes in app/static/css/shadcn_tokens.css only; no shadows (design/patterns.json ban).
    ------------------------------------------------------------------------------------------------ #}
-{% from 'components/modal.html' import modal as _modal_root %}
-{% from 'components/badge.html' import badge as _badge_root %}
-{% from 'components/status_badge.html' import status_badge as _status_badge_root %}
 
 {# shadcn_select: native <select> with label, help text and error state.
    Options come from `options` (list of (value, label) pairs) or from a {% call %} body of <option> elements.
@@ -176,57 +172,5 @@
     {% if error %}<p id="{{ _id }}-error" class="text-sm text-destructive-emphasis" role="alert">{{ error }}</p>
     {% elif help_text %}<p id="{{ _id }}-help" class="text-sm text-muted-foreground">{{ help_text }}</p>{% endif %}
 </div>
-{% endif %}
-{% endmacro %}
-
-{# shadcn_dialog: modal dialog. Wraps components/modal.html (role=dialog, aria-modal, aria-labelledby from the
-   title, close button, backdrop, focus trap and Escape through js/ui/modal.js) and adds the action row.
-   Open with data-modal-open="<id>" or Platform.modal.open('<id>').
-   primary / secondary are dicts: {"label": "Save", "type": "submit", "attrs": 'form="f"', "variant": "destructive"}
-   (secondary defaults to a Cancel button that closes the dialog). The body is the {% call %} content. #}
-{% macro shadcn_dialog(id, title, description="", primary=None, secondary=None, closable=true, size="default") %}
-{% set _body = caller() if caller is defined else "" %}
-{% call _modal_root(id=id, title=title, description=description, size=size, closable=closable) %}
-{{ _body }}
-{% if primary or secondary %}
-<div class="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-    {% set _sec = secondary if secondary else {"label": "Cancel"} %}
-    <button type="{{ _sec.get('type', 'button') }}" data-modal-close="{{ id }}" {{ (_sec.get('attrs', ''))|safe }}
-        class="inline-flex h-10 items-center justify-center rounded-md border border-input bg-background px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ring-offset-background">{{ _sec.get('label', 'Cancel') }}</button>
-    {% if primary %}
-    <button type="{{ primary.get('type', 'button') }}" {{ (primary.get('attrs', ''))|safe }}
-        class="inline-flex h-10 items-center justify-center rounded-md px-4 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ring-offset-background {{ 'bg-destructive text-destructive-foreground hover:bg-destructive/90' if primary.get('variant') == 'destructive' else 'bg-primary text-primary-foreground hover:bg-primary/90' }}">{{ primary.get('label', 'Confirm') }}</button>
-    {% endif %}
-</div>
-{% endif %}
-{% endcall %}
-{% endmacro %}
-
-{# shadcn_card: bordered container, border token only, no shadow. header slots (title, description, actions) and
-   footer are arguments; the body is the {% call %} content. footer / actions accept markup captured with {% set x %}...{% endset %}. #}
-{% macro shadcn_card(title="", description="", actions="", footer="", class="", body_class="") %}
-<div data-slot="card" class="rounded-xl border bg-card text-card-foreground {{ class }}">
-    {% if title or description or actions %}
-    <div data-slot="card-header" class="flex items-start justify-between gap-4 p-6 {{ 'pb-0' if caller is defined else '' }}">
-        <div class="flex flex-col space-y-1.5">
-            {% if title %}<h3 data-slot="card-title" class="text-lg font-semibold leading-none tracking-tight">{{ title }}</h3>{% endif %}
-            {% if description %}<p data-slot="card-description" class="text-sm text-muted-foreground">{{ description }}</p>{% endif %}
-        </div>
-        {% if actions %}<div data-slot="card-action" class="shrink-0">{{ actions }}</div>{% endif %}
-    </div>
-    {% endif %}
-    {% if caller is defined %}<div data-slot="card-content" class="p-6 {{ body_class }}">{{ caller() }}</div>{% endif %}
-    {% if footer %}<div data-slot="card-footer" class="flex items-center border-t p-6 pt-4">{{ footer }}</div>{% endif %}
-</div>
-{% endmacro %}
-
-{# shadcn_badge: variant "neutral" (plain label), "status" (lifecycle, coloured by tone: success | warning | error |
-   info | neutral) or "type" (element type; outline). Text is the first argument or the {% call %} body. #}
-{% macro shadcn_badge(text="", variant="neutral", tone="neutral", dot=false, icon=None, class="") %}
-{% set _label = text if text else (caller() if caller is defined else "") %}
-{% if variant == "status" %}
-    {{ _status_badge_root(text=_label, variant=tone, dot=dot, icon=icon, class=class) }}
-{% else %}
-    {% call _badge_root(variant=("outline" if variant == "type" else "neutral"), class=class) %}{{ _label }}{% endcall %}
 {% endif %}
 {% endmacro %}

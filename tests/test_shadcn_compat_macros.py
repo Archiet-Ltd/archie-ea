@@ -1,4 +1,4 @@
-"""Render tests for the shadcn_compat substrate macros (select, dialog, card, badge)."""
+"""Render tests for the shadcn_compat substrate macro (the native select)."""
 import re
 from pathlib import Path
 
@@ -11,7 +11,7 @@ TEMPLATES = Path(__file__).resolve().parent.parent / "app" / "templates"
 @pytest.fixture(scope="module")
 def render():
     env = jinja2.Environment(loader=jinja2.FileSystemLoader(str(TEMPLATES)), autoescape=True)
-    imp = "{% from 'macros/shadcn_compat.html' import shadcn_select, shadcn_dialog, shadcn_card, shadcn_badge %}"
+    imp = "{% from 'macros/shadcn_compat.html' import shadcn_select %}"
     return lambda src, **kw: env.from_string(imp + src).render(**kw)
 
 
@@ -29,25 +29,6 @@ def test_select_error_state(render):
 def test_select_bare_call_body(render):
     out = render("{% call shadcn_select('p', bare=true) %}<option>x</option>{% endcall %}")
     assert "<label" not in out and "<option>x</option>" in out
-
-
-def test_dialog_semantics_and_actions(render):
-    out = render("{% call shadcn_dialog('d', 'Title', primary={'label': 'Save', 'type': 'submit'}) %}BODYTEXT{% endcall %}")
-    assert 'role="dialog"' in out and 'aria-modal="true"' in out and 'aria-labelledby="d-title"' in out
-    assert 'id="d-title"' in out and "BODYTEXT" in out and 'data-modal-close="d"' in out and ">Save<" in out
-
-
-def test_card_regions_and_no_shadow(render):
-    out = render("{% set f %}<b>foot</b>{% endset %}{% call shadcn_card(title='T', description='D', footer=f) %}BODY{% endcall %}")
-    for slot in ("card-header", "card-content", "card-footer"):
-        assert slot in out
-    assert "shadow" not in out and "<b>foot</b>" in out
-
-
-def test_badge_variants(render):
-    assert "bg-success/10" in render("{{ shadcn_badge('Live', 'status', 'success') }}")
-    assert "Capability" in render("{{ shadcn_badge('Capability', 'type') }}")
-    assert "bg-muted/50" in render("{{ shadcn_badge('x') }}")
 
 
 def test_new_macros_have_no_hardcoded_colours_or_shadows():
