@@ -146,7 +146,7 @@
     
         // Standard colors for common domains
         const standardColors = {
-            'CUST': 'bg-primary/10 text-primary/90',
+            'CUST': 'bg-primary/10 text-info-emphasis',
             'PROD': 'bg-sky-100 text-sky-800',
             'OPER': 'bg-amber-500/10 text-yellow-800',
             'FIN': 'bg-purple-100 text-purple-800',
@@ -157,7 +157,7 @@
             'TECH': 'bg-muted text-foreground',
             'MFG': 'bg-orange-100 text-orange-800',
             'Manufacturing': 'bg-orange-100 text-orange-800',
-            'Enterprise': 'bg-primary/10 text-primary/90',
+            'Enterprise': 'bg-primary/10 text-info-emphasis',
             'Experience': 'bg-sky-100 text-sky-800',
             'Engineering': 'bg-amber-500/10 text-yellow-800',
             'Integration': 'bg-purple-100 text-purple-800',
@@ -175,7 +175,7 @@
     
         // Generate consistent color for unknown domains
         const colors = [
-            'bg-primary/10 text-primary/90',
+            'bg-primary/10 text-info-emphasis',
             'bg-sky-100 text-sky-800',
             'bg-amber-500/10 text-yellow-800',
             'bg-purple-100 text-purple-800',
@@ -195,7 +195,7 @@
     
     function getTypeColor(type) {
         const colors = {
-            'core': 'bg-primary/10 text-primary/90',
+            'core': 'bg-primary/10 text-info-emphasis',
             'supporting': 'bg-muted text-foreground',
             'differentiating': 'bg-sky-100 text-sky-800'
         };
@@ -461,23 +461,23 @@
         }
     
         const domainColorSets = [
-            { bg: 'bg-primary/5', border: 'border-primary/20', textBold: 'text-primary', textHead: 'text-primary/90', badge: 'bg-primary/10' },
-            { bg: 'bg-sky-50', border: 'border-sky-200', textBold: 'text-sky-600', textHead: 'text-sky-800', badge: 'bg-sky-100' },
-            { bg: 'bg-purple-50', border: 'border-purple-200', textBold: 'text-primary', textHead: 'text-purple-800', badge: 'bg-purple-100' },
-            { bg: 'bg-orange-50', border: 'border-orange-200', textBold: 'text-orange-600', textHead: 'text-orange-800', badge: 'bg-orange-100' },
-            { bg: 'bg-teal-50', border: 'border-teal-200', textBold: 'text-teal-600', textHead: 'text-teal-800', badge: 'bg-teal-100' },
-            { bg: 'bg-indigo-50', border: 'border-indigo-200', textBold: 'text-primary', textHead: 'text-indigo-800', badge: 'bg-indigo-100' },
-            { bg: 'bg-pink-50', border: 'border-pink-200', textBold: 'text-pink-600', textHead: 'text-pink-800', badge: 'bg-pink-100' },
-            { bg: 'bg-cyan-50', border: 'border-cyan-200', textBold: 'text-cyan-600', textHead: 'text-cyan-800', badge: 'bg-cyan-100' },
-            { bg: 'bg-amber-50', border: 'border-amber-200', textBold: 'text-amber-600', textHead: 'text-amber-800', badge: 'bg-amber-100' },
+            { bg: 'bg-primary/5', border: 'border-primary/20', textBold: 'text-info-emphasis', textHead: 'text-info-emphasis', badge: 'bg-primary/10' },
+            { bg: 'bg-layer-implementation/5', border: 'border-layer-implementation/30', textBold: 'text-layer-implementation-emphasis', textHead: 'text-layer-implementation-emphasis', badge: 'bg-layer-implementation/10' },
+            { bg: 'bg-layer-motivation/5', border: 'border-layer-motivation/30', textBold: 'text-layer-motivation-emphasis', textHead: 'text-layer-motivation-emphasis', badge: 'bg-layer-motivation/10' },
+            { bg: 'bg-layer-strategy/5', border: 'border-layer-strategy/30', textBold: 'text-layer-strategy-emphasis', textHead: 'text-layer-strategy-emphasis', badge: 'bg-layer-strategy/10' },
+            { bg: 'bg-layer-business/5', border: 'border-layer-business/30', textBold: 'text-layer-business-emphasis', textHead: 'text-layer-business-emphasis', badge: 'bg-layer-business/10' },
+            { bg: 'bg-layer-application/5', border: 'border-layer-application/30', textBold: 'text-layer-application-emphasis', textHead: 'text-layer-application-emphasis', badge: 'bg-layer-application/10' },
+            { bg: 'bg-layer-risk/5', border: 'border-layer-risk/30', textBold: 'text-layer-risk-emphasis', textHead: 'text-layer-risk-emphasis', badge: 'bg-layer-risk/10' },
+            { bg: 'bg-layer-technology/5', border: 'border-layer-technology/30', textBold: 'text-layer-technology-emphasis', textHead: 'text-layer-technology-emphasis', badge: 'bg-layer-technology/10' },
+            { bg: 'bg-warning/5', border: 'border-warning/30', textBold: 'text-warning-emphasis', textHead: 'text-warning-emphasis', badge: 'bg-warning/10' },
         ];
     
         safeHTML(grid, domains.map((domain, index) => {
             const cs = domainColorSets[index % domainColorSets.length];
             const coverage = domain.total > 0 ? Math.round((domain.mapped / domain.total) * 100) : 0;
-            const coverageColor = coverage >= 70 ? 'text-sky-600' : coverage >= 40 ? 'text-amber-600' : 'text-rose-600';
-            const barColor = coverage >= 70 ? 'bg-sky-500' : coverage >= 40 ? 'bg-amber-500' : 'bg-rose-500';
-            const statusColor = coverage >= 70 ? 'bg-sky-400' : coverage >= 40 ? 'bg-amber-400' : 'bg-rose-400';
+            const coverageColor = coverage >= 70 ? 'text-layer-implementation-emphasis' : coverage >= 40 ? 'text-warning-emphasis' : 'text-destructive-emphasis';
+            const barColor = coverage >= 70 ? 'bg-layer-implementation-emphasis' : coverage >= 40 ? 'bg-warning' : 'bg-destructive';
+            const statusColor = coverage >= 70 ? 'bg-layer-implementation-emphasis' : coverage >= 40 ? 'bg-warning' : 'bg-destructive';
     
             return `
                 <button type="button"
@@ -765,7 +765,7 @@
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">
                     <div class="flex items-center">
                         <div class="w-16 bg-border rounded-full h-2 mr-2">
-                            <div class="${isMapped ? 'bg-sky-600' : 'bg-rose-600'} h-2 rounded-full" style="width: ${item.coverage_percentage || (isMapped ? 100 : 0)}%"></div>
+                            <div class="${isMapped ? 'bg-layer-implementation-emphasis' : 'bg-destructive'} h-2 rounded-full" style="width: ${item.coverage_percentage || (isMapped ? 100 : 0)}%"></div>
                         </div>
                         <span class="text-xs">${item.coverage_percentage || (isMapped ? 100 : 0)}%</span>
                     </div>
@@ -2633,7 +2633,7 @@
         if (filters.length > 0) {
             activeFiltersDisplay.classList.remove('hidden');
             safeHTML(activeFiltersTags, filters.map(f => `
-                <span class="inline-flex items-center px-3 py-1 bg-primary/10 text-primary/90 rounded-full text-sm">
+                <span class="inline-flex items-center px-3 py-1 bg-primary/10 text-info-emphasis rounded-full text-sm">
                     ${f.label}
                     <button type="button" data-cm-action="clear-filter" data-field="${escapeAttr(f.field)}" aria-label="Clear filter" class="ml-2 hover:text-blue-900">
                         <i data-lucide="x" class="w-3 h-3"></i>
@@ -3082,11 +3082,11 @@
     // which breaks Tailwind purge (e.g. bg-${color}-600 won't be found at build time)
     function getProgressBarClass(progress) {
         if (progress === 0) return 'bg-muted-foreground/20';
-        if (progress < 25) return 'bg-rose-600';
+        if (progress < 25) return 'bg-destructive';
         if (progress < 50) return 'bg-orange-600';
         if (progress < 75) return 'bg-yellow-600';
         if (progress < 100) return 'bg-primary';
-        return 'bg-sky-600';
+        return 'bg-layer-implementation-emphasis';
     }
 
     function getProgressTextClass(progress) {
@@ -5108,7 +5108,7 @@
         // Process type badge colors
         const typeColors = {
             'core': 'bg-purple-100 text-purple-800',
-            'support': 'bg-primary/10 text-primary/90',
+            'support': 'bg-primary/10 text-info-emphasis',
             'management': 'bg-muted text-foreground'
         };
         const typeColor = typeColors[item.process_type] || 'bg-muted text-foreground';

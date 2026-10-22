@@ -204,7 +204,7 @@
         <i data-lucide="alert-triangle" class="h-3.5 w-3.5 shrink-0 text-warning-emphasis" aria-hidden="true"></i>
         <span class="font-medium text-warning-emphasis">Data quality</span>
         <span class="truncate">{{ stats.owner_assigned|dash }} of {{ stats.total|dash }} applications in the portfolio have a named owner (a business owner on record, or an application manager assigned) · {{ stats.vendor_assigned|dash }} of {{ stats.total|dash }} applications in the portfolio have a vendor recorded · {{ stats.decommissioned|dash }} of {{ stats.total|dash }} applications in the portfolio decommissioned</span>
-        <a href="{{ url_for('enterprise_crud.data_freshness_cockpit') }}" class="ml-auto shrink-0 font-medium text-info hover:underline">View full data-freshness report</a>
+        <a href="{{ url_for('enterprise_crud.data_freshness_cockpit') }}" class="ml-auto shrink-0 font-medium text-info-emphasis hover:underline">View full data-freshness report</a>
       </div>
       <div class="flex items-center gap-2">
         {# D13: this badge counts the rows in the current (filtered) view, which by
