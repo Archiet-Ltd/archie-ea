@@ -15,7 +15,7 @@ from typing import Optional  # dead-code-ok: used by type hints
 from sqlalchemy import Index, Text, UniqueConstraint
 
 from app import db
-from app.models.mixins.core import TenantMixin
+from app.models.mixins.core import TenantMixin, _default_org_id
 
 HAS_PGVECTOR = False
 Vector = None
@@ -152,6 +152,29 @@ class ChatMessageEmbedding(db.Model):
     domain = db.Column(db.String(100), nullable=True)  # Chat domain (vendor, capability, etc)
     metadata_json = db.Column(db.JSON, default={})  # Additional metadata
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    # The organisation that was active when the message was written. Nullable: a
+    # history row whose owner has no home organisation has none to record. Chat
+    # history, saved sessions and page-guide history all live in this table, so
+    # one column fences all three. Reads use ``in_active_org()``.
+    organization_id = db.Column(
+        db.Integer,
+        db.ForeignKey("organizations.id", ondelete="CASCADE"),
+        nullable=True,
+        index=True,
+        default=_default_org_id,
+    )
+
+    @classmethod
+    def in_org(cls, org_id):
+        """Filter clause: rows made in organisation *org_id*.
+
+        Callers pass ``current_org_id()`` (the active organisation). Outside a
+        tenant request that is None and the clause is a no-op, as for every
+        other raw-scoped tenant read.
+        """
+        from sqlalchemy import true
+
+        return true() if org_id is None else cls.organization_id == org_id
 
     def __repr__(self):
         return f"<ChatMessageEmbedding session={self.chat_session_id} role={self.message_role}>"
