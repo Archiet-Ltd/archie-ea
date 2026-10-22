@@ -5,14 +5,15 @@
    double-quoted x-data="..." attribute truncates the attribute at the first
    inner quote (breaking the whole component). Hoist it to a script variable and
    reference that, the same pattern investment_matrix.html uses. #}
-<script nonce="{{ csp_nonce }}">window.__SCENARIO_CAPS = {{ capability_scores | tojson }};</script>
+{# The Chart.js objects live outside x-data: Alpine would wrap them in reactive proxies,
+   and a proxied chart recurses without end ("Maximum call stack size exceeded") on update. #}
+<script nonce="{{ csp_nonce }}">window.__SCENARIO_CAPS = {{ capability_scores | tojson }}; window.__scenarioCharts = { roi: null, payback: null, bubble: null };</script>
 <div
     x-data="{
         capabilities: (window.__SCENARIO_CAPS || []),
         selectedCapabilities: [],
         selectedIds: [null, null, null],
         scenarios: [],
-        charts: { roi: null, payback: null, bubble: null },
 
         initModal() {
             Platform.modal.open('scenario-comparison');
@@ -84,7 +85,7 @@
 
             const roiCtx = document.getElementById('comparisonRoiChart');
             if (roiCtx) {
-                this.charts.roi = new Chart(roiCtx, {
+                window.__scenarioCharts.roi = new Chart(roiCtx, {
                     type: 'bar',
                     data: {
                         labels: ['Scenario 1', 'Scenario 2', 'Scenario 3'],
@@ -106,7 +107,7 @@
 
             const paybackCtx = document.getElementById('comparisonPaybackChart');
             if (paybackCtx) {
-                this.charts.payback = new Chart(paybackCtx, {
+                window.__scenarioCharts.payback = new Chart(paybackCtx, {
                     type: 'bar',
                     data: {
                         labels: ['Scenario 1', 'Scenario 2', 'Scenario 3'],
@@ -128,7 +129,7 @@
 
             const bubbleCtx = document.getElementById('comparisonBubbleChart');
             if (bubbleCtx) {
-                this.charts.bubble = new Chart(bubbleCtx, {
+                window.__scenarioCharts.bubble = new Chart(bubbleCtx, {
                     type: 'bubble',
                     data: { datasets: [] },
                     options: {
@@ -158,17 +159,17 @@
         },
 
         updateCharts() {
-            if (!this.charts.roi || !this.charts.payback || !this.charts.bubble) return;
+            if (!window.__scenarioCharts.roi || !window.__scenarioCharts.payback || !window.__scenarioCharts.bubble) return;
 
-            this.charts.roi.data.datasets[0].data = [
+            window.__scenarioCharts.roi.data.datasets[0].data = [
                 this.scenarios[0]?.roi || 0, this.scenarios[1]?.roi || 0, this.scenarios[2]?.roi || 0
             ];
-            this.charts.roi.update();
+            window.__scenarioCharts.roi.update();
 
-            this.charts.payback.data.datasets[0].data = [
+            window.__scenarioCharts.payback.data.datasets[0].data = [
                 this.scenarios[0]?.paybackPeriod || 0, this.scenarios[1]?.paybackPeriod || 0, this.scenarios[2]?.paybackPeriod || 0
             ];
-            this.charts.payback.update();
+            window.__scenarioCharts.payback.update();
 
             const bubbleData = [];
             ['Scenario 1', 'Scenario 2', 'Scenario 3'].forEach((label, index) => {
@@ -181,15 +182,15 @@
                     });
                 }
             });
-            this.charts.bubble.data.datasets = bubbleData;
-            this.charts.bubble.update();
+            window.__scenarioCharts.bubble.data.datasets = bubbleData;
+            window.__scenarioCharts.bubble.update();
         },
 
         destroyCharts() {
-            Object.values(this.charts).forEach(chart => {
+            Object.values(window.__scenarioCharts).forEach(chart => {
                 if (chart) chart.destroy();
             });
-            this.charts = { roi: null, payback: null, bubble: null };
+            window.__scenarioCharts = { roi: null, payback: null, bubble: null };
         },
 
         exportComparison() {

@@ -138,6 +138,7 @@
   </div>
 
   {# ── Realizing applications ──────────────────────────────────────────── #}
+  <div id="applications">
   {% call panel('Realized by applications', 'layers') %}
     {% if apps %}
     <ul class="grid grid-cols-1 md:grid-cols-2 gap-x-6 divide-y md:divide-y-0 divide-border">
@@ -152,6 +153,7 @@
       {{ empty_state(icon='layers', title='No applications mapped', description='No application is recorded as realising this capability yet — a coverage gap worth closing.', padding='py-8') }}
     {% endif %}
   {% endcall %}
+  </div>
 
   {# ── Impact graph link ───────────────────────────────────────────────── #}
   {% if archimate_element_id %}
