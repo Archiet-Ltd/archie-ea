@@ -2296,6 +2296,15 @@ def render_application_detail(id):
         logger.exception("Could not load unified work packages for application %s", app_obj.id)
         db.session.rollback()
 
+    # --- Teams working on this application ---
+    app_teams = []
+    try:
+        from app.services.team_service import get_teams_for_application
+        app_teams = get_teams_for_application(id, app_obj.organization_id)
+    except Exception:
+        logger.exception("Could not load teams for application %s", app_obj.id)
+        db.session.rollback()
+
     return render_template(
         "applications/dashboard.html",
         app=app_obj,
@@ -2406,4 +2415,5 @@ def render_application_detail(id):
         linked_solutions=linked_solutions,
         archimate_info=archimate_info,
         archimate_relationships=archimate_relationships,
+        app_teams=app_teams,
     )

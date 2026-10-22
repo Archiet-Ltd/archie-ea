@@ -254,6 +254,7 @@
    application runs on are mapped, so an application with nothing recorded yet
    still needs the tab to record the first one. #}
 {% set _ = tabs.append({'id': 'technology', 'label': 'Technology', 'count': none}) %}
+{% set _ = tabs.append({'id': 'teams', 'label': 'Teams', 'count': (app_teams | default([], true)) | length}) %}
 {% if app.compliance_status or app.data_classification %}
   {% set _ = tabs.append({'id': 'compliance', 'label': 'Compliance', 'count': none}) %}
 {% endif %}
@@ -1203,6 +1204,55 @@
 
   </div>
   {% endcall %}{# /tab_panel technology #}
+
+  {# ═══════════════════════════════════════════════════════════════════════════
+     TAB: TEAMS
+  ═══════════════════════════════════════════════════════════════════════════ #}
+  {% call tab_panel('teams', active=(resolved_tab == 'teams')) %}
+  <div class="space-y-6">
+    {% if app_teams %}
+    <div class="overflow-x-auto rounded-lg border">
+      <table class="w-full">
+        <thead>
+          <tr class="border-b text-left text-sm font-medium text-muted-foreground">
+            <th class="px-4 py-3">Team</th>
+            <th class="px-4 py-3">Share</th>
+            <th class="px-4 py-3">Source</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in app_teams %}
+          <tr class="border-b hover:bg-accent/5 transition-colors">
+            <td class="px-4 py-3">
+              <a href="{{ url_for('teams.team_detail', team_id=item.team.id) }}"
+                 class="font-medium text-foreground hover:underline">
+                {{ item.team.name }}
+              </a>
+            </td>
+            <td class="px-4 py-3">{{ item.allocation.share_percent }}%</td>
+            <td class="px-4 py-3">
+              {% if item.allocation.source == 'derived' %}
+              <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-muted/20 text-muted-foreground">Derived</span>
+              {% else %}
+              <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-primary/10 text-primary">Recorded</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="rounded-lg border p-6 text-center">
+      <p class="text-sm text-muted-foreground">No teams are working on this application yet.</p>
+      <p class="text-xs text-muted-foreground mt-2">
+        <a href="{{ url_for('teams.team_list') }}" class="text-primary hover:underline">Manage teams</a>
+        to record which teams work on this application.
+      </p>
+    </div>
+    {% endif %}
+  </div>
+  {% endcall %}{# /tab_panel teams #}
 
   {# ═══════════════════════════════════════════════════════════════════════════
      TAB: IMPLEMENTATION
