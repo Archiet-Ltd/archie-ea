@@ -258,25 +258,47 @@ def work_package_detail(work_package_id):
         deliverables = Deliverable.query.filter_by(
             unified_work_package_id=work_package.id
         ).all()
-        events = (
-            ImplementationEvent.query.filter_by(work_package_id=legacy_id).all()
-            if legacy_id
-            else []
+        if legacy_id:
+            from app.models.relationship_tables import work_package_events
+            events = (
+                ImplementationEvent.query.join(
+                    work_package_events,
+                    ImplementationEvent.id == work_package_events.c.implementation_event_id
+                ).filter(
+                    work_package_events.c.work_package_id == legacy_id
+                ).all()
+            )
+        else:
+            events = []
+
+        org_id = _org_id()
+        shown = work_package_service.to_roadmap_dict(work_package, org_id)
+        plateau_ids = shown["plateau_ids"]
+        plateaus = (
+            ImplementationPlateau.query.filter(
+                ImplementationPlateau.id.in_(plateau_ids),
+                ImplementationPlateau.organization_id == org_id,
+            ).all()
+            if plateau_ids else []
         )
+        from app.models.user import Permission
 
         return render_template(
-            "implementation_planning/dashboard.html",
+            "implementation_planning/work_package_detail.html",
             work_package=work_package,
             deliverables=deliverables,
             events=events,
-            owner_panel=work_package_service.owner_and_approval_panel(
-                work_package, _org_id()
-            ),
+            gaps=shown["gaps"],
+            plateaus=plateaus,
+            owner_name=shown["owner_name"],
+            can_link=bool(current_user.can(Permission.GENERAL)),
+            owner_panel=work_package_service.owner_and_approval_panel(work_package, org_id),
         )
 
     except HTTPException:
         raise
-    except Exception:
+    except Exception as e:
+        current_app.logger.exception(f"Error loading work package {work_package_id}: {e}")
         flash("Error loading work package. Please try again.", "error")
         return redirect(url_for("implementation_planning.work_packages_list"))
 

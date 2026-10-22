@@ -454,7 +454,9 @@ def test_detail_page_title_changes_with_toggle(app, db_session, make_org):
     assert "<title>Application: ToggleTest" in html_off
 
     # Second user with setting ON, same org/element
-    client_on, user_on = _make_client(app, db_session, make_org, show_archimate_names=True)
+    client_on, user_on = _make_client(
+        app, db_session, make_org, show_archimate_names=True, organization_id=org_id
+    )
     resp_on = client_on.get(
         f"/architecture/application/ApplicationComponent/{elem.id}"
     )

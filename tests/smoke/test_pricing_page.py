@@ -33,12 +33,12 @@ def test_each_plan_card_holds_its_price_and_its_buy_button(browser, live_server)
             expect(card).to_be_visible(timeout=PAGE_TIMEOUT)
             expect(card.locator(".pp-price")).to_contain_text(price)
             expect(card.get_by_test_id(button)).to_be_visible()
-            # Large numeral (40-48px) and a 44px / 8px button, per the review's spec.
+            # Large numeral (40-48px) and the shared public button (at least 40px tall; it wraps, so it may grow; radius + 4px).
             size = card.locator(".pp-price").evaluate("e => parseFloat(getComputedStyle(e).fontSize)")
             assert 40 <= size <= 48, f"{key} price numeral is {size}px"
             box = card.get_by_test_id(button).evaluate(
                 "e => { const s = getComputedStyle(e); return [e.getBoundingClientRect().height, s.borderRadius]; }")
-            assert box == [44, "8px"], f"{key} button is {box}"
+            assert box[0] >= 40 and box[1] == "14px", f"{key} button is {box}"
         # Four across at desktop width.
         tops = {page.get_by_test_id(f"plan-card-{k}").bounding_box()["y"]
                 for k in ("community", "startup", "team", "enterprise")}
@@ -125,5 +125,34 @@ def test_pricing_reads_back_clean_and_stacks_on_mobile(browser, live_server):
         for banned in ("every canvas", "usage history", "coming soon", "verified", "assumption",
                        "tbc", "export and share", "docs/", ".md"):
             assert banned not in body, f"banned phrase on the page: {banned!r}"
+    finally:
+        context.close()
+
+
+@pytest.mark.parametrize("width", [1024, 1100, 1280])
+def test_four_across_prices_fit_their_cards_and_the_buttons_share_a_row(browser, live_server, width):
+    context, page = _open(browser, live_server, width=width)
+    try:
+        expect(page.get_by_test_id("plan-card-enterprise")).to_be_visible(timeout=PAGE_TIMEOUT)
+        tops, rights = [], []
+        for key in ("community", "startup", "team", "enterprise"):
+            card = page.get_by_test_id(f"plan-card-{key}")
+            price = card.locator(".pp-price")
+            fits = price.evaluate("e => e.scrollWidth <= e.clientWidth")
+            assert fits, f"{key} price overflows its box at {width}px"
+            # The text itself, measured with a range, stays inside the card's padding box.
+            inside = card.evaluate("""c => {
+                const p = c.querySelector('.pp-price'), cs = getComputedStyle(c);
+                const r = document.createRange(); r.selectNodeContents(p);
+                const limit = c.getBoundingClientRect().right - parseFloat(cs.paddingRight) - parseFloat(cs.borderRightWidth);
+                return Math.max(...[...r.getClientRects()].map(x => x.right)) <= limit + 0.5;
+            }""")
+            assert inside, f"{key} price text runs past the card padding at {width}px"
+            box = card.get_by_test_id(f"buy-{key}").bounding_box()
+            tops.append(round(box["y"]))
+            assert 40 <= box["height"] <= 80
+            rights.append(round(card.bounding_box()["x"] + card.bounding_box()["width"]))
+        assert max(rights) <= width, f"a plan card runs past the viewport at {width}px: {rights}"
+        assert max(tops) - min(tops) <= 1, f"plan buttons sit at different heights at {width}px: {tops}"
     finally:
         context.close()

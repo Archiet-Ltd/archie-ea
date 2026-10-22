@@ -18,6 +18,7 @@ belongs to). A dependency is an id in ``work_dependencies``.
 """
 from __future__ import annotations
 
+import re
 from datetime import datetime
 from typing import Any, Dict, Iterable, List, Optional
 
@@ -29,6 +30,18 @@ from app.models.unified_work_package import UnifiedWorkPackage
 # so the writer checks shape, not a closed list, and leaves the vocabulary alone.
 # A dependency that is finished or abandoned no longer blocks anything.
 _RESOLVED = ("completed", "cancelled")
+
+
+def status_key(status: Any) -> str:
+    """A stored status as one lowercase, underscore-separated spelling, so the
+    forms' "On Hold" and "Completed" and the API's "on_hold" compare equal."""
+    return re.sub(r"[\s\-]+", "_", str(status or "").strip().lower())
+
+
+def is_resolved(status: Any) -> bool:
+    """Completed or cancelled (either spelling of cancelled), in any supported
+    spelling of the status."""
+    return status_key(status) in _RESOLVED or status_key(status) == "canceled"
 
 _EDITABLE = (
     "name", "description", "status", "priority", "assigned_to", "business_capability",
@@ -500,6 +513,96 @@ def work_package_ids_for_gap(gap_id: int, organization_id: int) -> List[int]:
     return sorted({row[0] for row in rows if row[2] == _GAP_REL})
 
 
+def gap_ids_with_work_packages(gap_ids, organization_id: int) -> set:
+    """Which of these gaps have at least one of this organisation's work packages
+    linked, from the relationships in one query."""
+    gap_ids = list(gap_ids)
+    if not gap_ids:
+        return set()
+    rows = _link_rows(organization_id, gap_ids=gap_ids)
+    return {row[4] for row in rows if row[2] == _GAP_REL}
+
+
+def addressed_gap_ids(organization_id: int) -> set:
+    """Ids of this organisation's gaps that at least one of its work packages is
+    linked to (the one reader of the link; another organisation's rows never count)."""
+    return {row[4] for row in _link_rows(organization_id) if row[2] == _GAP_REL}
+
+
+def link_gap(work_package_id: int, gap_id: Any, *, organization_id: int) -> UnifiedWorkPackage:
+    """Link a gap to a work package, keeping the work package's other gap links.
+    Both must belong to ``organization_id``; a record of another organisation is
+    reported as missing and nothing is written. Linking twice changes nothing.
+    Flushes; the caller commits."""
+    wp = require_work_package(work_package_id, organization_id)
+    resolved = _resolve_links({"gap_id": gap_id}, organization_id)
+    if resolved.get("gap_id") is None:
+        raise WorkPackageError("Choose a gap to link.")
+    _apply_links(wp, resolved, organization_id, replace=False)
+    return wp
+
+
+def unlink_gap(work_package_id: int, gap_id: Any, *, organization_id: int) -> int:
+    """Remove the link between a gap and a work package of this organisation.
+    Returns how many links were removed (0 when they were not linked)."""
+    wp = require_work_package(work_package_id, organization_id)
+    resolved = _resolve_links({"gap_id": gap_id}, organization_id)
+    gap = resolved.get("gap_id")
+    if gap is None:
+        raise WorkPackageError("Choose a gap to unlink.")
+    lock_work_package(wp.id)
+    return remove_link_targets(wp, "gap_id", organization_id, [gap.id])
+
+
+def gaps_for_work_packages(
+    wps, organization_id: int, links_by_wp: Optional[Dict[int, Dict[str, List[int]]]] = None
+) -> Dict[int, List[Dict[str, Any]]]:
+    """{work package id: [{"id", "name"}, ...]} for the gaps each is linked to, in one
+    link read and one gap read. Another organisation's gaps never appear."""
+    from app.models.implementation_migration import Gap
+
+    links = links_by_wp if links_by_wp is not None else plateau_and_gap_links(wps, organization_id)
+    wanted = {gid for entry in links.values() for gid in entry["gap_ids"]}
+    names: Dict[int, str] = {}
+    if wanted:
+        for gid, name in db.session.execute(
+            db.select(Gap.id, Gap.name).where(
+                Gap.id.in_(wanted), Gap.organization_id == organization_id)
+        ).all():
+            names[gid] = name
+    return {
+        wp_id: [{"id": gid, "name": names[gid]} for gid in entry["gap_ids"] if gid in names]
+        for wp_id, entry in links.items()
+    }
+
+
+def work_packages_for_gaps(gap_ids, organization_id: int) -> Dict[int, List[UnifiedWorkPackage]]:
+    """{gap id: [this organisation's work packages linked to it]}, in one read of the
+    links and one of the work packages."""
+    out: Dict[int, List[UnifiedWorkPackage]] = {gid: [] for gid in gap_ids}
+    if not out:
+        return out
+    pairs = [(row[4], row[0]) for row in _link_rows(organization_id, gap_ids=list(out))
+             if row[2] == _GAP_REL]
+    rows = {
+        wp.id: wp for wp in query_for(organization_id).filter(
+            UnifiedWorkPackage.id.in_({wp_id for _g, wp_id in pairs})).all()
+    } if pairs else {}
+    for gid, wp_id in pairs:
+        if wp_id in rows and rows[wp_id] not in out[gid]:
+            out[gid].append(rows[wp_id])
+    return out
+
+
+def search_work_packages(organization_id: int, q: str = "", limit: int = 10) -> List[UnifiedWorkPackage]:
+    """This organisation's work packages whose name contains ``q`` (all when empty)."""
+    query = query_for(organization_id).order_by(UnifiedWorkPackage.name)
+    q = (q or "").strip()
+    if q:
+        query = query.filter(UnifiedWorkPackage.name.ilike("%" + q.replace("%", r"\%").replace("_", r"\_") + "%"))
+    return query.limit(limit).all()
+
+
 def plateau_work_package_ids(plateau_ids, organization_id: int) -> Dict[int, set]:
     """{plateau id: {ids of this organisation's work packages that realise it}}."""
     out: Dict[int, set] = {pid: set() for pid in plateau_ids}
@@ -605,6 +708,7 @@ def to_roadmap_dict(
         "plateau_id": links["plateau_ids"][0] if links["plateau_ids"] else None,
         "gap_ids": list(links["gap_ids"]),
         "plateau_ids": list(links["plateau_ids"]),
+        "gaps": gaps_for_work_packages([wp], organization_id, {wp.id: links})[wp.id],
         "deliverable_count": Deliverable.query.filter_by(unified_work_package_id=wp.id).count(),
         "child_count": len(children),
         "dependencies": _dependency_ids(wp),
@@ -728,7 +832,7 @@ def blocked_by_another_programme(organization_id: int) -> List[Dict[str, Any]]:
     by_id = {r.id: r for r in rows}
     result = []
     for wp in rows:
-        if wp.enterprise_initiative_id is None or wp.status in _RESOLVED:
+        if wp.enterprise_initiative_id is None or is_resolved(wp.status):
             continue
         blockers = []
         for dep_id in _dependency_ids(wp):
@@ -737,7 +841,7 @@ def blocked_by_another_programme(organization_id: int) -> List[Dict[str, Any]]:
                 dep is not None
                 and dep.enterprise_initiative_id is not None
                 and dep.enterprise_initiative_id != wp.enterprise_initiative_id
-                and dep.status not in _RESOLVED
+                and not is_resolved(dep.status)
             ):
                 blockers.append(dep)
         if blockers:

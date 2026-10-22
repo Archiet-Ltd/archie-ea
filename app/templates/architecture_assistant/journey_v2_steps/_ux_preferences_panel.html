@@ -1,6 +1,6 @@
 {# UX Preferences Panel — auto-inferred tab order, enum badges, brand colour, auth requirement #}
 <div x-data="uxPreferences('{{ solution_id }}')"
-     class="rounded-xl border border-border/60 bg-card overflow-hidden mt-4">
+     class="rounded-lg border border-border/60 bg-card overflow-hidden mt-4">
 
     {# ── Header / toggle ── #}
     <button type="button" @click="open = !open; if (open && !enrichment.loaded) load()"
@@ -130,7 +130,7 @@
                 <div class="flex items-center gap-3">
                     <div class="relative">
                         <input type="color" x-model="primaryColor"
-                               class="w-10 h-10 rounded-lg border border-border cursor-pointer p-0.5 bg-background"
+                               class="w-10 h-9 rounded-md border border-border cursor-pointer p-0.5 bg-background"
                                aria-label="Primary brand colour">
                     </div>
                     <div>
@@ -185,7 +185,7 @@
 
             {# ── Error / success feedback ── #}
             <div x-show="saveError" x-cloak
-                 class="flex items-center gap-2 rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3">
+                 class="flex items-center gap-2 rounded-md border border-destructive/40 bg-destructive/10 px-4 py-2">
                 <svg class="h-4 w-4 text-destructive shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
                 </svg>
@@ -198,7 +198,7 @@
                 <button type="button"
                         @click="save()"
                         :disabled="saving"
-                        class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50 shrink-0 ml-4">
+                        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center shrink-0 ml-4">
                     <svg x-show="saving" class="h-3.5 w-3.5 animate-spin" viewBox="0 0 24 24" fill="none">
                         <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
                         <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>

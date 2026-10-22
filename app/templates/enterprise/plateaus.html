@@ -23,7 +23,7 @@
         {# The ArchiMate CRUD workflow operates on this same Plateau model
            (MODEL_REGISTRY['Plateau']), so create and detail are real destinations. #}
         <a href="{{ url_for('archimate_crud.create_element', layer='implementation', element_type='Plateau') }}"
-           class="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+           class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center"
            data-testid="btn-new-plateau">
             <i data-lucide="plus" class="h-4 w-4" aria-hidden="true"></i> New Plateau
         </a>
@@ -32,7 +32,7 @@
     <!-- Plateaus Grid -->
     <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {% for plateau in plateaus|default([]) %}
-        <div data-slot="card" class="rounded-xl border bg-card p-6 hover:shadow-md transition-shadow">
+        <div data-slot="card" class="rounded-lg border border-border bg-card p-6 transition-shadow">
             <div class="flex items-start justify-between mb-4">
                 <div class="p-2 rounded-lg bg-primary/10">
                     <i data-lucide="layers" class="h-5 w-5 text-primary" aria-hidden="true"></i>
@@ -52,9 +52,18 @@
             <div class="text-sm">
                 <span class="text-muted-foreground">Target: {{ plateau.target_date|default('—', true) }}</span>
             </div>
+            <div class="mt-4 text-sm" data-testid="plateau-gaps-{{ plateau.id }}">
+                <div class="font-medium mb-1">Gaps</div>
+                {% for gap in (plateau_gaps or {}).get(plateau.id, []) %}
+                <div><a href="{{ url_for('archimate_crud.detail_element', layer='implementation', element_type='Gap', element_id=gap.id) }}"
+                        class="hover:underline" data-testid="plateau-gap-link">{{ gap.name|default('—', true) }}</a></div>
+                {% else %}
+                <span class="text-muted-foreground">—</span>
+                {% endfor %}
+            </div>
         </div>
         {% else %}
-        <div data-slot="card" class="col-span-full p-12 text-center text-muted-foreground rounded-xl border bg-card">
+        <div data-slot="card" class="col-span-full p-12 text-center text-muted-foreground rounded-lg border border-border bg-card">
             <i data-lucide="layers" class="h-12 w-12 mx-auto mb-4 opacity-50" aria-hidden="true"></i>
             <p>No plateaus defined yet</p>
             <p class="text-sm">Plateaus registered through the roadmap appear here.</p>

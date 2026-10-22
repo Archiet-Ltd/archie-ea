@@ -7,6 +7,9 @@
   "ai-chat-approval/model-approve-call": {
    "app/modules/enterprise_genome/services/ai_system_grounding.py": 2
   },
+  "archimate-drawing-engine/second-archimate-renderer": {
+   "app/static/js/archimate_diagram_renderer.js": 1
+  },
   "archimate-element-writer/element-construction": {
    "app/api/archimate_generation_routes.py": 1,
    "app/application_mgmt/archimate_routes.py": 1,
@@ -189,7 +192,6 @@
    "app/utils/tracing.py": 1
   },
   "entity-matching/name-matcher": {
-   "app/commands/backfill_application_owners.py": 1,
    "app/commands/backfill_capability_catalogs.py": 1,
    "app/modules/capabilities/services/business_capability_mapper.py": 1,
    "app/modules/solutions_strategic/v2/services/solution_ai_orchestrator.py": 1,
@@ -238,6 +240,52 @@
    "app/services/detection_strategies/base.py": 1,
    "app/services/fuzzy_matcher.py": 1,
    "app/services/togaf_deliverable_prefill_service.py": 1
+  },
+  "public-button/second-button-rule": {
+   "app/static/css/app.css": 18,
+   "app/static/css/data-table.css": 6,
+   "app/static/css/toast-notifications.css": 3,
+   "app/templates/ai_chat/entity_matching_chat_interface.html": 10,
+   "app/templates/application_mgmt/portfolio_gap_analysis.html": 4,
+   "app/templates/archimate/composer.html": 9,
+   "app/templates/architecture_assistant/archimate_model_viewer.html": 1,
+   "app/templates/errors/400.html": 4,
+   "app/templates/errors/401.html": 4,
+   "app/templates/errors/403.html": 4,
+   "app/templates/errors/404.html": 7,
+   "app/templates/errors/429.html": 4,
+   "app/templates/errors/500.html": 7,
+   "app/templates/errors/503.html": 7,
+   "app/templates/settings/index.html": 2,
+   "app/templates/solutions/blueprint.html": 1
+  },
+  "public-card/second-card-rule": {
+   "app/static/css/data-table.css": 12,
+   "app/templates/adm_kanban/board_v2.html": 1,
+   "app/templates/ai_chat/entity_matching_chat_interface.html": 3,
+   "app/templates/ai_chat/index.html": 3,
+   "app/templates/application_mgmt/portfolio_gap_analysis.html": 5,
+   "app/templates/architecture_assistant/arb_package_print.html": 3,
+   "app/templates/architecture_assistant/archimate_model_viewer.html": 1,
+   "app/templates/architecture_assistant/index.html": 3,
+   "app/templates/backlog/prioritisation.html": 2,
+   "app/templates/capability_map/capabilities.html": 1,
+   "app/templates/market_intelligence/index.html": 4,
+   "app/templates/solutions/export_executive.html": 1
+  },
+  "public-stepper/second-stepper-rule": {
+   "app/templates/archimate_roadmap/enhanced_roadmap_fixed.html": 11,
+   "app/templates/capability_roadmap/capability_roadmap.html": 1,
+   "app/templates/solutions/export_executive.html": 5,
+   "app/templates/strategic_roadmap/enhanced_roadmap_fixed.html": 11
+  },
+  "public-table/second-table-rule": {
+   "app/static/css/accessibility.css": 2,
+   "app/static/css/data-table.css": 32,
+   "app/templates/application_mgmt/portfolio_gap_analysis.html": 9,
+   "app/templates/archimate_crud/partials/_repository_workspace.html": 1,
+   "app/templates/solutions/export_executive.html": 7,
+   "app/templates/solutions/sad_document.html": 4
   }
  }
 }

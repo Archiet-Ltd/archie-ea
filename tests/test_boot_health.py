@@ -31,6 +31,10 @@ import pytest
 # statically and is out of scope.
 URL_FOR_LITERAL = re.compile(r"url_for\(\s*'([a-zA-Z_][\w]*\.[\w]+)'")
 
+# A Jinja comment never renders, so a url_for() named inside {# ... #} (usage
+# examples in a macro file's header) cannot raise a BuildError and is not scanned.
+JINJA_COMMENT = re.compile(r"\{#.*?#\}", re.DOTALL)
+
 # The documented guard for non-fatally-registered blueprints (see DESIGN.md):
 #   {% if 'value_stream.index' in flask.current_app.view_functions %}
 # An endpoint named in such a guard is *allowed* to be absent — that is the whole
@@ -103,7 +107,7 @@ def _scan_templates(paths):
         except OSError:
             continue
         guarded |= set(VIEW_FUNCTIONS_GUARD.findall(text))
-        for endpoint in URL_FOR_LITERAL.findall(text):
+        for endpoint in URL_FOR_LITERAL.findall(JINJA_COMMENT.sub("", text)):
             referenced.setdefault(endpoint, set()).add(path)
     return referenced, guarded
 
@@ -203,3 +207,17 @@ def test_all_template_endpoints_resolve(app):
         f"found only {len(templates)} templates — tests must run from the repo root"
     )
     _assert_endpoints_resolve(app, templates, "all templates")
+
+
+def test_url_for_inside_a_jinja_comment_is_not_scanned(tmp_path):
+    """A usage example in a {# #} comment is not a reference; real calls still are."""
+    template = tmp_path / "t.html"
+    template.write_text(
+        """{# example: {{ url_for('ghost.commented') }}
+   spans lines #}
+<a href="{{ url_for('ghost.live') }}">x</a>
+""",
+        encoding="utf-8",
+    )
+    referenced, _ = _scan_templates([str(template)])
+    assert set(referenced) == {"ghost.live"}

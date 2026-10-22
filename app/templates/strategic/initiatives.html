@@ -27,19 +27,19 @@
     {% set at_risk_count = initiatives | selectattr('risk_level', 'equalto', 'high') | list | length %}
 
     <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        <div data-slot="card" class="rounded-xl border bg-card shadow-sm p-4">
+        <div data-slot="card" class="rounded-lg border border-border bg-card p-4">
             <p class="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">Total</p>
             <p class="text-3xl font-bold text-foreground">{{ total }}</p>
         </div>
-        <div data-slot="card" class="rounded-xl border bg-card shadow-sm p-4">
+        <div data-slot="card" class="rounded-lg border border-border bg-card p-4">
             <p class="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">In Progress</p>
             <p class="text-3xl font-bold text-warning">{{ in_progress_count }}</p>
         </div>
-        <div data-slot="card" class="rounded-xl border bg-card shadow-sm p-4">
+        <div data-slot="card" class="rounded-lg border border-border bg-card p-4">
             <p class="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">Completed</p>
             <p class="text-3xl font-bold text-success">{{ completed_count }}</p>
         </div>
-        <div data-slot="card" class="rounded-xl border bg-card shadow-sm p-4">
+        <div data-slot="card" class="rounded-lg border border-border bg-card p-4">
             <p class="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">At Risk</p>
             <p class="text-3xl font-bold text-destructive">{{ at_risk_count }}</p>
         </div>
@@ -106,7 +106,7 @@
             'critical': 'destructive'
         }.get(init.risk_level, 'neutral') %}
 
-        <div data-slot="card" class="rounded-xl border bg-card shadow-sm p-5 flex flex-col gap-4 hover:bg-muted/30 transition-colors">
+        <div data-slot="card" class="rounded-lg border border-border bg-card p-5 flex flex-col gap-4 hover:bg-muted/30 transition-colors">
             <!-- Header: Name + Status/Priority badges -->
             <div class="flex items-start justify-between gap-3">
                 <h3 class="font-semibold text-foreground leading-tight">
@@ -234,7 +234,7 @@
             No initiatives with status <strong>{{ status_filter | replace('_', ' ') | title }}</strong>.
         </p>
         <a href="{{ url_for('unified_low_priority.strategic_initiatives') }}"
-           class="inline-flex items-center justify-center rounded-md text-sm font-medium border border-input bg-background hover:bg-accent h-9 px-4">
+           class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
             Clear Filter
         </a>
         {% else %}

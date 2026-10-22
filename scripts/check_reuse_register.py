@@ -20,8 +20,8 @@ What it checks
 --------------
 (a) Every ``active`` entry's canonical file exists and defines every listed symbol
     (``name`` for a module-level function or class, ``Class.method`` for a method, a
-    ``{% macro name(`` for a template, or a ``--name:`` custom-property declaration for
-    a ``.css`` canonical). A canonical that moved or was renamed fails, so the register
+    ``{% macro name(`` for a template, a ``--name:`` custom-property declaration for
+    a ``.css`` canonical, or a ``.name`` class in a selector of a ``.css`` canonical, comments excluded). A canonical that moved or was renamed fails, so the register
     cannot rot into a list of dead links.
 (b) Every ``must_not_create`` regex is run over its scope (default: ``app/**/*.py``).
     A match in any file other than the canonical file or a ``known_exceptions`` path is
@@ -39,6 +39,12 @@ enforce nothing: the register says plainly that no one owner has been chosen.
 
 The baseline
 ------------
+The ratchet against main is ``ratchet_problems`` (a pure function, tested without git; the live test in
+tests/test_check_reuse_register.py fetches origin/main and calls it): a pattern origin/main already has (in
+its baseline or its register) may not exceed main's total for it, a pattern new in a branch must be baselined
+at exactly the tree's per-file counts, and a baseline line for a file that does not exist is allowed only
+where main already has it.
+
 ``--update-baseline`` rewrites the baseline to the current hit counts and REFUSES to
 let a pattern grow (renames excepted): lowering is routine after a cleanup, raising is done by
 fixing the code, or by a ``known_exceptions`` entry (with a reason) in the register,
@@ -48,9 +54,12 @@ another.
 
 Exemptions
 ----------
-``reuse-ok: <reason>`` on the matching line, the line above it, or any line up to the colon that
-ends a multi-line def, for a definition that only looks like a
-second copy. A bare marker with no reason does not exempt.
+``reuse-ok: <reason>`` on the matching line, on a comment line directly above it (``#`` in Python,
+``{#`` in a template, ``/*`` in a stylesheet), or any line up to the colon that ends a multi-line def, for a
+definition that only looks like a second copy. A bare marker with no reason does not exempt.
+
+A comment line is skipped as a non-hit by file type: ``#`` only in ``.py`` and ``{#`` only in ``.html``. A
+``.css`` line that begins with ``#`` is an id selector and is matched like any other line.
 
 Proven-against: a ``def normalize_name(`` added to a new file under app/ -- the gate
 names the ``name-matching`` entry and fails; a canonical symbol renamed -- the gate
@@ -82,6 +91,10 @@ STATUSES = ("active", "pending", "undetermined")
 SKIP_PARTS = {"__pycache__", "node_modules", ".git", "venv", ".venv"}
 MARKER = re.compile(r"reuse-ok:\s*\S")
 NL = chr(10)
+# A line starting with one of these is a comment, not code, in that file type. A stylesheet has none: its
+# comments are /* */ and a line starting with # is an id selector.
+_COMMENT_PREFIX = {".py": ("#",), ".html": ("{#",)}
+_ABOVE_COMMENT = ("#", "{#", "/*")
 MACRO = r"{%-?\s*macro\s+NAME\s*\("
 
 
@@ -171,6 +184,15 @@ def _py_symbols(text: str) -> set[str]:
     return out
 
 
+def _css_symbol_defined(text: str, symbol: str) -> bool:
+    """A custom property is declared (`--name:`); a class symbol (`.name`) appears in a selector, followed by a
+    character that cannot continue a class name, so `.public-faq` is not found in `.public-faq-x`. `text` has
+    its comments removed."""
+    if symbol.startswith("."):
+        return re.search(r"(?<![\w-])" + re.escape(symbol) + r"(?![\w-])", text) is not None
+    return re.search(r"(?m)(^|[\s;{])" + re.escape(symbol) + r"\s*:", text) is not None
+
+
 def missing_symbols(root: Path, canonical_path: str, symbols) -> tuple[bool, list[str]]:
     """(file_exists, symbols not defined there)."""
     path = root / canonical_path
@@ -181,10 +203,11 @@ def missing_symbols(root: Path, canonical_path: str, symbols) -> tuple[bool, lis
         have = _py_symbols(text)
         return True, [s for s in symbols if s not in have]
     if path.suffix == ".css":
-        return True, [
-            s for s in symbols
-            if not re.search(r"(?m)(^|[\s;{])" + re.escape(s) + r"\s*:", text)
-        ]
+        uncommented = re.sub(r"/\*.*?\*/", "", text, flags=re.S)
+        return True, [s for s in symbols if not _css_symbol_defined(uncommented, s)]
+    if path.suffix == ".js":
+        return True, [s for s in symbols
+                      if not re.search(r"(?m)^\s*(?:let|const|var|function|class)\s+" + re.escape(s) + r"\b", text)]
     return True, [s for s in symbols if not re.search(MACRO.replace("NAME", re.escape(s)), text)]
 
 
@@ -213,7 +236,7 @@ def check_canonicals(root: Path, entries) -> tuple[list[str], list[str]]:
             if exists and not missing and canonical.get("symbols"):
                 notes.append(f"[{eid}] pending canonical has landed: set status to active")
         for x in e.get("known_exceptions") or []:
-            if not (root / x["path"]).exists():
+            if not x["path"].endswith("*") and not (root / x["path"]).exists():
                 notes.append(f"[{eid}] known exception {x['path']} does not exist here")
     return fails, notes
 
@@ -238,7 +261,7 @@ def _is_exception(rel: str, entry) -> bool:
         return True
     for x in entry.get("known_exceptions") or []:
         path = x["path"]
-        if rel == path or (path.endswith("/") and rel.startswith(path)):
+        if rel == path or (path.endswith(("/", "*")) and rel.startswith(path.rstrip("*"))):
             return True
     return False
 
@@ -271,7 +294,7 @@ def _exempt(lines: list[str], masked_lines: list[str], idx: int, col: int) -> bo
     """`reuse-ok: <reason>` on the match, on a comment-only line directly above it, or on a later line of
     the same statement: a multi-line def or call, followed only while the bracket opened at the match is
     still open (the check_untenanted_reads convention). One marker never covers a following block."""
-    if idx > 0 and lines[idx - 1].lstrip().startswith(("#", "{#")) and MARKER.search(lines[idx - 1]):
+    if idx > 0 and lines[idx - 1].lstrip().startswith(_ABOVE_COMMENT) and MARKER.search(lines[idx - 1]):
         return True
     depth = 0
     for i in range(idx, min(idx + 60, len(lines))):
@@ -322,7 +345,7 @@ def find_hits(root: Path, entries):
                 n = masked.count(NL, 0, m.start()) + 1
                 line = lines[n - 1]
                 col = m.start() - (masked.rfind(NL, 0, m.start()) + 1)
-                if line.lstrip().startswith(("#", "{#")) or _exempt(lines, mlines, n - 1, col):
+                if line.lstrip().startswith(_COMMENT_PREFIX.get(path.suffix, ())) or _exempt(lines, mlines, n - 1, col):
                     continue
                 bucket = hits[(e["id"], p["id"])].setdefault(rel, [])
                 if n not in bucket:
@@ -336,6 +359,43 @@ def counts_of(hits) -> dict[str, dict[str, int]]:
         if files:
             out[f"{eid}/{pid}"] = {f: len(lines) for f, lines in sorted(files.items())}
     return out
+
+
+def register_keys(entries) -> set[str]:
+    """Every "<entry id>/<pattern id>" listed under must_not_create, whatever the entry's status."""
+    return {f"{e['id']}/{p['id']}" for e in entries if isinstance(e, dict) and e.get("id")
+            for p in e.get("must_not_create") or [] if isinstance(p, dict) and p.get("id")}
+
+
+def ratchet_problems(main_keys: set, main_base: dict, mine: dict, tree: dict, root: Path) -> list[str]:
+    """Problems with a branch baseline (`mine`) judged against origin/main. No git, no I/O beyond existence checks.
+
+    `main_keys` is every key in origin/main's register, `main_base` origin/main's baseline, `tree` the hit
+    counts of this branch for the patterns new in it.
+    1. A key in main_base or main_keys is an existing pattern: its total in `mine` may not exceed main's
+       (a key missing from main_base counts as 0).
+    2. A key in neither is new in this branch: its per-file counts in `mine` must equal `tree`'s exactly.
+    3. A file in `mine` that does not exist must also be listed under the same key in main_base.
+    """
+    problems = []
+    existing = set(main_base) | set(main_keys)
+    for key in sorted(set(mine) | (set(tree) - existing)):
+        mine_files, base_files = mine.get(key, {}), main_base.get(key, {})
+        if key in existing:
+            have, allowed = sum(mine_files.values()), sum(base_files.values())
+            if have > allowed:
+                problems.append(f"{key}: baseline total {have} is above origin/main's {allowed}")
+        else:
+            want = tree.get(key, {})
+            for rel in sorted(set(mine_files) | set(want)):
+                if mine_files.get(rel, 0) != want.get(rel, 0):
+                    problems.append(f"{key} {rel}: new pattern baselined at {mine_files.get(rel, 0)}, "
+                                    f"the tree has {want.get(rel, 0)}")
+        for rel in sorted(mine_files):
+            if not (root / rel).exists() and rel not in base_files:
+                problems.append(f"{key} {rel}: baselined for a file that does not exist and origin/main "
+                                f"does not list it")
+    return problems
 
 
 def load_baseline(root: Path, baseline: Path | None = None) -> dict:
@@ -387,18 +447,27 @@ def compare(entries, hits, baseline, root: Path) -> tuple[list[str], list[str]]:
 # ---------------------------------------------------------------- baseline update
 
 
-def update_baseline(root: Path, entries, baseline_path: Path | None = None):
-    """(ok, messages). Writes the current counts only if none rises and no file is added."""
+def update_baseline(root: Path, entries, baseline_path: Path | None = None, allow_new_keys: bool = False):
+    """(ok, messages). Writes the current counts only if no existing key rises and no file is added to one. A key
+    with no entry yet (a pattern new to the register, or one that had no hits) is refused unless allow_new_keys is
+    set, and every key written that way is named in the messages; the live test against origin/main bounds it."""
     path = baseline_path or (root / BASELINE)
     current = counts_of(find_hits(root, entries))
     old = load_baseline(root, path) if path.exists() else None
     messages = []
     if old is not None:
         for key, files in current.items():
+            if key not in old:
+                if allow_new_keys:
+                    messages.append(f"new key written: {key} {dict(sorted(files.items()))}")
+                else:
+                    messages.append(f"refused: {key} has no baseline entry and would gain one "
+                                    f"({', '.join(sorted(files))}); pass --allow-new-keys for a pattern new to the register")
+                continue
             grown = excess_of(root, {r: [0] * n for r, n in files.items()}, old.get(key, {}))
             if grown:
                 messages.append(f"refused: {key} would rise in {', '.join(sorted(grown))}")
-        if messages:
+        if any(m.startswith("refused") for m in messages):
             messages.append("The baseline only falls. Reuse the canonical implementation, or add a "
                             "known_exceptions entry with a reason to the register.")
             return False, messages
@@ -447,6 +516,8 @@ def main(argv=None) -> int:
     parser.add_argument("--count", action="store_true")
     parser.add_argument("--entries", action="store_true")
     parser.add_argument("--update-baseline", action="store_true")
+    parser.add_argument("--allow-new-keys", action="store_true",
+                        help="with --update-baseline: also write a key the baseline has no entry for (a pattern new to the register)")
     args = parser.parse_args(argv)
     root = args.root.resolve()
     if args.entries or args.update_baseline:
@@ -457,7 +528,7 @@ def main(argv=None) -> int:
         if args.entries:
             print_entries(entries)
             return 0
-        ok, messages = update_baseline(root, entries)
+        ok, messages = update_baseline(root, entries, allow_new_keys=args.allow_new_keys)
         print("\n".join(messages))
         return 0 if ok else 1
     fails, notes = run(root)

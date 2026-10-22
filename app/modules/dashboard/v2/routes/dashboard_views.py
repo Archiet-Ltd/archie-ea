@@ -548,12 +548,14 @@ def overview():
     # Single aggregate query; percentages match DATA_REALITY.md definitions.
     data_coverage = {}
     try:
+        from app.services.element_ownership_service import application_is_owned_expression
+
         _nonempty = lambda col: db.func.sum(  # noqa: E731
             db.case((db.and_(col.isnot(None), col != ""), 1), else_=0)
         )
         cov_row = db.session.query(
             db.func.count(ApplicationComponent.id),
-            _nonempty(ApplicationComponent.business_owner),
+            db.func.sum(db.case((application_is_owned_expression(ApplicationComponent), 1), else_=0)),
             db.func.sum(
                 db.case(
                     (
@@ -598,7 +600,13 @@ def overview():
         data_coverage = {"query_error": str(exc)}
 
     # PLT-040: Role-based workspace cards
-    enterprise_role = getattr(current_user, "enterprise_role", "platform_admin")
+    # The lens a person chose for their own workspace cards, else the persona an
+    # administrator assigned; display only, never a permission.
+    enterprise_role = (
+        getattr(current_user, "persona_lens", None)
+        or getattr(current_user, "enterprise_role", None)
+        or "platform_admin"
+    )
 
     # Dashboard mode (shell-wave-1 Task 5): guided setup for a sparse org vs. the
     # data-led view once there is something to show. Reuses counts already fetched
@@ -606,24 +614,62 @@ def overview():
     # ApplicationCapabilityMapping counts collected while building capability_health.
     capability_mapping_count = sum(c.get("app_count", 0) for c in capability_health)
     applications_count = metrics.get("applications") or 0
+    # What the workspace really holds, read once and used for BOTH the mode and
+    # the checklist, so the setup card can never call a populated workspace
+    # empty. Capabilities are counted from the store the "New Capability" dialog
+    # writes; elements from the ArchiMate repository.
+    capability_count = nav_stats.get("capabilities") or 0
+    element_count = nav_stats.get("elements") or 0
     dashboard_mode = (
-        "guided" if applications_count < 5 and capability_mapping_count == 0 else "data"
+        "guided"
+        if applications_count < 5
+        and capability_mapping_count == 0
+        and capability_count == 0
+        and element_count == 0
+        else "data"
     )
 
     guided_steps = []
     if dashboard_mode == "guided":
+        from app.template_helpers import safe_url_for_with_fallback
+        from app.utils.role_access import can_edit_capabilities
+
+        # A blueprint that failed to register leaves its step pointing here
+        # rather than raising BuildError and taking the dashboard down.
+        FALLBACK_HREF = "/dashboard/overview"
+
+        # Guided mode means no capabilities exist, so this step is about
+        # creating the first one -- or, for a role that cannot, who can.
+        if can_edit_capabilities(current_user):
+            capability_step = {
+                "description": "No capabilities yet. Add the first one, then connect applications to it.",
+                "href": safe_url_for_with_fallback("unified_low_priority.capability_map_capabilities", FALLBACK_HREF, new=1),
+                "cta": "Add a capability",
+            }
+        else:
+            capability_step = {
+                "description": "No capabilities yet. An architect or administrator adds them.",
+                "href": safe_url_for_with_fallback("unified_low_priority.capability_map_capabilities", FALLBACK_HREF),
+                "cta": "View capabilities",
+            }
         guided_steps = [
             {
                 "title": "Import applications",
-                "description": f"Bring your application portfolio into {current_app.config['APP_NAME']}.",
-                "href": "/applications/",
+                "description": (
+                    f"{applications_count} "
+                    f"{'application' if applications_count == 1 else 'applications'} "
+                    f"in the portfolio. Import more from a spreadsheet."
+                    if applications_count
+                    else f"Bring your application portfolio into {current_app.config['APP_NAME']}."
+                ),
+                "href": safe_url_for_with_fallback("unified_applications.application_list", FALLBACK_HREF, **{"import": 1}),
+                "cta": "Import",
                 "done": applications_count > 0,
             },
             {
                 "title": "Map capabilities",
-                "description": "Connect applications to the capabilities they support.",
-                "href": "/capability-map/",
                 "done": capability_mapping_count > 0,
+                **capability_step,
             },
         ]
         try:
@@ -711,18 +757,23 @@ def api_overview_chart():
 @timed_route
 @login_required
 def api_onboarding_complete():
-    """PLT-040: Mark user onboarding as complete, optionally update enterprise_role."""
+    """Mark onboarding complete. Never writes a role.
+
+    ``enterprise_role`` carries permissions and is set only by an administrator
+    (role page, invitation, single sign-on mapping). This route used to write
+    it from the request body, so any signed-in account could make itself an
+    ARB member, enterprise architect or platform admin persona. A person's own
+    choice is a lens preference (``User.persona_lens``), which no permission
+    check reads; either key in the body is taken as that preference only.
+    """
     import datetime
 
+    from app.models.user import User
+
     data = request.get_json(silent=True) or {}
-    new_role = data.get("enterprise_role")
-    valid_roles = {
-        "solution_architect", "enterprise_architect",
-        "arb_member", "portfolio_manager", "platform_admin",
-        "cto", "application_manager", "procurement",
-    }
-    if new_role and new_role in valid_roles:
-        current_user.enterprise_role = new_role
+    lens = data.get("persona_lens") or data.get("enterprise_role")
+    if lens and lens in User.PERSONA_LENSES:
+        current_user.persona_lens = lens
     current_user.onboarding_completed_at = datetime.datetime.utcnow()
     try:
         db.session.commit()

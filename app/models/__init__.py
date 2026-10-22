@@ -87,6 +87,11 @@ else:
     # Session registry (server-side revocation on logout / password change).
     from .user_session import UserSession  # noqa: F401
     from .error_event import ErrorEvent  # noqa: F401 - server + client error telemetry
+    # Atomic per-family counter next_reference() allocates from (AD-, ARB-<year>-,
+    # ACR-<year>-, ACN-<year>-). Imported here so create_all() builds its table on
+    # a fresh install the same way the other infra tables on this list are.
+    from .reference_number_counter import ReferenceNumberCounter  # noqa: F401
+    from .permission_grant import PermissionGrant  # noqa: F401 - per-organisation permission matrix
     from .service_incident import ServiceIncident  # noqa: F401 - service-status incident history
     from .gdpr_request import *  # noqa
     from .subscription import *  # noqa
@@ -132,6 +137,7 @@ else:
     from .regulatory_framework import *  # noqa - FrameworkAdoption (tenant-hybrid framework catalogue)
     from .regulatory_change import *  # noqa - RegulatoryChange, RegulatoryChangeImpact (regulatory change tracker)
     from .cost_fact import *  # noqa - CostFact, ExchangeRate (one cost fact store)
+    from .change_feed_offset import *  # noqa - ChangeFeedOffset (change feed consumer position)
     from .graph_projection_snapshot import *  # noqa - GraphProjectionSnapshot (per-organisation graph projection copy)
     from .cost_intelligence import *  # noqa - CapabilityCostAllocation, VendorContract, SLA (Cost intelligence)
     from .decision_ledger import *  # noqa - DecisionLedger (append-only governance ledger)

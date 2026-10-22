@@ -31,9 +31,6 @@ ai_prompt_templates
 ai_recommendations
 ai_service_configs
 ai_suggestions
-analysis_audit_logs
-analysis_recommendations
-analysis_scenarios
 application_business_actor_mapping
 application_business_metrics
 application_capability
@@ -158,7 +155,6 @@ compliance_checks
 compliance_controls
 compliance_gaps
 compliance_governance_reports
-compliance_requirements
 compliance_requirements_model
 compliance_scan_reports
 composite_structures
@@ -284,7 +280,6 @@ platform_migration_scopes
 platform_types
 policy_enforcement
 policy_exemptions
-portfolio_initiatives
 process_actor_raci
 process_application_mapping
 process_embeddings
@@ -309,7 +304,6 @@ refactoring_tracking
 regulatory_frameworks
 relationship_suggestions
 replacement_plans
-required_capabilities
 requirement_change_log
 requirement_dependencies
 requirement_template
@@ -403,7 +397,6 @@ structural_locations
 subscriptions
 suggestion_feedback
 sync_logs
-system_boundaries
 system_dependencies
 system_deployments
 system_hierarchies
@@ -411,7 +404,6 @@ system_interfaces
 system_lifecycles
 system_settings
 systems
-tasks
 taxonomy_mappings
 tco_benchmarks
 tco_calculations
@@ -446,15 +438,12 @@ users
 validation_gates
 validation_violations
 vendor_archimate_templates
-vendor_capability_hierarchy
 vendor_comparison_criteria
 vendor_concentration_analysis
 vendor_data_sources
 vendor_integration_catalog
-vendor_options
 vendor_organization_embeddings
 vendor_organizations
-vendor_process_hierarchy
 vendor_product_aliases
 vendor_product_apqc_mapping
 vendor_product_details
@@ -485,3 +474,5 @@ workflow_templates
 oauth_authorization_codes
 oauth_clients
 oauth_tokens
+# reference_number_counters: global allocation counters, no tenant data, runtime role insert/update only
+reference_number_counters

@@ -7,6 +7,7 @@ cannot run locally; its definition is checked structurally at the end.
 
 import json
 import re
+import shutil
 import subprocess
 import textwrap
 from pathlib import Path
@@ -309,6 +310,64 @@ def test_the_plan_uses_the_merge_base_not_the_moved_base_tip(repo, tmp_path):
     assert data["merge_base"] == expected
 
 
+def test_prepare_succeeds_when_the_worktree_directory_was_wiped_but_its_registration_survives(
+    tmp_path, monkeypatch
+):
+    """A wiped worktree directory with a surviving registration must not block prepare.
+
+    The runner wipes $RUNNER_TEMP between jobs but the checkout's
+    .git/worktrees/failing-first-base entry survives, so the next run fails with
+    "fatal: '...' is a missing but already registered worktree" before any test
+    runs. prepare must prune that stale registration and clear the destination
+    before adding the worktree.
+    """
+    monkeypatch.delenv("GITHUB_OUTPUT", raising=False)
+    monkeypatch.delenv("GITHUB_STEP_SUMMARY", raising=False)
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _git(repo, "init", "-q", "-b", "main")
+    _write(repo, "app/__init__.py", "")
+    _write(repo, "app/feature.py", "def price():\n    return 1\n")
+    _write(repo, "tests/test_existing.py", "def test_ok():\n    assert True\n")
+    _git(repo, "add", "-A")
+    _git(repo, "commit", "-q", "-m", "base")
+    _git(repo, "checkout", "-q", "-b", "pr")
+    _write(repo, "tests/test_new.py", "def test_new():\n    assert True\n")
+    _git(repo, "add", "-A")
+    _git(repo, "commit", "-q", "-m", "pr change")
+
+    merge_base = subprocess.run(
+        ["git", "rev-parse", "main"], cwd=repo, capture_output=True, text=True, check=True
+    ).stdout.strip()
+    dest = tmp_path / "failing-first-base"
+
+    # Register the worktree, then wipe its directory exactly as the runner does
+    # between jobs. The registration entry survives without the directory.
+    _git(repo, "worktree", "add", "--detach", str(dest), merge_base)
+    shutil.rmtree(dest)
+    assert not dest.exists()
+
+    plan = tmp_path / "plan.json"
+    plan.write_text(
+        json.dumps(
+            {
+                "merge_base": merge_base,
+                "head": "pr",
+                "test_files": ["tests/test_new.py"],
+                "support_files": [],
+                "added_files": ["tests/test_new.py"],
+                "capped": 0,
+                "app_files_changed": 1,
+            },
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+    code = ff.main(["prepare", "--repo", str(repo), "--plan", str(plan), "--dest", str(dest)])
+    assert code == 0
+    assert (dest / "app" / "feature.py").read_text(encoding="utf-8") == "def price():\n    return 1\n"
+
+
 def test_judge_fails_on_a_missing_report(tmp_path):
     plan = tmp_path / "plan.json"
     plan.write_text(
@@ -471,3 +530,21 @@ def test_plan_writes_mode_once(repo, tmp_path, monkeypatch):
     )
     lines = [ln for ln in out.read_text().splitlines() if ln.startswith("mode=")]
     assert lines == ["mode=run"]
+
+
+def test_base_worktree_run_does_not_inherit_coverage_measurement(monkeypatch):
+    """The base-worktree pytest run must not measure coverage into the caller's data file.
+
+    Under ``pytest --cov`` the parent exports COV_CORE_* (and CI sets COVERAGE_FILE);
+    inherited, the child records paths of a deleted temporary worktree and the
+    aggregate job's ``coverage combine`` + ``coverage xml`` then fails with
+    "No source for code: 'app/feature.py'".
+    """
+    monkeypatch.setenv("COV_CORE_SOURCE", "app")
+    monkeypatch.setenv("COV_CORE_DATAFILE", ".coverage.3")
+    monkeypatch.setenv("COV_CORE_CONFIG", ".coveragerc")
+    monkeypatch.setenv("COVERAGE_FILE", ".coverage.3")
+    monkeypatch.setenv("KEEP_ME", "1")
+    env = ff._unmeasured_env()
+    assert not [k for k in env if k.startswith(("COV_CORE_", "COVERAGE_"))]
+    assert env["KEEP_ME"] == "1"

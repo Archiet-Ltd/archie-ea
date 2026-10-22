@@ -31,7 +31,7 @@
                 x-transition:leave="transition ease-in duration-150"
                 x-transition:leave-start="opacity-100 transform scale-100"
                 x-transition:leave-end="opacity-0 transform scale-95"
-                class="relative w-full rounded-lg border {{ alert_class }} {{ bg_class }} p-4 mb-4 shadow-sm"
+                class="relative w-full rounded-lg border {{ alert_class }} {{ bg_class }} p-4 mb-4"
                 role="alert"
             >
                 <div class="flex items-start gap-3">
@@ -41,7 +41,7 @@
                     </div>
                     <button type="button" 
                         @click="clearTimeout(timeout); flashVisible = false"
-                        class="flex-shrink-0 rounded-md p-1 hover:bg-black/5 transition-colors"
+                        class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                         aria-label="Close alert"
                     >
                         <i data-lucide="x" class="w-4 h-4"></i>

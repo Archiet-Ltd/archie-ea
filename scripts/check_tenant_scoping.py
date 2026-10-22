@@ -46,6 +46,12 @@ identifier that happens to be nearby but unused. As with raw_sql_tenancy, a
 clean run does not prove tenancy; it proves the one mechanically detectable
 failure — no predicate-shaped text anywhere nearby — is absent.
 
+A model chosen at runtime (`REGISTRY[key].query`, `session.get(cls, id)` with
+`cls = _import_model(...)`, `getattr(mod, name).query`) has no name to match, so it is reported
+as a `dynamic-dispatch` finding unless the statement carries `tenant-scoping-ok: <reason>` or
+the site is listed as `file:line` in scripts/dynamic_dispatch_sites.txt. Detection lives in
+scripts/dynamic_dispatch.py, shared with check_untenanted_reads.py.
+
 Exemptions
 ----------
 Append `tenant-scoping-ok: <reason>` on the line to record a deliberate
@@ -62,6 +68,9 @@ import json
 import os
 import re
 import sys
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import dynamic_dispatch  # noqa: E402  (shared with check_untenanted_reads.py)
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -243,6 +252,16 @@ def scan_file(path: str, models: set[str]) -> list[dict]:
                         "model": "@cached()",
                         "reason": "@cached(...) with no key_func= — cache key is org-blind",
                     })
+
+    rel = os.path.relpath(path, REPO_ROOT).replace("\\", "/")
+    for site in dynamic_dispatch.unlisted(rel, dynamic_dispatch.find_dynamic_sites(tree, lines)):
+        findings.append({
+            "file": rel,
+            "line": site["line"],
+            "model": "<unresolved>",
+            "reason": f"dynamic-dispatch: {site['shape']} on a model chosen at runtime; "
+                      "confirm it is fenced, then list it in scripts/dynamic_dispatch_sites.txt",
+        })
 
     return findings
 

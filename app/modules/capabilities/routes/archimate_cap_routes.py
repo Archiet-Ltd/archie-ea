@@ -477,6 +477,7 @@ def api_save_archimate_mappings():
     """
     try:
         from app.models.capability_archimate_mapping import CapabilityArchiMateClassification
+        from app.services.apqc_mapping_tenant_fence import capability_owned_by_caller
 
         data = request.get_json()
         if not data or "mappings" not in data:
@@ -485,6 +486,12 @@ def api_save_archimate_mappings():
         mappings_data = data["mappings"]
         created = 0
         updated = 0
+
+        # The mapping has no organisation of its own: only the caller's own
+        # capabilities may be read, updated or mapped.
+        mappings_data = [
+            md for md in mappings_data if capability_owned_by_caller(md.get("capability_id"))
+        ]
 
         # Batch-prefetch existing mappings to avoid N+1 queries
         _archimate_req_pairs = set()
@@ -651,8 +658,13 @@ def api_delete_archimate_mapping(mapping_id):
     try:
         from app.models.capability_archimate_mapping import CapabilityArchiMateClassification
 
+        from app.services.apqc_mapping_tenant_fence import capability_owned_by_caller
+
         mapping = CapabilityArchiMateClassification.query.get(mapping_id)
-        if not mapping:
+        # The mapping carries no organisation of its own; it belongs to its
+        # capability's organisation. Another organisation's id answers 404,
+        # the same as a missing id, so ids cannot be probed.
+        if not mapping or not capability_owned_by_caller(mapping.capability_id):
             return jsonify({"error": "Mapping not found"}), 404
 
         db.session.delete(mapping)

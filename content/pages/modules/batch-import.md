@@ -14,14 +14,18 @@ icon: upload
 
 # Batch Import
 
-*Spreadsheets and full architecture exports, all landing in the same model — with a full import
-history.*
+*Bring spreadsheet and pasted application data into the model, review what was drafted, and commit
+it only when you are happy.*
 
 ## What this module does
 
-Whatever format your existing data is in, it comes in here: a spreadsheet of people and suppliers,
-or a full architecture export from another tool. Import history keeps a record of exactly what came
-in and when.
+Upload a CSV or Excel file, or paste rows straight from a spreadsheet. Pick how much detail to generate — quick, standard or comprehensive — and the import
+drafts architecture elements from your rows in batches. Nothing lands in the repository until you
+have reviewed a batch and chosen to commit it. SAP landscape exports are recognised and tidied up
+automatically. The import dashboard lists the jobs you have run, with their status.
+
+Importing a model from another modelling tool is a different route: the ArchiMate import page
+takes Open Exchange files.
 
 ## Where you'll meet it
 

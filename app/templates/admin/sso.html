@@ -30,18 +30,18 @@
         {% endif %}
     {% endwith %}
 
-    <div class="bg-card border border-border rounded-lg shadow-sm p-6">
+    <div class="bg-card border border-border rounded-lg p-6">
 
         <form method="POST" action="{{ url_for('sso.admin_sso') }}" class="space-y-6">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
             {# Protocol selector #}
             <div>
-                <label class="block text-sm font-medium text-foreground mb-1" for="protocol">
+                <label class="block text-sm font-medium text-muted-foreground mb-1" for="protocol">
                     Protocol
                 </label>
                 <select id="protocol" name="protocol"
-                        class="w-full rounded-md border border-border bg-background text-foreground px-3 py-2 text-sm focus:ring-2 focus:ring-primary/50"
+                        class="h-9 w-full rounded-md border border-border bg-background text-foreground px-3 text-sm focus:ring-2 focus:ring-primary/50"
                         data-protocol-toggle>
                     <option value="oidc" {% if not config or config.protocol == 'oidc' %}selected{% endif %}>
                         OIDC / OpenID Connect (recommended)
@@ -58,13 +58,13 @@
 
             {# Email domain #}
             <div>
-                <label class="block text-sm font-medium text-foreground mb-1" for="email_domain">
+                <label class="block text-sm font-medium text-muted-foreground mb-1" for="email_domain">
                     Email Domain(s)
                 </label>
                 <input type="text" id="email_domain" name="email_domain"
                        value="{{ config.email_domain if config else '' }}"
                        placeholder="acme.com  or  acme.com,acme.co.uk"
-                       class="w-full rounded-md border border-border bg-background text-foreground px-3 py-2 text-sm focus:ring-2 focus:ring-primary/50">
+                       class="h-9 w-full rounded-md border border-border bg-background text-foreground px-3 text-sm focus:ring-2 focus:ring-primary/50">
                 <p class="mt-1 text-xs text-muted-foreground">
                     Users with these email domains are redirected to your IdP at login.
                     Separate multiple domains with commas.
@@ -74,21 +74,21 @@
             {# OIDC fields #}
             <div id="oidc-fields" class="space-y-4">
                 <div>
-                    <label class="block text-sm font-medium text-foreground mb-1" for="idp_metadata_url">
+                    <label class="block text-sm font-medium text-muted-foreground mb-1" for="idp_metadata_url">
                         IdP Discovery URL
                         <span class="text-muted-foreground font-normal">(OpenID Connect discovery document)</span>
                     </label>
                     <input type="url" id="idp_metadata_url" name="idp_metadata_url"
                            value="{{ config.idp_metadata_url if config else '' }}"
                            placeholder="https://login.microsoftonline.com/{tenant}/v2.0/.well-known/openid-configuration"
-                           class="w-full rounded-md border border-border bg-background text-foreground px-3 py-2 text-sm focus:ring-2 focus:ring-primary/50">
+                           class="h-9 w-full rounded-md border border-border bg-background text-foreground px-3 text-sm focus:ring-2 focus:ring-primary/50">
                     <p class="mt-1 text-xs text-muted-foreground">
                         Entra ID example:
                         <code class="bg-muted px-1 rounded text-xs">https://login.microsoftonline.com/&lt;tenant-id&gt;/v2.0/.well-known/openid-configuration</code>
                     </p>
                 </div>
                 <div>
-                    <label class="block text-sm font-medium text-foreground mb-1" for="client_id">
+                    <label class="block text-sm font-medium text-muted-foreground mb-1" for="client_id">
                         Client ID
                     </label>
                     {# entity-picker-ok: IdP OAuth client ID (external credential), not a platform application reference #}
@@ -98,7 +98,7 @@
                            class="w-full rounded-md border border-border bg-background text-foreground px-3 py-2 text-sm focus:ring-2 focus:ring-primary/50">
                 </div>
                 <div>
-                    <label class="block text-sm font-medium text-foreground mb-1" for="client_secret">
+                    <label class="block text-sm font-medium text-muted-foreground mb-1" for="client_secret">
                         Client Secret
                         {% if config and config._client_secret_encrypted %}
                             <span class="ml-2 text-xs text-primary font-normal">&#x2713; Secret stored</span>
@@ -107,7 +107,7 @@
                     <input type="password" id="client_secret" name="client_secret"
                            placeholder="{{ 'Leave blank to keep existing secret' if config and config._client_secret_encrypted else 'Paste client secret' }}"
                            autocomplete="new-password"
-                           class="w-full rounded-md border border-border bg-background text-foreground px-3 py-2 text-sm focus:ring-2 focus:ring-primary/50">
+                           class="h-9 w-full rounded-md border border-border bg-background text-foreground px-3 text-sm focus:ring-2 focus:ring-primary/50">
                     <p class="mt-1 text-xs text-muted-foreground">
                         Stored encrypted with Fernet (FERNET_KEY env var). Never logged.
                     </p>
@@ -120,17 +120,17 @@
                     Your identity provider must send a persistent NameID, or a subject-id or pairwise-id attribute. A temporary (transient) NameID is refused.
                 </p>
                 <div>
-                    <label class="block text-sm font-medium text-foreground mb-1" for="idp_sso_url">
+                    <label class="block text-sm font-medium text-muted-foreground mb-1" for="idp_sso_url">
                         IdP SSO URL
                         <span class="text-muted-foreground font-normal">(redirect-binding sign-in endpoint)</span>
                     </label>
                     <input type="url" id="idp_sso_url" name="idp_sso_url"
                            value="{{ config.idp_sso_url if config else '' }}"
                            placeholder="https://idp.example.com/saml/sso"
-                           class="w-full rounded-md border border-border bg-background text-foreground px-3 py-2 text-sm focus:ring-2 focus:ring-primary/50">
+                           class="h-9 w-full rounded-md border border-border bg-background text-foreground px-3 text-sm focus:ring-2 focus:ring-primary/50">
                 </div>
                 <div>
-                    <label class="block text-sm font-medium text-foreground mb-1" for="idp_x509_cert">
+                    <label class="block text-sm font-medium text-muted-foreground mb-1" for="idp_x509_cert">
                         IdP Signing Certificate
                         <span class="text-muted-foreground font-normal">(PEM, used to verify every assertion)</span>
                     </label>
@@ -143,36 +143,36 @@
                     </p>
                 </div>
                 <div>
-                    <label class="block text-sm font-medium text-foreground mb-1" for="idp_entity_id">
+                    <label class="block text-sm font-medium text-muted-foreground mb-1" for="idp_entity_id">
                         Identity Provider Entity ID
                     </label>
                     <input type="text" id="idp_entity_id" name="idp_entity_id"
                            value="{{ config.idp_entity_id if config and config.idp_entity_id else '' }}"
                            placeholder="The issuer your IdP puts in its assertions"
-                           class="w-full rounded-md border border-border bg-background text-foreground px-3 py-2 text-sm focus:ring-2 focus:ring-primary/50">
+                           class="h-9 w-full rounded-md border border-border bg-background text-foreground px-3 text-sm focus:ring-2 focus:ring-primary/50">
                     <p class="mt-1 text-xs text-muted-foreground">
                         Every sign-in response must name this issuer. SAML cannot be enabled without it.
                     </p>
                 </div>
                 <div>
-                    <label class="block text-sm font-medium text-foreground mb-1" for="sp_entity_id">
+                    <label class="block text-sm font-medium text-muted-foreground mb-1" for="sp_entity_id">
                         Service Provider Entity ID
                         <span class="text-muted-foreground font-normal">(optional; defaults to this platform's own URL)</span>
                     </label>
                     <input type="text" id="sp_entity_id" name="sp_entity_id"
                            value="{{ config.sp_entity_id if config else '' }}"
                            placeholder="Leave blank unless your IdP requires a specific entity id"
-                           class="w-full rounded-md border border-border bg-background text-foreground px-3 py-2 text-sm focus:ring-2 focus:ring-primary/50">
+                           class="h-9 w-full rounded-md border border-border bg-background text-foreground px-3 text-sm focus:ring-2 focus:ring-primary/50">
                 </div>
                 <div>
-                    <label class="block text-sm font-medium text-foreground mb-1" for="idp_metadata_url_saml">
+                    <label class="block text-sm font-medium text-muted-foreground mb-1" for="idp_metadata_url_saml">
                         IdP Metadata URL
                         <span class="text-muted-foreground font-normal">(optional, for reference only)</span>
                     </label>
                     <input type="url" id="idp_metadata_url_saml" name="idp_metadata_url"
                            value="{{ config.idp_metadata_url if config else '' }}"
                            placeholder="https://idp.example.com/saml/metadata"
-                           class="w-full rounded-md border border-border bg-background text-foreground px-3 py-2 text-sm focus:ring-2 focus:ring-primary/50">
+                           class="h-9 w-full rounded-md border border-border bg-background text-foreground px-3 text-sm focus:ring-2 focus:ring-primary/50">
                 </div>
             </div>
 
@@ -181,7 +181,7 @@
                 <input type="checkbox" id="enabled" name="enabled"
                        {% if config and config.enabled %}checked{% endif %}
                        class="h-4 w-4 rounded border-border text-primary focus:ring-primary/50">
-                <label for="enabled" class="text-sm font-medium text-foreground">
+                <label for="enabled" class="block text-sm font-medium text-muted-foreground mb-1">
                     Enable SSO for this organisation
                 </label>
             </div>

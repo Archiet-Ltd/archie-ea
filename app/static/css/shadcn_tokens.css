@@ -1,16 +1,21 @@
-/* shadcn/ui Design Tokens */
+/* shadcn/ui Design Tokens.
+   Palette (design register: north star): navy text, indigo accent, slate
+   surfaces. Dark is designed, not inverted: slate-900 page, slate-800 cards,
+   slate-50 text, slate-400 muted, slate-700 hairlines. --primary is the fill
+   token (white text on it in light, navy in dark); --info is the accent-as-text
+   token (links, active nav), lighter in dark so it reads on slate-900. */
 @layer base {
   :root {
     --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    --foreground: 222.2 47.4% 11.2%;
     --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card-foreground: 222.2 47.4% 11.2%;
     --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
-    --primary: 221.2 83.2% 53.3%;
-    --primary-foreground: 210 40% 98%;
+    --popover-foreground: 222.2 47.4% 11.2%;
+    --primary: 243.4 75.4% 58.6%;
+    --primary-foreground: 0 0% 100%;
     --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
+    --secondary-foreground: 215.3 25% 26.7%;
     --muted: 210 40% 96.1%;
     --muted-foreground: 215.4 16.3% 45%; /* 4.51:1 on bg-muted (46.9% was 4.34, a WCAG AA fail on every bg-muted chip) */
     --accent: 210 40% 96.1%;
@@ -32,12 +37,14 @@
        to near-black — the AI degraded-mode and provider-health banners were
        unreadable for dark-theme users. */
     --warning-emphasis: 32 95% 30%;
-    --info: 221.2 83.2% 53.3%;
-    --info-foreground: 210 40% 98%;
-    --info-emphasis: 221 83% 42%;
+    --info: 243.4 75.4% 58.6%;
+    --info-foreground: 0 0% 100%;
+    --info-emphasis: 244.5 57.9% 50.6%;
     --border: 214.3 31.8% 91.4%;
     --input: 214.3 31.8% 91.4%;
-    --ring: 221.2 83.2% 53.3%;
+    --ring: 243.4 75.4% 58.6%;
+    /* Dialog backdrop: navy in both themes, used at 50% (bg-overlay/50). */
+    --overlay: 222.2 47.4% 11.2%;
     --radius: 0.5rem;
 
     /* ArchiMate layer semantic colors (TOGAF ADM phases) */
@@ -61,13 +68,13 @@
   }
 
   .dark {
-    --background: 222.2 84% 4.9%;
+    --background: 222.2 47.4% 11.2%;
     --foreground: 210 40% 98%;
-    --card: 222.2 84% 4.9%;
+    --card: 217.2 32.6% 17.5%;
     --card-foreground: 210 40% 98%;
-    --popover: 222.2 84% 4.9%;
+    --popover: 217.2 32.6% 17.5%;
     --popover-foreground: 210 40% 98%;
-    --primary: 210 40% 98%;
+    --primary: 234.5 89.5% 73.9%;
     --primary-foreground: 222.2 47.4% 11.2%;
     --secondary: 217.2 32.6% 17.5%;
     --secondary-foreground: 210 40% 98%;
@@ -84,16 +91,17 @@
     --warning: 45.4 93.4% 47.5%;
     --warning-foreground: 0 0% 0%;
     --warning-emphasis: 45 93% 65%;   /* 11.81 on bg-warning/10 */
-    --info: 217.2 91.2% 59.8%;
+    --info: 234.5 89.5% 73.9%;
     --info-foreground: 222.2 47.4% 11.2%;
     /* --info-emphasis was declared in :root only, so text-info-emphasis
        resolved to an invalid declaration in dark mode and fell back to the
        inherited colour — affecting admin_overview.html and
        _capability_heatmap.html. 9.88 on bg-info/10. */
-    --info-emphasis: 213 94% 78%;
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
+    --info-emphasis: 228 96.5% 88.8%;
+    --border: 215.3 25% 26.7%;
+    --input: 215.3 25% 26.7%;
+    --ring: 234.5 89.5% 73.9%;
+    --overlay: 222.2 47.4% 11.2%;
 
     /* ArchiMate layer semantic colors (dark mode) */
     --layer-motivation: 263 70% 65%;

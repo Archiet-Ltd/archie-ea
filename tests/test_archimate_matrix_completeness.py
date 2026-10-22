@@ -21,6 +21,7 @@ import pytest
 from app.config.archimate_relationship_matrix import (
     ALL_ELEMENTS,
     CONNECTOR_ELEMENTS,
+    EXTENSION_ELEMENTS,
     LAYERED_ELEMENTS,
     OTHER_ELEMENTS,
     get_valid_relationships,
@@ -44,6 +45,14 @@ def test_every_archimate_32_concept_is_known():
     assert len(set(ALL_ELEMENTS)) == len(ALL_ELEMENTS), (
         "duplicate entries in ALL_ELEMENTS: %s"
         % sorted({e for e in ALL_ELEMENTS if ALL_ELEMENTS.count(e) > 1}))
+
+
+def test_standard_concepts_plus_one_extension():
+    """61 standard concepts plus the one Entelim extension (ADR-0014)."""
+    assert len(ALL_ELEMENTS) == 61
+    assert EXTENSION_ELEMENTS == ["Application"]
+    assert "Application" not in ALL_ELEMENTS
+    assert len(ALL_ELEMENTS) + len(EXTENSION_ELEMENTS) == 62
 
 
 class TestGrouping:

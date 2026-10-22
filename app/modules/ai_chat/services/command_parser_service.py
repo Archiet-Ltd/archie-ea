@@ -15,44 +15,60 @@ logger = logging.getLogger(__name__)
 class CommandParserService:
     """Parse and execute slash commands in AI chat messages."""
 
+    # Every entry states whether the command writes ("mutates"). A command with
+    # no such key is treated as a write, so a new write command is gated by
+    # default and a read-only one has to say so.
     COMMANDS = {
-        "/help": {"description": "Show available commands", "args": None},
+        "/help": {"description": "Show available commands", "args": None, "mutates": False},
         "/compare": {
             "description": "Compare two solutions",
             "args": "<solution1> <solution2>",
+            "mutates": False,
         },
         "/analyze": {
             "description": "Switch domain and get summary",
             "args": "<domain>",
+            "mutates": False,
         },
         "/arb": {
             "description": "Check ARB readiness for solution",
             "args": "<solution_name>",
+            "mutates": False,
         },
-        "/health": {"description": "Show portfolio health summary", "args": None},
+        "/health": {
+            "description": "Show portfolio health summary",
+            "args": None,
+            "mutates": False,
+        },
         "/gaps": {
             "description": "Run gap analysis (by domain or solution name)",
             "args": None,
+            "mutates": False,
         },
         "/portfolio-check": {
             "description": "Impact propagation across ArchiMate elements",
             "args": "<element_name>",
+            "mutates": False,
         },
         "/generate-from-capabilities": {
             "description": "Generate ArchiMate elements from a solution's linked capabilities",
             "args": "<solution_name>",
+            "mutates": True,
         },
         "/link-capability": {
             "description": "Link a capability to a solution",
             "args": "<capability-name> to <solution-name>",
+            "mutates": True,
         },
         "/quality": {
             "description": "Show ArchiMate quality score for a solution",
             "args": "<solution_name>",
+            "mutates": False,
         },
         "/dependencies": {
             "description": "Show what depends on an element (downstream impact)",
             "args": "<element_name>",
+            "mutates": False,
         },
     }
 
@@ -121,6 +137,10 @@ class CommandParserService:
         }
 
         handler = handlers.get(command)
+        if handler and self.is_mutating(command):
+            refusal = self._refuse_write(command, args, user_id, domain)
+            if refusal:
+                return refusal
         if not handler:
             return {
                 "response": f"Unknown command: `{command}`",
@@ -137,6 +157,34 @@ class CommandParserService:
                 "domain": domain,
                 "command_type": "error",
             }
+
+    def is_mutating(self, command):
+        """Whether a command writes. One that does not say otherwise is a write."""
+        return bool(self.COMMANDS.get(command, {}).get("mutates", True))
+
+    def _refuse_write(self, command, args, user_id, domain):
+        """The write-permission gate every mutating command passes first.
+
+        The approval-queue exemption for slash commands is unchanged: a person
+        typed the command, so it is not queued. It is still that person's write,
+        so it needs the same write access every other write surface requires.
+        Returns None when allowed, else the refusal response.
+        """
+        from app.modules.ai_chat.tools.executor import refuse_unless_can_write
+
+        refused = refuse_unless_can_write(
+            user_id, command.lstrip("/"), {"args": " ".join(args or [])},
+            via="slash_command",
+        )
+        if refused is None:
+            return None
+        return {
+            "response": refused["error"],
+            "domain": domain,
+            "command_type": "permission_denied",
+            "success": False,
+            "permission_denied": True,
+        }
 
     def get_help_text(self):
         """Return formatted help text listing all commands."""
@@ -770,6 +818,10 @@ class CommandParserService:
 
     def _handle_generate_from_capabilities(self, args, user_id, domain):
         """Generate ArchiMate elements from a solution's linked capabilities."""
+        refusal = self._refuse_write("/generate-from-capabilities", args, user_id, domain)
+        if refusal:
+            return refusal
+
         solution_name = " ".join(args)
 
         try:
@@ -949,6 +1001,10 @@ class CommandParserService:
 
     def _handle_link_capability(self, args, user_id, domain):
         """Link a business capability to a solution by name."""
+        refusal = self._refuse_write("/link-capability", args, user_id, domain)
+        if refusal:
+            return refusal
+
         raw_input = " ".join(args)
 
         if " to " not in raw_input:

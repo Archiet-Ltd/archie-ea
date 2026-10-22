@@ -71,7 +71,7 @@
 
     <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
         <!-- Domain Heatmap (Left) -->
-        <div data-slot="card" class="col-span-4 rounded-xl border bg-card text-card-foreground shadow">
+        <div data-slot="card" class="col-span-4 rounded-lg border border-border bg-card text-card-foreground">
             <div class="flex flex-col space-y-1.5 p-6">
                 <h2 class="font-semibold leading-none tracking-tight">Domain Health Index</h2>
                 <p class="text-sm text-muted-foreground">Aggregated health by L0 capability domains.</p>
@@ -100,7 +100,7 @@
         </div>
 
         <!-- Health Chart (Right) -->
-        <div data-slot="card" class="col-span-3 rounded-xl border bg-card text-card-foreground shadow">
+        <div data-slot="card" class="col-span-3 rounded-lg border border-border bg-card text-card-foreground">
             <div class="flex flex-col space-y-1.5 p-6">
                 <h2 class="font-semibold leading-none tracking-tight">Portfolio Distribution</h2>
                 <p class="text-sm text-muted-foreground">Status breakdown across all regions.</p>
@@ -128,13 +128,13 @@
     </div>
 
     <!-- At Risk Table -->
-    <div data-slot="card" class="rounded-xl border bg-card text-card-foreground shadow overflow-hidden">
+    <div data-slot="card" class="rounded-lg border border-border bg-card text-card-foreground overflow-hidden">
         <div class="flex flex-col space-y-1.5 p-6 border-b">
             <h2 class="font-semibold leading-none tracking-tight">Top At-Risk Capabilities</h2>
             <p class="text-sm text-muted-foreground">Prioritized list of capabilities requiring immediate attention based on Health Score.</p>
         </div>
         <div class="p-0">
-            <table class="w-full text-sm border-collapse">
+            <table class="dense-table w-full text-sm border-collapse">
                 <thead>
                     <tr class="bg-muted/50 border-b">
                         <th class="h-10 px-4 text-left align-middle font-medium text-muted-foreground">Capability</th>

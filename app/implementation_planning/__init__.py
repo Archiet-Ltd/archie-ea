@@ -37,19 +37,17 @@ mark_blueprint_guardrailed(implementation_planning)
 
 @implementation_planning.before_request
 def _check_feature_flag():
-    """Block all requests — module deprecated.
+    """Answer 404 only when an administrator has switched the module off.
 
-    Unlike ``is_feature_enabled`` (which defaults to True when a flag row
-    is missing), this guard defaults to **disabled** so the module stays
-    off even on a fresh database that hasn't run the seed script.
+    A database with no ``architecture_implementation_planning`` row has the
+    module on, as every other feature flag does (``is_feature_enabled``): the
+    gap analysis page and the work packages list link straight to these pages,
+    so a missing row must never turn those links into dead ends. A row that
+    exists and is not active still switches the module off.
     """
     from app.models.feature_flags import FeatureFlag
 
-    flag = FeatureFlag.query.filter_by(
-        key="architecture_implementation_planning"
-    ).first()
-    # Only allow access when the flag explicitly exists AND is active
-    if not flag or not flag.is_active:
+    if not FeatureFlag.is_feature_enabled("architecture_implementation_planning"):
         abort(404)
 
 

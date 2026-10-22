@@ -107,6 +107,10 @@ def init_extensions(app):
 
         if "/api/" not in request.path:
             return e
+        from app.utils.plain_errors import PLAIN, plain_json
+
+        if e.code in PLAIN:
+            return plain_json(e.code, (e.name or "error").lower().replace(" ", "_"))
         return jsonify({
             "success": False,
             "error": e.description,
@@ -738,6 +742,47 @@ def init_scheduler(app):
             trigger=IntervalTrigger(seconds=5),
             id="event_log_relay",
             name="Event Log Outbox Relay",
+            replace_existing=True,
+            max_instances=1,
+        )
+
+        # Change-feed consumer: reads each organisation's event log from its
+        # stored offset and writes bell notifications for the owners of what
+        # changed, through the rules in app/services/change_rules.py.
+        def run_change_feed_consumer():
+            with app.app_context():
+                import logging
+
+                from app.jobs.tenant_safe_job import run_for_each_tenant
+
+                log = logging.getLogger(__name__)
+
+                def _consume_one_tenant(organization_id):
+                    from app.services.change_feed_consumer import consume_changes
+                    return consume_changes(organization_id)
+
+                def _log_result(result):
+                    if not result.ok:
+                        log.error(
+                            "change feed consumer failed for org %s: %s",
+                            result.organization_id, result.error,
+                        )
+
+                try:
+                    run_for_each_tenant(
+                        app,
+                        "change-feed-consumer",
+                        _consume_one_tenant,
+                        on_result=_log_result,
+                    )
+                except Exception as exc:
+                    log.error("change feed consumer error: %s", exc)
+
+        scheduler.add_job(
+            func=run_change_feed_consumer,
+            trigger=IntervalTrigger(seconds=30),
+            id="change_feed_consumer",
+            name="Change Feed Consumer",
             replace_existing=True,
             max_instances=1,
         )

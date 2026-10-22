@@ -39,6 +39,9 @@ def _make_user(db_session, org, *, email=None):
         last_name="User",
         organization_id=org.id,
         role=role,
+        # An administrator-assigned persona: ARB decisions need one now that a
+        # new account no longer starts on platform_admin.
+        enterprise_role="platform_admin",
         confirmed=True,
     )
     user.password = uuid.uuid4().hex

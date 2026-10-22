@@ -14,21 +14,25 @@ icon: layers
 
 # Portfolio
 
-*Capabilities, value streams, programmes and work packages, joined — so a maturity gap, a stalled
-initiative, and a late work package all show up as one connected picture instead of three separate
-spreadsheets.*
+*Every transformation initiative with its budget, spend, health and benefits in one list, and a
+page per initiative for the detail behind each figure.*
 
 ## What this module does
 
-Ask which value streams are at risk, and the answer reads the capabilities underneath them to find
-maturity gaps, with initiatives and success metrics attached. Ask whether a programme is on time and
-on budget, and the same portfolio answers with dates, status and cost per work package — showing
-missing cost plainly rather than defaulting to zero.
+The list shows each initiative's phase, health, approved budget, spend to date, variance against
+budget, percentage complete, benefit count and sponsor, with totals across the portfolio. A figure
+nobody recorded shows as a dash, never as zero. You can filter to the initiatives that serve no
+strategic objective.
+
+Open an initiative to see its benefits against baseline and target, record measurements, track
+assumptions and their exposure, link the goals it serves, and see the work packages delivering it
+with their percentage complete, plus the demand it came from. The module also holds the demand
+intake queue. Work packages show progress only; cost and dates are not shown there.
 
 ## Where you'll meet it
 
-- [Which value streams are at risk?](/use-cases/value-streams-at-risk)
 - [Is the programme on time and on budget?](/use-cases/programme-tracking)
+- [Which value streams are at risk?](/use-cases/value-streams-at-risk) (a separate page, not part of this module)
 
 ## Related modules
 

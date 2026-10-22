@@ -45,7 +45,12 @@ Two checks, one script
 ----------------------
 ``--count`` / the default report is the READ gate above. ``--new-tables`` is the TABLE
 gate: every database table whose model has no tenant fence must be listed in
-``scripts/unfenced_tables.txt``. A new table that is neither fenced nor listed fails, so
+``scripts/unfenced_tables.txt``, and that list is a baseline: it is compared with the committed
+copy on main (the pull request's base branch in CI, origin/main locally; the committed
+``scripts/unfenced_tables_baseline.txt`` only when no main ref exists) and any added name fails, so it
+can only shrink. A new
+table is protected (TenantMixin) or declared shared reference data in
+``scripts/shared_reference_tables.txt`` with a reason after ``#`` (a line with no reason fails). A new table that is neither fenced nor listed fails, so
 the decision (fence it, or say it is global or reached only through a fenced parent)
 is made when the table is created, not after a later feature reads it. Regenerate the
 list with ``--tables`` when a table is removed or gains the mixin.
@@ -54,6 +59,16 @@ Proven-against: a new ``db.select(User).where(User.id == user_id)`` added to a r
 with no organisation predicate -- the read count rises by one; and a new model with a
 ``__tablename__`` and no ``TenantMixin`` added without listing it -- the table check
 reports it by name. Both are pinned in tests/test_check_untenanted_reads.py.
+
+Dynamic dispatch
+----------------
+A model chosen at runtime has no name for the checks above to match: ``REGISTRY[key].query``,
+``session.get(cls, id)`` where ``cls = _import_model(path)``, ``getattr(mod, name).query``.
+Such a site is reported as ``[dynamic-dispatch] <unresolved>`` and counts as a read until it is
+exempted with ``tenant-scoping-ok: <reason>`` or listed as ``file:line`` in
+``scripts/dynamic_dispatch_sites.txt`` after a person has confirmed every model the site can
+reach is fenced or the caller checks tenancy where it dispatches. Detection is in
+``scripts/dynamic_dispatch.py``, shared with ``check_tenant_scoping.py``.
 
 Exemptions
 ----------
@@ -68,13 +83,22 @@ from __future__ import annotations
 import argparse
 import ast
 import json
+import os
 import re
+import subprocess
 import sys
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import dynamic_dispatch  # noqa: E402  (shared with check_tenant_scoping.py)
 
 REPO = Path(__file__).resolve().parent.parent
 APP = REPO / "app"
 TABLE_LIST = REPO / "scripts" / "unfenced_tables.txt"
+# The committed snapshot of the list. The list may lose names; it may never gain one.
+TABLE_BASELINE = REPO / "scripts" / "unfenced_tables_baseline.txt"
+# Tables that are shared reference data on purpose. One per line, `table  # reason`.
+SHARED_REFERENCE = REPO / "scripts" / "shared_reference_tables.txt"
 
 FENCE_BASES = ("TenantMixin", "HybridCapabilityTenantMixin", "HybridTenantMixin")
 MODEL_BASES = ("db.Model", "Model", "Base")
@@ -289,6 +313,106 @@ def listed_tables(path=None):
     return names
 
 
+def shared_reference_tables(path=None):
+    """(names, lines_without_a_reason) from the shared-reference file."""
+    path = path or SHARED_REFERENCE
+    names, bare = set(), []
+    if not path.exists():
+        return names, bare
+    for line in path.read_text(encoding="utf-8").splitlines():
+        body, _, reason = line.partition("#")
+        body = body.strip()
+        if not body:
+            continue
+        names.add(body)
+        if not reason.strip():
+            bare.append(body)
+    return names, bare
+
+
+LIST_REL = "scripts/unfenced_tables.txt"
+BASE_REFS = ("origin/main", "anioko/main")
+
+
+def _git_show(repo, ref, rel):
+    proc = subprocess.run(["git", "show", f"{ref}:{rel}"], cwd=repo, capture_output=True, text=True)
+    return proc.stdout if proc.returncode == 0 else None
+
+
+def _names(text):
+    out = set()
+    for line in text.splitlines():
+        line = line.split("#", 1)[0].strip()
+        if line:
+            out.add(line)
+    return out
+
+
+def base_table_list(repo=None, env=None):
+    """(names, source, error): the unfenced list as main has it, which this branch may not add to.
+
+    On a pull request run (``GITHUB_BASE_REF`` set) the base branch's copy is read, fetching that
+    one ref when the checkout is shallow; if it cannot be read, ``error`` says so and the gate
+    fails (it never passes without a base to compare). Otherwise the list at the merge base with
+    origin/main or anioko/main (whichever is nearer this branch) is used, so a table that main
+    gained after this branch left it is not read as added here. With no main ref at all the committed snapshot is the
+    fallback, with a note on stderr.
+    """
+    repo = repo or REPO
+    env = os.environ if env is None else env
+    base = env.get("GITHUB_BASE_REF", "").strip()
+    if base:
+        text = _git_show(repo, f"origin/{base}", LIST_REL)
+        source = f"origin/{base}"
+        if text is None:
+            fetched = subprocess.run(["git", "fetch", "--depth=1", "origin", base], cwd=repo,
+                                     capture_output=True, text=True)
+            text = _git_show(repo, "FETCH_HEAD", LIST_REL) if fetched.returncode == 0 else None
+            source = f"FETCH_HEAD ({base})"
+        if text is None:
+            return None, None, (f"cannot read {LIST_REL} from the pull request's base branch '{base}'; "
+                                "the gate fails rather than pass without a list to compare with")
+        return _names(text), source, None
+    best = None
+    for ref in BASE_REFS:
+        mb = subprocess.run(["git", "merge-base", "HEAD", ref], cwd=repo, capture_output=True, text=True)
+        if mb.returncode != 0 or not mb.stdout.strip():
+            continue
+        sha = mb.stdout.strip()
+        ahead = subprocess.run(["git", "rev-list", "--count", f"{sha}..HEAD"], cwd=repo,
+                               capture_output=True, text=True).stdout.strip()
+        text = _git_show(repo, sha, LIST_REL)
+        if text is not None and ahead.isdigit() and (best is None or int(ahead) < best[0]):
+            best = (int(ahead), text, f"{ref} (merge base {sha[:9]})")
+    if best:
+        return _names(best[1]), best[2], None
+    print("note: no main ref found (origin/main, anioko/main); comparing with the committed "
+          "snapshot scripts/unfenced_tables_baseline.txt instead", file=sys.stderr)
+    return listed_tables(TABLE_BASELINE), "snapshot", None
+
+
+def table_problems(tables, listed=None, baseline=None, shared=None):
+    """Every reason the table gate fails, as printable lines (empty = pass).
+
+    - a name in the unfenced list that the committed baseline does not have (the list can
+      only shrink);
+    - a table with no fence that is neither listed nor declared shared reference data;
+    - a shared-reference line with no reason after ``#``.
+    Removing a name from either file never fails.
+    """
+    listed = listed_tables() if listed is None else listed
+    baseline = listed_tables(TABLE_BASELINE) if baseline is None else baseline
+    shared_names, bare = shared_reference_tables() if shared is None else shared
+    problems = []
+    for name in sorted(listed - baseline):
+        problems.append(f"  added to the unfenced list: {name}")
+    for name in sorted(t for t in tables if t not in listed and t not in shared_names):
+        problems.append(f"  new unfenced table: {name}")
+    for name in sorted(bare):
+        problems.append(f"  shared reference table with no reason: {name}")
+    return problems
+
+
 def scan(app=None, repo=None):
     app, repo = app or APP, repo or REPO
     classes = discover_models(app, repo)
@@ -305,6 +429,11 @@ def scan(app=None, repo=None):
         scanner = _Scan(rel, lines, models)
         scanner.visit(tree)
         hits.extend(scanner.hits)
+        for site in dynamic_dispatch.unlisted(rel, dynamic_dispatch.find_dynamic_sites(tree, lines)):
+            hits.append({
+                "file": rel, "line": site["line"], "model": "<unresolved>",
+                "shape": "dynamic-dispatch", "has_org_col": None,
+            })
     return models, hits
 
 
@@ -326,13 +455,19 @@ def main() -> int:
             print("# inherit TenantMixin or be added here, which shows up in review.")
             print(chr(10).join(tables))
             return 0
-        new = [t for t in tables if t not in listed_tables()]
-        for t in new:
-            print(f"  new unfenced table: {t}")
-        if new:
-            print("Give the model TenantMixin, or list the table in scripts/unfenced_tables.txt "
-                  "(global reference data, or reached only through a fenced parent).")
-        print(len(new))
+        base, source, error = base_table_list()
+        if error:
+            print(f"  {error}")
+            print(1)
+            return 0
+        problems = table_problems(tables, baseline=base)
+        for line in problems:
+            print(line)
+        if problems:
+            print("Give the model TenantMixin, or declare it shared reference data in "
+                  "scripts/shared_reference_tables.txt with a reason after `#`. "
+                  "scripts/unfenced_tables.txt can only shrink; a name added to it fails.")
+        print(len(problems))
         return 0
     models, hits = scan()
     if args.ambiguous:
@@ -350,7 +485,7 @@ def main() -> int:
         print(len(hits))
         return 0
     for hit in sorted(hits, key=lambda h: (h["file"], h["line"])):
-        col = "column" if hit["has_org_col"] else "NO COLUMN"
+        col = {True: "column", False: "NO COLUMN", None: "model resolved at runtime"}[hit["has_org_col"]]
         print(f"  {hit['file']}:{hit['line']}: [{hit['shape']}] {hit['model']} ({col}) read with no organisation predicate")
     print(f"\n{len(hits)} read(s) of {len(models)} unfenced model(s)")
     print(f"Add a predicate, or `# {MARKER}: <reason>` on the statement. See the module docstring.")
