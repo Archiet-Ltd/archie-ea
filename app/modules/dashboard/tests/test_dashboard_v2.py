@@ -377,6 +377,12 @@ class TestDashboardV2ServiceInlining:
         "app.services.application_cost_accessor",
         # The owner store is the ownership system of record; the one definition of owned lives there.
         "app.services.element_ownership_service",
+        # One options engine and one governance service serve every surface; a v2
+        # copy would be a second implementation of the same analysis.
+        "app.services.options_analysis_engine",
+        "app.services.governance_service",
+        # The one rationalization scoring model; the dashboard reads it, not a copy.
+        "app.services.rationalization_scoring_service",
     }
 
     def test_no_direct_app_services_imports(self):
@@ -391,3 +397,18 @@ class TestDashboardV2ServiceInlining:
                     offenders.append(f"{py_file.relative_to(v2_root.parent)}: {module}")
 
         assert offenders == [], f"Direct app.services imports found: {offenders}"
+
+    def test_no_dynamic_app_services_imports(self):
+        """importlib / __import__ must not hide an app.services import from the test above."""
+        v2_root = pathlib.Path(__file__).resolve().parents[1] / "v2"
+        pattern = re.compile(
+            r"""(?:import_module|__import__)\s*\(\s*["']app\.services""",
+        )
+
+        offenders = [
+            str(py_file.relative_to(v2_root.parent))
+            for py_file in v2_root.rglob("*.py")
+            if pattern.search(py_file.read_text(encoding="utf-8"))
+        ]
+
+        assert offenders == [], f"Dynamic app.services imports found: {offenders}"
