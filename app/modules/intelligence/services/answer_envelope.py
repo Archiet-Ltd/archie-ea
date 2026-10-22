@@ -67,6 +67,11 @@ MAX_BODY_BYTES = 1024 * 1024
 ADDRESS_PATTERN = re.compile(r"^[0-9a-f]{32}$")
 
 
+def _is_real_number(value: Any) -> bool:
+    """True for int or float, but not bool (which is a subclass of int)."""
+    return isinstance(value, (int, float)) and not isinstance(value, bool)
+
+
 class AnswerParamError(ValueError):
     """The question was malformed (a 400)."""
 
@@ -343,20 +348,23 @@ def build_envelope(
     for original in result["rows"]:
         for relation in _relations_of(kind, original):
             if relation.get("kind") == "derived":
-                if relation.get("confidence") is not None:
-                    derived_confidences.append(float(relation["confidence"]))
+                conf = relation.get("confidence")
+                if _is_real_number(conf):
+                    derived_confidences.append(float(conf))
                 if relation.get("computed_at"):
                     derived_computed.append(_jsonable(relation["computed_at"]))
             if relation.get("stale"):
                 stale_rows += 1
         if kind == KIND_ELEMENT_PROFILE and original.get("basis") == "worked_out":
-            if original.get("confidence") is not None:
-                derived_confidences.append(float(original["confidence"]))
+            conf = original.get("confidence")
+            if _is_real_number(conf):
+                derived_confidences.append(float(conf))
             if original.get("as_of"):
                 derived_computed.append(_jsonable(original["as_of"]))
         if kind == KIND_RISK_PROPAGATION and original.get("path_kind") == "derived":
-            if original.get("path_confidence") is not None:
-                derived_confidences.append(float(original["path_confidence"]))
+            conf = original.get("path_confidence")
+            if _is_real_number(conf):
+                derived_confidences.append(float(conf))
 
     if not rows:
         confidence, basis = None, CONFIDENCE_NO_ROWS
@@ -707,7 +715,9 @@ def _compute_element_profile(params: Dict[str, Any]) -> Dict[str, Any]:
                 if row["basis"] == "worked_out":
                     cost["basis"] = "worked_out"
                     cost["reached_by"] = "worked_out_link"
-                    cost["confidence"] = row.get("confidence")
+                    conf = row.get("confidence")
+                    if _is_real_number(conf):
+                        cost["confidence"] = float(conf)
                 rows.append(cost)
         if len(delivering) > PROFILE_MAX_COSTED_APPLICATIONS and ROWS_TRUNCATED_REASON not in reasons:
             reasons.append(ROWS_TRUNCATED_REASON)
