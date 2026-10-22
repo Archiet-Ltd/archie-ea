@@ -54,12 +54,12 @@ DEFAULT_TABLE = Path(__file__).resolve().parent.parent.parent / "tests" / "shard
 # is the plain count balancing this module used before the table existed.
 _FALLBACK_SECONDS_PER_TEST = 1.0
 
-# Head start (milliseconds) for shard 0 so that the bin-packer assigns it
+# Head start (seconds) for shard 0 so that the bin-packer assigns it
 # less ordinary work.  This compensates for the assistant-connector (MCP)
-# step that shard 0 runs but the balancing does not count.  The value was
-# measured from the CI junit data as the typical duration of the connector‑tests
-# step; see scripts/ci/update_shard_durations.py for the source data.
-SHARD_0_CONNECTOR_HEAD_START_MS = 20_000  # 20 s head start
+# step that shard 0 runs but the balancing does not count.  The value is
+# the median duration of the connector-tests step across runs
+# 39647761444, 39648269461, 39651713459, 39651981883.
+SHARD_0_CONNECTOR_HEAD_START_SECONDS = 246
 
 
 def _file_of(item) -> str:
@@ -114,7 +114,7 @@ def _bin_pack(weights: dict[str, int], total: int) -> dict[str, int]:
     """
     ordered = sorted(weights.items(), key=lambda pair: (-pair[1], pair[0]))
     loads = [0] * total
-    loads[0] = SHARD_0_CONNECTOR_HEAD_START_MS
+    loads[0] = SHARD_0_CONNECTOR_HEAD_START_SECONDS * 1000
     assignment: dict[str, int] = {}
     for path, weight in ordered:
         shard = min(range(total), key=lambda i: (loads[i], i))

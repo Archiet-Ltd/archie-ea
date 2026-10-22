@@ -1,12 +1,12 @@
 {
  "comment": "Per-file run time of the backend tests, used by scripts/ci/test_sharding.py to balance the eight pytest shards. Regenerate with scripts/ci/update_shard_durations.py.",
  "generated_at": "2026-10-21T23:27Z",
- "source_runs": [
-  "/home/ubuntu/verify/briefs/shardjunit/39647761444",
-  "/home/ubuntu/verify/briefs/shardjunit/39648269461",
-  "/home/ubuntu/verify/briefs/shardjunit/39651713459",
-  "/home/ubuntu/verify/briefs/shardjunit/39651981883"
- ],
+"source_runs": [
+   "39647761444",
+   "39648269461",
+   "39651713459",
+   "39651981883"
+  ],
  "default_seconds_per_test": 0.317,
  "files": {
   "app/modules/account/tests/test_account.py": {
