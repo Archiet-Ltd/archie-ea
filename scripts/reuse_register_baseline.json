@@ -192,7 +192,6 @@
    "app/utils/tracing.py": 1
   },
   "entity-matching/name-matcher": {
-   "app/commands/backfill_application_owners.py": 1,
    "app/commands/backfill_capability_catalogs.py": 1,
    "app/modules/capabilities/services/business_capability_mapper.py": 1,
    "app/modules/solutions_strategic/v2/services/solution_ai_orchestrator.py": 1,
