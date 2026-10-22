@@ -29,8 +29,13 @@ from app.modules.ai_chat.tools.route_read_tools import (
 PUBLISHED_NAMES = {
     "ask_impact", "ask_strategy", "ask_portfolio", "ask_programme",
     "ask_risk", "ask_accountability", "search_elements", "get_element",
-    "list_canvases", "get_canvas",
+    "list_canvases", "get_canvas", "answer",
 }
+
+# The answer tool is published to both chat and the connector so that
+# answers through the connector carry citations. Its handler is the
+# executor's own _tool_answer, not an entry in ROUTE_READ_HANDLERS.
+SHARED_WITH_CHAT = {"answer"}
 
 
 def _mcp_violations(schemas):
@@ -69,7 +74,9 @@ def test_connector_tools_are_not_offered_to_the_chat_model(provider):
 
     built = AgentRunner._build_tool_schemas(provider, TOOL_SCHEMAS)
     names = {t["name"] if provider == "anthropic" else t["function"]["name"] for t in built}
-    assert names.isdisjoint(PUBLISHED_NAMES), sorted(names & PUBLISHED_NAMES)
+    # answer is deliberately shared: it appears on both surfaces so that
+    # connector answers carry citations.
+    assert (names & PUBLISHED_NAMES) == SHARED_WITH_CHAT, sorted(names & PUBLISHED_NAMES)
     for kept in ("create_solution", "find_applications", "search_archimate_elements",
                  "get_executive_dashboard", "create_goal"):
         assert kept in names, kept
@@ -110,7 +117,8 @@ def test_no_tool_name_appears_twice():
 def test_every_connector_tool_has_an_executor_handler():
     for tool in connector_tools():
         assert callable(getattr(ToolExecutor, f"_tool_{tool['name']}", None))
-    assert set(ROUTE_READ_HANDLERS) == PUBLISHED_NAMES
+    # answer uses the executor's own _tool_answer, not a route read handler.
+    assert set(ROUTE_READ_HANDLERS) == PUBLISHED_NAMES - SHARED_WITH_CHAT
 
 
 def test_a_write_tool_marked_mcp_never_reaches_the_connector(monkeypatch):
