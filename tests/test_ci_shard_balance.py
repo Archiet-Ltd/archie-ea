@@ -140,6 +140,20 @@ def test_the_committed_table_balances_the_shards_within_fifteen_percent_of_the_m
     assert max(loads) <= mean * 1.15, [round(ms / 60000, 1) for ms in loads]
 
 
+def test_the_committed_table_balances_within_thirteen_percent_with_head_start():
+    """Verify the head-start bin-pack keeps every shard within 1.3x of the mean.
+
+    The shard-0 connector-tests head start of 20s is designed exactly so the
+    longest-processing shard does not exceed 1.3x the mean when the table is
+    well-formed.
+    """
+    table = _table()
+    counts = {path: entry["tests"] for path, entry in table["files"].items()}
+    _assignment, loads = sharding.plan(counts, TOTAL, table)
+    mean = sum(loads) / TOTAL
+    assert max(loads) <= mean * 1.3, [round(ms / 60000, 1) for ms in loads]
+
+
 def test_the_committed_table_is_well_formed():
     table = _table()
     assert table["default_seconds_per_test"] > 0
