@@ -32,7 +32,7 @@ from flask import (
 )
 from flask_login import current_user, login_required  # dead-code-ok
 from app.middleware.tenant_context import current_org_id
-from sqlalchemy import or_  # dead-code-ok
+from sqlalchemy import case, or_  # dead-code-ok
 from sqlalchemy.exc import SQLAlchemyError
 
 from .. import db
@@ -881,6 +881,8 @@ def plateaus():
 _GAP_SORT_COLUMNS = {
     "name": Gap.name,
     "gap_type": Gap.gap_type,
+    # critical sorts above high, not alphabetically; an unrecorded severity ranks below low
+    "severity": case({"low": 1, "medium": 2, "high": 3, "critical": 4}, value=Gap.severity, else_=0),
     "priority": Gap.priority,
     "resolution_status": Gap.resolution_status,
     "impact": Gap.impact,

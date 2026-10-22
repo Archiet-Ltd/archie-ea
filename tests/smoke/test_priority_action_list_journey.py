@@ -7,6 +7,7 @@ back, opens a risk row and sees that risk, then reloads the list and finds the
 same order. The Architecture Intelligence page shows the same list.
 """
 
+import re
 from datetime import datetime, timedelta
 
 import pytest
@@ -116,5 +117,59 @@ def test_a_list_cut_at_ten_has_a_link_to_all_of_it(browser, live_server):
             page.wait_for_url(lambda url: "all_actions=1" in url, timeout=PAGE_TIMEOUT)
             assert len(_order(page)) == 13
             expect(page.get_by_test_id("priority-actions")).to_contain_text("Cut-off gap 12 %s" % suffix)
+    finally:
+        context.close()
+
+
+def test_a_critical_row_lands_on_a_critical_highlighted_gap(browser, live_server):
+    """The row the list calls Critical is, on the page it opens, Critical and marked."""
+    org = create_fresh_org("enterprise_architect")
+    suffix = org["suffix"]
+    from app import create_app, db
+    from app.models.implementation_migration import Gap
+
+    app = create_app("testing")
+    with app.app_context():
+        # Only severity is set: priority and impact keep their stored default of "medium".
+        critical = Gap(name="Event backbone resilience %s" % suffix, severity="critical",
+                       organization_id=org["org_id"])
+        calm = Gap(name="Minor reporting gap %s" % suffix, severity="low", organization_id=org["org_id"])
+        db.session.add_all([critical, calm])
+        db.session.commit()
+        critical_id, calm_id = critical.id, calm.id
+        db.session.remove()
+    context = browser.new_context(ignore_https_errors=True, viewport={"width": 1440, "height": 1000})
+    context.add_init_script("localStorage.setItem('archie_onboarding_ts', Date.now().toString());")
+    page = context.new_page()
+    try:
+        sign_in(page, live_server, org["emails"]["enterprise_architect"])
+        page.goto(live_server + LIST_PAGES[0], wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        row = page.get_by_test_id("priority-action-row").filter(has_text="Event backbone resilience")
+        expect(row).to_contain_text("Critical")
+        row.get_by_test_id("priority-action-link").click()
+        page.wait_for_url(lambda url: url.endswith("/implementation/gap-analysis#gap-%d" % critical_id),
+                          timeout=PAGE_TIMEOUT)
+
+        landing = page.locator("#gap-%d" % critical_id)
+        expect(landing).to_be_visible()
+        expect(landing).to_contain_text("Critical")
+        # The page's own summary agrees with the list: one critical gap.
+        summary = page.get_by_text("By the severity recorded on each gap").locator(
+            "xpath=ancestor::*[@data-slot='card'][1]")
+        expect(summary).to_contain_text(re.compile(r"Critical\s+1\b"))
+
+        # The landing row is the browser's target and is marked; the other row is not.
+        assert page.evaluate("document.querySelector(':target') && document.querySelector(':target').id")             == "gap-%d" % critical_id
+        shade = lambda sel: page.evaluate(  # noqa: E731
+            "s => getComputedStyle(document.querySelector(s)).backgroundColor", sel)
+        assert shade("#gap-%d" % critical_id) != shade("#gap-%d" % calm_id)
+        # ... across the whole row, the pinned first and last cells included.
+        for cell in ("td:first-child", "td:last-child"):
+            assert shade("#gap-%d %s" % (critical_id, cell)) != shade("#gap-%d %s" % (calm_id, cell)), cell
+
+        # No bare dashes: an empty Type or Work packages cell says why and what to do.
+        expect(landing.get_by_test_id("gap-type-unset")).to_contain_text("open the gap to classify it")
+        expect(landing.get_by_test_id("gap-no-work-package")).to_contain_text("Convert to Work Package")
+        expect(landing.get_by_role("cell", name="—", exact=True)).to_have_count(0)
     finally:
         context.close()
