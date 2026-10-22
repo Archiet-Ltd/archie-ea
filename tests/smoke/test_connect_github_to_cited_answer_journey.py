@@ -279,6 +279,14 @@ def test_4_the_review_groups_the_proposals_each_with_a_reason_and_the_owners(adm
     expect(apps.filter(has_text="Payments Service")).to_contain_text("owner.one@example.test")
     expect(apps.filter(has_text="Customer Portal")).to_contain_text("acme/web-team")
     expect(admin.get_by_role("button", name="Approve all (22)")).to_be_visible()
+    # What the review shows as the owner of three things the answer will name later.
+    shown = {}
+    for name, rows_, column in (("Billing Api", apps, 2), ("Customer Portal", apps, 2), ("Payments Worker", parts, 3)):
+        shown[name] = rows_.filter(has_text=name).first.locator("td").nth(column).inner_text().strip()
+        assert shown[name], "the review shows nothing in the owner column for %s" % name
+        if name != "Payments Worker":  # its repository has no code-owner file: the review says so
+            assert not shown[name].startswith("No owner"), "the review names no owner for %s: %r" % (name, shown[name])
+    world["review_owner"] = shown
     remember(world, admin)
     shoot(admin, "4-review")
 
@@ -373,10 +381,23 @@ def test_7a_the_saved_answer_names_them_at_its_own_address(admin, world):
     remember(world, admin)
 
 
+def shoot_whole_answer(page, path):
+    """The whole page in one picture. The page scrolls inside its own frame, so the window is made
+    as tall as the longest scrolling thing for the moment of the capture, then put back."""
+    size = page.viewport_size
+    height = page.evaluate(
+        "Math.max(document.documentElement.scrollHeight, ...Array.from(document.querySelectorAll('*'))"
+        ".filter(e => e.scrollHeight > e.clientHeight + 50 && /auto|scroll/.test(getComputedStyle(e).overflowY))"
+        ".map(e => e.getBoundingClientRect().top + e.scrollHeight))"
+    )
+    page.set_viewport_size({"width": size["width"], "height": min(max(int(height), size["height"]), 8000)})
+    page.wait_for_timeout(300)
+    page.screenshot(path=path, full_page=True)
+    page.set_viewport_size(size)
+
+
 def shoot_on_a_phone(browser, world, name):
     """The Ask answer as it opens on a phone: a second person's window at 390 wide, not a resized one."""
-    if not SHOTS:
-        return
     context = browser.new_context(viewport={"width": 390, "height": 844})
     context.add_init_script(SKIP_WELCOME)
     context.set_default_timeout(PAGE_TIMEOUT)
@@ -384,8 +405,13 @@ def shoot_on_a_phone(browser, world, name):
     try:
         sign_in(page, world["base"], world["one"]["emails"]["solution_architect"])
         ask_what_breaks_if_payments_service_fails(page, world["base"])
-        os.makedirs(SHOTS, exist_ok=True)
-        page.locator("#ask-results").screenshot(path=os.path.join(SHOTS, "%s-390.png" % name))
+        page.wait_for_timeout(1200)  # the smooth scroll to the answer's heading has settled
+        heading = page.locator("#ask-results-heading").bounding_box()
+        bar = page.evaluate("(() => { const b = document.querySelector('header'); return b ? b.getBoundingClientRect().bottom : 0; })()")
+        assert heading and heading["y"] >= bar - 1, "the answer's heading sits under the top bar: heading %s, bar bottom %s" % (heading, bar)
+        if SHOTS:
+            os.makedirs(SHOTS, exist_ok=True)
+            shoot_whole_answer(page, os.path.join(SHOTS, "%s-390.png" % name))
     finally:
         context.close()
 
@@ -399,9 +425,20 @@ def test_7b_each_dependent_is_cited_with_its_repository_and_file(admin, world, b
     assert re.search(r"@ [0-9a-f]{7}(?![0-9a-f])", text), "no short commit in: " + text
     portal = rows.filter(has_text="Customer Portal").first.inner_text()
     assert "acme/customer-portal" in portal and "package.json" in portal, portal
+    # Two screens, one owner: the answer shows what the review showed, not "Not recorded".
+    for name, owner in world["review_owner"].items():
+        row_text = rows.filter(has_text=name).first.inner_text()
+        if owner.startswith("No owner"):  # nothing was found, so nothing may be invented
+            assert "from GitHub code owners" not in row_text, row_text
+            continue
+        assert owner in row_text, "review showed %r as the owner of %s, the answer shows: %s" % (owner, name, row_text)
+        assert "Owner\nNot recorded" not in row_text, row_text
+    # The question line sits inside the card's padding, not flush with its edge.
+    padding = admin.evaluate("parseFloat(getComputedStyle(document.querySelector('#ask-results .question-line')).paddingLeft)")
+    assert padding >= 12, "the question line has %spx of padding" % padding
     if SHOTS:
         os.makedirs(SHOTS, exist_ok=True)
-        admin.locator("#ask-results").screenshot(path=os.path.join(SHOTS, "7b-answer-cited-1440.png"))
+        shoot_whole_answer(admin, os.path.join(SHOTS, "7b-answer-cited-1440.png"))
     shoot_on_a_phone(browser, world, "7b-answer-cited")
 
 

@@ -71,12 +71,12 @@
     {% for section in review.applications %}
     <section class="mb-8" aria-labelledby="group-{{ loop.index }}">
         <h2 id="group-{{ loop.index }}" class="text-sm font-semibold mb-2">{{ section.group }}</h2>
-        {% call dense_table(table_class='max-sm:[&_thead]:sr-only max-sm:[&_tbody]:block max-sm:[&_tr]:block max-sm:[&_tr]:h-auto max-sm:[&_tr]:py-3 max-sm:[&_td]:block max-sm:[&_td]:py-0.5', columns=[('Application', ''), ('Why', ''), ('Owner', ''), ('Read from', ''), ('', 'text-right')], rows=section['items']|length, caption='Applications in ' ~ section.group) %}
+        {% call dense_table(table_class='max-sm:[&_thead]:sr-only max-sm:[&_tbody]:block max-sm:[&_tr]:block max-sm:[&_tr]:h-auto max-sm:[&_tr]:py-3 max-sm:[&_td]:block max-sm:[&_td]:py-0.5', columns=[('Application', ''), ('Why', ''), ('GitHub code owner', ''), ('Read from', ''), ('', 'text-right')], rows=section['items']|length, caption='Applications in ' ~ section.group) %}
         {% for item in section['items'] %}
         <tr class="group h-12 transition-colors hover:bg-muted/50">
             <td class="px-2 align-middle font-medium text-foreground">{{ item.name }}</td>
             <td class="px-2 align-middle text-xs text-muted-foreground"><span class="sm:hidden font-medium text-muted-foreground">Why: </span>{{ item.reason }}</td>
-            <td class="px-2 align-middle text-xs"><span class="sm:hidden font-medium text-muted-foreground">Owner: </span>{% if item.owners %}{{ item.owners|join(', ') }}{% elif item.owning_team %}{{ item.owning_team }}{% else %}<span class="text-muted-foreground">No owner found</span>{% endif %}</td>
+            <td class="px-2 align-middle text-xs"><span class="sm:hidden font-medium text-muted-foreground">GitHub code owner: </span>{% if item.owners %}{{ item.owners|join(', ') }}{% elif item.owning_team %}{{ item.owning_team }}{% else %}<span class="text-muted-foreground">No owner found</span>{% endif %}</td>
             <td class="px-2 align-middle text-xs font-mono text-muted-foreground break-words"><span class="sm:hidden font-medium text-muted-foreground">Read from: </span>{{ evidence(item) }}</td>
             <td class="px-2 align-middle">{{ item_controls(item, classifications) }}</td>
         </tr>
@@ -88,12 +88,13 @@
     {% if review.parts %}
     <section class="mb-8" aria-labelledby="parts-heading">
         <h2 id="parts-heading" class="text-sm font-semibold mb-2">Parts of applications</h2>
-        {% call dense_table(table_class='max-sm:[&_thead]:sr-only max-sm:[&_tbody]:block max-sm:[&_tr]:block max-sm:[&_tr]:h-auto max-sm:[&_tr]:py-3 max-sm:[&_td]:block max-sm:[&_td]:py-0.5', columns=[('Part', ''), ('Belongs to', ''), ('Why', ''), ('Read from', ''), ('', 'text-right')], rows=review.parts|length, caption='Parts of applications') %}
+        {% call dense_table(table_class='max-sm:[&_thead]:sr-only max-sm:[&_tbody]:block max-sm:[&_tr]:block max-sm:[&_tr]:h-auto max-sm:[&_tr]:py-3 max-sm:[&_td]:block max-sm:[&_td]:py-0.5', columns=[('Part', ''), ('Belongs to', ''), ('Why', ''), ('GitHub code owner', ''), ('Read from', ''), ('', 'text-right')], rows=review.parts|length, caption='Parts of applications') %}
         {% for item in review.parts %}
         <tr class="group h-12 transition-colors hover:bg-muted/50">
             <td class="px-2 align-middle font-medium text-foreground">{{ item.name }}</td>
             <td class="px-2 align-middle text-xs"><span class="sm:hidden font-medium text-muted-foreground">Belongs to: </span>{{ item.parent_name }}</td>
             <td class="px-2 align-middle text-xs text-muted-foreground"><span class="sm:hidden font-medium text-muted-foreground">Why: </span>{{ item.reason }}</td>
+            <td class="px-2 align-middle text-xs"><span class="sm:hidden font-medium text-muted-foreground">GitHub code owner: </span>{% if item.owners %}{{ item.owners|join(', ') }}{% elif item.owning_team %}{{ item.owning_team }}{% else %}<span class="text-muted-foreground">No owner found</span>{% endif %}</td>
             <td class="px-2 align-middle text-xs font-mono text-muted-foreground break-words"><span class="sm:hidden font-medium text-muted-foreground">Read from: </span>{{ evidence(item) }}</td>
             <td class="px-2 align-middle">{{ item_controls(item, classifications) }}</td>
         </tr>

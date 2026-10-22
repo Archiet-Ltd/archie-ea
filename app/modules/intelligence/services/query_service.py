@@ -387,6 +387,26 @@ def _resolve_application_owners_batch(
             for o in owners
         ]
 
+    # The one owner store holds people only. A repository's code owner (a team or a handle) is
+    # not a person in the organisation, so approval records it as a fact on the element with its
+    # source; the answer shows that fact, labelled as such, where no person is recorded.
+    missing = [eid for eid in distinct_ids if not results[eid]]
+    if missing:
+        from app.models.archimate_core import ArchiMateElement
+
+        for eid, props in db.session.execute(
+            db.select(ArchiMateElement.id, ArchiMateElement.acm_properties)
+            .where(ArchiMateElement.id.in_(missing))
+            .where(ArchiMateElement.organization_id == org_id)
+        ).all():
+            props = props or {}
+            owners = (props.get("github_code_owners") or {}).get("value")
+            shown = ", ".join(owners) if owners else (props.get("github_owning_team") or {}).get("value")
+            if shown:
+                results[eid] = [
+                    {"name": f"{shown} (from GitHub code owners; assign an owner)", "role": "GitHub code owner"}
+                ]
+
     return results
 
 
