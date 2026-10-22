@@ -206,6 +206,22 @@ def test_4_the_review_groups_the_proposals_each_with_a_reason_and_the_owners(adm
     remember(world, admin)
     shoot(admin, "4-review")
 
+    # On a phone every proposal still shows its name, reason, owner and source, with no sideways scroll.
+    admin.set_viewport_size({"width": 390, "height": 844})
+    try:
+        admin.reload(wait_until="domcontentloaded")
+        overflow = admin.evaluate("document.documentElement.scrollWidth - document.documentElement.clientWidth")
+        assert overflow <= 0, "the review page scrolls sideways by %spx at 390 wide" % overflow
+        rows = admin.locator("section[aria-labelledby^='group-'] tbody tr")
+        for i in range(rows.count()):
+            cells = rows.nth(i).locator("td")
+            for index, label in ((0, "name"), (1, "reason"), (2, "owner"), (3, "source")):
+                box = cells.nth(index).bounding_box()
+                assert box and cells.nth(index).is_visible() and box["width"] > 200, "the %s of row %s is clipped at 390 wide" % (label, i)
+                assert cells.nth(index).inner_text().strip(), "the %s of row %s is empty at 390 wide" % (label, i)
+    finally:
+        admin.set_viewport_size({"width": 1440, "height": 900})
+
 
 def test_5_approve_all_adds_everything_to_the_model(admin, world):
     admin.get_by_role("button", name="Approve all (22)").click()
@@ -270,22 +286,70 @@ def test_7a_the_saved_answer_names_them_at_its_own_address(admin, world):
     remember(world, admin)
 
 
-@pytest.mark.xfail(strict=True, reason="The answer names what breaks but not the repository and file each link was read from")
-def test_7b_each_dependent_is_cited_with_its_repository_and_file(admin, world):
+def shoot_on_a_phone(browser, world, name):
+    """The Ask answer as it opens on a phone: a second person's window at 390 wide, not a resized one."""
+    if not SHOTS:
+        return
+    context = browser.new_context(viewport={"width": 390, "height": 844})
+    context.add_init_script(SKIP_WELCOME)
+    context.set_default_timeout(PAGE_TIMEOUT)
+    page = context.new_page()
+    try:
+        sign_in(page, world["base"], world["one"]["emails"]["solution_architect"])
+        ask_what_breaks_if_payments_service_fails(page, world["base"])
+        os.makedirs(SHOTS, exist_ok=True)
+        page.locator("#ask-results").screenshot(path=os.path.join(SHOTS, "%s-390.png" % name))
+    finally:
+        context.close()
+
+
+def test_7b_each_dependent_is_cited_with_its_repository_and_file(admin, world, browser):
     rows = ask_what_breaks_if_payments_service_fails(admin, world["base"])
-    billing = rows.filter(has_text="Billing Api").first.inner_text() + admin.locator("#ask-results").inner_text()
-    assert "acme/billing-api" in billing and "pom.xml" in billing
-    portal = admin.locator("#ask-results").inner_text()
-    assert "acme/customer-portal" in portal and "package.json" in portal
+    billing = rows.filter(has_text="Billing Api").first
+    expect(billing.locator("[data-citation]").first).to_be_visible()
+    text = billing.inner_text()
+    assert "acme/billing-api" in text and "pom.xml" in text, text
+    assert re.search(r"@ [0-9a-f]{7}(?![0-9a-f])", text), "no short commit in: " + text
+    portal = rows.filter(has_text="Customer Portal").first.inner_text()
+    assert "acme/customer-portal" in portal and "package.json" in portal, portal
+    if SHOTS:
+        os.makedirs(SHOTS, exist_ok=True)
+        admin.locator("#ask-results").screenshot(path=os.path.join(SHOTS, "7b-answer-cited-1440.png"))
+    shoot_on_a_phone(browser, world, "7b-answer-cited")
 
 
-@pytest.mark.xfail(strict=True, reason="The answer offers no link from a citation to the repository file it came from")
 def test_7c_a_citation_link_opens_on_content(admin, world):
-    ask_what_breaks_if_payments_service_fails(admin, world["base"])
-    link = admin.locator("#ask-results a[href*='github.com'], #ask-results [data-citation] a").first
-    expect(link).to_be_visible(timeout=3000)
-    link.click()
-    assert admin.locator("body").inner_text().strip()
+    rows = ask_what_breaks_if_payments_service_fails(admin, world["base"])
+    link = rows.filter(has_text="Billing Api").first.get_by_role("link", name="View file on GitHub").first
+    expect(link).to_be_visible()
+    href = link.get_attribute("href")
+    # GitHub is not reachable from here: the address must be exactly the file at the commit.
+    assert re.fullmatch(r"https://github\.com/acme/billing-api/blob/[0-9a-f]{40}/pom\.xml", href), href
+    assert link.get_attribute("target") == "_blank" and "noopener" in link.get_attribute("rel") and "noreferrer" in link.get_attribute("rel")
+    portal = rows.filter(has_text="Customer Portal").first.get_by_role("link", name="View file on GitHub").first
+    assert re.fullmatch(r"https://github\.com/acme/customer-portal/blob/[0-9a-f]{40}/package\.json", portal.get_attribute("href"))
+    # The citation's short commit is the start of the commit in the address.
+    short = re.search(r"@ ([0-9a-f]{7})", rows.filter(has_text="Billing Api").first.inner_text()).group(1)
+    assert "/blob/" + short in href
+    # Inside the product, the same row leads to the element on the twin map, which has content.
+    inside = rows.filter(has_text="Billing Api").first.get_by_role("link", name="View on twin map")
+    inside.click()
+    admin.wait_for_load_state("domcontentloaded")
+    assert admin.locator("#main-content").inner_text().strip()
+    expect(admin.locator("#main-content").get_by_text("Billing Api").first).to_be_visible()
+
+
+def test_7d_the_saved_answer_cites_each_dependent_with_a_link(admin, world):
+    admin.goto(world["seen"]["answer_url"], wait_until="domcontentloaded")
+    rows = admin.locator("[data-answer-rows] tbody tr")
+    billing = rows.filter(has_text="Billing Api")
+    expect(billing).to_contain_text("acme/billing-api")
+    expect(billing).to_contain_text("pom.xml")
+    href = billing.get_by_role("link", name="View file on GitHub").first.get_attribute("href")
+    assert re.fullmatch(r"https://github\.com/acme/billing-api/blob/[0-9a-f]{40}/pom\.xml", href), href
+    expect(rows.filter(has_text="Customer Portal").first).to_contain_text("acme/customer-portal")
+    remember(world, admin)
+    shoot(admin, "7d-saved-answer")
 
 
 def test_8_another_organisation_sees_none_of_it(browser, world):

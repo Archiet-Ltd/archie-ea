@@ -584,6 +584,7 @@ def _attach_origins(rows: List[Dict[str, Any]], org_id: Optional[int]) -> None:
     """
     import json
 
+    from app.connectors.github import file_url as github_file_url
     from app.models import ArchiMateRelationship
 
     ids = sorted({rid for row in rows for rid in row["relation"]["chain"]})
@@ -617,6 +618,9 @@ def _attach_origins(rows: List[Dict[str, Any]], org_id: Optional[int]) -> None:
             "detail": body.get("detail"),
             "label": label,
             "recorded_at": recorded_at.isoformat() if recorded_at else None,
+            "url": github_file_url(body.get("repository"), body.get("commit"), body.get("file"))
+            if body.get("system") == "github"
+            else None,
         }
     if not origins:
         return

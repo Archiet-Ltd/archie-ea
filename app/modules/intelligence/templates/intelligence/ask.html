@@ -109,6 +109,15 @@
                     <a :href="twinMapHref(node)" class="inline-flex h-8 items-center justify-center rounded-md px-2 text-13 font-medium text-muted-foreground transition-colors hover:bg-muted/50 hover:text-info">View on twin map</a>
                 </div>
                 <div class="basis-full text-xs text-muted-foreground">{{ stale_line('node.staleLine') }}</div>
+                <ul class="basis-full space-y-1 text-xs text-muted-foreground" data-citations aria-label="Where this was read from">
+                    <template x-for="(o, n) in node.origins" :key="n">
+                        <li data-citation>
+                            <span class="text-foreground" x-text="o.repository + (o.file ? ' · ' + o.file : '') + (o.short ? ' @ ' + o.short : '')"></span>
+                            <a x-show="o.url" :href="o.url" target="_blank" rel="noopener noreferrer" class="ml-2 underline hover:text-info">View file on GitHub</a>
+                        </li>
+                    </template>
+                    <li x-show="!node.origins.length" data-citation-missing>Source not recorded</li>
+                </ul>
                 <div class="basis-full">{{ full_detail({'detail': 'node.detail', 'uid': 'node.key'}) }}</div>
             {% endcall %}
         </div>

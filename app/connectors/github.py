@@ -301,6 +301,28 @@ def _identity(repository: Optional[str], path: Optional[str] = None) -> str:
     return f"{repository}#{path}" if path else str(repository)
 
 
+_SAFE_NAME = re.compile(r"^[A-Za-z0-9._-]+$")
+_SAFE_SHA = re.compile(r"^[0-9a-fA-F]{7,64}$")
+
+
+def file_url(repository, commit, file) -> "str | None":
+    """The address of a file at a commit on GitHub, built from a stored origin.
+
+    Only parts that are plainly an owner, a repository and a hex commit are used; the path is
+    percent-encoded. Anything else gives no address, never a guessed one."""
+    parts = str(repository or "").split("/")
+    if len(parts) != 2 or not file or not commit or not _SAFE_SHA.match(str(commit)):
+        return None
+    if any(not _SAFE_NAME.match(p) or set(p) == {"."} for p in parts):
+        return None
+    segments = [seg for seg in str(file).split("/") if seg not in ("", ".", "..")]
+    if not segments:
+        return None
+    from urllib.parse import quote
+
+    return "https://github.com/%s/%s/blob/%s/%s" % (parts[0], parts[1], commit, "/".join(quote(seg, safe="") for seg in segments))
+
+
 def origin_ref(repository, commit, file=None, path=None, detail=None) -> str:
     """The JSON a connector-written element or relationship keeps in ``source_ref``."""
     body = {"system": SOURCE_SYSTEM, "repository": repository, "commit": commit, "file": file}

@@ -9,7 +9,7 @@
 {%- endmacro %}
 
 {% macro item_controls(item, classifications) %}
-<div class="flex items-center justify-end gap-2">
+<div class="flex flex-wrap items-center gap-2 sm:justify-end">
     <form method="POST" action="{{ url_for('m365_connector.github_review_classify', approval_id=item.id) }}" class="flex items-center gap-1">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <label for="class-{{ item.id }}" class="sr-only">What {{ item.name }} is</label>
@@ -55,7 +55,7 @@
     {% if review.total == 0 %}
         {{ quiet_alert('neutral', text='Nothing is waiting for review. Connect GitHub, or read your repositories again, to see what it shows.', link_href=url_for('m365_connector.github_connect'), link_text='Open the GitHub page') }}
     {% else %}
-    <div class="mb-6 flex items-center justify-between gap-4" data-testid="github-review-actions">
+    <div class="mb-6 flex flex-wrap items-center justify-between gap-4" data-testid="github-review-actions">
         <p class="text-sm text-muted-foreground">
             {{ review.applications_total }} applications, {{ review.parts|length }} parts, {{ review.links|length }} links and {{ review.others|length }} repositories that stay out of the model.
         </p>
@@ -71,13 +71,13 @@
     {% for section in review.applications %}
     <section class="mb-8" aria-labelledby="group-{{ loop.index }}">
         <h2 id="group-{{ loop.index }}" class="text-sm font-semibold mb-2">{{ section.group }}</h2>
-        {% call dense_table(columns=[('Application', ''), ('Why', ''), ('Owner', ''), ('Read from', ''), ('', 'text-right')], rows=section['items']|length, caption='Applications in ' ~ section.group) %}
+        {% call dense_table(table_class='max-sm:[&_thead]:sr-only max-sm:[&_tbody]:block max-sm:[&_tr]:block max-sm:[&_tr]:h-auto max-sm:[&_tr]:py-3 max-sm:[&_td]:block max-sm:[&_td]:py-0.5', columns=[('Application', ''), ('Why', ''), ('Owner', ''), ('Read from', ''), ('', 'text-right')], rows=section['items']|length, caption='Applications in ' ~ section.group) %}
         {% for item in section['items'] %}
         <tr class="group h-12 transition-colors hover:bg-muted/50">
             <td class="px-2 align-middle font-medium text-foreground">{{ item.name }}</td>
-            <td class="px-2 align-middle text-xs text-muted-foreground">{{ item.reason }}</td>
-            <td class="px-2 align-middle text-xs">{% if item.owners %}{{ item.owners|join(', ') }}{% elif item.owning_team %}{{ item.owning_team }}{% else %}<span class="text-muted-foreground">No owner found</span>{% endif %}</td>
-            <td class="px-2 align-middle text-xs font-mono text-muted-foreground">{{ evidence(item) }}</td>
+            <td class="px-2 align-middle text-xs text-muted-foreground"><span class="sm:hidden font-medium text-muted-foreground">Why: </span>{{ item.reason }}</td>
+            <td class="px-2 align-middle text-xs"><span class="sm:hidden font-medium text-muted-foreground">Owner: </span>{% if item.owners %}{{ item.owners|join(', ') }}{% elif item.owning_team %}{{ item.owning_team }}{% else %}<span class="text-muted-foreground">No owner found</span>{% endif %}</td>
+            <td class="px-2 align-middle text-xs font-mono text-muted-foreground break-words"><span class="sm:hidden font-medium text-muted-foreground">Read from: </span>{{ evidence(item) }}</td>
             <td class="px-2 align-middle">{{ item_controls(item, classifications) }}</td>
         </tr>
         {% endfor %}
@@ -88,13 +88,13 @@
     {% if review.parts %}
     <section class="mb-8" aria-labelledby="parts-heading">
         <h2 id="parts-heading" class="text-sm font-semibold mb-2">Parts of applications</h2>
-        {% call dense_table(columns=[('Part', ''), ('Belongs to', ''), ('Why', ''), ('Read from', ''), ('', 'text-right')], rows=review.parts|length, caption='Parts of applications') %}
+        {% call dense_table(table_class='max-sm:[&_thead]:sr-only max-sm:[&_tbody]:block max-sm:[&_tr]:block max-sm:[&_tr]:h-auto max-sm:[&_tr]:py-3 max-sm:[&_td]:block max-sm:[&_td]:py-0.5', columns=[('Part', ''), ('Belongs to', ''), ('Why', ''), ('Read from', ''), ('', 'text-right')], rows=review.parts|length, caption='Parts of applications') %}
         {% for item in review.parts %}
         <tr class="group h-12 transition-colors hover:bg-muted/50">
             <td class="px-2 align-middle font-medium text-foreground">{{ item.name }}</td>
-            <td class="px-2 align-middle text-xs">{{ item.parent_name }}</td>
-            <td class="px-2 align-middle text-xs text-muted-foreground">{{ item.reason }}</td>
-            <td class="px-2 align-middle text-xs font-mono text-muted-foreground">{{ evidence(item) }}</td>
+            <td class="px-2 align-middle text-xs"><span class="sm:hidden font-medium text-muted-foreground">Belongs to: </span>{{ item.parent_name }}</td>
+            <td class="px-2 align-middle text-xs text-muted-foreground"><span class="sm:hidden font-medium text-muted-foreground">Why: </span>{{ item.reason }}</td>
+            <td class="px-2 align-middle text-xs font-mono text-muted-foreground break-words"><span class="sm:hidden font-medium text-muted-foreground">Read from: </span>{{ evidence(item) }}</td>
             <td class="px-2 align-middle">{{ item_controls(item, classifications) }}</td>
         </tr>
         {% endfor %}
@@ -105,12 +105,12 @@
     {% if review.links %}
     <section class="mb-8" aria-labelledby="links-heading">
         <h2 id="links-heading" class="text-sm font-semibold mb-2">Links between them</h2>
-        {% call dense_table(columns=[('Link', ''), ('What the code says', ''), ('Read from', ''), ('', 'text-right')], rows=review.links|length, caption='Links between applications') %}
+        {% call dense_table(table_class='max-sm:[&_thead]:sr-only max-sm:[&_tbody]:block max-sm:[&_tr]:block max-sm:[&_tr]:h-auto max-sm:[&_tr]:py-3 max-sm:[&_td]:block max-sm:[&_td]:py-0.5', columns=[('Link', ''), ('What the code says', ''), ('Read from', ''), ('', 'text-right')], rows=review.links|length, caption='Links between applications') %}
         {% for item in review.links %}
         <tr class="group h-12 transition-colors hover:bg-muted/50">
             <td class="px-2 align-middle font-medium text-foreground">{{ item.source_name }} {{ 'serves' if item.relationship_type == 'Serving' else 'is linked to' }} {{ item.target_name }}</td>
-            <td class="px-2 align-middle text-xs text-muted-foreground">{{ item.detail }}</td>
-            <td class="px-2 align-middle text-xs font-mono text-muted-foreground">{{ item['from'] }} @ {{ item.short_commit }} ({{ item.file }})</td>
+            <td class="px-2 align-middle text-xs text-muted-foreground"><span class="sm:hidden font-medium text-muted-foreground">What the code says: </span>{{ item.detail }}</td>
+            <td class="px-2 align-middle text-xs font-mono text-muted-foreground break-words"><span class="sm:hidden font-medium text-muted-foreground">Read from: </span>{{ item['from'] }} @ {{ item.short_commit }} ({{ item.file }})</td>
             <td class="px-2 align-middle">
                 <form method="POST" action="{{ url_for('m365_connector.github_review_skip', approval_id=item.id) }}" class="flex justify-end">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -126,12 +126,12 @@
     {% if review.others %}
     <section class="mb-8" aria-labelledby="others-heading">
         <h2 id="others-heading" class="text-sm font-semibold mb-2">Not added to the model</h2>
-        {% call dense_table(columns=[('Repository', ''), ('Looks like', ''), ('Why', ''), ('', 'text-right')], rows=review.others|length, caption='Repositories that are not added to the model') %}
+        {% call dense_table(table_class='max-sm:[&_thead]:sr-only max-sm:[&_tbody]:block max-sm:[&_tr]:block max-sm:[&_tr]:h-auto max-sm:[&_tr]:py-3 max-sm:[&_td]:block max-sm:[&_td]:py-0.5', columns=[('Repository', ''), ('Looks like', ''), ('Why', ''), ('', 'text-right')], rows=review.others|length, caption='Repositories that are not added to the model') %}
         {% for item in review.others %}
         <tr class="group h-12 transition-colors hover:bg-muted/50">
             <td class="px-2 align-middle font-medium text-foreground">{{ item.name }}</td>
-            <td class="px-2 align-middle text-xs">{{ item.classification|capitalize }}</td>
-            <td class="px-2 align-middle text-xs text-muted-foreground">{{ item.reason }}</td>
+            <td class="px-2 align-middle text-xs"><span class="sm:hidden font-medium text-muted-foreground">Looks like: </span>{{ item.classification|capitalize }}</td>
+            <td class="px-2 align-middle text-xs text-muted-foreground"><span class="sm:hidden font-medium text-muted-foreground">Why: </span>{{ item.reason }}</td>
             <td class="px-2 align-middle">{{ item_controls(item, classifications) }}</td>
         </tr>
         {% endfor %}
@@ -143,7 +143,7 @@
     {% if review.owner_changes %}
     <section class="mb-8" aria-labelledby="owners-heading">
         <h2 id="owners-heading" class="text-sm font-semibold mb-2">Owner changes to decide one by one</h2>
-        {% call dense_table(columns=[('Proposal', '')], rows=review.owner_changes|length, caption='Owner changes') %}
+        {% call dense_table(table_class='max-sm:[&_thead]:sr-only max-sm:[&_tbody]:block max-sm:[&_tr]:block max-sm:[&_tr]:h-auto max-sm:[&_tr]:py-3 max-sm:[&_td]:block max-sm:[&_td]:py-0.5', columns=[('Proposal', '')], rows=review.owner_changes|length, caption='Owner changes') %}
         {% for item in review.owner_changes %}
         <tr class="h-12"><td class="px-2 align-middle text-xs">{{ item.user_email }} is named as code owner of {{ item.repository }}.</td></tr>
         {% endfor %}
