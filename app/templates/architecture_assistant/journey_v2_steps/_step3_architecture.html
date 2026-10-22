@@ -527,7 +527,7 @@
                 <div class="border-b border-border"
                      x-data="{ diagramReady: false, diagramError: false }"
                      x-init="(function(){
-                         function renderDiagram(val) {
+                         var renderDiagram = function(val) {
                              if (!val || !val.elements_by_layer) return;
                              $nextTick(function() {
                                  var container = document.getElementById('journey-arch-diagram');
@@ -557,7 +557,7 @@
                                      diagramError = true;
                                  }
                              });
-                         }
+                         };
                          $watch('architectureResult', renderDiagram);
                          if (architectureResult && architectureResult.elements_by_layer) renderDiagram(architectureResult);
                      })()">
@@ -569,8 +569,8 @@
                         <div id="journey-arch-diagram" class="w-full rounded-lg border border-border bg-background overflow-hidden" style="min-height:280px;"></div>
                         {# A render failure used to leave the "generate it first" hint on screen,
                            telling the user nothing had been generated when it had. #}
-                        <p x-show="!diagramReady && !diagramError" class="text-xs text-muted-foreground text-center py-8">Generate architecture to see the layered viewpoint diagram</p>
-                        <p x-show="diagramError" x-cloak class="text-xs text-destructive-emphasis text-center py-8">The architecture was generated, but this diagram could not be drawn. Open it in the Composer to view the model.</p>
+                        <p x-show="!diagramReady && !(diagramError && architectureResult && architectureResult.total > 0)" class="text-xs text-muted-foreground text-center py-8">Generate architecture to see the layered viewpoint diagram</p>
+                        <p x-show="diagramError && architectureResult && architectureResult.total > 0" x-cloak class="text-xs text-destructive-emphasis text-center py-8">The architecture was generated, but this diagram could not be drawn. Open it in the Composer to view the model.</p>
                     </div>
                 </div>
 
@@ -1006,7 +1006,7 @@
     </div>
 
     {# Generate button — only when no data exists yet #}
-    <div x-show="!architectureResult && reasoningLandscape.length === 0 && !architectureLoading && (acceptedCapabilities.length > 0 || domainsPopulated)" x-cloak>
+    <div x-show="(!architectureResult || !(architectureResult.total > 0)) && !architectureLoading && (acceptedCapabilities.length > 0 || domainsPopulated)" x-cloak data-testid="step3-generate">
         <button type="button" @click="generateArchitecture()"
                 :disabled="architectureLoading"
                 class="w-full inline-flex items-center justify-center gap-2 px-4 py-3 text-sm font-medium bg-primary text-primary-foreground rounded-xl hover:bg-primary/90 transition-colors disabled:opacity-50">
