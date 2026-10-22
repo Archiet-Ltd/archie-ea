@@ -20,7 +20,11 @@ from flask_login import current_user, login_required
 from app import db
 from app.decorators import audit_log
 from app.models.application_owner import ApplicationOwner
-from app.utils.tenant_users import user_in_org
+from app.services.element_ownership_service import (
+    CrossOrganisationElementOwner,
+    DuplicateElementOwner,
+    set_element_owner,
+)
 
 from . import unified_applications_bp
 from ._helpers import _verify_app_in_org
@@ -69,30 +73,26 @@ def add_owner(app_id: int):
             "error": f"ownership_type must be one of {ApplicationOwner.OWNERSHIP_TYPES}",
         }), 400
 
-    user = user_in_org(user_id, org_id)
-    if user is None:
+    try:
+        owner = set_element_owner(
+            element_type="application",
+            element_id=app_id,
+            user_id=user_id,
+            organization_id=org_id,
+            ownership_type=ownership_type,
+            assigned_by=current_user.id,
+            refuse_duplicate=True,
+        )
+    except CrossOrganisationElementOwner:
         return jsonify({
             "success": False,
             "error": "User not found in your organisation",
         }), 404
-
-    # Check for duplicate (same user + same type)
-    existing = _duplicate_owner(app_id, user.id, ownership_type, org_id)
-    if existing is not None:
+    except DuplicateElementOwner:
         return jsonify({
             "success": False,
             "error": f"User already assigned as {ownership_type} owner",
         }), 409
-
-    owner = ApplicationOwner(
-        application_id=app_id,
-        user_id=user.id,
-        assigned_by=current_user.id,
-        organization_id=org_id,
-        ownership_type=ownership_type,
-    )
-    db.session.add(owner)
-    db.session.commit()
 
     return jsonify({
         "success": True,
