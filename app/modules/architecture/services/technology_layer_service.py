@@ -31,6 +31,7 @@ from typing import Dict, List, Optional
 from app import db
 from app.models import ArchiMateElement, ArchiMateRelationship
 from app.services.llm_service import LLMService
+from app.models.archimate_element_types import is_application_kind
 
 
 class TechnologyLayerService:
@@ -114,7 +115,7 @@ class TechnologyLayerService:
             List of assignment relationships (Node assigned to ApplicationComponent)
         """
         app_component = db.session.get(ArchiMateElement, application_component_id)
-        if not app_component or app_component.type != "ApplicationComponent":
+        if not app_component or not is_application_kind(app_component.type):
             raise ValueError(f"ApplicationComponent {application_component_id} not found")
 
         relationships = []

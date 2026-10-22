@@ -43,11 +43,11 @@
     <div class="rounded-xl border-2 border-input bg-background p-6">
         <h2 class="text-xl font-semibold mb-6">Quick Actions</h2>
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <a href="{{ url_for('enterprise.data_models') }}" class="flex items-center gap-3 p-4 rounded-lg border-2 border-input bg-background hover:border-primary/50 hover:shadow-sm transition-all duration-200">
+            <a href="{{ url_for('enterprise.data_models') }}" class="flex items-center gap-3 p-4 rounded-lg border-2 border-input bg-background hover:border-primary/50 transition-all duration-200">
                 <i data-lucide="database" class="w-5 h-5 text-muted-foreground" aria-hidden="true"></i>
                 <span class="text-sm font-medium">View All Models</span>
             </a>
-            <a href="{{ url_for('data_architecture.data_lineage_view') }}" data-testid="data-architecture-lineage-link" class="flex items-center gap-3 p-4 rounded-lg border-2 border-input bg-background hover:border-primary/50 hover:shadow-sm transition-all duration-200">
+            <a href="{{ url_for('data_architecture.data_lineage_view') }}" data-testid="data-architecture-lineage-link" class="flex items-center gap-3 p-4 rounded-lg border-2 border-input bg-background hover:border-primary/50 transition-all duration-200">
                 <i data-lucide="git-merge" class="w-5 h-5 text-muted-foreground" aria-hidden="true"></i>
                 <span class="text-sm font-medium">Data Lineage</span>
             </a>
@@ -71,7 +71,7 @@
             </div>
         </div>
         <div class="overflow-x-auto">
-            <table class="w-full text-sm text-left">
+            <table class="dense-table w-full text-sm text-left">
                 <thead class="bg-muted/50 text-muted-foreground font-medium border-b border-input">
                     <tr>
                         <th class="px-6 py-4">Capability Area</th>
@@ -103,14 +103,14 @@
                         <td class="px-6 py-4">
                             <div class="flex items-center justify-center gap-1.5">
                                 {% for i in range(5) %}
-                                <div class="w-2 h-4 rounded-sm {% if i < item.maturity %}bg-primary shadow-sm{% else %}bg-muted{% endif %}"></div>
+                                <div class="w-2 h-4 rounded-sm {% if i < item.maturity %}bg-primary {% else %}bg-muted{% endif %}"></div>
                                 {% endfor %}
                                 <span class="ml-2 text-xs font-black text-primary">L{{ item.maturity }}</span>
                             </div>
                         </td>
                         <td class="px-6 py-4">
                             <div class="flex items-center justify-center gap-3">
-                                <div class="flex-1 max-w-[100px] h-2 bg-muted rounded-full overflow-hidden border border-border shadow-inner">
+                                <div class="flex-1 max-w-[100px] h-2 bg-muted rounded-full overflow-hidden border border-border">
                                     <div class="h-full bg-success rounded-full transition-all duration-700" style="width: {{ item.fit }}%"></div>
                                 </div>
                                 <span class="text-xs font-black text-success-emphasis tabular-nums">{{ item.fit }}%</span>

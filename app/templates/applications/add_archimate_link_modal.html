@@ -1,4 +1,4 @@
-{% from 'macros/shadcn_compat.html' import shadcn_select %}
+{% from 'components/form_field.html' import form_group, form_footer %}
 {% from 'components/modal_form.html' import modal_form %}
 
 {% call modal_form(
@@ -15,37 +15,39 @@
 <div class="space-y-4">
     <div>
         <label for="al-target" class="block text-sm font-medium mb-1.5">Target Element <span class="text-destructive-emphasis">*</span></label>
-        {% call shadcn_select('target_element_id', bare=true, id='al-target', class='h-9 w-full', attrs='required') %}
+        <select id="al-target" name="target_element_id" required
+                class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
             <option value="">Select an element...</option>
             {% for opt in archimate_form_config.element_options %}
             <option value="{{ opt.id }}">{{ opt.label }}</option>
             {% endfor %}
-        {% endcall %}
+        </select>
     </div>
 
     <div class="grid grid-cols-2 gap-4">
         <div>
             <label for="al-type" class="block text-sm font-medium mb-1.5">Relationship Type <span class="text-destructive-emphasis">*</span></label>
-            {% call shadcn_select('relationship_type', bare=true, id='al-type', class='h-9 w-full', attrs='required') %}
+            <select id="al-type" name="relationship_type" required
+                    class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
                 {% for val, label in archimate_form_config.relationship_types %}
                 <option value="{{ val }}">{{ label }}</option>
                 {% endfor %}
-            {% endcall %}
+            </select>
         </div>
         <div>
             <label for="al-direction" class="block text-sm font-medium mb-1.5">Direction</label>
-            {% call shadcn_select('relationship_direction', bare=true, id='al-direction', class='h-9 w-full') %}
+            <select id="al-direction" name="relationship_direction"
+                    class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
                 {% for val, label in archimate_form_config.direction_options %}
                 <option value="{{ val }}">{{ label }}</option>
                 {% endfor %}
-            {% endcall %}
+            </select>
         </div>
     </div>
 
-    <div>
-        <label for="al-context" class="block text-sm font-medium mb-1.5">Context</label>
+    {% call form_group(id='al-context', label='Context') %}
         <textarea id="al-context" name="relationship_context" rows="2" placeholder="Optional context for this relationship..."
-                  class="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"></textarea>
-    </div>
+                  class="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"></textarea>
+    {% endcall %}
 </div>
 {% endcall %}

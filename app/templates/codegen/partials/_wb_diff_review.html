@@ -10,7 +10,7 @@
   class="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
   @keydown.escape.window="close()"
 >
-  <div class="bg-[var(--color-surface)] rounded-xl shadow-2xl border border-[var(--color-border)] w-full max-w-4xl max-h-[90vh] flex flex-col mx-4">
+  <div class="bg-[var(--color-surface)] rounded-xl border border-[var(--color-border)] w-full max-w-4xl max-h-[90vh] flex flex-col mx-4">
     {# Header #}
     <div class="flex items-center justify-between px-5 py-3 border-b border-[var(--color-border)]">
       <div>
@@ -28,7 +28,7 @@
           :disabled="isApplying"
           x-text="isApplying ? 'Applying...' : `Accept All (${patches.length})`"
         ></button>
-        <button aria-label="Close diff review" type="button" @click="close()" class="text-[var(--color-muted)] hover:text-[var(--color-text)] p-1">
+        <button aria-label="Close diff review" type="button" @click="close()" class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
           <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
           </svg>

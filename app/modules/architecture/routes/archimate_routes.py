@@ -23,6 +23,7 @@ from flask_login import current_user, login_required
 from sqlalchemy.orm import joinedload
 
 from app import db
+from app.core.auth.decorators import require_permission
 from app.models.constants import ArchiMateRelationshipType
 from app.modules.architecture.routes.lucidchart_import_routes import (
     register_lucidchart_import_routes,
@@ -30,6 +31,7 @@ from app.modules.architecture.routes.lucidchart_import_routes import (
 from app.modules.architecture.services.archimate_xml_export_service import export_to_xml
 from app.utils.response_helpers import api_error, api_success
 from app.utils.pagination import MAX_PAGE_SIZE, safe_int_arg
+from app.models.archimate_element_types import StandardTypeTable
 
 archimate_bp = Blueprint("archimate", __name__, url_prefix="/archimate")
 register_lucidchart_import_routes(archimate_bp)
@@ -1191,12 +1193,39 @@ def composer_page():
             reaching this page-render route just means selectViewpoint's
             fetch will come back with that 400 and the composer will show the
             resulting error state rather than a silently unfiltered canvas.
+        element (int): Optional. Open this element's impact neighbourhood as an
+            unsaved view (focus mode). 404 when the element is missing or
+            belongs to another organisation. Ignored when viewpoint_id is set.
+        depth (int): Hops for focus mode, clamped to 1-5, default 3.
+        derived (0|1): Include worked-out connections in focus mode, default 1.
     """
     from app.services.archimate_viewpoint_service import get_available_viewpoints, get_viewpoint_counts
 
     solution_id = request.args.get("solution_id", type=int)
     viewpoint = request.args.get("viewpoint", "")
     initial_layer = request.args.get("layer", "")
+    # Focus mode: ?element=<id>&depth=<1-5>&derived=<0|1> opens that element's
+    # impact neighbourhood as an unsaved view. viewpoint_id wins, so existing
+    # saved-diagram links behave exactly as before.
+    focus = None
+    focus_element_id = request.args.get("element", type=int)
+    if focus_element_id is not None and not request.args.get("viewpoint_id"):
+        # Same fence as the impact endpoint: the tenant-isolation listener scopes
+        # this query, so a missing id and another organisation's id are both 404.
+        from app.models import ArchiMateElement  # noqa: PLC0415
+        centre = ArchiMateElement.query.filter_by(id=focus_element_id).first()
+        if centre is None:
+            abort(404)
+        focus_depth = request.args.get("depth", type=int)
+        focus_depth = 3 if focus_depth is None else max(1, min(5, focus_depth))
+        focus_derived = request.args.get("derived", "1").strip().lower() in ("1", "true")
+        focus = {
+            "element": centre.id,
+            "name": centre.name or f"Element #{centre.id}",
+            "depth": focus_depth,
+            "derived": focus_derived,
+        }
+
     solution_name = None
     if solution_id:
         # solution_id is an unvalidated query parameter, so the raw lookup must
@@ -1227,6 +1256,7 @@ def composer_page():
         viewpoint_counts=vp_counts,
         initial_viewpoint=viewpoint,
         initial_layer=initial_layer,
+        focus=focus,
     )
 
 
@@ -1458,8 +1488,24 @@ def api_list_relationships():
     })
 
 
+def _in_callers_organisation(*rows):
+    """True when every row belongs to the caller's active organisation.
+
+    Compared explicitly on the loaded rows: the ORM fence and row-level
+    security filter a fresh SELECT, not an identity-map hit from
+    ``Session.get``.
+    """
+    from app.core.auth.permissions import _matrix_org
+
+    org_id = _matrix_org(current_user, None)
+    return org_id is not None and all(
+        row is not None and row.organization_id == org_id for row in rows
+    )
+
+
 @archimate_bp.route("/api/relationships", methods=["POST"])
 @login_required
+@require_permission("create", "relationship")
 # CSRF: Protected via X-CSRFToken header sent by Platform.fetch
 def api_create_relationship():
     """Create a new ArchiMate relationship.
@@ -1498,6 +1544,8 @@ def api_create_relationship():
         return api_error(f"Source element {source_id} not found", 404)
     if not target_el:
         return api_error(f"Target element {target_id} not found", 404)
+    if not _in_callers_organisation(source_el, target_el):
+        return api_error("Element not found", 404)
 
     # The relationship-type list above is a spelling check only. Confirm the
     # metamodel actually allows this type between these two element types —
@@ -1572,6 +1620,7 @@ def api_create_relationship():
 
 @archimate_bp.route("/api/relationships/<int:rel_id>", methods=["PUT"])
 @login_required
+@require_permission("edit", "relationship")
 # CSRF: Protected via X-CSRFToken header sent by Platform.fetch
 def api_update_relationship(rel_id):
     """Update an existing ArchiMate relationship.
@@ -1583,8 +1632,16 @@ def api_update_relationship(rel_id):
     """
     from app.models.archimate_core import ArchiMateRelationship
 
+    from app.models.archimate_core import ArchiMateElement
+
     rel = db.session.get(ArchiMateRelationship, rel_id)
     if not rel:
+        return api_error("Relationship not found", 404)
+    if not _in_callers_organisation(
+        rel,
+        db.session.get(ArchiMateElement, rel.source_id),
+        db.session.get(ArchiMateElement, rel.target_id),
+    ):
         return api_error("Relationship not found", 404)
 
     data = request.get_json(silent=True) or {}
@@ -1634,13 +1691,20 @@ def api_update_relationship(rel_id):
 
 @archimate_bp.route("/api/relationships/<int:rel_id>", methods=["DELETE"])
 @login_required
+@require_permission("delete", "relationship")
 # CSRF: Protected via X-CSRFToken header sent by Platform.fetch
 def api_delete_relationship(rel_id):
     """Delete an ArchiMate relationship by ID."""
-    from app.models.archimate_core import ArchiMateRelationship
+    from app.models.archimate_core import ArchiMateElement, ArchiMateRelationship
 
     rel = db.session.get(ArchiMateRelationship, rel_id)
     if not rel:
+        return api_error("Relationship not found", 404)
+    if not _in_callers_organisation(
+        rel,
+        db.session.get(ArchiMateElement, rel.source_id),
+        db.session.get(ArchiMateElement, rel.target_id),
+    ):
         return api_error("Relationship not found", 404)
 
     db.session.delete(rel)
@@ -4368,7 +4432,7 @@ _LAYER_DISPLAY = {
 }
 
 # Business-friendly type names (avoid ArchiMate jargon)
-_BUSINESS_TYPE_NAMES = {
+_BUSINESS_TYPE_NAMES = StandardTypeTable({
     "BusinessActor": "person or team",
     "BusinessRole": "role",
     "BusinessProcess": "business process",
@@ -4404,7 +4468,7 @@ _BUSINESS_TYPE_NAMES = {
     "Deliverable": "deliverable",
     "Plateau": "plateau",
     "Gap": "gap",
-}
+})
 
 
 def _friendly_type(el_type, audience):
@@ -7094,6 +7158,7 @@ def api_composer_element_metrics():
 
 @archimate_bp.route("/api/import/oef", methods=["POST"])
 @login_required
+@require_permission("create", "relationship")
 def api_import_oef():
     """Import an OEF XML model and answer in the composer's shape.
 
@@ -7128,8 +7193,16 @@ def api_import_oef():
     else:
         strategy = request.form.get("strategy") or "skip_duplicates"
 
+    # The uploaded file name is the origin recorded on each row
+    source_label = None
+    for field in ("file", "oef_file"):
+        uploaded = request.files.get(field) if request.files else None
+        if uploaded is not None and uploaded.filename:
+            source_label = uploaded.filename
+            break
+
     try:
-        result = ArchiMateImportService().import_xml(content, strategy=strategy)
+        result = ArchiMateImportService().import_xml(content, strategy=strategy, source_label=source_label)
     except ImportRequestError as exc:
         return jsonify({"error": str(exc)}), exc.status_code
 

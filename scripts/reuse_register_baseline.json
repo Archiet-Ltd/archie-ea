@@ -7,6 +7,9 @@
   "ai-chat-approval/model-approve-call": {
    "app/modules/enterprise_genome/services/ai_system_grounding.py": 2
   },
+  "archimate-drawing-engine/second-archimate-renderer": {
+   "app/static/js/archimate_diagram_renderer.js": 1
+  },
   "archimate-element-writer/element-construction": {
    "app/api/archimate_generation_routes.py": 1,
    "app/application_mgmt/archimate_routes.py": 1,
@@ -189,7 +192,6 @@
    "app/utils/tracing.py": 1
   },
   "entity-matching/name-matcher": {
-   "app/commands/backfill_application_owners.py": 1,
    "app/commands/backfill_capability_catalogs.py": 1,
    "app/modules/capabilities/services/business_capability_mapper.py": 1,
    "app/modules/solutions_strategic/v2/services/solution_ai_orchestrator.py": 1,

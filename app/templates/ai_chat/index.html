@@ -1,4 +1,5 @@
 {% extends 'layouts/admin_base.html' %}
+{% from 'components/form_field.html' import form_group, form_footer %}
 {% block title %}AI Assistant{% endblock %}
 
 {% block extra_css %}
@@ -125,7 +126,7 @@
 
 {% block content %}
 {% if chat_bootstrap_error %}
-<div class="mx-4 mt-4 rounded-lg border border-warning/30 bg-warning/10 px-4 py-3 text-sm text-warning-emphasis" role="alert">
+<div class="mx-4 mt-4 rounded-md border border-warning/40 bg-warning/10 px-4 py-2 text-sm text-warning-emphasis" role="alert">
     <div class="flex items-start gap-2">
         <i data-lucide="alert-triangle" class="mt-0.5 h-4 w-4 shrink-0 text-warning-emphasis" aria-hidden="true"></i>
         <span>{{ chat_bootstrap_error }}</span>
@@ -136,7 +137,7 @@
 {% if not llm_configured %}
 <div class="flex flex-wrap items-center gap-x-2 gap-y-1 bg-warning/10 border-b border-warning/30 px-4 py-2 text-sm text-warning-emphasis"
      role="alert">
-        <i data-lucide="alert-triangle" class="h-4 w-4 shrink-0 text-layer-strategy-emphasis" aria-hidden="true"></i><!-- token-migration-ok -->
+        <i data-lucide="alert-triangle" class="h-4 w-4 shrink-0 text-amber-600" aria-hidden="true"></i><!-- token-migration-ok -->
         {# The banner named the fault and stopped there. It is the earliest and
            most visible surface for "the AI cannot answer", so it is also the
            right place to say what closes it — otherwise every archetype reads
@@ -183,7 +184,7 @@
              class="flex items-center justify-between gap-3">
             <!-- Left: mobile rail toggle + merged assistant/scope control -->
             <div class="flex items-center gap-2 min-w-0 flex-1">
-                <button type="button" id="sidebar-toggle" @click="toggleSidebar()" aria-label="Toggle context panel" class="lg:hidden shrink-0 inline-flex h-9 w-9 items-center justify-center rounded-md border border-input bg-background hover:bg-accent transition-colors">
+                <button type="button" id="sidebar-toggle" @click="toggleSidebar()" aria-label="Toggle context panel" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 w-9 p-0 lg:hidden shrink-0 w-9 items-center justify-center">
                     <i data-lucide="panel-left" class="h-4 w-4" aria-hidden="true"></i>
                 </button>
 
@@ -196,7 +197,7 @@
                     <div class="relative min-w-[150px] max-w-[240px]">
                         <label for="persona-selector" class="sr-only">Assistant</label>
                         <select id="persona-selector" aria-label="Assistant"
-                            class="h-9 w-full appearance-none rounded-lg border border-input bg-background pl-3 pr-8 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring font-medium">
+                            class="h-9 w-full appearance-none rounded-md border border-input bg-background pl-3 pr-8 py-1 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring font-medium">
                             {% set persona_category_labels = {
                                 'architects': 'AI Architects (governed, live data)',
                                 'governance': 'Governance',
@@ -225,7 +226,7 @@
                     <div class="relative min-w-[140px] max-w-[220px]">
                         <label for="domain-selector" class="sr-only">Looking at</label>
                         <select id="domain-selector" aria-label="Looking at"
-                            class="h-9 w-full appearance-none rounded-lg border border-input bg-background pl-3 pr-8 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                            class="h-9 w-full appearance-none rounded-md border border-input bg-background pl-3 pr-8 py-1 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                             <option value="general">Whole portfolio</option>
                             <option value="architecture">Architecture</option>
                             <option value="data_architecture">Data architecture</option>
@@ -256,7 +257,7 @@
                 <div class="relative">
                     <button type="button" @click="showAdvanced = !showAdvanced" :aria-expanded="showAdvanced.toString()" aria-haspopup="true"
                         :class="showAdvanced ? 'bg-accent border-primary/40' : ''"
-                        class="inline-flex h-9 items-center gap-1.5 rounded-md border border-input bg-background px-2.5 hover:bg-accent transition-colors text-sm"
+                        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center"
                         title="Role, model settings" aria-label="Toggle advanced settings">
                         <i data-lucide="sliders-horizontal" class="h-4 w-4" aria-hidden="true"></i>
                         <span class="hidden lg:inline">Settings</span>
@@ -265,7 +266,7 @@
 
                     <div x-show="showAdvanced" x-cloak @click.outside="showAdvanced = false"
                          x-transition:enter="transition ease-out duration-150" x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100"
-                         class="absolute right-0 mt-2 w-64 rounded-md border border-border bg-popover shadow-lg z-50 p-3" role="menu">
+                         class="absolute right-0 mt-2 w-64 rounded-md border border-border bg-popover z-50 p-3" role="menu">
                         {# ARCH-045: a control that offers exactly one, empty choice looks
                            stubbed rather than governed. Hidden by default and only
                            revealed by loadAvailableModels() (app.js) once /ai-chat/models
@@ -277,7 +278,7 @@
                             <label for="model-selector" class="text-xs font-medium text-muted-foreground block mb-1.5">AI model</label>
                             <div class="relative">
                                 <select id="model-selector" aria-label="AI model"
-                                    class="h-9 w-full appearance-none rounded-lg border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring font-medium">
+                                    class="h-9 w-full appearance-none rounded-md border border-input bg-background px-3 py-1 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring font-medium">
                                     <option value="">Auto-Select Model</option>
                                 </select>
                                 <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
@@ -294,13 +295,13 @@
                 <!-- Overflow menu: Docs / Match / Export / Approvals -->
                 <div class="relative" data-testid="chat-overflow-menu">
                     <button type="button" @click="menuOpen = !menuOpen" :aria-expanded="menuOpen.toString()" aria-haspopup="true" aria-label="More actions" title="More actions"
-                        class="inline-flex h-9 w-9 items-center justify-center rounded-md border border-input bg-background hover:bg-accent transition-colors">
+                        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 w-9 p-0 w-9 items-center justify-center">
                         <i data-lucide="more-horizontal" class="h-4 w-4" aria-hidden="true"></i>
                     </button>
 
                     <div x-show="menuOpen" x-cloak @click.outside="menuOpen = false"
                          x-transition:enter="transition ease-out duration-150" x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100"
-                         class="absolute right-0 mt-2 w-56 rounded-md border border-border bg-popover shadow-lg z-50" role="menu">
+                         class="absolute right-0 mt-2 w-56 rounded-md border border-border bg-popover z-50" role="menu">
                         <div class="p-1">
                             <button type="button" @click="toggleDocumentUploadPanel(); menuOpen = false" role="menuitem"
                                 class="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent transition-colors" title="Upload documents — auto-create ArchiMate elements">
@@ -346,7 +347,7 @@
                                     </span>
                                     <span x-show="pendingCount > 0" x-cloak
                                           x-text="pendingCount"
-                                          class="inline-flex items-center justify-center px-1.5 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-primary border border-primary/30"></span>
+                                          class="inline-flex items-center justify-center px-1.5 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-info-emphasis border border-primary/30"></span>
                                 </button>
                             </div>
 
@@ -371,9 +372,9 @@
              :class="railOpen ? 'w-72 lg:w-80' : 'w-72 lg:w-0 lg:overflow-hidden lg:border-r-0'"
              :aria-hidden="(!railOpen).toString()"
              :inert="!railOpen"
-             class="absolute lg:relative inset-y-0 left-0 z-40 border-r bg-muted/30 flex flex-col transform -translate-x-full lg:translate-x-0 transition-all duration-200 ease-in-out shadow-lg lg:shadow-none max-h-full overflow-hidden">
+             class="absolute lg:relative inset-y-0 left-0 z-40 border-r bg-muted/30 flex flex-col transform -translate-x-full lg:translate-x-0 transition-all duration-200 ease-in-out max-h-full overflow-hidden">
             {# Mobile Close Button #}
-            <button type="button" @click="toggleSidebar()" aria-label="Close sidebar" class="lg:hidden absolute top-2 right-2 h-8 w-8 flex items-center justify-center rounded-md hover:bg-accent z-50">
+            <button type="button" @click="toggleSidebar()" aria-label="Close sidebar" class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring lg:hidden absolute top-2 right-2 z-50">
                 <i data-lucide="x" class="h-4 w-4" aria-hidden="true"></i>
             </button>
             {# Sidebar Tabs #}
@@ -431,32 +432,31 @@
 
                 <div class="flex-1 overflow-y-auto p-4 space-y-4 min-h-0" tabindex="0">
                     {# Query Input #}
-                    <div class="relative">
-                        <label for="nl-query-input" class="sr-only">Natural language query</label>
+                    {% call form_group(id='nl-query-input', label='Natural language query', class='relative') %}
                         <input type="text" id="nl-query-input"
                             placeholder="e.g., Show apps without owner..."
-                            class="w-full h-9 px-3 py-2 pr-10 text-sm border rounded-lg bg-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                            class="w-full h-9 px-3 py-2 pr-10 text-sm border rounded-md bg-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                             >
                         <button type="button" @click="executeNLQuery()" aria-label="Execute query"
                             class="absolute right-1 top-1 h-7 px-2 bg-primary text-primary-foreground rounded text-xs">
                             <i data-lucide="play" class="h-3 w-3" aria-hidden="true"></i>
                         </button>
-                    </div>
+                    {% endcall %}
 
                     {# Example Queries #}
                     <div class="space-y-2">
                         <p class="text-xs font-medium text-muted-foreground">Quick queries:</p>
                         <div class="flex flex-wrap gap-1">
-                            <button type="button" class="quick-query-btn inline-flex items-center gap-1 rounded-md border border-input bg-background px-3 py-1 text-xs hover:bg-accent" data-quick-query="Show all applications without an assigned owner" aria-label="Quick query: Apps without owner">Apps without owner</button>
-                            <button type="button" class="quick-query-btn inline-flex items-center gap-1 rounded-md border border-input bg-background px-3 py-1 text-xs hover:bg-accent" data-quick-query="List capabilities with maturity below 3" aria-label="Quick query: Low maturity caps">Low maturity caps</button>
-                            <button type="button" class="quick-query-btn inline-flex items-center gap-1 rounded-md border border-input bg-background px-3 py-1 text-xs hover:bg-accent" data-quick-query="Show vendors with contracts expiring in the next 90 days" aria-label="Quick query: Expiring vendors">Expiring vendors</button>
-                            <button type="button" class="quick-query-btn inline-flex items-center gap-1 rounded-md border border-input bg-background px-3 py-1 text-xs hover:bg-accent" data-quick-query="List applications with risk score above 70" aria-label="Quick query: High-risk apps">High-risk apps</button>
-                            <button type="button" class="quick-query-btn inline-flex items-center gap-1 rounded-md border border-input bg-background px-3 py-1 text-xs hover:bg-accent" data-quick-query="Create a new business capability" aria-label="Quick query: Create capability">Create capability</button>
-                            <button type="button" class="quick-query-btn inline-flex items-center gap-1 rounded-md border border-input bg-background px-3 py-1 text-xs hover:bg-accent" data-quick-query="/map-apqc" aria-label="Quick query: Map APQC framework">Map APQC framework</button>
+                            <button type="button" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center" data-quick-query="Show all applications without an assigned owner" aria-label="Quick query: Apps without owner">Apps without owner</button>
+                            <button type="button" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center" data-quick-query="List capabilities with maturity below 3" aria-label="Quick query: Low maturity caps">Low maturity caps</button>
+                            <button type="button" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center" data-quick-query="Show vendors with contracts expiring in the next 90 days" aria-label="Quick query: Expiring vendors">Expiring vendors</button>
+                            <button type="button" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center" data-quick-query="List applications with risk score above 70" aria-label="Quick query: High-risk apps">High-risk apps</button>
+                            <button type="button" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center" data-quick-query="Create a new business capability" aria-label="Quick query: Create capability">Create capability</button>
+                            <button type="button" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center" data-quick-query="/map-apqc" aria-label="Quick query: Map APQC framework">Map APQC framework</button>
                         </div>
                     </div>
                     <div class="mt-3 pt-3 border-t border-border">
-                        <button type="button" id="ai-chat-create-solution-btn" class="w-full inline-flex items-center justify-center gap-2 rounded-md border border-primary bg-primary/10 px-3 py-2 text-sm font-medium text-primary hover:bg-primary/20 transition-colors" aria-label="Create a new solution from a brief">
+                        <button type="button" id="ai-chat-create-solution-btn" class="w-full inline-flex items-center justify-center gap-2 rounded-md border border-primary bg-primary/10 px-3 py-2 text-sm font-medium text-info-emphasis hover:bg-primary/20 transition-colors" aria-label="Create a new solution from a brief">
                             <i data-lucide="plus-circle" class="h-4 w-4" aria-hidden="true"></i>
                             Create solution from brief
                         </button>
@@ -554,7 +554,7 @@
            The bare role="dialog" is also dropped: an element with that role and
            no accessible name is an aria-dialog-name violation once visible, and
            this element is decorative — the sidebar it reveals carries the meaning. #}
-        <div id="sidebar-backdrop" @click="toggleSidebar()" class="hidden modal-root lg:hidden fixed inset-0 bg-black/50 overflow-y-auto z-30"></div>
+        <div id="sidebar-backdrop" @click="toggleSidebar()" class="hidden modal-root lg:hidden fixed inset-0 overflow-y-auto z-30 bg-overlay/50"></div>
 
         <!-- Chat Message Area -->
         <div class="flex-1 flex flex-col min-w-0">
@@ -564,7 +564,7 @@
                 <!-- Domain Selection Welcome Grid — hidden after first user message -->
                 <div id="domain-welcome-grid" class="max-w-3xl mx-auto py-8 space-y-8" x-data="{ showMoreSuggestions: false }">
                     <div class="text-center space-y-3">
-                        <div class="inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-primary to-primary/70 text-primary-foreground shadow-lg">
+                        <div class="inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-primary to-primary/70 text-primary-foreground">
                             <i data-lucide="bot" class="h-7 w-7" aria-hidden="true"></i>
                         </div>
                         <h2 class="mt-4 text-2xl font-bold text-foreground tracking-tight">How can I help you today?</h2>
@@ -584,7 +584,7 @@
                        on a live portfolio should not open by asking the user to
                        supply the agenda. Populated by panels.js; every state it
                        can be in is designed, including the failed one. #}
-                    <div id="portfolio-briefing" class="rounded-xl border border-border bg-card p-4" aria-live="polite" aria-busy="true">
+                    <div id="portfolio-briefing" class="rounded-lg border border-border bg-card p-4" aria-live="polite" aria-busy="true">
                         <div class="flex items-center gap-2 text-xs text-muted-foreground">
                             <i data-lucide="loader-2" class="h-3.5 w-3.5 animate-spin" aria-hidden="true"></i>
                             Reading your portfolio…
@@ -625,8 +625,8 @@
                         <div class="grid grid-cols-[repeat(auto-fill,minmax(240px,1fr))] gap-3">
                             <button type="button" data-persona="enterprise_architect"
                                     data-prompt="Give me a portfolio health verdict — rationalization picture, capability coverage, and any transformation programme that's drifting."
-                                    class="architect-card group flex flex-col p-4 bg-card border border-border rounded-xl text-left hover:border-primary hover:shadow-md transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                                <span class="w-9 h-9 bg-primary/10 rounded-lg flex items-center justify-center text-primary mb-2.5 group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
+                                    class="architect-card group flex flex-col p-4 bg-card border border-border rounded-xl text-left hover:border-primary transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                                <span class="w-9 h-9 bg-primary/10 rounded-lg flex items-center justify-center text-info-emphasis mb-2.5 group-hover:bg-primary group-hover:text-info-emphasis-foreground transition-colors">
                                     <i data-lucide="building-2" class="h-5 w-5"></i>
                                 </span>
                                 <h3 class="text-sm font-semibold text-foreground">AI Enterprise Architect</h3>
@@ -634,8 +634,8 @@
                             </button>
                             <button type="button" data-persona="solutions_architect"
                                     data-prompt="Help me design a solution — give me 2–3 options with cost/risk trade-offs and what the ARB will ask for."
-                                    class="architect-card group flex flex-col p-4 bg-card border border-border rounded-xl text-left hover:border-primary hover:shadow-md transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                                <span class="w-9 h-9 bg-primary/10 rounded-lg flex items-center justify-center text-primary mb-2.5 group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
+                                    class="architect-card group flex flex-col p-4 bg-card border border-border rounded-xl text-left hover:border-primary transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                                <span class="w-9 h-9 bg-primary/10 rounded-lg flex items-center justify-center text-info-emphasis mb-2.5 group-hover:bg-primary group-hover:text-info-emphasis-foreground transition-colors">
                                     <i data-lucide="puzzle" class="h-5 w-5"></i>
                                 </span>
                                 <h3 class="text-sm font-semibold text-foreground">AI Solution Architect</h3>
@@ -643,8 +643,8 @@
                             </button>
                             <button type="button" data-persona="technology_architect"
                                     data-prompt="Review my integration patterns and technology layer for conformance — flag any blocked patterns or single points of failure."
-                                    class="architect-card group flex flex-col p-4 bg-card border border-border rounded-xl text-left hover:border-primary hover:shadow-md transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                                <span class="w-9 h-9 bg-primary/10 rounded-lg flex items-center justify-center text-primary mb-2.5 group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
+                                    class="architect-card group flex flex-col p-4 bg-card border border-border rounded-xl text-left hover:border-primary transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                                <span class="w-9 h-9 bg-primary/10 rounded-lg flex items-center justify-center text-info-emphasis mb-2.5 group-hover:bg-primary group-hover:text-info-emphasis-foreground transition-colors">
                                     <i data-lucide="server-cog" class="h-5 w-5"></i>
                                 </span>
                                 <h3 class="text-sm font-semibold text-foreground">AI Technical Architect</h3>
@@ -652,8 +652,8 @@
                             </button>
                             <button type="button" data-persona="data_architect"
                                     data-prompt="Review my data layer — canonical entities, data-classification coverage, and lineage gaps. Where are the PII risks?"
-                                    class="architect-card group flex flex-col p-4 bg-card border border-border rounded-xl text-left hover:border-primary hover:shadow-md transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                                <span class="w-9 h-9 bg-primary/10 rounded-lg flex items-center justify-center text-primary mb-2.5 group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
+                                    class="architect-card group flex flex-col p-4 bg-card border border-border rounded-xl text-left hover:border-primary transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                                <span class="w-9 h-9 bg-primary/10 rounded-lg flex items-center justify-center text-info-emphasis mb-2.5 group-hover:bg-primary group-hover:text-info-emphasis-foreground transition-colors">
                                     <i data-lucide="database" class="h-5 w-5"></i>
                                 </span>
                                 <h3 class="text-sm font-semibold text-foreground">AI Data Architect</h3>
@@ -661,8 +661,8 @@
                             </button>
                             <button type="button" data-persona="business_architect"
                                     data-prompt="Map my strategy to capabilities — which capabilities are most critical, where are the maturity gaps, and how do value streams depend on them?"
-                                    class="architect-card group flex flex-col p-4 bg-card border border-border rounded-xl text-left hover:border-primary hover:shadow-md transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                                <span class="w-9 h-9 bg-primary/10 rounded-lg flex items-center justify-center text-primary mb-2.5 group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
+                                    class="architect-card group flex flex-col p-4 bg-card border border-border rounded-xl text-left hover:border-primary transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                                <span class="w-9 h-9 bg-primary/10 rounded-lg flex items-center justify-center text-info-emphasis mb-2.5 group-hover:bg-primary group-hover:text-info-emphasis-foreground transition-colors">
                                     <i data-lucide="briefcase" class="h-5 w-5"></i>
                                 </span>
                                 <h3 class="text-sm font-semibold text-foreground">AI Business Architect</h3>
@@ -689,7 +689,7 @@
                     <div class="grid grid-cols-[repeat(auto-fill,minmax(240px,1fr))] gap-3">
                         <!-- Architecture -->
                         <button type="button" data-domain="architecture" data-prompt="Analyze my application architecture and suggest ArchiMate improvements"
-                            class="domain-card group flex flex-col p-4 bg-card border border-border rounded-xl text-left hover:border-primary hover:shadow-md transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"><!-- token-migration-ok -->
+                            class="domain-card group flex flex-col p-4 bg-card border border-border rounded-xl text-left hover:border-primary transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"><!-- token-migration-ok -->
                             <div class="w-9 h-9 bg-primary/5 rounded-lg flex items-center justify-center text-primary mb-2.5 group-hover:bg-primary group-hover:text-primary-foreground transition-colors"><!-- token-migration-ok -->
                                 <i data-lucide="layers" class="h-5 w-5" aria-hidden="true"></i>
                             </div>
@@ -698,8 +698,8 @@
                         </button>
                         <!-- Technology -->
                         <button type="button" data-domain="technology" data-prompt="Review my tech stack and identify lifecycle risks"
-                            class="domain-card group flex flex-col p-4 bg-card border border-border rounded-xl text-left hover:border-layer-business hover:shadow-md transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"><!-- design-tokens-ok: domain-card legend, 6 distinct hues > available semantic tokens -->
-                            <div class="w-9 h-9 bg-layer-business/10 rounded-lg flex items-center justify-center text-layer-business-emphasis mb-2.5 group-hover:bg-layer-business group-hover:text-primary-foreground transition-colors"><!-- token-migration-ok -->
+                            class="domain-card group flex flex-col p-4 bg-card border border-border rounded-xl text-left hover:border-emerald-500 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"><!-- design-tokens-ok: domain-card legend, 6 distinct hues > available semantic tokens -->
+                            <div class="w-9 h-9 bg-emerald-50 rounded-lg flex items-center justify-center text-emerald-600 mb-2.5 group-hover:bg-emerald-500 group-hover:text-primary-foreground transition-colors"><!-- token-migration-ok -->
                                 <i data-lucide="cpu" class="h-5 w-5" aria-hidden="true"></i>
                             </div>
                             <h3 class="text-sm font-semibold text-foreground">Technology</h3>
@@ -707,7 +707,7 @@
                         </button>
                         <!-- Capabilities -->
                         <button type="button" data-domain="business_capability" data-prompt="Map my business capabilities and identify strategic gaps"
-                            class="domain-card group flex flex-col p-4 bg-card border border-border rounded-xl text-left hover:border-purple-500 hover:shadow-md transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"><!-- design-tokens-ok: domain-card legend, 6 distinct hues > available semantic tokens -->
+                            class="domain-card group flex flex-col p-4 bg-card border border-border rounded-xl text-left hover:border-purple-500 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"><!-- design-tokens-ok: domain-card legend, 6 distinct hues > available semantic tokens -->
                             <div class="w-9 h-9 bg-purple-50 rounded-lg flex items-center justify-center text-primary mb-2.5 group-hover:bg-primary group-hover:text-primary-foreground transition-colors"><!-- token-migration-ok -->
                                 <i data-lucide="building-2" class="h-5 w-5" aria-hidden="true"></i>
                             </div>
@@ -724,7 +724,7 @@
                          class="grid grid-cols-[repeat(auto-fill,minmax(240px,1fr))] gap-3">
                         <!-- Gap Analysis -->
                         <button type="button" data-domain="gap_analysis" data-prompt="Identify gaps in my current architecture roadmap"
-                            class="domain-card group flex flex-col p-4 bg-card border border-border rounded-xl text-left hover:border-orange-500 hover:shadow-md transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"><!-- design-tokens-ok: domain-card legend, 6 distinct hues > available semantic tokens -->
+                            class="domain-card group flex flex-col p-4 bg-card border border-border rounded-xl text-left hover:border-orange-500 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"><!-- design-tokens-ok: domain-card legend, 6 distinct hues > available semantic tokens -->
                             <div class="w-9 h-9 bg-orange-50 rounded-lg flex items-center justify-center text-orange-600 mb-2.5 group-hover:bg-orange-500 group-hover:text-primary-foreground transition-colors"><!-- token-migration-ok -->
                                 <i data-lucide="git-branch" class="h-5 w-5" aria-hidden="true"></i>
                             </div>
@@ -733,7 +733,7 @@
                         </button>
                         <!-- Vendors -->
                         <button type="button" data-domain="vendor_intelligence" data-prompt="Analyze my vendor contracts and identify supplier risks"
-                            class="domain-card group flex flex-col p-4 bg-card border border-border rounded-xl text-left hover:border-cyan-500 hover:shadow-md transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"><!-- design-tokens-ok: domain-card legend, 6 distinct hues > available semantic tokens -->
+                            class="domain-card group flex flex-col p-4 bg-card border border-border rounded-xl text-left hover:border-cyan-500 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"><!-- design-tokens-ok: domain-card legend, 6 distinct hues > available semantic tokens -->
                             <div class="w-9 h-9 bg-cyan-50 rounded-lg flex items-center justify-center text-cyan-600 mb-2.5 group-hover:bg-cyan-500 group-hover:text-primary-foreground transition-colors"><!-- token-migration-ok -->
                                 <i data-lucide="briefcase" class="h-5 w-5" aria-hidden="true"></i>
                             </div>
@@ -742,8 +742,8 @@
                         </button>
                         <!-- Smart Search -->
                         <button type="button" data-domain="smart_search" data-prompt="Search across my entire enterprise portfolio"
-                            class="domain-card group flex flex-col p-4 bg-primary/5 border border-primary/20 rounded-xl text-left hover:bg-primary hover:border-primary hover:shadow-md transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                            <div class="w-9 h-9 bg-primary/10 rounded-lg flex items-center justify-center text-primary mb-2.5 group-hover:bg-background/20 group-hover:text-primary-foreground transition-colors"><!-- token-migration-ok -->
+                            class="domain-card group flex flex-col p-4 bg-primary/5 border border-primary/20 rounded-xl text-left hover:bg-primary hover:border-primary transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                            <div class="w-9 h-9 bg-primary/10 rounded-lg flex items-center justify-center text-info-emphasis mb-2.5 group-hover:bg-background/20 group-hover:text-info-emphasis-foreground transition-colors"><!-- token-migration-ok -->
                                 <i data-lucide="sparkles" class="h-5 w-5" aria-hidden="true"></i>
                             </div>
                             <h3 class="text-sm font-semibold text-foreground group-hover:text-primary-foreground">Smart Search</h3><!-- token-migration-ok -->
@@ -812,7 +812,7 @@
                                 placeholder="Ask me about architecture, capabilities, gaps, or vendor analysis..."
                                  aria-label="Ask me about architecture, capabilities, gaps, or vendor analysis..."></textarea>
                                 <button type="submit" id="send-btn"
-                                    class="absolute bottom-2.5 right-2.5 inline-flex h-9 w-9 items-center justify-center rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50 shadow-sm"
+                                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 w-9 p-0 absolute bottom-2.5 right-2.5 w-9 items-center justify-center"
                                     aria-label="Send message" title="Send message">
                                     <i data-lucide="send" class="h-4 w-4" aria-hidden="true"></i>
                                 </button>
@@ -827,7 +827,7 @@
                             <button
                                 type="button"
                                 @click="toggleDocumentUploadPanel()"
-                                class="inline-flex h-10 w-10 items-center justify-center rounded-md bg-primary/10 hover:bg-primary/20 text-primary transition-colors"
+                                class="inline-flex h-10 w-10 items-center justify-center rounded-md bg-primary/10 hover:bg-primary/20 text-info-emphasis transition-colors"
                                 aria-label="Upload document" title="Upload document for AI analysis and auto-create ArchiMate elements"
                             >
                                 <i data-lucide="upload-cloud" class="h-4 w-4" aria-hidden="true"></i>
@@ -842,7 +842,7 @@
             </div>
 
             <!-- Floating Document Upload Panel - Positioned outside input area -->
-            <div id="document-upload-panel" class="hidden fixed bottom-24 right-6 w-[420px] max-h-[600px] overflow-y-auto bg-background border rounded-lg shadow-xl z-50 p-4">
+            <div id="document-upload-panel" class="hidden fixed bottom-24 right-6 w-[420px] max-h-[600px] overflow-y-auto bg-background border rounded-lg z-50 p-4">
                 {# `with context` is load-bearing, not decoration. Jinja's `from ...
                    import` does NOT pass the caller's context, so csp_nonce — a
                    context-processor variable — was undefined inside the macro. The
@@ -926,20 +926,18 @@
 </div>
 
 {# Create Solution Modal — MUST be outside overflow-hidden containers (CLAUDE.md rule) #}
-<div id="ai-chat-create-solution-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/50" role="dialog" aria-modal="true" aria-labelledby="ai-chat-create-solution-heading">
-    <div class="w-full max-w-lg rounded-xl bg-background p-6 shadow-xl mx-4">
+<div id="ai-chat-create-solution-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-overlay/50" role="dialog" aria-modal="true" aria-labelledby="ai-chat-create-solution-heading">
+    <div class="w-full max-w-lg rounded-lg bg-background p-6 mx-4 border border-border">
         <h2 id="ai-chat-create-solution-heading" class="text-lg font-semibold mb-4">Create solution from brief</h2>
         <form id="ai-chat-create-solution-form">
-            <div class="mb-4">
-                <label for="ai-chat-solution-title" class="block text-sm font-medium mb-1">Solution title</label>
-                <input id="ai-chat-solution-title" type="text" class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm" placeholder="e.g. Modernise Customer Portal" required>
-            </div>
-            <div class="mb-4">
-                <label for="ai-chat-solution-brief" class="block text-sm font-medium mb-1">Brief (problem, current state, goals)</label>
+            {% call form_group(id='ai-chat-solution-title', label='Solution title', class='mb-4') %}
+                <input id="ai-chat-solution-title" type="text" class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm" placeholder="e.g. Modernise Customer Portal" required>
+            {% endcall %}
+            {% call form_group(id='ai-chat-solution-brief', label='Brief (problem, current state, goals)', class='mb-4') %}
                 <textarea id="ai-chat-solution-brief" rows="4" class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm" placeholder="Describe the problem, current state, budget, and timeline..." required></textarea>
-            </div>
+            {% endcall %}
             <div class="flex justify-end gap-2">
-                <button type="button" id="ai-chat-create-solution-cancel" class="rounded-md border border-input px-4 py-2 text-sm" aria-label="Cancel">Cancel</button>
+                <button type="button" id="ai-chat-create-solution-cancel" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4" aria-label="Cancel">Cancel</button>
                 <button type="submit" id="ai-chat-create-solution-submit" class="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90" aria-label="Create solution and generate draft">Create solution</button>
             </div>
         </form>
@@ -960,7 +958,7 @@
          aria-modal="true"
          aria-label="Approvals for review">
         <!-- Backdrop -->
-        <div class="absolute inset-0 bg-black/50" data-modal-close="ai-chat-approvals-modal"></div>
+        <div class="absolute inset-0 bg-overlay/50" data-modal-close="ai-chat-approvals-modal"></div>
         <!-- Panel — no @click.stop: the backdrop is a separate sibling element
              (not an ancestor of the panel), so a click inside the panel would
              never hit the backdrop's own data-modal-close handler regardless.
@@ -971,12 +969,12 @@
              only ways to dismiss the modal were Escape or a backdrop click.
              Invisible until the modal itself became reachable (see the
              CRITICAL fix moving this modal out of the overflow dropdown). -->
-        <div class="relative w-full max-w-lg max-h-[80vh] mx-4 rounded-lg border border-border bg-background shadow-lg flex flex-col">
+        <div class="relative w-full max-w-lg max-h-[80vh] mx-4 rounded-lg border border-border bg-background flex flex-col">
             <!-- Header -->
             <div class="flex items-center justify-between px-6 py-4 border-b border-border shrink-0">
                 <h2 class="text-lg font-semibold text-foreground">Approvals for review</h2>
                 <button type="button" data-modal-close="ai-chat-approvals-modal" aria-label="Close modal"
-                    class="inline-flex h-8 w-8 items-center justify-center rounded-md hover:bg-accent transition-colors text-muted-foreground">
+                    class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                     <i data-lucide="x" class="h-4 w-4" aria-hidden="true"></i>
                 </button>
             </div>
@@ -993,7 +991,7 @@
                      class="rounded-md bg-destructive/10 border border-destructive/30 px-3 py-2 text-sm text-destructive-emphasis flex items-center justify-between gap-3">
                     <span x-text="$store.approvals.error"></span>
                     <button type="button" @click="$store.approvals.fetchPending()" aria-label="Retry approval queue"
-                            class="inline-flex h-8 items-center justify-center rounded-md border border-destructive/30 bg-background px-3 text-xs font-medium text-foreground hover:bg-accent disabled:opacity-50 disabled:pointer-events-none">
+                            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
                         Retry
                     </button>
                 </div>
@@ -1064,11 +1062,11 @@
                                 <div class="flex gap-2">
                                     <button type="button" @click="$store.approvals.confirmReject(item.id)"
                                             :class="$store.approvals.busyIds[item.id] ? 'opacity-50 pointer-events-none' : ''"
-                                            class="inline-flex items-center gap-1 rounded-md bg-destructive px-3 py-1.5 text-xs font-medium text-destructive-foreground hover:bg-destructive/90 transition-colors disabled:opacity-50">
+                                            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-destructive text-destructive-foreground text-sm font-semibold transition-colors hover:bg-destructive/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                                         Confirm Reject
                                     </button>
                                     <button type="button" @click="$store.approvals.cancelReject()"
-                                            class="inline-flex items-center gap-1 rounded-md border border-input bg-background px-3 py-1.5 text-xs font-medium hover:bg-accent transition-colors">
+                                            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                                         Cancel
                                     </button>
                                 </div>
@@ -1098,7 +1096,7 @@
             <!-- Footer -->
             <div class="px-6 py-3 border-t border-border shrink-0 flex justify-end">
                 <button type="button" data-modal-close="ai-chat-approvals-modal"
-                    class="inline-flex items-center rounded-md border border-input bg-background px-4 py-2 text-sm font-medium hover:bg-accent transition-colors">
+                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                     Close
                 </button>
             </div>

@@ -7,7 +7,7 @@
 <section id="architecture_decisions" data-bp-section class="bp-section mb-8"
          x-data="decisionsSection()"
          x-init="init()">
-    <div class="rounded-xl border border-border bg-card shadow-sm overflow-hidden">
+    <div class="rounded-lg border border-border bg-card overflow-hidden">
 
         {# ── Section header ── #}
         <div class="flex items-center justify-between px-5 py-3 border-b border-border bg-muted/30">
@@ -25,7 +25,7 @@
             </div>
             <button type="button"
                     @click="openCreateModal()"
-                    class="bp-action-btn inline-flex items-center px-2.5 py-1 rounded-md text-2xs font-medium bg-primary/10 text-primary border border-primary/30 hover:bg-primary/20 transition-colors">
+                    class="bp-action-btn inline-flex items-center px-2.5 py-1 rounded-md text-2xs font-medium bg-primary/10 text-info-emphasis border border-primary/30 hover:bg-primary/20 transition-colors">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
                 New Decision
             </button>
@@ -82,7 +82,7 @@
 
             {# ── Error state ── #}
             <div x-show="error && !loading" x-cloak
-                 class="rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive-emphasis"
+                 class="rounded-md border border-destructive/40 bg-destructive/10 px-4 py-2 text-sm text-destructive-emphasis"
                  x-text="error"></div>
 
             {# ── Content ── #}
@@ -112,7 +112,7 @@
                         <div class="rounded-lg border border-border bg-card overflow-hidden">
 
                             {# Card header #}
-                            <div class="flex items-start justify-between px-4 py-3 border-b border-border bg-muted/20">
+                            <div class="border flex items-start justify-between px-4 py-2 border-b border-border bg-muted/20">
                                 <div class="flex-1 min-w-0">
                                     <div class="flex items-center gap-2 flex-wrap mb-1">
                                         {# Decision ID badge #}
@@ -132,7 +132,7 @@
 
                                         {# Decision type badge #}
                                         <span x-show="d.decision_type" x-cloak
-                                              class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-primary border border-primary/30"
+                                              class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-info-emphasis border border-primary/30"
                                               x-text="(d.decision_type || '').replace(/_/g, ' ')"></span>
                                     </div>
                                     <h3 class="text-sm font-semibold text-foreground" x-text="d.title"></h3>
@@ -273,7 +273,7 @@
                     <p class="text-sm text-muted-foreground mb-3">No architecture decisions recorded yet.</p>
                     <button type="button"
                             @click="openCreateModal()"
-                            class="inline-flex items-center px-3 py-1.5 rounded-md text-xs font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors">
+                            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
                         Record First Decision
                     </button>

@@ -23,7 +23,7 @@
         </div>
     </template>
     <template x-if="error">
-        <div class="rounded-xl border border-destructive/40 bg-destructive/5 px-5 py-4 text-destructive-emphasis text-sm"
+        <div class="rounded-md border border-destructive/40 bg-destructive/10 px-5 py-2 text-destructive-emphasis text-sm"
              x-text="error"></div>
     </template>
 
@@ -31,19 +31,19 @@
     <template x-if="!loading && analytics">
         <div class="grid gap-4 md:grid-cols-3">
             <!-- Throughput -->
-            <div data-slot="card" class="rounded-xl border bg-card p-5">
+            <div data-slot="card" class="rounded-lg border border-border bg-card p-5">
                 <p class="text-xs font-medium text-muted-foreground mb-1">Throughput</p>
                 <p class="text-3xl font-bold" x-text="analytics.throughput"></p>
                 <p class="text-xs text-muted-foreground mt-1">cards completed in sprint</p>
             </div>
             <!-- Cycle Time -->
-            <div data-slot="card" class="rounded-xl border bg-card p-5">
+            <div data-slot="card" class="rounded-lg border border-border bg-card p-5">
                 <p class="text-xs font-medium text-muted-foreground mb-1">Avg Cycle Time</p>
                 <p class="text-3xl font-bold" x-text="analytics.cycle_time?.average_days?.toFixed(1) + ' days'"></p>
                 <p class="text-xs text-muted-foreground mt-1">started → done (mean)</p>
             </div>
             <!-- Sprint -->
-            <div data-slot="card" class="rounded-xl border bg-card p-5">
+            <div data-slot="card" class="rounded-lg border border-border bg-card p-5">
                 <p class="text-xs font-medium text-muted-foreground mb-1">Sprint Window</p>
                 <p class="text-sm font-semibold" x-text="analytics.start_date + ' → ' + analytics.end_date"></p>
                 <p class="text-xs text-muted-foreground mt-1" x-text="analytics.sprint_name"></p>
@@ -53,7 +53,7 @@
 
     <!-- Throughput Chart -->
     <template x-if="!loading && analytics">
-        <div data-slot="card" class="rounded-xl border bg-card p-5">
+        <div data-slot="card" class="rounded-lg border border-border bg-card p-5">
             <h2 class="text-sm font-semibold mb-4 flex items-center gap-2">
                 <i data-lucide="bar-chart-2" class="h-4 w-4 text-primary" aria-hidden="true"></i>
                 Throughput — Cards Completed per Day
@@ -71,7 +71,7 @@
 
     <!-- Cycle Time Chart -->
     <template x-if="!loading && analytics && analytics.cycle_time?.data_points?.length > 0">
-        <div data-slot="card" class="rounded-xl border bg-card p-5">
+        <div data-slot="card" class="rounded-lg border border-border bg-card p-5">
             <h2 class="text-sm font-semibold mb-4 flex items-center gap-2">
                 <i data-lucide="clock" class="h-4 w-4 text-primary" aria-hidden="true"></i>
                 Cycle Time — Days per Card
@@ -84,7 +84,7 @@
 
     <!-- Cumulative Flow Diagram -->
     <template x-if="!loading && analytics && analytics.cfd?.length > 0">
-        <div data-slot="card" class="rounded-xl border bg-card p-5">
+        <div data-slot="card" class="rounded-lg border border-border bg-card p-5">
             <h2 class="text-sm font-semibold mb-4 flex items-center gap-2">
                 <i data-lucide="layers" class="h-4 w-4 text-primary" aria-hidden="true"></i>
                 Cumulative Flow Diagram
@@ -97,12 +97,12 @@
 
     <!-- Cycle time detail table -->
     <template x-if="!loading && analytics && analytics.cycle_time?.data_points?.length > 0">
-        <div data-slot="card" class="rounded-xl border bg-card overflow-hidden">
+        <div data-slot="card" class="rounded-lg border border-border bg-card overflow-hidden">
             <div class="px-5 py-4 border-b">
                 <h2 class="text-sm font-semibold">Cycle Time Detail</h2>
             </div>
             <div class="overflow-x-auto">
-                <table class="w-full text-sm">
+                <table class="dense-table w-full text-sm">
                     <thead>
                         <tr class="border-b bg-muted/50 text-muted-foreground">
                             <th class="px-4 py-3 text-left font-medium text-xs">Card</th>

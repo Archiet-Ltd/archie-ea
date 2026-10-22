@@ -15,6 +15,7 @@ import json
 import logging
 import re
 from datetime import datetime  # dead-code-ok
+from app.models.archimate_element_types import is_application_kind
 
 # Define the logger
 logger = logging.getLogger(__name__)
@@ -1086,7 +1087,7 @@ def validate_archimate_element_creation(
     elif layer == "application":
         # Application elements benefit from technical specifications
         if (
-            archimate_type == "ApplicationComponent"
+            is_application_kind(archimate_type)
             and properties
             and len(properties) > 0
         ):
