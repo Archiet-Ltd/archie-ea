@@ -372,6 +372,9 @@
 /* Shared public component; used by the homepage and the pricing page; registered in docs/reuse-register.yml. */
 /* layout_rhythm.table: wrapper overflow-x auto; 48rem minimum; 16px cell padding; header at muted 50% */
 .public-site .public-table { width: 100%; min-width: 48rem; border-collapse: collapse; text-align: left; font-size: 0.875rem; line-height: 1.25rem; }
+@media (max-width: 639px) {
+  .public-site .public-table { min-width: 0; max-width: 100%; table-layout: fixed; }
+}
 /* A table that fits its container: no minimum width, equal fixed columns; its wrapper must not set overflow. */
 .public-site .public-table--fit { min-width: 0; table-layout: fixed; }
 .public-site .public-table thead tr { border-bottom: 1px solid hsl(var(--border)); background: hsl(var(--muted) / 0.5); }
