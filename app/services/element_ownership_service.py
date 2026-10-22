@@ -392,7 +392,8 @@ def application_owner_expression(model, field: str):
 # ── "owned": the one rule every screen reads ─────────────────────────────────
 # An application is owned when it has an ACCOUNTABLE owner: a primary or
 # business owner record, or a non-empty legacy application/business owner text.
-# A technical, backup or steward owner alone does not make it owned: the owner
+# The named user must belong to the application's organisation. A technical,
+# backup or steward owner alone does not make it owned: the owner
 # the product's questions ask about ("who is accountable for ...") is the
 # accountable one. The dashboard's owner coverage and the Ask question
 # "applications with no owner" both call these two functions; do not write a
@@ -410,10 +411,16 @@ def application_is_owned_expression(model=None):
         db.and_(getattr(model, column).isnot(None), db.func.trim(getattr(model, column)) != "")
         for column in ACCOUNTABLE_LEGACY_OWNER_COLUMNS
     ])
+    # The named user must belong to the application's organisation: a record
+    # whose user is elsewhere names nobody who can be held accountable here.
+    from app.models.user import User
+
     has_record = (
         db.select(ApplicationOwner.id)
+        .join(User, User.id == ApplicationOwner.user_id)
         .where(ApplicationOwner.application_id == model.id)
         .where(ApplicationOwner.organization_id == model.organization_id)
+        .where(User.organization_id == model.organization_id)
         .where(ApplicationOwner.ownership_type.in_(ACCOUNTABLE_OWNERSHIP_TYPES))
         .exists()
     )
@@ -425,11 +432,15 @@ def application_is_owned(application) -> bool:
     for column in ACCOUNTABLE_LEGACY_OWNER_COLUMNS:
         if (getattr(application, column, None) or "").strip():
             return True
+    from app.models.user import User
+
     return db.session.query(
         db.session.query(ApplicationOwner.id)
+        .join(User, User.id == ApplicationOwner.user_id)
         .filter(
             ApplicationOwner.application_id == application.id,
             ApplicationOwner.organization_id == application.organization_id,
+            User.organization_id == application.organization_id,
             ApplicationOwner.ownership_type.in_(ACCOUNTABLE_OWNERSHIP_TYPES),
         )
         .exists()
