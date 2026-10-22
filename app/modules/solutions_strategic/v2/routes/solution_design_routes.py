@@ -49,6 +49,7 @@ from sqlalchemy.orm import joinedload  # dead-code-ok
 from werkzeug.exceptions import HTTPException
 
 from app import csrf, db
+from app.core.auth.permissions import can as _matrix_can
 from app.decorators import audit_log, require_roles
 from app.middleware.tenant_decorators import is_active_org_admin
 from app.models.application_portfolio import ApplicationComponent
@@ -1120,7 +1121,7 @@ def list_solutions():
             is_active_org_admin()
             or (hasattr(current_user, 'can_vote_arb') and current_user.can_vote_arb())
             or (hasattr(current_user, 'can_manage_portfolio') and current_user.can_manage_portfolio())
-            or getattr(current_user, 'enterprise_role', None) in ('enterprise_architect', 'cto', 'platform_admin')
+            or _matrix_can(current_user, 'view_all', 'solution')
         )
         if _can_see_all:
             query = Solution.query.filter(~Solution.name.like("[DELETED]%"))
@@ -5908,7 +5909,7 @@ def bulk_delete_solutions():
                 is_active_org_admin()
                 or (hasattr(current_user, 'can_vote_arb') and current_user.can_vote_arb())
                 or (hasattr(current_user, 'can_manage_portfolio') and current_user.can_manage_portfolio())
-                or getattr(current_user, 'enterprise_role', None) in ('enterprise_architect', 'cto', 'platform_admin')
+                or _matrix_can(current_user, 'view_all', 'solution')
             )
             _q = Solution.query if _can_see_all else Solution.query.filter_by(created_by_id=current_user.id)
             _all = _q.order_by(Solution.id).all()
@@ -6014,7 +6015,7 @@ def api_list_solutions():
         is_active_org_admin()
         or (hasattr(current_user, 'can_vote_arb') and current_user.can_vote_arb())
         or (hasattr(current_user, 'can_manage_portfolio') and current_user.can_manage_portfolio())
-        or getattr(current_user, 'enterprise_role', None) in ('enterprise_architect', 'cto', 'platform_admin')
+        or _matrix_can(current_user, 'view_all', 'solution')
     )
     if _can_see_all:
         solutions = Solution.query.order_by(Solution.created_at.desc()).all()

@@ -39,16 +39,28 @@
 
             init: function () {
                 var self = this;
+                // Leaving the page aborts the cascade's requests cleanly: WebKit
+                // logs a console error for any fetch the navigation tears down,
+                // and the candidate loop must not start another one.
+                this.controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+                if (this.controller) {
+                    var abort = function () { self.controller.abort(); };
+                    global.addEventListener('pagehide', abort);
+                    global.addEventListener('beforeunload', abort);
+                }
                 this.loadChanges().then(function () { return self.pickElement(); }).then(function (candidates) {
                     return self.loadFirstWithRows(candidates || []);
                 }).catch(function () { self.state = 'error'; });
             },
 
+            signal: function () { return this.controller ? this.controller.signal : undefined; },
+            aborted: function () { return Boolean(this.controller && this.controller.signal.aborted); },
+
             loadChanges: function () {
                 var self = this;
                 var to = new Date();
                 var from = new Date(to.getTime() - DAYS * 86400000);
-                return Platform.fetch.get(CHANGES_URL, { from: from.toISOString(), to: to.toISOString() }, { silent: true })
+                return Platform.fetch.get(CHANGES_URL, { from: from.toISOString(), to: to.toISOString() }, { silent: true, signal: this.signal() })
                     .then(function (resp) {
                         var list = resp && resp.data && Array.isArray(resp.data.changes) ? resp.data.changes
                             : (resp && Array.isArray(resp.changes) ? resp.changes : []);
@@ -76,10 +88,11 @@
                 var candidate = this.changes.filter(function (c) {
                     return /application/.test(c.tableName || '') && c.what && c.what.charAt(0) !== '#';
                 })[0];
+                var self = this;
                 var terms = candidate ? [candidate.what] : ['a', 'e', 'i', 'o', 's'];
                 var seen = {};
                 return Promise.all(terms.map(function (t) {
-                    return Intelligence.searchElements(t).catch(function () { return []; });
+                    return Intelligence.searchElements(t, self.signal()).catch(function () { return []; });
                 })).then(function (lists) {
                     var hits = [];
                     lists.forEach(function (list) {
@@ -98,10 +111,10 @@
             /* Try candidates in order until one answers with rows. */
             loadFirstWithRows: function (candidates) {
                 var self = this;
-                if (!candidates.length) { this.state = 'empty'; return Promise.resolve(); }
+                if (!candidates.length || this.aborted()) { this.state = 'empty'; return Promise.resolve(); }
                 var head = candidates[0];
                 return this.load(head.id).then(function () {
-                    if (self.state === 'ready' || candidates.length === 1) { return; }
+                    if (self.state === 'ready' || candidates.length === 1 || self.aborted()) { return; }
                     return self.loadFirstWithRows(candidates.slice(1));
                 });
             },
@@ -109,7 +122,7 @@
             load: function (elementId) {
                 var self = this;
                 this.state = 'loading';
-                return Intelligence.fetchImpact(elementId, { includeDerived: true, maxDepth: 3 }).then(function (payload) {
+                return Intelligence.fetchImpact(elementId, { includeDerived: true, maxDepth: 3, signal: this.signal() }).then(function (payload) {
                     self.centreId = elementId;
                     var name = Intelligence.nameOf(payload.elements || {}, elementId) || self.centreName;
                     self.centreName = name;
