@@ -274,8 +274,22 @@ def test_archiet_file_gives_55_applications_and_no_components(
     with open(FIXTURE, "r", encoding="utf-8") as fh:
         xml = fh.read()
     with tenant_ctx(org_id):
+        # Today's data: every ApplicationComponent the file lists, each with its inventory row.
+        # The importer now decides Application or component (T-app-03), so the legacy state is
+        # built with promotion off and one inventory row linked to each mirror element.
         service = ArchiMateImportService()
-        service.execute_import(service.parse_oef_xml(xml), strategy="skip_duplicates")
+        service.execute_import(
+            service.parse_oef_xml(xml, promote_top_level=False), strategy="skip_duplicates"
+        )
+        for el in ArchiMateElement.query.filter(  # model-safety-ok: explicit org predicate
+            ArchiMateElement.organization_id == org_id,
+            ArchiMateElement.type == "ApplicationComponent",
+        ).all():
+            db_session.add(
+                ApplicationComponent(
+                    name=el.name, organization_id=org_id, archimate_element_id=el.id
+                )
+            )
         db_session.commit()
 
     def count(type_name):
