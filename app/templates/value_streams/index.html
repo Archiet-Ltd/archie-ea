@@ -15,12 +15,17 @@
             {'label': 'Home', 'href': url_for('main.index')},
             {'label': 'Value Streams'}
         ],
-        actions=[
+        actions=([
             {'text': 'New Value Stream', 'icon': 'plus', 'onclick': "Platform.modal.open('vs-create-modal')", 'variant': 'default'}
-        ]
+        ] if can_author_models(current_user) else [])
     ) }}
 
     <div class="p-6 space-y-6">
+        {% if not can_author_models(current_user) %}
+        <p class="rounded-md border border-border bg-muted/30 px-4 py-3 text-sm text-muted-foreground" data-testid="vs-read-only-note">
+            Your account can read value streams but not create them. Architects and administrators of your organisation can create one; ask them to add one for you or to change your role.
+        </p>
+        {% endif %}
         {% if streams %}
         <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
             {{ data_card(icon='workflow', icon_color='blue', value=streams|length, label='Value Streams', subtitle='Defined end-to-end flows') }}
@@ -67,7 +72,7 @@
             icon='workflow',
             title='No value streams yet',
             description='Model your end-to-end value delivery flows (e.g. Order-to-Cash, Concept-to-Market) and map supporting capabilities to each stage.',
-            cta_text='Create Value Stream',
+            cta_text='Create Value Stream' if can_author_models(current_user) else None,
             cta_onclick="Platform.modal.open('vs-create-modal')",
             cta_icon='plus'
         ) }}

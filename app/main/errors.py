@@ -92,6 +92,24 @@ def forbidden(e):
         return ("Forbidden", 403)
 
 
+@main.app_errorhandler(405)
+def method_not_allowed(e):
+    api = _api_error(405, "Method Not Allowed")
+    if api is not None:
+        return api
+    try:
+        from flask import redirect
+        from flask_login import current_user
+
+        if not current_user.is_authenticated:
+            # A visitor who is not signed in has no app frame to show; the sign-in page is the way forward.
+            return redirect("/account/login")
+        return render_plain_error(405, "errors/500.html")
+    except Exception:
+        _log_exception(e)
+        return ("Method Not Allowed", 405)
+
+
 @main.app_errorhandler(404)
 def page_not_found(e):
     api = _api_error(404, "Not Found")

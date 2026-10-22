@@ -17,6 +17,12 @@ PLAIN = {
         "Your role does not include this page. Ask an administrator of your organisation to "
         "give you access, or go back to the dashboard.",
     ),
+    405: (
+        "mouse-pointer-click",
+        "That address can't be opened as a link",
+        "This action runs from a button on a page, so opening its address directly does not work. "
+        "Go back to the page and use the button there.",
+    ),
     404: (
         "search-x",
         "We couldn't find that page",
