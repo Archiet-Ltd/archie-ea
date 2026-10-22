@@ -54,6 +54,7 @@ from app import db
 from app.models import User
 from app.utils.tenant_sql import org_scope
 from app.models.vector_embeddings import ChatMessageEmbedding
+from app.middleware.tenant_context import current_org_id
 
 # Import AI Chat Extension Services
 from app.services.ai_chat_extensions import (
@@ -2442,7 +2443,8 @@ class MultiDomainChatService:
 
             messages = (
                 ChatMessageEmbedding.query.filter(
-                    ChatMessageEmbedding.chat_session_id == session_id
+                    ChatMessageEmbedding.chat_session_id == session_id,
+                    ChatMessageEmbedding.in_org(current_org_id()),
                 )
                 .order_by(ChatMessageEmbedding.created_at.asc())
                 .all()
@@ -2485,8 +2487,9 @@ class MultiDomainChatService:
 
         try:
             embeddings_cleared = ChatMessageEmbedding.query.filter(
-                ChatMessageEmbedding.chat_session_id == session_id
-            ).delete()
+                ChatMessageEmbedding.chat_session_id == session_id,
+                ChatMessageEmbedding.in_org(current_org_id()),
+            ).delete(synchronize_session=False)
             db.session.commit()
             self.logger.info(
                 f"Cleared {embeddings_cleared} chat messages for session {session_id}"
@@ -2589,7 +2592,10 @@ class MultiDomainChatService:
                     sql_func.count(ChatMessageEmbedding.id).label("msg_count"),
                     sql_func.min(ChatMessageEmbedding.created_at).label("created"),
                 )
-                .filter(ChatMessageEmbedding.chat_session_id.like(f"{saved_prefix}%"))
+                .filter(
+                    ChatMessageEmbedding.chat_session_id.like(f"{saved_prefix}%"),
+                    ChatMessageEmbedding.in_org(current_org_id()),
+                )
                 .group_by(ChatMessageEmbedding.chat_session_id)
                 .all()
             )
@@ -2603,7 +2609,8 @@ class MultiDomainChatService:
                 # Get session name from the first message's metadata
                 first_msg = (
                     ChatMessageEmbedding.query.filter(
-                        ChatMessageEmbedding.chat_session_id == full_session_id
+                        ChatMessageEmbedding.chat_session_id == full_session_id,
+                        ChatMessageEmbedding.in_org(current_org_id()),
                     )
                     .order_by(ChatMessageEmbedding.created_at.asc())
                     .first()
@@ -2651,7 +2658,8 @@ class MultiDomainChatService:
 
             messages = (
                 ChatMessageEmbedding.query.filter(
-                    ChatMessageEmbedding.chat_session_id == full_session_id
+                    ChatMessageEmbedding.chat_session_id == full_session_id,
+                    ChatMessageEmbedding.in_org(current_org_id()),
                 )
                 .order_by(ChatMessageEmbedding.created_at.asc())
                 .all()

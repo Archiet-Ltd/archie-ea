@@ -22,7 +22,7 @@ from __future__ import annotations
 from typing import Optional
 
 ACTIONS = ("create", "read", "edit", "delete", "bulk_delete")
-OBJECT_TYPES = ("application", "relationship")
+OBJECT_TYPES = ("application", "relationship", "motivation_element")
 
 _ALL = frozenset(ACTIONS)
 # Architects create, read, edit and delete one application at a time; deleting
@@ -57,8 +57,49 @@ DEFAULTS = {
         "architect": _ARCHITECT,
         "viewer": _READ,
     },
+    # Goals, drivers, requirements and other motivation elements: administrators and
+    # architects create, edit and delete them, everyone else reads.
+    "motivation_element": {
+        "org_admin": _ALL,
+        "administrator": _ALL,
+        "admin": _ALL,
+        "architect": _ARCHITECT,
+        "viewer": _READ,
+    },
 }
 _FALLBACK = _READ
+
+# Governance abilities. These are not drawn on the Permissions tab (that lists
+# OBJECT_TYPES above); they are the one answer to "may this person vote on the
+# board, edit a solution, edit the model, manage the portfolio". They key on the
+# persona an ADMINISTRATOR assigned (``enterprise_role``, written only by the
+# admin role page, an invitation or single sign-on group mapping; no route lets
+# a person set their own), plus organisation-administrator status, which
+# ``can`` answers first. A person's own persona preference is stored apart
+# (``User.persona_lens``) and is never read here.
+GOVERNANCE_ACTIONS = {
+    "solution": ("edit", "view_all", "access_any"),
+    "archimate": ("edit",),
+    "arb_decision": ("vote", "decide"),
+    "portfolio": ("manage",),
+}
+_GOVERNANCE_DEFAULTS = {
+    "solution": {
+        "edit": frozenset({"solution_architect", "enterprise_architect", "business_architect", "platform_admin"}),
+        "view_all": frozenset({"enterprise_architect", "cto", "platform_admin"}),
+        "access_any": frozenset({"platform_admin"}),
+    },
+    "archimate": {
+        "edit": frozenset({"enterprise_architect", "business_architect", "platform_admin"}),
+    },
+    "arb_decision": {
+        "vote": frozenset({"arb_member", "enterprise_architect", "business_architect", "platform_admin"}),
+        "decide": frozenset({"arb_member", "cto", "enterprise_architect", "platform_admin"}),
+    },
+    "portfolio": {
+        "manage": frozenset({"portfolio_manager", "enterprise_architect", "business_architect", "platform_admin"}),
+    },
+}
 
 # Role keys shown on the Permissions tab that the matrix cannot restrict.
 LOCKED_ROLES = ("org_admin",)
@@ -126,7 +167,14 @@ def role_key(user, organization_id: Optional[int] = None) -> str:
     return sorted(names)[0] if names else "viewer"
 
 
+def persona_key(user) -> str:
+    """The matrix role key of an administrator-assigned persona (may be empty)."""
+    return str(getattr(user, "enterprise_role", "") or "").strip().lower()
+
+
 def default_allowed(role: str, action: str, object_type: str) -> bool:
+    if object_type in GOVERNANCE_ACTIONS:
+        return str(role).lower() in _GOVERNANCE_DEFAULTS[object_type].get(action, frozenset())
     table = DEFAULTS.get(object_type, {})
     return action in table.get(str(role).lower(), _FALLBACK)
 
@@ -147,7 +195,11 @@ def can(user, action: str, object_type: str, organization_id: Optional[int] = No
     """Whether ``user`` may ``action`` an ``object_type`` in the organisation."""
     if user is None or not getattr(user, "is_authenticated", False):
         return False
-    if action not in ACTIONS or object_type not in OBJECT_TYPES:
+    governance = object_type in GOVERNANCE_ACTIONS
+    if governance:
+        if action not in GOVERNANCE_ACTIONS[object_type]:
+            return False
+    elif action not in ACTIONS or object_type not in OBJECT_TYPES:
         return False
     org_id = _matrix_org(user, organization_id)
     if _is_administrator(user, org_id):
@@ -156,7 +208,7 @@ def can(user, action: str, object_type: str, organization_id: Optional[int] = No
         row = _grant(org_id, "user", user.id, object_type, action)
         if row is not None:
             return bool(row.allowed)
-    key = role_key(user, org_id)
+    key = persona_key(user) if governance else role_key(user, org_id)
     if org_id is not None:
         row = _grant(org_id, "role", key, object_type, action)
         if row is not None:
@@ -179,8 +231,11 @@ def set_grant(org_id, subject_type, subject_key, object_type, action, allowed, g
 
     if (
         subject_type not in ("role", "user")
-        or action not in ACTIONS
-        or object_type not in OBJECT_TYPES
+        or (
+            action not in GOVERNANCE_ACTIONS.get(object_type, ())
+            if object_type in GOVERNANCE_ACTIONS
+            else (action not in ACTIONS or object_type not in OBJECT_TYPES)
+        )
     ):
         raise ValueError("unknown subject, action or object type")
     row = _grant(org_id, subject_type, subject_key, object_type, action)
