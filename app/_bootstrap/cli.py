@@ -532,6 +532,14 @@ def init_cli(app):
     except Exception as e:
         app.logger.warning(f"⚠️  Failed to register demo company seed CLI: {e}")
 
+    # T-demo-02: remove named test records from the demo organisations
+    try:
+        from app.commands import purge_demo_test_records
+        purge_demo_test_records.init_app(app)
+        app.logger.info("✅ Demo test-record purge CLI command registered")
+    except Exception as e:
+        app.logger.warning(f"⚠️  Failed to register demo test-record purge CLI: {e}")
+
 # Domain element backfill
     try:
         from app.commands.backfill_domain_elements import init_app as init_domain_elements
