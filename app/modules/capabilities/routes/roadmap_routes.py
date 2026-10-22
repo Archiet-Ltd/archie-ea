@@ -35,7 +35,7 @@ from flask_login import current_user, login_required
 from app.decorators import WORK_PACKAGE_WRITE_ROLES, require_roles
 from app.middleware.tenant_context import current_org_id
 
-from app.decorators import audit_log, require_roles
+from app.decorators import audit_log
 from app.services.rate_limiter import rate_limit
 
 from app import db
