@@ -36,6 +36,9 @@
             targetName: target.name || null,
             targetHref: target.href || null,
             drawnBy: link.drawn_by || null,
+            // "Imported from <file>" and "Drawn by <person>" already say who; the
+            // drawer must not put a second "Drawn by" in front of them.
+            originNamesItself: /^(Imported from|Drawn by) /.test(link.drawn_by || ''),
             drawnAt: global.Intelligence.timeText(link.drawn_at)
         };
     }

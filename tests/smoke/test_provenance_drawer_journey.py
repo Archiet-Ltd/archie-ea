@@ -64,10 +64,14 @@ def _seed_organisation_with_provenance(label):
 
         # Link 1: Imported from a file
         imported_at = datetime.datetime(2026, 9, 1, 10, 30, 0)
+        # The origin columns arrive with the impact-row origin work; where the
+        # model does not have them yet the link is simply recorded without one.
+        has_origin = hasattr(ArchiMateRelationship, "source_kind")
         rel1 = ArchiMateRelationship(
             type="Serving", source_id=mainframe.id, target_id=gateway.id,
             organization_id=org.id,
-            source_kind="import", source_label="estate.xml", source_recorded_at=imported_at,
+            **(dict(source_kind="import", source_label="estate.xml",
+                    source_recorded_at=imported_at) if has_origin else {}),
         )
         db.session.add(rel1)
 
@@ -76,7 +80,8 @@ def _seed_organisation_with_provenance(label):
         rel2 = ArchiMateRelationship(
             type="Serving", source_id=gateway.id, target_id=portal.id,
             organization_id=org.id, created_by_id=user.id,
-            source_kind="manual", source_label="Grace Hopper %s" % label, source_recorded_at=drawn_at,
+            **(dict(source_kind="manual", source_label="Grace Hopper %s" % label,
+                    source_recorded_at=drawn_at) if has_origin else {}),
         )
         db.session.add(rel2)
 
@@ -121,7 +126,7 @@ def two_organisations(live_server):
 
 @pytest.fixture
 def page(browser):
-    ctx = browser.new_context(viewport={"width": 1440, "height": 900})
+    ctx = browser.new_context(viewport={"width": 1440, "height": 900}, timezone_id="UTC", locale="en-GB")
     ctx.set_default_timeout(PAGE_TIMEOUT)
     ctx.set_default_navigation_timeout(PAGE_TIMEOUT)
     pg = ctx.new_page()
@@ -175,234 +180,136 @@ def _row_for(page, name, kind=None):
     return rows.filter(has=page.get_by_role("heading", name=name, exact=True))
 
 
-def test_provenance_drawer_shows_origin_for_imported_link(page, live_server, two_organisations):
-    """For an imported link, the Why drawer shows 'Imported from <file>' and the date."""
-    ours = two_organisations["ours"]
-    names = ours["names"]
-    _login(page, live_server, ours["email"])
-    _open_ask(page, live_server)
+def _open_why(page, base, org, centre, other, kind):
+    """Sign in, ask what depends on `centre`, open Why? on the row for `other`."""
+    names = org["names"]
+    _login(page, base, org["email"])
+    _open_ask(page, base)
     _dismiss_first_run(page)
     _open_question(page)
-    _type_and_wait(page, "ask", ours["noun"])
-    _pick_by_click(page, "ask", names["mainframe"])
+    _type_and_wait(page, "ask", org["noun"])
+    _pick_by_click(page, "ask", names[centre])
     page.wait_for_selector("[data-ask-row]")
-
-    # The Mainframe row has an explicit link to Gateway (imported)
-    gateway_row = _row_for(page, names["gateway"], "explicit")
-    expect(gateway_row).to_have_count(1)
-    gateway_row.get_by_role("button", name="Why?").click()
-
+    row = _row_for(page, names[other], kind)
+    expect(row).to_have_count(1)
+    row.get_by_role("button", name="Why?").click()
     dialog = page.locator("#drawer-provenance [role=dialog]")
     dialog.wait_for(state="visible")
-
-    # Provenance section should be visible for explicit rows
-    provenance_section = dialog.locator("[data-provenance-record]")
-    expect(provenance_section).to_be_visible()
-
-    # Should show "Imported from estate.xml"
-    expect(provenance_section.locator("p").first).to_contain_text("Imported from estate.xml")
-
-    # Should show the recorded date
-    expect(provenance_section).to_contain_text("Recorded")
-    expect(provenance_section).to_contain_text("1 Sep 2026")
-
-    # Should have a link to the relationship record
-    rel_link = provenance_section.locator("[data-relationship-link]")
-    expect(rel_link).to_be_visible()
-    expect(rel_link).to_have_attribute("href", re.compile(r"/architecture/relationships#relationship-%s$" % ours["rel1_id"]))
-
-    page.keyboard.press("Escape")
-    dialog.wait_for(state="hidden")
+    return dialog
 
 
-def test_provenance_drawer_shows_origin_for_hand_drawn_link(page, live_server, two_organisations):
-    """For a hand-drawn link, the Why drawer shows 'Drawn by <person>' and the date."""
+def _origin_section(dialog):
+    section = dialog.locator("[data-provenance-record]")
+    expect(section).to_be_visible()
+    return section
+
+
+def _one_date(section, pattern):
+    """Exactly one date line, in the product's date format, and no 'not recorded' beside it."""
+    dates = section.locator("[data-provenance-date]")
+    expect(dates).to_have_count(1)
+    expect(dates).to_have_text(re.compile(pattern))
+    assert "Date not recorded" not in section.text_content()
+
+
+def test_drawer_says_imported_from_the_file_and_when(page, live_server, two_organisations):
+    """A CTO asks what depends on the mainframe; the imported link says where it came from."""
     ours = two_organisations["ours"]
-    names = ours["names"]
-    _login(page, live_server, ours["email"])
-    _open_ask(page, live_server)
-    _dismiss_first_run(page)
-    _open_question(page)
-    _type_and_wait(page, "ask", ours["noun"])
-    _pick_by_click(page, "ask", names["gateway"])
-    page.wait_for_selector("[data-ask-row]")
-
-    # The Gateway row has an explicit link to Portal (drawn by architect)
-    portal_row = _row_for(page, names["portal"], "explicit")
-    expect(portal_row).to_have_count(1)
-    portal_row.get_by_role("button", name="Why?").click()
-
-    dialog = page.locator("#drawer-provenance [role=dialog]")
-    dialog.wait_for(state="visible")
-
-    provenance_section = dialog.locator("[data-provenance-record]")
-    expect(provenance_section).to_be_visible()
-
-    # Should show "Drawn by Grace Hopper Ours"
-    expect(provenance_section.locator("p").first).to_contain_text("Drawn by Grace Hopper Ours")
-
-    # Should show the recorded date
-    expect(provenance_section).to_contain_text("Recorded")
-    expect(provenance_section).to_contain_text("2 Sep 2026")
-
-    # Should have a link to the relationship record
-    rel_link = provenance_section.locator("[data-relationship-link]")
-    expect(rel_link).to_be_visible()
-    expect(rel_link).to_have_attribute("href", re.compile(r"/architecture/relationships#relationship-%s$" % ours["rel2_id"]))
-
-    page.keyboard.press("Escape")
-    dialog.wait_for(state="hidden")
+    dialog = _open_why(page, live_server, ours, "mainframe", "gateway", "explicit")
+    section = _origin_section(dialog)
+    expect(section.locator("p").first).to_have_text("Imported from estate.xml")
+    _one_date(section, r"^Recorded 1 Sept? 2026, 10:30$")
 
 
-def test_provenance_drawer_shows_origin_not_recorded_for_legacy_link(page, live_server, two_organisations):
-    """For a link from before origins were recorded, the Why drawer shows 'Origin not recorded'."""
+def test_drawer_says_drawn_by_the_person_and_when(page, live_server, two_organisations):
+    """A hand-drawn link says who drew it and when."""
     ours = two_organisations["ours"]
-    names = ours["names"]
-    _login(page, live_server, ours["email"])
-    _open_ask(page, live_server)
-    _dismiss_first_run(page)
-    _open_question(page)
-    _type_and_wait(page, "ask", ours["noun"])
-    _pick_by_click(page, "ask", names["mainframe"])
-    page.wait_for_selector("[data-ask-row]")
-
-    # The Mainframe row also has an explicit link to Portal (legacy, no origin)
-    portal_row = _row_for(page, names["portal"], "explicit")
-    expect(portal_row).to_have_count(1)
-    portal_row.get_by_role("button", name="Why?").click()
-
-    dialog = page.locator("#drawer-provenance [role=dialog]")
-    dialog.wait_for(state="visible")
-
-    provenance_section = dialog.locator("[data-provenance-record]")
-    expect(provenance_section).to_be_visible()
-
-    # Should show "origin not recorded" (lowercase as stored)
-    expect(provenance_section.locator("p").first).to_contain_text("origin not recorded")
-
-    # Should show "Date not recorded"
-    expect(provenance_section).to_contain_text("Date not recorded")
-
-    # Should have a link to the relationship record
-    rel_link = provenance_section.locator("[data-relationship-link]")
-    expect(rel_link).to_be_visible()
-    expect(rel_link).to_have_attribute("href", re.compile(r"/architecture/relationships#relationship-%s$" % ours["rel3_id"]))
-
-    page.keyboard.press("Escape")
-    dialog.wait_for(state="hidden")
+    dialog = _open_why(page, live_server, ours, "gateway", "portal", "explicit")
+    section = _origin_section(dialog)
+    expect(section.locator("p").first).to_have_text("Drawn by Grace Hopper Ours")
+    _one_date(section, r"^Recorded 2 Sept? 2026, 14:00$")
 
 
-def test_provenance_drawer_worked_out_row_renders_as_before(page, live_server, two_organisations):
-    """Worked-out rows still show 'The links behind this' with the derivation chain."""
+def test_drawer_says_origin_not_recorded_for_an_old_link(page, live_server, two_organisations):
+    """A link from before origins were kept says so, and shows the only date it has."""
     ours = two_organisations["ours"]
-    names = ours["names"]
-    _login(page, live_server, ours["email"])
-    _open_ask(page, live_server)
-    _dismiss_first_run(page)
-    _open_question(page)
-    _type_and_wait(page, "ask", ours["noun"])
-    _pick_by_click(page, "ask", names["mainframe"])
-    page.wait_for_selector("[data-ask-row]")
-
-    # The worked-out connection Mainframe -> Portal
-    derived_row = _row_for(page, names["portal"], "derived")
-    expect(derived_row).to_have_count(1)
-    derived_row.get_by_role("button", name="Why?").click()
-
-    dialog = page.locator("#drawer-provenance [role=dialog]")
-    dialog.wait_for(state="visible")
-
-    # Should show "The links behind this" section, not provenance section
-    why_section = dialog.locator("[data-why-chain]")
-    expect(why_section).to_be_visible()
-
-    # Should show the derivation rule
-    expect(why_section.locator("[data-why-rule]")).to_contain_text("serving link followed by a serving link")
-
-    # Should show both links in the chain
-    links = why_section.locator("[data-why-link]")
-    expect(links).to_have_count(2)
-
-    # First link: Mainframe -> Gateway (imported)
-    expect(links.nth(0)).to_contain_text("Drawn by Grace Hopper Ours")
-
-    # Second link: Gateway -> Portal (drawn)
-    expect(links.nth(1)).to_contain_text("Drawn by Grace Hopper Ours")
-
-    # Provenance section should NOT be visible for derived rows
-    provenance_section = dialog.locator("[data-provenance-record]")
-    expect(provenance_section).to_be_hidden()
-
-    page.keyboard.press("Escape")
-    dialog.wait_for(state="hidden")
+    dialog = _open_why(page, live_server, ours, "mainframe", "portal", "explicit")
+    section = _origin_section(dialog)
+    expect(section.locator("p").first).to_have_text("Origin not recorded")
+    _one_date(section, r"^Recorded 1 Aug 2026, 09:00$")
 
 
-def test_relationship_record_link_returns_200_for_owner(page, live_server, two_organisations):
-    """The relationship record link returns 200 for the owning organisation."""
-    ours = two_organisations["ours"]
-    names = ours["names"]
-    _login(page, live_server, ours["email"])
-    _open_ask(page, live_server)
-    _dismiss_first_run(page)
-    _open_question(page)
-    _type_and_wait(page, "ask", ours["noun"])
-    _pick_by_click(page, "ask", names["mainframe"])
-    page.wait_for_selector("[data-ask-row]")
-
-    gateway_row = _row_for(page, names["gateway"], "explicit")
-    gateway_row.get_by_role("button", name="Why?").click()
-
-    dialog = page.locator("#drawer-provenance [role=dialog]")
-    dialog.wait_for(state="visible")
-
-    rel_link = dialog.locator("[data-relationship-link]")
-    href = rel_link.get_attribute("href")
-
-    # Navigate to the relationship record page
-    page.goto(live_server + href, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
-
-    # Should return 200 and show the relationships list
-    expect(page.locator("main")).to_be_visible()
-    # The relationship should be in the list
-    expect(page.locator("main")).to_contain_text(names["mainframe"])
-    expect(page.locator("main")).to_contain_text(names["gateway"])
-
-    page.keyboard.press("Escape")
-    dialog.wait_for(state="hidden")
-
-
-def test_relationship_record_link_returns_not_found_for_other_organisation(page, live_server, two_organisations):
-    """Another organisation's viewer gets 'not found' (empty list) from the same link."""
+def test_drawer_link_opens_the_relationship_record(page, live_server, two_organisations):
+    """Clicking 'Open relationship record' lands on a page that shows that very link."""
     ours = two_organisations["ours"]
     other = two_organisations["other"]
     names = ours["names"]
+    dialog = _open_why(page, live_server, ours, "mainframe", "gateway", "explicit")
+    dialog.get_by_role("link", name="Open relationship record").click()
+    page.wait_for_url(re.compile(r"/architecture/relationships#relationship-%s$" % ours["rel1_id"]))
+
+    row = page.locator("#relationship-%s" % ours["rel1_id"])
+    expect(row).to_have_count(1)
+    expect(row).to_contain_text(names["mainframe"])
+    expect(row).to_contain_text(names["gateway"])
+    expect(row).to_contain_text("Serving")
+    # The page is this organisation's own and nobody else's.
+    assert other["noun"] not in page.locator("main").inner_text()
+
+
+def test_worked_out_row_still_shows_the_links_behind_it(page, live_server, two_organisations):
+    """As before: a worked-out row explains itself from the links it was worked out from."""
+    ours = two_organisations["ours"]
+    names = ours["names"]
+    dialog = _open_why(page, live_server, ours, "mainframe", "portal", "derived")
+    chain = dialog.locator("[data-why-chain]")
+    expect(chain).to_be_visible()
+    expect(chain.locator("[data-why-rule]")).to_contain_text("serving link followed by a serving link")
+    links = chain.locator("[data-why-link]")
+    expect(links).to_have_count(2)
+    expect(links.nth(0)).to_contain_text(names["mainframe"])
+    expect(links.nth(0)).to_contain_text(names["gateway"])
+    expect(links.nth(1)).to_contain_text(names["gateway"])
+    expect(links.nth(1)).to_contain_text(names["portal"])
+    # The recorded-link section belongs to recorded rows only.
+    expect(dialog.locator("[data-provenance-record]")).to_be_hidden()
+
+
+def test_worked_out_links_name_their_origin_once(page, live_server, two_organisations):
+    """Each link behind a worked-out row reads 'Imported from <file>' or 'Drawn by <person>', never 'Drawn by Imported from'."""
+    ours = two_organisations["ours"]
+    dialog = _open_why(page, live_server, ours, "mainframe", "portal", "derived")
+    links = dialog.locator("[data-why-chain] [data-why-link]")
+    expect(links).to_have_count(2)
+    first = re.sub(r"\s+", " ", links.nth(0).inner_text())
+    second = re.sub(r"\s+", " ", links.nth(1).inner_text())
+    assert "Imported from estate.xml" in first
+    assert "Drawn by Imported" not in first
+    assert "Drawn by Grace Hopper Ours" in second
+
+
+def test_owner_opens_the_relationship_list_with_their_links(page, live_server, two_organisations):
+    """The list the drawer link opens is there for the owner, with both ends of each link."""
+    ours = two_organisations["ours"]
+    names = ours["names"]
     _login(page, live_server, ours["email"])
-    _open_ask(page, live_server)
-    _dismiss_first_run(page)
-    _open_question(page)
-    _type_and_wait(page, "ask", ours["noun"])
-    _pick_by_click(page, "ask", names["mainframe"])
-    page.wait_for_selector("[data-ask-row]")
+    page.goto(live_server + "/architecture/relationships", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    main = page.locator("main")
+    expect(main).to_contain_text(names["mainframe"])
+    expect(main).to_contain_text(names["gateway"])
+    expect(main).to_contain_text(names["portal"])
 
-    gateway_row = _row_for(page, names["gateway"], "explicit")
-    gateway_row.get_by_role("button", name="Why?").click()
 
-    dialog = page.locator("#drawer-provenance [role=dialog]")
-    dialog.wait_for(state="visible")
-
-    rel_link = dialog.locator("[data-relationship-link]")
-    href = rel_link.get_attribute("href")
-
-    # Log in as the other organisation
-    page.goto(live_server + "/account/logout", wait_until="domcontentloaded")
+def test_relationship_record_is_not_found_for_another_organisation(page, live_server, two_organisations):
+    """Another organisation's viewer opening the same address sees their own links, never ours."""
+    ours = two_organisations["ours"]
+    other = two_organisations["other"]
     _login(page, live_server, other["email"])
-
-    # Navigate to the same relationship record link
-    page.goto(live_server + href, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
-
-    # Should return 200 but the relationship should NOT be in the list
-    # (the list is tenant-scoped, so the other org sees their own relationships)
-    expect(page.locator("main")).to_be_visible()
-    # The relationship from our org should not appear
-    assert names["mainframe"] not in page.locator("main").inner_text()
-    assert names["gateway"] not in page.locator("main").inner_text()
+    page.goto(
+        live_server + "/architecture/relationships#relationship-%s" % ours["rel1_id"],
+        wait_until="domcontentloaded", timeout=PAGE_TIMEOUT,
+    )
+    main = page.locator("main")
+    expect(main).to_contain_text(other["names"]["gateway"])
+    assert ours["noun"] not in main.inner_text()
+    expect(page.locator("#relationship-%s" % ours["rel1_id"])).to_have_count(0)

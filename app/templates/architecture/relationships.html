@@ -19,7 +19,7 @@
             <tbody class="divide-y divide-border">{# actionable-rows-ok: no per-element link here -- open the
                  element from the ArchiMate element list or the Composer instead. #}
                 {% for rel in relationships %}
-                <tr class="hover:bg-muted/30">
+                <tr id="relationship-{{ rel.id }}" class="hover:bg-muted/30">
                     <td class="px-6 py-3 text-foreground">{{ rel.source_name or ('#' ~ rel.source_id) }}</td>
                     <td class="px-6 py-3 text-muted-foreground">{{ rel.type|default('—') }}</td>
                     <td class="px-6 py-3 text-foreground">{{ rel.target_name or ('#' ~ rel.target_id) }}</td>

@@ -490,7 +490,13 @@
         // For explicit (recorded) rows, include provenance so the drawer can show
         // where the link came from, who recorded it and when.
         if (relation.kind === 'explicit' && relation.provenance) {
-            detail.provenance = relation.provenance;
+            // The server's words are lower case where the origin is missing
+            // ("origin not recorded"); the drawer shows them as a sentence.
+            var origin = Object.assign({}, relation.provenance);
+            if (typeof origin.text === 'string' && origin.text) {
+                origin.text = origin.text.charAt(0).toUpperCase() + origin.text.slice(1);
+            }
+            detail.provenance = origin;
         }
         return detail;
     }
