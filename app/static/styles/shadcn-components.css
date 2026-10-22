@@ -61,6 +61,13 @@
     background-color: hsl(var(--card));
 }
 
+/* The row a link anchors to (for example #gap-5) is marked across every cell. The
+   sticky first and last cells carry their own opaque colour, so they are tinted
+   here too, with the same primary tint laid over the card colour. */
+#main-content .overflow-x-auto table tbody tr:target td {
+    background-color: color-mix(in srgb, hsl(var(--primary)) 10%, hsl(var(--card)));
+}
+
 #main-content .overflow-x-auto table thead th:first-child,
 #main-content .overflow-x-auto table tbody td:first-child {
     left: 0;
