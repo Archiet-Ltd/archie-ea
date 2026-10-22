@@ -389,10 +389,33 @@ def favicon():
     return Response(status=204)
 
 
+# Old /portfolio/<name> addresses whose page lives under another prefix.
+_PORTFOLIO_MOVED = {"gap-analysis": "enterprise.gap_analysis"}
+
+
 @main.route("/portfolio/<path:subpath>")
 def portfolio_redirect(subpath):
-    """Redirect /portfolio/* to /enterprise/portfolio/* for convenience"""
-    return redirect("/enterprise/portfolio/" + subpath, code=301)
+    """Redirect /portfolio/* to /enterprise/portfolio/* when that page exists.
+
+    A path with no page behind it is a plain 404 here, not a redirect into a
+    404 under /enterprise. Old addresses whose page lives elsewhere are listed
+    in _PORTFOLIO_MOVED and go to that page by endpoint name.
+    """
+    from flask import abort
+    from werkzeug.exceptions import HTTPException
+    from werkzeug.routing import RequestRedirect
+
+    moved = _PORTFOLIO_MOVED.get(subpath.rstrip("/"))
+    if moved:
+        return redirect(url_for(moved), code=301)
+    target = "/enterprise/portfolio/" + subpath
+    try:
+        current_app.url_map.bind_to_environ(request.environ).match(target, method="GET")
+    except RequestRedirect:
+        return redirect(target, code=301)  # the page exists under a slash variant
+    except HTTPException:
+        abort(404)  # no page behind it
+    return redirect(target, code=301)  # matched: the page exists
 
 
 @main.route("/dashboards/overview")

@@ -9,6 +9,7 @@ Routes: 14
 from flask import Blueprint, jsonify, request
 from flask_login import current_user, login_required
 
+from app.core.auth.decorators import require_permission
 from app.decorators import audit_log
 from app.services.ai_data_interaction_service import AIDataInteractionService
 from app.services.rate_limiter import rate_limit
@@ -125,6 +126,7 @@ def validate_operation():
 
 @ai_data_interaction.route("/create-application", methods=["POST"])
 @login_required
+@require_permission("create", "application")
 @audit_log("ai_data_create_application")
 @rate_limit(20, "1h")
 def create_application():
@@ -165,6 +167,7 @@ def create_application():
 
 @ai_data_interaction.route("/update-application/<int:application_id>", methods=["PUT"])
 @login_required
+@require_permission("edit", "application")
 @audit_log("ai_data_update_application")
 def update_application(application_id):
     """
@@ -271,6 +274,7 @@ def update_vendor(vendor_id):
 
 @ai_data_interaction.route("/create-capability-mapping", methods=["POST"])
 @login_required
+@require_permission("create", "relationship")
 @audit_log("ai_data_create_capability_mapping")
 @rate_limit(20, "1h")
 def create_capability_mapping():
@@ -291,6 +295,16 @@ def create_capability_mapping():
         if not data:
             return jsonify({"error": "No JSON data received"}), 400
 
+        # Both ends must be visible in the caller's organisation (the ORM is
+        # tenant-scoped); a foreign id is "not found", not a link.
+        from app.models.application_portfolio import ApplicationComponent
+        from app.models.unified_capability import UnifiedCapability
+
+        if not ApplicationComponent.query.get(data.get("application_component_id") or 0):
+            return jsonify({"success": False, "error": "Application not found"}), 404
+        if not UnifiedCapability.query.get(data.get("unified_capability_id") or 0):
+            return jsonify({"success": False, "error": "Capability not found"}), 404
+
         service = AIDataInteractionService(user_id=current_user.id)
         result = service.create_capability_mapping(data)
 
@@ -310,6 +324,7 @@ def create_capability_mapping():
 
 @ai_data_interaction.route("/update-capability-mapping/<int:mapping_id>", methods=["PUT"])
 @login_required
+@require_permission("edit", "relationship")
 @audit_log("ai_data_update_capability_mapping")
 def update_capability_mapping(mapping_id):
     """
@@ -326,6 +341,17 @@ def update_capability_mapping(mapping_id):
         data = request.get_json()
         if not data:
             return jsonify({"error": "No JSON data received"}), 400
+
+        # The mapping belongs to an application; that application must be
+        # visible in the caller's organisation.
+        from app.models.application_portfolio import ApplicationComponent
+        from app.models.unified_application_capability_mapping import (
+            UnifiedApplicationCapabilityMapping,
+        )
+
+        mapping = UnifiedApplicationCapabilityMapping.query.get(mapping_id)
+        if mapping is None or not ApplicationComponent.query.get(mapping.application_component_id):
+            return jsonify({"success": False, "error": "Mapping not found"}), 404
 
         service = AIDataInteractionService(user_id=current_user.id)
         result = service.update_capability_mapping(mapping_id, data)
@@ -346,6 +372,7 @@ def update_capability_mapping(mapping_id):
 
 @ai_data_interaction.route("/bulk-create-applications", methods=["POST"])
 @login_required
+@require_permission("create", "application")
 @audit_log("ai_data_bulk_create_applications")
 @rate_limit(5, "1h")
 def bulk_create_applications():
@@ -397,6 +424,7 @@ def bulk_create_applications():
 
 @ai_data_interaction.route("/bulk-update-applications", methods=["POST"])
 @login_required
+@require_permission("edit", "application")
 @audit_log("ai_data_bulk_update_applications")
 @rate_limit(5, "1h")
 def bulk_update_applications():
