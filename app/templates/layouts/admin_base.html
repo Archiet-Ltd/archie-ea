@@ -498,14 +498,12 @@
     </div>
 
     <!-- Global Loading Indicator -->
+    {# No x-transition: the bar flips on and off with every request, often inside
+       one transition duration. Alpine rejects the superseded transition promise
+       with {isFromCancelledTransition}, and Firefox reports that rejection as an
+       uncaught page error before 05-error.js can see it. A 4px bar needs no fade. #}
     <div x-data
          x-show="$store.loading.active" x-cloak
-         x-transition:enter="transition ease-out duration-200"
-         x-transition:enter-start="opacity-0"
-         x-transition:enter-end="opacity-100"
-         x-transition:leave="transition ease-in duration-150"
-         x-transition:leave-start="opacity-100"
-         x-transition:leave-end="opacity-0"
          class="fixed top-0 left-0 right-0 z-50 h-1 bg-primary/20"
          x-cloak>
         <div class="h-full bg-primary animate-pulse"></div>

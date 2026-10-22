@@ -415,7 +415,7 @@ def test_a_changed_classification_is_honoured_by_approve_all(db_session, org_a, 
 
 
 def _origin_of(citation):
-    return citation.get("origin") or {}
+    return citation.get("source") or {}
 
 
 def test_what_breaks_if_an_application_fails_cites_repositories_and_commits(
