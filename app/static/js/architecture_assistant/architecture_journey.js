@@ -9,14 +9,53 @@
      * - Rejects on non-2xx HTTP status (so .catch() fires on 404/500)
      * - Always returns parsed JSON
      */
+    // A person never reads database or exception text. Anything that looks like
+    // it is replaced by the one plain sentence the rest of the product uses.
+    const RAW_ERROR = /UPDATE statement|expected to update|StaleDataError|sqlalchemy|psycopg|IntegrityError|OperationalError|ProgrammingError|\[SQL|\[parameters|Traceback|violates .* constraint|does not exist|NoneType|KeyError|AttributeError|TypeError|ValueError|Exception|Errno/i;
+    const NO_MODEL = /LLM provider|No enabled LLM|AI feature .* not available|provider must be configured|No LLM/i;
+    const PLAIN_NO_MODEL = 'This step needs an AI model and none is connected for your organisation. ' +
+        'You can carry on by hand: add the items yourself on this page, or ask an administrator to connect a provider.';
+    const PLAIN_FAILED = 'Something went wrong on our side. Check whether your changes were saved before trying again. ' +
+        'If it keeps happening, tell your administrator.';
+    function _plainMessage(status, message) {
+        const m = String(message || '');
+        if (NO_MODEL.test(m)) return PLAIN_NO_MODEL;
+        if (RAW_ERROR.test(m)) return PLAIN_FAILED;
+        if (status >= 500 && !m) return PLAIN_FAILED;
+        return m || 'Request failed';
+    }
+
+    // Writes to one solution run one at a time. The wizard used to send the
+    // pipeline's next call, the progress save and the relationship inference at
+    // the same moment, and two of them would race for the same solution row.
+    const _writeQueues = {};
     function _fetch(url, opts) {
+        const method = String((opts && opts.method) || 'GET').toUpperCase();
+        if (method === 'GET') return _fetchNow(url, opts);
+        const key = String(url).split('/').slice(0, 3).join('/');
+        const prev = _writeQueues[key] || Promise.resolve();
+        const run = prev.then(function () { return _fetchWithRetry(url, opts, 0); });
+        _writeQueues[key] = run.catch(function () { /* the queue goes on after a failure */ });
+        return run;
+    }
+    function _fetchWithRetry(url, opts, attempt) {
+        return _fetchNow(url, opts).catch(function (e) {
+            if (e && e.status === 409 && e.body && e.body.errors && e.body.errors.kind === 'conflict' && attempt < 2) {
+                return new Promise(function (resolve) { setTimeout(resolve, 500 * (attempt + 1)); })
+                    .then(function () { return _fetchWithRetry(url, opts, attempt + 1); });
+            }
+            throw e;
+        });
+    }
+
+    function _fetchNow(url, opts) {
         // Platform.fetch already handles CSRF, JSON serialization, and error throwing.
         // We preserve the same envelope unwrapping behavior.
         return Platform.fetch(url, opts).then(function (body) {
             // Explicit failure envelope: {success: false, error: "..."} with HTTP 200
             // Treat as a thrown error so callers' .catch() fires — prevents silent empty results.
             if (body && body.success === false) {
-                let err = new Error(body.error || 'Request failed');
+                let err = new Error(_plainMessage(200, body.error || 'Request failed'));
                 err.status = 200; // Platform.fetch throws on non-2xx, so this is a 200 response
                 err.body = body;
                 throw err;
@@ -28,7 +67,7 @@
             // We need to preserve the existing error shape for backward compatibility.
             // The original _fetch attached status and body to the error.
             // PlatformError has e.status and e.data.
-            const err = new Error(e.message || 'Request failed');
+            const err = new Error(e.status === 200 ? (e.message || 'Request failed') : _plainMessage(e.status || 0, e.message));
             err.status = e.status || 0;
             err.body = e.data || null;
             throw err;
@@ -342,7 +381,7 @@
                 // ever ran — so every freshly created solution opened its journey
                 // behind two error toasts describing a state that is not an error.
                 // The genuine failures are still reported, by the .catch().
-                _fetch(API_BASE + '/' + self.solutionId + '/codegen/file-list', { silent: true })
+                _fetch('/solutions/' + self.solutionId + '/codegen/file-list', { silent: true })
                     .then(function (data) {
                         if (data && data.files && data.files.length > 0) {
                             self.hasGeneratedFiles = true;
@@ -668,6 +707,17 @@
                 });
             },
 
+            // A step is ticked complete only when its content exists.
+            _tick: function (n) {
+                let has = true;
+                if (n === 2) has = this.acceptedCapabilities.length > 0 || this.domainsPopulated;
+                else if (n === 3) has = this.reasoningLandscape.length > 0 || !!(this.architectureResult && this.architectureResult.total > 0);
+                else if (n === 4) has = this.reasoningOptions.length > 0 || (this.decisionPoints || []).length > 0;
+                else if (n === 5) has = !!this.reasoningRecommendation;
+                else if (n === 6) has = (this.reasoningCompleteness || 0) > 0;
+                if (has && this.completedSteps.indexOf(n) === -1) this.completedSteps.push(n);
+            },
+
             prevStep: function () {
                 this.currentStep = Math.max(this.currentStep - 1, 1);
                 this._autoLoadStepData(this.currentStep);
@@ -708,7 +758,7 @@
                         }
                         break;
                     case 3:
-                        if (this.architectureResult) {
+                        if (this.architectureResult && this.architectureResult.total > 0) {
                             this.copilotMessage = 'Architecture generated. Review elements by layer -- accept or reject each.';
                         } else {
                             this.copilotMessage = 'Click "Generate Architecture" to create ArchiMate elements from your accepted capabilities.';
@@ -1688,7 +1738,7 @@
                     clearInterval(pollTimer);
                     self.llmDegraded.step3 = true;
                     self.error = 'Failed to generate architecture: ' + msg;
-                    self.copilotMessage = 'Architecture generation failed. Check API configuration and retry.';
+                    self.copilotMessage = 'Architecture generation did not complete. Your capabilities are kept.';
                     self.architectureLoading = false;
                 }
 
@@ -3583,7 +3633,6 @@
                     }
 
                     // Step 2 -> 3: Map landscape
-                    self.completedSteps.push(2);
                     self.currentStep = 3;
                     return _fetch(API_BASE + '/' + self.solutionId + '/reasoning/map-landscape', {
                         method: 'POST',
@@ -3591,6 +3640,7 @@
                     });
                 }).then(function (data) {
                     self.reasoningLandscape = data.applications || [];
+                    self._tick(2);
                     const decomCount = data.decommissioning_count || 0;
                     const costedCount = data.costed_count || 0;
                     self.copilotMessage = data.count + ' applications serve your capabilities' +
@@ -3643,7 +3693,7 @@
                     }
 
                     // Step 3 -> 4: Detect gaps
-                    self.completedSteps.push(3);
+                    self._tick(3);
                     self.currentStep = 4;
                     return _fetch(API_BASE + '/' + self.solutionId + '/reasoning/detect-gaps', {
                         method: 'POST',
@@ -3665,7 +3715,7 @@
                     });
                 }).then(function (data) {
                     self.reasoningOptions = data.options || [];
-                    self.completedSteps.push(4);
+                    self._tick(4);
                     self.currentStep = 5;
 
                     // Auto-select first option (hybrid if available)
@@ -3686,7 +3736,7 @@
                     });
                 }).then(function (data) {
                     self.reasoningRecommendation = data;
-                    self.completedSteps.push(5);
+                    self._tick(5);
                     self.currentStep = 6;
 
                     // Step 6: Populate blueprint
@@ -3697,7 +3747,7 @@
                 }).then(function (data) {
                     self.reasoningCompleteness = data.completeness || 0;
                     self.domainsPopulated = true;
-                    self.completedSteps.push(6);
+                    self._tick(6);
                     self.loading = false;
                     self._pipelineRunning = false;
                     self._saveState();
@@ -3711,14 +3761,14 @@
                     self.loading = false;
                     self._pipelineRunning = false;
                     if (e.message !== 'No capabilities' && e.message !== 'No options') {
-                        let stepName = 'step ' + self.currentStep;
-                        if (self.currentStep === 2) stepName = 'discover-capabilities';
-                        else if (self.currentStep === 3) stepName = 'map-landscape / estimate-costs';
-                        else if (self.currentStep === 4) stepName = 'detect-gaps';
-                        else if (self.currentStep === 5) stepName = 'generate-options / select-recommendation';
-                        else if (self.currentStep === 6) stepName = 'populate-blueprint';
-                        self.error = 'Pipeline stopped at "' + stepName + '": ' + (e.message || 'Unknown error');
-                        self.copilotMessage = 'Pipeline stopped at "' + stepName + '". You can continue manually from the current step.';
+                        let stepName = 'this step';
+                        if (self.currentStep === 2) stepName = 'finding capabilities';
+                        else if (self.currentStep === 3) stepName = 'mapping your applications and costs';
+                        else if (self.currentStep === 4) stepName = 'finding gaps';
+                        else if (self.currentStep === 5) stepName = 'preparing options';
+                        else if (self.currentStep === 6) stepName = 'filling the blueprint';
+                        self.error = 'The automatic run stopped while ' + stepName + '. ' + _plainMessage(e.status || 0, e.message);
+                        self.copilotMessage = 'The automatic run stopped while ' + stepName + '. You can continue by hand from the current step.';
                     }
                 });
             },
