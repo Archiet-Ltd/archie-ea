@@ -28,8 +28,8 @@ def _tokens(selector):
 
 
 def _rgb(triplet):
-    h, s, l = re.match(r"^\s*([\d.]+)\s+([\d.]+)%\s+([\d.]+)%", triplet).groups()
-    r, g, b = colorsys.hls_to_rgb(float(h) / 360.0, float(l) / 100.0, float(s) / 100.0)
+    h, s, light = re.match(r"^\s*([\d.]+)\s+([\d.]+)%\s+([\d.]+)%", triplet).groups()
+    r, g, b = colorsys.hls_to_rgb(float(h) / 360.0, float(light) / 100.0, float(s) / 100.0)
     return r, g, b
 
 
