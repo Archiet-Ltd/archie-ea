@@ -31,7 +31,8 @@ from sqlalchemy import (  # dead-code-ok
     Text,
     event,
 )
-from sqlalchemy.orm import relationship, validates  # dead-code-ok
+from sqlalchemy.ext.hybrid import hybrid_property
+from sqlalchemy.orm import Session, relationship, validates  # dead-code-ok
 
 from .. import db
 from .mixins import OptimisticLockMixin, TenantMixin
@@ -75,6 +76,33 @@ APPLICATION_LIFECYCLE_STAGES = [
 # mean "not assessed"; consumers must not present arbitrary strings as facts.
 APPLICATION_RISK_LEVELS = frozenset({"low", "medium", "high", "critical"})
 APPLICATION_HEALTH_STATUSES = frozenset({"healthy", "at_risk", "critical"})
+
+
+def _owner_field(field: str) -> hybrid_property:
+    """An application's owner field, answered by the one ownership record.
+
+    Reading gives the recorded owner's name, assigning records the owner at the
+    next flush, and on the class it is SQL a filter or ordering can use. All of
+    it lives in element_ownership_service; this is only the attribute.
+    """
+
+    def read(self):
+        from app.services import element_ownership_service as owners
+
+        return owners.application_owner_text(self, field)
+
+    def write(self, value):
+        from app.services import element_ownership_service as owners
+
+        owners.stage_application_owner_text(self, field, value)
+
+    def sql(cls):
+        from app.services import element_ownership_service as owners
+
+        return owners.application_owner_expression(cls, field)
+
+    read.__name__ = write.__name__ = sql.__name__ = field
+    return hybrid_property(read, write, expr=sql)
 
 
 class ApplicationComponent(TenantMixin, db.Model, OptimisticLockMixin):
@@ -280,9 +308,15 @@ class ApplicationComponent(TenantMixin, db.Model, OptimisticLockMixin):
     security_certifications = Column(db.Text)  # JSON array of security certifications
 
     # Governance
-    application_owner = Column(db.String(100))
-    business_owner = Column(db.String(100))
-    technical_owner = Column(db.String(100))
+    # Owners are recorded as ApplicationOwner rows (ADR 0008, one system of
+    # record); the three text columns hold only a name that matched no user and
+    # are read and written through the owner fields below, never directly.
+    legacy_application_owner = Column("application_owner", db.String(100))
+    legacy_business_owner = Column("business_owner", db.String(100))
+    legacy_technical_owner = Column("technical_owner", db.String(100))
+    application_owner = _owner_field("application_owner")
+    business_owner = _owner_field("business_owner")
+    technical_owner = _owner_field("technical_owner")
     technical_lead = Column(db.String(100))  # Technical lead for the application
     product_manager = Column(db.String(100))
     development_team = Column(db.String(100))
@@ -968,6 +1002,27 @@ class ApplicationPortfolio(db.Model, OptimisticLockMixin):
 
 
 # Event listeners for ApplicationComponent validation
+@event.listens_for(Session, "before_flush")
+def record_assigned_application_owners(session, flush_context, instances):
+    """Turn owner fields assigned on an application into ownership records.
+
+    Runs before the flush so the new ``ApplicationOwner`` rows are written in
+    the same flush as the application, inside the caller's transaction.
+    """
+    from flask import g, has_request_context
+
+    from app.services.element_ownership_service import apply_staged_application_owners
+
+    for application in [o for o in (*session.new, *session.dirty) if isinstance(o, ApplicationComponent)]:
+        if not application.__dict__.get("_pending_owner_text"):
+            continue
+        organization_id = application.organization_id
+        if organization_id is None and has_request_context():
+            organization_id = getattr(g, "current_org_id", None)
+        with session.no_autoflush:
+            apply_staged_application_owners(application, organization_id)
+
+
 @event.listens_for(ApplicationComponent, "before_insert")
 @event.listens_for(ApplicationComponent, "before_update")
 def validate_application_name(mapper, connection, target):

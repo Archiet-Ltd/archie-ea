@@ -550,12 +550,14 @@ def overview():
     # Single aggregate query; percentages match DATA_REALITY.md definitions.
     data_coverage = {}
     try:
+        from app.services.element_ownership_service import application_is_owned_expression
+
         _nonempty = lambda col: db.func.sum(  # noqa: E731
             db.case((db.and_(col.isnot(None), col != ""), 1), else_=0)
         )
         cov_row = db.session.query(
             db.func.count(ApplicationComponent.id),
-            _nonempty(ApplicationComponent.business_owner),
+            db.func.sum(db.case((application_is_owned_expression(ApplicationComponent), 1), else_=0)),
             db.func.sum(
                 db.case(
                     (
@@ -600,7 +602,13 @@ def overview():
         data_coverage = {"query_error": str(exc)}
 
     # PLT-040: Role-based workspace cards
-    enterprise_role = getattr(current_user, "enterprise_role", "platform_admin")
+    # The lens a person chose for their own workspace cards, else the persona an
+    # administrator assigned; display only, never a permission.
+    enterprise_role = (
+        getattr(current_user, "persona_lens", None)
+        or getattr(current_user, "enterprise_role", None)
+        or "platform_admin"
+    )
 
     # Dashboard mode (shell-wave-1 Task 5): guided setup for a sparse org vs. the
     # data-led view once there is something to show. Reuses counts already fetched
@@ -751,18 +759,23 @@ def api_overview_chart():
 @timed_route
 @login_required
 def api_onboarding_complete():
-    """PLT-040: Mark user onboarding as complete, optionally update enterprise_role."""
+    """Mark onboarding complete. Never writes a role.
+
+    ``enterprise_role`` carries permissions and is set only by an administrator
+    (role page, invitation, single sign-on mapping). This route used to write
+    it from the request body, so any signed-in account could make itself an
+    ARB member, enterprise architect or platform admin persona. A person's own
+    choice is a lens preference (``User.persona_lens``), which no permission
+    check reads; either key in the body is taken as that preference only.
+    """
     import datetime
 
+    from app.models.user import User
+
     data = request.get_json(silent=True) or {}
-    new_role = data.get("enterprise_role")
-    valid_roles = {
-        "solution_architect", "enterprise_architect",
-        "arb_member", "portfolio_manager", "platform_admin",
-        "cto", "application_manager", "procurement",
-    }
-    if new_role and new_role in valid_roles:
-        current_user.enterprise_role = new_role
+    lens = data.get("persona_lens") or data.get("enterprise_role")
+    if lens and lens in User.PERSONA_LENSES:
+        current_user.persona_lens = lens
     current_user.onboarding_completed_at = datetime.datetime.utcnow()
     try:
         db.session.commit()
