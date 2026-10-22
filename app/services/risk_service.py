@@ -351,13 +351,20 @@ def ranked_risks():
         app_elements = {t["element_id"] for t in touches}
         # The risk's own mirrored element is never listed: it is the risk itself,
         # not something the risk touches (its page has no relationships to show).
-        app_elements.add(risk.archimate_element_id)
+        if risk.archimate_element_id is not None:
+            app_elements.add(risk.archimate_element_id)
         nearest = sorted(reached, key=lambda e: (reached[e], names.get(e, ""), e))
+        named = [e for e in nearest if e in names and e not in app_elements]
         touches += [{"name": names[e], "kind": "element", "id": e, "element_id": e}
-                    for e in nearest if e in names and e not in app_elements][:_TOUCHES_SHOWN]
+                    for e in named[:_TOUCHES_SHOWN]]
+        # The ranking sentence states the reach figure only when the elements
+        # named beside it are exactly that many; otherwise it says nothing a
+        # reader could count and find different.
+        figure_matches = exposure is not None and len(named) == exposure
         entries.append({
             "risk": risk, "exposure": exposure, "why": why, "touches": touches,
-            "score": risk.risk_score,
+            "score": risk.risk_score, "reached_total": len(named),
+            "figure_matches": figure_matches,
         })
 
     entries.sort(key=lambda e: (
@@ -372,9 +379,11 @@ def ranked_risks():
     for position, entry in enumerate(entries, start=1):
         risk = entry["risk"]
         scores = "likelihood %d of 5, impact %d of 5" % (risk.likelihood, risk.impact)
-        if entry["exposure"] is not None:
+        if entry["exposure"] is not None and entry["figure_matches"]:
             reason = "Ranked %d of %d: reaches %s, %s" % (
                 position, total, _plural(entry["exposure"], "element"), scores)
+        elif entry["exposure"] is not None:
+            reason = "Ranked %d of %d by how far it reaches, then by score (%s)" % (position, total, scores)
         elif entry["why"] == "no_links":
             reason = "Ranked %d of %d: no linked elements recorded, ranked by its recorded score of %d (%s)" % (
                 position, total, entry["score"], scores)
@@ -386,6 +395,7 @@ def ranked_risks():
             "status": risk.status.value, "risk_level": risk.risk_level,
             "likelihood": risk.likelihood, "impact": risk.impact, "risk_score": entry["score"],
             "exposure": entry["exposure"], "reason": reason, "touches": entry["touches"],
+            "reached_total": entry["reached_total"],
             "worked_out": entry["why"] != "not_computed",
         })
     return {"rows": rows, "total": total, "rule": RANKING_RULE}

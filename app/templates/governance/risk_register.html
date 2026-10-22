@@ -82,14 +82,18 @@
                     </div>
                     <p class="text-xs text-muted-foreground mt-0.5" data-risk-reason>{{ r.reason }}</p>
                     {% if r.touches %}
-                    <p class="text-xs text-muted-foreground mt-1">Touches:
-                        {% for t in r.touches %}
-                        {% if t.kind == 'application' and 'unified_applications.application_fact_sheet' in flask.current_app.view_functions %}
-                        <a href="{{ url_for('unified_applications.application_fact_sheet', id=t.id) }}" class="text-primary hover:underline">{{ t.name }}</a>{{ ',' if not loop.last }}
-                        {% elif 'archimate.element_impact_graph_page' in flask.current_app.view_functions %}
-                        <a href="{{ url_for('archimate.element_impact_graph_page', element_id=t.element_id) }}" class="text-primary hover:underline">{{ t.name }}</a>{{ ',' if not loop.last }}
-                        {% else %}{{ t.name }}{{ ',' if not loop.last }}{% endif %}
-                        {% endfor %}
+                    {% set _linked = r.touches | selectattr('kind', 'equalto', 'application') | list %}
+                    {% set _reached = r.touches | rejectattr('kind', 'equalto', 'application') | list %}
+                    <p class="text-xs text-muted-foreground mt-1" data-risk-touches>
+                        {% macro _touch(t) -%}
+                        {% if t.kind == 'application' and 'unified_applications.application_fact_sheet' in flask.current_app.view_functions -%}
+                        <a href="{{ url_for('unified_applications.application_fact_sheet', id=t.id) }}" class="text-primary hover:underline">{{ t.name }}</a>
+                        {%- elif 'archimate.element_impact_graph_page' in flask.current_app.view_functions -%}
+                        <a href="{{ url_for('archimate.element_impact_graph_page', element_id=t.element_id) }}" class="text-primary hover:underline">{{ t.name }}</a>
+                        {%- else -%}{{ t.name }}{%- endif %}
+                        {%- endmacro %}
+                        {% if _linked %}<span data-risk-linked>Linked to {% for t in _linked %}{{ _touch(t) }}{{ ', ' if not loop.last }}{% endfor %}{% if _reached %};{% endif %}</span>{% endif %}
+                        {% if _reached %}<span data-risk-reached>{{ 'reaches' if _linked else 'Reaches' }} <span class="tabular-nums">{{ r.reached_total }}</span>{{ ' more' if _linked }}{{ ', including' if r.reached_total > _reached | length }}: {% for t in _reached %}{{ _touch(t) }}{{ ', ' if not loop.last }}{% endfor %}</span>{% endif %}
                     </p>
                     {% elif r.worked_out %}
                     <p class="text-xs text-muted-foreground mt-1" data-risk-unlinked>Not linked to any application, solution or programme yet.

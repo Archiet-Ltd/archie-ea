@@ -67,19 +67,31 @@ def test_risk_register_touches_journey(live_server, browser):
         return page.locator("[data-risk-row]", has_text="%s linked risk" % noun)
 
     row = register()
-    touches = row.locator("p", has_text="Touches:")
+    touches = row.locator("[data-risk-touches]")
     expect(touches).to_be_visible()
     # Never the risk's own element.
     assert "mirror" not in touches.inner_text()
     # The count is said once per row: in the ranking sentence, not also as a chip.
     assert row.inner_text().lower().count("reaches 2 elements") == 1, row.inner_text()
+    # What each is: the linked application is named under "Linked to"; the
+    # reach number equals the reached elements named beside it.
+    linked = row.locator("[data-risk-linked]")
+    reached = row.locator("[data-risk-reached]")
+    assert linked.inner_text().strip().rstrip(";") == "Linked to %s Billing" % noun, linked.inner_text()
+    assert linked.locator("a").all_inner_texts() == ["%s Billing" % noun]
+    reached_names = reached.locator("a").all_inner_texts()
+    assert sorted(reached_names) == ["%s Invoices" % noun, "%s Payments" % noun]
+    shown = int(reached.locator(".tabular-nums").inner_text())
+    assert shown == len(reached_names) == 2
+    assert "reaches 2 more" in touches.inner_text().lower()
+    assert "reaches 2 elements" in row.locator("[data-risk-reason]").inner_text().lower()
     names = touches.locator("a").all_inner_texts()
     assert sorted(names) == sorted(["%s Billing" % noun, "%s Invoices" % noun, "%s Payments" % noun]), names
 
     # Click every Touches link: the landing page shows content for that element.
     for name in names:
         row = register()
-        row.locator("p", has_text="Touches:").get_by_role("link", name=name, exact=True).click()
+        row.locator("[data-risk-touches]").get_by_role("link", name=name, exact=True).click()
         page.wait_for_load_state("domcontentloaded")
         body = page.locator("body")
         expect(body).not_to_contain_text("Page not found")
@@ -96,7 +108,7 @@ def test_risk_register_touches_journey(live_server, browser):
     register()
     loose = page.locator("[data-risk-row]", has_text="%s loose risk" % noun)
     expect(loose.locator("[data-risk-unlinked]")).to_contain_text("Not linked to any application, solution or programme yet")
-    expect(loose).not_to_contain_text("Touches:")
+    expect(loose.locator("[data-risk-touches]")).to_have_count(0)
     expect(loose).not_to_contain_text("Reaches —")
     assert "mirror" not in loose.inner_text()
     loose.get_by_role("button", name="Link it").click()
