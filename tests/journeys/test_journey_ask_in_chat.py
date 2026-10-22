@@ -65,7 +65,16 @@ def person(app, client):
         user_id = make_user(db, org_id, "asker", "enterprise_architect", role_name="Architect")
         root_id = _seed_estate(db, org_id)
     login(client, user_id)
-    return {"element_id": root_id, "element_name": "Ledger Core"}
+    yield {"element_id": root_id, "element_name": "Ledger Core"}
+    # Every ask stores its answer; leave none behind for tests that count stored answers.
+    with app.app_context():
+        from app.models.answer_record import AnswerRecord
+
+        try:
+            AnswerRecord.query.filter_by(organization_id=org_id).delete()
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
 
 
 def _page(browser, client):
