@@ -4,10 +4,9 @@ Blueprint: teams_bp  |  URL prefix: /teams
 """
 
 import logging
-from datetime import date
 
 from flask import Blueprint, abort, flash, jsonify, redirect, render_template, request, url_for
-from flask_login import current_user, login_required
+from flask_login import login_required
 
 from app import db
 from app.middleware.tenant_context import current_org_id

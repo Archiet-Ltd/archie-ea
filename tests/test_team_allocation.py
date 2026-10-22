@@ -3,8 +3,6 @@
 These tests use the standard test fixtures (db_session, make_org) from conftest.py.
 """
 import pytest
-from app import db
-from app.models.business_layer import BusinessActor
 from app.models.team_allocation import TeamAllocation
 from app.services.team_service import (
     AllocationOverflow,
@@ -133,11 +131,11 @@ class TestTeamAllocationModel:
         """List allocations for a team."""
         org = make_org("test-org")
         team = create_team(name="Test Team", organization_id=org.id)
-        alloc1 = record_allocation(
+        record_allocation(
             team_id=team.id, element_type="application", element_id=1,
             share_percent=50, organization_id=org.id,
         )
-        alloc2 = record_allocation(
+        record_allocation(
             team_id=team.id, element_type="technology", element_id=2,
             share_percent=50, organization_id=org.id,
         )
