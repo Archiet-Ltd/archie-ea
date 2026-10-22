@@ -57625,7 +57625,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 33,
+   "rendered_on_count": 34,
    "target": {
     "href": "href"
    },
@@ -60296,6 +60296,148 @@
    "template": "app/templates/components/pagination_controls.html",
    "testid": null,
    "type": "inline-render",
+   "via_macro": null
+  },
+  {
+   "id": "app/templates/components/priority_actions.html::link::0",
+   "kind": "link",
+   "label": "row.action",
+   "line": null,
+   "mutating": false,
+   "rendered_on": [
+    "/enterprise/analysis/ai-architecture",
+    "/strategic/impact-analysis"
+   ],
+   "rendered_on_count": 2,
+   "target": {
+    "href": "href"
+   },
+   "template": "app/templates/components/priority_actions.html",
+   "testid": "priority-action-link",
+   "type": null,
+   "via_macro": null
+  },
+  {
+   "id": "app/templates/components/priority_actions.html::link::1",
+   "kind": "link",
+   "label": "Show all {{ pa.total }} actions",
+   "line": null,
+   "mutating": false,
+   "rendered_on": [
+    "/enterprise/analysis/ai-architecture",
+    "/strategic/impact-analysis"
+   ],
+   "rendered_on_count": 2,
+   "target": {
+    "href": "{{ request.path }}?all_actions=1#priority-actions"
+   },
+   "template": "app/templates/components/priority_actions.html",
+   "testid": "priority-actions-show-all",
+   "type": null,
+   "via_macro": null
+  },
+  {
+   "id": "app/templates/components/priority_actions.html::link::2",
+   "kind": "link",
+   "label": "Show the first 10",
+   "line": null,
+   "mutating": false,
+   "rendered_on": [
+    "/enterprise/analysis/ai-architecture",
+    "/strategic/impact-analysis"
+   ],
+   "rendered_on_count": 2,
+   "target": {
+    "href": "{{ request.path }}#priority-actions"
+   },
+   "template": "app/templates/components/priority_actions.html",
+   "testid": null,
+   "type": null,
+   "via_macro": null
+  },
+  {
+   "id": "app/templates/components/priority_actions.html::testid::0",
+   "kind": "testid",
+   "label": "section",
+   "line": null,
+   "mutating": false,
+   "rendered_on": [
+    "/enterprise/analysis/ai-architecture",
+    "/strategic/impact-analysis"
+   ],
+   "rendered_on_count": 2,
+   "target": {},
+   "template": "app/templates/components/priority_actions.html",
+   "testid": "priority-actions",
+   "type": null,
+   "via_macro": null
+  },
+  {
+   "id": "app/templates/components/priority_actions.html::testid::1",
+   "kind": "testid",
+   "label": "p",
+   "line": null,
+   "mutating": false,
+   "rendered_on": [
+    "/enterprise/analysis/ai-architecture",
+    "/strategic/impact-analysis"
+   ],
+   "rendered_on_count": 2,
+   "target": {},
+   "template": "app/templates/components/priority_actions.html",
+   "testid": "priority-actions-rule",
+   "type": null,
+   "via_macro": null
+  },
+  {
+   "id": "app/templates/components/priority_actions.html::testid::2",
+   "kind": "testid",
+   "label": "ol",
+   "line": null,
+   "mutating": false,
+   "rendered_on": [
+    "/enterprise/analysis/ai-architecture",
+    "/strategic/impact-analysis"
+   ],
+   "rendered_on_count": 2,
+   "target": {},
+   "template": "app/templates/components/priority_actions.html",
+   "testid": "priority-actions-list",
+   "type": null,
+   "via_macro": null
+  },
+  {
+   "id": "app/templates/components/priority_actions.html::testid::3",
+   "kind": "testid",
+   "label": "li",
+   "line": null,
+   "mutating": false,
+   "rendered_on": [
+    "/enterprise/analysis/ai-architecture",
+    "/strategic/impact-analysis"
+   ],
+   "rendered_on_count": 2,
+   "target": {},
+   "template": "app/templates/components/priority_actions.html",
+   "testid": "priority-action-row",
+   "type": null,
+   "via_macro": null
+  },
+  {
+   "id": "app/templates/components/priority_actions.html::testid::4",
+   "kind": "testid",
+   "label": "p",
+   "line": null,
+   "mutating": false,
+   "rendered_on": [
+    "/enterprise/analysis/ai-architecture",
+    "/strategic/impact-analysis"
+   ],
+   "rendered_on_count": 2,
+   "target": {},
+   "template": "app/templates/components/priority_actions.html",
+   "testid": "priority-actions-empty",
+   "type": null,
    "via_macro": null
   },
   {
@@ -69331,44 +69473,6 @@
   {
    "id": "app/templates/enterprise/ai_architecture_analysis.html::link::0",
    "kind": "link",
-   "label": "Review Gaps",
-   "line": null,
-   "mutating": false,
-   "rendered_on": [
-    "/enterprise/analysis/ai-architecture"
-   ],
-   "rendered_on_count": 1,
-   "target": {
-    "endpoint": "enterprise.gap_analysis",
-    "href": "url_for('enterprise.gap_analysis')"
-   },
-   "template": "app/templates/enterprise/ai_architecture_analysis.html",
-   "testid": null,
-   "type": null,
-   "via_macro": null
-  },
-  {
-   "id": "app/templates/enterprise/ai_architecture_analysis.html::link::1",
-   "kind": "link",
-   "label": "View Applications",
-   "line": null,
-   "mutating": false,
-   "rendered_on": [
-    "/enterprise/analysis/ai-architecture"
-   ],
-   "rendered_on_count": 1,
-   "target": {
-    "endpoint": "unified_applications.application_list",
-    "href": "{{ url_for('unified_applications.application_list') }}?status=under_review"
-   },
-   "template": "app/templates/enterprise/ai_architecture_analysis.html",
-   "testid": null,
-   "type": null,
-   "via_macro": null
-  },
-  {
-   "id": "app/templates/enterprise/ai_architecture_analysis.html::link::2",
-   "kind": "link",
    "label": "Add Applications",
    "line": null,
    "mutating": false,
@@ -69386,7 +69490,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/enterprise/ai_architecture_analysis.html::link::3",
+   "id": "app/templates/enterprise/ai_architecture_analysis.html::link::1",
    "kind": "link",
    "label": "View gaps \u2192",
    "line": null,
@@ -69405,7 +69509,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/enterprise/ai_architecture_analysis.html::link::4",
+   "id": "app/templates/enterprise/ai_architecture_analysis.html::link::2",
    "kind": "link",
    "label": "app.name",
    "line": null,
@@ -69424,7 +69528,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/enterprise/ai_architecture_analysis.html::link::5",
+   "id": "app/templates/enterprise/ai_architecture_analysis.html::link::3",
    "kind": "link",
    "label": "Browse Portfolio",
    "line": null,
@@ -69992,6 +70096,25 @@
   {
    "id": "app/templates/enterprise/gap_analysis.html::link::0",
    "kind": "link",
+   "label": "Not set: open the gap to classify it",
+   "line": null,
+   "mutating": false,
+   "rendered_on": [
+    "/enterprise/implementation/gap-analysis"
+   ],
+   "rendered_on_count": 1,
+   "target": {
+    "endpoint": "archimate_crud.detail_element",
+    "href": "url_for('archimate_crud.detail_element', layer='implementation', element_type='Gap', element_id=gap.id)"
+   },
+   "template": "app/templates/enterprise/gap_analysis.html",
+   "testid": "gap-type-unset",
+   "type": null,
+   "via_macro": null
+  },
+  {
+   "id": "app/templates/enterprise/gap_analysis.html::link::1",
+   "kind": "link",
    "label": "label",
    "line": null,
    "mutating": false,
@@ -70008,7 +70131,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/enterprise/gap_analysis.html::link::1",
+   "id": "app/templates/enterprise/gap_analysis.html::link::2",
    "kind": "link",
    "label": "gap.name|default('\u2014', true)",
    "line": null,
@@ -70027,7 +70150,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/enterprise/gap_analysis.html::link::2",
+   "id": "app/templates/enterprise/gap_analysis.html::link::3",
    "kind": "link",
    "label": "wp.name|default('\u2014', true)",
    "line": null,
@@ -70046,7 +70169,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/enterprise/gap_analysis.html::link::3",
+   "id": "app/templates/enterprise/gap_analysis.html::link::4",
    "kind": "link",
    "label": "gap.name|default('\u2014', true)",
    "line": null,
@@ -70065,7 +70188,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/enterprise/gap_analysis.html::link::4",
+   "id": "app/templates/enterprise/gap_analysis.html::link::5",
    "kind": "link",
    "label": "View Details",
    "line": null,
@@ -70105,7 +70228,7 @@
    "id": "app/templates/enterprise/gap_analysis.html::table::0",
    "kind": "table",
    "label": "",
-   "line": 68,
+   "line": 87,
    "mutating": false,
    "rendered_on": [
     "/enterprise/implementation/gap-analysis"
@@ -70121,7 +70244,7 @@
    "id": "app/templates/enterprise/gap_analysis.html::table::1",
    "kind": "table",
    "label": "",
-   "line": 128,
+   "line": 141,
    "mutating": false,
    "rendered_on": [
     "/enterprise/implementation/gap-analysis"
@@ -70136,6 +70259,38 @@
   {
    "id": "app/templates/enterprise/gap_analysis.html::testid::0",
    "kind": "testid",
+   "label": "tr",
+   "line": null,
+   "mutating": false,
+   "rendered_on": [
+    "/enterprise/implementation/gap-analysis"
+   ],
+   "rendered_on_count": 1,
+   "target": {},
+   "template": "app/templates/enterprise/gap_analysis.html",
+   "testid": "gap-row",
+   "type": null,
+   "via_macro": null
+  },
+  {
+   "id": "app/templates/enterprise/gap_analysis.html::testid::1",
+   "kind": "testid",
+   "label": "div",
+   "line": null,
+   "mutating": false,
+   "rendered_on": [
+    "/enterprise/implementation/gap-analysis"
+   ],
+   "rendered_on_count": 1,
+   "target": {},
+   "template": "app/templates/enterprise/gap_analysis.html",
+   "testid": "gap-severity-narrow",
+   "type": null,
+   "via_macro": null
+  },
+  {
+   "id": "app/templates/enterprise/gap_analysis.html::testid::2",
+   "kind": "testid",
    "label": "td",
    "line": null,
    "mutating": false,
@@ -70146,6 +70301,22 @@
    "target": {},
    "template": "app/templates/enterprise/gap_analysis.html",
    "testid": "gap-work-packages-{{ gap.id }}",
+   "type": null,
+   "via_macro": null
+  },
+  {
+   "id": "app/templates/enterprise/gap_analysis.html::testid::3",
+   "kind": "testid",
+   "label": "span",
+   "line": null,
+   "mutating": false,
+   "rendered_on": [
+    "/enterprise/implementation/gap-analysis"
+   ],
+   "rendered_on_count": 1,
+   "target": {},
+   "template": "app/templates/enterprise/gap_analysis.html",
+   "testid": "gap-no-work-package",
    "type": null,
    "via_macro": null
   },
@@ -74094,7 +74265,7 @@
   {
    "id": "app/templates/governance/risk_register.html::button::1",
    "kind": "button",
-   "label": "",
+   "label": "Link it",
    "line": null,
    "mutating": false,
    "rendered_on": [
@@ -74112,7 +74283,7 @@
   {
    "id": "app/templates/governance/risk_register.html::button::2",
    "kind": "button",
-   "label": "Add item",
+   "label": "",
    "line": null,
    "mutating": false,
    "rendered_on": [
@@ -74130,7 +74301,7 @@
   {
    "id": "app/templates/governance/risk_register.html::button::3",
    "kind": "button",
-   "label": "'Resolve' if item.status.value == 'open' else 'Close'",
+   "label": "Add item",
    "line": null,
    "mutating": false,
    "rendered_on": [
@@ -74148,6 +74319,24 @@
   {
    "id": "app/templates/governance/risk_register.html::button::4",
    "kind": "button",
+   "label": "'Resolve' if item.status.value == 'open' else 'Close'",
+   "line": null,
+   "mutating": false,
+   "rendered_on": [
+    "/risks/"
+   ],
+   "rendered_on_count": 1,
+   "target": {
+    "button_type": "button"
+   },
+   "template": "app/templates/governance/risk_register.html",
+   "testid": null,
+   "type": "inline-render",
+   "via_macro": null
+  },
+  {
+   "id": "app/templates/governance/risk_register.html::button::5",
+   "kind": "button",
    "label": "Cancel",
    "line": null,
    "mutating": false,
@@ -74164,7 +74353,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/governance/risk_register.html::button::5",
+   "id": "app/templates/governance/risk_register.html::button::6",
    "kind": "button",
    "label": "Save",
    "line": null,
@@ -74182,7 +74371,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/governance/risk_register.html::button::6",
+   "id": "app/templates/governance/risk_register.html::button::7",
    "kind": "button",
    "label": "Cancel",
    "line": null,
@@ -74197,24 +74386,6 @@
    "template": "app/templates/governance/risk_register.html",
    "testid": null,
    "type": "noop",
-   "via_macro": null
-  },
-  {
-   "id": "app/templates/governance/risk_register.html::button::7",
-   "kind": "button",
-   "label": "",
-   "line": null,
-   "mutating": false,
-   "rendered_on": [
-    "/risks/"
-   ],
-   "rendered_on_count": 1,
-   "target": {
-    "button_type": "button"
-   },
-   "template": "app/templates/governance/risk_register.html",
-   "testid": null,
-   "type": "inline-render",
    "via_macro": null
   },
   {
@@ -74238,7 +74409,7 @@
   {
    "id": "app/templates/governance/risk_register.html::button::9",
    "kind": "button",
-   "label": "Map to\u2026",
+   "label": "",
    "line": null,
    "mutating": false,
    "rendered_on": [
@@ -74256,7 +74427,7 @@
   {
    "id": "app/templates/governance/risk_register.html::button::10",
    "kind": "button",
-   "label": "Unmap",
+   "label": "Map to\u2026",
    "line": null,
    "mutating": false,
    "rendered_on": [
@@ -74274,7 +74445,7 @@
   {
    "id": "app/templates/governance/risk_register.html::button::11",
    "kind": "button",
-   "label": "",
+   "label": "Unmap",
    "line": null,
    "mutating": false,
    "rendered_on": [
@@ -74292,7 +74463,7 @@
   {
    "id": "app/templates/governance/risk_register.html::button::12",
    "kind": "button",
-   "label": "Edit",
+   "label": "",
    "line": null,
    "mutating": false,
    "rendered_on": [
@@ -74309,6 +74480,24 @@
   },
   {
    "id": "app/templates/governance/risk_register.html::button::13",
+   "kind": "button",
+   "label": "Edit",
+   "line": null,
+   "mutating": false,
+   "rendered_on": [
+    "/risks/"
+   ],
+   "rendered_on_count": 1,
+   "target": {
+    "button_type": "button"
+   },
+   "template": "app/templates/governance/risk_register.html",
+   "testid": null,
+   "type": "inline-render",
+   "via_macro": null
+  },
+  {
+   "id": "app/templates/governance/risk_register.html::button::14",
    "kind": "button",
    "label": "Delete",
    "line": null,
@@ -74345,7 +74534,7 @@
    "id": "app/templates/governance/risk_register.html::modal::1",
    "kind": "modal",
    "label": "Add RAID Item",
-   "line": 264,
+   "line": 273,
    "mutating": false,
    "rendered_on": [
     "/risks/"
@@ -74363,7 +74552,7 @@
    "id": "app/templates/governance/risk_register.html::modal::2",
    "kind": "modal",
    "label": "Add Risk",
-   "line": 318,
+   "line": 327,
    "mutating": false,
    "rendered_on": [
     "/risks/"
@@ -74381,7 +74570,7 @@
    "id": "app/templates/governance/risk_register.html::table::0",
    "kind": "table",
    "label": "",
-   "line": 125,
+   "line": 134,
    "mutating": false,
    "rendered_on": [
     "/risks/"
@@ -74397,7 +74586,7 @@
    "id": "app/templates/governance/risk_register.html::table::1",
    "kind": "table",
    "label": "",
-   "line": 200,
+   "line": 209,
    "mutating": false,
    "rendered_on": [
     "/risks/"
@@ -101230,20 +101419,20 @@
   }
  ],
  "counts": {
-  "controls": 5527,
+  "controls": 5538,
   "controls_by_kind": {
-   "button": 3137,
+   "button": 3138,
    "form": 248,
-   "link": 1010,
+   "link": 1012,
    "modal": 193,
    "table": 374,
-   "testid": 565
+   "testid": 573
   },
   "controls_mutating": 745,
   "pages": 469,
   "pages_without_parameters": 339,
   "routes": 3784,
-  "templates": 688,
+  "templates": 689,
   "templates_not_reached_by_a_route": 110
  },
  "routes": [
@@ -107341,7 +107530,8 @@
    "closure": [],
    "endpoint": "ai_data_interaction.bulk_create_applications",
    "guards": [
-    "login_required"
+    "login_required",
+    "require_permission"
    ],
    "has_parameters": false,
    "id": "ai_data_interaction.bulk_create_applications /ai-chat/data/bulk-create-applications",
@@ -107360,7 +107550,8 @@
    "closure": [],
    "endpoint": "ai_data_interaction.bulk_update_applications",
    "guards": [
-    "login_required"
+    "login_required",
+    "require_permission"
    ],
    "has_parameters": false,
    "id": "ai_data_interaction.bulk_update_applications /ai-chat/data/bulk-update-applications",
@@ -107398,7 +107589,8 @@
    "closure": [],
    "endpoint": "ai_data_interaction.create_application",
    "guards": [
-    "login_required"
+    "login_required",
+    "require_permission"
    ],
    "has_parameters": false,
    "id": "ai_data_interaction.create_application /ai-chat/data/create-application",
@@ -107417,7 +107609,8 @@
    "closure": [],
    "endpoint": "ai_data_interaction.create_capability_mapping",
    "guards": [
-    "login_required"
+    "login_required",
+    "require_permission"
    ],
    "has_parameters": false,
    "id": "ai_data_interaction.create_capability_mapping /ai-chat/data/create-capability-mapping",
@@ -107493,7 +107686,8 @@
    "closure": [],
    "endpoint": "ai_data_interaction.update_application",
    "guards": [
-    "login_required"
+    "login_required",
+    "require_permission"
    ],
    "has_parameters": true,
    "id": "ai_data_interaction.update_application /ai-chat/data/update-application/<int:application_id>",
@@ -107512,7 +107706,8 @@
    "closure": [],
    "endpoint": "ai_data_interaction.update_capability_mapping",
    "guards": [
-    "login_required"
+    "login_required",
+    "require_permission"
    ],
    "has_parameters": true,
    "id": "ai_data_interaction.update_capability_mapping /ai-chat/data/update-capability-mapping/<int:mapping_id>",
@@ -140026,6 +140221,7 @@
     "app/templates/components/metrics_card.html",
     "app/templates/components/page_guide_drawer.html",
     "app/templates/components/page_header.html",
+    "app/templates/components/priority_actions.html",
     "app/templates/components/sidebar_nav.html",
     "app/templates/components/switch.html",
     "app/templates/components/toast-container.html",
@@ -153311,7 +153507,7 @@
    "endpoint": "my_applications.app_detail",
    "guards": [
     "login_required",
-    "requires_application_owner_or_org_admin"
+    "require_permission"
    ],
    "has_parameters": true,
    "id": "my_applications.app_detail /my-applications/app/<int:app_id>",
@@ -153388,7 +153584,7 @@
    "endpoint": "my_applications.app_list",
    "guards": [
     "login_required",
-    "requires_application_owner_or_org_admin"
+    "require_permission"
    ],
    "has_parameters": false,
    "id": "my_applications.app_list /my-applications/list",
@@ -153427,7 +153623,7 @@
    "endpoint": "my_applications.dashboard",
    "guards": [
     "login_required",
-    "requires_application_owner_or_org_admin"
+    "require_permission"
    ],
    "has_parameters": false,
    "id": "my_applications.dashboard /my-applications/",
@@ -153466,7 +153662,7 @@
    "endpoint": "my_applications.health_overview",
    "guards": [
     "login_required",
-    "requires_application_owner_or_org_admin"
+    "require_permission"
    ],
    "has_parameters": false,
    "id": "my_applications.health_overview /my-applications/health",
@@ -153505,7 +153701,7 @@
    "endpoint": "my_applications.roadmap_impact",
    "guards": [
     "login_required",
-    "requires_application_owner_or_org_admin"
+    "require_permission"
    ],
    "has_parameters": false,
    "id": "my_applications.roadmap_impact /my-applications/roadmap",
@@ -169238,6 +169434,7 @@
     "app/templates/components/_breadcrumb_root.html",
     "app/templates/components/admin_header.html",
     "app/templates/components/admin_sidebar.html",
+    "app/templates/components/badge.html",
     "app/templates/components/breadcrumb_nav.html",
     "app/templates/components/drawer.html",
     "app/templates/components/impact_scenario_comparison_modal.html",
@@ -169246,6 +169443,7 @@
     "app/templates/components/modal.html",
     "app/templates/components/page_guide_drawer.html",
     "app/templates/components/page_header.html",
+    "app/templates/components/priority_actions.html",
     "app/templates/components/sidebar_nav.html",
     "app/templates/components/switch.html",
     "app/templates/components/toast-container.html",
@@ -170810,7 +171008,8 @@
    "closure": [],
    "endpoint": "unified_ai_chat.apply_apqc",
    "guards": [
-    "login_required"
+    "login_required",
+    "require_permission"
    ],
    "has_parameters": false,
    "id": "unified_ai_chat.apply_apqc /ai-chat/apply-apqc",
@@ -170829,7 +171028,8 @@
    "closure": [],
    "endpoint": "unified_ai_chat.apply_archimate",
    "guards": [
-    "login_required"
+    "login_required",
+    "require_permission"
    ],
    "has_parameters": false,
    "id": "unified_ai_chat.apply_archimate /ai-chat/apply-archimate",
@@ -173032,7 +173232,8 @@
    "closure": [],
    "endpoint": "unified_ai_chat.save_chat_insights_to_application",
    "guards": [
-    "login_required"
+    "login_required",
+    "require_permission"
    ],
    "has_parameters": false,
    "id": "unified_ai_chat.save_chat_insights_to_application /ai-chat/chat/save-insights",
@@ -173203,7 +173404,8 @@
    "closure": [],
    "endpoint": "unified_ai_chat.update_application_metadata",
    "guards": [
-    "login_required"
+    "login_required",
+    "require_permission"
    ],
    "has_parameters": true,
    "id": "unified_ai_chat.update_application_metadata /ai-chat/data/update-application/<int:app_id>",
@@ -186852,7 +187054,7 @@
    "includes": [],
    "name": "components/badge.html",
    "parse_errors": [],
-   "rendered_on_count": 33,
+   "rendered_on_count": 34,
    "unresolved_refs": []
   },
   "app/templates/components/breadcrumb.html": {
@@ -187194,6 +187396,17 @@
    "name": "components/pagination_controls.html",
    "parse_errors": [],
    "rendered_on_count": 1,
+   "unresolved_refs": []
+  },
+  "app/templates/components/priority_actions.html": {
+   "extends": [],
+   "imports": [
+    "app/templates/components/badge.html"
+   ],
+   "includes": [],
+   "name": "components/priority_actions.html",
+   "parse_errors": [],
+   "rendered_on_count": 2,
    "unresolved_refs": []
   },
   "app/templates/components/progress.html": {
@@ -188002,7 +188215,9 @@
     "app/templates/components/metrics_card.html",
     "app/templates/components/page_header.html"
    ],
-   "includes": [],
+   "includes": [
+    "app/templates/components/priority_actions.html"
+   ],
    "name": "enterprise/ai_architecture_analysis.html",
    "parse_errors": [],
    "rendered_on_count": 1,
@@ -190815,7 +191030,9 @@
     "app/templates/components/llm_recommendations.html",
     "app/templates/components/page_header.html"
    ],
-   "includes": [],
+   "includes": [
+    "app/templates/components/priority_actions.html"
+   ],
    "name": "strategic/impact_analysis.html",
    "parse_errors": [],
    "rendered_on_count": 1,
@@ -191250,5 +191467,5 @@
   "app/templates/solutions_strategic/partials/_issue_board.html",
   "app/templates/tools/gantt_demo.html"
  ],
- "templates_sha256": "49765853a6213d587eb87cd31441dde6a6e67b5c490015a978ba061a5053b8d4"
+ "templates_sha256": "f1747fcb21f0fbd57323a52949e8985dac09e690c295d2ef426a7189b1e98a5f"
 }
