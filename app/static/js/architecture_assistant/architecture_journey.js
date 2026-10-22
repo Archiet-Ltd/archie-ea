@@ -212,6 +212,7 @@
             domainsLoading: false,
             expandedDomains: {},
             domainCoverage: 0,
+            hasAcmDomains: true,
             domainBlockers: [],
             expandedElement: null,  // {code: "APP", id: 123}
             propertyTemplates: {},  // {archimateType: [templates]}
@@ -363,15 +364,18 @@
                 // Load solution name from hidden input
                 const nameEl = document.getElementById('journey-v2-solution-name');
                 if (nameEl) {
-                    self.solutionName = nameEl.value || '';
+                    self.solutionName = /^Untitled Solution/i.test(nameEl.value || '') ? '' : (nameEl.value || '');
                 }
                 // Load governance status for Step 7 lock
                 const govEl = document.getElementById('journey-v2-governance-status');
                 if (govEl) {
                     self.governanceStatus = govEl.value || 'draft';
                 }
+                const acmEl = document.getElementById('journey-v2-acm');
+                if (acmEl) { self.hasAcmDomains = acmEl.value === '1'; }
                 // Restore saved state
                 self._restoreState();
+                if (self.domainsPopulated && !self.architectureResult) { self._loadArchitectureFromPromoted(); }
 
                 // Check if code has already been generated for this solution
                 // (enables skipping to Step 7 and showing deploy panel)
@@ -510,6 +514,7 @@
                     this.completedSteps.push(this.currentStep);
                 }
                 const fromStep = this.currentStep;
+                if (fromStep === 1) { this._nameFromProblem(); }
                 // TRAC-001: fire-and-forget chain health check for steps 2-5
                 if (fromStep >= 2 && fromStep <= 5) {
                     this._validateStepChain(fromStep);
@@ -709,13 +714,7 @@
 
             // A step is ticked complete only when its content exists.
             _tick: function (n) {
-                let has = true;
-                if (n === 2) has = this.acceptedCapabilities.length > 0 || this.domainsPopulated;
-                else if (n === 3) has = this.reasoningLandscape.length > 0 || !!(this.architectureResult && this.architectureResult.total > 0);
-                else if (n === 4) has = this.reasoningOptions.length > 0 || (this.decisionPoints || []).length > 0;
-                else if (n === 5) has = !!this.reasoningRecommendation;
-                else if (n === 6) has = (this.reasoningCompleteness || 0) > 0;
-                if (has && this.completedSteps.indexOf(n) === -1) this.completedSteps.push(n);
+                if (this.stepDone(n) && this.completedSteps.indexOf(n) === -1) this.completedSteps.push(n);
             },
 
             prevStep: function () {
@@ -2421,7 +2420,7 @@
 
             _refreshCompleteness: function () {
                 let self = this;
-                _fetch(API_BASE + '/' + self.solutionId + '/domain-completeness')
+                return _fetch(API_BASE + '/' + self.solutionId + '/domain-completeness')
                     .then(function (data) {
                         self.domainCoverage = data.domain_coverage || 0;
                         // Merge backend blockers with client-side threshold blockers:
@@ -2629,7 +2628,7 @@
             _loadArchitectureFromPromoted: function () {
                 let self = this;
                 self.architectureLoading = true;
-                _fetch(API_BASE + '/' + self.solutionId + '/promoted-elements')
+                return _fetch(API_BASE + '/' + self.solutionId + '/promoted-elements')
                     .then(function (data) {
                         self.architectureResult = data;
                         // Build accepted state and replace entire object for reactivity
@@ -3147,6 +3146,7 @@
                     body: JSON.stringify({ name: name })
                 }).then(function () {
                     self.solutionNameSaving = false;
+                    self._applyDisplayName();
                 }).catch(function (e) {
                     Platform.toast.error('The solution name did not save — please retry.');
                     self.solutionNameSaving = false;
@@ -3274,13 +3274,112 @@
                        }, 0))
                     : 0;
                 return [
-                    { label: 'Problem statement defined', pass: self.problemStatement.length > 20 },
-                    { label: 'Capabilities confirmed', pass: self.capabilitiesConfirmedForReadiness() },
-                    { label: 'Architecture elements generated', pass: archElemCount > 0 },
-                    { label: 'All 7 domains confirmed', pass: self.domainCoverage === 7 },
-                    { label: 'Decision points reviewed', pass: !!(self.decisionPoints && self.decisionPoints.length > 0) },
-                    { label: 'Migration roadmap generated', pass: !!(self.roadmapData && self.roadmapData.phases && self.roadmapData.phases.length > 0) }
+                    { key: 'problem', label: 'Problem statement defined', pass: self.problemStatement.length > 20 },
+                    { key: 'capabilities', label: 'Capabilities confirmed', pass: self.capabilitiesConfirmedForReadiness() },
+                    { key: 'elements', label: 'Architecture elements generated', pass: archElemCount > 0 },
+                    { key: 'domains', label: 'All 7 domains confirmed', pass: self.domainCoverage === 7 },
+                    { key: 'decisions', label: 'Decision points reviewed', pass: !!(self.decisionPoints && self.decisionPoints.length > 0) },
+                    { key: 'roadmap', label: 'Migration roadmap generated', pass: !!(self.roadmapData && self.roadmapData.phases && self.roadmapData.phases.length > 0) }
                 ];
+            },
+
+            _readiness: function (key) {
+                const hit = this.readinessItems().filter(function (i) { return i.key === key; })[0];
+                return !!(hit && hit.pass);
+            },
+
+            /* A step is done when the readiness list says its own item is done: the
+             * same predicates the ARB readiness panel and the status strip read. */
+            stepDone: function (n) {
+                switch (n) {
+                    case 1: return this._readiness('problem');
+                    case 2: return this.hasAcmDomains ? this._readiness('domains') : this._readiness('capabilities');
+                    case 3: return this._readiness('elements');
+                    case 4: return this._readiness('decisions');
+                    case 5: return this._readiness('roadmap');
+                    case 6: return this.readinessScore() === 100;
+                    default: return this.completedSteps.indexOf(n) !== -1;
+                }
+            },
+
+            tickedSteps: function () {
+                const out = [];
+                for (let n = 1; n <= 8; n++) { if (this.stepDone(n)) out.push(n); }
+                return out;
+            },
+
+            _stepLabel: function (n) {
+                const acm = ['Clarify', 'Domains', 'Architecture', 'Decisions', 'Roadmap', 'ARB Review'];
+                const plain = ['Clarify', 'Capabilities', 'Architecture', 'Options', 'Migration', 'Review'];
+                return (this.hasAcmDomains ? acm : plain)[n - 1] || ('Step ' + n);
+            },
+
+            _stopReason: function (n) {
+                if (n === 1) return 'Add a problem statement of at least 20 characters.';
+                if (n === 2) {
+                    return this.hasAcmDomains
+                        ? ('Your domains are not confirmed yet (' + this.domainCoverage + ' of 7). Review them here and confirm each one to continue.')
+                        : 'No capabilities are confirmed yet. Accept at least one to continue.';
+                }
+                if (n === 3) return 'No architecture elements exist yet. Generate them (this needs an AI model) or add them by hand.';
+                if (n === 4) return 'No decision points have been reviewed yet. Load them from this step.';
+                if (n === 5) return 'No migration roadmap has been built yet. Build it from this step.';
+                return 'Submit the package to the ARB from this step.';
+            },
+
+            firstOpenStep: function () {
+                for (let n = 1; n <= 6; n++) { if (!this.stepDone(n)) return n; }
+                return null;
+            },
+
+            /* After the automatic run: show the step it actually reached and why it stopped. */
+            _finishPipeline: function () {
+                const open = this.firstOpenStep();
+                for (let n = 1; n <= 6; n++) { this._tick(n); }
+                if (open === null) {
+                    this.currentStep = 6;
+                    this.copilotMessage = 'Every step is in place. Review the package and submit it to the ARB.';
+                    return;
+                }
+                this.currentStep = open;
+                this._autoLoadStepData(open);
+                this.copilotMessage = 'The automatic run stopped at ' + this._stepLabel(open) + '. ' + this._stopReason(open);
+            },
+
+            // ── Name ─────────────────────────────────────────────────────
+
+            hasName: function () {
+                const n = (this.solutionName || '').trim();
+                return n.length > 0 && !/^Untitled Solution/i.test(n);
+            },
+
+            displayTitle: function () {
+                return this.hasName() ? this.solutionName.trim() : 'This solution has no name yet';
+            },
+
+            _applyDisplayName: function () {
+                const title = this.displayTitle();
+                const h1 = document.querySelector('main h1, h1');
+                if (h1) h1.textContent = title;
+                const crumb = document.querySelector('nav[aria-label="Breadcrumb"] [aria-current="page"] span');
+                if (crumb) crumb.textContent = title;
+            },
+
+            focusName: function () {
+                this.currentStep = 1;
+                const el = document.querySelector("input[x-model='solutionName']");
+                if (el) { el.scrollIntoView({ block: 'center' }); el.focus(); }
+            },
+
+            /* The person's own words name the solution when they have not named it. */
+            _nameFromProblem: function () {
+                if (this.hasName()) return;
+                const text = (this.enrichedBrief || this.problemStatement || '').replace(/\s+/g, ' ').trim();
+                if (text.length < 20) return;
+                let title = text.split(/(?<=[.!?])\s/)[0];
+                if (title.length > 80) title = title.slice(0, 80).replace(/\s+\S*$/, '') + '\u2026';
+                this.solutionName = title.replace(/[.!?]+$/, '');
+                this.saveSolutionName();
             },
 
             readinessScore: function () {
@@ -3747,16 +3846,13 @@
                 }).then(function (data) {
                     self.reasoningCompleteness = data.completeness || 0;
                     self.domainsPopulated = true;
-                    self._tick(6);
                     self.loading = false;
                     self._pipelineRunning = false;
+                    // Read back what now exists, so the ticks and the status strip say the same thing.
+                    return Promise.all([self._refreshCompleteness(), self._loadArchitectureFromPromoted()]);
+                }).then(function () {
+                    self._finishPipeline();
                     self._saveState();
-
-                    const pct = Math.round(self.reasoningCompleteness * 100);
-                    self.copilotMessage = 'Blueprint populated! Completeness: ' + pct +
-                        '%. ' + (data.sections_populated || 0) + ' sections filled, ' +
-                        (data.gaps_as_risks || 0) + ' gaps registered as risks. ' +
-                        'Open the Solution Blueprint to review and refine.';
                 }).catch(function (e) {
                     self.loading = false;
                     self._pipelineRunning = false;

@@ -65,7 +65,7 @@ def matching_capabilities(seeded):
              "Dispatch planning", "Quality monitoring"]
         ):
             db.session.add(BusinessCapability(
-                name=name, code="JW%s%d" % (suffix[:3].upper(), i),
+                name=name, code="JW%s%d" % (suffix.upper(), i),
                 organization_id=org_id, level=1,
                 description="Certificate, dispatch and quality data for calibration.",
             ))
@@ -92,6 +92,54 @@ def _state(page):
                            landscape: d.reasoningLandscape.length, loadingArch: d.architectureLoading,
                            error: d.error, options: d.reasoningOptions.length}; }"""
     )
+
+
+def _ticked(page):
+    """The steps the stepper shows as complete, read from what is drawn."""
+    return page.evaluate(
+        """() => [...document.querySelectorAll("[role=navigation][aria-label='Progress steps'] button")]
+                   .map((b, i) => [i + 1, b.className.includes('bg-success/15')])
+                   .filter(x => x[1]).map(x => x[0])"""
+    )
+
+
+def _strip(page):
+    """The status strip's own figures: domains confirmed and elements."""
+    text = page.evaluate(
+        """() => [...document.querySelectorAll('span')].map(s => s.textContent.trim().replace(/\\s+/g, ' '))
+                   .filter(t => /^\\d+\\/7 domains$|^\\d+ elements$/.test(t))"""
+    )
+    domains = next((int(t.split("/")[0]) for t in text if t.endswith("domains")), None)
+    elements = next((int(t.split(" ")[0]) for t in text if t.endswith("elements")), None)
+    return domains, elements
+
+
+def _assert_ticks_agree_with_the_screen(page):
+    """Every ticked step's own count is above zero, and the strip says the same as the ticks."""
+    ticked = _ticked(page)
+    domains, elements = _strip(page)
+    counts = page.evaluate(
+        """() => { const d = Alpine.$data(document.querySelector('[x-data*=journeyV2Flow]'));
+                   return {problem: d.problemStatement.length, decisions: (d.decisionPoints || []).length,
+                           roadmap: d.roadmapData && d.roadmapData.phases ? d.roadmapData.phases.length : 0,
+                           readiness: d.readinessItems().map(i => [i.label, i.pass])}; }"""
+    )
+    if 1 in ticked:
+        assert counts["problem"] > 20, "Clarify is ticked with no problem statement"
+    if 2 in ticked:
+        assert domains == 7, "Domains is ticked but the status strip says %s of 7 domains" % domains
+    if 3 in ticked:
+        assert elements and elements > 0, "Architecture is ticked but the status strip says %s elements" % elements
+    if 4 in ticked:
+        assert counts["decisions"] > 0, "Decisions is ticked with no decision points"
+    if 5 in ticked:
+        assert counts["roadmap"] > 0, "Roadmap is ticked with no roadmap phases"
+    if 6 in ticked:
+        assert all(p for _, p in counts["readiness"]), "ARB Review is ticked while the readiness list has open items"
+    # And the other way: the strip's figures show up as ticks.
+    assert (domains == 7) == (2 in ticked), "ticks %s and strip (%s domains) disagree about Domains" % (ticked, domains)
+    assert bool(elements) == (3 in ticked), "ticks %s and strip (%s elements) disagree about Architecture" % (ticked, elements)
+    return ticked
 
 
 def _start_solution_design(page, live_server, email):
@@ -125,7 +173,9 @@ def started(page, live_server, seeded, matching_capabilities):
 
 
 def test_automatic_run_finishes_without_raw_errors_or_failed_requests(page, live_server, started):
-    page.fill("input[x-model='solutionName']", "Calibration certificate consolidation %s" % uuid.uuid4().hex[:5])
+    # No name typed: the person's own words become the name, never "Untitled Solution".
+    assert page.locator("h1").inner_text().strip() == "This solution has no name yet"
+    assert page.locator("[data-testid='name-offer']").is_visible(), "no offer to name the solution"
     page.fill("textarea[placeholder^='e.g., We need']", PROBLEM)
     page.click("button:has-text('Skip clarification')")
 
@@ -133,7 +183,7 @@ def test_automatic_run_finishes_without_raw_errors_or_failed_requests(page, live
     while time.time() < deadline:
         page.wait_for_timeout(2000)
         text = _body(page)
-        if "Blueprint populated" in text or "stopped while" in text or "No capabilities found" in text:
+        if "automatic run stopped" in text or "Every step is in place" in text or "capabilities generated" in text:
             break
     page.wait_for_timeout(2500)
 
@@ -146,7 +196,10 @@ def test_automatic_run_finishes_without_raw_errors_or_failed_requests(page, live
     assert "Could not load vendor suggestions" not in text
     errors = [e for e in page.console_errors + page.page_errors if "favicon" not in e.lower()]
     assert not [e for e in errors if "cb is not a function" in e or "(reading 'after')" in e], errors
-    assert "Blueprint populated" in text, "the run did not reach the blueprint: %s" % text[-600:]
+    assert "Blueprint populated" not in text, "the run claims success while steps are open"
+    assert "automatic run stopped" in text or "Every step is in place" in text, text[-600:]
+    assert "Untitled Solution" not in text, "the solution is still called Untitled Solution"
+    assert page.locator("h1").inner_text().startswith("Lantern Quay calibrates and tests water-quality sensors")
 
     # Each ticked step has its content: open each one and read it.
     state = _state(page)
@@ -158,6 +211,29 @@ def test_automatic_run_finishes_without_raw_errors_or_failed_requests(page, live
         assert not RAW.search(panel), "step %d shows raw error text" % n
         after = _state(page)
         assert after["cur"] == n, "clicking ticked step %d did not open it" % n
+        _assert_ticks_agree_with_the_screen(page)
+
+
+def test_ticks_agree_with_the_status_strip_and_the_run_shows_where_it_stopped(page, live_server, started):
+    page.fill("input[x-model='solutionName']", "Calibration certificate consolidation %s" % uuid.uuid4().hex[:5])
+    page.fill("textarea[placeholder^='e.g., We need']", PROBLEM)
+    page.click("button:has-text('Skip clarification')")
+    deadline = time.time() + 120
+    while time.time() < deadline:
+        page.wait_for_timeout(2000)
+        text = _body(page)
+        if "automatic run stopped" in text or "Every step is in place" in text or "capabilities generated" in text:
+            break
+    page.wait_for_timeout(2500)
+
+    # The ticks come from the same facts as the status strip and the readiness list.
+    ticked = _assert_ticks_agree_with_the_screen(page)
+    open_step = next((n for n in range(1, 7) if n not in ticked), None)
+    if open_step:
+        assert _state(page)["cur"] == open_step, "the stepper does not show the step the run stopped at"
+        text = _body(page)
+        assert "Blueprint populated" not in text
+        assert "automatic run stopped at" in text or "capabilities generated" in text, text[-500:]
 
 
 def test_step_three_has_its_controls_and_the_solution_page_opens(page, live_server, started):
@@ -211,3 +287,37 @@ def test_step_three_has_its_controls_and_the_solution_page_opens(page, live_serv
     response, _ = _visit(page, live_server, href)
     assert response.status < 400
     assert "Manual path" in _body(page), "the solution page did not open the solution"
+
+
+def test_phone_stepper_labels_are_readable_and_do_not_overlap(page, live_server, started):
+    page.set_viewport_size({"width": 390, "height": 844})
+    page.wait_for_timeout(600)
+    boxes = page.evaluate(
+        """() => [...document.querySelectorAll("[role=navigation][aria-label='Progress steps'] button, "
+                 + "[role=navigation][aria-label='Progress steps'] .text-xs.font-medium")]
+                 .filter(e => e.offsetParent !== null)
+                 .map(e => { const r = e.getBoundingClientRect();
+                             return {t: (e.getAttribute('aria-label') || e.textContent).trim(),
+                                     l: r.left, r: r.right, top: r.top, b: r.bottom}; })"""
+    )
+    assert boxes, "no stepper controls are visible at 390 wide"
+    for i, a in enumerate(boxes):
+        assert a["l"] >= 0 and a["r"] <= 390, "%r runs off the edge of the phone" % a["t"]
+        for c in boxes[i + 1:]:
+            overlap = a["l"] < c["r"] and c["l"] < a["r"] and a["top"] < c["b"] and c["top"] < a["b"]
+            assert not overlap, "%r overlaps %r on the phone" % (a["t"], c["t"])
+    current = page.locator("[data-testid='stepper-current']")
+    assert current.is_visible() and "Step 1 of" in current.inner_text(), "the phone does not say which step this is"
+    assert page.evaluate("document.documentElement.scrollWidth <= 390"), "the wizard scrolls sideways on the phone"
+
+
+def test_unnamed_solution_says_so_and_offers_to_name_it(page, live_server, started):
+    assert page.locator("h1").inner_text().strip() == "This solution has no name yet"
+    assert "Untitled Solution" not in _body(page)
+    page.locator("[data-testid='name-offer'] button").click()
+    focused = page.evaluate("document.activeElement && document.activeElement.getAttribute('aria-label')")
+    assert focused == "Solution Name", "the offer did not take the person to the name field"
+    page.keyboard.type("Calibration records in one place")
+    page.keyboard.press("Enter")
+    page.wait_for_timeout(1500)
+    assert page.locator("h1").inner_text().strip() == "Calibration records in one place"

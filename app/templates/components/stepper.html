@@ -32,7 +32,7 @@
         <button type="button"
                 {% if on_click %}@click="{{ locked_steps_expr }}.includes({{ step.num }}) ? null : {{ on_click }}({{ step.num }})"{% endif %}
                 :disabled="{{ locked_steps_expr }}.includes({{ step.num }})"
-                class="flex h-10 w-10 items-center justify-center rounded-full text-sm font-semibold transition-colors duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                class="flex h-8 w-8 sm:h-10 sm:w-10 items-center justify-center rounded-full text-sm font-semibold transition-colors duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                 :class="{
  'cursor-pointer': !{{ locked_steps_expr }}.includes({{ step.num }}),
  'cursor-not-allowed opacity-40': {{ locked_steps_expr }}.includes({{ step.num }}),
@@ -62,7 +62,7 @@
             </template>
         </button>
         {# Label below circle #}
-        <div class="mt-2 text-center">
+        <div class="mt-2 text-center hidden sm:block">
             <div class="text-xs font-medium whitespace-nowrap sm:text-sm"
                  :class="{
                      'text-primary': {{ current_step_expr }} === {{ step.num }} && !{{ locked_steps_expr }}.includes({{ step.num }}),
@@ -77,12 +77,18 @@
         </div>
         {# Connecting line to next step #}
         {% if not loop.last %}
-        <div class="absolute top-5 left-[calc(50%+24px)] h-0.5 w-[calc(100%-48px)] -translate-y-1/2 transition-colors duration-300"
+        <div class="hidden sm:block absolute top-5 left-[calc(50%+24px)] h-0.5 w-[calc(100%-48px)] -translate-y-1/2 transition-colors duration-300"
              :class="{{ completed_expr }}.includes({{ step.num }}) ? 'bg-success/40' : 'bg-border'"></div>
         {% endif %}
     </div>
     {% endfor %}
 </div>
+{# Below sm the labels are hidden; the current step is named once, with a count. #}
+<p class="mt-3 text-center text-sm font-medium text-foreground sm:hidden" data-testid="stepper-current">
+    {% for step in steps %}
+    <span x-show="{{ current_step_expr }} === {{ step.num }}" x-cloak>Step {{ step.num }} of {{ steps|length }}: {{ step.label }}</span>
+    {% endfor %}
+</p>
 {% endmacro %}
 
 

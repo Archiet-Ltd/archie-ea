@@ -69,6 +69,7 @@
 <input type="hidden" id="journey-v2-solution-description" value="{{ solution.description|default('', true)|e if solution is defined and solution else '' }}">
 <input type="hidden" id="journey-v2-solution-name" value="{{ solution.name|default('', true)|e if solution is defined and solution else '' }}">
 <input type="hidden" id="journey-v2-state" value="{{ journey_state_json|default('null', true)|e }}">
+<input type="hidden" id="journey-v2-acm" value="{{ '1' if has_acm_domains else '0' }}">
 <input type="hidden" id="journey-v2-governance-status" value="{{ (solution.governance_status or 'draft')|e if solution is defined and solution else 'draft' }}">
 
 <div x-data="journeyV2Flow({{ solution_id or 0 }})" x-init="init()" class="space-y-4">
@@ -76,14 +77,22 @@
     {# This branch shipped with no page header and no heading at all — it opened
        straight on the stepper. page_shell now provides the page's single heading
        and its single breadcrumb. #}
+    {% set _unnamed = (solution is defined and solution and (not solution.name or solution.name.startswith('Untitled Solution'))) %}
+    {% set _title = ('This solution has no name yet' if _unnamed else solution.name) if solution is defined and solution else 'Architecture Journey' %}
     {{ page_shell(
-        title=solution.name if solution is defined and solution else 'Architecture Journey',
+        title=_title,
         subtitle='AI-guided TOGAF ADM workflow',
         breadcrumb=[
             ('Solutions', url_for('solution_design.list_solutions')),
-            (solution.name if solution is defined and solution else 'Architecture Journey', None)
+            (_title, None)
         ]
     ) }}
+    <div x-show="!hasName()" x-cloak class="-mt-4" data-testid="name-offer">
+        <button type="button" @click="focusName()"
+                class="text-sm font-medium text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm">
+            Name this solution
+        </button>
+    </div>
 
     {# ── Stepper — uses shared macro ── #}
     {% from 'components/stepper.html' import stepper %}
@@ -114,7 +123,7 @@
         {{ stepper(
             steps=wizard_steps,
             current_step_expr='currentStep',
-            completed_expr='completedSteps',
+            completed_expr='tickedSteps()',
             on_click='goToStep',
             locked_steps_expr='(codegenUnlocked() ? [] : [7, 8])'
         ) }}
