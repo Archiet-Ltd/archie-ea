@@ -401,7 +401,8 @@ def portfolio_redirect(subpath):
     404 under /enterprise. Old addresses whose page lives elsewhere are listed
     in _PORTFOLIO_MOVED and go to that page by endpoint name.
     """
-    from werkzeug.exceptions import HTTPException, NotFound
+    from flask import abort
+    from werkzeug.exceptions import HTTPException
     from werkzeug.routing import RequestRedirect
 
     moved = _PORTFOLIO_MOVED.get(subpath.rstrip("/"))
@@ -411,14 +412,10 @@ def portfolio_redirect(subpath):
     try:
         current_app.url_map.bind_to_environ(request.environ).match(target, method="GET")
     except RequestRedirect:
-        return redirect(target, code=301)
-    except NotFound:
-        from flask import abort
-
-        abort(404)
+        return redirect(target, code=301)  # the page exists under a slash variant
     except HTTPException:
-        pass  # the page exists but does not take GET; let it answer
-    return redirect(target, code=301)
+        abort(404)  # no page behind it
+    return redirect(target, code=301)  # matched: the page exists
 
 
 @main.route("/dashboards/overview")
