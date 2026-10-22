@@ -47,7 +47,9 @@
     'partial': 'Indirect connections are up to date for some of these elements and not for others.',
     'not_used': 'Only recorded links were followed.',
 } %}
-{% if kind == 'risk_propagation' %}
+{% if kind == 'element_profile' %}
+    {% set heading = 'Everything about ' ~ name_of(answer, answer.params.element_id) %}
+{% elif kind == 'risk_propagation' %}
     {% set heading = 'Risks that reach ' ~ name_of(answer, answer.params.element_id) %}
 {% elif kind == 'set_impact' %}
     {% set ns = namespace(names=[]) %}
@@ -102,7 +104,9 @@
         <p role="status" class="rounded-lg border border-border bg-muted/30 p-4 text-sm text-foreground" data-reason="{{ reason }}">{{ reason_words.get(reason, 'Not stated.') }}</p>
     {% endfor %}
 
-    {% if not answer.rows %}
+    {% if kind == 'element_profile' %}
+        {% include 'intelligence/_element_profile.html' %}
+    {% elif not answer.rows %}
         {% if kind == 'risk_propagation' %}
             {{ empty_state(icon='shield-check', title='No open risk reaches this', description='Nothing in the risk register is recorded on this or on anything it depends on. That is what is recorded today, not a guarantee.') }}
         {% else %}

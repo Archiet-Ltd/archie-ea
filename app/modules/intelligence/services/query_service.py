@@ -383,7 +383,12 @@ def _resolve_application_owners_batch(
     }
     for eid, owners in pending.items():
         results[eid] = [
-            {"name": display_by_id[o.id]["user_name"], "role": display_by_id[o.id]["ownership_type_label"]}
+            {
+                "name": display_by_id[o.id]["user_name"],
+                "role": display_by_id[o.id]["ownership_type_label"],
+                "owner_record_id": o.id,
+                "assigned_at": display_by_id[o.id]["assigned_at"],
+            }
             for o in owners
         ]
 
@@ -492,7 +497,51 @@ def _attach_plain_terms(rows: List[Dict[str, Any]], elements: Dict[str, Dict[str
         )
 
 
+ORIGIN_NOT_RECORDED = "origin not recorded"
+RECORDED_CONFIDENCE = "recorded"
+
+
+def _row_origin(rel) -> Dict[str, Any]:
+    """The origin a relationship row recorded, read from the row the walk
+    already loaded (no query). A person's name is filled in afterwards, in one
+    batch, by ``_attach_origins`` when only their id was recorded. A row with no
+    recorded origin says so; none is ever invented.
+    """
+    kind = (getattr(rel, "source_kind", None) or "").strip() or None
+    label = (getattr(rel, "source_label", None) or "").strip() or None
+    text = None
+    if kind == "import" and label:
+        text = f"Imported from {label}"
+    elif kind == "manual" and label:
+        text = f"Drawn by {label}"
+    elif kind in ("connector", "derived") and label:
+        text = label
+    created = getattr(rel, "created_at", None)
+    recorded = getattr(rel, "source_recorded_at", None) or created
+    person_ids: List[int] = []
+    if kind == "manual" and not label:
+        # The drawing path stores the drawer's id in source_ref; older rows
+        # carry created_by_id instead.
+        for candidate in (getattr(rel, "source_ref", None), getattr(rel, "created_by_id", None)):
+            try:
+                person_ids.append(int(candidate))
+            except (TypeError, ValueError):
+                continue
+    return {
+        "basis": "explicit",
+        "kind": kind,
+        "label": label,
+        "text": text or ORIGIN_NOT_RECORDED,
+        "recorded_at": recorded.isoformat() if recorded else None,
+        # Internal: resolved to a name in one batch, then dropped.
+        "_person_ids": person_ids,
+        "_created_at": created.isoformat() if created else None,
+    }
+
+
 def _explicit_row(rel, depth: int, chain: List[int], chain_elements: List[int], element_id: int) -> Dict[str, Any]:
+    origin = _row_origin(rel)
+    origin["relationship_id"] = rel.id
     return {
         "element_id": element_id,
         "_endpoints": (rel.source_id, rel.target_id),
@@ -503,9 +552,13 @@ def _explicit_row(rel, depth: int, chain: List[int], chain_elements: List[int], 
             "rule_id": None,
             "chain": chain,
             "chain_elements": chain_elements,
-            "confidence": None,
-            "provenance": "explicit",
-            "computed_at": None,
+            # A recorded row is a drawn or imported fact, not a computed one.
+            "confidence": RECORDED_CONFIDENCE,
+            # Same keys as a worked-out row: the provenance names the
+            # relationship record the row rests on (the last link of ``chain``)
+            # and where and when that record came from.
+            "provenance": origin,
+            "computed_at": origin["recorded_at"],
             "stale": False,
             # Derived-fact-only fields; an explicit row has no derived fact,
             # so all three are null.
@@ -514,6 +567,45 @@ def _explicit_row(rel, depth: int, chain: List[int], chain_elements: List[int], 
             "plain_terms": None,
         },
     }
+
+
+def _attach_origins(rows: List[Dict[str, Any]], org_id: int) -> None:
+    """Name the person behind every hand-drawn row that recorded only an id,
+    in ONE tenant-fenced select for the whole page, then drop the internal
+    key. A person outside the organisation is never named."""
+    pending = [
+        row["relation"]["provenance"]
+        for row in rows
+        if row["relation"]["kind"] == "explicit" and isinstance(row["relation"].get("provenance"), dict)
+    ]
+    ids = {pid for o in pending for pid in o.get("_person_ids") or []}
+    names: Dict[int, str] = {}
+    if ids:
+        from app.models.user import User
+
+        for user in db.session.execute(
+            db.select(User).where(User.id.in_(ids)).where(User.organization_id == org_id)
+        ).scalars():
+            first = (user.first_name or "").strip()
+            last = (user.last_name or "").strip()
+            full = f"{first} {last}".strip() or user.username or user.email
+            if full:
+                names[user.id] = full
+    for row in rows:
+        relation = row["relation"]
+        origin = relation.get("provenance")
+        if relation["kind"] != "explicit" or not isinstance(origin, dict):
+            continue
+        person_ids = origin.pop("_person_ids", None) or []
+        created_at = origin.pop("_created_at", None)
+        name = next((names[pid] for pid in person_ids if pid in names), None)
+        if name:
+            origin["label"] = name
+            origin["text"] = f"Drawn by {name}"
+        elif origin["text"] == ORIGIN_NOT_RECORDED:
+            # No origin: only the creation date is a recorded date.
+            origin["recorded_at"] = created_at
+            relation["computed_at"] = created_at
 
 
 def _walk_explicit(root_id: int, max_depth: int, direction: str) -> List[Dict[str, Any]]:
@@ -1000,6 +1092,11 @@ class IntelligenceQueryService:
                 if slice_start + page_size < total:
                     next_cursor = slice_start + page_size
                 rows = page
+
+            # Origins for the page's rows only: one batched select for the
+            # people behind hand-drawn rows, whatever the page size.
+            if org_id is not None and rows:
+                _attach_origins(rows, org_id)
 
             # Owner resolution for the page's rows only (moved after
             # pagination so the 2,400-row walk resolves owners for 50 rows, not
@@ -1895,6 +1992,8 @@ class IntelligenceQueryService:
         licence_entries = _licence_entries(component, org_id)
         component_block = {
             "name": component.name,
+            "updated_at": component.updated_at.isoformat() if component.updated_at else None,
+            "end_of_life_date": component.end_of_life_date.isoformat() if component.end_of_life_date else None,
             "health": _health_block(component),
             "cost": _cost_block(component),
             "cost_by_period": _cost_by_period_block(component, org_id),

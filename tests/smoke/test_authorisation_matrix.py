@@ -60,9 +60,11 @@ POLICY = {
     # risk.risk_register and risk.risk_page (/risks/<id>, 404 for another
     # organisation's risk, pinned in tests/test_risk_ranking.py) are @login_required only.
     "/risks/":                 set(ARCHETYPES),
-    "/my-applications/":       {"application_manager"},
-    "/my-applications/list":   {"application_manager"},
-    "/my-applications/health": {"application_manager"},
+    # My Applications is gated by the permission matrix (read on application),
+    # which every archetype holds; the detail page keeps its own ownership check.
+    "/my-applications/":       set(ARCHETYPES),
+    "/my-applications/list":   set(ARCHETYPES),
+    "/my-applications/health": set(ARCHETYPES),
     "/applications/ownership-coverage": {"cto", "portfolio_manager"},
     # The duplicate lookup in the Add Application dialog carries the same
     # @require_roles("admin", "architect") as the create route it precedes.

@@ -1663,6 +1663,11 @@ class ToolExecutor:
                 f"Answer address {body['address']} (open at {body['page_url']})."
                 + (" The list is partial: report the total, not the rows shown." if len(shown) < total else "")
             )
+        if body.get("question_kind") == "element_profile":
+            absent = [g["label"] for g in (body.get("summary") or {}).get("groups") or []
+                      if g.get("status") == "not_recorded"]
+            if rows and absent:
+                message += " Not recorded: " + ", ".join(absent) + "."
         return {"success": True, "result": body, "message": message}
 
     def _tool_answer(self, args: dict) -> dict:
