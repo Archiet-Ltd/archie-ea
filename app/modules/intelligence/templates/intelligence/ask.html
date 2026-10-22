@@ -63,6 +63,10 @@
         actions_caller=_ps_actions
     ) }}
 
+    <p class="text-sm text-muted-foreground">
+        Prefer to type a question? <a data-ask-in-chat-link href="{{ url_for('unified_ai_chat.index') }}" class="font-medium text-foreground underline underline-offset-4 hover:text-info">Ask the AI chat</a> what breaks if something fails, or what the risk to it is.
+    </p>
+
     {% call workspace_gate(home_url) %}
     {# Command pattern (design/patterns.json: focused_task): one large input, the
        question lenses as chips beneath it, the answer cascade below. The picker

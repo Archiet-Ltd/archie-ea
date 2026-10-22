@@ -88,42 +88,42 @@ def _derivation_status():
 
 
 # The questions the chat carries as starters, keyed by the name the Ask address
-# uses for them. Every other lens is still answered on the Ask page itself.
+# uses for them. Every other lens is answered on the Ask page itself.
 CHAT_STARTERS = ("impact", "risk")
 
 
 def _chat_starter_redirect():
-    """The chat page's address for any Ask address.
+    """The chat page's address for an Ask address the chat can answer, or None.
 
-    An element and/or a question the chat carries becomes a starter that runs on
-    arrival; an element alone asks what breaks if it fails, as the Ask page does.
-    Any other address (no parameters, or a lens the chat does not carry) opens
-    the chat plainly. A value that is not a whole number is dropped.
+    The chat answers two questions, impact and risk, about a picked element. An
+    address that carries one of them with an element, or an element alone (which
+    asks what breaks, as the Ask page does), becomes a starter that runs on
+    arrival. Everything else (a bare address, a question with no usable element,
+    any other lens) is None, and the Ask page answers it. An element that is not a
+    whole number counts as no element.
     """
-    asked = request.args.get("question")
-    element_raw = request.args.get("element")
-    starter = asked if asked is not None else ("impact" if element_raw is not None else None)
-    if starter not in CHAT_STARTERS:
-        return url_for("unified_ai_chat.index")
-    params = {"starter": starter}
     element_id = request.args.get("element", type=int)
-    if element_id is not None and element_id > 0:
-        params["element"] = element_id
-    return url_for("unified_ai_chat.index", **params)
+    if element_id is None or element_id <= 0:
+        return None
+    asked = request.args.get("question")
+    starter = asked if asked is not None else "impact"
+    if starter not in CHAT_STARTERS:
+        return None
+    return url_for("unified_ai_chat.index", starter=starter, element=element_id)
 
 
 @intelligence_ui.route("/ask", methods=["GET"])
 @login_required
 def ask():
-    """The Ask address opens the chat, the one place to ask, whatever it carries.
+    """Ask a plain business question about what depends on a chosen element.
 
-    The Ask template stays in the repository; nothing renders it from here.
+    The impact and risk questions on a chosen element open in the chat, the one
+    place to ask them; every other request, and every other lens, is answered
+    here.
     """
-    return redirect(_chat_starter_redirect())
-
-
-def _render_ask_page():
-    """The Ask page itself (kept for a later fold decision; no route reaches it)."""
+    chat_address = _chat_starter_redirect()
+    if chat_address is not None:
+        return redirect(chat_address)
     workspace_is_empty = _workspace_is_empty()
     return render_template(
         "intelligence/ask.html",

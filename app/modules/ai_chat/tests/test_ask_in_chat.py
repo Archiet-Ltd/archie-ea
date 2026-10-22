@@ -14,6 +14,7 @@ app/modules/conftest.py.
 
 from __future__ import annotations
 
+import re
 import uuid
 from urllib.parse import parse_qs, urlparse
 
@@ -112,23 +113,50 @@ def test_an_element_alone_on_the_ask_address_asks_what_breaks(
     assert query["starter"] == ["impact"] and query["element"] == ["9"]
 
 
-@pytest.mark.parametrize("query", ["", "?question=strategy&element=3", "?question=compliance"])
-def test_the_ask_address_opens_the_chat_in_every_case(
+@pytest.mark.parametrize(
+    "query",
+    [
+        "",
+        "?element=3&question=strategy",
+        "?element=3&question=portfolio",
+        "?element=3&question=programme",
+        "?element=3&question=data",
+        "?element=3&question=compliance",
+        "?element=3&question=accountability",
+        "?question=impact",
+        "?question=risk",
+    ],
+)
+def test_the_ask_address_still_shows_the_ask_page_for_every_other_request(
     app, db_session, make_org, client, login_as, query
 ):
-    org = make_org("ask-chat-always")
+    org = make_org("ask-chat-no-redirect")
     login_as(client, _user(db_session, org.id))
 
     response = client.get("/intelligence/ask" + query)
 
-    assert response.status_code == 302
-    target = urlparse(response.headers["Location"])
-    assert target.path.rstrip("/") == "/ai-chat"
-    assert "starter" not in parse_qs(target.query)
+    assert response.status_code == 200
+    page = response.get_data(as_text=True)
+    assert 'x-data="askSurface()"' in page
+    assert 'data-ask-in-chat-link' in page
+
+
+def test_the_ask_page_points_to_the_chat_for_the_impact_and_risk_questions(
+    app, db_session, make_org, client, login_as
+):
+    org = make_org("ask-chat-link")
+    login_as(client, _user(db_session, org.id))
+
+    page = client.get("/intelligence/ask").get_data(as_text=True)
+
+    assert re.search(r'<a[^>]*data-ask-in-chat-link[^>]*href="/ai-chat"', page) or re.search(
+        r'<a[^>]*href="/ai-chat"[^>]*data-ask-in-chat-link', page
+    )
+    assert "what breaks" in page.lower() and "risk" in page.lower()
 
 
 @pytest.mark.parametrize("element", ["abc", "0", "-3", "1.5"])
-def test_an_element_that_is_not_a_whole_number_is_not_passed_to_the_chat(
+def test_an_element_that_is_not_a_whole_number_does_not_redirect(
     app, db_session, make_org, client, login_as, element
 ):
     org = make_org("ask-chat-bad-element")
@@ -136,5 +164,4 @@ def test_an_element_that_is_not_a_whole_number_is_not_passed_to_the_chat(
 
     response = client.get(f"/intelligence/ask?question=impact&element={element}")
 
-    assert response.status_code == 302
-    assert "element" not in parse_qs(urlparse(response.headers["Location"]).query)
+    assert response.status_code == 200
