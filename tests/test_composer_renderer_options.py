@@ -28,7 +28,7 @@ def test_every_new_option_is_opt_in():
     assert "opts.tokens === true" in RENDERER
     assert "typeof opts.onSelect === 'function'" in RENDERER
     # provenance styling only starts from a relationship that names one
-    assert re.search(r"function decorateEdge\(link, rel\) \{\s*if \(!rel \|\| !rel\.provenance\) return;", RENDERER)
+    assert re.search(r"function decorateEdge\(link, rel, plain, ink\) \{\s*if \(!rel \|\| !rel\.provenance\) return;", RENDERER)
 
 
 def test_derived_connections_carry_text_not_just_colour():

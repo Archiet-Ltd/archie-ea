@@ -21,7 +21,7 @@
 <div 
     x-show="showFilters" x-cloak
     x-transition
-    class="rounded-lg border bg-card text-card-foreground shadow-sm p-4 mb-4 {{ class }}"
+    class="rounded-lg border bg-card text-card-foreground p-4 mb-4 {{ class }}"
 >
     <div class="flex items-center justify-between mb-4">
         <h3 class="text-sm font-semibold">Filters</h3>
@@ -41,7 +41,7 @@
             {% if filter.type == 'select' %}
             <select aria-label="{{ filter.label }}" 
                 x-model="{{ filter.model }}"
-                class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
             >
                 <option value="">All</option>
                 {% for option in filter.options %}
@@ -54,7 +54,7 @@
                 type="text"
                 x-model="{{ filter.model }}"
                 placeholder="{{ filter.placeholder or '' }}"
-                class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
              aria-label="{{ filter.placeholder or '' }}"/>
             
             {% elif filter.type == 'daterange' %}
@@ -62,13 +62,13 @@
                 <input 
                     type="date"
                     x-model="{{ filter.model_start }}"
-                    class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                    class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                  aria-label="Date field"/>
                 <span class="text-muted-foreground">to</span>
                 <input 
                     type="date"
                     x-model="{{ filter.model_end }}"
-                    class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                    class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                  aria-label="Date field"/>
             </div>
             {% endif %}

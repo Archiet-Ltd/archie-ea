@@ -11,6 +11,7 @@ from typing import Any, Dict, List, Optional
 
 
 from app.models.archimate_core import ArchiMateElement, ArchiMateRelationship
+from app.models.archimate_element_types import StandardTypeTable
 
 logger = logging.getLogger(__name__)
 
@@ -189,7 +190,7 @@ class RelationshipPatternService:
 
         Defines which relationship types are valid between which element types.
         """
-        return {
+        return StandardTypeTable({
             "ApplicationComponent": {
                 "Composition": [
                     "ApplicationInterface",
@@ -234,7 +235,7 @@ class RelationshipPatternService:
                 "Flow": ["BusinessProcess"],
                 "Composition": ["BusinessFunction"],
             },
-        }
+        })
 
     def get_most_common_patterns(
         self, element_type: Optional[str] = None, limit: int = 10

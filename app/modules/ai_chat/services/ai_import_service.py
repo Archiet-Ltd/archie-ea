@@ -36,6 +36,7 @@ from app.services.llm_service import LLMService
 from app.services.unified_apqc_service import get_unified_apqc_service
 from app.services.vector_embedding_service import VectorEmbeddingService
 from app.services.vendor_product_service import VendorProductService
+from app.models.archimate_element_types import is_application_kind
 
 logger = logging.getLogger(__name__)
 
@@ -2141,7 +2142,7 @@ Provide analysis in JSON format:
                             )
                             if el:
                                 result["mappings_created"]["archimate_elements"] += 1
-                                if not primary_id and elem.get("type") == "ApplicationComponent":
+                                if not primary_id and is_application_kind(elem.get("type")):
                                     primary_id = el.id
                         if primary_id:
                             app.archimate_element_id = primary_id

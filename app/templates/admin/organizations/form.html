@@ -15,7 +15,7 @@
         ]
     ) }}
 
-    <div class="bg-card rounded-lg border border-border shadow-sm p-6 max-w-2xl">
+    <div class="bg-card rounded-lg border border-border p-6 max-w-2xl">
         <form method="POST"
               action="{{ url_for('admin.organization_edit', org_id=org.id) if org else url_for('admin.organization_create') }}">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -23,21 +23,21 @@
             <div class="space-y-4">
                 <!-- Name -->
                 <div>
-                    <label for="org-name" class="block text-sm font-medium mb-1">Name <span class="text-destructive-emphasis">*</span></label>
+                    <label for="org-name" class="block text-sm font-medium text-muted-foreground mb-1">Name <span class="text-destructive-emphasis">*</span></label>
                     <input type="text" name="name" id="org-name" required
                            value="{{ org.name if org else '' }}"
                            placeholder="Acme Corp"
-                           class="w-full px-3 py-2 border border-border rounded-md bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent">
+                           class="h-9 w-full px-3 border border-border rounded-md bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent">
                 </div>
 
                 <!-- Slug -->
                 <div>
-                    <label for="org-slug" class="block text-sm font-medium mb-1">Slug</label>
+                    <label for="org-slug" class="block text-sm font-medium text-muted-foreground mb-1">Slug</label>
                     <input type="text" name="slug" id="org-slug"
                            value="{{ org.slug if org else '' }}"
                            placeholder="acme-corp"
                            pattern="[a-z0-9\-]+"
-                           class="w-full px-3 py-2 border border-border rounded-md bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent">
+                           class="h-9 w-full px-3 border border-border rounded-md bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent">
                     <p class="mt-1 text-xs text-muted-foreground">URL-safe identifier. Auto-generated from name if left blank.</p>
                 </div>
 
@@ -50,9 +50,9 @@
                 </div>
                 {% else %}
                 <div>
-                    <label for="org-plan" class="block text-sm font-medium mb-1">Plan</label>
+                    <label for="org-plan" class="block text-sm font-medium text-muted-foreground mb-1">Plan</label>
                     <select name="plan" id="org-plan"
-                            class="w-full px-3 py-2 border border-border rounded-md bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent">
+                            class="h-9 w-full px-3 border border-border rounded-md bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent">
                         <option value="free" {% if plan_key == 'free' %}selected{% endif %}>Community (3 people)</option>
                         <option value="startup" {% if plan_key == 'startup' %}selected{% endif %}>Startup (10 people)</option>
                         <option value="team" {% if plan_key == 'team' %}selected{% endif %}>Team (seats below)</option>
@@ -62,10 +62,10 @@
 
                 <!-- Team seats -->
                 <div>
-                    <label for="org-seats" class="block text-sm font-medium mb-1">Team seats</label>
+                    <label for="org-seats" class="block text-sm font-medium text-muted-foreground mb-1">Team seats</label>
                     <input type="number" name="seats" id="org-seats" min="1" max="10000"
                            value="{{ seats if plan_key == 'team' and seats else 15 }}"
-                           class="w-full px-3 py-2 border border-border rounded-md bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent">
+                           class="h-9 w-full px-3 border border-border rounded-md bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent">
                     <p class="mt-1 text-xs text-muted-foreground">Editor seats on Team. Community and Startup have fixed limits and Enterprise has none.</p>
                 </div>
                 {% endif %}
@@ -74,12 +74,12 @@
             <!-- Actions -->
             <div class="flex items-center gap-3 mt-6 pt-4 border-t border-border">
                 <button type="submit"
-                        class="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4">
+                        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
                     <i data-lucide="{{ 'save' if org else 'plus' }}" class="w-4 h-4 mr-2" aria-hidden="true"></i>
                     {{ 'Save Changes' if org else 'Create Organization' }}
                 </button>
                 <a href="{{ url_for('admin.organizations_list') }}"
-                   class="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors border border-border hover:bg-accent h-10 px-4">
+                   class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
                     Cancel
                 </a>
             </div>

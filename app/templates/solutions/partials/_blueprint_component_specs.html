@@ -59,7 +59,7 @@
                         <span class="text-xs text-muted-foreground"
                               x-text="'Version ' + ((componentSpecs[elem.element_id || elem.id] && componentSpecs[elem.element_id || elem.id].spec_data) ? (componentSpecs[elem.element_id || elem.id].spec_data.fields_version || 0) : 0)"></span>
                         <div class="flex gap-2">
-                            <button type="button" class="inline-flex items-center px-3 py-1 text-xs font-medium bg-primary text-primary-foreground hover:bg-primary/90 rounded-md transition-colors"
+                            <button type="button" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center"
                                     x-on:click="inferSpec(elem.element_id || elem.id)"
                                     :disabled="specLoading[elem.element_id || elem.id]">
                                 <span x-show="!specLoading[elem.element_id || elem.id]">Infer Fields</span>
@@ -75,7 +75,7 @@
                     {# Fields table #}
                     <template x-if="componentSpecs[elem.element_id || elem.id] && componentSpecs[elem.element_id || elem.id].spec_data && componentSpecs[elem.element_id || elem.id].spec_data.fields">
                         <div class="overflow-x-auto rounded-lg border border-border">
-                            <table class="w-full text-xs">
+                            <table class="dense-table w-full text-xs">
                                 <thead>
                                     <tr class="border-b border-border bg-muted/30">
                                         <th class="text-left py-2 px-3 text-muted-foreground font-medium">Name</th>
@@ -111,7 +111,7 @@
                         <span class="text-xs text-muted-foreground"
                               x-text="'Version ' + ((componentSpecs[elem.element_id || elem.id] && componentSpecs[elem.element_id || elem.id].spec_data) ? (componentSpecs[elem.element_id || elem.id].spec_data.api_contract_version || 0) : 0)"></span>
                         <div class="flex gap-2">
-                            <button type="button" class="inline-flex items-center px-3 py-1 text-xs font-medium bg-primary text-primary-foreground hover:bg-primary/90 rounded-md transition-colors"
+                            <button type="button" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center"
                                     x-on:click="inferSpec(elem.element_id || elem.id)"
                                     :disabled="specLoading[elem.element_id || elem.id]">
                                 <span x-show="!specLoading[elem.element_id || elem.id]">Infer Contract</span>
@@ -129,7 +129,7 @@
                             {# Endpoints list #}
                             <template x-if="componentSpecs[elem.element_id || elem.id].spec_data.api_contract.endpoints">
                                 <div class="overflow-x-auto rounded-lg border border-border">
-                                    <table class="w-full text-xs">
+                                    <table class="dense-table w-full text-xs">
                                         <thead>
                                             <tr class="border-b border-border bg-muted/30">
                                                 <th class="text-left py-2 px-3 text-muted-foreground font-medium">Method</th>
@@ -172,7 +172,7 @@
                     <div class="flex justify-between items-center mb-3">
                         <span class="text-xs text-muted-foreground">Business Rules</span>
                         <div class="flex gap-2">
-                            <button type="button" class="inline-flex items-center px-3 py-1 text-xs font-medium bg-primary text-primary-foreground hover:bg-primary/90 rounded-md transition-colors"
+                            <button type="button" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center"
                                     x-on:click="inferSpec(elem.element_id || elem.id)"
                                     :disabled="specLoading[elem.element_id || elem.id]">
                                 <span x-show="!specLoading[elem.element_id || elem.id]">Infer Rules</span>
@@ -184,7 +184,7 @@
                     <template x-if="componentSpecs[elem.element_id || elem.id] && componentSpecs[elem.element_id || elem.id].spec_data && componentSpecs[elem.element_id || elem.id].spec_data.business_rules">
                         <div class="space-y-2">
                             <template x-for="rule in componentSpecs[elem.element_id || elem.id].spec_data.business_rules" :key="rule.id || rule.name">
-                                <div class="flex items-start justify-between p-3 rounded-lg border border-border bg-muted/20">
+                                <div class="flex items-start justify-between px-3 py-2 rounded-md border border-border bg-muted/20">
                                     <div class="min-w-0 flex-1">
                                         <div class="flex items-center gap-2 mb-1">
                                             <span class="text-xs font-medium text-foreground" x-text="rule.name"></span>

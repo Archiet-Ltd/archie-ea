@@ -32,7 +32,7 @@
             {% endif %}
             <p class="mt-3">
                 <a href="{{ queue_action_url }}"
-                   class="inline-flex h-9 items-center justify-center rounded-md border border-input bg-background px-4 py-2 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                   class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
                     <i data-lucide="rotate-cw" class="mr-2 h-4 w-4" aria-hidden="true"></i>Retry
                 </a>
             </p>
@@ -43,14 +43,14 @@
 <form method="get" action="{{ queue_action_url }}" class="mb-6" role="search" aria-label="Filter typed ARB reviews">
     <div class="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
         <div class="min-w-0 flex-1 sm:max-w-xs">
-            <label for="arb-queue-q" class="mb-1.5 block text-sm font-medium text-foreground">Review number or subject title</label>
+            <label for="arb-queue-q" class="block text-sm font-medium text-muted-foreground mb-1">Review number or subject title</label>
             <input type="search" id="arb-queue-q" name="q" value="{{ _filters.get('q') or '' }}"
-                   class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+                   class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
         </div>
         <div class="min-w-0 sm:w-48">
-            <label for="arb-queue-state" class="mb-1.5 block text-sm font-medium text-foreground">State</label>
+            <label for="arb-queue-state" class="block text-sm font-medium text-muted-foreground mb-1">State</label>
             <select id="arb-queue-state" name="state"
-                    class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+                    class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
                 <option value="">All states</option>
                 {% for option in _options.get('state', []) %}
                 <option value="{{ option.value }}" {% if _filters.get('state') == option.value %}selected{% endif %}>{{ option.label }}</option>
@@ -58,9 +58,9 @@
             </select>
         </div>
         <div class="min-w-0 sm:w-56">
-            <label for="arb-queue-subject-type" class="mb-1.5 block text-sm font-medium text-foreground">Subject type</label>
+            <label for="arb-queue-subject-type" class="block text-sm font-medium text-muted-foreground mb-1">Subject type</label>
             <select id="arb-queue-subject-type" name="subject_type"
-                    class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+                    class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
                 <option value="">All subject types</option>
                 {% for option in _options.get('subject_type', []) %}
                 <option value="{{ option.value }}" {% if _filters.get('subject_type') == option.value %}selected{% endif %}>{{ option.label }}</option>
@@ -69,11 +69,11 @@
         </div>
         <div class="flex items-center gap-2">
             <button type="submit"
-                    class="inline-flex h-9 items-center justify-center whitespace-nowrap rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center whitespace-nowrap">
                 Apply filters
             </button>
             <a href="{{ queue_action_url }}"
-               class="inline-flex h-9 items-center justify-center whitespace-nowrap rounded-md px-4 py-2 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+               class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center whitespace-nowrap">
                 Clear filters
             </a>
         </div>
@@ -185,7 +185,7 @@
                     {% endcall %}
                     {% call table_cell(class='align-top text-right') %}
                         <a href="{{ url_for('arb.review_detail', id=item.review_item_id) }}{{ item.required_action_anchor or '' }}"
-                           class="inline-flex h-8 items-center justify-center whitespace-nowrap rounded-md border border-input bg-background px-3 text-xs font-medium transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                           class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center whitespace-nowrap">
                             Open review<span class="sr-only"> {{ item.review_number }}</span>
                         </a>
                     {% endcall %}
@@ -200,7 +200,7 @@
 {# ---- Mobile: one bordered card per cycle, labels repeated in text ---- #}
 <ul class="space-y-3 md:hidden" role="list">
     {% for item in queue['items'] %}
-    <li class="rounded-xl border bg-card p-4 text-card-foreground shadow-sm">
+    <li class="rounded-lg border border-border bg-card p-4 text-card-foreground">
         <div class="flex flex-wrap items-start justify-between gap-2">
             <div class="min-w-0">
                 <p class="text-xs text-muted-foreground">Review</p>
@@ -243,11 +243,11 @@
     <div class="flex items-center gap-2">
         {% if queue.page > 1 %}
         <a href="{{ queue_action_url }}?page={{ queue.page - 1 }}{{ _qs }}"
-           class="inline-flex h-9 items-center justify-center rounded-md border border-input bg-background px-4 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">Previous</a>
+           class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">Previous</a>
         {% endif %}
         {% if queue.page < queue.total_pages %}
         <a href="{{ queue_action_url }}?page={{ queue.page + 1 }}{{ _qs }}"
-           class="inline-flex h-9 items-center justify-center rounded-md border border-input bg-background px-4 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">Next</a>
+           class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">Next</a>
         {% endif %}
     </div>
 </nav>

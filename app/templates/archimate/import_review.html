@@ -30,7 +30,7 @@
     <div x-show="loading" class="p-12 text-center text-sm text-muted-foreground">Loading…</div>
 
     <div x-show="!loading && loadError" x-cloak
-         class="rounded-xl border border-destructive bg-card p-12 text-center">
+         class="rounded-lg border border-destructive bg-card p-12 text-center">
         <p class="text-lg font-semibold text-destructive-emphasis">The review queue could not be read</p>
         <p class="text-sm text-muted-foreground mt-1" x-text="loadError"></p>
         <button type="button" @click="load()"
@@ -40,7 +40,7 @@
     </div>
 
     <div x-show="!loading && !loadError && total === 0" x-cloak
-         class="rounded-xl border border-border bg-card p-12 text-center">
+         class="rounded-lg border border-border bg-card p-12 text-center">
         <p class="text-lg font-semibold text-foreground">Nothing waiting</p>
         <p class="text-sm text-muted-foreground mt-1">
             Every inferred element and relationship has been reviewed.
@@ -79,8 +79,7 @@
             <span class="text-sm text-muted-foreground" x-text="selected.length + ' selected'"></span>
 
             <button type="button" @click="accept()" :disabled="!selected.length"
-                    class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium
-                           bg-primary text-primary-foreground disabled:opacity-50 transition-colors">
+                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                 Confirm as correct
             </button>
 
@@ -93,17 +92,16 @@
                 </template>
             </select>
             <button type="button" @click="retype()" :disabled="!retypeTo || !selectedElements.length"
-                    class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium
-                           border border-input bg-background hover:bg-accent disabled:opacity-50 transition-colors">
+                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                 Apply to <span x-text="selectedElements.length"></span> element(s)
             </button>
 
             <span x-show="message" x-cloak class="text-xs text-muted-foreground" x-text="message"></span>
         </div>
 
-        <div class="rounded-xl border border-border bg-card overflow-hidden">
+        <div class="rounded-lg border border-border bg-card overflow-hidden">
             <div class="overflow-x-auto">
-                <table class="w-full text-sm" data-testid="review-table">
+                <table class="dense-table w-full text-sm" data-testid="review-table">
                     <thead class="bg-muted/40">
                         <tr>
                             <th class="px-4 py-2 w-8"><span class="sr-only">Select</span></th>
