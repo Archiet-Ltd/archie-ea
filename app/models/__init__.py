@@ -214,6 +214,7 @@ else:
     # Batch Import Models - Batch processing with approval workflow
     from .batch_import import *  # noqa - BatchImportJob, BatchImportBatch, BatchImportApplication, BatchImportElement, BatchImportCheckpoint
     from .business_layer import *  # noqa - BusinessActor, BusinessRole, BusinessService, BusinessObject
+    from .team_allocation import TeamAllocation  # noqa - TeamAllocation (team-element allocation with share percent)
     from .capability_models import *  # noqa - CapabilityDependency, CapabilityMaturityAssessment, TechnologyCapabilityMapping (renamed from TechnologyCapability), CapabilityRoadmap
 
     # Capability to Vendor/Application Mapping Models - Cross-specialization type relationships
