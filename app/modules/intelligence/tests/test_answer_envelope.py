@@ -108,8 +108,9 @@ def test_asking_stores_the_answer_and_returns_the_envelope(app, db_session, make
     assert data["summary"]["total"] == 2
     assert data["freshness"]["computed_at"] == data["computed_at"]
     assert data["freshness"]["derivation_state"] in ("current", "not_computed", "stale", "partial")
-    assert {"type": "relationship", "id": rels[0].id} in data["citations"]
-    assert {"type": "relationship", "id": rels[2].id} in data["citations"]
+    cited = {(c["type"], c["id"]) for c in data["citations"]}
+    assert ("relationship", rels[0].id) in cited
+    assert ("relationship", rels[2].id) in cited
     assert _count(db_session, org.id) == 1
 
 
