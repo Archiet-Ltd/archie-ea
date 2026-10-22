@@ -827,6 +827,7 @@ def public_role(slug):
     from app.services.public_pages import (
         MERGED_PAGES,
         build_jsonld,
+        build_landing,
         get_page_screenshot,
         load_page,
         role_siblings,
@@ -843,6 +844,7 @@ def public_role(slug):
     return render_template(
         "public/page.html", page=page, jsonld=build_jsonld(page),
         screenshot=get_page_screenshot(page), siblings=role_siblings(page),
+        landing=build_landing(page),
     )
 
 

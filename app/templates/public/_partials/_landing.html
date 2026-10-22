@@ -18,6 +18,29 @@
 {% from 'components/badge.html' import badge %}
 {% set primary_label, primary_url = landing.primary_action %}
 {% set secondary_label, secondary_url = landing.secondary_action %}
+{# A role page with its own captured screen opens with the home page's hero (text left, the screen in
+   a browser frame right) through the one shared partial; every other landing keeps the text hero below. #}
+{% set role_hero = page.family == 'role' and screenshot %}
+{% if role_hero %}
+{% set hero = {
+  'testid': 'landing-hero',
+  'breadcrumb': landing.breadcrumb,
+  'title': landing.title,
+  'compact': true,
+  'lead': landing.lead_html,
+  'primary': (primary_label, primary_url),
+  'secondary': (secondary_label, '/pricing'),
+  'figure': {
+    'url': screenshot.url, 'width': screenshot.width, 'height': screenshot.height,
+    'mobile_url': screenshot.mobile.url if screenshot.mobile else none,
+    'mobile_width': screenshot.mobile.width if screenshot.mobile else none,
+    'mobile_height': screenshot.mobile.height if screenshot.mobile else none,
+    'frame_label': 'Ask · Demonstration company',
+    'alt': screenshot.alt, 'caption': screenshot.caption,
+  },
+} %}
+{% include 'public/_partials/_hero.html' %}
+{% else %}
 <section data-testid="landing-hero" class="landing-hero bg-background border-b border-border">
   <div class="public-container">
     <nav aria-label="Breadcrumb">
@@ -33,6 +56,7 @@
     </div>
   </div>
 </section>
+{% endif %}
 
 <div class="landing-bands">
   {# A use-case page's figure (if any) renders inside its "What Entelim answers" band below
@@ -43,7 +67,7 @@
      be dropped entirely instead of rendered anywhere. Every other landing family (module,
      comparison) keeps this page-top slot exactly as before regardless. #}
   {% set has_figure_band = landing.sections | selectattr('variant', 'equalto', 'figure_band') | list %}
-  {% if (screenshot or recording) and not (page.family == 'function-per-segment' and has_figure_band) %}
+  {% if (screenshot or recording) and not role_hero and not (page.family == 'function-per-segment' and has_figure_band) %}
   <section class="landing-band">
     <div class="public-container">
       <div class="[&>figure:first-child]:mt-0">
@@ -101,6 +125,19 @@
     </div>
   </section>
   {% endfor %}
+
+  {% if siblings %}
+  <section class="landing-band" aria-label="Other roles">
+    <div class="public-container">
+      <div class="public-page-content prose max-w-none"><h2>Other roles</h2></div>
+      <ul role="list" class="mt-8 flex flex-wrap gap-3">
+        {% for group in siblings %}{% for entry in group.pages %}
+        <li><a href="{{ entry.url }}" class="public-btn border border-border bg-card text-foreground font-medium hover:bg-muted transition-colors">{{ entry.title }}</a></li>
+        {% endfor %}{% endfor %}
+      </ul>
+    </div>
+  </section>
+  {% endif %}
 
   {% if page.cta == 'plans' %}
   <section class="landing-band">

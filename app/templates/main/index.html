@@ -35,54 +35,25 @@
 <!-- Hero: category name first, product-in-search-terms second. One centred column, then the real
      product window (the applications portfolio) in a browser frame. The captures are 2x and shown 1:1
      (scripts/capture_proof_assets.py). -->
-<section class="home-hero" data-testid="home-hero">
-  <div class="mx-auto max-w-5xl px-4 text-center">
-    {% call badge(size='pill') %}
-      <span class="sm:hidden">Open source &middot; Self-host free</span>
-      <span class="hidden sm:inline">Open source under AGPL-3.0 &middot; Self-host free, forever</span>
-    {% endcall %}
-
-    <h1 class="home-display">
-      The company brain for every enterprise.
-    </h1>
-
-    <p class="home-lead">
-      One living, explainable model of your enterprise: its strategy, systems, data, people, money, risk,
-      suppliers and AI, kept current and turned into cited answers &mdash; built so that when your AI agents
-      need to know how your company actually works, there is a governed source to ask, not a guess. Entelim is
-      an open-source enterprise architecture and intelligence platform built on ArchiMate 3.2. Import your
-      model and get a free, cited answer to what breaks if a system fails, in minutes.
-    </p>
-
-    <div class="mt-9 flex flex-col gap-3 sm:flex-row sm:justify-center">
-      <a href="{{ url_for('account.register') }}" class="public-btn public-btn--lg public-btn--primary">Start free</a>
-      <a href="/pricing" class="public-btn public-btn--lg public-btn--outline">See pricing</a>
-    </div>
-  </div>
-
-  <div class="home-hero__stage mt-16">
-    <figure class="home-hero__figure" data-testid="home-hero-figure">
-      <div class="home-frame">
-        <div class="home-frame__bar" aria-hidden="true">
-          <span class="home-frame__dot"></span><span class="home-frame__dot"></span><span class="home-frame__dot"></span>
-          <span class="home-frame__url">Applications</span>
-        </div>
-        {# The desktop capture is 1280 CSS px wide and is shown at that width; the phone-width capture
-           of the same screen is shown below 740px. #}
-        <picture>
-          <source media="(max-width: 739px)" srcset="{{ url_for('static', filename='img/home/product-portfolio-mobile.webp') }}"
-                  width="358" height="640">
-          <img src="{{ url_for('static', filename='img/home/product-portfolio.webp') }}"
-               alt="The Entelim application portfolio for a demonstration company: every application with its owner, lifecycle status and the business capability it serves."
-               width="1280" height="800" decoding="async" fetchpriority="high" class="home-frame__img">
-        </picture>
-      </div>
-      <figcaption class="public-card-body mt-3 text-center">
-        The application portfolio of the demonstration company, as Entelim shows it.
-      </figcaption>
-    </figure>
-  </div>
-</section>
+{% set hero = {
+  'testid': 'home-hero',
+  'badge_short': 'Open source &middot; Self-host free',
+  'badge_long': 'Open source under AGPL-3.0 &middot; Self-host free, forever',
+  'title': 'The company brain for every enterprise.',
+  'lead': "One living, explainable model of your enterprise: its strategy, systems, data, people, money, risk, suppliers and AI, kept current and turned into cited answers — built so that when your AI agents need to know how your company actually works, there is a governed source to ask, not a guess. Entelim is an open-source enterprise architecture and intelligence platform built on ArchiMate 3.2. Import your model and get a free, cited answer to what breaks if a system fails, in minutes.",
+  'primary': ('Start free', url_for('account.register')),
+  'secondary': ('See pricing', '/pricing'),
+  'figure': {
+    'url': url_for('static', filename='img/home/product-portfolio.webp'),
+    'width': 1280, 'height': 800,
+    'mobile_url': url_for('static', filename='img/home/product-portfolio-mobile.webp'),
+    'mobile_width': 358, 'mobile_height': 640,
+    'frame_label': 'Applications',
+    'alt': "The Entelim application portfolio for a demonstration company: every application with its owner, lifecycle status and the business capability it serves.",
+    'caption': "The application portfolio of the demonstration company, as Entelim shows it.",
+  },
+} %}
+{% include 'public/_partials/_hero.html' %}
 
 <!-- 1. The category: the problem, the analogy, a capability not a department -->
 <section class="home-section">
