@@ -26,6 +26,7 @@ from typing import Dict, List
 from flask import current_app
 
 from .decorators import transactional
+from app.services.element_ownership_service import application_is_owned
 
 from app import db
 from app.models.application_layer import (
@@ -824,7 +825,7 @@ class ArchitecturalGapAnalyzer:
                 len(app.supported_processes) if hasattr(app, "supported_processes") else 0  # model-safety-ok
             )
 
-            if cap_count == 0 and process_count == 0 and not app.business_owner:
+            if cap_count == 0 and process_count == 0 and not application_is_owned(app):
                 gaps["orphaned_applications"].append(
                     {
                         "application_id": app.id,
