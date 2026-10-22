@@ -10,6 +10,8 @@ import xml.etree.ElementTree as ET
 from typing import Any, Dict, List
 from xml.dom import minidom
 
+from app.models.archimate_element_types import exchange_type_for
+
 
 # QA 3.5: The Open Group ArchiMate Model Exchange File Format keeps the
 # `.../archimate/3.0/` namespace URI across ArchiMate 3.0/3.1/3.2 — there is no
@@ -24,6 +26,54 @@ _XSI_SCHEMA_LOC = (
     "http://www.opengroup.org/xsd/archimate/3.0/ "
     "http://www.opengroup.org/xsd/archimate/3.0/archimate3_Model.xsd"
 )
+
+
+_SPEC_DEF_ID = "propid-specialization"
+
+
+def _write_elements(elements_el, elements: List[Dict]) -> Dict[str, str]:
+    """Write each element; an Application goes out as its parent type plus the Entelim property.
+
+    Returns the property keys used (key -> propertyDefinition identifier) so the caller can declare them.
+    """
+    used: Dict[str, str] = {}
+    for el in elements:
+        exchange_type, extra = exchange_type_for(el.get("type", "ApplicationComponent"))
+        elem_node = ET.SubElement(
+            elements_el,
+            f"{{{_OEF_NS}}}element",
+            attrib={
+                "identifier": f"id-{el.get('id', '')}",
+                "xsi:type": exchange_type,
+            },
+        )
+        label = ET.SubElement(elem_node, f"{{{_OEF_NS}}}name")
+        label.text = el.get("name", "")
+        desc = el.get("description") or el.get("description_text") or ""
+        if desc:
+            doc_node = ET.SubElement(elem_node, f"{{{_OEF_NS}}}documentation")
+            doc_node.text = desc
+        if extra:
+            props_el = ET.SubElement(elem_node, f"{{{_OEF_NS}}}properties")
+            for key, value in extra.items():
+                used.setdefault(key, f"{_SPEC_DEF_ID}-{len(used) + 1}")
+                prop = ET.SubElement(
+                    props_el, f"{{{_OEF_NS}}}property", attrib={"propertyDefinitionRef": used[key]}
+                )
+                ET.SubElement(prop, f"{{{_OEF_NS}}}value").text = value
+    return used
+
+
+def _write_property_definitions(root, used: Dict[str, str]) -> None:
+    """Declare the property keys the elements use; must follow <relationships> and precede <views>."""
+    if not used:
+        return
+    defs_el = ET.SubElement(root, f"{{{_OEF_NS}}}propertyDefinitions")
+    for key, ident in used.items():
+        definition = ET.SubElement(
+            defs_el, f"{{{_OEF_NS}}}propertyDefinition", attrib={"identifier": ident, "type": "string"}
+        )
+        ET.SubElement(definition, f"{{{_OEF_NS}}}name").text = key
 
 
 def to_open_exchange_xml(viewpoint_dict: Dict[str, Any]) -> str:
@@ -70,23 +120,10 @@ def to_open_exchange_xml(viewpoint_dict: Dict[str, Any]) -> str:
 
     # <elements>
     elements: List[Dict] = viewpoint_dict.get("elements", [])
+    used_props: Dict[str, str] = {}
     if elements:
         elements_el = ET.SubElement(root, f"{{{_OEF_NS}}}elements")
-        for el in elements:
-            elem_node = ET.SubElement(
-                elements_el,
-                f"{{{_OEF_NS}}}element",
-                attrib={
-                    "identifier": f"id-{el.get('id', '')}",
-                    "xsi:type": el.get("type", "ApplicationComponent"),
-                },
-            )
-            label = ET.SubElement(elem_node, f"{{{_OEF_NS}}}name")
-            label.text = el.get("name", "")
-            desc = el.get("description") or el.get("description_text") or ""
-            if desc:
-                doc_node = ET.SubElement(elem_node, f"{{{_OEF_NS}}}documentation")
-                doc_node.text = desc
+        used_props = _write_elements(elements_el, elements)
 
     # <relationships>
     relationships: List[Dict] = viewpoint_dict.get("relationships", [])
@@ -104,6 +141,8 @@ def to_open_exchange_xml(viewpoint_dict: Dict[str, Any]) -> str:
                 },
             )
             _ = rel_node  # node created; no child elements required for relationships
+
+    _write_property_definitions(root, used_props)
 
     # <views> — minimal single diagram view for the viewpoint
     views_el = ET.SubElement(root, f"{{{_OEF_NS}}}views")
@@ -230,23 +269,10 @@ def _export_with_layout(viewpoint_dict: Dict[str, Any]) -> str:
 
     # <elements>
     elements: List[Dict] = viewpoint_dict.get("elements", [])
+    used_props: Dict[str, str] = {}
     if elements:
         elements_el = ET.SubElement(root, f"{{{_OEF_NS}}}elements")
-        for el in elements:
-            elem_node = ET.SubElement(
-                elements_el,
-                f"{{{_OEF_NS}}}element",
-                attrib={
-                    "identifier": f"id-{el.get('id', '')}",
-                    "xsi:type": el.get("type", "ApplicationComponent"),
-                },
-            )
-            label = ET.SubElement(elem_node, f"{{{_OEF_NS}}}name")
-            label.text = el.get("name", "")
-            desc = el.get("description") or ""
-            if desc:
-                doc_node = ET.SubElement(elem_node, f"{{{_OEF_NS}}}documentation")
-                doc_node.text = desc
+        used_props = _write_elements(elements_el, elements)
 
     # <relationships>
     relationships: List[Dict] = viewpoint_dict.get("relationships", [])
@@ -263,6 +289,8 @@ def _export_with_layout(viewpoint_dict: Dict[str, Any]) -> str:
                     "target": f"id-{rel.get('target_id', '')}",
                 },
             )
+
+    _write_property_definitions(root, used_props)
 
     # <views> with layout coordinates
     views_el = ET.SubElement(root, f"{{{_OEF_NS}}}views")

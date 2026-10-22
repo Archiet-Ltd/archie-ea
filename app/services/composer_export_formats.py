@@ -206,6 +206,7 @@ def to_lucid_zip(vp: Dict[str, Any]) -> bytes:
 # --------------------------------------------------------------------------- #
 
 import xml.etree.ElementTree as ET  # noqa: E402
+from app.models.archimate_element_types import exchange_type_for  # noqa: E402
 from xml.dom import minidom  # noqa: E402
 
 _ARCHI_NS = "http://www.archimatetool.com/archimate"
@@ -253,11 +254,15 @@ def to_archi(vp: Dict[str, Any]) -> str:
             "name": data["name"], "id": f"folder-{ftype}", "type": ftype,
         })
         for el in data["elements"]:
-            ET.SubElement(folder, "element", attrib={
-                f"{{{_XSI_NS}}}type": f"archimate:{el.get('type', 'ApplicationComponent')}",
+            exchange_type, extra = exchange_type_for(el.get("type", "ApplicationComponent"))
+            node = ET.SubElement(folder, "element", attrib={
+                f"{{{_XSI_NS}}}type": f"archimate:{exchange_type}",
                 "name": _clean(el.get("name")),
                 "id": f"e{el['id']}",
             })
+            # An Application is a component plus the Entelim property (ADR-0014 Decision 5).
+            for key, value in extra.items():
+                ET.SubElement(node, "property", attrib={"key": key, "value": value})
 
     # Relations folder.
     rels = vp.get("relationships", [])

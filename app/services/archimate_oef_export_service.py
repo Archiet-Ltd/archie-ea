@@ -1,9 +1,11 @@
 """ArchiMate 3.2 Open Exchange Format (OEF) XML export service (ARC-E01)."""
 
 import logging
+from typing import Optional
 from xml.etree.ElementTree import Element, SubElement, indent, tostring
 
 from app import db
+from app.models.archimate_element_types import exchange_type_for
 
 logger = logging.getLogger(__name__)
 
@@ -112,8 +114,9 @@ class ArchimateOEFExportService:
 
         elements_container = SubElement(root, "elements")
 
+        used_props: dict = {}
         for elem in elements:
-            self._add_element(elements_container, elem)
+            self._add_element(elements_container, elem, used_props)
 
         # Relationships
         if relationships:
@@ -126,6 +129,16 @@ class ArchimateOEFExportService:
                 r.set("xsi:type", oef_rel)
                 r.set("source", f"id-{rel.source_id}")
                 r.set("target", f"id-{rel.target_id}")
+
+        if used_props:
+            defs = SubElement(root, "propertyDefinitions")
+            for key, ident in used_props.items():
+                definition = SubElement(defs, "propertyDefinition")
+                definition.set("identifier", ident)
+                definition.set("type", "string")
+                d_name = SubElement(definition, "name")
+                d_name.set("xml:lang", "en")
+                d_name.text = key
 
         indent(root, space="  ")
         return '<?xml version="1.0" encoding="UTF-8"?>\n' + tostring(
@@ -157,9 +170,14 @@ class ArchimateOEFExportService:
             logger.exception("Failed to query solution ArchiMate elements")
             return []
 
-    def _add_element(self, parent: Element, elem) -> None:
-        """Add a single ArchiMate element to the OEF XML tree."""
-        element_type = getattr(elem, "type", None) or "grouping"  # model-safety-ok
+    def _add_element(self, parent: Element, elem, used_props: Optional[dict] = None) -> None:
+        """Add a single ArchiMate element to the OEF XML tree.
+
+        An Application is written as its parent type with the Entelim property (ADR-0014 Decision 5);
+        the property keys used are collected in *used_props* for the caller to declare.
+        """
+        stored_type = getattr(elem, "type", None) or "grouping"  # model-safety-ok
+        element_type, extra = exchange_type_for(stored_type)
         oef_type = ARCHIMATE_TYPE_MAP.get(element_type, element_type)
 
         el = SubElement(parent, "element")
@@ -175,6 +193,18 @@ class ArchimateOEFExportService:
             doc_el = SubElement(el, "documentation")
             doc_el.set("xml:lang", "en")
             doc_el.text = description
+
+        if extra:
+            if used_props is None:
+                used_props = {}
+            props_el = SubElement(el, "properties")
+            for key, value in extra.items():
+                ident = used_props.setdefault(key, f"propid-{len(used_props) + 1}")
+                prop_el = SubElement(props_el, "property")
+                prop_el.set("propertyDefinitionRef", ident)
+                val_el = SubElement(prop_el, "value")
+                val_el.set("xml:lang", "en")
+                val_el.text = value
 
 
     def _get_relationships(self, element_ids):

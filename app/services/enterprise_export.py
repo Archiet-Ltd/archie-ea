@@ -24,6 +24,8 @@ Usage:
 
 from io import BytesIO
 from typing import List, Optional
+
+from app.models.archimate_element_types import exchange_type_for
 import logging
 
 logger = logging.getLogger(__name__)
@@ -185,6 +187,7 @@ class EnterpriseExportService:
         ]
         
         # Export elements
+        spec_keys: dict = {}
         for elem in elements:
             # elem.element_type does not exist on ArchiMateElement (the
             # column is `type`) -- this line raised AttributeError on every
@@ -192,10 +195,18 @@ class EnterpriseExportService:
             # incidentally while escaping this line for the raw-html-escaping
             # gate (11 Sep 2026); fixing the attribute name since the escaping
             # fix alone would leave this endpoint permanently broken.
-            xml_lines.append(f'    <element identifier="{elem.id}" xsi:type="{_escape_xml(elem.layer)}:{_escape_xml(elem.type)}">')  # raw-html-ok: elem.id is an int PK; elem.layer/type are _escape_xml()'d inline
+            exchange_type, spec_props = exchange_type_for(elem.type)
+            xml_lines.append(f'    <element identifier="{elem.id}" xsi:type="{_escape_xml(elem.layer)}:{_escape_xml(exchange_type)}">')  # raw-html-ok: elem.id is an int PK; elem.layer/type are _escape_xml()'d inline
             xml_lines.append(f'      <name>{_escape_xml(elem.name)}</name>')  # raw-html-ok: _escape_xml() call
             if elem.description:
                 xml_lines.append(f'      <documentation>{_escape_xml(elem.description)}</documentation>')  # raw-html-ok: _escape_xml() call
+            # An Application is its parent type plus the Entelim property (ADR-0014 Decision 5).
+            if spec_props:
+                xml_lines.append('      <properties>')
+                for prop_key, prop_value in spec_props.items():
+                    spec_keys.setdefault(prop_key, f"propid-{len(spec_keys) + 1}")
+                    xml_lines.append(f'      <property propertyDefinitionRef="{spec_keys[prop_key]}"><value>{_escape_xml(prop_value)}</value></property>')  # raw-html-ok: ref is a generated id; value is _escape_xml()'d
+                xml_lines.append('      </properties>')
             xml_lines.append('    </element>')
         
         xml_lines.extend(['  </elements>', '  <relationships>'])
@@ -219,7 +230,13 @@ class EnterpriseExportService:
                 xml_lines.append(f'      <name>{_escape_xml(rel.custom_label)}</name>')  # raw-html-ok: _escape_xml() call
             xml_lines.append('    </relationship>')
         
-        xml_lines.extend(['  </relationships>', '</model>'])
+        xml_lines.append('  </relationships>')
+        if spec_keys:
+            xml_lines.append('  <propertyDefinitions>')
+            for prop_key, ident in spec_keys.items():
+                xml_lines.append(f'    <propertyDefinition identifier="{ident}" type="string"><name>{_escape_xml(prop_key)}</name></propertyDefinition>')  # raw-html-ok: ident generated; name is _escape_xml()'d
+            xml_lines.append('  </propertyDefinitions>')
+        xml_lines.append('</model>')
         
         return '\n'.join(xml_lines)
     
