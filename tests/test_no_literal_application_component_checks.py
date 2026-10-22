@@ -62,7 +62,6 @@ BASELINE = {
     "app/modules/solutions_strategic/v2/routes/solution_link_routes.py": 1,
     "app/modules/solutions_strategic/v2/services/journey_reasoning_orchestrator.py": 1,
     "app/services/ai_import_service.py": 1,
-    "app/services/archimate_import_service.py": 2,
     "app/services/document_entity_matching_service.py": 2,
     "app/services/lucid_import_service.py": 1,
     "app/services/metric_calculation_service.py": 1,

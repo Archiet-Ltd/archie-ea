@@ -1267,10 +1267,12 @@ def gate_untenanted_reads(baseline: int) -> Result:
 def gate_unfenced_tables() -> Result:
     """Every table whose model has no tenant fence is listed, so a new one is a decision.
 
-    scripts/unfenced_tables.txt is the inventory of tables with no TenantMixin. A new
-    table that is neither fenced nor listed fails, so whether it holds tenant data,
-    global reference data or rows reached only through a fenced parent is decided when
-    the table is created, not after a later feature reads it.
+    scripts/unfenced_tables.txt is the inventory of tables with no TenantMixin, and it is
+    a baseline: it is compared with scripts/unfenced_tables_baseline.txt and a name added
+    to it fails (removing one always passes). A new table that is neither fenced nor
+    declared shared reference data (scripts/shared_reference_tables.txt, a reason after
+    `#` on every line) fails, so whether it holds tenant data or is global reference
+    data is decided when the table is created, not after a later feature reads it.
     """
     proc = _run([sys.executable, "scripts/check_untenanted_reads.py", "--new-tables"])
     try:
@@ -1279,6 +1281,24 @@ def gate_unfenced_tables() -> Result:
         return Result("unfenced-tables", FAIL, f"could not parse: {proc.stdout!r}")
     detail = proc.stdout[-1500:] if count else ""
     return Result("unfenced-tables", PASS if count == 0 else FAIL, detail, count, 0)
+
+
+def gate_request_field_writes(baseline: int) -> Result:
+    """Loops that write attributes named by the loop (``setattr(obj, field, value)``).
+
+    A request body that picks the columns written can name ``organization_id`` or any
+    other column the model has. A ratchet: the count may fall, never rise. See
+    scripts/check_request_field_writes.py.
+    """
+    proc = _run([sys.executable, "scripts/check_request_field_writes.py", "--count"])
+    try:
+        count = int(proc.stdout.strip().splitlines()[-1])
+    except (ValueError, IndexError):
+        return Result("request-field-writes", FAIL, f"could not parse: {proc.stdout!r}")
+    detail = ""
+    if count > baseline:
+        detail = _run([sys.executable, "scripts/check_request_field_writes.py"]).stdout[-1500:]
+    return Result("request-field-writes", PASS if count <= baseline else FAIL, detail, count, baseline)
 
 
 def gate_reuse_register() -> Result:
@@ -1896,8 +1916,14 @@ def build_gates(baseline: dict) -> list[Gate]:
              tags=["static", "security"]),
         Gate("unfenced-tables", "every table without a tenant fence is listed (a new one is a decision)",
              "ratchet", gate_unfenced_tables,
-             remediation="give the model TenantMixin, or list the table in "
-                         "scripts/unfenced_tables.txt with a reason in review",
+             remediation="give the model TenantMixin, or declare it shared reference data in "
+                         "scripts/shared_reference_tables.txt with a reason; "
+                         "scripts/unfenced_tables.txt can only shrink",
+             tags=["static", "security"]),
+        Gate("request-field-writes", "loops writing attributes named by the loop (setattr(obj, field, value))",
+             "ratchet", lambda: gate_request_field_writes(baseline["request_field_writes"]),
+             remediation="assign the named fields explicitly or load through a schema; "
+                         "or append 'request-field-writes-ok: <reason>' to the for line",
              tags=["static", "security"]),
         Gate("unfiltered-id-lookups",
              "a lookup by id on an organisation-scoped model runs the organisation filter",
