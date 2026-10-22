@@ -14,7 +14,7 @@
   {% if rows %}
   <div class="rounded-lg border border-border bg-card overflow-hidden">
     <div class="overflow-x-auto">
-      <table class="w-full text-sm" data-testid="copies-table">
+      <table class="dense-table w-full text-sm" data-testid="copies-table">
         <thead class="bg-muted/50 text-xs text-muted-foreground uppercase tracking-wide">
           <tr>
             <th class="text-left px-4 py-2.5">Data entity</th>
@@ -31,7 +31,7 @@
             <td class="px-4 py-2.5 text-right tabular-nums">{{ row.consumer_count }}</td>
             <td class="px-4 py-2.5 text-right">
               <a href="{{ url_for('data_governance.entity_detail', entity_id=row.entity.id) }}"
-                 class="inline-flex items-center justify-center rounded-md text-sm font-medium border border-input bg-transparent hover:bg-accent hover:text-accent-foreground h-8 px-3 text-xs">Declare</a>
+                 class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">Declare</a>
             </td>
           </tr>
           {% endfor %}

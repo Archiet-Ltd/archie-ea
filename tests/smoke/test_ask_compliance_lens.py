@@ -104,12 +104,15 @@ def test_the_compliance_question_states_missing_evidence_and_never_a_percentage(
     page.goto(live_server + "/intelligence/ask", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
     _ready(page, "askSurface")
 
-    card = page.locator("#ask-question-compliance")
+    # The chips replace the accordion that showed every sentence: choose the
+    # lens, then its sentence is on screen.
+    card = page.get_by_role("button", name="Regulations and controls")
     expect(card).to_be_visible()
-    expect(page.get_by_text("Which regulations and controls apply to")).to_be_visible()
-    expect(page.get_by_text("and which controls have no evidence of being met?")).to_be_visible()
-
     card.click()
+    sentence = page.locator("#ask-sentence-compliance")
+    expect(sentence).to_be_visible()
+    expect(sentence).to_contain_text("Which regulations and controls apply to")
+    expect(sentence).to_contain_text("and which controls have no evidence of being met?")
     expect(page.locator("#ask-picker-input")).to_be_focused()
     _pick(page, compliance_graph["noun"], "Service")
 

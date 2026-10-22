@@ -1,10 +1,10 @@
 {# CMP-053: Landscape map view #}
 <div x-show="landscapeViewOpen" x-cloak x-transition
-     class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-filter backdrop-blur-sm"
+     class="fixed inset-0 z-50 flex items-center justify-center backdrop-filter bg-overlay/50"
      role="dialog" aria-modal="true" aria-label="Landscape Map"
      @keydown.escape.window="closeLandscapeView()"
      @keydown.tab.prevent>
-    <div class="bg-background border border-border rounded-xl shadow-2xl flex flex-col"
+    <div class="bg-background border border-border rounded-xl flex flex-col"
          style="width: 90vw; max-width: 1200px; max-height: 85vh;"
          @click.outside="closeLandscapeView()">
 
@@ -13,7 +13,7 @@
             <i data-lucide="grid" class="w-5 h-5 text-primary"></i>
             <span class="font-semibold">Landscape Map</span>
             <div class="flex-1"></div>
-            <button type="button" aria-label="Close" @click="closeLandscapeView()" class="p-1 rounded hover:bg-muted transition-colors">
+            <button type="button" aria-label="Close" @click="closeLandscapeView()" class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                 <i data-lucide="x" class="w-4 h-4"></i>
             </button>
         </div>
@@ -58,7 +58,7 @@
         <div class="flex-1 overflow-auto p-4">
             <template x-if="landscapeData && landscapeData.rows && landscapeData.columns">
                 <div class="overflow-x-auto">
-                    <table class="text-xs border-collapse w-full">
+                    <table class="dense-table text-xs border-collapse w-full">
                         <thead>
                             <tr>
                                 <th class="sticky left-0 z-10 bg-background border border-border px-2 py-1.5 text-left font-semibold min-w-[160px]"

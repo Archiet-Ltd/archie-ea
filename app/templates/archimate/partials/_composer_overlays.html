@@ -186,7 +186,7 @@
     {# ── ENT-104: Element colour override picker ──────────── #}
     <!-- modal-a11y-ok -->
     <div x-show="colourPickerOpen" x-cloak aria-modal="true"
-         class="fixed z-[80] shadow-2xl border border-border rounded-xl p-3"
+         class="fixed z-[80] border border-border rounded-xl p-3"
          style="background: hsl(var(--card)); min-width: 244px;" {# inline-style-ok #}
          :style="'left:' + colourPickerX + 'px; top:' + colourPickerY + 'px'"
          @click.outside="colourPickerOpen = false"
@@ -223,7 +223,7 @@
          class="fixed z-50 pointer-events-none"
          style="top: 0; left: 0; right: 0; display: flex; justify-content: center; padding-top: 56px;" {# inline-style-ok #}
          role="search" aria-label="Search elements on canvas">
-        <div class="pointer-events-auto flex items-center gap-2 px-3 py-2 rounded-xl shadow-xl border border-border"
+        <div class="pointer-events-auto flex items-center gap-2 px-3 py-2 rounded-xl border border-border"
              style="background: hsl(var(--card)); min-width: 360px; max-width: 520px;" {# inline-style-ok #}
              @keydown.escape.stop="closeCanvasSearch()">
             <i data-lucide="search" class="w-4 h-4 flex-shrink-0 text-muted-foreground"></i>
@@ -278,7 +278,7 @@
 
                 <div class="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
                     <div class="space-y-4">
-                        <div class="rounded-xl border border-primary/20 bg-primary/5 p-4">
+                        <div class="rounded-md border border-primary/40 bg-primary/10 px-3 py-2">
                             <div class="flex items-center gap-2 text-sm font-semibold text-foreground">
                                 <i data-lucide="upload" class="w-4 h-4 text-primary"></i>
                                 Step 1 — Upload exported Lucid file
@@ -294,13 +294,13 @@
                                    @change="handleLucidchartFileSelection($event)">
 
                             <div id="lucidchart-upload-dropzone"
-                                 class="mt-3 rounded-xl border border-dashed border-primary/30 bg-background/80 px-4 py-5 text-center transition-colors"
+                                 class="mt-3 rounded-xl border border-dashed border-primary/30 bg-overlay/50 px-4 py-5 text-center transition-colors"
                                  @click="chooseLucidchartUploadFile()"
                                  @dragenter.prevent="highlightLucidchartDropzone(true)"
                                  @dragover.prevent="highlightLucidchartDropzone(true)"
                                  @dragleave.prevent="highlightLucidchartDropzone(false)"
                                  @drop.prevent="handleLucidchartFileDrop($event)">
-                                <div class="mx-auto flex size-11 items-center justify-center rounded-full bg-primary/10 text-primary">
+                                <div class="mx-auto flex size-11 items-center justify-center rounded-full bg-primary/10 text-info-emphasis">
                                     <i data-lucide="file-up" class="w-5 h-5"></i>
                                 </div>
                                 <div class="mt-3 text-sm font-medium text-foreground">Drop Lucid export here</div>
@@ -343,7 +343,7 @@
                             </ul>
                         </div>
 
-                        <div class="rounded-xl border border-primary/30 bg-primary/5 p-4">
+                        <div class="rounded-md border border-primary/40 bg-primary/10 px-3 py-2">
                             <div class="flex items-center gap-2 text-sm font-semibold text-foreground">
                                 <i data-lucide="sparkles" class="w-4 h-4 text-primary"></i>
                                 Want a preview + AI assist + review first?
@@ -363,7 +363,7 @@
                         </div>
 
                         <div id="lucidchart-import-summary"
-                             class="hidden rounded-xl border border-success/30 bg-success/5 p-4">
+                             class="hidden rounded-md border border-success/40 bg-success/10 px-3 py-2">
                             <div id="lucidchart-import-summary-title" class="text-sm font-semibold text-foreground">
                                 Import complete
                             </div>
@@ -443,7 +443,7 @@
         <div class="search-panel" style="max-width: 640px; max-height: 85vh; overflow-y: auto;" {# inline-style-ok #} @keydown.escape="generateModalOpen = false">
             <div class="p-5">
                 <div class="flex items-center gap-3 mb-5">
-                    <div class="size-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
+                    <div class="size-10 rounded-xl bg-primary/10 flex items-center justify-center text-info-emphasis">
                         <i data-lucide="sparkles" class="w-5 h-5"></i>
                     </div>
                     <div>
@@ -455,13 +455,13 @@
                     <textarea aria-label="Describe the architecture to generate" x-model="generateDescription" rows="4"
                         @input="debouncedContextPreview()"
                         placeholder="e.g., Cloud migration architecture for our CRM system, integrating with the existing ERP and data warehouse..."
-                        class="w-full text-sm rounded-xl p-4 bg-muted/30 border-none focus:ring-2 focus:ring-primary/50 resize-none text-foreground"></textarea>
+                        class="w-full text-sm rounded-md p-4 bg-muted/30 border-none focus:ring-2 focus:ring-primary/50 resize-none text-foreground"></textarea>
 
                     {# Phase + Domain row #}
                     <div class="flex items-center gap-3">
                         <select aria-label="TOGAF phase" x-model="generatePhase"
                             @change="debouncedContextPreview()"
-                            class="text-xs rounded-lg px-3 py-1.5 bg-muted/50 border-none font-medium text-muted-foreground">
+                            class="text-xs rounded-md px-3 py-1.5 bg-muted/50 border-none font-medium text-muted-foreground">
                             <option value="">Auto-detect phase</option>
                             <option value="A">Phase A &mdash; Vision</option>
                             <option value="B">Phase B &mdash; Business</option>
@@ -471,12 +471,12 @@
                         <input type="text" x-model="generateDomain"
                             @input="debouncedContextPreview()"
                             placeholder="Business domain (optional)"
-                            class="text-xs rounded-lg px-3 py-1.5 bg-muted/50 border-none font-medium flex-1 text-muted-foreground" aria-label="Business domain (optional)">
+                            class="text-xs rounded-md px-3 py-1.5 bg-muted/50 border-none font-medium flex-1 text-muted-foreground" aria-label="Business domain (optional)">
                     </div>
 
                     {# Context preview #}
                     <template x-if="generateContextPreview && generateUseContext">
-                        <div class="rounded-lg bg-muted/20 p-3 text-xs">
+                        <div class="rounded-md bg-muted/20 px-3 py-2 text-xs">
                             <div class="flex items-center justify-between mb-2">
                                 <span class="font-semibold text-foreground flex items-center gap-1.5">
                                     <i data-lucide="database" class="w-3 h-3"></i>
@@ -506,7 +506,7 @@
                                 <div class="mt-2 pt-2 border-t border-border">
                                     <span class="text-muted-foreground">Search terms: </span>
                                     <template x-for="term in generateContextPreview.query_terms" :key="term">
-                                        <span class="inline-flex items-center px-1.5 py-0.5 rounded bg-primary/10 text-primary text-2xs mr-1" x-text="term"></span>
+                                        <span class="inline-flex items-center px-1.5 py-0.5 rounded bg-primary/10 text-info-emphasis text-2xs mr-1" x-text="term"></span>
                                     </template>
                                 </div>
                             </template>
@@ -538,7 +538,7 @@
                         <button type="button" @click="generateModalOpen = false"
                             class="px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">Cancel</button>
                         <button type="button" @click="generateFromDescription()" :disabled="!generateDescription.trim() || generateLoading"
-                            class="px-6 py-2 bg-primary text-primary-foreground text-sm font-semibold rounded-lg shadow-md disabled:opacity-50 disabled:cursor-not-allowed transition-all hover:opacity-90">
+                            class="px-6 py-2 bg-primary text-primary-foreground text-sm font-semibold rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all hover:opacity-90">
                             <span x-show="!generateLoading" x-cloak>Generate Architecture</span>
                             <span x-show="generateLoading" x-cloak class="flex items-center gap-2">
                                 <i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i>
@@ -551,7 +551,7 @@
 
             {# Rationale panel #}
             <template x-if="generateRationale">
-                <div class="border-t border-border px-4 py-3 bg-muted/10">
+                <div class="border border-t border-border px-4 py-2 bg-muted/10">
                     <div class="text-xs font-semibold text-muted-foreground mb-1 flex items-center gap-1">
                         <i data-lucide="lightbulb" class="w-3 h-3"></i> Design Rationale
                     </div>
@@ -564,7 +564,7 @@
                 <div class="border-t border-border p-4 space-y-3">
 
                     {# Summary + primary CTA — one click places everything #}
-                    <div class="rounded-xl bg-primary/5 border border-primary/20 p-4 space-y-3">
+                    <div class="rounded-md bg-primary/10 border border-primary/40 px-3 py-2 space-y-3">
                         <div class="flex items-start justify-between">
                             <div>
                                 <div class="text-sm font-bold text-foreground flex items-center gap-2">
@@ -583,7 +583,7 @@
                             </div>
                         </div>
                         <button type="button" @click="acceptAllGenerated()"
-                            class="w-full py-2.5 bg-primary text-primary-foreground font-semibold text-sm rounded-lg shadow-md hover:opacity-90 transition-all flex items-center justify-center gap-2">
+                            class="w-full py-2.5 bg-primary text-primary-foreground font-semibold text-sm rounded-lg hover:opacity-90 transition-all flex items-center justify-center gap-2">
                             <i data-lucide="layout-panel-top" class="w-4 h-4"></i>
                             Place Full Diagram on Canvas
                         </button>
@@ -611,7 +611,7 @@
                                             <span class="ml-1 inline-flex items-center px-1.5 py-0.5 rounded bg-success/10 text-success-emphasis text-2xs font-medium">EXISTING</span>
                                         </template>
                                         <template x-if="el.category === 'new'">
-                                            <span class="ml-1 inline-flex items-center px-1.5 py-0.5 rounded bg-primary/10 text-primary text-2xs font-medium">NEW</span>
+                                            <span class="ml-1 inline-flex items-center px-1.5 py-0.5 rounded bg-primary/10 text-info-emphasis text-2xs font-medium">NEW</span>
                                         </template>
                                         <template x-if="el.category === 'possible_duplicate'">
                                             <span class="ml-1 inline-flex items-center px-1.5 py-0.5 rounded bg-warning/10 text-warning-emphasis text-2xs font-medium">
@@ -623,7 +623,7 @@
                                         <template x-if="el.category === 'possible_duplicate'">
                                             <div class="flex gap-1">
                                                 <button type="button" @click="useExistingElement(i)" class="px-2 py-0.5 bg-success/10 text-success-emphasis rounded hover:bg-success/20 transition-colors text-2xs">Use existing</button>
-                                                <button type="button" @click="keepNewElement(i)" class="px-2 py-0.5 bg-primary/10 text-primary rounded hover:bg-primary/20 transition-colors text-2xs">Keep new</button>
+                                                <button type="button" @click="keepNewElement(i)" class="px-2 py-0.5 bg-primary/10 text-info-emphasis rounded hover:bg-primary/20 transition-colors text-2xs">Keep new</button>
                                             </div>
                                         </template>
                                         <template x-if="el.category !== 'possible_duplicate'">
@@ -677,7 +677,7 @@
             </div>
             <div class="p-4 space-y-3">
                 <textarea x-model="extractText" rows="6" placeholder="Paste architecture description, vendor proposal, or system specification..."
-                    class="w-full text-sm border border-border rounded-lg p-3 bg-background text-foreground resize-none focus:ring-1 focus:ring-primary outline-none" aria-label="Paste architecture description, vendor proposal, or system specification..."></textarea>
+                    class="w-full text-sm border border-border rounded-md p-3 bg-background text-foreground resize-none focus:ring-1 focus:ring-primary outline-none" aria-label="Paste architecture description, vendor proposal, or system specification..."></textarea>
                 <div class="flex gap-3">
                     <select aria-label="TOGAF phase" x-model="extractPhase" class="text-xs border border-border rounded px-2 py-1.5 bg-background text-foreground">
                         <option value="">Auto-detect</option>
@@ -733,7 +733,7 @@
                             </template>
                         </div>
                     </template>
-                    <button type="button" @click="acceptAllExtracted()" class="w-full mt-2 px-3 py-1.5 bg-primary/10 text-primary rounded text-xs font-medium hover:bg-primary/20 transition-colors">
+                    <button type="button" @click="acceptAllExtracted()" class="w-full mt-2 px-3 py-1.5 bg-primary/10 text-info-emphasis rounded text-xs font-medium hover:bg-primary/20 transition-colors">
                         Accept All (<span x-text="extractedElements.length"></span> elements)
                     </button>
                 </div>
@@ -754,7 +754,7 @@
                 <div>
                     <label class="text-xs font-medium text-foreground">Pattern</label>
                     <select x-model="selectedPatternId"
-                        class="w-full mt-1 text-sm border border-border rounded-lg px-3 py-2 bg-background text-foreground focus:ring-1 focus:ring-primary outline-none" aria-label="Pattern">
+                        class="w-full mt-1 text-sm border border-border rounded-md px-3 py-2 bg-background text-foreground focus:ring-1 focus:ring-primary outline-none" aria-label="Pattern">
                         <option value="">Select a pattern...</option>
                         <template x-for="pat in patterns" :key="pat.id">
                             <option :value="pat.id">
@@ -771,7 +771,7 @@
                 <div>
                     <label class="text-xs font-medium text-foreground">Context (e.g., "Order Processing")</label>
                     <input x-model="patternContext" type="text" placeholder="Enter context name..."
-                        class="w-full mt-1 text-sm border border-border rounded-lg px-3 py-2 bg-background text-foreground focus:ring-1 focus:ring-primary outline-none" aria-label="Context (e.g., &quot;Order Processing&quot;)">
+                        class="w-full mt-1 text-sm border border-border rounded-md px-3 py-2 bg-background text-foreground focus:ring-1 focus:ring-primary outline-none" aria-label="Context (e.g., &quot;Order Processing&quot;)">
                 </div>
                 <button type="button" @click="applyPattern()" :disabled="!selectedPatternId || !patternContext.trim() || patternLoading"
                     class="w-full px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
@@ -827,7 +827,7 @@
             <div class="px-4 py-4 flex flex-col gap-3">
                 <label class="text-xs text-muted-foreground font-medium">Viewpoint name</label>
                 <input type="text" x-model="saveNameValue" x-ref="saveNameInput"
-                       class="w-full px-3 py-2 text-sm bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/40"
+                       class="w-full px-3 py-2 text-sm bg-background border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary/40"
                        placeholder="e.g., Application Layer – Salesforce Replacement"
                        @keydown.enter.prevent="confirmSaveName()"
                        @keydown.escape.prevent="cancelSaveName()"
@@ -863,12 +863,12 @@
                 <div>
                     <label class="text-xs font-medium text-foreground">Pattern Name</label>
                     <input x-model="savePatternName" type="text" placeholder="e.g., My Integration Pattern"
-                        class="w-full mt-1 text-sm border border-border rounded-lg px-3 py-2 bg-background text-foreground focus:ring-1 focus:ring-primary outline-none" aria-label="Pattern Name">
+                        class="w-full mt-1 text-sm border border-border rounded-md px-3 py-2 bg-background text-foreground focus:ring-1 focus:ring-primary outline-none" aria-label="Pattern Name">
                 </div>
                 <div>
                     <label class="text-xs font-medium text-foreground">Description (optional)</label>
                     <textarea x-model="savePatternDescription" rows="2" placeholder="Brief description..."
-                        class="w-full mt-1 text-sm border border-border rounded-lg p-3 bg-background text-foreground resize-none focus:ring-1 focus:ring-primary outline-none" aria-label="Description (optional)"></textarea>
+                        class="w-full mt-1 text-sm border border-border rounded-md p-3 bg-background text-foreground resize-none focus:ring-1 focus:ring-primary outline-none" aria-label="Description (optional)"></textarea>
                 </div>
                 <button type="button" @click="saveSelectionAsPattern()" :disabled="!savePatternName.trim()"
                     class="w-full px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
@@ -953,7 +953,7 @@
                                     <option value="WorkPackage">Work Package</option>
                                 </select>
                                 <button type="button" @click="quickAddPick({type: _quickAddNewType || 'ApplicationComponent', name: quickAddQuery, layer: ''})"
-                                        class="inline-flex items-center gap-1 px-3 py-1.5 rounded text-xs font-medium bg-primary text-primary-foreground hover:bg-primary/90">
+                                        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                                     Create
                                 </button>
                             </div>
@@ -991,7 +991,7 @@
             <div class="flex items-center gap-2 px-4 py-3 border-b border-border" style="background: hsl(var(--muted) / 0.3);"> <!-- inline-style-ok -->
                 <i data-lucide="folder-open" class="w-4 h-4 text-primary"></i>
                 <h3 class="text-sm font-semibold text-foreground">Load Saved Viewpoint</h3>
-                <button type="button" @click="savedVpOpen = false" class="ml-auto text-muted-foreground hover:text-foreground" aria-label="Close">&times;</button>
+                <button type="button" @click="savedVpOpen = false" class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ml-auto" aria-label="Close">&times;</button>
             </div>
             <div class="p-2 max-h-80 overflow-y-auto">
                 <template x-if="savedViewpoints.length === 0">
@@ -1031,12 +1031,12 @@
                 <i data-lucide="history" class="w-4 h-4 text-primary"></i>
                 <h3 class="text-sm font-semibold text-foreground">Version History</h3>
                 <button type="button" @click="openVersionCompare()" x-show="snapshots.length >= 2" x-cloak
-                        class="ml-auto text-2xs font-medium px-2.5 py-1 rounded-md bg-primary/10 text-primary hover:bg-primary/20 border border-primary/20 transition-colors"
+                        class="ml-auto text-2xs font-medium px-2.5 py-1 rounded-md bg-primary/10 text-info-emphasis hover:bg-primary/20 border border-primary/20 transition-colors"
                         title="Compare two specific versions">
                     <i data-lucide="git-compare" class="w-3 h-3 inline-block mr-1 align-middle"></i>
                     Compare Versions
                 </button>
-                <button type="button" @click="snapshotListOpen = false" class="text-muted-foreground hover:text-foreground" :class="{'ml-auto': snapshots.length < 2}" aria-label="Close">&times;</button>
+                <button type="button" @click="snapshotListOpen = false" class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" :class="{'ml-auto': snapshots.length < 2}" aria-label="Close">&times;</button>
             </div>
             <div class="p-2 max-h-80 overflow-y-auto">
                 <template x-if="snapshots.length === 0">
@@ -1075,7 +1075,7 @@
             <div class="flex items-center gap-2 px-4 py-3 border-b border-border bg-muted/30">
                 <i data-lucide="git-compare" class="w-4 h-4 text-primary"></i>
                 <h3 class="text-sm font-semibold text-foreground">Compare Versions</h3>
-                <button type="button" @click="versionCompareOpen = false" class="ml-auto text-muted-foreground hover:text-foreground" aria-label="Close">&times;</button>
+                <button type="button" @click="versionCompareOpen = false" class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ml-auto" aria-label="Close">&times;</button>
             </div>
             <div class="p-4 space-y-4">
                 <p class="text-xs text-muted-foreground">Select two snapshots to compare. Version A is the baseline (older), Version B is the newer version.</p>
@@ -1083,7 +1083,7 @@
                     <div>
                         <label class="block text-2xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">Version A (Baseline)</label>
                         <select x-model="versionCompareA"
-                                class="w-full text-xs bg-background border border-border rounded-lg px-3 py-2 text-foreground focus:border-primary outline-none transition-colors" aria-label="Version A (Baseline)">
+                                class="w-full text-xs bg-background border border-border rounded-md px-3 py-2 text-foreground focus:border-primary outline-none transition-colors" aria-label="Version A (Baseline)">
                             <option :value="null" disabled>Select version…</option>
                             <template x-for="snap in snapshots" :key="'a-' + snap.id">
                                 <option :value="snap.id" x-text="snap.name + (snap.created_at ? ' (' + new Date(snap.created_at).toLocaleDateString() + ')' : '')"></option>
@@ -1093,7 +1093,7 @@
                     <div>
                         <label class="block text-2xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">Version B (Newer)</label>
                         <select x-model="versionCompareB"
-                                class="w-full text-xs bg-background border border-border rounded-lg px-3 py-2 text-foreground focus:border-primary outline-none transition-colors" aria-label="Version B (Newer)">
+                                class="w-full text-xs bg-background border border-border rounded-md px-3 py-2 text-foreground focus:border-primary outline-none transition-colors" aria-label="Version B (Newer)">
                             <option :value="null" disabled>Select version…</option>
                             <template x-for="snap in snapshots" :key="'b-' + snap.id">
                                 <option :value="snap.id" x-text="snap.name + (snap.created_at ? ' (' + new Date(snap.created_at).toLocaleDateString() + ')' : '')"></option>
@@ -1126,7 +1126,7 @@
         <div class="flex items-center gap-2 px-3 py-2.5 border-b border-border bg-muted/30">
             <i data-lucide="file-diff" class="w-3.5 h-3.5 text-primary"></i>
             <h4 class="text-xs font-semibold text-foreground">Change Summary</h4>
-            <button type="button" @click="diffSummaryOpen = false" class="ml-auto text-muted-foreground hover:text-foreground text-sm" aria-label="Close summary">&times;</button>
+            <button type="button" @click="diffSummaryOpen = false" class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ml-auto" aria-label="Close summary">&times;</button>
         </div>
         <div class="p-2 overflow-y-auto max-h-[calc(100vh-300px)]">
             <template x-if="diffDetails">
@@ -1177,7 +1177,7 @@
                             </div>
                             <template x-for="el in diffDetails.movedElements" :key="'mov-' + el.id">
                                 <div class="px-2.5 py-1 text-2xs text-foreground flex items-center gap-1.5">
-                                    <span class="inline-flex items-center px-1.5 py-0.5 rounded text-2xs font-medium bg-primary/10 text-primary border border-primary/30">MOV</span>
+                                    <span class="inline-flex items-center px-1.5 py-0.5 rounded text-2xs font-medium bg-primary/10 text-info-emphasis border border-primary/30">MOV</span>
                                     <span class="truncate" x-text="el.name"></span>
                                     <span class="text-muted-foreground text-2xs ml-auto flex-shrink-0" x-text="'dx:' + el.dx + ' dy:' + el.dy"></span>
                                 </div>
@@ -1241,7 +1241,7 @@
             <div class="flex items-center gap-2 px-4 py-3 border-b border-border" style="background: hsl(var(--muted) / 0.3);"> <!-- inline-style-ok -->
                 <i data-lucide="copy" class="w-4 h-4 text-primary"></i>
                 <h3 class="text-sm font-semibold text-foreground">Diagram Templates</h3>
-                <button type="button" @click="templateListOpen = false" class="ml-auto text-muted-foreground hover:text-foreground" aria-label="Close">&times;</button>
+                <button type="button" @click="templateListOpen = false" class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ml-auto" aria-label="Close">&times;</button>
             </div>
 
             {# CMP2-006: Portfolio-generated templates section #}
@@ -1314,7 +1314,7 @@
    relationships already on the canvas, ordered by sequence_order; there is no
    separate sequence-diagram store (ADR 0008). #}
 <div x-show="sequencePanelOpen" x-cloak
-     class="fixed top-20 right-4 z-40 w-72 max-w-[90vw] bg-card border border-border rounded-xl shadow-lg"
+     class="fixed top-20 right-4 z-40 w-72 max-w-[90vw] bg-card border border-border rounded-lg"
      role="region" aria-label="Sequence View messages">
     <div class="flex items-center justify-between px-4 py-3 border-b border-border">
         <div class="text-sm font-semibold text-foreground flex items-center gap-2">
@@ -1355,11 +1355,11 @@
 
 {# CMP-052: Annotation text edit modal #}
 <div x-show="annotEditOpen" x-cloak
-     class="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40"
+     class="fixed inset-0 z-[9999] flex items-center justify-center bg-overlay/50"
      role="dialog" aria-modal="true" aria-label="Edit Annotation"
      @keydown.escape.window="cancelAnnotationEdit()"
      @keydown.tab.prevent>
-    <div class="bg-background border border-border rounded-xl shadow-xl w-80 max-w-full mx-4" @click.stop>
+    <div class="bg-background border border-border rounded-lg w-80 max-w-full mx-4" @click.stop>
         <div class="flex items-center gap-2 px-4 py-3 border-b border-border bg-muted/30">
             <i data-lucide="sticky-note" class="w-4 h-4 text-warning"></i>
             <h3 class="text-sm font-semibold text-foreground">Edit Annotation</h3>
@@ -1369,7 +1369,7 @@
             <textarea aria-label="Annotation text" x-model="annotEditText"
                       @keydown.ctrl.enter="saveAnnotationText()"
                       placeholder="Enter annotation text…"
-                      class="w-full text-sm bg-muted/30 border border-border rounded-lg px-3 py-2 resize-none focus:border-primary outline-none transition-colors text-foreground"
+                      class="w-full text-sm bg-muted/30 border border-border rounded-md px-3 py-2 resize-none focus:border-primary outline-none transition-colors text-foreground"
                       rows="4"
                       x-ref="annotTextarea"
                       x-effect="if (annotEditOpen) $nextTick(() => { $refs.annotTextarea && $refs.annotTextarea.focus(); })" aria-label="Enter annotation text…"></textarea>
@@ -1390,10 +1390,10 @@
     {# ── ENT-111: Relationship staleness review modal ──────── #}
     <!-- modal-a11y-ok -->
     <div x-show="showStalenessReview" x-cloak
-         class="fixed inset-0 z-[90] flex items-center justify-center bg-black/50"
+         class="fixed inset-0 z-[90] flex items-center justify-center bg-overlay/50"
          @keydown.escape.window="dismissStalenessReview()"
          role="dialog" aria-modal="true" aria-label="Relationship staleness review">
-        <div class="relative w-full max-w-2xl mx-4 rounded-2xl shadow-2xl border border-border overflow-hidden"
+        <div class="relative w-full max-w-2xl mx-4 rounded-2xl border border-border overflow-hidden"
              style="background: hsl(var(--card)); max-height: 80vh;" {# inline-style-ok #}
              @click.outside="dismissStalenessReview()">
             {# Header #}
@@ -1417,7 +1417,7 @@
             {# Relationship list #}
             <div class="overflow-y-auto p-4 space-y-3" style="max-height: calc(80vh - 140px);" {# inline-style-ok #}>
                 <template x-for="rel in staleRelationships" :key="rel.rel_id">
-                    <div class="flex items-center gap-3 p-3 rounded-xl border border-warning/20 bg-warning/5">
+                    <div class="flex items-center gap-3 px-3 py-2 rounded-md border border-warning/40 bg-warning/10">
                         <div class="flex-1 min-w-0">
                             <div class="text-sm font-medium text-foreground flex items-center gap-1.5 flex-wrap">
                                 <span x-text="rel.source_name"></span>
@@ -1434,7 +1434,7 @@
                         </div>
                         <div class="flex gap-2 flex-shrink-0">
                             <button type="button" @click="keepAsIntent(rel.rel_id)"
-                                    class="px-3 py-1.5 text-xs font-medium rounded-lg bg-primary/10 text-primary hover:bg-primary/20 transition-colors whitespace-nowrap">
+                                    class="px-3 py-1.5 text-xs font-medium rounded-lg bg-primary/10 text-info-emphasis hover:bg-primary/20 transition-colors whitespace-nowrap">
                                 Keep as intent
                             </button>
                             <button type="button" @click="removeStalenessRel(rel.rel_id)"
@@ -1458,11 +1458,11 @@
 
 {# ── CMP2-002: Bulk Import from Portfolio modal ───────── #}
 <div x-show="bulkImportOpen" x-cloak
-     class="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+     class="fixed inset-0 z-50 flex items-center justify-center bg-overlay/50"
      @click.self="bulkImportOpen = false"
      @keydown.escape.window="bulkImportOpen = false"
      role="dialog" aria-modal="true" aria-label="Import elements from portfolio">
-    <div class="bg-background border border-border rounded-xl shadow-xl w-full max-w-2xl max-h-[80vh] flex flex-col"
+    <div class="bg-background border border-border rounded-lg w-full max-w-2xl max-h-[80vh] flex flex-col"
          tabindex="-1">
         {# Header #}
         <div class="flex items-center justify-between px-4 py-3 border-b border-border">
@@ -1471,7 +1471,7 @@
                 <h3 class="text-sm font-semibold text-foreground">Import from Portfolio</h3>
             </div>
             <button aria-label="Close bulk import" type="button" @click="bulkImportOpen = false"
-                    class="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
+                    class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                 <i data-lucide="x" class="w-4 h-4"></i>
             </button>
         </div>
@@ -1550,7 +1550,7 @@
             </template>
         </div>
         {# Footer with action button #}
-        <div class="flex items-center justify-between px-4 py-3 border-t border-border bg-muted/20">
+        <div class="border flex items-center justify-between px-4 py-2 border-t border-border bg-muted/20">
             <button type="button" @click="bulkImportOpen = false"
                     class="px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
                 Cancel

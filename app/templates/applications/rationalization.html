@@ -58,7 +58,7 @@
 <div class="flex flex-wrap gap-3">
       <!-- History Button -->
       <a href="{{ url_for('unified_duplicate.simple_dashboard') }}"
-         class="inline-flex items-center justify-center h-10 px-4 rounded-md text-sm font-semibold border border-input bg-background hover:bg-accent hover:text-accent-foreground hover:border-accent-foreground/20 transition-all shadow-sm"
+         class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center"
          aria-label="View duplicate detection history">
         <svg class="w-4 h-4 sm:mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
@@ -68,7 +68,7 @@
 
       <!-- Consolidation List Button -->
       <a href="{{ url_for('consolidation_list.dashboard') }}"
-         class="inline-flex items-center justify-center h-10 px-4 rounded-md text-sm font-semibold bg-primary text-primary-foreground hover:bg-primary/90 transition-all shadow-sm"
+         class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center"
          aria-label="Open consolidation list">
         <svg class="w-4 h-4 sm:mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path>
@@ -78,7 +78,7 @@
 
       <!-- Run Detection Button -->
       <button type="button" @click="scrollToDetection()"
-              class="inline-flex items-center justify-center h-10 px-5 rounded-md text-sm font-semibold bg-primary text-primary-foreground hover:bg-primary/90 transition-all shadow-sm hover:shadow-md"
+              class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center"
               aria-label="Scroll to run detection panel">
         <svg class="w-4 h-4 sm:mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
@@ -90,7 +90,7 @@
   {{ page_shell(title='Application Rationalization', subtitle='Identify duplicates, consolidate applications, and optimize your portfolio', actions_caller=_ps_actions) }}
 
   <!-- ── RAT-126: End-to-End Workflow Progress ── -->
-  <div class="bg-background rounded-lg border border-border p-4 shadow-sm mb-6" x-data="workflowProgress()">
+  <div class="bg-background rounded-lg border border-border p-4 mb-6" x-data="workflowProgress()">
     <div class="flex items-center justify-between mb-3">
       <h2 class="text-sm font-semibold text-foreground">Application Workflow Progress</h2>
       <span x-show="loaded" x-cloak class="text-xs text-muted-foreground" x-text="completionPct + '% complete'"></span>
@@ -114,7 +114,7 @@
   </div>
 
   <!-- ── RAT-122: Executive Summary ── -->
-  <div class="bg-background rounded-lg border border-border p-5 shadow-sm mb-6" x-data="executiveSummary()" x-init="load()">
+  <div class="bg-background rounded-lg border border-border p-5 mb-6" x-data="executiveSummary()" x-init="load()">
     <div class="flex items-center justify-between mb-4">
       <h2 class="text-lg font-semibold text-foreground">Executive Summary</h2>
       <button type="button" @click="load()" class="text-xs text-muted-foreground hover:text-foreground transition-colors" aria-label="Refresh executive summary">Refresh</button>
@@ -229,10 +229,10 @@
   <!-- Statistics Cards -->
   <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 mb-8">
     <!-- Total Applications -->
-    <div class="relative rounded-xl border border-input bg-background hover:border-primary/50 hover:shadow-sm transition-all duration-200">
+    <div class="relative rounded-xl border border-input bg-background hover:border-primary/50 transition-all duration-200">
       <div class="p-5">
         <div class="flex items-start gap-3 mb-4">
-          <div class="h-12 w-12 rounded-lg bg-muted-foreground flex items-center justify-center flex-shrink-0 shadow-sm">
+          <div class="h-12 w-12 rounded-lg bg-muted-foreground flex items-center justify-center flex-shrink-0">
             <svg class="w-7 h-7 text-primary-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" aria-hidden="true">
               <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 10h16M4 14h16M4 18h16"></path>
             </svg>
@@ -252,10 +252,10 @@
     </div>
 
     <!-- Duplicate Groups -->
-    <div class="relative rounded-xl border border-input bg-background hover:border-primary/50 hover:shadow-sm transition-all duration-200">
+    <div class="relative rounded-xl border border-input bg-background hover:border-primary/50 transition-all duration-200">
       <div class="p-5">
         <div class="flex items-start gap-3 mb-4">
-          <div class="h-12 w-12 rounded-lg bg-warning flex items-center justify-center flex-shrink-0 shadow-sm">
+          <div class="h-12 w-12 rounded-lg bg-warning flex items-center justify-center flex-shrink-0">
             <svg class="w-7 h-7 text-primary-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" aria-hidden="true">
               <path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
             </svg>
@@ -275,10 +275,10 @@
     </div>
 
     <!-- Pending Review -->
-    <div class="relative rounded-xl border border-input bg-background hover:border-primary/50 hover:shadow-sm transition-all duration-200">
+    <div class="relative rounded-xl border border-input bg-background hover:border-primary/50 transition-all duration-200">
       <div class="p-5">
         <div class="flex items-start gap-3 mb-4">
-          <div class="h-12 w-12 rounded-lg bg-primary flex items-center justify-center flex-shrink-0 shadow-sm">
+          <div class="h-12 w-12 rounded-lg bg-primary flex items-center justify-center flex-shrink-0">
             <svg class="w-7 h-7 text-primary-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" aria-hidden="true">
               <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
             </svg>
@@ -298,10 +298,10 @@
     </div>
 
     <!-- Resolved -->
-    <div class="relative rounded-xl border border-input bg-background hover:border-primary/50 hover:shadow-sm transition-all duration-200">
+    <div class="relative rounded-xl border border-input bg-background hover:border-primary/50 transition-all duration-200">
       <div class="p-5">
         <div class="flex items-start gap-3 mb-4">
-          <div class="h-12 w-12 rounded-lg bg-success flex items-center justify-center flex-shrink-0 shadow-sm">
+          <div class="h-12 w-12 rounded-lg bg-success flex items-center justify-center flex-shrink-0">
             <svg class="w-7 h-7 text-primary-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" aria-hidden="true">
               <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
             </svg>
@@ -321,10 +321,10 @@
     </div>
 
     <!-- Potential Savings -->
-    <div id="savings-stat" class="relative rounded-xl border border-input bg-background hover:border-primary/50 hover:shadow-sm transition-all duration-200">
+    <div id="savings-stat" class="relative rounded-xl border border-input bg-background hover:border-primary/50 transition-all duration-200">
       <div class="p-5">
         <div class="flex items-start gap-3 mb-4">
-          <div class="h-12 w-12 rounded-lg bg-success flex items-center justify-center flex-shrink-0 shadow-sm">
+          <div class="h-12 w-12 rounded-lg bg-success flex items-center justify-center flex-shrink-0">
             <svg class="w-7 h-7 text-primary-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" aria-hidden="true">
               <path stroke-linecap="round" stroke-linejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
             </svg>
@@ -339,10 +339,10 @@
     </div>
 
     <!-- Decision Readiness (RAT-101) — populated by JS after load -->
-    <div id="readiness-stat" class="relative rounded-xl border border-input bg-background hover:border-primary/50 hover:shadow-sm transition-all duration-200">
+    <div id="readiness-stat" class="relative rounded-xl border border-input bg-background hover:border-primary/50 transition-all duration-200">
       <div class="p-5">
         <div class="flex items-start gap-3 mb-4">
-          <div class="h-12 w-12 rounded-lg bg-primary flex items-center justify-center flex-shrink-0 shadow-sm">
+          <div class="h-12 w-12 rounded-lg bg-primary flex items-center justify-center flex-shrink-0">
             <svg class="w-7 h-7 text-primary-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" aria-hidden="true">
               <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
             </svg>
@@ -411,7 +411,7 @@
   </nav>
 
   <!-- Decision Workbench (RAT-119) -->
-  <div class="rounded-xl border bg-card text-card-foreground shadow-sm mb-8" id="decision-workbench"
+  <div class="rounded-lg border border-border bg-card text-card-foreground mb-8" id="decision-workbench"
        x-data="decisionWorkbench()" x-init="load()">
     <div class="p-5 border-b flex flex-wrap items-center justify-between gap-3">
       <div class="flex items-center gap-2">
@@ -420,7 +420,7 @@
         <span class="ml-1 text-xs text-muted-foreground font-normal">— triage scored applications by readiness, disposition, and confidence</span>
       </div>
       <button type="button" @click="clearFilters()"
-              class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium border border-input bg-background hover:bg-accent hover:text-accent-foreground transition-colors"
+              class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center"
               aria-label="Clear all workbench filters">
         <i data-lucide="x" class="w-3 h-3" aria-hidden="true"></i>
         Clear Filters
@@ -428,7 +428,7 @@
     </div>
 
     <!-- Filter bar -->
-    <div class="p-5 border-b bg-muted/20">
+    <div class="border px-3 py-2 border-b bg-muted/20">
       <div class="flex flex-wrap gap-3 items-end">
         <!-- Search -->
         <div class="flex-1 min-w-[160px]">
@@ -524,7 +524,7 @@
     </div>
 
     <!-- Error state -->
-    <div x-show="error" x-cloak class="m-5 rounded-lg border border-destructive/30 bg-destructive/5 p-5 text-center">
+    <div x-show="error" x-cloak class="m-5 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-center">
       <p class="text-sm font-semibold text-destructive-emphasis" x-text="error"></p>
     </div>
 
@@ -537,7 +537,7 @@
           <span class="font-semibold text-foreground" x-text="total"></span> scored applications
         </span>
         <span x-show="Object.keys(filters_applied).length > 0" x-cloak
-              class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-primary border border-primary/30"><!-- token-migration-ok -->
+              class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-info-emphasis border border-primary/30"><!-- token-migration-ok -->
           Filters active
         </span>
       </div>
@@ -584,7 +584,7 @@
             Request Data
           </button>
           <button type="button" @click="selectedIds = []; selectAll = false; bulkResult = null"
-                  class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium border border-input bg-background hover:bg-accent transition-colors"
+                  class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center"
                   aria-label="Clear selection">
             <i data-lucide="x" class="w-3 h-3" aria-hidden="true"></i>
             Clear
@@ -599,7 +599,7 @@
 
       <!-- Table -->
       <div x-show="results.length > 0" x-cloak class="overflow-x-auto">
-        <table class="w-full text-sm" aria-label="Portfolio triage workbench">
+        <table class="dense-table w-full text-sm" aria-label="Portfolio triage workbench">
           <thead>
             <tr class="border-b bg-muted/30">
               <!-- RAT-121: Select-all checkbox -->
@@ -678,7 +678,7 @@
         <div class="flex items-center gap-2">
           <button type="button" @click="prevPage()"
                   :disabled="page <= 1"
-                  class="inline-flex items-center justify-center h-8 w-8 rounded-md border border-input bg-background text-sm hover:bg-accent disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 w-9 p-0 items-center justify-center w-8"
                   aria-label="Previous page">
             <i data-lucide="chevron-left" class="w-4 h-4" aria-hidden="true"></i>
           </button>
@@ -694,7 +694,7 @@
   </div>
 
   <!-- Canonical Disposition Taxonomy — reference legend -->
-  <div class="rounded-xl border bg-card text-card-foreground shadow-sm mb-8" id="disposition-taxonomy">
+  <div class="rounded-lg border border-border bg-card text-card-foreground mb-8" id="disposition-taxonomy">
     <div class="p-5 border-b flex items-center gap-2">
       <i data-lucide="book-open" class="w-4 h-4 text-muted-foreground" aria-hidden="true"></i>
       <h2 class="text-sm font-semibold">Canonical Disposition Taxonomy</h2>
@@ -773,16 +773,16 @@
   <!-- Main Content -->
   <div class="max-w-5xl mx-auto">
     <!-- Run Detection Panel -->
-    <div id="detection-panel" class="rounded-xl border bg-card text-card-foreground shadow-sm">
+    <div id="detection-panel" class="rounded-lg border border-border bg-card text-card-foreground">
       <div class="p-8">
         <h2 class="text-2xl font-semibold tracking-tight mb-6">Run Detection</h2>
 
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8" role="radiogroup" aria-label="Detection strategy">
           <!-- Fast Strategy -->
-          <div class="strategy-card group relative overflow-hidden rounded-xl border border-input bg-background cursor-pointer hover:border-primary/50 hover:shadow-sm transition-all duration-200 focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:outline-none" data-strategy="fast" role="radio" aria-checked="false" tabindex="0">
+          <div class="strategy-card group relative overflow-hidden rounded-xl border border-input bg-background cursor-pointer hover:border-primary/50 transition-all duration-200 focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:outline-none" data-strategy="fast" role="radio" aria-checked="false" tabindex="0">
             <div class="p-5">
               <div class="flex items-center gap-3 mb-4">
-                <div class="h-11 w-11 rounded-lg bg-primary flex items-center justify-center flex-shrink-0 shadow-sm">
+                <div class="h-11 w-11 rounded-lg bg-primary flex items-center justify-center flex-shrink-0">
                   <svg class="w-6 h-6 text-primary-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
                   </svg>
@@ -800,16 +800,16 @@
           </div>
 
           <!-- Hybrid Strategy -->
-          <div class="strategy-card group relative overflow-hidden rounded-xl border border-input bg-background cursor-pointer hover:border-primary/50 hover:shadow-sm transition-all duration-200 focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:outline-none" data-strategy="hybrid" role="radio" aria-checked="false" tabindex="0">
+          <div class="strategy-card group relative overflow-hidden rounded-xl border border-input bg-background cursor-pointer hover:border-primary/50 transition-all duration-200 focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:outline-none" data-strategy="hybrid" role="radio" aria-checked="false" tabindex="0">
             <div class="p-5">
               <div class="flex items-center gap-3 mb-4">
-                <div class="h-11 w-11 rounded-lg bg-primary flex items-center justify-center flex-shrink-0 shadow-sm">
+                <div class="h-11 w-11 rounded-lg bg-primary flex items-center justify-center flex-shrink-0">
                   <svg class="w-6 h-6 text-primary-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z"></path>
                   </svg>
                 </div>
                 <h3 class="font-bold text-lg">Hybrid</h3>
-                <span class="ml-auto px-2 py-0.5 text-xs font-semibold rounded-full bg-primary/10 text-primary">Recommended</span>
+                <span class="ml-auto px-2 py-0.5 text-xs font-semibold rounded-full bg-primary/10 text-info-emphasis">Recommended</span>
               </div>
               <p class="text-sm text-muted-foreground leading-relaxed mb-4">Hash-based exact matching + fuzzy analysis. Balanced accuracy.</p>
               <div class="flex items-center gap-1.5 text-xs text-muted-foreground font-medium">
@@ -822,10 +822,10 @@
           </div>
 
           <!-- Enhanced Strategy -->
-          <div class="strategy-card group relative overflow-hidden rounded-xl border border-input bg-background cursor-pointer hover:border-primary/50 hover:shadow-sm transition-all duration-200 focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:outline-none" data-strategy="enhanced" role="radio" aria-checked="false" tabindex="0">
+          <div class="strategy-card group relative overflow-hidden rounded-xl border border-input bg-background cursor-pointer hover:border-primary/50 transition-all duration-200 focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:outline-none" data-strategy="enhanced" role="radio" aria-checked="false" tabindex="0">
             <div class="p-5">
               <div class="flex items-center gap-3 mb-4">
-                <div class="h-11 w-11 rounded-lg bg-success flex items-center justify-center flex-shrink-0 shadow-sm">
+                <div class="h-11 w-11 rounded-lg bg-success flex items-center justify-center flex-shrink-0">
                   <svg class="w-6 h-6 text-primary-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
                   </svg>
@@ -861,7 +861,7 @@
         </div>
 
         <!-- Run Button -->
-        <button type="button" id="run-detection-btn" @click="runDetection()" class="w-full h-14 inline-flex items-center justify-center gap-2 rounded-xl text-lg font-bold bg-primary text-primary-foreground hover:bg-primary/90 transition-all shadow-md hover:shadow-lg disabled:pointer-events-none disabled:opacity-50" aria-label="Run duplicate detection">
+        <button type="button" id="run-detection-btn" @click="runDetection()" class="w-full h-14 inline-flex items-center justify-center gap-2 rounded-xl text-lg font-bold bg-primary text-primary-foreground hover:bg-primary/90 transition-all disabled:pointer-events-none disabled:opacity-50" aria-label="Run duplicate detection">
           <span class="normal-state inline-flex items-center">
             <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"></path>
@@ -881,7 +881,7 @@
         <!-- Results Area -->
         <div id="detection-results" class="mt-6 hidden" aria-live="polite">
           <!-- Empty State: No duplicates detected -->
-          <div id="detection-empty-state" class="hidden rounded-lg border border-primary/20 bg-primary/5 p-6 text-center">
+          <div id="detection-empty-state" class="hidden rounded-md border border-primary/40 bg-primary/10 px-3 py-2 text-center">
             <div class="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-3">
               <svg class="w-6 h-6 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
@@ -892,7 +892,7 @@
             <p class="text-xs text-muted-foreground">Try lowering the similarity threshold or using a different detection strategy for broader results.</p>
           </div>
           <!-- Results Panel -->
-          <div id="detection-results-panel" class="rounded-lg border border-success/20 bg-success/5 p-6">
+          <div id="detection-results-panel" class="rounded-md border border-success/40 bg-success/10 px-3 py-2">
             <div class="flex items-center gap-2 mb-4">
               <div class="h-8 w-8 rounded-full bg-success/10 flex items-center justify-center">
                 <svg class="w-5 h-5 text-success" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -923,13 +923,13 @@
               </div>
             </div>
             <div class="flex gap-3">
-              <a id="view-results-link" href="{{ url_for('unified_duplicate.simple_dashboard') }}" class="flex-1 inline-flex items-center justify-center h-12 px-6 rounded-md text-base font-bold bg-primary text-primary-foreground hover:bg-primary/90 transition-colors shadow-md hover:shadow-lg">
+              <a id="view-results-link" href="{{ url_for('unified_duplicate.simple_dashboard') }}" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 flex-1 items-center justify-center">
                 View Duplicate Groups
                 <svg class="w-5 h-5 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"></path>
                 </svg>
               </a>
-              <button type="button" @click="location.reload()" class="inline-flex items-center justify-center h-12 px-6 rounded-md text-base font-semibold border border-success/30 bg-background hover:bg-success/5 transition-colors shadow-sm" aria-label="Refresh detection statistics">
+              <button type="button" @click="location.reload()" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center" aria-label="Refresh detection statistics">
                 <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
                 </svg>
@@ -947,10 +947,10 @@
     <h2 class="text-2xl font-semibold tracking-tight">Quick Actions</h2>
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
       <!-- 1. Run Detection (Detect step) -->
-      <button type="button" @click="document.getElementById('detection-panel').scrollIntoView({behavior:'smooth'})" class="group relative overflow-hidden rounded-xl border border-input bg-background hover:border-primary/50 hover:shadow-sm transition-all duration-200 text-left" aria-label="Scroll to detection panel">
+      <button type="button" @click="document.getElementById('detection-panel').scrollIntoView({behavior:'smooth'})" class="group relative overflow-hidden rounded-xl border border-input bg-background hover:border-primary/50 transition-all duration-200 text-left" aria-label="Scroll to detection panel">
         <div class="p-5">
           <div class="flex items-start gap-3 mb-4">
-            <div class="h-12 w-12 rounded-lg bg-primary flex items-center justify-center flex-shrink-0 shadow-sm">
+            <div class="h-12 w-12 rounded-lg bg-primary flex items-center justify-center flex-shrink-0">
               <svg class="w-7 h-7 text-primary-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
               </svg>
@@ -962,10 +962,10 @@
       </button>
 
       <!-- 2. Score Portfolio (Score step) — NEW -->
-      <button type="button" id="score-portfolio-btn" @click="scorePortfolio()" class="group relative overflow-hidden rounded-xl border border-input bg-background hover:border-primary/50 hover:shadow-sm transition-all duration-200 text-left" aria-label="Score entire portfolio">
+      <button type="button" id="score-portfolio-btn" @click="scorePortfolio()" class="group relative overflow-hidden rounded-xl border border-input bg-background hover:border-primary/50 transition-all duration-200 text-left" aria-label="Score entire portfolio">
         <div class="p-5">
           <div class="flex items-start gap-3 mb-4">
-            <div class="h-12 w-12 rounded-lg bg-primary flex items-center justify-center flex-shrink-0 shadow-sm">
+            <div class="h-12 w-12 rounded-lg bg-primary flex items-center justify-center flex-shrink-0">
               <svg class="w-7 h-7 text-primary-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
               </svg>
@@ -977,10 +977,10 @@
       </button>
 
       <!-- 3. Auto-Resolve Exact Matches (Plan step) -->
-      <button type="button" id="auto-resolve-btn" @click="autoResolveExact()" class="group relative overflow-hidden rounded-xl border border-input bg-background hover:border-primary/50 hover:shadow-sm transition-all duration-200 text-left" aria-label="Auto-resolve exact matches">
+      <button type="button" id="auto-resolve-btn" @click="autoResolveExact()" class="group relative overflow-hidden rounded-xl border border-input bg-background hover:border-primary/50 transition-all duration-200 text-left" aria-label="Auto-resolve exact matches">
         <div class="p-5">
           <div class="flex items-start gap-3 mb-4">
-            <div class="h-12 w-12 rounded-lg bg-destructive flex items-center justify-center flex-shrink-0 shadow-sm">
+            <div class="h-12 w-12 rounded-lg bg-destructive flex items-center justify-center flex-shrink-0">
               <svg class="w-7 h-7 text-primary-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
               </svg>
@@ -992,10 +992,10 @@
       </button>
 
       <!-- 4. Consolidation List (Plan step) -->
-      <a href="{{ url_for('consolidation_list.dashboard') }}" class="group relative overflow-hidden rounded-xl border border-input bg-background hover:border-primary/50 hover:shadow-sm transition-all duration-200">
+      <a href="{{ url_for('consolidation_list.dashboard') }}" class="group relative overflow-hidden rounded-xl border border-input bg-background hover:border-primary/50 transition-all duration-200">
         <div class="p-5">
           <div class="flex items-start gap-3 mb-4">
-            <div class="h-12 w-12 rounded-lg bg-primary flex items-center justify-center flex-shrink-0 shadow-sm">
+            <div class="h-12 w-12 rounded-lg bg-primary flex items-center justify-center flex-shrink-0">
               <svg class="w-7 h-7 text-primary-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path>
               </svg>
@@ -1007,10 +1007,10 @@
       </a>
 
       <!-- 5. Review Exact Matches -->
-      <a href="{{ url_for('unified_duplicate.simple_dashboard') }}" class="group relative overflow-hidden rounded-xl border border-input bg-background hover:border-primary/50 hover:shadow-sm transition-all duration-200">
+      <a href="{{ url_for('unified_duplicate.simple_dashboard') }}" class="group relative overflow-hidden rounded-xl border border-input bg-background hover:border-primary/50 transition-all duration-200">
         <div class="p-5">
           <div class="flex items-start gap-3 mb-4">
-            <div class="h-12 w-12 rounded-lg bg-primary flex items-center justify-center flex-shrink-0 shadow-sm">
+            <div class="h-12 w-12 rounded-lg bg-primary flex items-center justify-center flex-shrink-0">
               <svg class="w-7 h-7 text-primary-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
               </svg>
@@ -1022,10 +1022,10 @@
       </a>
 
       <!-- 6. Application Portfolio -->
-      <a href="{{ url_for('unified_applications.application_list') }}" class="group relative overflow-hidden rounded-xl border border-input bg-background hover:border-primary/50 hover:shadow-sm transition-all duration-200">
+      <a href="{{ url_for('unified_applications.application_list') }}" class="group relative overflow-hidden rounded-xl border border-input bg-background hover:border-primary/50 transition-all duration-200">
         <div class="p-5">
           <div class="flex items-start gap-3 mb-4">
-            <div class="h-12 w-12 rounded-lg bg-muted-foreground flex items-center justify-center flex-shrink-0 shadow-sm">
+            <div class="h-12 w-12 rounded-lg bg-muted-foreground flex items-center justify-center flex-shrink-0">
               <svg class="w-7 h-7 text-primary-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 10h16M4 14h16M4 18h16"></path>
               </svg>
@@ -1043,7 +1043,7 @@
     <h2 class="text-2xl font-semibold tracking-tight">Options Analysis</h2>
     <p class="text-muted-foreground">Evaluate build/buy/consolidate options for applications with MIGRATE or INVEST recommendations.</p>
 
-    <div data-slot="card" class="rounded-xl border bg-card text-card-foreground shadow-sm">
+    <div data-slot="card" class="rounded-lg border border-border bg-card text-card-foreground">
       <div class="p-6">
         <!-- Application Search -->
         <div class="flex flex-col sm:flex-row gap-4 mb-6">
@@ -1051,13 +1051,13 @@
             <label for="options-app-search" class="block text-sm font-semibold mb-2">Application</label>
             <input type="text" id="options-app-search" placeholder="Search by name or code..."
                    autocomplete="off" role="combobox" aria-expanded="false" aria-controls="options-app-dropdown" aria-autocomplete="list"
-                   class="w-full h-10 px-3 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent">
+                   class="w-full h-9 px-3 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent">
             <input type="hidden" id="options-app-id">
-            <div id="options-app-dropdown" role="listbox" class="hidden absolute z-50 w-full mt-1 bg-popover border border-border rounded-lg shadow-lg max-h-60 overflow-y-auto"></div>
+            <div id="options-app-dropdown" role="listbox" class="hidden absolute z-50 w-full mt-1 bg-popover border border-border rounded-lg max-h-60 overflow-y-auto"></div>
           </div>
           <div class="flex items-end gap-2">
             <button type="button" id="analyze-options-btn" @click="analyzeOptions()"
-                    class="h-10 px-4 rounded-md text-sm font-semibold bg-primary text-primary-foreground hover:bg-primary transition-all shadow-sm" aria-label="Analyze options for selected application">
+                    class="h-10 px-4 rounded-md text-sm font-semibold bg-primary text-primary-foreground hover:bg-primary transition-all" aria-label="Analyze options for selected application">
               <i data-lucide="bar-chart-3" class="w-4 h-4 inline mr-1" aria-hidden="true"></i>
               Analyze Options
             </button>
@@ -1089,7 +1089,7 @@
           <div id="options-review-panel"
                x-data="reviewWorkflow()"
                x-cloak
-               class="rounded-lg border bg-card">
+               class="rounded-lg border border-border bg-card">
             <div class="px-4 py-3 border-b flex items-center justify-between gap-3 flex-wrap">
               <div class="flex items-center gap-2">
                 <i data-lucide="shield-check" class="w-4 h-4 text-muted-foreground" aria-hidden="true"></i>
@@ -1157,7 +1157,7 @@
                            placeholder="Search by name or email..."
                            class="w-full h-8 px-3 rounded-md border border-input bg-background text-xs focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent"
                            :required="true" autocomplete="off" aria-label="Search by name or email...">
-                    <div x-show="ushow" x-cloak class="absolute z-20 mt-1 w-full bg-popover border border-border rounded-md shadow-lg max-h-40 overflow-y-auto">
+                    <div x-show="ushow" x-cloak class="absolute z-20 mt-1 w-full bg-popover border border-border rounded-md max-h-40 overflow-y-auto">
                       <template x-for="u in ures" :key="u.id">
                         <button type="button" @click="uselect(u)" class="w-full px-3 py-1.5 text-left text-sm hover:bg-muted flex items-center justify-between">
                           <span x-text="u.name" class="font-medium"></span>
@@ -1205,7 +1205,7 @@
           </div>
 
           <!-- RAT-112: ARB Governance panel -->
-          <div class="bg-background rounded-lg border border-border p-5 shadow-sm" x-data="arbGovernance()">
+          <div class="bg-background rounded-lg border border-border p-5" x-data="arbGovernance()">
             <div class="flex items-center justify-between mb-4">
               <h2 class="text-lg font-semibold text-foreground">ARB Governance</h2>
               <span class="text-xs text-muted-foreground">Governed dispositions: Retire, Replace, Consolidate</span>
@@ -1229,7 +1229,7 @@
                   <!-- Submit button -->
                   <button type="button" x-show="!submissionStatus || submissionStatus === 'rejected'" x-cloak
                           @click="submitToArb()" :disabled="submitting"
-                          class="inline-flex items-center px-3 py-1.5 text-sm font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50">
+                          class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                     <span x-show="!submitting" x-cloak>Submit to ARB</span>
                     <span x-show="submitting" x-cloak>Submitting…</span>
                   </button>
@@ -1265,7 +1265,7 @@
           </div>
 
           <!-- Business Case Generation Link -->
-          <div class="rounded-lg border border-primary/20 bg-primary/5 p-4">
+          <div class="rounded-md border border-primary/40 bg-primary/10 px-3 py-2">
             <div class="flex items-start gap-3">
               <div class="h-10 w-10 rounded-lg bg-success flex items-center justify-center flex-shrink-0">
                 <i data-lucide="file-text" class="w-5 h-5 text-primary-foreground" aria-hidden="true"></i>
@@ -1274,7 +1274,7 @@
                 <h4 class="font-semibold mb-1">Generate Business Case</h4>
                 <p class="text-sm text-muted-foreground mb-3">Create a comprehensive business case document for the recommended option.</p>
                 <button type="button" id="generate-bc-btn" @click="generateBusinessCase()"
-                        class="h-9 px-4 rounded-md text-sm font-semibold bg-success text-primary-foreground hover:bg-success transition-colors shadow-sm" aria-label="Generate business case document">
+                        class="h-9 px-4 rounded-md text-sm font-semibold bg-success text-primary-foreground hover:bg-success transition-colors" aria-label="Generate business case document">
                   Generate Business Case
                 </button>
               </div>
@@ -1303,7 +1303,7 @@
           <option value="low">Low</option>
         </select>
         <button type="button" id="dep-risk-load-btn" @click="loadPortfolioDependencies()"
-                class="h-9 px-4 rounded-md text-sm font-semibold bg-primary text-primary-foreground hover:bg-primary/90 transition-all shadow-sm"
+                class="h-9 px-4 rounded-md text-sm font-semibold bg-primary text-primary-foreground hover:bg-primary/90 transition-all"
                 aria-label="Load dependency risk data">
           <svg class="w-4 h-4 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
@@ -1313,7 +1313,7 @@
       </div>
     </div>
 
-    <div data-slot="card" class="rounded-xl border bg-card text-card-foreground shadow-sm">
+    <div data-slot="card" class="rounded-lg border border-border bg-card text-card-foreground">
       <!-- Empty / loading state -->
       <div id="dep-risk-empty" class="p-10 text-center text-muted-foreground">
         <svg class="w-10 h-10 mx-auto mb-3 text-muted-foreground/40" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
@@ -1340,7 +1340,7 @@
 
         <!-- Table -->
         <div class="overflow-x-auto">
-          <table class="w-full text-sm" aria-label="Portfolio dependency risk table">
+          <table class="dense-table w-full text-sm" aria-label="Portfolio dependency risk table">
             <thead>
               <tr class="border-b bg-muted/20">
                 <th class="text-left py-3 px-4 font-semibold text-muted-foreground">Application</th>
@@ -1377,11 +1377,11 @@
   </div>
 
   <!-- Dependency Impact Detail Panel (inline, shown on row expand) -->
-  <div id="dep-impact-detail-panel" class="hidden mt-4 rounded-xl border bg-card shadow-sm" aria-live="polite" aria-label="Dependency impact detail">
+  <div id="dep-impact-detail-panel" class="hidden mt-4 rounded-lg border border-border bg-card" aria-live="polite" aria-label="Dependency impact detail">
     <div class="p-5 border-b flex items-center justify-between">
       <h3 class="font-semibold text-base" id="dep-impact-panel-title">Dependency Impact</h3>
       <button type="button" @click="document.getElementById('dep-impact-detail-panel').classList.add('hidden')"
-              class="h-7 w-7 rounded-md flex items-center justify-center hover:bg-accent transition-colors"
+              class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               aria-label="Close dependency impact panel">
         <svg class="w-4 h-4 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
@@ -1404,7 +1404,7 @@
       </div>
     </div>
 
-    <div data-slot="card" class="rounded-xl border bg-card text-card-foreground shadow-sm">
+    <div data-slot="card" class="rounded-lg border border-border bg-card text-card-foreground">
       <div class="p-6 space-y-6">
 
         <!-- Step 1 — pick the source application -->
@@ -1422,12 +1422,12 @@
                    x-model="sourceQuery"
                    @input.debounce.300ms="searchSource()"
                    @keydown.escape="closeSourceDropdown()"
-                   class="w-full h-10 px-3 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent">
+                   class="w-full h-9 px-3 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent">
             <input type="hidden" id="rp-source-id" x-model="sourceAppId">
             <div id="rp-source-dropdown"
                  role="listbox"
                  x-show="sourceResults.length > 0" x-cloak
-                 class="absolute z-50 w-full mt-1 bg-popover border border-border rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                 class="absolute z-50 w-full mt-1 bg-popover border border-border rounded-lg max-h-60 overflow-y-auto">
               <template x-for="app in sourceResults" :key="app.id">
                 <button type="button"
                         role="option"
@@ -1477,12 +1477,12 @@
                        x-model="targetQuery"
                        @input.debounce.300ms="searchTarget()"
                        @keydown.escape="closeTargetDropdown()"
-                       class="w-full h-10 px-3 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent">
+                       class="w-full h-9 px-3 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent">
                 <input type="hidden" id="rp-target-id" x-model="form.target_app_id">
                 <div id="rp-target-dropdown"
                      role="listbox"
                      x-show="targetResults.length > 0" x-cloak
-                     class="absolute z-50 w-full mt-1 bg-popover border border-border rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                     class="absolute z-50 w-full mt-1 bg-popover border border-border rounded-lg max-h-60 overflow-y-auto">
                   <template x-for="app in targetResults" :key="app.id">
                     <button type="button"
                             role="option"
@@ -1496,7 +1496,7 @@
               </div>
               <!-- Selected target badge -->
               <div x-show="form.target_app_name" x-cloak
-                   class="inline-flex items-center gap-2 px-2.5 py-1 rounded-md text-xs font-medium bg-primary/10 text-primary border border-primary/30">
+                   class="inline-flex items-center gap-2 px-2.5 py-1 rounded-md text-xs font-medium bg-primary/10 text-info-emphasis border border-primary/30">
                 <span x-text="form.target_app_name"></span>
                 <button type="button"
                         @click="clearTarget()"
@@ -1514,7 +1514,7 @@
               <label for="rp-migration-phase" class="block text-sm font-semibold">Migration Phase <span class="text-destructive-emphasis">*</span></label>
               <select id="rp-migration-phase"
                       x-model="form.migration_phase"
-                      class="w-full h-10 px-3 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+                      class="w-full h-9 px-3 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring">
                 <option value="planning">Planning</option>
                 <option value="pilot">Pilot</option>
                 <option value="migration">Migration</option>
@@ -1532,7 +1532,7 @@
                 <input type="number" id="rp-cost" min="0" step="1000"
                        x-model.number="form.estimated_cost"
                        placeholder="0"
-                       class="w-full h-10 pl-7 pr-3 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+                       class="w-full h-9 pl-7 pr-3 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring">
               </div>
             </div>
 
@@ -1542,7 +1542,7 @@
               <input type="number" id="rp-duration" min="1" max="120"
                      x-model.number="form.estimated_duration_months"
                      placeholder="e.g. 12"
-                     class="w-full h-10 px-3 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+                     class="w-full h-9 px-3 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring">
             </div>
 
             <!-- Risk level -->
@@ -1550,7 +1550,7 @@
               <label for="rp-risk" class="block text-sm font-semibold">Risk Level <span class="text-destructive-emphasis">*</span></label>
               <select id="rp-risk"
                       x-model="form.risk_level"
-                      class="w-full h-10 px-3 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+                      class="w-full h-9 px-3 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring">
                 <option value="low">Low</option>
                 <option value="medium">Medium</option>
                 <option value="high">High</option>
@@ -1563,7 +1563,7 @@
               <label for="rp-rollout" class="block text-sm font-semibold">Rollout Strategy <span class="text-destructive-emphasis">*</span></label>
               <select id="rp-rollout"
                       x-model="form.rollout_strategy"
-                      class="w-full h-10 px-3 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+                      class="w-full h-9 px-3 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring">
                 <option value="big_bang">Big Bang</option>
                 <option value="phased">Phased</option>
                 <option value="parallel_run">Parallel Run</option>
@@ -1587,7 +1587,7 @@
             <button type="button"
                     @click="savePlan()"
                     :disabled="saving"
-                    class="h-10 px-5 rounded-md text-sm font-semibold bg-primary text-primary-foreground hover:bg-primary/90 transition-all shadow-sm disabled:opacity-60 disabled:cursor-not-allowed inline-flex items-center gap-2">
+                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
               <svg x-show="saving" x-cloak class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24" aria-hidden="true">
                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                 <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
@@ -1622,7 +1622,7 @@
       </div>
     </div>
 
-    <div data-slot="card" class="rounded-xl border bg-card text-card-foreground shadow-sm">
+    <div data-slot="card" class="rounded-lg border border-border bg-card text-card-foreground">
       <div class="p-6 space-y-6">
 
         <!-- Application picker -->
@@ -1640,12 +1640,12 @@
                    x-model="appQuery"
                    @input.debounce.300ms="searchApp()"
                    @keydown.escape="closeDropdown()"
-                   class="w-full h-10 px-3 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent">
+                   class="w-full h-9 px-3 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent">
             <input type="hidden" id="dc-app-id" x-model="appId">
             <div id="dc-app-dropdown"
                  role="listbox"
                  x-show="appResults.length > 0" x-cloak
-                 class="absolute z-50 w-full mt-1 bg-popover border border-border rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                 class="absolute z-50 w-full mt-1 bg-popover border border-border rounded-lg max-h-60 overflow-y-auto">
               <template x-for="app in appResults" :key="app.id">
                 <button type="button"
                         role="option"
@@ -1716,8 +1716,8 @@
                            x-model="form.plan_owner"
                            @input.debounce.300ms="usearch()"
                            placeholder="Search by name or email..."
-                           class="w-full h-10 px-3 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring" autocomplete="off">
-                    <div x-show="ushow" x-cloak class="absolute z-20 mt-1 w-full bg-popover border border-border rounded-md shadow-lg max-h-40 overflow-y-auto">
+                           class="w-full h-9 px-3 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring" autocomplete="off">
+                    <div x-show="ushow" x-cloak class="absolute z-20 mt-1 w-full bg-popover border border-border rounded-md max-h-40 overflow-y-auto">
                       <template x-for="u in ures" :key="u.id">
                         <button type="button" @click="uselect(u)" class="w-full px-3 py-1.5 text-left text-sm hover:bg-muted flex items-center justify-between">
                           <span x-text="u.name" class="font-medium"></span>
@@ -1732,7 +1732,7 @@
                   <label for="dc-migration-approach" class="block text-sm font-semibold">Migration Approach</label>
                   <select id="dc-migration-approach"
                           x-model="form.migration_approach"
-                          class="w-full h-10 px-3 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+                          class="w-full h-9 px-3 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring">
                     <option value="">-- Select --</option>
                     <option value="big_bang">Big Bang</option>
                     <option value="phased">Phased</option>
@@ -1745,7 +1745,7 @@
                   <label for="dc-cutover-date" class="block text-sm font-semibold">Target Cutover Date</label>
                   <input type="date" id="dc-cutover-date"
                          x-model="form.cutover_date"
-                         class="w-full h-10 px-3 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+                         class="w-full h-9 px-3 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring">
                 </div>
 
                 <div class="space-y-2">
@@ -1753,7 +1753,7 @@
                   <input type="text" id="dc-downtime-window"
                          x-model="form.downtime_window"
                          placeholder="e.g. 4 hours"
-                         class="w-full h-10 px-3 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+                         class="w-full h-9 px-3 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring">
                 </div>
 
                 <div class="space-y-2">
@@ -1761,7 +1761,7 @@
                   <input type="text" id="dc-rollback-window"
                          x-model="form.rollback_window"
                          placeholder="e.g. 48 hours post-cutover"
-                         class="w-full h-10 px-3 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+                         class="w-full h-9 px-3 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring">
                 </div>
 
                 <div class="space-y-2">
@@ -1769,7 +1769,7 @@
                   <input type="text" id="dc-data-retention"
                          x-model="form.data_retention_period"
                          placeholder="e.g. 7 years per policy"
-                         class="w-full h-10 px-3 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+                         class="w-full h-9 px-3 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring">
                 </div>
 
               </div><!-- /core details grid -->
@@ -1829,7 +1829,7 @@
                   <button type="button"
                           @click="savePlan()"
                           :disabled="saving"
-                          class="h-10 px-5 rounded-md text-sm font-semibold bg-primary text-primary-foreground hover:bg-primary/90 transition-all shadow-sm disabled:opacity-60 disabled:cursor-not-allowed inline-flex items-center gap-2"
+                          class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center"
                           aria-label="Save decommission plan">
                     <svg x-show="saving" x-cloak class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24" aria-hidden="true">
                       <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
@@ -1875,7 +1875,7 @@
     <h2 class="text-2xl font-semibold tracking-tight">Retirement Sequence</h2>
     <p class="text-muted-foreground">Dependency-aware retirement order for ELIMINATE and MIGRATE applications. Apps in Wave 1 can be retired immediately; each subsequent wave becomes available once the prior wave is complete.</p>
 
-    <div data-slot="card" class="rounded-xl border bg-card text-card-foreground shadow-sm">
+    <div data-slot="card" class="rounded-lg border border-border bg-card text-card-foreground">
       <div class="p-6">
         <div id="retirement-sequence-container" aria-live="polite" aria-label="Retirement sequence timeline">
           <!-- Populated by loadRetirementSequence() in rationalization.js -->
@@ -1888,7 +1888,7 @@
     <h2 class="text-2xl font-semibold tracking-tight">Retirement Impact Analysis</h2>
     <p class="text-muted-foreground">Analyze the impact of retiring an application before making ELIMINATE decisions.</p>
 
-    <div data-slot="card" class="rounded-xl border bg-card text-card-foreground shadow-sm">
+    <div data-slot="card" class="rounded-lg border border-border bg-card text-card-foreground">
       <div class="p-6">
         <!-- Application Search -->
         <div class="flex flex-col sm:flex-row gap-4 mb-6">
@@ -1896,18 +1896,18 @@
             <label for="impact-app-search" class="block text-sm font-semibold mb-2">Application</label>
             <input type="text" id="impact-app-search" placeholder="Search by name or code..."
                    autocomplete="off" role="combobox" aria-expanded="false" aria-controls="impact-app-dropdown" aria-autocomplete="list"
-                   class="w-full h-10 px-3 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent">
+                   class="w-full h-9 px-3 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent">
             <input type="hidden" id="impact-app-id">
-            <div id="impact-app-dropdown" role="listbox" class="hidden absolute z-50 w-full mt-1 bg-popover border border-border rounded-lg shadow-lg max-h-60 overflow-y-auto"></div>
+            <div id="impact-app-dropdown" role="listbox" class="hidden absolute z-50 w-full mt-1 bg-popover border border-border rounded-lg max-h-60 overflow-y-auto"></div>
           </div>
           <div class="flex items-end gap-2">
             <button type="button" id="check-blockers-btn" @click="checkRetirementBlockers()"
-                    class="h-10 px-4 rounded-md text-sm font-semibold bg-warning text-primary-foreground hover:bg-warning transition-colors shadow-sm" aria-label="Check retirement blockers for selected application">
+                    class="h-10 px-4 rounded-md text-sm font-semibold bg-warning text-primary-foreground hover:bg-warning transition-colors" aria-label="Check retirement blockers for selected application">
               <i data-lucide="alert-triangle" class="w-4 h-4 inline mr-1" aria-hidden="true"></i>
               Check Blockers
             </button>
             <button type="button" id="blast-radius-btn" @click="checkBlastRadius()"
-                    class="h-10 px-4 rounded-md text-sm font-semibold bg-destructive text-primary-foreground hover:bg-destructive transition-colors shadow-sm" aria-label="Calculate blast radius for selected application">
+                    class="h-10 px-4 rounded-md text-sm font-semibold bg-destructive text-primary-foreground hover:bg-destructive transition-colors" aria-label="Calculate blast radius for selected application">
               <i data-lucide="target" class="w-4 h-4 inline mr-1" aria-hidden="true"></i>
               Blast Radius
             </button>
@@ -2001,7 +2001,7 @@
           </div>
 
           <!-- No Blockers / No Impact Message (context-aware) -->
-          <div id="no-blockers-message" class="hidden rounded-lg border border-success/20 bg-success/5 p-6 text-center">
+          <div id="no-blockers-message" class="hidden rounded-md border border-success/40 bg-success/10 px-3 py-2 text-center">
             <div class="h-12 w-12 rounded-full bg-success/10 flex items-center justify-center mx-auto mb-3">
               <i data-lucide="check-circle" class="w-6 h-6 text-success" aria-hidden="true"></i>
             </div>
@@ -2016,7 +2016,7 @@
 
 <!-- ── RAT-113: Override Management ── -->
 <div class="mt-6 max-w-2xl mx-auto px-4 sm:px-6 lg:px-8">
-  <div class="bg-background rounded-lg border border-border p-5 shadow-sm" x-data="overrideManager()">
+  <div class="bg-background rounded-lg border border-border p-5" x-data="overrideManager()">
     <div class="flex items-center justify-between mb-4">
       <h2 class="text-lg font-semibold text-foreground">Override Management</h2>
     </div>
@@ -2033,7 +2033,7 @@
           <p class="text-sm"><span class="font-medium">By:</span> <span x-text="overrideActor"></span></p>
           <p class="text-sm"><span class="font-medium">Rationale:</span> <span x-text="overrideRationale"></span></p>
           <p class="text-sm"><span class="font-medium">Expires:</span> <span x-text="overrideExpiry"></span></p>
-          <button type="button" @click="removeOverride()" class="mt-2 inline-flex items-center px-3 py-1.5 text-sm font-medium rounded-md bg-destructive text-destructive-foreground hover:bg-destructive/90">
+          <button type="button" @click="removeOverride()" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-destructive text-destructive-foreground text-sm font-semibold transition-colors hover:bg-destructive/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 mt-2 items-center">
             Remove Override
           </button>
         </div>
@@ -2063,7 +2063,7 @@
             <input type="number" x-model.number="form.expiry_days" min="1" max="365" class="w-32 rounded-md border border-input bg-background px-3 py-2 text-sm"  aria-label="Expiry (days)"/>
           </div>
           <button type="button" @click="createOverride()" :disabled="!canSubmit || submitting"
-                  class="inline-flex items-center px-3 py-1.5 text-sm font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50">
+                  class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
             <span x-show="!submitting" x-cloak>Create Override</span>
             <span x-show="submitting" x-cloak>Creating…</span>
           </button>
@@ -2086,7 +2086,7 @@
     </div>
   </div>
 
-  <div data-slot="card" class="rounded-xl border bg-card text-card-foreground shadow-sm">
+  <div data-slot="card" class="rounded-lg border border-border bg-card text-card-foreground">
     <div class="p-5 border-b">
       <div class="flex flex-col sm:flex-row gap-3 items-start sm:items-end">
         <div class="flex-1 space-y-1">
@@ -2107,7 +2107,7 @@
             <!-- Dropdown -->
             <div id="dossier-app-dropdown"
                  x-show="showDropdown" x-cloak
-                 class="absolute z-10 mt-1 w-full rounded-md border border-border bg-popover shadow-md"
+                 class="absolute z-10 mt-1 w-full rounded-md border border-border bg-popover"
                  role="listbox">
               <template x-for="app in results" :key="app.id">
                 <div class="px-3 py-2 cursor-pointer hover:bg-accent text-sm border-b last:border-0"
@@ -2122,7 +2122,7 @@
         </div>
         <button type="button" @click="loadDossier()"
                 :disabled="!selectedAppId || loading"
-                class="inline-flex items-center px-4 py-2 text-sm font-semibold rounded-md bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors shadow-sm"
+                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center"
                 aria-label="Load decision dossier for selected application">
           <svg x-show="loading" x-cloak class="w-4 h-4 mr-2 animate-spin" fill="none" viewBox="0 0 24 24" aria-hidden="true">
             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
@@ -2351,7 +2351,7 @@
     </span>
   </div>
 
-  <div data-slot="card" class="rounded-xl border bg-card text-card-foreground shadow-sm">
+  <div data-slot="card" class="rounded-lg border border-border bg-card text-card-foreground">
     <div class="p-6 space-y-6">
 
       <!-- Application picker -->
@@ -2366,11 +2366,11 @@
                  aria-expanded="false"
                  aria-autocomplete="list"
                  aria-controls="bt-app-results"
-                 class="w-full h-10 px-3 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+                 class="w-full h-9 px-3 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring">
           <input type="hidden" id="bt-app-id">
           <ul id="bt-app-results"
               role="listbox"
-              class="absolute z-50 mt-1 w-full max-h-56 overflow-y-auto rounded-md border bg-popover text-popover-foreground shadow-md hidden">
+              class="absolute z-50 mt-1 w-full max-h-56 overflow-y-auto rounded-md border bg-popover text-popover-foreground hidden">
           </ul>
         </div>
       </div>
@@ -2389,7 +2389,7 @@
         <div class="space-y-2">
           <label class="block text-sm font-semibold">Tracking Status</label>
           <select x-model="form.tracking_status"
-                  class="w-full max-w-xs h-10 px-3 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring" aria-label="Tracking Status">
+                  class="w-full max-w-xs h-9 px-3 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring" aria-label="Tracking Status">
             <option value="projected">Projected</option>
             <option value="in_progress">In Progress</option>
             <option value="measured">Measured</option>
@@ -2502,7 +2502,7 @@
                      x-model="form.measured_by"
                      @input.debounce.300ms="usearch()"
                      class="w-full h-9 px-3 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring" autocomplete="off" aria-label="Measured By">
-              <div x-show="ushow" x-cloak class="absolute z-20 mt-1 w-full bg-popover border border-border rounded-md shadow-lg max-h-40 overflow-y-auto">
+              <div x-show="ushow" x-cloak class="absolute z-20 mt-1 w-full bg-popover border border-border rounded-md max-h-40 overflow-y-auto">
                 <template x-for="u in ures" :key="u.id">
                   <button type="button" @click="uselect(u)" class="w-full px-3 py-1.5 text-left text-sm hover:bg-muted flex items-center justify-between">
                     <span x-text="u.name" class="font-medium"></span>
@@ -2534,7 +2534,7 @@
         <div class="flex justify-end">
           <button type="button" @click="saveBenefits()"
                   :disabled="submitting"
-                  class="inline-flex items-center justify-center h-10 px-6 rounded-md text-sm font-semibold bg-primary text-primary-foreground hover:bg-primary/90 transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed">
+                  class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
             <span x-show="!submitting" x-cloak>Save Benefits</span>
             <span x-show="submitting" x-cloak>Saving…</span>
           </button>
@@ -2547,7 +2547,7 @@
 
 <!-- RAT-115: Roadmap Generation Section -->
 <div class="mt-6 max-w-2xl mx-auto px-4 sm:px-6 lg:px-8">
-  <div class="bg-background rounded-lg border border-border p-5 shadow-sm" x-data="roadmapGenerator()">
+  <div class="bg-background rounded-lg border border-border p-5" x-data="roadmapGenerator()">
     <div class="flex items-center justify-between mb-4">
       <h2 class="text-lg font-semibold text-foreground">Generate Roadmap Item</h2>
       <span x-show="loaded && hasRoadmapItem" x-cloak
@@ -2631,7 +2631,7 @@
           <div class="flex items-center gap-3">
             <button type="button" @click="createRoadmapItem()"
                     :disabled="!form.owner.trim() || submitting"
-                    class="inline-flex items-center px-4 py-2 text-sm font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
               <span x-show="!submitting" x-cloak>
                 <svg class="w-4 h-4 mr-2 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
