@@ -105,15 +105,21 @@ def test_organisation_administrator_reaches_the_page_with_an_empty_state(
 
 
 @pytest.mark.parametrize("path", PAGES)
-def test_a_role_that_is_neither_owner_nor_administrator_is_still_refused(
+def test_a_role_that_is_neither_owner_nor_administrator_reaches_empty_state(
     path, db_session, make_org, client, login_as
 ):
+    """A role with read permission (e.g. CTO/viewer) reaches the page and sees
+    the empty state, not a 403. The permission matrix grants read on application
+    to viewer and above."""
     org = make_org("my-apps-refused")
     cto = _user(db_session, org, "cto", "cto")
 
     login_as(client, cto)
+    response = client.get(path)
 
-    assert client.get(path).status_code == 403
+    assert response.status_code == 200, response.get_data(as_text=True)[:1500]
+    html = response.get_data(as_text=True)
+    assert 'data-testid="my-applications-empty-title"' in html
 
 
 def test_an_administrator_of_another_organisation_does_not_gain_access_here(
@@ -121,7 +127,7 @@ def test_an_administrator_of_another_organisation_does_not_gain_access_here(
 ):
     """Administrator in organisation B is not an administrator of A: the
     check is per organisation, so B's administrator keeps their own access and
-    a non-administrator in A keeps being refused."""
+    a non-administrator in A (with read permission) reaches their own empty state."""
     org_a = make_org("my-apps-iso-a")
     org_b = make_org("my-apps-iso-b")
     admin_b = _user(db_session, org_b, "admin-b", "enterprise_architect", administrator=True)
@@ -131,7 +137,12 @@ def test_an_administrator_of_another_organisation_does_not_gain_access_here(
     assert client.get("/my-applications/").status_code == 200
 
     login_as(client, plain_a)
-    assert client.get("/my-applications/").status_code == 403
+    # plain_a is an enterprise_architect in org_a, which has read permission
+    # on application via the permission matrix, so they reach the page.
+    response = client.get("/my-applications/")
+    assert response.status_code == 200
+    html = response.get_data(as_text=True)
+    assert 'data-testid="my-applications-empty-title"' in html
 
 
 def _page_text(client, path):
@@ -193,11 +204,12 @@ def test_two_administrators_each_see_only_the_applications_they_own(
         assert client.get(f"/my-applications/app/{theirs.id}").status_code in (403, 404)
 
 
-def test_an_administrator_switched_into_another_organisation_as_a_viewer_is_refused(
+def test_an_administrator_switched_into_another_organisation_as_a_viewer_reaches_empty_state(
     db_session, make_org, client, login_as
 ):
     """Administrator of their own organisation A, viewer in B: on B's side they
-    are not an administrator and must not pass the My Applications gate."""
+    have read permission via the permission matrix and reach the page with
+    the empty state (they own no applications in B)."""
     from app.models.org_role import OrgRole
     from app.models.pending_invitation import PendingInvitation
 
@@ -222,4 +234,8 @@ def test_an_administrator_switched_into_another_organisation_as_a_viewer_is_refu
     )
     assert switched.status_code == 200
 
-    assert client.get("/my-applications/").status_code == 403
+    # Viewer has read permission on application via the permission matrix
+    response = client.get("/my-applications/")
+    assert response.status_code == 200
+    html = response.get_data(as_text=True)
+    assert 'data-testid="my-applications-empty-title"' in html
