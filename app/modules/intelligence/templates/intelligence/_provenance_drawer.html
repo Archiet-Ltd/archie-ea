@@ -29,6 +29,28 @@
             <h3 id="drawer-plain-terms-heading" class="text-sm font-semibold text-foreground">In plain terms</h3>
             <p class="mt-1 text-sm text-foreground" data-plain-terms x-text="drawer.plainTerms"></p>
         </section>
+
+        <!-- Provenance for recorded (explicit) rows -->
+        <section x-show="drawer.provenance" x-cloak aria-labelledby="drawer-provenance-heading" data-provenance-record>
+            <h3 id="drawer-provenance-heading" class="text-sm font-semibold text-foreground">Where this link came from</h3>
+            <div class="mt-2 space-y-2">
+                <p class="text-sm text-foreground" x-text="drawer.provenance.text"></p>
+                <div x-show="drawer.provenance.recorded_at" class="text-xs text-muted-foreground">
+                    <span>Recorded </span>
+                    <span x-text="formatDate(drawer.provenance.recorded_at)"></span>
+                </div>
+                <div x-show="!drawer.provenance.recorded_at" class="text-xs text-muted-foreground">Date not recorded</div>
+                <div x-show="drawer.provenance.relationship_id" class="text-sm">
+                    <a :href="'/architecture/relationships#relationship-' + drawer.provenance.relationship_id"
+                       class="font-medium text-primary hover:underline"
+                       data-relationship-link>
+                        Open relationship record
+                    </a>
+                </div>
+            </div>
+        </section>
+
+        <!-- The links behind a worked-out connection -->
         <section x-show="drawer.why.state !== 'idle'" x-cloak aria-labelledby="drawer-why-heading" data-why-chain>
             <h3 id="drawer-why-heading" class="text-sm font-semibold text-foreground">The links behind this</h3>
             <div x-show="drawer.why.state === 'loading'" x-cloak class="mt-2">
