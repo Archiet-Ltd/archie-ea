@@ -4,6 +4,7 @@ from datetime import datetime  # dead-code-ok
 
 from flask import current_app, flash, g, jsonify, render_template, request  # dead-code-ok
 from flask_login import current_user, login_required
+from app.decorators import WORK_PACKAGE_WRITE_ROLES, require_roles
 from sqlalchemy import text  # dead-code-ok
 
 from app import db
@@ -267,6 +268,7 @@ def get_strategic_work_packages():
 
 @main.route("/api/strategic-work-packages", methods=["POST"])
 @login_required
+@require_roles(*WORK_PACKAGE_WRITE_ROLES)
 def create_strategic_work_package():
     """Create new strategic work package"""
     try:
@@ -334,6 +336,7 @@ def create_strategic_work_package():
 
 @main.route("/api/strategic-work-packages/<int:wp_id>", methods=["PUT"])
 @login_required
+@require_roles(*WORK_PACKAGE_WRITE_ROLES)
 def update_strategic_work_package(wp_id):
     """Update strategic work package"""
     try:
@@ -395,6 +398,7 @@ def update_strategic_work_package(wp_id):
 
 @main.route("/api/strategic-work-packages/<int:wp_id>", methods=["DELETE"])
 @login_required
+@require_roles(*WORK_PACKAGE_WRITE_ROLES)
 def delete_strategic_work_package(wp_id):
     """Delete strategic work package"""
     try:

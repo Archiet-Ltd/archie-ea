@@ -5,6 +5,7 @@ from datetime import datetime  # dead-code-ok
 
 from flask import flash, g, jsonify, render_template, request  # dead-code-ok
 from flask_login import current_user, login_required
+from app.decorators import WORK_PACKAGE_WRITE_ROLES, require_roles
 from sqlalchemy import text  # dead-code-ok
 
 from app import db
@@ -369,6 +370,7 @@ def get_archimate_work_packages():
 
 @main.route("/api/archimate-work-packages", methods=["POST"])
 @login_required
+@require_roles(*WORK_PACKAGE_WRITE_ROLES)
 def create_archimate_work_package():
     """Create new ArchiMate work package"""
     try:
@@ -437,6 +439,7 @@ def create_archimate_work_package():
 
 @main.route("/api/archimate-work-packages/<int:wp_id>", methods=["PUT"])
 @login_required
+@require_roles(*WORK_PACKAGE_WRITE_ROLES)
 def update_archimate_work_package(wp_id):
     """Update ArchiMate work package"""
     try:
@@ -499,6 +502,7 @@ def update_archimate_work_package(wp_id):
 
 @main.route("/api/archimate-work-packages/<int:wp_id>", methods=["DELETE"])
 @login_required
+@require_roles(*WORK_PACKAGE_WRITE_ROLES)
 def delete_archimate_work_package(wp_id):
     """Delete ArchiMate work package"""
     try:

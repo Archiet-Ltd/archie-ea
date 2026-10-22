@@ -7,6 +7,7 @@ from datetime import datetime
 
 from flask import abort, current_app, g, jsonify, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
+from app.decorators import WORK_PACKAGE_WRITE_ROLES, require_roles
 from sqlalchemy import func
 
 from app import db
@@ -599,6 +600,7 @@ def get_capability_work_packages():
 
 @main.route("/api/capability-work-packages", methods=["POST"])
 @login_required
+@require_roles(*WORK_PACKAGE_WRITE_ROLES)
 def create_capability_work_package():
     """Create new capability work package with multi-capability support"""
     try:
@@ -686,6 +688,7 @@ def create_capability_work_package():
 
 @main.route("/api/capability-work-packages/<int:wp_id>", methods=["PUT"])
 @login_required
+@require_roles(*WORK_PACKAGE_WRITE_ROLES)
 def update_capability_work_package(wp_id):
     """Update capability work package"""
     try:
@@ -757,6 +760,7 @@ def update_capability_work_package(wp_id):
 
 @main.route("/api/capability-work-packages/<int:wp_id>", methods=["DELETE"])
 @login_required
+@require_roles(*WORK_PACKAGE_WRITE_ROLES)
 def delete_capability_work_package(wp_id):
     """Delete capability work package"""
     try:
@@ -824,6 +828,7 @@ def get_work_package_tasks(wp_id):
 
 @main.route("/api/capability-work-packages/<int:wp_id>/tasks", methods=["POST"])
 @login_required
+@require_roles(*WORK_PACKAGE_WRITE_ROLES)
 def create_work_package_task(wp_id):
     """Create a new task for a work package"""
     try:
@@ -873,6 +878,7 @@ def create_work_package_task(wp_id):
 
 @main.route("/api/capability-work-packages/<int:wp_id>/tasks/<int:task_id>", methods=["PUT"])
 @login_required
+@require_roles(*WORK_PACKAGE_WRITE_ROLES)
 def update_work_package_task(wp_id, task_id):
     """Update a task"""
     try:
@@ -926,6 +932,7 @@ def update_work_package_task(wp_id, task_id):
 
 @main.route("/api/capability-work-packages/<int:wp_id>/tasks/<int:task_id>", methods=["DELETE"])
 @login_required
+@require_roles(*WORK_PACKAGE_WRITE_ROLES)
 def delete_work_package_task(wp_id, task_id):
     """Delete a task"""
     try:
@@ -987,6 +994,7 @@ def get_work_package_deliverables(wp_id):
 
 @main.route("/api/capability-work-packages/<int:wp_id>/deliverables", methods=["POST"])
 @login_required
+@require_roles(*WORK_PACKAGE_WRITE_ROLES)
 def create_work_package_deliverable(wp_id):
     """Create a new deliverable for a work package"""
     try:
@@ -1032,6 +1040,7 @@ def create_work_package_deliverable(wp_id):
     "/api/capability-work-packages/<int:wp_id>/deliverables/<int:deliverable_id>", methods=["PUT"]
 )
 @login_required
+@require_roles(*WORK_PACKAGE_WRITE_ROLES)
 def update_work_package_deliverable(wp_id, deliverable_id):
     """Update a deliverable"""
     try:
@@ -1069,6 +1078,7 @@ def update_work_package_deliverable(wp_id, deliverable_id):
     methods=["DELETE"],
 )
 @login_required
+@require_roles(*WORK_PACKAGE_WRITE_ROLES)
 def delete_work_package_deliverable(wp_id, deliverable_id):
     """Delete a deliverable"""
     try:

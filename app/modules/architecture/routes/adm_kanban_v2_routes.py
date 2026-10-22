@@ -11,6 +11,7 @@ import logging
 
 from flask import Blueprint, current_app, g, jsonify, request
 from flask_login import current_user, login_required
+from app.decorators import WORK_PACKAGE_WRITE_ROLES, require_roles
 
 from app import db
 from app.decorators import audit_log
@@ -530,6 +531,7 @@ def delete_task(card_ref):
 
 @adm_kanban_v2_bp.route("/cards/<card_ref>/push-to-gantt", methods=["POST"])
 @login_required
+@require_roles(*WORK_PACKAGE_WRITE_ROLES)
 @audit_log("kanban_push_to_gantt")
 def push_to_gantt(card_ref):
     """

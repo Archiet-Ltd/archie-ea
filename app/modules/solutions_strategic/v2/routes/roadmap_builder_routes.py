@@ -34,6 +34,7 @@ from datetime import datetime
 
 from flask import Blueprint, jsonify, request
 from flask_login import current_user, login_required
+from app.decorators import WORK_PACKAGE_WRITE_ROLES, require_roles
 
 from app.decorators import audit_log
 
@@ -83,6 +84,7 @@ def list_work_packages():
 
 @roadmap_builder_bp.route("/work-packages", methods=["POST"])
 @login_required
+@require_roles(*WORK_PACKAGE_WRITE_ROLES)
 @audit_log("create_work_package")
 def create_work_package():
     """
@@ -169,6 +171,7 @@ def get_work_package(work_package_id: int):
 
 @roadmap_builder_bp.route("/work-packages/<int:work_package_id>", methods=["PUT"])
 @login_required
+@require_roles(*WORK_PACKAGE_WRITE_ROLES)
 @audit_log("update_work_package")
 def update_work_package(work_package_id: int):
     """
@@ -207,6 +210,7 @@ def update_work_package(work_package_id: int):
 
 @roadmap_builder_bp.route("/work-packages/<int:work_package_id>", methods=["DELETE"])
 @login_required
+@require_roles(*WORK_PACKAGE_WRITE_ROLES)
 @audit_log("delete_work_package")
 def delete_work_package(work_package_id: int):
     """
@@ -229,6 +233,7 @@ def delete_work_package(work_package_id: int):
 
 @roadmap_builder_bp.route("/work-packages/<int:work_package_id>/dependencies", methods=["POST"])
 @login_required
+@require_roles(*WORK_PACKAGE_WRITE_ROLES)
 @audit_log("add_dependency")
 def add_dependency(work_package_id: int):
     """
@@ -253,7 +258,8 @@ def add_dependency(work_package_id: int):
     result = service.add_dependency(work_package_id, data["depends_on_id"])
 
     if not result.get("success"):
-        return jsonify(result), 400
+        # Another organisation's work package is indistinguishable from a missing one.
+        return jsonify(result), 404 if "not found" in result.get("error", "") else 400
 
     return jsonify({"success": True, "data": result})
 
@@ -262,6 +268,7 @@ def add_dependency(work_package_id: int):
     "/work-packages/<int:work_package_id>/dependencies/<int:dep_id>", methods=["DELETE"]
 )
 @login_required
+@require_roles(*WORK_PACKAGE_WRITE_ROLES)
 def remove_dependency(work_package_id: int, dep_id: int):
     """
     Remove a dependency from a work package.
@@ -304,6 +311,7 @@ def list_plateaus():
 
 @roadmap_builder_bp.route("/plateaus", methods=["POST"])
 @login_required
+@require_roles(*WORK_PACKAGE_WRITE_ROLES)
 @audit_log("create_plateau")
 def create_plateau():
     """

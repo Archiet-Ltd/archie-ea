@@ -49,7 +49,7 @@ from sqlalchemy.orm import joinedload  # dead-code-ok
 from werkzeug.exceptions import HTTPException
 
 from app import csrf, db
-from app.decorators import audit_log, require_roles
+from app.decorators import WORK_PACKAGE_WRITE_ROLES, audit_log, require_roles
 from app.middleware.tenant_decorators import is_active_org_admin
 from app.models.application_portfolio import ApplicationComponent
 from app.models.apqc_process import APQCProcess, ProcessApplicationMapping
@@ -6426,6 +6426,7 @@ def api_solution_gantt_data(solution_id: int):
     "/<int:solution_id>/api/work-packages/<int:wp_id>", methods=["PUT", "DELETE"]
 )
 @login_required
+@require_roles(*WORK_PACKAGE_WRITE_ROLES)
 @audit_log("solution_work_package_crud")
 def api_solution_work_packages(solution_id, wp_id=None):
     """CRUD for solution work packages (used by Gantt component)."""
@@ -6470,7 +6471,9 @@ def api_solution_work_packages(solution_id, wp_id=None):
             return jsonify({"success": True, "id": wp.id}), 201
 
         elif request.method == "PUT":
-            wp = RoadmapWorkPackage.query.get_or_404(wp_id)
+            wp = RoadmapWorkPackage.query.filter_by(
+                id=wp_id, source_type="solution", source_id=solution_id
+            ).first_or_404()
             data = request.get_json() or {}
             for field in ("name", "status", "priority", "description"):
                 if field in data:
@@ -6500,7 +6503,9 @@ def api_solution_work_packages(solution_id, wp_id=None):
             return jsonify({"success": True})
 
         elif request.method == "DELETE":
-            wp = RoadmapWorkPackage.query.get_or_404(wp_id)
+            wp = RoadmapWorkPackage.query.filter_by(
+                id=wp_id, source_type="solution", source_id=solution_id
+            ).first_or_404()
             db.session.delete(wp)
             db.session.commit()
             return jsonify({"success": True})
@@ -7766,6 +7771,7 @@ def api_capabilities_by_type():
 
 @solution_design_bp.route("/<int:solution_id>/update-roadmap-item", methods=["POST"])
 @login_required
+@require_roles(*WORK_PACKAGE_WRITE_ROLES)
 @audit_log("update_roadmap_item")
 def update_roadmap_item(solution_id: int):
     """Update a single roadmap item in a solution."""
@@ -7828,6 +7834,7 @@ def update_roadmap_item(solution_id: int):
 
 @solution_design_bp.route("/<int:solution_id>/delete-roadmap-items", methods=["POST"])
 @login_required
+@require_roles(*WORK_PACKAGE_WRITE_ROLES)
 @audit_log("delete_roadmap_items")
 def delete_roadmap_items(solution_id: int):
     """Delete selected roadmap items from a solution."""

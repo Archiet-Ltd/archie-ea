@@ -12,6 +12,8 @@ from .audit import *  # noqa
 from .feature_flags import *  # noqa
 from .llm_required import *  # noqa
 from .requires_role import (  # noqa
+    WORK_PACKAGE_WRITE_ROLES,
+    require_work_package_write,
     requires_admin,
     requires_any_architect,
     requires_application_owner,

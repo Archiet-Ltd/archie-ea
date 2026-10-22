@@ -19,7 +19,7 @@ from flask import Blueprint, jsonify, render_template, request
 from flask_login import login_required
 from sqlalchemy import or_
 
-from app.decorators import audit_log
+from app.decorators import WORK_PACKAGE_WRITE_ROLES, audit_log, require_roles
 from app.services.application_cost_accessor import set_annual_cost
 
 from .. import db
@@ -752,6 +752,7 @@ def bulk_action():
 
 @consolidation_list_bp.route("/api/create-roadmap-task", methods=["POST"])
 @login_required
+@require_roles(*WORK_PACKAGE_WRITE_ROLES)
 @audit_log("consolidation_roadmap_task")
 def create_roadmap_task():
     """Create a roadmap task for a consolidation list entry"""
@@ -771,7 +772,9 @@ def create_roadmap_task():
             return jsonify({"success": False, "error": "Consolidation entry not found"}), 404
 
         # Get the application
-        app = ApplicationComponent.query.get(entry.application_id)
+        # A filtered SELECT, not Query.get (which can skip the tenant filter): the
+        # entry has no organisation of its own, its application does.
+        app = ApplicationComponent.query.filter_by(id=entry.application_id).first()
         if not app:
             return jsonify({"success": False, "error": "Application not found"}), 404
 

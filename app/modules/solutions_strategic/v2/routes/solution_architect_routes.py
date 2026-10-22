@@ -23,6 +23,7 @@ from flask import (
     url_for,
 )
 from flask_login import current_user, login_required
+from app.decorators import WORK_PACKAGE_WRITE_ROLES, require_roles
 from werkzeug.exceptions import HTTPException
 
 from app import db
@@ -911,6 +912,7 @@ def apply_requirements(session_id: int):
     "/api/sessions/<int:session_id>/apply-roadmap", methods=["POST"]
 )
 @login_required
+@require_roles(*WORK_PACKAGE_WRITE_ROLES)
 @audit_log("apply_roadmap")
 def apply_roadmap(session_id: int):
     """Apply AI-suggested roadmap items to a solution."""

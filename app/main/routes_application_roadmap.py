@@ -5,6 +5,7 @@ from datetime import datetime
 
 from flask import current_app, flash, g, jsonify, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
+from app.decorators import WORK_PACKAGE_WRITE_ROLES, require_roles
 
 from app import db
 
@@ -14,6 +15,9 @@ from app.models.application_layer import ApplicationComponent
 from app.models.archimate_core import ArchiMateElement
 from app.models.implementation_migration import Gap, Plateau, WorkPackage
 from app.models.unified_work_package import UnifiedWorkPackage
+from app.models.unified_capability import UnifiedCapability
+from app.services import work_package_service
+from werkzeug.exceptions import HTTPException
 
 
 @main.route("/applications/<int:id>/roadmap")
@@ -197,11 +201,22 @@ def application_roadmap(id):
 # lives in application_api (app/api/application_routes.py:api_work_packages).
 
 
+def _own_ref(model, record_id):
+    """``record_id`` when it names a row of this organisation (or is empty); a
+    row of another organisation is a 404 and is never linked."""
+    if record_id in (None, ""):
+        return None
+    return work_package_service.own_or_404(model, record_id).id
+
+
 @main.route("/api/applications/<int:id>/work-packages", methods=["POST"])
 @login_required
+@require_roles(*WORK_PACKAGE_WRITE_ROLES)
 def create_application_work_package(id):
     """Create new work package for specific application"""
     try:
+        # This organisation's application, else 404 (before the body is read).
+        work_package_service.own_or_404(ApplicationComponent, id)
         data = request.get_json()
 
         # Validate required fields
@@ -250,8 +265,8 @@ def create_application_work_package(id):
             sequence_order=data.get("sequence_order", 1),
             context="application",
             # ArchiMate 3.2 Implementation & Migration links (RDM-021)
-            plateau_id=data.get("plateau_id"),
-            capability_id=data.get("capability_id"),
+            plateau_id=_own_ref(Plateau, data.get("plateau_id")),
+            capability_id=_own_ref(UnifiedCapability, data.get("capability_id")),
         )
 
         db.session.add(new_wp)
@@ -293,6 +308,9 @@ def create_application_work_package(id):
             }
         )
 
+    except HTTPException:
+        db.session.rollback()
+        raise
     except Exception:
         db.session.rollback()
         return jsonify({"error": "An internal error occurred"}), 500
@@ -300,12 +318,13 @@ def create_application_work_package(id):
 
 @main.route("/api/applications/<int:id>/work-packages/<int:wp_id>", methods=["PUT"])
 @login_required
+@require_roles(*WORK_PACKAGE_WRITE_ROLES)
 def update_application_work_package(id, wp_id):
     """Update work package for specific application"""
     try:
         data = request.get_json()
 
-        work_package = WorkPackage.query.get_or_404(wp_id)
+        work_package = work_package_service.own_or_404(WorkPackage, wp_id)
 
         # Verify this work package belongs to the specified application
         if work_package.application_component_id != id:
@@ -341,9 +360,9 @@ def update_application_work_package(id, wp_id):
         if "application_phase" in data:
             work_package.togaf_phase = data["application_phase"]
         if "plateau_id" in data:
-            work_package.plateau_id = data["plateau_id"]
+            work_package.plateau_id = _own_ref(Plateau, data["plateau_id"])
         if "capability_id" in data:
-            work_package.capability_id = data["capability_id"]
+            work_package.capability_id = _own_ref(UnifiedCapability, data["capability_id"])
         if "archimate_element_id" in data:
             work_package.archimate_element_id = data["archimate_element_id"]
 
@@ -409,6 +428,9 @@ def update_application_work_package(id, wp_id):
             }
         )
 
+    except HTTPException:
+        db.session.rollback()
+        raise
     except Exception:
         db.session.rollback()
         return jsonify({"error": "An internal error occurred"}), 500
@@ -416,10 +438,11 @@ def update_application_work_package(id, wp_id):
 
 @main.route("/api/applications/<int:id>/work-packages/<int:wp_id>", methods=["DELETE"])
 @login_required
+@require_roles(*WORK_PACKAGE_WRITE_ROLES)
 def delete_application_work_package(id, wp_id):
     """Delete work package for specific application"""
     try:
-        work_package = WorkPackage.query.get_or_404(wp_id)
+        work_package = work_package_service.own_or_404(WorkPackage, wp_id)
 
         # Verify this work package belongs to the specified application
         if work_package.application_component_id != id:
@@ -434,6 +457,9 @@ def delete_application_work_package(id, wp_id):
             {"success": True, "message": f"Application work package {wp_id} deleted"}
         )
 
+    except HTTPException:
+        db.session.rollback()
+        raise
     except Exception:
         db.session.rollback()
         return jsonify({"error": "An internal error occurred"}), 500

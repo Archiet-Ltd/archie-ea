@@ -13,6 +13,7 @@ from flask import current_app, flash, redirect, request, url_for
 from app.core.auth.decorators import require_permission
 from app import db
 from app.decorators import audit_log
+from app.services import work_package_service
 from app.models.application_layer import (
     ApplicationInterface,
     ApplicationService,
@@ -25,7 +26,6 @@ from app.models.business_layer import (
     BusinessService,
 )
 from app.models.implementation_migration import (
-    Deliverable,
     Plateau,
     WorkPackage,
 )
@@ -686,10 +686,7 @@ def work_package_add(id):
         flash("No work package selected", "error")
         return redirect(url_for("unified_applications.application_detail", id=id))
 
-    work_package = WorkPackage.query.get(work_package_id)
-    if not work_package:
-        flash("Work package not found", "error")
-        return redirect(url_for("unified_applications.application_detail", id=id))
+    work_package = work_package_service.own_or_404(WorkPackage, work_package_id)
 
     # Check if already linked to another application
     if (
@@ -738,10 +735,7 @@ def deliverable_add(id):
         flash("No deliverable selected", "error")
         return redirect(url_for("unified_applications.application_detail", id=id))
 
-    deliverable = Deliverable.query.get(deliverable_id)
-    if not deliverable:
-        flash("Deliverable not found", "error")
-        return redirect(url_for("unified_applications.application_detail", id=id))
+    deliverable = work_package_service.own_deliverable_or_404(deliverable_id)
 
     # Check if already linked to another application
     if (
@@ -788,10 +782,7 @@ def plateau_add(id):
         flash("No plateau selected", "error")
         return redirect(url_for("unified_applications.application_detail", id=id))
 
-    plateau = Plateau.query.get(plateau_id)
-    if not plateau:
-        flash("Plateau not found", "error")
-        return redirect(url_for("unified_applications.application_detail", id=id))
+    plateau = work_package_service.own_or_404(Plateau, plateau_id)
 
     # Check if already linked to another application
     if plateau.application_component_id and plateau.application_component_id != app.id:

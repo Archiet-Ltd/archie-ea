@@ -23,6 +23,44 @@ from app.utils.role_access import get_user_role
 DATA_SUBJECT_REQUEST_ROLES = ["security_architect"]
 
 
+# The roles that may create, change or delete a work package, a roadmap gap or a
+# plateau, wherever the route lives. One list, shared by every route that writes
+# them (``require_roles(*WORK_PACKAGE_WRITE_ROLES)``). A read-only Viewer is not
+# in it, so reads stay open and writes are refused with 403.
+WORK_PACKAGE_WRITE_ROLES = (
+    "admin",
+    "architect",
+    "business_architect",
+    "cto",
+    "portfolio_manager",
+    "application_manager",
+)
+
+
+def require_work_package_write(f):
+    """Guard a route that writes work packages, roadmap gaps or plateaus.
+
+    ``require_roles(*WORK_PACKAGE_WRITE_ROLES)`` on every method except the
+    read-only ones, so a route that serves its form on GET and saves on POST
+    keeps the form open to a Viewer and refuses the save.
+    """
+    from functools import wraps
+
+    from flask import request
+
+    from app._decorators_base import require_roles
+
+    guarded = require_roles(*WORK_PACKAGE_WRITE_ROLES)(f)
+
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if request.method in ("GET", "HEAD", "OPTIONS"):
+            return f(*args, **kwargs)
+        return guarded(*args, **kwargs)
+
+    return decorated
+
+
 def may_handle_data_subject_requests(user):
     """True when ``user`` may open the data-subject request pages: the roles in
     DATA_SUBJECT_REQUEST_ROLES, and platform_admin as ``requires_role`` always

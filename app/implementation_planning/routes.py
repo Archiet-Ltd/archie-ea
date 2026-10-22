@@ -19,6 +19,7 @@ from datetime import datetime  # dead-code-ok
 from werkzeug.exceptions import HTTPException
 from flask import abort, current_app, flash, jsonify, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
+from app.decorators import WORK_PACKAGE_WRITE_ROLES, require_roles, require_work_package_write
 from sqlalchemy import or_
 
 from .. import db  # dead-code-ok
@@ -344,6 +345,7 @@ def _form_context(work_package, action):
 
 @implementation_planning.route("/work-packages/create", methods=["GET", "POST"])
 @login_required
+@require_work_package_write
 def create_work_package():
     """
     Create a new work package (the one writer: work_package_service).
@@ -402,6 +404,7 @@ def create_work_package():
     "/work-packages/<int:work_package_id>/edit", methods=["GET", "POST"]
 )
 @login_required
+@require_work_package_write
 def edit_work_package(work_package_id):
     """
     Edit an existing work package (the one writer: work_package_service).
@@ -454,6 +457,7 @@ def edit_work_package(work_package_id):
     "/work-packages/<int:work_package_id>/dependencies", methods=["POST"]
 )
 @login_required
+@require_roles(*WORK_PACKAGE_WRITE_ROLES)
 def add_work_package_dependency(work_package_id):
     """Record that this work package depends on another (form or JSON)."""
     data = request.get_json(silent=True) if request.is_json else request.form.to_dict()
@@ -491,6 +495,7 @@ def add_work_package_dependency(work_package_id):
     methods=["POST"],
 )
 @login_required
+@require_roles(*WORK_PACKAGE_WRITE_ROLES)
 def remove_work_package_dependency(work_package_id, dependency_id):
     try:
         work_package_service.remove_dependency(
@@ -512,6 +517,7 @@ def remove_work_package_dependency(work_package_id, dependency_id):
     "/work-packages/<int:work_package_id>/delete", methods=["POST"]
 )
 @login_required
+@require_roles(*WORK_PACKAGE_WRITE_ROLES)
 def delete_work_package(work_package_id):
     """
     Delete a work package.
@@ -644,6 +650,7 @@ def api_work_package_detail(work_package_id):
 
 @implementation_planning.route("/api/work-packages", methods=["POST"])
 @login_required
+@require_roles(*WORK_PACKAGE_WRITE_ROLES)
 def api_create_work_package():
     """
     API endpoint to create a new work package.
@@ -680,6 +687,7 @@ def api_create_work_package():
     "/api/work-packages/<int:work_package_id>", methods=["PUT"]
 )
 @login_required
+@require_roles(*WORK_PACKAGE_WRITE_ROLES)
 def api_update_work_package(work_package_id):
     """
     API endpoint to update a work package.
@@ -710,6 +718,7 @@ def api_update_work_package(work_package_id):
     "/api/work-packages/<int:work_package_id>", methods=["DELETE"]
 )
 @login_required
+@require_roles(*WORK_PACKAGE_WRITE_ROLES)
 def api_delete_work_package(work_package_id):
     """
     API endpoint to delete a work package.
@@ -801,6 +810,7 @@ def gaps_list():
 
 @implementation_planning.route("/gaps/discover", methods=["POST"])
 @login_required
+@require_roles(*WORK_PACKAGE_WRITE_ROLES)
 def discover_gaps():
     """
     Run intelligent gap discovery analysis and save the results to the gap
@@ -884,6 +894,7 @@ def api_gaps():
 
 @implementation_planning.route("/api/gaps/discover", methods=["POST"])
 @login_required
+@require_roles(*WORK_PACKAGE_WRITE_ROLES)
 def api_discover_gaps():
     """
     API endpoint to run gap discovery.
@@ -980,6 +991,7 @@ def api_deliverables():
 
 @implementation_planning.route("/api/deliverables", methods=["POST"])
 @login_required
+@require_roles(*WORK_PACKAGE_WRITE_ROLES)
 def api_create_deliverable():
     """
     API endpoint to create a new deliverable.
