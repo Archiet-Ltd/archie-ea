@@ -192,17 +192,11 @@ def test_six_ownership_numbers_agree(estate, client, login_as):
     portfolio = _soup(_get(client, login_as, estate["portfolio"], "/applications/"))
     assigned, portfolio_total = _portfolio_banner(portfolio)
 
-    from app.models.application_owner import ApplicationOwner
-
-    org_id = estate["org"].id
-    with_ownership_row = {
-        o.application_id for o in ApplicationOwner.query.filter_by(organization_id=org_id).all()
-    }
-    with_business_owner = {a.id for a in estate["apps"].values() if a.business_owner}
     assert portfolio_total == len(estate["apps"])
-    # Every application either manager owns is counted as having a named owner,
-    # so the sending side can never say "none" while the receiving side says "1".
-    assert assigned == len(with_ownership_row | with_business_owner) == 5
+    # Owned means primary or business owner record, or legacy application/business owner text.
+    # A (primary), C (business), D (primary by other), F (legacy business_owner) = 4 owned.
+    # B (backup only) and E (no owner) are not owned.
+    assert assigned == 4
     assert assigned >= total
 
 
