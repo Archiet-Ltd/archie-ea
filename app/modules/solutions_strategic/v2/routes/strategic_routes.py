@@ -204,7 +204,13 @@ def api_risk_analysis():
 @login_required
 def impact_analysis():
     """Impact analysis dashboard — architecture change ripple-effect visualization."""
-    return render_template("strategic/impact_analysis.html")
+    from app.middleware.tenant_context import current_org_id
+    from app.services.priority_action_service import limit_for, prioritised_actions
+
+    return render_template(
+        "strategic/impact_analysis.html",
+        priority_actions=prioritised_actions(current_org_id(), limit=limit_for(request.args)),
+    )
 
 
 @strategic_bp.route("/api/impact-analysis", methods=["POST"])

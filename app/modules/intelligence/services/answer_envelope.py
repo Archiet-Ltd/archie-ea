@@ -275,6 +275,8 @@ def _row_truth_class(kind: str, row: Dict[str, Any]) -> str:
 def _citations(kind: str, rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     cited: Dict[Tuple[str, int], None] = {}
 
+    origins: Dict[Tuple[str, int], Dict[str, Any]] = {}
+
     def cite(source: str, ident: Any) -> None:
         if isinstance(ident, int):
             cited.setdefault((source, ident), None)
@@ -295,7 +297,23 @@ def _citations(kind: str, rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
             for relationship_id in relation.get("chain") or []:
                 cite("relationship", relationship_id)
             cite("derived_relationship", relation.get("derived_id"))
-    return [{"type": t, "id": i} for (t, i) in sorted(cited)][:MAX_CITATIONS]
+            # The relationship a recorded row rests on carries its origin and
+            # date, so the citation says where the fact came from.
+            origin = relation.get("provenance")
+            if relation.get("kind") == "explicit" and isinstance(origin, dict):
+                record_id = origin.get("relationship_id")
+                if isinstance(record_id, int):
+                    origins[("relationship", record_id)] = {
+                        "origin": origin.get("text"),
+                        "recorded_at": origin.get("recorded_at"),
+                        "confidence": relation.get("confidence"),
+                    }
+    out = []
+    for t, i in sorted(cited):
+        citation: Dict[str, Any] = {"type": t, "id": i}
+        citation.update(origins.get((t, i), {}))
+        out.append(citation)
+    return out[:MAX_CITATIONS]
 
 
 def build_envelope(
