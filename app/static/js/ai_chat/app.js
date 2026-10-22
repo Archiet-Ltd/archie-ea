@@ -1334,7 +1334,10 @@ Would you like me to provide more details about the extracted elements or help y
     try { window.loadSessionList(); } catch (e) { /* swallow-ok: loadSessionList renders its own "Couldn't load conversations" state; this guard only stops a throw at page load from aborting the rest of the script */ }
     try {
       var savedId = sessionStorage.getItem('archie_chat_thread_id');
-      if (savedId) window.loadSession(savedId);
+      // A page opened with a starter (the Ask address) runs it on arrival; restoring the
+      // tab's earlier conversation would clear the answer that run puts on screen.
+      var arrivedWithStarter = new URLSearchParams(window.location.search).has('starter');
+      if (savedId && !arrivedWithStarter) window.loadSession(savedId);
     } catch (e) { /* swallow-ok: storage may be unavailable (private browsing); user still reaches the Chats panel manually */ }
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot); else boot();
