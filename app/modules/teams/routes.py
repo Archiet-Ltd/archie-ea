@@ -31,8 +31,8 @@ logger = logging.getLogger(__name__)
 teams_bp = Blueprint("teams", __name__, template_folder="../../templates/teams")
 
 
-def _org_id():
-    """Return the current org id or abort."""
+def _require_org():
+    """Return current org id or abort."""
     org_id = current_org_id()
     if org_id is None:
         abort(403)
@@ -46,7 +46,7 @@ def _org_id():
 @login_required
 def team_list():
     """List all teams in the current organisation."""
-    org_id = _org_id()
+    org_id = _require_org()
     teams = get_teams_for_organization(org_id)
     return render_template("teams/team_list.html", teams=teams)
 
@@ -58,7 +58,7 @@ def team_list():
 @login_required
 def team_detail(team_id):
     """Show a team's detail page with its allocations."""
-    org_id = _org_id()
+    org_id = _require_org()
     team = get_team(team_id, org_id)
     if team is None:
         abort(404)
@@ -89,7 +89,7 @@ def team_detail(team_id):
 @require_org_or_platform_admin
 def team_create():
     """Create a new team."""
-    org_id = _org_id()
+    org_id = _require_org()
     if request.method == "POST":
         name = request.form.get("name", "").strip()
         if not name:
@@ -119,7 +119,7 @@ def team_create():
 @require_org_or_platform_admin
 def team_edit(team_id):
     """Edit a team."""
-    org_id = _org_id()
+    org_id = _require_org()
     team = get_team(team_id, org_id)
     if team is None:
         abort(404)
@@ -153,7 +153,7 @@ def team_edit(team_id):
 @require_org_or_platform_admin
 def team_delete(team_id):
     """Delete a team."""
-    org_id = _org_id()
+    org_id = _require_org()
     if delete_team(team_id, org_id):
         flash("Team deleted.", "success")
     else:
@@ -169,7 +169,7 @@ def team_delete(team_id):
 @require_org_or_platform_admin
 def allocation_add(team_id):
     """Add an allocation to a team."""
-    org_id = _org_id()
+    org_id = _require_org()
     team = get_team(team_id, org_id)
     if team is None:
         abort(404)
@@ -211,7 +211,7 @@ def allocation_add(team_id):
 @require_org_or_platform_admin
 def allocation_edit(team_id, allocation_id):
     """Edit an allocation's share percent."""
-    org_id = _org_id()
+    org_id = _require_org()
     try:
         share_percent = int(request.form.get("share_percent", 0))
     except (ValueError, TypeError):
@@ -242,7 +242,7 @@ def allocation_edit(team_id, allocation_id):
 @require_org_or_platform_admin
 def allocation_delete(team_id, allocation_id):
     """Delete an allocation."""
-    org_id = _org_id()
+    org_id = _require_org()
     if delete_allocation(allocation_id, org_id):
         flash("Allocation removed.", "success")
     else:
@@ -255,7 +255,7 @@ def allocation_delete(team_id, allocation_id):
 @require_org_or_platform_admin
 def derive_allocations(team_id):
     """Derive technology allocations from owned applications."""
-    org_id = _org_id()
+    org_id = _require_org()
     derived = derive_allocations_for_team(team_id, org_id)
     flash(f"Derived {len(derived)} technology allocation(s) from owned applications.", "success")
     return redirect(url_for("teams.team_detail", team_id=team_id))
@@ -268,7 +268,7 @@ def derive_allocations(team_id):
 @login_required
 def api_team_list():
     """Return teams as JSON for selectors."""
-    org_id = _org_id()
+    org_id = _require_org()
     teams = get_teams_for_organization(org_id)
     return jsonify([
         {"id": t.id, "name": t.name, "headcount": t.headcount or 0}
@@ -280,7 +280,7 @@ def api_team_list():
 @login_required
 def api_team_allocations(team_id):
     """Return a team's allocations as JSON."""
-    org_id = _org_id()
+    org_id = _require_org()
     allocations = get_allocations_for_team(team_id, org_id)
     return jsonify([
         {
