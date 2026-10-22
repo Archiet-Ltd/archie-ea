@@ -155,7 +155,7 @@
     {% set row_total = conn.depends_on | length + conn.used_by | length + conn.other | length %}
     <section class="rounded-lg border border-border bg-card p-6" data-testid="answer-card" aria-labelledby="answer-heading">
         <h2 id="answer-heading" class="text-xs font-semibold uppercase tracking-[0.06em] text-muted-foreground">What this answers</h2>
-        <p class="mt-2 max-w-[640px] text-sm text-muted-foreground">What depends on {{ elem_name }}, and what does it need?</p>
+        <p class="question-line mt-3 max-w-[640px]">What depends on {{ elem_name }}, and what does it need?</p>
 
         {% if not conn.available %}
         <p class="mt-4 text-sm text-muted-foreground" data-testid="answer-impact">
