@@ -1992,9 +1992,231 @@ def seed_demo_company() -> dict:
                     wp_by_name[wp_name].id, gap.id, organization_id=org_id)
         db.session.flush()
 
+        _seed_sweep_records(org_id, stats)
+
         db.session.commit()
 
     return stats
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+#  Records behind route parameters: solution designs, journeys, business case,
+#  value stream, decisions, programme, data domain, viewpoint.
+#
+#  The live sweep opens every address in the product with a real record of the
+#  right type. These are the record types that had no row in the demo company,
+#  so 255 solution routes, the architecture journey pages and the decision,
+#  business case and value stream pages had nothing to open. Each row is linked
+#  to the rest of the demo company (applications, risks, people) so a page shows
+#  a connected picture, not an empty shell.
+# ═════════════════════════════════════════════════════════════════════════════
+
+_SWEEP_ARCHITECT = "sage.itops@lantern-quay.example.com"
+_SWEEP_REVIEWER = "casey.inventory@lantern-quay.example.com"
+_SWEEP_SOLUTIONS = (
+    # (name, status, deployment, adm phase, step, description)
+    ("Field-service scheduling modernisation", "in_progress", "design", "C", 3,
+     "Replace the legacy work-order scheduler with one service that plans technician visits against parts "
+     "availability, so a visit is not booked before the parts exist."),
+    ("Parts inventory visibility", "planned", "design", "B", 1,
+     "Give technicians and the warehouse one view of stock by depot, fed from the inventory system."),
+)
+_SWEEP_JOURNEYS = (
+    # (title, intent, outcome, stage, layers, solution index, programme?)
+    ("Retire the legacy work-order scheduler", "solution_design", "solution", "shape",
+     ["business", "application", "technology"], 0, True),
+    ("Assess integration risk across the event relay", "architecture_assessment", "architecture_only", "discover",
+     ["application", "technology", "governance"], None, False),
+)
+
+
+def _seed_sweep_records(org_id, stats):
+    """Idempotent: a record found by its title or name is kept, none is doubled."""
+    from datetime import date, datetime
+
+    from app.models import ArchiMateElement
+    from app.models.adr import ArchitectureDecisionRecord
+    from app.models.application_portfolio import ApplicationComponent
+    from app.models.architecture_decision import ArchitectureDecision
+    from app.models.architecture_journey import ArchitectureJourney
+    from app.models.architecture_journey_link import ArchitectureJourneyLink, ArchitectureJourneyMember
+    from app.models.archimate_viewpoint import ArchiMateViewpoint
+    from app.models.business_case import BusinessCase
+    from app.models.process_data import DataDomain, DataEntity
+    from app.models.risk import Risk
+    from app.models.solution_element import SolutionElement
+    from app.models.solution_models import Solution
+    from app.models.strategic import StrategicInitiative
+    from app.models.unified_capability import ValueStream
+    users = _resolve_users(org_id)
+    architect = users.get(_SWEEP_ARCHITECT)
+    reviewer = users.get(_SWEEP_REVIEWER)
+    if architect is None:
+        stats["sweep_records_created"] = 0
+        return
+    created = 0
+
+    def first(model, **kw):
+        return db.session.query(model).filter_by(**kw).first()
+
+    # programme
+    programme = first(StrategicInitiative, organization_id=org_id, name="Field-service platform consolidation")
+    if programme is None:
+        programme = StrategicInitiative(
+            organization_id=org_id, name="Field-service platform consolidation", record_kind="programme",
+            description="Move scheduling, dispatch and parts visibility onto one platform and retire the systems it replaces.",
+            status="in_progress", priority="high", start_date=date(2026, 1, 12),
+            target_completion_date=date(2027, 3, 31), budget_allocated=620000, budget_spent=210000,
+            owner_id=architect.id, risk_level="medium", initiative_type="consolidation")
+        db.session.add(programme)
+        db.session.flush()
+        created += 1
+
+    # solutions with elements
+    apps = db.session.query(ApplicationComponent).filter_by(organization_id=org_id).order_by(ApplicationComponent.id).limit(6).all()
+    elements = db.session.query(ArchiMateElement).filter_by(organization_id=org_id).order_by(ArchiMateElement.id).limit(40).all()
+    solutions = []
+    for name, status, deployment, phase, step, description in _SWEEP_SOLUTIONS:
+        sol = first(Solution, organization_id=org_id, name=name)
+        if sol is None:
+            sol = Solution(
+                organization_id=org_id, name=name, description=description, status=status,
+                deployment_status=deployment, adm_phase=phase, current_step=step, solution_type="Service",
+                business_domain="Field service", complexity_level="Moderate", created_by_id=architect.id,
+                solution_owner="Sage ITOps", business_sponsor="Finley Support", technical_lead="Sage ITOps",
+                governance_status="draft", initiative_id=programme.id,
+                problem_clarification="Technician visits are booked before the parts are known to exist, so about one visit in six is repeated.",
+                journey_state={"step": step, "phase": phase, "confirmed_domains": ["business"] if step > 1 else []},
+                scope_in="Scheduling, dispatch, parts reservation", scope_out="Billing, payroll",
+                target_completion_date=date(2027, 2, 28), estimated_cost=410000)
+            db.session.add(sol)
+            db.session.flush()
+            for el in elements[:8 if status == "in_progress" else 4]:
+                db.session.add(SolutionElement(solution_id=sol.id, archimate_element_id=el.id, layer=(el.layer or "business").lower()))
+            created += 1
+        solutions.append(sol)
+    db.session.flush()
+
+    # decisions: the governed decision and the architecture decision record
+    decision = first(ArchitectureDecision, organization_id=org_id, title="Run scheduling as one service behind the event relay")
+    if decision is None:
+        decision = ArchitectureDecision(
+            organization_id=org_id, title="Run scheduling as one service behind the event relay", status="accepted",
+            adm_phase="C", decision_type="architecture", enterprise_level=False, solution_id=solutions[0].id,
+            context="Three tools plan technician visits and none of them see parts availability.",
+            decision="Build one scheduling service that reads stock through the event relay and replaces the three tools.",
+            rationale="One owner, one source for parts, and the relay already carries stock events.",
+            consequences="The legacy scheduler is retired after the pilot depot runs for 60 days.",
+            decision_id="AD-9001", created_by_id=architect.id, decided_by_id=architect.id, decided_at=datetime(2026, 9, 18, 10, 0),
+            decided_by_label="Architecture review board")
+        db.session.add(decision)
+        db.session.flush()
+        created += 1
+    adr = first(ArchitectureDecisionRecord, organization_id=org_id, title="Use the event relay for stock changes")
+    if adr is None:
+        adr = ArchitectureDecisionRecord(
+            organization_id=org_id, adr_number=9001, title="Use the event relay for stock changes", status="accepted",
+            solution_id=solutions[0].id, context="Stock changes reach the scheduler hours late through a nightly file.",
+            decision="Publish every stock change on the event relay and let the scheduler subscribe.",
+            rationale="Near-real-time stock without a new integration.",
+            consequences="The nightly file is removed once the scheduler subscribes.", decided_by="Sage ITOps",
+            decision_date=date(2026, 9, 18), created_by=architect.id)
+        db.session.add(adr)
+        db.session.flush()
+        created += 1
+
+    # business case and value stream
+    case = first(BusinessCase, organization_id=org_id, title="Consolidate field-service scheduling")
+    if case is None:
+        case = BusinessCase(
+            organization_id=org_id, title="Consolidate field-service scheduling", status="submitted",
+            solution_id=solutions[0].id, strategic_initiative_id=programme.id, created_by_id=architect.id,
+            description="One scheduling service in place of three tools.",
+            problem_statement="Repeat visits cost about 1,900 technician hours a year.",
+            options_considered="Keep three tools; extend the current scheduler; build one service.",
+            recommended_option="Build one service behind the event relay.",
+            expected_benefits="Fewer repeat visits, one owner, one support contract.",
+            key_risks="Pilot depot data quality; relay capacity at month end.",
+            financial_benefit_annual=240000, capex=410000, opex_annual=60000, tco_3yr=590000,
+            roi_percentage=38.0, payback_months=22)
+        db.session.add(case)
+        db.session.flush()
+        created += 1
+    stream = first(ValueStream, organization_id=org_id, name="Request to repair")
+    if stream is None:
+        stream = ValueStream(
+            organization_id=org_id, name="Request to repair", code="R2R", value_stream_type="customer_facing",
+            industry_domain="Field service", strategic_importance="critical", business_owner="Finley Support",
+            description="From a customer reporting a fault to a technician closing the visit.",
+            target_cycle_time=3, current_cycle_time=5, quality_target=95.0, current_quality=88.0)
+        db.session.add(stream)
+        db.session.flush()
+        created += 1
+
+    # data domain with entities, and a viewpoint
+    domain = first(DataDomain, organization_id=org_id, name="Service and parts")
+    if domain is None:
+        domain = DataDomain(organization_id=org_id, name="Service and parts", code="SVC-PARTS", domain_type="operational",
+                            criticality="high", data_owner="Finley Support", data_steward="Ellis Datasteward",
+                            description="Work orders, visits, technicians and the parts they use.")
+        db.session.add(domain)
+        db.session.flush()
+        created += 1
+    for ent in ("Work order", "Technician visit"):
+        if first(DataEntity, organization_id=org_id, name=ent) is None:
+            db.session.add(DataEntity(organization_id=org_id, name=ent, domain_id=domain.id, entity_type="transactional",
+                                      description=f"{ent} records for field service.", contains_pii=False,
+                                      data_classification="internal"))
+            created += 1
+    if first(ArchiMateViewpoint, organization_id=org_id, name="Application cooperation") is None:
+        db.session.add(ArchiMateViewpoint(
+            organization_id=org_id, name="Application cooperation", viewpoint_type="application_cooperation",
+            purpose="Show how applications work together and which data they exchange.",
+            concerns=["integration", "dependencies"], typical_stakeholders=["enterprise architect", "application owner"],
+            includes_strategy_layer=False, includes_business_layer=False, includes_application_layer=True,
+            includes_technology_layer=False, includes_physical_layer=False, includes_motivation_layer=False,
+            includes_implementation_layer=False, allowed_element_types=["ApplicationComponent", "ApplicationService", "DataObject"],
+            allowed_relationship_types=["Serving", "Flow", "Access"], archimate_version="3.2", is_standard=False,
+            created_at=datetime.utcnow(), updated_at=datetime.utcnow()))
+        created += 1
+    db.session.flush()
+
+    # journeys with links and people
+    risk = db.session.query(Risk).filter_by(organization_id=org_id).order_by(Risk.id).first()
+    for title, intent, outcome, stage, layers, sol_idx, with_programme in _SWEEP_JOURNEYS:
+        j = first(ArchitectureJourney, organization_id=org_id, title=title)
+        if j is None:
+            j = ArchitectureJourney(
+                organization_id=org_id, owner_id=architect.id, title=title, intent=intent, outcome_type=outcome,
+                current_stage=stage, status="active", selected_layers=layers,
+                selected_deliverables=["architecture_definition", "capability_map"],
+                solution_id=solutions[sol_idx].id if sol_idx is not None else None,
+                programme_id=programme.id if with_programme else None,
+                journey_state={"framing": {"purpose": title}, "stage": stage})
+            db.session.add(j)
+            db.session.flush()
+            created += 1
+        wanted = [("decision", adr.id, "produces"), ("risk", risk.id if risk else None, "informs"),
+                  ("application", apps[0].id if apps else None, "impacts"),
+                  ("archimate_element", elements[0].id if elements else None, "references")]
+        if sol_idx is not None:
+            wanted += [("solution", solutions[sol_idx].id, "produces"), ("value_stream", stream.id, "impacts"),
+                       ("programme", programme.id, "governs")]
+        for etype, eid, relation in wanted:
+            if eid is None:
+                continue
+            if first(ArchitectureJourneyLink, journey_id=j.id, entity_type=etype, entity_id=eid) is None:
+                db.session.add(ArchitectureJourneyLink(
+                    organization_id=org_id, journey_id=j.id, entity_type=etype, entity_id=eid, relation=relation,
+                    created_by_id=architect.id))
+                created += 1
+        for user, role in ((architect, "owner"), (reviewer, "reviewer")):
+            if user is not None and first(ArchitectureJourneyMember, journey_id=j.id, user_id=user.id) is None:
+                db.session.add(ArchitectureJourneyMember(
+                    organization_id=org_id, journey_id=j.id, user_id=user.id, role=role, added_by_id=architect.id))
+                created += 1
+    db.session.flush()
+    stats["sweep_records_created"] = created
 
 
 # ═════════════════════════════════════════════════════════════════════════════
