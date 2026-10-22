@@ -2779,3 +2779,23 @@ def test_new_role_page_appears_everywhere_with_no_other_edit(app):
         assert "https://entelim.org/roles/zzz-e2e-role</loc>" in client.get("/sitemap.xml").data.decode()
         rules = _parse_robots_rules(_ROBOTS_TXT_PATH.read_text(encoding="utf-8"))
         assert _robots_allows(rules, "/roles/zzz-e2e-role")
+
+
+ROLE_PAGE_SLUGS = ("enterprise-architects", "cto-and-cio", "it-portfolio-managers", "solution-architects")
+
+
+def test_role_pages_are_live_and_listed_everywhere(app):
+    """The four role pages are on main: not held, in the hub, each other's strip, sitemap and llms.txt."""
+    with app.test_client() as client:
+        hub = client.get("/roles").data.decode()
+        sitemap = client.get("/sitemap.xml").data.decode()
+        llms = client.get("/llms.txt").data.decode()
+        for slug in ROLE_PAGE_SLUGS:
+            page = load_page("role", slug=slug)
+            assert not page.is_held, f"{slug} is still held"
+            url = "/roles/" + slug
+            assert url in hub and url in sitemap and url in llms, f"{slug} missing from hub, sitemap or llms.txt"
+            html = client.get(url).data.decode()
+            for other in ROLE_PAGE_SLUGS:
+                if other != slug:
+                    assert "/roles/" + other in html, f"{slug}: sibling strip does not list {other}"
