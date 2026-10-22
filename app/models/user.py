@@ -197,10 +197,12 @@ class User(UserMixin, db.Model):
     role_id = db.Column(db.Integer, db.ForeignKey("roles.id"))
 
     # Enterprise RBAC role (ENT-068) — granular role for access control.
-    # Defaults to 'platform_admin' for backward compatibility (existing users get full access).
-    enterprise_role = db.Column(
-        db.String(50), nullable=False, default=ROLE_PLATFORM_ADMIN, server_default=ROLE_PLATFORM_ADMIN
-    )
+    # Set only by an administrator; it carries the persona's abilities (see core.auth.permissions).
+    # No default: a new account carries no persona until an administrator
+    # assigns one (the role page, an invitation or single sign-on group mapping).
+    # It used to default to platform_admin, which handed every new account the
+    # widest persona. Accounts already on it are left as they are.
+    enterprise_role = db.Column(db.String(50), nullable=True)
 
     # SSO / Enterprise Identity (S0-01)
     external_id = db.Column(db.String(255), index=True)
@@ -365,6 +367,38 @@ class User(UserMixin, db.Model):
         prefs["show_archimate_names"] = bool(value)
         self.notification_preferences = prefs
 
+    # A person's own choice of lens (which role's workspace cards, sidebar
+    # ordering and call to action they see first). It is a preference, not a
+    # grant: it lives in the preferences JSON beside show_archimate_names, and
+    # no permission check reads it. Permissions come from enterprise_role as
+    # set by an administrator (see app.core.auth.permissions).
+    PERSONA_LENSES = (
+        "solution_architect", "enterprise_architect", "business_architect",
+        "arb_member", "portfolio_manager", "cto", "application_manager",
+        "procurement", "security_architect", "data_architect", "platform_admin",
+    )
+    DEFAULT_PERSONA_LENS = "cto"
+
+    @property
+    def persona_lens(self):
+        import json
+
+        raw = self.notification_preferences or {}
+        prefs = json.loads(raw) if isinstance(raw, str) else raw
+        value = prefs.get("persona_lens")
+        return value if value in self.PERSONA_LENSES else None
+
+    @persona_lens.setter
+    def persona_lens(self, value):
+        if value not in self.PERSONA_LENSES:
+            raise ValueError("unknown persona lens")
+        import json
+
+        raw = self.notification_preferences or {}
+        prefs = dict(json.loads(raw) if isinstance(raw, str) else raw)
+        prefs["persona_lens"] = value
+        self.notification_preferences = prefs
+
     @staticmethod
     def normalize_email(email):
         if email is None:
@@ -486,40 +520,34 @@ class User(UserMixin, db.Model):
         """Check if user has any of the specified enterprise roles."""
         return self.enterprise_role in roles
 
+    # The four abilities below answer from the permission matrix
+    # (app.core.auth.permissions.can), the one source: organisation
+    # administrators hold all of them, everyone else holds what the persona an
+    # administrator assigned carries by default, adjusted by the organisation's
+    # own grants. Nothing a person can set for themselves feeds them.
+    def _matrix_can(self, action, object_type):
+        from app.core.auth.permissions import can
+
+        try:
+            return bool(can(self, action, object_type))
+        except Exception:  # fabricated-ok: an unreadable grant is no ability
+            return False
+
     def can_edit_solutions(self):
-        """Solution editing: solution_architect, enterprise_architect, business_architect, platform_admin."""
-        return self.enterprise_role in (
-            ROLE_SOLUTION_ARCHITECT,
-            ROLE_ENTERPRISE_ARCHITECT,
-            ROLE_BUSINESS_ARCHITECT,
-            ROLE_PLATFORM_ADMIN,
-        )
+        """Solution editing (matrix: solution / edit)."""
+        return self._matrix_can("edit", "solution")
 
     def can_edit_archimate(self):
-        """ArchiMate editing: enterprise_architect, business_architect, platform_admin."""
-        return self.enterprise_role in (
-            ROLE_ENTERPRISE_ARCHITECT,
-            ROLE_BUSINESS_ARCHITECT,
-            ROLE_PLATFORM_ADMIN,
-        )
+        """ArchiMate editing (matrix: archimate / edit)."""
+        return self._matrix_can("edit", "archimate")
 
     def can_vote_arb(self):
-        """ARB voting: arb_member, enterprise_architect, business_architect, platform_admin."""
-        return self.enterprise_role in (
-            ROLE_ARB_MEMBER,
-            ROLE_ENTERPRISE_ARCHITECT,
-            ROLE_BUSINESS_ARCHITECT,
-            ROLE_PLATFORM_ADMIN,
-        )
+        """ARB voting (matrix: arb_decision / vote)."""
+        return self._matrix_can("vote", "arb_decision")
 
     def can_manage_portfolio(self):
-        """Portfolio management: portfolio_manager, enterprise_architect, business_architect, platform_admin."""
-        return self.enterprise_role in (
-            ROLE_PORTFOLIO_MANAGER,
-            ROLE_ENTERPRISE_ARCHITECT,
-            ROLE_BUSINESS_ARCHITECT,
-            ROLE_PLATFORM_ADMIN,
-        )
+        """Portfolio management (matrix: portfolio / manage)."""
+        return self._matrix_can("manage", "portfolio")
 
     # PLT-017: Notification preference helpers
     _DEFAULT_NOTIFICATION_PREFS = {
@@ -559,6 +587,8 @@ class User(UserMixin, db.Model):
         stored = json.loads(raw) if isinstance(raw, str) else (raw or {})
         merged = {k: bool(v) for k, v in stored.items() if k in known_keys}
         merged.update({k: bool(v) for k, v in prefs_dict.items() if k in known_keys})
+        if stored.get("persona_lens") in self.PERSONA_LENSES:
+            merged["persona_lens"] = stored["persona_lens"]
         self.notification_preferences = merged
 
     def __repr__(self):

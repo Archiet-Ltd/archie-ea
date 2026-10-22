@@ -24,6 +24,7 @@ from typing import Any, Dict, List
 from sqlalchemy import func, or_
 
 from app import db
+from app.core.auth.permissions import can as _matrix_can
 from app.models.architecture_review_board import (
     DEFAULT_GOVERNANCE_STANDARDS,
     ARBBoardMember,
@@ -527,14 +528,14 @@ class ARBGovernanceService:
         # ARB-decision-eligible (see ROLE_SECTION_ACCESS in
         # app/utils/role_access.py: arb_member/cto/enterprise_architect/
         # platform_admin are the roles with a "governance" section).
-        ARB_DECISION_ELIGIBLE_ROLES = {
-            "arb_member", "cto", "enterprise_architect", "platform_admin",
-        }
+        # Eligibility is the permission matrix's arb_decision / decide answer
+        # (board member, CTO, enterprise architect or platform admin persona
+        # assigned by an administrator; organisation administrators always).
         try:
             from app.models.user import User
 
             decider = db.session.get(User, decided_by_id)
-            if decider is not None and (decider.enterprise_role or "") not in ARB_DECISION_ELIGIBLE_ROLES:
+            if decider is not None and not _matrix_can(decider, "decide", "arb_decision"):
                 self._audit_decision_refusal(
                     item,
                     event="decision_refused",

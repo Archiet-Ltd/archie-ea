@@ -65,6 +65,11 @@ flask --app manage merge-work-package-stores --verify
 flask --app manage apply-entity-history-trigger || echo 'WARN entity-history trigger skipped - no version is recorded for a changed element/relationship until it runs' >&2
 flask --app manage backfill-entity-history || echo 'WARN entity-history backfill skipped - pre-existing elements/relationships have no history version until it runs' >&2
 
+# Application owners: copy the owner text columns (and the named contact of each
+# organisation-unit ownership row) into application_owners, one organisation at
+# a time. Idempotent; a name that matches no user is listed, never guessed.
+flask --app manage backfill-application-owners || echo 'WARN application owner backfill skipped - owners recorded only as text on an application read as that text, and are not yet people the owner screens can list, until it runs' >&2
+
 # ADR 0008 -- give unified_capabilities (the canonical capability store, per
 # app/models/unified_capability.py and docs/adr/0008-one-system-of-record.md) a
 # producer. Must run after reconcile-schema (provenance columns) and after every

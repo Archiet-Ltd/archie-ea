@@ -32,6 +32,16 @@ is a dict entry and two or more Surface(...) lines. A gate nobody can extend
 gets bypassed, so keep it that way -- put the model path and the URL in the
 registry, never a special case in the engine.
 
+Comparing values as well as presence
+------------------------------------
+Count mode cannot see a column and its fact that both exist and disagree: each
+holds one row for the element, so every count is 1. A concept opts into value
+mode by registering ValuePair(...) entries under its name in VALUE_PAIRS. For
+every element answered by both sides the values must agree within the pair's
+tolerance, else a `value-disagreement` finding names the element and both
+amounts. Opt-in: a concept with no VALUE_PAIRS entry is compared exactly as
+before. Used first by "applications with a recorded annual cost".
+
 Not reporting differences that are legitimate
 ---------------------------------------------
 Two counts may honestly differ, and a gate that cries wolf gets ignored --
@@ -116,6 +126,7 @@ import argparse
 import json
 import os
 import sys
+from decimal import Decimal
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ALLOW_MARKER = "store-agreement-ok:"
@@ -174,6 +185,77 @@ class Surface:
         self.tenant_via = list(tenant_via or [])
         # orm-only: the reason this store is deliberately shared reference data.
         self.shared = shared
+
+
+class ValueSide:
+    """One side of a value comparison: a store read as {key: value}.
+
+    target     dotted model path
+    key        the attribute that identifies the element the value belongs to
+    field      the attribute holding the value (rows where it is NULL are not
+               readings and are left out)
+    filter_eq  attribute -> value, as on Surface
+    """
+
+    def __init__(self, name, target, key, field, filter_eq=None, reader=None):
+        self.name = name
+        self.target = target
+        self.key = key
+        self.field = field
+        self.filter_eq = filter_eq or {}
+        # A value that is not one column of one model (a name that must be read
+        # through a join, say) supplies its own `reader(db, org_id)` ->
+        # {key: value}; the tenancy rule is then the reader's, and it states it.
+        self.reader = reader
+
+
+class ValuePair:
+    """Opt-in second comparison mode: compare VALUES, not just presence.
+
+    Count mode (Surface) cannot see a column and its fact that both exist and
+    disagree: each holds one row for the element, so every count is 1. A concept
+    opts in by registering a ValuePair under its name in VALUE_PAIRS. For every
+    element present on BOTH sides the two values must agree within `tolerance`;
+    an element present on one side only is a presence question and is left to
+    count mode. A concept with no VALUE_PAIRS entry is compared exactly as
+    before.
+    """
+
+    def __init__(self, name, left, right, tolerance="0.005", agree=None,
+                 presence=False):
+        self.name = name
+        self.left = left
+        self.right = right
+        self.tolerance = Decimal(tolerance)
+        # `agree(left_value, right_value)` replaces the numeric tolerance for a
+        # value that is not an amount (an owner's name against the user it was
+        # recorded as). `presence=True` also reports an element read on the
+        # left that the right does not hold at all: for a retired store that
+        # must be copied across completely, that absence is the finding.
+        self.agree = agree
+        self.presence = presence
+
+
+class ValueReading:
+    """What both sides of a ValuePair answered for one tenant."""
+
+    def __init__(self, pair, left_values, right_values):
+        self.pair = pair
+        self.left_values = left_values
+        self.right_values = right_values
+
+
+class Observations(dict):
+    """{concept: [count rows]} exactly as before, plus the value readings.
+
+    A dict subclass so every existing reader of the count observations is
+    unaffected; `value_readings` is {concept: [ValueReading]} and is empty
+    unless a concept has opted into value comparison.
+    """
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.value_readings = {}
 
 
 # --------------------------------------------------------------------------
@@ -345,19 +427,16 @@ CONCEPTS = {
         Surface("orm:Risk", "orm", "app.models.risk.Risk"),
         Surface("GET /api/risks", "http", "/api/risks", extract="len:"),
     ],
-    # "How many applications have an owner recorded", asked of the two owner
-    # stores and of the owner text columns on the application itself.
+    # "Which applications have an owner recorded", asked of the one owner
+    # record. The owner text columns on the application are a retired store and
+    # are compared by value below (VALUE_PAIRS): every name held there must be
+    # the person recorded in ApplicationOwner. ApplicationOwnership is not a
+    # surface here: it records which organisation UNIT holds an application
+    # (budget, percentage, dates), a different question from which person owns it.
     "application owners": [
         Surface("orm:ApplicationOwner(applications)", "orm",
                 "app.models.application_owner.ApplicationOwner",
                 distinct="application_id"),
-        Surface("orm:ApplicationOwnership(applications)", "orm",
-                "app.models.enterprise_intelligence.ApplicationOwnership",
-                distinct="application_id"),
-        Surface("orm:ApplicationComponent(owner text recorded)", "orm",
-                "app.models.application_portfolio.ApplicationComponent",
-                filter_not_null=("application_owner", "business_owner",
-                                 "technical_owner")),
         # A primary owner is a subset of "has an owner": declared narrower.
         Surface("orm:ApplicationOwner(applications, primary)", "orm",
                 "app.models.application_owner.ApplicationOwner",
@@ -459,9 +538,117 @@ CONCEPTS = {
     ],
 }
 
+
+# --------------------------------------------------------------------------
+# VALUE PAIRS. A concept listed here is ALSO compared by value. Opt-in: nothing
+# else in CONCEPTS is touched by it.
+# --------------------------------------------------------------------------
+# application column -> the category of the fact the cost accessor keeps in step
+# with it (app.services.application_cost_accessor.FACT_COLUMNS; a test pins the
+# two lists together).
+_APPLICATION_COST_COLUMNS = {
+    "total_cost_of_ownership": "total",
+    "license_cost": "license_cost",
+    "license_cost_annual": "license_cost_annual",
+    "maintenance_cost": "maintenance_cost",
+    "infrastructure_cost": "infrastructure_cost",
+    "infrastructure_cost_monthly": "infrastructure_cost_monthly",
+    "support_cost": "support_cost",
+    "implementation_cost": "implementation_cost",
+    "development_cost_annual": "development_cost_annual",
+}
+_APPLICATION_COST_FACT_SOURCE = "application_cost_accessor"
+
+def _read_legacy_owner_text(field):
+    """{application id: owner name} still held as text on the application.
+
+    Reads the retired column itself (`legacy_<field>`), not the owner field
+    that answers from the owner record, or the two sides could not differ.
+    """
+    def read(db, org_id):
+        from app.models.application_portfolio import ApplicationComponent
+
+        column = getattr(ApplicationComponent, "legacy_" + field)
+        rows = (db.session.query(ApplicationComponent.id, column)
+                .filter(ApplicationComponent.organization_id == org_id)
+                .filter(column.isnot(None)).all())
+        return {i: text.strip().lower() for i, text in rows if text and text.strip()}
+    return read
+
+
+def _read_recorded_owner_identities(ownership_type):
+    """{application id: names and emails of its recorded owners of that type}."""
+    def read(db, org_id):
+        from app.models.application_owner import ApplicationOwner
+        from app.models.user import User
+
+        rows = (db.session.query(ApplicationOwner.application_id, User.first_name,
+                                 User.last_name, User.email)
+                .join(User, User.id == ApplicationOwner.user_id)
+                .filter(ApplicationOwner.organization_id == org_id)
+                .filter(User.organization_id == org_id)
+                .filter(ApplicationOwner.application_id.isnot(None))
+                .filter(ApplicationOwner.ownership_type == ownership_type).all())
+        identities = {}
+        for application_id, first, last, email in rows:
+            names = identities.setdefault(application_id, set())
+            names.add(" ".join(p for p in (first, last) if p).strip().lower())
+            if email:
+                names.add(email.strip().lower())
+        return identities
+    return read
+
+
+# application owner field -> the ownership type it is recorded as (the same map
+# app.services.element_ownership_service.APPLICATION_OWNER_FIELDS holds; a test
+# pins the two together).
+_APPLICATION_OWNER_FIELDS = {
+    "application_owner": "primary",
+    "business_owner": "business",
+    "technical_owner": "technical",
+}
+
+
+def _owner_text_is_recorded_owner(text, identities):
+    return text in identities
+
+
+VALUE_PAIRS = {
+    "application owners": [
+        ValuePair(
+            "application.%s text = recorded %s owner" % (field, ownership_type),
+            ValueSide("orm:ApplicationComponent.legacy_%s" % field, "", "", "",
+                      reader=_read_legacy_owner_text(field)),
+            ValueSide("orm:ApplicationOwner(%s)" % ownership_type, "", "", "",
+                      reader=_read_recorded_owner_identities(ownership_type)),
+            agree=_owner_text_is_recorded_owner, presence=True)
+        for field, ownership_type in _APPLICATION_OWNER_FIELDS.items()
+    ],
+    "applications with a recorded annual cost": [
+        ValuePair(
+            "application.%s = cost fact %s" % (column, category),
+            ValueSide("orm:ApplicationComponent.%s" % column,
+                      "app.models.application_portfolio.ApplicationComponent",
+                      key="id", field=column),
+            ValueSide("orm:CostFact(%s)" % category,
+                      "app.models.cost_fact.CostFact",
+                      key="element_id", field="amount",
+                      filter_eq={"element_type": "application",
+                                 "category": category,
+                                 "source": _APPLICATION_COST_FACT_SOURCE}))
+        for column, category in _APPLICATION_COST_COLUMNS.items()
+    ],
+}
+
 # Concepts and surfaces deliberately NOT registered, and why -- naming the
 # exclusion is the point, because a hollow entry here would defeat the file:
 #
+#   organisation-    ApplicationOwnership (application_ownership) records which
+#   unit ownership   organisation UNIT holds an application -- budget holder,
+#                     product owner, a percentage and dates -- not which person
+#                     owns it. It is a different question from "application
+#                     owners", so it is not a surface of that concept; the
+#                     reuse register carries it as its own entry.
 #   maturity gaps     CapabilityGapAnalysis and CapabilityGapDetail
 #                     (capability_gap_analysis, capability_gap_details) are
 #                     not the planned-gap register above. They are the
@@ -638,6 +825,64 @@ def compare(observations):
                             "unfiltered population (%d). A filter cannot add "
                             "rows, so the two surfaces are reading different "
                             "stores." % (concept, name, count, scope, total))
+    value_findings, value_notes = _compare_values(
+        getattr(observations, "value_readings", {}))
+    return findings + value_findings, notes + value_notes
+
+
+def _compare_values(value_readings):
+    """Value mode. {concept: [ValueReading]} in, (findings, notes) out.
+
+    For each pair, every element answered by BOTH sides must carry the same
+    value within the pair's tolerance. An element on one side only is not a
+    value question (count mode reports presence) and is not reported here.
+    """
+    findings, notes = [], []
+    for concept in sorted(value_readings):
+        for reading in value_readings[concept]:
+            pair = reading.pair
+            if reading.left_values is None or reading.right_values is None:
+                notes.append("  %s [unanswered] %s: a side could not be read, "
+                             "so its values were not compared"
+                             % (concept, pair.name))
+                continue
+            if pair.presence:
+                missing = sorted(set(reading.left_values) - set(reading.right_values))
+                if missing:
+                    findings.append(
+                        "  %s [unmigrated] %s: %d element(s) carry a value in %s "
+                        "that %s does not hold (ids %s%s)"
+                        % (concept, pair.name, len(missing), pair.left.name,
+                           pair.right.name,
+                           ", ".join(str(k) for k in missing[:5]),
+                           "" if len(missing) <= 5 else ", ..."))
+            shared = sorted(set(reading.left_values) & set(reading.right_values))
+            if not shared:
+                if not (pair.presence and reading.left_values):
+                    notes.append("  %s [no-evidence] %s: no element carries a "
+                                 "value on both sides; nothing was compared"
+                                 % (concept, pair.name))
+                continue
+            if pair.agree is not None:
+                differing = [k for k in shared
+                             if not pair.agree(reading.left_values[k],
+                                               reading.right_values[k])]
+            else:
+                differing = [k for k in shared
+                             if abs(reading.left_values[k] - reading.right_values[k])
+                             > pair.tolerance]
+            if not differing:
+                continue
+            shown = "; ".join(
+                "id %s: %s=%s vs %s=%s" % (
+                    k, pair.left.name, reading.left_values[k],
+                    pair.right.name, reading.right_values[k])
+                for k in differing[:5])
+            findings.append(
+                "  %s [value-disagreement] %s: %d of %d element(s) recorded on "
+                "both sides carry different amounts (%s%s)"
+                % (concept, pair.name, len(differing), len(shared), shown,
+                   "" if len(differing) <= 5 else "; ..."))
     return findings, notes
 
 
@@ -810,7 +1055,7 @@ def observe_tenant(app, db, org_id, user=None, concepts=None, http=True):
 
 
 def _observe_concepts(concepts, db, client, org_id, http, notes):
-    observations = {}
+    observations = Observations()
     for concept, surfaces in concepts.items():
         rows = []
         for surface in surfaces:
@@ -836,6 +1081,12 @@ def _observe_concepts(concepts, db, client, org_id, http, notes):
                 continue
             rows.append((surface.name, count, surface.scope, unscoped))
         observations[concept] = rows
+        pairs = VALUE_PAIRS.get(concept)
+        if pairs:
+            observations.value_readings[concept] = [
+                ValueReading(pair, _read_values(pair.left, db, org_id),
+                             _read_values(pair.right, db, org_id))
+                for pair in pairs]
     return observations
 
 
@@ -957,6 +1208,40 @@ def _count_orm(surface, db, org_id):
         return None, "the query failed: %s" % str(exc)[:160], False, None
 
 
+def _read_values(side, db, org_id):
+    """{key: Decimal} for one ValueSide in this tenant, or None if unreadable.
+
+    The same tenancy rule as count mode for a store that can be scoped: the ORM
+    events scope a TenantMixin model, a bare organization_id column is filtered
+    here, and anything else cannot be read for one organisation.
+    """
+    if side.reader is not None:
+        try:
+            return side.reader(db, org_id)
+        except Exception:
+            db.session.rollback()
+            return None
+    module, _, cls = side.target.rpartition(".")
+    try:
+        model = getattr(__import__(module, fromlist=[cls]), cls)
+        key, field = getattr(model, side.key), getattr(model, side.field)
+        query = db.session.query(key, field).select_from(model)
+        for attr, value in side.filter_eq.items():
+            query = query.filter(getattr(model, attr) == value)
+        query = query.filter(field.isnot(None))
+        if not _session_scoped(model):
+            if "organization_id" not in model.__table__.c:
+                return None
+            query = query.filter(model.organization_id == org_id)
+        values = {}
+        for row_key, row_value in query.all():
+            values[row_key] = Decimal(str(row_value))
+        return values
+    except Exception:
+        db.session.rollback()
+        return None
+
+
 def _ask(surface, db, client, org_id=None):
     """(count, reason-it-could-not-answer)."""
     if surface.kind == "orm":
@@ -994,7 +1279,16 @@ def observe_synthetic(root):
                     % root]
     with open(path, encoding="utf-8") as fh:
         raw = json.load(fh)
-    observations = {}
+    observations = Observations()
+    for concept, entries in (raw.pop("__values__", None) or {}).items():
+        observations.value_readings[concept] = [
+            ValueReading(
+                ValuePair(e["pair"], ValueSide(e["left"], "", "", ""),
+                          ValueSide(e["right"], "", "", ""),
+                          tolerance=e.get("tolerance", "0.005")),
+                {k: Decimal(str(v)) for k, v in e["left_values"].items()},
+                {k: Decimal(str(v)) for k, v in e["right_values"].items()})
+            for e in entries]
     for concept, rows in raw.items():
         kept = []
         for row in rows:
