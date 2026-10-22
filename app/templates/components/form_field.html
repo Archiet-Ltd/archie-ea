@@ -18,7 +18,7 @@
      <select id="app-owner" name="owner" x-model="form.owner" class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm">...</select>
    {% endcall %}
 
-   {{ form_footer(submit_text='Save application', cancel_attrs='data-modal-close="modal-create"') }}
+   {{ form_footer(submit_text='Save application', cancel_attrs={'data-modal-close': 'modal-create'}) }}
 #}
 
 {% macro form_label(id, label, required=false) %}
@@ -78,7 +78,7 @@
 {% endmacro %}
 
 {% macro form_group(id='', label='', required=false, error=none, help_text=none, class='', attrs='') %}
-    <div class="{{ class }}"{% if attrs %} {{ attrs|safe }}{% endif %}>
+    <div class="{{ class }}"{% if attrs %}{{ attrs|xmlattr }}{% endif %}>
         {{ form_label(id, label, required) }}
         {{ caller() }}
         {{ form_note(id, error, help_text) }}
@@ -88,8 +88,8 @@
 {% macro form_footer(submit_text='Save', cancel_text='Cancel', cancel_attrs='', submit_attrs='', submit_variant='primary', class='') %}
     <div class="flex justify-end gap-2 pt-2 {{ class }}">
         {% if cancel_text %}
-        <button type="button" class="inline-flex h-9 items-center justify-center rounded-md px-4 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"{% if cancel_attrs %} {{ cancel_attrs|safe }}{% endif %}>{{ cancel_text }}</button>
+        <button type="button" class="inline-flex h-9 items-center justify-center rounded-md px-4 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"{% if cancel_attrs %}{{ cancel_attrs|xmlattr }}{% endif %}>{{ cancel_text }}</button>
         {% endif %}
-        <button type="submit" class="inline-flex h-9 items-center justify-center gap-2 whitespace-nowrap rounded-md px-4 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 {% if submit_variant == 'destructive' %}bg-destructive text-destructive-foreground hover:bg-destructive/90{% else %}bg-primary text-primary-foreground hover:bg-primary/90{% endif %}"{% if submit_attrs %} {{ submit_attrs|safe }}{% endif %}>{{ submit_text }}</button>
+        <button type="submit" class="inline-flex h-9 items-center justify-center gap-2 whitespace-nowrap rounded-md px-4 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 {% if submit_variant == 'destructive' %}bg-destructive text-destructive-foreground hover:bg-destructive/90{% else %}bg-primary text-primary-foreground hover:bg-primary/90{% endif %}"{% if submit_attrs %}{{ submit_attrs|xmlattr }}{% endif %}>{{ submit_text }}</button>
     </div>
 {% endmacro %}

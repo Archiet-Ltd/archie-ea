@@ -26,6 +26,7 @@ DEPENDENCIES:
     - Flask context (url_for, current_user, config)
 ===============================================================================
 #}
+{% from 'components/sidebar_nav.html' import sidebar_group, sidebar_item, sidebar_collapsible, sidebar_subitem %}
 <aside
     id="admin-sidebar"
     data-testid="sidebar"
@@ -96,6 +97,8 @@ DEPENDENCIES:
        custom chrome, since the sidebar's own :hover/:focus-within styling
        already handles when it should be visually quiet. #}
     <script src="{{ url_for('static', filename='js/sidebar/module_search.js') }}"></script>
+    {# sidebar_collapsible (components/sidebar_nav.html) needs this component once per page. #}
+    <script src="{{ url_for('static', filename='js/sidebar/collapsible.js') }}"></script>
     {# #sidebar-nav's own box height is the full flex-1 space available to it regardless of what
        scrolls inside -- clientHeight measures the box, not its scrolled content. The search box is
        `sticky top-0` (not a sibling outside nav) so it stays on screen while the list scrolls beneath it,
@@ -207,25 +210,16 @@ DEPENDENCIES:
            zone, heading included, on that list being non-empty. #}
         {% set visible_links = zone.links | selectattr('endpoint', 'in', flask.current_app.view_functions) | list %}
         {% if visible_links %}
-        <div class="px-2 pb-1">
-            <div class="mb-1 mt-4 px-2 text-10 font-semibold uppercase tracking-[0.08em] text-muted-foreground" role="heading" aria-level="3">
-                {{ zone.title }}
-            </div>
-            <div class="space-y-0.5">
-                {% for link in visible_links %}
-                {% if link.endpoint == 'modules_directory.index' %}{% set ns.has_all_modules = true %}{% endif %}
-                {# title, not just the label span: collapsed, the span is
-                   display:none and the icon is the only thing left, so the
-                   tooltip is the only way to learn what this link is. #}
-                <a href="{{ url_for(link.endpoint, **(link.query_params or {})) }}"
-                   title="{{ link.label }}"
-                   class="flex h-8 items-center gap-2 rounded-md px-2 text-13 transition-colors hover:bg-accent hover:text-foreground {% if request.endpoint == link.endpoint %}bg-muted text-info font-medium dark:bg-card{% else %}text-muted-foreground{% endif %}" {%- if request.endpoint == link.endpoint -%} aria-current="page"{%- endif -%}>
-                    <i data-lucide="{{ link.icon }}" class="h-4 w-4 flex-shrink-0"></i>
-                    <span class="flex-1 truncate">{{ link.label }}</span>
-                </a>
-                {% endfor %}
-            </div>
-        </div>
+        {# One sidebar markup: components/sidebar_nav.html (design/patterns.json:
+           sidebar-group). Zones are groups; links are level-1 items; a zone
+           that needs sub-menus calls sidebar_collapsible there, not here. #}
+        {% call sidebar_group(zone.title) %}
+            {% for link in visible_links %}
+            {% if link.endpoint == 'modules_directory.index' %}{% set ns.has_all_modules = true %}{% endif %}
+            {{ sidebar_item(url_for(link.endpoint, **(link.query_params or {})), link.label,
+                            icon=link.icon, active=request.endpoint == link.endpoint) }}
+            {% endfor %}
+        {% endcall %}
         {% endif %}
         {% endfor %}
         </div>

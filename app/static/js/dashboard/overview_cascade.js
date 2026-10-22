@@ -114,7 +114,11 @@
                     var name = Intelligence.nameOf(payload.elements || {}, elementId) || self.centreName;
                     self.centreName = name;
                     self.questionText = 'What breaks if ' + name + ' fails or is under-resourced?';
-                    self.rows = Intelligence.buildRows(payload, elementId);
+                    // The cascade's source tooltip reads sourceConfidence; a row without one
+                    // carries null so no text ever reads "undefined".
+                    self.rows = Intelligence.buildRows(payload, elementId).map(function (r) {
+                        return Object.assign({ sourceConfidence: null }, r);
+                    });
                     self.state = self.rows.length ? 'ready' : 'empty';
                 }).catch(function () { self.state = 'error'; });
             }

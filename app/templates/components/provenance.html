@@ -154,9 +154,9 @@
             {% endif %}
             {{ provenance_badge(entry.kind) }}
         </div>
-        {# The source column is the whole traceability claim: a reader can
-           reproduce the number without leaving the page. #}
-        <p class="mt-1 font-mono text-xs text-muted-foreground break-words">{{ entry.source }}</p>
+        {# The basis is stated in words; the raw column stays in `source`
+           for machine readers. #}
+        <p class="mt-1 text-xs text-muted-foreground break-words">{{ entry.source_text }}</p>
         {% if entry.hint %}
         <p class="mt-1 text-xs text-muted-foreground">{{ entry.hint }}</p>
         {% endif %}

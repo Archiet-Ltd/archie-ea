@@ -107,11 +107,12 @@
                             </td>
                             <td class="px-2">
                                 <button type="button" class="px-3 py-1.5 text-sm rounded-md border hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed"
-                                        @click="convertToWorkPackage({{ gap.id }}, {{ (gap.name|default('this gap'))|tojson }}, $event.target)"
-                                        :disabled="busyId === {{ gap.id }}"
+                                        @click='convertToWorkPackage({{ gap.id }}, {{ (gap.name|default("this gap"))|tojson }})' 
+                                        :disabled="busyId === {{ gap.id }} || convertedIds.includes({{ gap.id }})"
                                         aria-label="Convert this gap to a work package">
-                                    <span x-show="busyId !== {{ gap.id }}">Convert to Work Package</span>
+                                    <span x-show="busyId !== {{ gap.id }} && !convertedIds.includes({{ gap.id }})">Convert to Work Package</span>
                                     <span x-show="busyId === {{ gap.id }}">Converting…</span>
+                                    <span x-show="busyId !== {{ gap.id }} && convertedIds.includes({{ gap.id }})">Converted</span>
                                 </button>
                             </td>
                         </tr>
@@ -170,8 +171,22 @@
     function gapAnalysisTable() {
         return {
             busyId: null,
+            convertedIds: [],
+            showWorkPackage(gapId, wp) {
+                const cell = document.querySelector('[data-testid="gap-work-packages-' + gapId + '"]');
+                if (!cell || !wp || !wp.id) return;
+                cell.querySelectorAll('.text-muted-foreground').forEach((el) => el.remove());
+                const row = document.createElement('div');
+                const link = document.createElement('a');
+                link.href = '/implementation/work-packages/' + wp.id;
+                link.className = 'text-primary hover:underline';
+                link.setAttribute('data-testid', 'gap-work-package-link');
+                link.textContent = wp.name || 'Work package';
+                row.appendChild(link);
+                cell.appendChild(row);
+            },
             convertToWorkPackage(gapId, gapName) {
-                if (this.busyId !== null) return;
+                if (this.busyId !== null || this.convertedIds.includes(gapId)) return;
                 this.busyId = gapId;
                 Platform.fetch.post('/capability-map/api/roadmap/gaps/' + gapId + '/work-packages', { template: 'auto' })
                     .then((data) => {
@@ -179,6 +194,8 @@
                             Platform.toast.error(data.error || 'Could not convert "' + gapName + '" to a work package.');
                             return;
                         }
+                        this.convertedIds.push(gapId);
+                        this.showWorkPackage(gapId, data && data.work_package);
                         Platform.toast.success('"' + gapName + '" converted to a work package.');
                     })
                     .catch((err) => {

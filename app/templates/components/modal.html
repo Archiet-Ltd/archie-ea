@@ -62,12 +62,8 @@
     aria-modal="true"
     {% if _lby %}aria-labelledby="{{ _lby }}"{% endif %}
     class="modal-root fixed inset-0 items-center justify-center p-4"
-    {% if attrs %}{{ attrs|safe }}{% endif %}
+    {% if attrs %}{{ attrs|xmlattr }}{% endif %}
 >
-    {# The z-index scale as real CSS in a nonce-scoped block, not a style=
-       attribute: the CSP forbids inline style attributes and Tailwind's JIT
-       does not compile an arbitrary value that mixes a comma and a plus. #}
-    <style nonce="{{ csp_nonce }}">#{{ id }} { z-index: var(--modal-z, 1000); } #{{ id }} > .modal-panel { z-index: calc(var(--modal-z, 1000) + 1); }</style>
     <!-- Backdrop -->
     <div
         data-modal-backdrop="{{ id }}" aria-hidden="true"

@@ -25,7 +25,11 @@
    children. The 6px source pin sits right of the name; its tooltip is an
    Alpine x-show. No shadows anywhere. #}
 {% from 'components/provenance.html' import answer_envelope %}
-{% macro answer_cascade(id, question, rows, ask=None, save=None, row_attrs='', root=None) %}
+{% from 'intelligence/_parts.html' import element_name, owner_field, health_field %}
+{# rich    when true each node is a row of the Intelligence row model: the name
+           is a heading (or the absence treatment), health and owner come from
+           the shared cells, and the card grows to hold the caller's content. #}
+{% macro answer_cascade(id, question, rows, ask=None, save=None, row_attrs='', root=None, rich=False) %}
 <section id="{{ id }}" class="cascade" data-cascade
          x-data="{ tip: null, selected: null, shared: false, saved: false,
                    continues(i, list) { var d = list[i].depth || 0; for (var j = i + 1; j < list.length; j++) { var dj = list[j].depth || 0; if (dj < d) { return false; } if (dj === d) { return true; } } return false; } }">
@@ -58,7 +62,7 @@
                      class="absolute -left-5 -top-2 h-12 w-5 text-border" viewBox="0 0 20 48" fill="none" aria-hidden="true">
                     <path :d="'M1 0 V' + (continues(i, {{ rows }}) ? 48 : 28) + ' M1 28 H20'" stroke="currentColor" stroke-width="1" />
                 </svg>
-                <div class="flex h-10 items-center gap-2 rounded-md border bg-card px-4 transition-colors hover:bg-muted/50"
+                <div class="flex {{ 'min-h-10 flex-wrap py-2' if rich else 'h-10' }} items-center gap-2 rounded-md border bg-card px-4 transition-colors hover:bg-muted/50"
                      :class="selected && selected.key === node.key ? 'border-ring' : 'border-border'"
                      @click="selected = node">
                     <svg x-show="!node.derived" class="h-4 w-4 shrink-0 text-muted-foreground" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -67,7 +71,11 @@
                     <svg x-show="node.derived" x-cloak class="h-4 w-4 shrink-0 text-muted-foreground" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                         <line x1="6" x2="6" y1="3" y2="15" /><circle cx="18" cy="6" r="3" /><circle cx="6" cy="18" r="3" /><path d="M18 9a9 9 0 0 1-9 9" />
                     </svg>
+                    {% if rich %}
+                    <h3 class="min-w-0 break-words text-sm font-semibold text-foreground">{{ element_name('node.name') }}</h3>
+                    {% else %}
                     <span class="truncate text-sm font-semibold text-foreground" x-text="node.entity_name || node.name"></span>
+                    {% endif %}
                     <button type="button"
                             class="relative h-1.5 w-1.5 shrink-0 rounded-full bg-primary focus-visible:outline-offset-4"
                             @mouseenter="tip = node.key" @mouseleave="tip = null"
@@ -86,7 +94,14 @@
                             x_kind="node.derived ? 'derived' : 'measured'"
                         ) }}
                     </div>
+                    {% if rich %}
+                    <div class="ml-auto flex flex-wrap items-center gap-x-6 gap-y-1">
+                        {{ health_field() }}
+                        {{ owner_field('node.ownerName') }}
+                    </div>
+                    {% else %}
                     <span class="ml-auto shrink-0 truncate text-xs text-muted-foreground" x-text="node.owner || node.ownerName || 'No owner recorded'"></span>
+                    {% endif %}
                     {% if caller %}{{ caller() }}{% endif %}
                 </div>
             </li>
