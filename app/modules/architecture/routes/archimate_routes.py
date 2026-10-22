@@ -31,7 +31,11 @@ from app.modules.architecture.routes.lucidchart_import_routes import (
 from app.modules.architecture.services.archimate_xml_export_service import export_to_xml
 from app.utils.response_helpers import api_error, api_success
 from app.utils.pagination import MAX_PAGE_SIZE, safe_int_arg
-from app.models.archimate_element_types import StandardTypeTable
+from app.models.archimate_element_types import (
+    StandardTypeTable,
+    application_kind_types,
+    type_registry_for_page,
+)
 
 archimate_bp = Blueprint("archimate", __name__, url_prefix="/archimate")
 register_lucidchart_import_routes(archimate_bp)
@@ -1257,6 +1261,7 @@ def composer_page():
         initial_viewpoint=viewpoint,
         initial_layer=initial_layer,
         focus=focus,
+        type_registry=type_registry_for_page(),
     )
 
 
@@ -2522,7 +2527,8 @@ def api_elements_search():
 
     Query params:
         q        - name substring filter (case-insensitive)
-        type     - exact element type filter (e.g. ApplicationComponent)
+        type     - exact element type filter (e.g. Application, or a component type)
+        kind     - "application" returns every application kind (Application and its components)
         layer    - layer filter (case-insensitive, e.g. application)
         limit    - max results (default 30, max 200)
         solution_id - restrict to elements linked to this solution
@@ -2534,6 +2540,8 @@ def api_elements_search():
     elem_type = request.args.get("type", "").strip()
     if elem_type:
         query = query.filter(ArchiMateElement.type == elem_type)
+    elif request.args.get("kind", "").strip().lower() == "application":
+        query = query.filter(ArchiMateElement.type.in_(application_kind_types()))
 
     layer = request.args.get("layer", "").strip()
     if layer:

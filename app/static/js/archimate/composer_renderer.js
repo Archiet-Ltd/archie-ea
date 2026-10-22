@@ -47,7 +47,8 @@ let ComposerRenderer = (function() {
             { type: 'Product',               label: 'Product' },
         ],
         'Application': [
-            { type: 'ApplicationComponent',     label: 'Application' },
+            { type: 'Application',              label: 'Application' },
+            { type: 'ApplicationComponent',     label: 'App Component' },
             { type: 'ApplicationCollaboration', label: 'App Collaboration' },
             { type: 'ApplicationInterface',     label: 'App Interface' },
             { type: 'ApplicationInteraction',   label: 'App Interaction' },
@@ -127,6 +128,47 @@ let ComposerRenderer = (function() {
             TYPE_TO_LAYER[item.type] = layerKey;
         });
     });
+
+    /* The page's type registry ({type: {base, label}}), sent by the server from the element-type registry.
+       A specialisation (Application) is drawn with its parent's icon, shape kind and container behaviour and
+       shown with its own name above the element name. No second list of types is kept here. */
+    let TYPE_REGISTRY = {};
+
+    function applyTypeRegistry(registry) {
+        TYPE_REGISTRY = registry || {};
+        Object.keys(PALETTE).forEach(function(layerName) {
+            PALETTE[layerName].forEach(function(item) {
+                if (TYPE_REGISTRY[item.type] && TYPE_REGISTRY[item.type].label) {
+                    item.title = TYPE_REGISTRY[item.type].label;
+                }
+            });
+        });
+    }
+
+    function baseTypeOf(elType) {
+        let entry = TYPE_REGISTRY[elType];
+        return entry && entry.base ? entry.base : elType;
+    }
+
+    /* A specialisation shows its own name in guillemets, as the standard notation for a specialisation. */
+    function specialisationTag(elType) {
+        let entry = TYPE_REGISTRY[elType];
+        return entry && entry.base && entry.base !== elType ? '«' + (entry.label || elType) + '»' : '';
+    }
+
+    /* The tag sits above the element name; the name moves down to make room. */
+    function placeSpecialisationTag(node, elType, tagY, nameY) {
+        if (!specialisationTag(elType)) return;
+        node.attr('typeLabel/y', tagY);
+        node.attr('typeLabel/style', 'fill: hsl(var(--muted-foreground))');
+        node.attr('typeLabel/fontSize', 12);
+        node.attr('typeLabel/fontWeight', 500);
+        node.attr('nameLabel/y', nameY);
+    }
+
+    function typeCaption(elType) {
+        return specialisationTag(elType) || (elType || '').replace(/([A-Z])/g, ' $1').trim();
+    }
 
     function guessLayer(elType) {
         return TYPE_TO_LAYER[elType] || 'application';
@@ -247,7 +289,7 @@ let ComposerRenderer = (function() {
     };
 
     function typeIconPath(elType) {
-        return TYPE_ICONS[elType] || '';
+        return TYPE_ICONS[baseTypeOf(elType)] || '';
     }
 
     /* ── JointJS custom ArchiMate element shapes ─────────────────────────────
@@ -683,7 +725,7 @@ let ComposerRenderer = (function() {
     };
 
     function shapeCategory(elType) {
-        return SHAPE_CATEGORY[elType] || 'node';
+        return SHAPE_CATEGORY[baseTypeOf(elType)] || 'node';
     }
 
     /* ── Create special shapes (junction, grouping, location, note) ── */
@@ -828,7 +870,7 @@ let ComposerRenderer = (function() {
         }
         let c = layerColor(layer);
         let iconPath = typeIconPath(elType);
-        let typeName = (elType || '').replace(/([A-Z])/g, ' $1').trim();
+        let typeName = typeCaption(elType);
         let cat = shapeCategory(elType);
 
         /* Select shape class from category */
@@ -866,6 +908,8 @@ let ComposerRenderer = (function() {
             size: { width: 200, height: 130 },
             attrs: shapeAttrs,
         });
+
+        placeSpecialisationTag(node, elType, 54, 72);
 
         /* UX-CMP-001: Override port colors with layer accent.
          * Ports are pre-declared in CARD_PORTS.items; here we just restyle them. */
@@ -1047,7 +1091,7 @@ let ComposerRenderer = (function() {
     function createContainerNode(elementId, name, elType, layer, x, y, w, h) {
         let c = layerColor(layer);
         let iconPath = typeIconPath(elType);
-        let typeName = (elType || '').replace(/([A-Z])/g, ' $1').trim();
+        let typeName = typeCaption(elType);
 
         let container = new joint.shapes.archimate.Container({
             position: { x: x, y: y },
@@ -1062,6 +1106,8 @@ let ComposerRenderer = (function() {
                 resizeHandle: { stroke: c.accent || c.stroke },
             },
         });
+
+        placeSpecialisationTag(container, elType, 6, 24);
 
         /* UX-CMP-001: Override port colors for containers.
          * Ports pre-declared in CARD_PORTS.items; restyle with layer accent. */
@@ -2061,6 +2107,8 @@ let ComposerRenderer = (function() {
         TYPE_ICONS: TYPE_ICONS,
         layerColor: layerColor,
         guessLayer: guessLayer,
+        baseTypeOf: baseTypeOf,
+        applyTypeRegistry: applyTypeRegistry,
         shapeCategory: shapeCategory,
         typeIconPath: typeIconPath,
         markerPath: markerPath,

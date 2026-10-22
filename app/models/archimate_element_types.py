@@ -2014,6 +2014,25 @@ def application_kind_types() -> Tuple[str, ...]:
     return tuple(sorted(parents | {s for s, p in SPECIALIZATIONS.items() if p in parents}))
 
 
+# Where a page must tell a parent from its specialisation, the parent reads as a component. The global plain
+# name of ApplicationComponent stays "Application" until the migration has run (ADR-0014 Decision 7), so that
+# screens listing existing inventory mirrors do not change before their data does.
+PARENT_PAGE_LABELS: Dict[str, str] = {"ApplicationComponent": "Application component"}
+
+
+def type_registry_for_page() -> Dict[str, Dict[str, str]]:
+    """The specialisations and their parents with plain labels, for a page's script.
+
+    ``{type: {"base": standard type, "label": plain name}}`` for every specialisation and its parent, so a
+    page draws and labels an Application from the registry, not from a second hand-written list.
+    """
+    types = set(SPECIALIZATIONS) | set(SPECIALIZATIONS.values())
+    return {
+        t: {"base": base_type(t), "label": PARENT_PAGE_LABELS.get(t) or plain_name_for(t)}
+        for t in sorted(types)
+    }
+
+
 # The element property that names a specialisation in an exchange file (ADR-0014 Decision 5).
 SPECIALIZATION_PROPERTY = "entelim:specialization"
 

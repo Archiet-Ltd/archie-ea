@@ -16,7 +16,7 @@ import uuid
 
 import pytest
 
-BASE_KEYS = {"solutionId", "solutionName", "startBlank", "initialViewpoint", "initialLayer"}
+BASE_KEYS = {"solutionId", "solutionName", "startBlank", "initialViewpoint", "initialLayer", "typeRegistry"}
 
 
 def _user(db_session, org):
