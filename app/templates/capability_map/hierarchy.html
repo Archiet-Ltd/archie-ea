@@ -221,10 +221,10 @@ function hierarchyView() {
             const classes = {
                 // design-tokens-ok: 5-level hierarchy depth legend, level 1 is already primary
                 1: 'bg-primary/10 text-primary border border-primary/30',
-                2: 'bg-layer-implementation/10 text-layer-implementation-emphasis border border-layer-implementation/30', // design-tokens-ok
-                3: 'bg-layer-strategy/10 text-layer-strategy-emphasis border border-layer-strategy/30', // design-tokens-ok
-                4: 'bg-layer-motivation/10 text-layer-motivation-emphasis border border-layer-motivation/30', // design-tokens-ok
-                5: 'bg-layer-risk/10 text-layer-risk-emphasis border border-layer-risk/30' // design-tokens-ok
+                2: 'bg-sky-500/10 text-sky-700 border border-sky-500/30', // design-tokens-ok
+                3: 'bg-amber-500/10 text-amber-700 border border-amber-500/30', // design-tokens-ok
+                4: 'bg-violet-500/10 text-violet-700 border border-violet-500/30', // design-tokens-ok
+                5: 'bg-rose-500/10 text-rose-700 border border-rose-500/30' // design-tokens-ok
             };
             return classes[level] || 'bg-muted text-foreground border border-border';
         },
@@ -233,10 +233,10 @@ function hierarchyView() {
             const classes = {
                 // design-tokens-ok: 5-level hierarchy depth legend, level 1 is already primary
                 1: 'bg-primary text-primary-foreground',
-                2: 'bg-layer-implementation text-primary-foreground', // design-tokens-ok
-                3: 'bg-layer-strategy text-primary-foreground', // design-tokens-ok
-                4: 'bg-layer-motivation text-primary-foreground', // design-tokens-ok
-                5: 'bg-layer-risk text-primary-foreground' // design-tokens-ok
+                2: 'bg-sky-600 text-primary-foreground', // design-tokens-ok
+                3: 'bg-amber-600 text-primary-foreground', // design-tokens-ok
+                4: 'bg-violet-600 text-primary-foreground', // design-tokens-ok
+                5: 'bg-rose-600 text-primary-foreground' // design-tokens-ok
             };
             return classes[level] || 'bg-primary text-primary-foreground';
         },
@@ -245,10 +245,10 @@ function hierarchyView() {
             const colors = {
                 // design-tokens-ok: 5-level hierarchy depth legend, level 1 is already primary
                 1: 'bg-primary',
-                2: 'bg-layer-implementation', // design-tokens-ok
-                3: 'bg-layer-strategy', // design-tokens-ok
-                4: 'bg-layer-motivation', // design-tokens-ok
-                5: 'bg-layer-risk' // design-tokens-ok
+                2: 'bg-sky-500', // design-tokens-ok
+                3: 'bg-amber-500', // design-tokens-ok
+                4: 'bg-violet-500', // design-tokens-ok
+                5: 'bg-rose-500' // design-tokens-ok
             };
             return colors[level] || 'bg-muted-foreground';
         },
@@ -257,10 +257,10 @@ function hierarchyView() {
             const colors = {
                 // design-tokens-ok: 5-level hierarchy depth legend, level 1 is already primary
                 1: 'border-primary/40',
-                2: 'border-layer-implementation/40', // design-tokens-ok
-                3: 'border-layer-strategy/40', // design-tokens-ok
-                4: 'border-layer-motivation/40', // design-tokens-ok
-                5: 'border-layer-risk/40' // design-tokens-ok
+                2: 'border-sky-500/40', // design-tokens-ok
+                3: 'border-amber-500/40', // design-tokens-ok
+                4: 'border-violet-500/40', // design-tokens-ok
+                5: 'border-rose-500/40' // design-tokens-ok
             };
             return colors[level] || 'border-border';
         },
@@ -477,17 +477,17 @@ function hierarchyView() {
             // design-tokens-ok: 12-category domain palette, more distinct hues than success/warning/info/destructive can provide
             const colorMap = {
                 'Enterprise': 'bg-primary',
-                'Experience': 'bg-layer-business', // design-tokens-ok
-                'Engineering': 'bg-layer-strategy', // design-tokens-ok
+                'Experience': 'bg-emerald-500', // design-tokens-ok
+                'Engineering': 'bg-amber-500', // design-tokens-ok
                 'Integration': 'bg-primary',
                 'Operations': 'bg-destructive',
                 'Data': 'bg-cyan-500', // design-tokens-ok
                 'Governance': 'bg-lime-500', // design-tokens-ok
                 'Analytics': 'bg-orange-500', // design-tokens-ok
-                'Security': 'bg-layer-risk', // design-tokens-ok
+                'Security': 'bg-rose-500', // design-tokens-ok
                 'Quality': 'bg-pink-500', // design-tokens-ok
                 'Mobility': 'bg-teal-500', // design-tokens-ok
-                'Finance': 'bg-layer-strategy' // design-tokens-ok
+                'Finance': 'bg-amber-500' // design-tokens-ok
             };
             return colorMap[domain] || 'bg-muted/50';
         },
