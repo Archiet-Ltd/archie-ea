@@ -22,6 +22,71 @@ from app.utils.ai_chat_audit import get_audit_logger
 
 logger = logging.getLogger(__name__)
 
+# The attributes the chat's update functions may change, per record. Each list
+# is what the product's own edit surfaces already let a person change:
+#   application   the application edit form (application_mgmt.forms) plus the
+#                 fields the REST update (api/v1/applications.py) writes
+#   capability    the capability edit and optional-field routes
+#                 (capabilities/routes/enterprise_crud_routes.py) and the
+#                 maturity edit
+#   vendor        the vendor edit form and the REST update (api/v1/vendors.py)
+#   mapping       the capability-mapping update on the application page
+#                 (application_mgmt/detail_layer_routes.py) plus
+#                 relationship_type, which the mapping guardrail validates
+# Anything else (organization_id, id, any foreign key, created_*, deleted_*,
+# lock_version, archimate_element_id ...) is refused, never written.
+_NEVER_EDITABLE = frozenset({
+    "id", "organization_id", "created_at", "updated_at", "created_by", "created_by_id",
+    "deleted_at", "deleted_by", "lock_version", "archimate_element_id",
+})
+
+CAPABILITY_EDITABLE_FIELDS = frozenset({
+    "name", "description", "category", "level", "business_domain", "business_owner",
+    "it_owner", "strategic_importance", "business_value", "current_maturity_level",
+    "target_maturity_level", "maturity_assessment_notes",
+})
+APPLICATION_API_EDITABLE_FIELDS = frozenset({
+    "name", "description", "business_owner", "technical_owner", "lifecycle_status",
+})
+VENDOR_EDITABLE_FIELDS = frozenset({
+    "name", "display_name", "description", "vendor_type", "website", "headquarters_location",
+    "enterprise_readiness_score", "status", "year_founded", "employee_count",
+    "strategic_tier", "partnership_level",
+})
+MAPPING_EDITABLE_FIELDS = frozenset({
+    "support_level", "coverage_percentage", "maturity_level", "is_strategic", "notes",
+    "relationship_type",
+})
+
+
+def application_editable_fields() -> frozenset:
+    """Fields of the application edit form that are columns, plus the REST update's."""
+    from sqlalchemy.inspection import inspect as sa_inspect
+    from app.application_mgmt.forms import ApplicationComponentForm
+
+    form_fields = {n for n in dir(ApplicationComponentForm) if hasattr(getattr(ApplicationComponentForm, n), "field_class")}
+    columns = {c.key: c for c in sa_inspect(ApplicationComponent).columns}
+    allowed = {
+        n for n in (form_fields | APPLICATION_API_EDITABLE_FIELDS)
+        if n in columns and not columns[n].foreign_keys and not columns[n].primary_key
+    }
+    return frozenset(allowed - _NEVER_EDITABLE)
+
+
+def _refuse_uneditable(update_data: Any, allowed, operation: str) -> Optional[Dict[str, Any]]:
+    """Return a refusal naming the fields a person may not edit, or None."""
+    if not isinstance(update_data, dict):
+        return {"success": False, "error": "Update data must be an object", "operation": operation}
+    bad = sorted(str(f) for f in update_data if f not in allowed or f in _NEVER_EDITABLE)
+    if bad:
+        return {
+            "success": False,
+            "error": "Fields that cannot be edited here: " + ", ".join(bad),
+            "rejected_fields": bad,
+            "operation": operation,
+        }
+    return None
+
 
 class AIDataInteractionService:
     """
@@ -129,6 +194,10 @@ class AIDataInteractionService:
                     "error": f"Capability with ID {capability_id} not found",
                     "operation": "update_capability",
                 }
+
+            refused = _refuse_uneditable(update_data, CAPABILITY_EDITABLE_FIELDS, "update_capability")
+            if refused:
+                return refused
 
             # Check guardrails
             guardrails_result = self.guardrails.validate_capability_update(capability, update_data)
@@ -258,6 +327,10 @@ class AIDataInteractionService:
                     "operation": "update_application",
                 }
 
+            refused = _refuse_uneditable(update_data, application_editable_fields(), "update_application")
+            if refused:
+                return refused
+
             # Check guardrails
             guardrails_result = self.guardrails.validate_application_update(
                 application, update_data
@@ -369,6 +442,10 @@ class AIDataInteractionService:
                     "error": f"Vendor with ID {vendor_id} not found",
                     "operation": "update_vendor",
                 }
+
+            refused = _refuse_uneditable(update_data, VENDOR_EDITABLE_FIELDS, "update_vendor")
+            if refused:
+                return refused
 
             # Check guardrails
             guardrails_result = self.guardrails.validate_vendor_update(vendor, update_data)
@@ -483,6 +560,10 @@ class AIDataInteractionService:
                     "error": f"Mapping with ID {mapping_id} not found",
                     "operation": "update_capability_mapping",
                 }
+
+            refused = _refuse_uneditable(update_data, MAPPING_EDITABLE_FIELDS, "update_capability_mapping")
+            if refused:
+                return refused
 
             # Check guardrails
             guardrails_result = self.guardrails.validate_mapping_update(mapping, update_data)
