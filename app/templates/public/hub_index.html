@@ -44,6 +44,23 @@
     {% set groups = extra_groups or [] %}
     {% set show_descriptions = false %}
     {% include 'public/_hub_groups.html' %}
+
+    {% if role_catalogue %}
+    {# The roles Entelim is built for, from the site registry (the same list as the
+       Roles menu and the footer). A role with a page links to it. #}
+    <section aria-labelledby="role-catalogue-heading" data-role-catalogue>
+      <h2 id="role-catalogue-heading">All {{ role_catalogue.count }} roles</h2>
+      <p>The roles Entelim is built for, by family. A role with its own page links to it. For the others, <a href="{{ url_for('main.public_site_page', slug='contact') }}">talk to us</a> about your role.</p>
+      {% for family in role_catalogue.families %}
+      <h3 id="{{ family.id }}">{{ family.label }}</h3>
+      <ul>
+        {% for role in family.roles %}
+        <li id="{{ role.id }}">{% if role.has_page %}<a href="{{ role.href }}">{{ role.label }}</a>{% else %}{{ role.label }}{% endif %}</li>
+        {% endfor %}
+      </ul>
+      {% endfor %}
+    </section>
+    {% endif %}
   </article>
 </div>
 {% include 'components/public_footer.html' %}

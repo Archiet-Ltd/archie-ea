@@ -1,0 +1,74 @@
+{# smoke-coverage-ok: covered by tests/test_public_nav_journey.py (every menu item rendered from the registry, opened by mouse and keyboard).
+   Macros for the public navbar's menu panels. Every row comes from
+   site_registry() (app/services/site_registry.py, content/site/registry.yml);
+   nothing here holds a label, a description or a link. One row pattern for
+   every menu: icon, label, one-line description, the row is one link.
+   Coming soon rows use the same pattern with data-availability="early_access"
+   and a muted icon, and link to their waiting-list page.
+#}
+
+{% macro menu_row(item) -%}
+<li>
+  <a href="{{ item.href }}"
+     class="flex gap-3 rounded-md p-3 hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+     data-menu-item data-label="{{ item.label }}"
+     data-availability="{{ 'early_access' if item.coming_soon else 'live' }}">
+    <i data-lucide="{{ item.icon }}" class="mt-0.5 h-5 w-5 shrink-0 {{ 'text-muted-foreground' if item.coming_soon else 'text-foreground' }}" aria-hidden="true"></i>
+    <span class="min-w-0">
+      <span class="block text-sm font-medium text-foreground">{{ item.label }}</span>
+      {% if item.blurb %}<span class="block text-sm text-muted-foreground">{{ item.blurb }}</span>{% endif %}
+    </span>
+  </a>
+</li>
+{%- endmacro %}
+
+{% macro group_heading(id, text) -%}
+<p id="{{ id }}" class="px-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">{{ text }}</p>
+{%- endmacro %}
+
+{% macro menu_group(group, id_prefix='grp') -%}
+<div>
+  {{ group_heading(id_prefix ~ '-' ~ group.id, group.label) }}
+  <ul class="mt-2 space-y-1" aria-labelledby="{{ id_prefix }}-{{ group.id }}">
+    {% for item in group['items'] %}{{ menu_row(item) }}{% endfor %}
+  </ul>
+</div>
+{%- endmacro %}
+
+{# The Coming soon column: always the last group, set apart by a dashed hairline. #}
+{% macro soon_group(label, items, id_prefix, all_link=none) -%}
+<div class="border-t border-dashed border-border pt-4 lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0"
+     data-availability="early_access" data-menu-group="coming-soon">
+  {{ group_heading(id_prefix ~ '-coming-soon', label) }}
+  <p class="mt-1 px-3 text-sm text-muted-foreground">Not available yet. Join the waiting list.</p>
+  <ul class="mt-2 space-y-1" aria-labelledby="{{ id_prefix }}-coming-soon">
+    {% for item in items %}{{ menu_row(item) }}{% endfor %}
+    {% if all_link %}
+    <li>
+      <a href="{{ all_link.href }}"
+         class="flex gap-3 rounded-md p-3 hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+         data-menu-item data-label="{{ all_link.label }}">
+        <i data-lucide="arrow-right" class="mt-0.5 h-5 w-5 shrink-0 text-muted-foreground" aria-hidden="true"></i>
+        <span class="min-w-0">
+          <span class="block text-sm font-medium text-foreground">{{ all_link.label }}</span>
+          {% if all_link.blurb %}<span class="block text-sm text-muted-foreground">{{ all_link.blurb }}</span>{% endif %}
+        </span>
+      </a>
+    </li>
+    {% endif %}
+  </ul>
+</div>
+{%- endmacro %}
+
+{# A plain text link row for the Roles, Compare and Resources menus (no icon, no description). #}
+{% macro text_link(href, label, class='') -%}
+<li><a href="{{ href }}" class="block rounded-md px-3 py-1.5 text-sm text-foreground hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring {{ class }}" data-menu-item data-label="{{ label }}">{{ label }}</a></li>
+{%- endmacro %}
+
+{% macro see_all(href, label) -%}
+<div class="mt-4 border-t border-border pt-4">
+  <a href="{{ href }}" class="inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-sm font-medium text-foreground hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" data-menu-item data-label="{{ label }}">
+    {{ label }}<i data-lucide="arrow-right" class="h-4 w-4" aria-hidden="true"></i>
+  </a>
+</div>
+{%- endmacro %}

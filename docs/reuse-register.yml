@@ -708,3 +708,24 @@ entries:
     must_not_create:
       - id: type-table-class
         regex: 'class\s+\w*TypeTable\s*\('
+
+  - id: public-site-registry
+    concept: The public navbar, its menus, the footer and the roles hub link lists (one registry file, one reader)
+    status: active
+    canonical:
+      path: app/services/site_registry.py
+      symbols: [site_registry, items_needing_own_page]
+    reuse: >
+      Add, move or relabel a public navbar, menu or footer link in content/site/registry.yml only; the navbar
+      (components/public_navbar.html), the menu rows (components/public_menu.html), the footer
+      (components/public_footer.html) and the roles hub read it through site_registry(). Labels and one-line
+      descriptions are the reviewed ones; do not reword them in a template. Do not write a second link list,
+      a second reader or a literal href in those templates (the public-shell gate fails on it).
+    must_not_create:
+      - id: second-site-registry
+        regex: 'def\s+_?(public_|site_)(nav|menu|footer|registry)\w*\s*\('
+        scope: [app]
+        suffixes: [.py]
+    known_exceptions:
+      - path: app/services/site_registry.py
+        reason: the canonical reader

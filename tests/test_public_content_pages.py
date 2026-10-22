@@ -980,7 +980,12 @@ def test_comparison_pages_have_faq_jsonld(app):
 
 def test_module_pages_have_software_application_jsonld(app):
     """Module pages have SoftwareApplication JSON-LD."""
-    pages = [p for p in load_all_pages() if p.family == "module" and not _is_merged(p)]
+    # A module still on the waiting list is a plain page: no software node for a
+    # capability that cannot be used yet.
+    pages = [
+        p for p in load_all_pages()
+        if p.family == "module" and not _is_merged(p) and p.cta != "waiting_list"
+    ]
     assert len(pages) > 0, "No module pages found"
     with app.test_client() as client:
         for page in pages[:5]:  # Sample first 5
@@ -1334,8 +1339,10 @@ def test_no_waiting_list_on_non_cta_pages(app):
     with app.test_client() as client:
         rv = client.get("/modules/applications")
         html = rv.data.decode()
-        # applications has no cta field, so no waiting list
-        assert "Join the waiting list" not in html
+        # applications has no cta field, so no waiting list. The site menus (the
+        # Coming soon column) are the shell, not this page's content.
+        content = re.sub(r"<footer.*?</footer>", "", re.sub(r"<header.*?</header>", "", html, flags=re.DOTALL), flags=re.DOTALL)
+        assert "Join the waiting list" not in content
 
 
 def test_page_count_consistency(app):

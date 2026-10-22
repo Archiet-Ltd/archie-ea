@@ -385,6 +385,14 @@ def init_context_processors(app):
         return {"legal_links": legal_links()}
 
     @app.context_processor
+    def inject_site_registry():
+        """The public navbar and footer read one registry. Handed over as a
+        callable so only the pages that render the navbar or footer pay for it."""
+        from app.services.site_registry import site_registry
+
+        return {"site_registry": site_registry}
+
+    @app.context_processor
     def inject_feature_flags():
         """Make feature flag helpers available to all templates"""
         from app.models import FeatureFlag
