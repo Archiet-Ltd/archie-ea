@@ -173,3 +173,119 @@ def test_a_critical_row_lands_on_a_critical_highlighted_gap(browser, live_server
         expect(landing.get_by_role("cell", name="—", exact=True)).to_have_count(0)
     finally:
         context.close()
+
+
+_PIXEL_JS = """
+(css) => {
+  const c = document.createElement('canvas'); c.width = 1; c.height = 1;
+  const x = c.getContext('2d', {willReadFrequently: true});
+  x.clearRect(0, 0, 1, 1); x.fillStyle = css; x.fillRect(0, 0, 1, 1);
+  const d = x.getImageData(0, 0, 1, 1).data; return [d[0], d[1], d[2], d[3] / 255];
+}
+"""
+
+_CONTRAST_JS = """
+(el) => {
+  const px = (css) => {
+    const c = document.createElement('canvas'); c.width = 1; c.height = 1;
+    const x = c.getContext('2d', {willReadFrequently: true});
+    x.clearRect(0, 0, 1, 1); x.fillStyle = css; x.fillRect(0, 0, 1, 1);
+    const d = x.getImageData(0, 0, 1, 1).data; return [d[0], d[1], d[2], d[3] / 255];
+  };
+  const over = (top, under) => {
+    const a = top[3];
+    return [0, 1, 2].map(i => top[i] * a + under[i] * (1 - a)).concat([1]);
+  };
+  const layers = [];
+  for (let n = el; n; n = n.parentElement) {
+    const bg = px(getComputedStyle(n).backgroundColor);
+    if (bg[3] > 0) layers.push(bg);
+    if (bg[3] === 1) break;
+  }
+  let base = [255, 255, 255, 1];
+  if (layers.length && layers[layers.length - 1][3] === 1) base = layers.pop();
+  while (layers.length) base = over(layers.pop(), base);
+  const fg = over(px(getComputedStyle(el).color), base);
+  const lum = (c) => {
+    const f = c.slice(0, 3).map(v => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); });
+    return 0.2126 * f[0] + 0.7152 * f[1] + 0.0722 * f[2];
+  };
+  const a = lum(fg), b = lum(base);
+  return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+}
+"""
+
+
+def _landing_page(browser, live_server, width, scheme):
+    org = create_fresh_org("enterprise_architect")
+    suffix = org["suffix"]
+    from app import create_app, db
+    from app.models.implementation_migration import Gap
+
+    app = create_app("testing")
+    with app.app_context():
+        critical = Gap(name="Event backbone resilience %s" % suffix, severity="critical",
+                       organization_id=org["org_id"])
+        db.session.add(critical)
+        db.session.commit()
+        gap_id = critical.id
+        db.session.remove()
+    context = browser.new_context(ignore_https_errors=True, viewport={"width": width, "height": 900},
+                                  color_scheme=scheme)
+    context.add_init_script("localStorage.setItem('archie_onboarding_ts', Date.now().toString());")
+    if scheme == "dark":
+        context.add_init_script(
+            "localStorage.setItem('theme', 'dark');"
+            "document.documentElement.classList.add('dark');")
+    page = context.new_page()
+    sign_in(page, live_server, org["emails"]["enterprise_architect"])
+    page.goto(live_server + LIST_PAGES[0], wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    page.get_by_test_id("priority-action-row").filter(has_text="Event backbone resilience") \
+        .get_by_test_id("priority-action-link").click()
+    page.wait_for_url(lambda url: url.endswith("/implementation/gap-analysis#gap-%d" % gap_id),
+                      timeout=PAGE_TIMEOUT)
+    page.evaluate("() => document.documentElement.classList.toggle('dark', %s)"
+                  % ("true" if scheme == "dark" else "false"))
+    page.wait_for_timeout(500)
+    return context, page, gap_id
+
+
+def test_on_a_phone_the_landing_row_shows_its_severity(browser, live_server):
+    """At 390 wide the row a link lands on names its severity where the person can see it."""
+    context, page, gap_id = _landing_page(browser, live_server, 390, "light")
+    try:
+        landing = page.locator("#gap-%d" % gap_id)
+        expect(landing).to_be_visible()
+        seen = page.evaluate(
+            """(sel) => {
+              const row = document.querySelector(sel);
+              const vw = document.documentElement.clientWidth;
+              const out = [];
+              for (const el of row.querySelectorAll('span, div')) {
+                if (el.children.length || el.textContent.trim() !== 'Critical') continue;
+                const r = el.getBoundingClientRect();
+                if (!r.width || !r.height) continue;
+                const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+                const top = document.elementFromPoint(cx, cy);
+                out.push({inView: r.left >= 0 && r.right <= vw && r.top >= 0 && r.bottom <= innerHeight,
+                          uncovered: !!top && (top === el || el.contains(top) || top.contains(el)) &&
+                                     !top.closest('button')});
+              }
+              return out;
+            }""", "#gap-%d" % gap_id)
+        assert any(s["inView"] and s["uncovered"] for s in seen), \
+            "the landing row's Critical is not visible at 390: %s" % seen
+    finally:
+        context.close()
+
+
+def test_in_dark_mode_the_critical_badge_is_readable(browser, live_server):
+    context, page, gap_id = _landing_page(browser, live_server, 1440, "dark")
+    try:
+        badge = page.locator("#gap-%d [data-testid='gap-severity-narrow'], #gap-%d td:nth-child(3) span"
+                             % (gap_id, gap_id)).filter(has_text=re.compile("^\s*Critical\s*$")).last
+        expect(badge).to_be_visible()
+        ratio = badge.evaluate(_CONTRAST_JS)
+        assert ratio >= 4.5, "Critical badge contrast in dark mode is %.2f:1" % ratio
+    finally:
+        context.close()

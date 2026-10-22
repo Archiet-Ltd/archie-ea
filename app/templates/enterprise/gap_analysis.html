@@ -20,7 +20,7 @@
 {% macro severity_badge(gap) %}
     {% set sev = (gap.severity or '')|lower %}
     {% if sev == 'critical' %}
-        {{ status_badge('Critical', 'error') }}
+        {{ status_badge('Critical', 'error', class='!text-destructive-emphasis') }}
     {% elif sev == 'high' %}
         {{ status_badge('High', 'warning') }}
     {% elif sev %}
@@ -92,6 +92,8 @@
                                        class="hover:underline" data-testid="gap-link-{{ gap.id }}">{{ gap.name|default('—', true) }}</a>
                                 </div>
                                 <div class="text-sm text-muted-foreground">{{ gap.description|default('', true)|truncate(50) }}</div>
+                                {# The Severity column scrolls out of sight behind the pinned Convert button on a phone, so the pinned first cell repeats it. #}
+                                <div class="mt-1 md:hidden" data-testid="gap-severity-narrow">{{ severity_badge(gap) }}</div>
                             </td>
                             <td class="px-2">{{ gap_type_cell(gap) }}</td>
                             <td class="px-2">{{ severity_badge(gap) }}</td>
