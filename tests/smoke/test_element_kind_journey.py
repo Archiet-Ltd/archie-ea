@@ -22,15 +22,7 @@ pytestmark = [pytest.mark.smoke, pytest.mark.journey]
 
 
 def _create_archimate_element(page, org, name, element_type, layer):
-    """Create an ArchiMateElement via the API and return its id."""
-    status, data = api(page, "POST", "/architecture/api/elements", {
-        "name": name,
-        "element_type": element_type,
-        "layer": layer,
-    })
-    assert status in (200, 201), f"Create element failed: {data}"
-    # The create endpoint returns the model id; we need the ArchiMateElement id.
-    # Create the ArchiMateElement directly through the ORM instead.
+    """Create an ArchiMateElement directly and return its id."""
     from app import create_app, db
     from app.models.archimate_core import ArchiMateElement
 
@@ -168,7 +160,8 @@ def test_viewer_cannot_edit_kind(browser, live_server):
         wp_id = _create_archimate_element(page, org, wp_name, "WorkPackage", "implementation")
         _set_kind(page, org, wp_id, "Feature")
 
-        # Now sign in as viewer and try to change the kind.
+        # Log out and sign in as viewer.
+        page.goto(live_server + "/account/logout", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
         sign_in(page, live_server, org["emails"]["viewer"])
 
         status, data = api(page, "POST", f"/architecture/api/elements/{wp_id}/profile", {
@@ -206,7 +199,8 @@ def test_organisation_b_cannot_see_kind(browser, live_server):
         wp_id = _create_archimate_element(page, org_a, wp_name, "WorkPackage", "implementation")
         _set_kind(page, org_a, wp_id, "Epic")
 
-        # Switch to org B and try to read the element.
+        # Log out and sign in as org B.
+        page.goto(live_server + "/account/logout", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
         sign_in(page, live_server, org_b["emails"]["enterprise_architect"])
         status, data = api(page, "GET", f"/architecture/api/elements/{wp_id}/profile")
         # Org B should not see org A's element at all (tenant isolation).

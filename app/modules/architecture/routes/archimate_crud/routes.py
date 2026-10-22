@@ -2711,11 +2711,18 @@ def api_element_profile(element_id):
 
 @archimate_crud.route("/api/elements/<int:element_id>/profile", methods=["POST"])
 @login_required
-@require_roles("admin", "architect", "enterprise_architect", "solution_architect",
-               "business_architect", "application_manager", "portfolio_manager",
-               "cto", "security_architect", "data_architect")
 def api_element_set_kind(element_id):
-    """Set the framework kind on an element."""
+    """Set the framework kind on an element.
+
+    Only Architect and above (not Viewer) may edit.
+    """
+    from flask_login import current_user
+
+    # Check enterprise_role: Viewer cannot edit.
+    enterprise_role = getattr(current_user, "enterprise_role", "").lower()
+    if enterprise_role == "viewer":
+        return jsonify({"error": "Viewer cannot edit element kind."}), 403
+
     element = ArchiMateElement.query.filter_by(id=element_id).first_or_404()
     data = request.get_json() or {}
     kind = data.get("kind")
@@ -2738,11 +2745,18 @@ def api_element_set_kind(element_id):
 
 @archimate_crud.route("/api/elements/<int:element_id>/profile/wsjf", methods=["POST"])
 @login_required
-@require_roles("admin", "architect", "enterprise_architect", "solution_architect",
-               "business_architect", "application_manager", "portfolio_manager",
-               "cto", "security_architect", "data_architect")
 def api_element_set_wsjf(element_id):
-    """Set WSJF components on an element."""
+    """Set WSJF components on an element.
+
+    Only Architect and above (not Viewer) may edit.
+    """
+    from flask_login import current_user
+
+    # Check enterprise_role: Viewer cannot edit.
+    enterprise_role = getattr(current_user, "enterprise_role", "").lower()
+    if enterprise_role == "viewer":
+        return jsonify({"error": "Viewer cannot edit WSJF components."}), 403
+
     element = ArchiMateElement.query.filter_by(id=element_id).first_or_404()
     data = request.get_json() or {}
 
