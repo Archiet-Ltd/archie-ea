@@ -24,37 +24,37 @@
     <form method="post" action="{{ request.path }}" class="space-y-6">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
-        <div class="rounded-lg border bg-card p-6 space-y-4">
+        <div class="rounded-lg border border-border bg-card p-6 space-y-4">
             <h2 class="text-sm font-semibold text-foreground uppercase tracking-wide">Identity</h2>
 
             <div>
-                <label for="name" class="block text-sm font-medium text-foreground mb-1">Name <span class="text-destructive-emphasis">*</span></label>
+                <label for="name" class="block text-sm font-medium text-muted-foreground mb-1">Name <span class="text-destructive-emphasis">*</span></label>
                 <input type="text" id="name" name="name" required value="{{ entity.name if entity else '' }}"
                     class="w-full h-9 px-3 text-sm rounded-md border border-input bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
                     placeholder="e.g., Customer Master, Sales Order, Product Catalog">
             </div>
 
             <div>
-                <label for="business_name" class="block text-sm font-medium text-foreground mb-1">Business Name</label>
+                <label for="business_name" class="block text-sm font-medium text-muted-foreground mb-1">Business Name</label>
                 <input type="text" id="business_name" name="business_name" value="{{ entity.business_name if entity else '' }}"
                     class="w-full h-9 px-3 text-sm rounded-md border border-input bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
                     placeholder="Business-friendly name">
             </div>
 
             <div>
-                <label for="description" class="block text-sm font-medium text-foreground mb-1">Description</label>
+                <label for="description" class="block text-sm font-medium text-muted-foreground mb-1">Description</label>
                 <textarea id="description" name="description" rows="3"
                     class="w-full px-3 py-2 text-sm rounded-md border border-input bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
                     placeholder="Describe what this data entity represents and how it's used">{{ entity.description if entity else '' }}</textarea>
             </div>
         </div>
 
-        <div class="rounded-lg border bg-card p-6 space-y-4">
+        <div class="rounded-lg border border-border bg-card p-6 space-y-4">
             <h2 class="text-sm font-semibold text-foreground uppercase tracking-wide">Classification</h2>
 
-            <div class="grid grid-cols-2 gap-4">
+            <div class="grid grid-cols-1 gap-4">
                 <div>
-                    <label for="domain_id" class="block text-sm font-medium text-foreground mb-1">Domain</label>
+                    <label for="domain_id" class="block text-sm font-medium text-muted-foreground mb-1">Domain</label>
                     <select id="domain_id" name="domain_id"
                         class="w-full h-9 px-3 text-sm rounded-md border border-input bg-background text-foreground">
                         <option value="">Select domain...</option>
@@ -65,7 +65,7 @@
                 </div>
 
                 <div>
-                    <label for="entity_type" class="block text-sm font-medium text-foreground mb-1">Entity Type</label>
+                    <label for="entity_type" class="block text-sm font-medium text-muted-foreground mb-1">Entity Type</label>
                     <select id="entity_type" name="entity_type"
                         class="w-full h-9 px-3 text-sm rounded-md border border-input bg-background text-foreground">
                         <option value="">Select type...</option>
@@ -77,9 +77,9 @@
                 </div>
             </div>
 
-            <div class="grid grid-cols-2 gap-4">
+            <div class="grid grid-cols-1 gap-4">
                 <div>
-                    <label for="data_classification" class="block text-sm font-medium text-foreground mb-1">Data Classification</label>
+                    <label for="data_classification" class="block text-sm font-medium text-muted-foreground mb-1">Data Classification</label>
                     <select id="data_classification" name="data_classification"
                         class="w-full h-9 px-3 text-sm rounded-md border border-input bg-background text-foreground">
                         <option value="">Select classification...</option>
@@ -134,7 +134,7 @@
     </form>
 
     {% if entity %}
-    <div class="rounded-lg border border-destructive/30 bg-destructive/5 p-6">
+    <div class="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2">
         <h2 class="text-sm font-semibold text-destructive-emphasis mb-2">Danger Zone</h2>
         <p class="text-sm text-muted-foreground mb-4">Deleting this data entity removes it permanently from the catalog.</p>
         <form id="delete-entity-form" method="post" action="{{ url_for('data_architecture.delete_data_entity', entity_id=entity.id) }}">

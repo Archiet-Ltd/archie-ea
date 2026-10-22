@@ -10,29 +10,29 @@
 
     <!-- Statistics Cards -->
     <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-        <div class="bg-background rounded-lg shadow p-6">
+        <div class="bg-background rounded-lg p-6">
             <div class="text-sm text-muted-foreground mb-1">Total Capabilities</div>
             <div class="text-3xl font-bold text-foreground">{{ total_capabilities }}</div>
         </div>
 
-        <div class="bg-primary/5 rounded-lg shadow p-6">
+        <div class="bg-primary/10 rounded-md px-3 py-2">
             <div class="text-sm text-primary mb-1">From Abacus</div>
             <div class="text-3xl font-bold text-primary">{{ abacus_capabilities }}</div>
         </div>
 
-        <div class="bg-success/5 rounded-lg shadow p-6">
+        <div class="bg-success/10 rounded-md px-3 py-2">
             <div class="text-sm text-success-emphasis mb-1">Manual Entries</div>
             <div class="text-3xl font-bold text-success">{{ manual_capabilities }}</div>
         </div>
 
-        <div class="bg-warning/5 rounded-lg shadow p-6">
+        <div class="bg-warning/10 rounded-md px-3 py-2">
             <div class="text-sm text-warning-emphasis mb-1">Potential Duplicates</div>
             <div class="text-3xl font-bold text-warning" x-text="duplicates.length">{{ duplicate_candidates|length }}</div>
         </div>
     </div>
 
     <!-- Controls -->
-    <div class="bg-background rounded-lg shadow p-6 mb-6">
+    <div class="bg-background rounded-lg p-6 mb-6">
         <div class="flex flex-wrap gap-4 items-end">
             <!-- Similarity Threshold -->
             <div class="flex-1 min-w-[200px]">
@@ -45,7 +45,7 @@
                     max="100"
                     x-model="threshold"
                     @change="loadCandidates()"
-                    class="w-full h-2 bg-muted rounded-lg appearance-none cursor-pointer"
+                    class="w-full h-2 bg-muted rounded-md appearance-none cursor-pointer"
                  aria-label="Similarity threshold percentage">
                 <div class="flex justify-between text-xs text-muted-foreground mt-1">
                     <span>60% (More matches)</span>
@@ -90,13 +90,13 @@
     </div>
 
     <!-- Duplicate Candidates Table -->
-    <div class="bg-background rounded-lg shadow overflow-hidden">
+    <div class="bg-background rounded-lg overflow-hidden">
         <div class="px-6 py-4 border-b border-border">
             <h2 class="text-lg font-semibold text-foreground">Duplicate Candidates</h2>
         </div>
 
         <div class="overflow-x-auto">
-            <table class="min-w-full divide-y divide-border">
+            <table class="dense-table min-w-full divide-y divide-border">
                 <thead class="bg-muted">
                     <tr>
                         <th class="px-6 py-3 text-left">
@@ -232,7 +232,7 @@
             <h3 class="mt-2 text-sm font-medium text-destructive-emphasis">Candidates could not be loaded</h3>
             <p class="mt-1 text-sm text-muted-foreground" x-text="loadError"></p>
             <button type="button" @click="loadCandidates()"
-                    class="mt-4 inline-flex items-center justify-center rounded-md text-sm font-medium border border-input bg-background hover:bg-accent hover:text-accent-foreground h-9 px-4 py-2">
+                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 mt-4 items-center justify-center">
                 Retry
             </button>
         </div>
@@ -245,7 +245,7 @@
              'bg-success/5 border-success/20': statusType === 'success',
              'bg-destructive/5 border-destructive/20': statusType === 'error'
          }"
-         class="fixed bottom-4 right-4 max-w-md rounded-lg border-2 p-4 shadow-lg">
+         class="fixed bottom-4 right-4 max-w-md rounded-lg border-2 p-4">
         <div class="flex items-start">
             <div class="flex-shrink-0">
                 <template x-if="statusType === 'success'">

@@ -86,8 +86,8 @@
   <div x-show="importOpen" x-cloak
        class="fixed inset-0 z-50 flex items-center justify-center p-4"
        @click.self="importOpen = false">
-    <div class="absolute inset-0 bg-black/50 backdrop-blur-sm"></div>
-    <div class="relative bg-card border border-border rounded-xl shadow-xl w-full max-w-2xl max-h-[85vh] flex flex-col">
+    <div class="absolute inset-0 bg-overlay/50"></div>
+    <div class="relative bg-card border border-border rounded-lg w-full max-w-2xl max-h-[85vh] flex flex-col">
 
       {# Modal header #}
       <div class="flex items-center justify-between px-4 py-3 border-b border-border shrink-0">
@@ -97,7 +97,7 @@
             Paste an existing schema to set confirmed fields — prevents field invention during code generation.
           </p>
         </div>
-        <button aria-label="Close import panel" type="button" @click="importOpen = false" class="text-muted-foreground hover:text-foreground transition-colors">
+        <button aria-label="Close import panel" type="button" @click="importOpen = false" class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
           <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
             <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
           </svg>
@@ -250,7 +250,7 @@
           {# Field table #}
           <template x-if="el.fields.length > 0">
             <div>
-              <table class="w-full text-2xs mb-2.5">
+              <table class="dense-table w-full text-2xs mb-2.5">
                 <thead>
                   <tr class="text-2xs uppercase tracking-wider text-muted-foreground border-b border-border/50">
                     <th class="text-left pb-1 font-medium w-[35%]">Field</th>

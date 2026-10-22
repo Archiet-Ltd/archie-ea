@@ -8,8 +8,8 @@
 <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
     {{ page_header(title='Error', breadcrumbs=[{'label': 'Home', 'href': '/'}, {'label': 'Error'}]) }}
 
-    <div data-slot="card" class="rounded-xl border bg-card shadow-sm p-8 text-center">
-        <div class="rounded-lg bg-destructive/10 p-3 inline-block mb-4">
+    <div data-slot="card" class="rounded-lg border border-border bg-card p-8 text-center">
+        <div class="rounded-md bg-destructive/10 px-3 py-2 inline-block mb-4">
             <i data-lucide="alert-triangle" class="w-8 h-8 text-destructive" aria-hidden="true"></i>
         </div>
         <p class="text-sm text-muted-foreground">{{ error|default('An unexpected error occurred.') }}</p>

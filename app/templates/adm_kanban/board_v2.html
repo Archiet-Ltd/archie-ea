@@ -54,7 +54,7 @@
                 Plateau Roadmap
             </a>
             <a href="{{ url_for('adm_kanban_view.adm_roadmap_timeline') }}"
-               class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs border border-border rounded hover:bg-muted transition-colors text-muted-foreground">
+               class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-8 px-2.5 items-center">
                 <i data-lucide="calendar-range" class="h-3.5 w-3.5"></i> Roadmap
             </a>
             {# View mode toggle: flat columns vs swimlane rows #}
@@ -78,7 +78,7 @@
             </div>
             {# Sprint Planning button #}
             <button type="button" @click="$dispatch('open-sprint-panel')"
-                    class="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium bg-primary text-primary-foreground rounded border border-primary/80 hover:bg-primary/90 transition-colors"
+                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center"
                     aria-label="Open Sprint Planning panel"
                     title="Sprint Planning — manage sprints and assign cards">
                 <i data-lucide="calendar-clock" class="h-3.5 w-3.5"></i> Sprint Planning
@@ -133,7 +133,7 @@
         <i data-lucide="kanban" class="h-12 w-12 text-muted-foreground/30 mb-4"></i>
         <h3 class="text-lg font-semibold text-foreground mb-1">No solutions on the board</h3>  <!-- frontend-quality-ok -->
         <p class="text-sm text-muted-foreground mb-4">Create a solution to start tracking ADM phases</p>
-        <a href="/architecture-journey/" class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium bg-primary text-primary-foreground rounded-lg hover:bg-primary/90">
+        <a href="/architecture-journey/" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
             <i data-lucide="plus" class="h-4 w-4"></i> Create First Solution
         </a>
     </div>
@@ -185,13 +185,13 @@
                      :class="dragOverColumn === col.id ? 'bg-primary/5 ring-1 ring-primary/20' : ''">
                     <template x-for="card in columnCards(col.id)" :key="card.id">
                         <div draggable="true"
-                             class="kanban-card group relative bg-card border border-border rounded-lg p-3 cursor-grab active:cursor-grabbing hover:border-primary/30 hover:shadow-sm transition-all"
+                             class="kanban-card group relative bg-card border border-border rounded-lg p-3 cursor-grab active:cursor-grabbing hover:border-primary/30 transition-all"
                              :data-card-id="card.id"
                               @dragstart="onDragStart($event, card)"
                               @dragend="onDragEnd()"
                               @click="openDetail(card)"
                               :class="{
- 'opacity-40 rotate-1 shadow-lg scale-[0.98]': draggingCard && draggingCard.id === card.id,
+ 'opacity-40 rotate-1 scale-[0.98]': draggingCard && draggingCard.id === card.id,
  'ring-2 ring-primary': isSelected(card.id)
  }">
 
@@ -337,7 +337,7 @@
                                 {# Row 1: avatar + owner name + app count #}
                                 <div class="flex items-center justify-between">
                                     <div class="flex items-center gap-1.5 min-w-0">
-                                        <span class="flex-shrink-0 w-5 h-5 rounded-full bg-primary/10 text-primary text-2xs font-bold flex items-center justify-center"
+                                        <span class="flex-shrink-0 w-5 h-5 rounded-full bg-primary/10 text-info-emphasis text-2xs font-bold flex items-center justify-center"
                                               x-text="(() => { const o = (card.owner || 'U'); const parts = o.split('@')[0].split(/[\s._-]/); return (parts[0] || '').charAt(0).toUpperCase() + (parts[1] || '').charAt(0).toUpperCase(); })()"></span>
                                         <span class="text-xs text-muted-foreground truncate"
                                               x-text="(card.owner || 'Unassigned').split('@')[0].replace(/[._-]/g, ' ').replace(/\b\w/g, function(c){ return c.toUpperCase(); })"></span>
@@ -474,7 +474,7 @@
                     {# Viewpoint link — maps ADM phase to ArchiMate viewpoint #}
                     <a @click.stop
                        :href="'/archimate/viewpoints?active=' + ({A:'stakeholder',B:'business_process',C:'application_cooperation',D:'technology',E:'implementation_deployment',F:'migration',G:'motivation',H:'motivation'}[phase.code] || 'basic')"
-                       class="ml-1 shrink-0 inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-xs font-medium bg-primary/10 text-primary border border-primary/20 hover:bg-primary/20 transition-colors"
+                       class="ml-1 shrink-0 inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-xs font-medium bg-primary/10 text-info-emphasis border border-primary/20 hover:bg-primary/20 transition-colors"
                        title="Open ArchiMate viewpoint for this phase">
                         <i data-lucide="eye" class="w-2.5 h-2.5"></i>
                         VP
@@ -483,7 +483,7 @@
 
                 {# Deliverable checklist dropdown #}
                 <template x-if="expandedDeliverablePhase === phase.code">
-                    <div class="mb-2 mx-1 p-3 rounded-md border border-border bg-card shadow-sm text-xs"
+                    <div class="mb-2 mx-1 p-3 rounded-md border border-border bg-card text-xs"
                          @click.stop>
                         <p class="font-semibold text-foreground mb-2 text-2xs">
                             TOGAF Deliverables — Phase <span x-text="phase.code"></span>
@@ -525,12 +525,12 @@
 
                                 <template x-for="card in swimlaneCards(phase.code, col.id)" :key="card.id">
                                     <div draggable="true"
-                                         class="kanban-card bg-card border border-border rounded p-2 cursor-grab active:cursor-grabbing hover:border-primary/30 hover:shadow-sm transition-all"
+                                         class="kanban-card bg-card border border-border rounded p-2 cursor-grab active:cursor-grabbing hover:border-primary/30 transition-all"
                                          :data-card-id="card.id"
                                           @dragstart="onDragStart($event, card)"
                                           @dragend="onDragEnd()"
                                           @click="openDetail(card)"
-                                          :class="draggingCard && draggingCard.id === card.id ? 'opacity-40 rotate-1 shadow-lg scale-[0.98]' : ''">
+                                          :class="draggingCard && draggingCard.id === card.id ? 'opacity-40 rotate-1 scale-[0.98]' : ''">
                                         <div class="flex items-center justify-between mb-1">
                                             <span class="inline-flex items-center px-1.5 py-0.5 text-xs font-medium rounded bg-muted text-muted-foreground"
                                                   x-text="card.card_type"></span>
@@ -582,7 +582,7 @@
          x-transition:leave="transition ease-in duration-100"
          x-transition:leave-start="translate-y-0 opacity-100"
          x-transition:leave-end="translate-y-4 opacity-0"
-         class="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 bg-card border border-border rounded-lg shadow-lg px-4 py-2.5 flex items-center gap-3"
+         class="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 bg-card border border-border rounded-lg px-4 py-2.5 flex items-center gap-3"
          @keydown.escape.window="clearSelection()">
         <span class="text-xs font-medium text-foreground" x-text="selectedCardIds.length + ' selected'"></span>
         <div class="h-4 w-px bg-border"></div>
@@ -621,13 +621,13 @@
          role="dialog"
          aria-modal="true"
          aria-labelledby="create-task-title">
-        <div class="fixed inset-0 bg-black/40" @click="show = false"></div>
-        <div class="relative bg-card border border-border rounded-lg shadow-xl w-full max-w-md mx-4"
+        <div class="fixed inset-0 bg-overlay/50" @click="show = false"></div>
+        <div class="relative bg-card border border-border rounded-lg w-full max-w-md mx-4"
              @click.stop>
             <div class="flex items-center justify-between px-5 py-4 border-b border-border">
                 <h2 id="create-task-title" class="text-sm font-semibold text-foreground">New Architecture Task</h2>
                 <button type="button" @click="show = false"
-                        class="p-1 text-muted-foreground hover:text-foreground rounded"
+                        class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                         aria-label="Close">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
@@ -694,7 +694,7 @@
                         <div class="space-y-1">
                             <label class="text-xs font-medium text-foreground">ADM Phase</label>
                             <div x-show="lockedPhase" x-cloak class="flex items-center gap-1.5">
-                                <span class="inline-flex items-center h-8 px-2.5 text-xs font-medium rounded bg-primary/10 text-primary border border-primary/20"
+                                <span class="inline-flex items-center h-8 px-2.5 text-xs font-medium rounded bg-primary/10 text-info-emphasis border border-primary/20"
                                       x-text="(phases.find(function(p){ return p.code === lockedPhase; }) || {label: lockedPhase}).label"></span>
                                 <span class="text-xs text-muted-foreground">pre-selected</span>
                             </div>
@@ -833,7 +833,7 @@
                                        autocomplete="off"
                                        class="w-full h-8 px-3 text-sm bg-background border border-border rounded text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary">
                                 <div x-show="userResults.length > 0" x-cloak
-                                     class="absolute z-50 mt-1 w-full bg-background border border-border rounded shadow-lg max-h-48 overflow-y-auto">
+                                     class="absolute z-50 mt-1 w-full bg-background border border-border rounded max-h-48 overflow-y-auto">
                                     <template x-for="u in userResults" :key="u.id">
                                         <button type="button" @click="selectUser(u)"
                                                 class="w-full text-left px-3 py-2 text-sm hover:bg-muted flex items-center gap-2">
@@ -902,7 +902,7 @@
                             <input type="text" x-model="requirementSearch" @input.debounce.300ms="searchRequirements()" @focus="searchRequirements()"
                                    placeholder="Search requirements..."
                                    class="w-full text-sm border border-border rounded px-3 py-1.5 bg-background text-foreground" aria-label="Search requirements...">
-                            <div x-show="requirementResults.length > 0" x-cloak class="mt-1 border border-border rounded bg-background shadow-lg max-h-40 overflow-y-auto z-50">
+                            <div x-show="requirementResults.length > 0" x-cloak class="mt-1 border border-border rounded bg-background max-h-40 overflow-y-auto z-50">
                                 <template x-for="r in requirementResults" :key="r.id">
                                     <button type="button" @click="addRequirement(r)" class="w-full text-left px-3 py-1.5 text-sm hover:bg-muted">
                                         <span class="font-mono text-xs text-muted-foreground mr-2" x-text="r.ref"></span>
@@ -928,7 +928,7 @@
                             <input type="text" x-model="goalSearch" @input.debounce.300ms="searchGoals()" @focus="searchGoals()"
                                    placeholder="Search goals..."
                                    class="w-full text-sm border border-border rounded px-3 py-1.5 bg-background text-foreground" aria-label="Search goals...">
-                            <div x-show="goalResults.length > 0" x-cloak class="mt-1 border border-border rounded bg-background shadow-lg max-h-40 overflow-y-auto z-50">
+                            <div x-show="goalResults.length > 0" x-cloak class="mt-1 border border-border rounded bg-background max-h-40 overflow-y-auto z-50">
                                 <template x-for="r in goalResults" :key="r.id">
                                     <button type="button" @click="addGoal(r)" class="w-full text-left px-3 py-1.5 text-sm hover:bg-muted">
                                         <span class="font-mono text-xs text-muted-foreground mr-2" x-text="r.ref"></span>
@@ -954,7 +954,7 @@
                             <input type="text" x-model="driverSearch" @input.debounce.300ms="searchDrivers()" @focus="searchDrivers()"
                                    placeholder="Search drivers..."
                                    class="w-full text-sm border border-border rounded px-3 py-1.5 bg-background text-foreground" aria-label="Search drivers...">
-                            <div x-show="driverResults.length > 0" x-cloak class="mt-1 border border-border rounded bg-background shadow-lg max-h-40 overflow-y-auto z-50">
+                            <div x-show="driverResults.length > 0" x-cloak class="mt-1 border border-border rounded bg-background max-h-40 overflow-y-auto z-50">
                                 <template x-for="r in driverResults" :key="r.id">
                                     <button type="button" @click="addDriver(r)" class="w-full text-left px-3 py-1.5 text-sm hover:bg-muted">
                                         <span class="font-mono text-xs text-muted-foreground mr-2" x-text="r.ref"></span>
@@ -980,7 +980,7 @@
                             <input type="text" x-model="principleSearch" @input.debounce.300ms="searchPrinciples()" @focus="searchPrinciples()"
                                    placeholder="Search principles..."
                                    class="w-full text-sm border border-border rounded px-3 py-1.5 bg-background text-foreground" aria-label="Search principles...">
-                            <div x-show="principleResults.length > 0" x-cloak class="mt-1 border border-border rounded bg-background shadow-lg max-h-40 overflow-y-auto z-50">
+                            <div x-show="principleResults.length > 0" x-cloak class="mt-1 border border-border rounded bg-background max-h-40 overflow-y-auto z-50">
                                 <template x-for="r in principleResults" :key="r.id">
                                     <button type="button" @click="addPrinciple(r)" class="w-full text-left px-3 py-1.5 text-sm hover:bg-muted">
                                         <span class="font-mono text-xs text-muted-foreground mr-2" x-text="r.ref"></span>
@@ -1022,8 +1022,8 @@
          x-transition:leave-start="opacity-100"
          x-transition:leave-end="opacity-0"
          @keydown.escape.window="card = null">
-        <div class="fixed inset-0 bg-black/40" @click="card = null"></div>
-        <div class="relative bg-card border-l border-border shadow-2xl w-full max-w-xl flex flex-col h-full"
+        <div class="fixed inset-0 bg-overlay/50" @click="card = null"></div>
+        <div class="relative bg-card border-l border-border w-full max-w-xl flex flex-col h-full border"
              role="dialog" aria-modal="true"
              x-show="card"
              x-transition:enter="transition ease-out duration-200"
@@ -1043,7 +1043,7 @@
                            x-text="card ? card.description : ''"></p>
                     </div>
                     <button aria-label="Close card details" type="button" @click="card = null"
-                            class="mt-0.5 p-1 rounded text-muted-foreground hover:text-foreground transition-colors shrink-0">
+                            class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring mt-0.5 shrink-0">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
                     </button>
                 </div>
@@ -1285,7 +1285,7 @@
                         <div class="flex items-center gap-2">
                             <span class="text-sm font-semibold text-foreground">Requirements & Motivation</span>
                             <span x-show="card && ((card.requirement_ids && card.requirement_ids.length) || (card.goal_ids && card.goal_ids.length) || (card.driver_ids && card.driver_ids.length) || (card.principle_ids && card.principle_ids.length))" x-cloak
-                                  class="inline-flex items-center px-1.5 py-0.5 text-xs font-medium rounded-full bg-primary/10 text-primary"
+                                  class="inline-flex items-center px-1.5 py-0.5 text-xs font-medium rounded-full bg-primary/10 text-info-emphasis"
                                   x-text="((card && card.requirement_ids ? card.requirement_ids.length : 0) + (card && card.goal_ids ? card.goal_ids.length : 0) + (card && card.driver_ids ? card.driver_ids.length : 0) + (card && card.principle_ids ? card.principle_ids.length : 0))"></span>
                         </div>
                         <svg class="w-4 h-4 text-muted-foreground transition-transform duration-200"
@@ -1337,10 +1337,10 @@
                                            autocomplete="off"
                                            class="w-full px-3 py-2 text-sm border border-border rounded-md bg-background focus:outline-none focus:ring-1 focus:ring-ring" aria-label="Search requirements..."/>
                                     <div x-show="typeaheadError.requirements" x-cloak
-                                         class="absolute z-50 mt-1 w-full bg-background border border-border rounded-md shadow-lg px-3 py-2 text-sm text-destructive-emphasis"
+                                         class="absolute z-50 mt-1 w-full bg-background border border-border rounded-md px-3 py-2 text-sm text-destructive-emphasis"
                                          x-text="typeaheadError.requirements"></div>
                                     <div x-show="!typeaheadError.requirements && detailRequirementResults.length > 0" x-cloak
-                                         class="absolute z-50 mt-1 w-full bg-background border border-border rounded-md shadow-lg max-h-40 overflow-y-auto">
+                                         class="absolute z-50 mt-1 w-full bg-background border border-border rounded-md max-h-40 overflow-y-auto">
                                         <template x-for="item in detailRequirementResults" :key="item.id">
                                             <button type="button" @click="addDetailRequirement(item)"
                                                     class="w-full text-left px-3 py-2 text-sm hover:bg-muted">
@@ -1362,10 +1362,10 @@
                                            autocomplete="off"
                                            class="w-full px-3 py-2 text-sm border border-border rounded-md bg-background focus:outline-none focus:ring-1 focus:ring-ring" aria-label="Search goals..."/>
                                     <div x-show="typeaheadError.goals" x-cloak
-                                         class="absolute z-50 mt-1 w-full bg-background border border-border rounded-md shadow-lg px-3 py-2 text-sm text-destructive-emphasis"
+                                         class="absolute z-50 mt-1 w-full bg-background border border-border rounded-md px-3 py-2 text-sm text-destructive-emphasis"
                                          x-text="typeaheadError.goals"></div>
                                     <div x-show="!typeaheadError.goals && detailGoalResults.length > 0" x-cloak
-                                         class="absolute z-50 mt-1 w-full bg-background border border-border rounded-md shadow-lg max-h-40 overflow-y-auto">
+                                         class="absolute z-50 mt-1 w-full bg-background border border-border rounded-md max-h-40 overflow-y-auto">
                                         <template x-for="item in detailGoalResults" :key="item.id">
                                             <button type="button" @click="addDetailGoal(item)"
                                                     class="w-full text-left px-3 py-2 text-sm hover:bg-muted">
@@ -1387,10 +1387,10 @@
                                            autocomplete="off"
                                            class="w-full px-3 py-2 text-sm border border-border rounded-md bg-background focus:outline-none focus:ring-1 focus:ring-ring" aria-label="Search drivers..."/>
                                     <div x-show="typeaheadError.drivers" x-cloak
-                                         class="absolute z-50 mt-1 w-full bg-background border border-border rounded-md shadow-lg px-3 py-2 text-sm text-destructive-emphasis"
+                                         class="absolute z-50 mt-1 w-full bg-background border border-border rounded-md px-3 py-2 text-sm text-destructive-emphasis"
                                          x-text="typeaheadError.drivers"></div>
                                     <div x-show="!typeaheadError.drivers && detailDriverResults.length > 0" x-cloak
-                                         class="absolute z-50 mt-1 w-full bg-background border border-border rounded-md shadow-lg max-h-40 overflow-y-auto">
+                                         class="absolute z-50 mt-1 w-full bg-background border border-border rounded-md max-h-40 overflow-y-auto">
                                         <template x-for="item in detailDriverResults" :key="item.id">
                                             <button type="button" @click="addDetailDriver(item)"
                                                     class="w-full text-left px-3 py-2 text-sm hover:bg-muted">
@@ -1412,10 +1412,10 @@
                                            autocomplete="off"
                                            class="w-full px-3 py-2 text-sm border border-border rounded-md bg-background focus:outline-none focus:ring-1 focus:ring-ring" aria-label="Search principles..."/>
                                     <div x-show="typeaheadError.principles" x-cloak
-                                         class="absolute z-50 mt-1 w-full bg-background border border-border rounded-md shadow-lg px-3 py-2 text-sm text-destructive-emphasis"
+                                         class="absolute z-50 mt-1 w-full bg-background border border-border rounded-md px-3 py-2 text-sm text-destructive-emphasis"
                                          x-text="typeaheadError.principles"></div>
                                     <div x-show="!typeaheadError.principles && detailPrincipleResults.length > 0" x-cloak
-                                         class="absolute z-50 mt-1 w-full bg-background border border-border rounded-md shadow-lg max-h-40 overflow-y-auto">
+                                         class="absolute z-50 mt-1 w-full bg-background border border-border rounded-md max-h-40 overflow-y-auto">
                                         <template x-for="item in detailPrincipleResults" :key="item.id">
                                             <button type="button" @click="addDetailPrinciple(item)"
                                                     class="w-full text-left px-3 py-2 text-sm hover:bg-muted">
@@ -1676,7 +1676,7 @@
                                        autocomplete="off"
                                        class="w-full px-3 py-2 text-sm border border-border rounded-md bg-background focus:outline-none focus:ring-1 focus:ring-ring" aria-label="Edit Assignee Search"/>
                                 <div x-show="editUserResults.length > 0" x-cloak
-                                     class="absolute z-50 mt-1 w-full bg-background border border-border rounded-md shadow-lg max-h-40 overflow-y-auto">
+                                     class="absolute z-50 mt-1 w-full bg-background border border-border rounded-md max-h-40 overflow-y-auto">
                                     <template x-for="u in editUserResults" :key="u.id">
                                         <button type="button" @click="selectEditUser(u)"
                                                 class="w-full text-left px-3 py-2 text-sm hover:bg-muted">
@@ -2103,7 +2103,7 @@
          x-transition:leave-start="opacity-100"
          x-transition:leave-end="opacity-0"
          @click.self="open = false; $store.modal.close('sprint-planning-panel')"
-         class="fixed inset-0 bg-black/30 z-40"
+         class="fixed inset-0 z-40 bg-overlay/50"
          x-cloak></div>
 
     {# Panel #}
@@ -2114,7 +2114,7 @@
          x-transition:leave="transition ease-in duration-150"
          x-transition:leave-start="translate-x-0"
          x-transition:leave-end="translate-x-full"
-         class="fixed right-0 top-0 h-full w-96 bg-background border-l border-border shadow-xl z-50 flex flex-col"
+         class="fixed right-0 top-0 h-full w-96 bg-background border-l border-border z-50 flex flex-col"
          x-cloak
          aria-label="Sprint Planning panel">
 
@@ -2122,7 +2122,7 @@
         <div class="flex items-center justify-between px-4 py-3 border-b border-border">
             <h2 class="text-sm font-semibold text-foreground">Sprint Planning</h2>
             <button type="button" @click="open = false; $store.modal.close('sprint-planning-panel')"
-                    class="text-muted-foreground hover:text-foreground transition-colors"
+                    class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     aria-label="Close Sprint Planning panel">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
@@ -2145,7 +2145,7 @@
                 <div class="space-y-2">
                     <div class="flex items-center justify-between">
                         <span class="text-xs font-semibold text-foreground" x-text="activeSprint.name"></span>
-                        <span class="text-xs px-1.5 py-0.5 rounded bg-primary/10 text-primary font-medium"
+                        <span class="text-xs px-1.5 py-0.5 rounded bg-primary/10 text-info-emphasis font-medium"
                               x-text="activeSprint.status"></span>
                     </div>
                     <p class="text-xs text-muted-foreground">
@@ -2203,38 +2203,38 @@
                 <form @submit.prevent="createSprint(newSprint.name, newSprint.startDate, newSprint.endDate, newSprint.capacityPoints)"
                       class="space-y-3 p-3 rounded-md border border-border bg-muted/30">
                     <div>
-                        <label class="block text-xs font-medium text-muted-foreground mb-1" for="sprint-name">Sprint Name *</label>
+                        <label class="block text-sm font-medium text-muted-foreground mb-1" for="sprint-name">Sprint Name *</label>
                         <input id="sprint-name"
                                x-model="newSprint.name"
                                type="text"
                                required
                                placeholder="e.g. Sprint 1"
-                               class="w-full px-2.5 py-1.5 text-xs border border-border rounded-md bg-background focus:outline-none focus:ring-1 focus:ring-primary"/>
+                               class="h-9 w-full px-2.5 text-xs border border-border rounded-md bg-background focus:outline-none focus:ring-1 focus:ring-primary"/>
                     </div>
-                    <div class="grid grid-cols-2 gap-2">
+                    <div class="grid grid-cols-1 gap-2">
                         <div>
-                            <label class="block text-xs font-medium text-muted-foreground mb-1" for="sprint-start">Start Date</label>
+                            <label class="block text-sm font-medium text-muted-foreground mb-1" for="sprint-start">Start Date</label>
                             <input id="sprint-start"
                                    x-model="newSprint.startDate"
                                    type="date"
-                                   class="w-full px-2 py-1 text-xs border border-border rounded-md bg-background focus:outline-none focus:ring-1 focus:ring-primary"/>
+                                   class="h-9 w-full px-2 text-xs border border-border rounded-md bg-background focus:outline-none focus:ring-1 focus:ring-primary"/>
                         </div>
                         <div>
-                            <label class="block text-xs font-medium text-muted-foreground mb-1" for="sprint-end">End Date</label>
+                            <label class="block text-sm font-medium text-muted-foreground mb-1" for="sprint-end">End Date</label>
                             <input id="sprint-end"
                                    x-model="newSprint.endDate"
                                    type="date"
-                                   class="w-full px-2 py-1 text-xs border border-border rounded-md bg-background focus:outline-none focus:ring-1 focus:ring-primary"/>
+                                   class="h-9 w-full px-2 text-xs border border-border rounded-md bg-background focus:outline-none focus:ring-1 focus:ring-primary"/>
                         </div>
                     </div>
                     <div>
-                        <label class="block text-xs font-medium text-muted-foreground mb-1" for="sprint-capacity">Capacity Points</label>
+                        <label class="block text-sm font-medium text-muted-foreground mb-1" for="sprint-capacity">Capacity Points</label>
                         <input id="sprint-capacity"
                                x-model.number="newSprint.capacityPoints"
                                type="number"
                                min="0"
                                placeholder="0"
-                               class="w-full px-2.5 py-1.5 text-xs border border-border rounded-md bg-background focus:outline-none focus:ring-1 focus:ring-primary"/>
+                               class="h-9 w-full px-2.5 text-xs border border-border rounded-md bg-background focus:outline-none focus:ring-1 focus:ring-primary"/>
                     </div>
                     <button type="submit"
                             :disabled="!newSprint.name"

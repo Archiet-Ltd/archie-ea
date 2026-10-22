@@ -3,7 +3,7 @@
 
     {# TRAC-001: chain health warning banner for Step 5 #}
     <template x-if="stepWarnings[5] && !stepWarningsDismissed[5]">
-        <div class="rounded-lg border border-warning/30 bg-warning/5 px-4 py-3">
+        <div class="rounded-md border border-warning/40 bg-warning/10 px-4 py-2">
             <div class="flex items-start justify-between gap-3">
                 <div class="flex items-start gap-3 flex-1">
                     <svg class="h-4 w-4 text-warning mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -62,7 +62,7 @@
         <button type="button" @click="loadRoadmapData()"
                 :disabled="roadmapLoading"
                 x-show="domainsPopulated && (!roadmapData || !roadmapData.phases || roadmapData.phases.length === 0)"
-                class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors disabled:opacity-50">
+                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
             <template x-if="!roadmapLoading">
                 <span class="flex items-center gap-2">
                     <i data-lucide="calendar" class="w-4 h-4" aria-hidden="true"></i>
