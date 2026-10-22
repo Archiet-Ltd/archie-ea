@@ -1142,19 +1142,30 @@ def api_capability_applications(capability_id):
         # Get all applications
         all_applications = ApplicationComponent.query.order_by(ApplicationComponent.name).limit(500).all()
 
-        # Get existing mappings for this capability
-        existing_mappings = ApplicationCapabilityCoverage.query.filter_by(
-            capability_id=capability_id_int
-        ).all()
+        # The capability row, the Investment Map and this panel and dialog must
+        # say the same thing about the same capability: an application mapped in
+        # any store the screens read counts as mapped here (one shared helper).
+        from app.services.capability_fact_sheet import application_mappings_for_capability
 
-        mapped_app_ids = {m.application_component_id for m in existing_mappings}
-        mapping_details = {m.application_component_id: m for m in existing_mappings}
+        all_mappings = application_mappings_for_capability(capability_id_int)
+        mapped_app_ids = set(all_mappings)
+        # Only a coverage row has an id the dialog may update or delete.
+        mapping_details = {
+            app_id: m for app_id, m in all_mappings.items()
+            if isinstance(m, ApplicationCapabilityCoverage)
+        }
+        other_details = {
+            app_id: m for app_id, m in all_mappings.items() if app_id not in mapping_details
+        }
 
         # Build application list with mapping status
         applications_data = []
+        listed_ids = {a.id for a in all_applications}
+        mapped_app_ids &= listed_ids
         for app in all_applications:
             is_mapped = app.id in mapped_app_ids
             mapping = mapping_details.get(app.id)
+            shown = mapping or other_details.get(app.id)
 
             app_data = {
                 "id": str(app.id),  # Convert to string to preserve precision
@@ -1167,8 +1178,8 @@ def api_capability_applications(capability_id):
                 "mapping_id": str(mapping.id)
                 if mapping and mapping.id
                 else None,  # Convert to string to preserve precision
-                "support_level": (mapping.support_level or "partial") if mapping else "partial",
-                "coverage_percentage": (mapping.coverage_percentage or 0) if mapping else 0,
+                "support_level": (shown.support_level or "partial") if shown else "partial",
+                "coverage_percentage": (shown.coverage_percentage or 0) if shown else 0,
                 "support_quality": (mapping.support_quality or 3) if mapping else 3,  # model-safety-ok: support_quality_score fallback removed, field is support_quality
                 "relationship_type": (mapping.relationship_type or "enables") if mapping else "enables",
                 "relationship_strength": (mapping.relationship_strength or 3) if mapping else 3,

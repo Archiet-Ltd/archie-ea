@@ -43,8 +43,11 @@ Idempotent; safe to re-run.
     flask --app manage seed-demo-mappings --org-id 7
 """
 
+import logging
+
 import click
 from flask.cli import with_appcontext
+from sqlalchemy import text
 
 from app import db
 
@@ -170,6 +173,42 @@ def _unified_capabilities_by_source(org_id, capability_ids):
     return {int(row.source_id): row for row in rows}
 
 
+def _ensure_provenance_index(connection):
+    """Make sure the unified capability provenance index exists before projecting.
+
+    The projection refuses to write (it logs an error and skips) on a database
+    where `apply-unified-capability-provenance-migration` has not run, which left
+    a freshly upgraded and seeded demonstration with no unified rows and an
+    Investment Map asking for setup. The index is idempotent
+    (`CREATE UNIQUE INDEX IF NOT EXISTS`), so the seed ensures it itself and a
+    demonstration comes up right in either order, with a single seed.
+    """
+    from app.commands.apply_unified_capability_provenance_migration import (
+        MIGRATION_PATH,
+    )
+    from app.commands.project_capabilities import _has_provenance_index
+
+    if _has_provenance_index(connection):
+        return
+    try:
+        sql = MIGRATION_PATH.read_text(encoding="utf-8")
+        body = chr(10).join(
+            line for line in sql.splitlines()
+            if line.strip().upper() not in {"BEGIN;", "COMMIT;"}
+        )
+        # Its own connection, committed at once: the index is schema, not seed
+        # data, so it must outlive a rolled-back seed (the process remembers that
+        # the index exists). A short lock wait keeps a busy table from hanging
+        # the seed; the old behaviour (skip, log) applies if the index cannot be made.
+        with db.engine.connect().execution_options(isolation_level="AUTOCOMMIT") as ddl:
+            ddl.execute(text("SET lock_timeout = '5s'"))
+            ddl.execute(text(body))
+    except Exception:  # noqa: BLE001 - a role that cannot create indexes keeps the old behaviour
+        logging.getLogger(__name__).exception(
+            "could not ensure the unified capability provenance index"
+        )
+
+
 def _project_missing_unified_rows(capabilities):
     """Project capabilities that have no unified row yet, through the one projection.
 
@@ -183,6 +222,7 @@ def _project_missing_unified_rows(capabilities):
     from app.models.business_capabilities import _project_capability_row
 
     connection = db.session.connection()
+    _ensure_provenance_index(connection)
     for capability in capabilities:
         _project_capability_row(connection, capability)
 

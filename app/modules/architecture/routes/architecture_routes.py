@@ -13,7 +13,7 @@ Provides REST API endpoints for the new architecture models:
 
 import logging
 
-from flask import Blueprint, current_app, flash, jsonify, render_template, request
+from flask import Blueprint, current_app, flash, jsonify, render_template, request, url_for
 from werkzeug.exceptions import HTTPException
 from flask_login import login_required
 
@@ -746,6 +746,19 @@ def investment_priorities():
             "strategic/investment_matrix_prereq.html",
             mapping_count=mapping_count,
         )
+
+    # Each capability opens its fact sheet (identity, maturity, the applications
+    # that realise it); its "N apps" cell opens the applications section of it.
+    # The lists below hold the same row objects, so one pass covers them all.
+    # A capability that was not projected from a business capability has no fact
+    # sheet; it opens the Capability Map, where every capability is listed.
+    for row in analysis["capability_scores"]:
+        business_id = row.get("business_capability_id")
+        if business_id:
+            row["capability_url"] = url_for("enterprise_crud.capability_fact_sheet", capability_id=business_id)
+            row["capability_url_apps"] = row["capability_url"] + "#applications"
+        else:
+            row["capability_url"] = row["capability_url_apps"] = url_for("capability_map.index")
 
     return render_template(
         "strategic/investment_matrix.html",

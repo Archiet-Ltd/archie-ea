@@ -15,8 +15,6 @@ from __future__ import annotations
 
 from typing import Any, Dict, List
 
-from app import db
-
 _COMPLETENESS_FIELDS = [
     ("description", "Description", 1),
     ("business_domain", "Business domain", 2),
@@ -78,25 +76,66 @@ def _maturity(cap: Any) -> Dict[str, Any]:
             "assessed": getattr(cap, "maturity_assessment_date", None)}
 
 
-def _realizing_apps(cap_id: int) -> List[Dict[str, Any]]:
-    """Applications that realise / cover this capability."""
+def application_mappings_for_capability(cap_id: int) -> Dict[int, Any]:
+    """Every application mapped to one business capability, whichever store says so.
+
+    The Capability Map row reads ``ApplicationCapabilityMapping``, the Investment
+    Map reads ``UnifiedApplicationCapabilityMapping`` (through the capability's
+    projection) and the mapping dialog historically read only
+    ``ApplicationCapabilityCoverage``. Each screen gave a different answer for
+    the same capability, so every screen that lists a capability's applications
+    asks this one function. Returns ``{application_component_id: mapping row}``;
+    a coverage row wins over the other two because it carries the dialog's
+    editable detail, and the row store wins over the unified store.
+    """
+    from app.models.application_capability import ApplicationCapabilityMapping  # noqa: PLC0415
     from app.models.business_capabilities import (  # noqa: PLC0415
         ApplicationCapabilityCoverage,
     )
+    from app.models.unified_application_capability_mapping import (  # noqa: PLC0415
+        UnifiedApplicationCapabilityMapping,
+    )
+    from app.models.unified_capability import UnifiedCapability  # noqa: PLC0415
+
+    found: Dict[int, Any] = {}
+
+    unified_ids = [
+        u.id
+        for u in UnifiedCapability.query.filter_by(
+            source_table="business_capability", source_id=str(cap_id)
+        ).all()
+    ]
+    if unified_ids:
+        # tenant-scoping-ok: the unified mapping table has no organisation
+        # column; scoped through the unified capability ids of this
+        # (tenant-scoped) capability.
+        for m in UnifiedApplicationCapabilityMapping.query.filter(
+            UnifiedApplicationCapabilityMapping.unified_capability_id.in_(unified_ids)
+        ).all():
+            found[m.application_component_id] = m
+    # tenant-scoping-ok: filtered by one capability that the caller looked up
+    # through the tenant-scoped BusinessCapability query.
+    for m in ApplicationCapabilityMapping.query.filter_by(business_capability_id=cap_id).all():
+        found[m.application_component_id] = m
+    for m in ApplicationCapabilityCoverage.query.filter_by(capability_id=cap_id).all():
+        found[m.application_component_id] = m
+    return found
+
+
+def _realizing_apps(cap_id: int) -> List[Dict[str, Any]]:
+    """Applications that realise / cover this capability."""
     from app.models.application_portfolio import ApplicationComponent  # noqa: PLC0415
-    rows = (db.session.query(ApplicationCapabilityCoverage, ApplicationComponent)
-            .join(ApplicationComponent,
-                  ApplicationCapabilityCoverage.application_component_id == ApplicationComponent.id)
-            .filter(ApplicationCapabilityCoverage.capability_id == cap_id)
-            .limit(60).all())
-    out = []
-    for cov, app in rows:
-        out.append({
-            "id": app.id,
-            "name": getattr(app, "name", None) or f"Application {app.id}",
-            "support_level": getattr(cov, "support_level", None),
-        })
-    return out
+    mapped = application_mappings_for_capability(cap_id)
+    if not mapped:
+        return []
+    apps = (ApplicationComponent.query
+            .filter(ApplicationComponent.id.in_(list(mapped)))
+            .order_by(ApplicationComponent.name).limit(60).all())
+    return [{
+        "id": app.id,
+        "name": getattr(app, "name", None) or f"Application {app.id}",
+        "support_level": getattr(mapped[app.id], "support_level", None),
+    } for app in apps]
 
 
 def _sub_capabilities(cap_id: int) -> List[Dict[str, Any]]:

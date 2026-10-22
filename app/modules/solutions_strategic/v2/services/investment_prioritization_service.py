@@ -80,11 +80,17 @@ class InvestmentPrioritizationService:
         # Build capability → initiative map via RoadmapItem.linked_capabilities JSON
         linked_initiatives = self._get_linked_initiatives()
 
+        # The Capability Map reads BusinessCapability; each unified row records
+        # which one it was projected from. Domain and the link to the capability
+        # come from that row so both screens say the same thing.
+        business_by_source = self._business_capabilities_by_source(capabilities)
+
         # Analyze each capability for investment priority
         capability_scores = []
         for capability in capabilities:
             score_data = self._calculate_capability_score(
-                capability, include_risk_analysis, mappings_by_cap, linked_initiatives
+                capability, include_risk_analysis, mappings_by_cap, linked_initiatives,
+                business_by_source.get(str(getattr(capability, "source_id", None))),
             )
             capability_scores.append(score_data)
 
@@ -177,6 +183,7 @@ class InvestmentPrioritizationService:
         self, capability, include_risk: bool,
         mappings_by_cap: Dict = None,
         linked_initiatives: Dict = None,
+        business_capability=None,
     ) -> Dict:
         """Calculate investment priority score for a single capability."""
 
@@ -222,8 +229,23 @@ class InvestmentPrioritizationService:
 
         return {
             "capability_id": capability.id,
+            # id and name: the keys the scenario comparison dialog lists capabilities by.
+            "id": capability.id,
+            "name": capability.name,
             "capability_name": capability.name,
-            "capability_domain": getattr(capability, 'industry_domain', None) or getattr(capability, 'business_domain', None) or "Unknown",
+            # Same value and wording as the Capability Map, which reads the
+            # business capability's domain and calls a missing one "Unassigned".
+            "capability_domain": (
+                getattr(business_capability, "business_domain", None)
+                or getattr(capability, "industry_domain", None)
+                or getattr(capability, "business_domain", None)
+                or "Unassigned"
+            ),
+            "business_capability_id": business_capability.id if business_capability is not None else None,
+            # Scores that rest on a default rather than on recorded data say so.
+            "strategic_defaulted": (capability.strategic_importance or "").lower()
+            not in ("critical", "high", "medium", "low"),
+            "risk_has_signal": risk_score > 0,
             "strategic_importance": capability.strategic_importance,
             "coverage_count": coverage_count,
             "strategic_score": strategic_score,
@@ -249,6 +271,30 @@ class InvestmentPrioritizationService:
                 capability, total_score, coverage_count
             ),
         }
+
+    @staticmethod
+    def _business_capabilities_by_source(capabilities) -> Dict:
+        """Map str(business_capability id) -> BusinessCapability for projected rows."""
+        from app.models.business_capabilities import BusinessCapability
+
+        ids = []
+        for capability in capabilities:
+            if getattr(capability, "source_table", None) == "business_capability":
+                try:
+                    ids.append(int(capability.source_id))
+                except (TypeError, ValueError):
+                    continue
+        if not ids:
+            return {}
+        try:
+            # Tenant-scoped through the model's own query.
+            return {
+                str(bc.id): bc
+                for bc in BusinessCapability.query.filter(BusinessCapability.id.in_(ids)).all()
+            }
+        except Exception:
+            logger.debug("Could not load business capabilities for the matrix", exc_info=True)
+            return {}
 
     def _calculate_strategic_score(self, capability) -> int:
         """Calculate strategic importance score (0 - 25 points)."""
