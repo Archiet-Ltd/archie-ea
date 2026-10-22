@@ -653,9 +653,11 @@ class TestingConfig(Config):
     }
 
     # Opt-in: ARCHIE_TEST_POOL=one runs the suite on one pooled connection
-    # that every checkout reuses, as production does (ADR 0013). Two overflow
+    # that every checkout reuses, as production does (ADR 0013). Eight overflow
     # connections stay available because job_lock, the error-tracking handler
-    # and CommandService hold a second connection by design; overflow
+    # and CommandService hold a second connection by design, and the tests that
+    # run several threads at once (concurrent creates, independent approvals,
+    # lock-holding applies) need one connection per thread; overflow
     # connections close on return, so every sequential use still reuses the
     # one pooled physical connection. Unset keeps NullPool.
     if os.environ.get("ARCHIE_TEST_POOL", "").strip().lower() == "one":
@@ -665,8 +667,8 @@ class TestingConfig(Config):
             "pool_pre_ping": True,
             "poolclass": _QueuePool,
             "pool_size": 1,
-            "max_overflow": 2,
-            "pool_timeout": 5,
+            "max_overflow": 8,
+            "pool_timeout": 10,
             "pool_reset_on_return": "commit",
         }
 

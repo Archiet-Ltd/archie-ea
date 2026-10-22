@@ -294,6 +294,18 @@ if os.environ.get("ARCHIE_TEST_POOL", "").strip().lower() == "one":
     from sqlalchemy import event as _sa_event
     from sqlalchemy.pool import Pool as _Pool
 
+    from tests import _pool_hygiene
+
+    _pool_hygiene.track_engines()
+
+    @pytest.fixture(autouse=True, scope="module")
+    def _release_idle_pooled_connections():
+        """Every module-scoped ``create_app`` builds an engine whose one pooled
+        connection would stay open for the whole session; close them when the
+        module ends (see tests/_pool_hygiene.py)."""
+        yield
+        _pool_hygiene.dispose_tracked_engines()
+
     @_sa_event.listens_for(_Pool, "checkout")
     def _record_backend_pid(dbapi_connection, connection_record, connection_proxy):
         try:
@@ -309,7 +321,13 @@ def pytest_sessionfinish(session, exitstatus):
         return
     if getattr(session.config, "workerinput", None) is not None:
         return  # an xdist worker; the controller has no pids to judge
-    if session.config.option.collectonly or session.testscollected == 0:
+    # --collect-only and --setup-plan run no test body, so no connection is ever
+    # checked out; the proof only applies to a session that ran tests.
+    if (
+        session.config.option.collectonly
+        or getattr(session.config.option, "setupplan", False)
+        or session.testscollected == 0
+    ):
         return
     reused = {pid: n for pid, n in _POOL_PIDS.items() if n > 1}
     print(
