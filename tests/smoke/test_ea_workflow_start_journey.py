@@ -114,3 +114,104 @@ def test_arch_review_workflow_start_approve_persists(browser, live_server, seede
         expect(status_badge).to_have_text('Review Complete', timeout=PAGE_TIMEOUT)
     finally:
         page.close()
+
+
+def _modal_is_gone(page):
+    """No part of the start-workflow modal (root, backdrop, panel) is left over the page."""
+    state = page.evaluate(
+        """() => {
+            const root = document.getElementById('startWorkflowModal');
+            const visible = (el) => {
+                const s = getComputedStyle(el);
+                const r = el.getBoundingClientRect();
+                return s.display !== 'none' && s.visibility !== 'hidden' && r.width > 0 && r.height > 0;
+            };
+            const parts = root ? [root, ...root.querySelectorAll('.modal-backdrop, .modal-panel, div')] : [];
+            return {
+                visibleParts: parts.filter(visible).length,
+                bodyLocked: document.body.classList.contains('overflow-hidden'),
+                inertLeft: document.querySelectorAll('[inert]').length,
+            };
+        }"""
+    )
+    return state
+
+
+def test_start_workflow_modal_leaves_page_clickable_after_every_close(browser, live_server, seeded):
+    """A person opens the start-workflow modal, sees the steps of the workflow they
+    chose, closes it (Cancel, Escape, backdrop click, or by starting it) and must be
+    able to click the page underneath again. A backdrop left behind swallows the click."""
+    _ensure_workflow_defaults_seeded()
+
+    page = browser.new_page()
+    problems = []
+    page.on('console', lambda m: problems.append(m.text) if m.type == 'error' else None)
+    page.on('pageerror', lambda e: problems.append(str(e)))
+    try:
+        _login(page, live_server, seeded['emails']['platform_admin'])
+        assert page.goto(live_server + '/ea-workflows', timeout=PAGE_TIMEOUT).status == 200
+
+        modal = page.locator('#startWorkflowModal')
+        card_start = page.locator('[data-scenario-card="ARCH_REVIEW"] button')
+        other_start = page.locator('[data-scenario-card="GAP_REMEDIATION"] button')
+        expect(card_start).to_be_visible(timeout=PAGE_TIMEOUT)
+
+        def open_modal(button, title):
+            button.click(timeout=5000)
+            expect(modal).to_be_visible(timeout=PAGE_TIMEOUT)
+            expect(modal.locator('#startWorkflowTitle')).to_have_text(title)
+            # The right-hand panel shows what will happen for the chosen workflow.
+            expect(modal.get_by_text('What will happen')).to_be_visible()
+            steps = modal.locator('#stepPreviewList > div')
+            expect(steps.first).to_be_visible()
+            assert steps.count() >= 3, 'step preview is not filled for the chosen workflow'
+            expect(modal.locator('#stepPreviewOutputsList span').first).to_be_visible()
+            expect(modal.get_by_role('button', name='Cancel', exact=True)).to_be_visible()
+
+        def assert_closed_and_page_clickable(route):
+            expect(modal).to_be_hidden(timeout=5000)
+            state = _modal_is_gone(page)
+            assert state['visibleParts'] == 0, f'{route}: modal pieces still on screen: {state}'
+            assert not state['bodyLocked'], f'{route}: page scroll still locked: {state}'
+            assert state['inertLeft'] == 0, f'{route}: page still inert: {state}'
+            # The element underneath takes a real click and does its job: it opens
+            # the modal for a different workflow.
+            other_start.click(timeout=5000)
+            expect(modal.locator('#startWorkflowTitle')).not_to_have_text('Architecture Review')
+            expect(modal).to_be_visible(timeout=5000)
+            page.keyboard.press('Escape')
+            expect(modal).to_be_hidden(timeout=5000)
+
+        title = page.evaluate("WORKFLOW_DATA['ARCH_REVIEW'].label")
+
+        # 1. Cancel
+        open_modal(card_start, title)
+        modal.get_by_role('button', name='Cancel', exact=True).click()
+        assert_closed_and_page_clickable('cancel')
+
+        # 2. Escape
+        open_modal(card_start, title)
+        page.keyboard.press('Escape')
+        assert_closed_and_page_clickable('escape')
+
+        # 3. Backdrop click (the dimmed area outside the dialog panel)
+        open_modal(card_start, title)
+        page.mouse.click(5, 5)
+        assert_closed_and_page_clickable('backdrop')
+
+        # 4. Start: the modal gives way to the new instance, with nothing left over it.
+        open_modal(card_start, title)
+        modal.locator('#field_application_id').select_option(str(seeded['ids']['application']))
+        page.locator('#startWorkflowBtn').click()
+        page.wait_for_url('**/ea-workflows/instance/*', timeout=PAGE_TIMEOUT)
+        assert page.locator('#startWorkflowModal').count() == 0 or \
+            not page.locator('#startWorkflowModal').is_visible()
+        page.go_back(timeout=PAGE_TIMEOUT)
+        page.wait_for_load_state('load', timeout=PAGE_TIMEOUT)
+        expect(card_start).to_be_visible(timeout=PAGE_TIMEOUT)
+        card_start.click(timeout=5000)
+        expect(modal).to_be_visible(timeout=5000)
+
+        assert problems == [], f'console errors: {problems}'
+    finally:
+        page.close()
