@@ -286,24 +286,29 @@ class ConversationHistoryService:
         Returns:
             List of ConversationThread objects
         """
-        org_clause = "" if organization_id is None else "AND organization_id = :organization_id"
-        result = db.session.execute(  # tenant-filtered: user_id and organization_id
-            text(
-                f"""
+        params = {"user_id": user_id, "limit": limit, "offset": offset}
+        if organization_id is None:
+            statement = text(
+                """
                 SELECT id, user_id, title, model, created_at, updated_at, message_count
                 FROM conversation_threads
-                WHERE user_id = :user_id {org_clause}
+                WHERE user_id = :user_id
                 ORDER BY updated_at DESC
                 LIMIT :limit OFFSET :offset
-            """  # nosec B608 - fixed fragment, values are bound
-            ),
-            {
-                "user_id": user_id,
-                "limit": limit,
-                "offset": offset,
-                **({} if organization_id is None else {"organization_id": organization_id}),
-            },
-        )
+            """
+            )
+        else:
+            params["organization_id"] = organization_id
+            statement = text(
+                """
+                SELECT id, user_id, title, model, created_at, updated_at, message_count
+                FROM conversation_threads
+                WHERE user_id = :user_id AND organization_id = :organization_id
+                ORDER BY updated_at DESC
+                LIMIT :limit OFFSET :offset
+            """
+            )
+        result = db.session.execute(statement, params)  # tenant-filtered: user_id and organization_id
 
         threads = []
         for row in result:
@@ -510,17 +515,20 @@ def thread_owned_by(thread_id: str, user_id: int, organization_id: Optional[int]
         return False
     if organization_id is None:
         organization_id = current_org_id()
-    org_clause = "" if organization_id is None else " AND organization_id = :organization_id"
     params = {"thread_id": str(thread_id), "user_id": user_id}
-    if organization_id is not None:
-        params["organization_id"] = organization_id
-    row = db.session.execute(  # tenant-filtered: user_id and organization_id
-        text(
+    if organization_id is None:
+        statement = text(
             "SELECT 1 FROM conversation_threads "
-            "WHERE id = :thread_id AND user_id = :user_id" + org_clause + " LIMIT 1"  # nosec B608 - fixed fragment
-        ),
-        params,
-    ).first()
+            "WHERE id = :thread_id AND user_id = :user_id LIMIT 1"
+        )
+    else:
+        params["organization_id"] = organization_id
+        statement = text(
+            "SELECT 1 FROM conversation_threads "
+            "WHERE id = :thread_id AND user_id = :user_id "
+            "AND organization_id = :organization_id LIMIT 1"
+        )
+    row = db.session.execute(statement, params).first()  # tenant-filtered: user_id and organization_id
     return row is not None
 
 
