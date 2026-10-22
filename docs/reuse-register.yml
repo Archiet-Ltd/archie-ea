@@ -664,3 +664,46 @@ entries:
         reason: provides _render_target() for render_template extraction (reused by component_inventory.py)
       - path: scripts/check_macro_kwargs.py
         reason: provides collect_signatures() for macro signatures (reused by component_inventory.py)
+
+  - id: application-kind
+    concept: Whether an element type is an application (Application or ApplicationComponent)
+    status: active
+    canonical:
+      path: app/models/archimate_element_types.py
+      symbols: [is_application_kind, base_type]
+    reuse: >
+      Call archimate_element_types.is_application_kind(element_type). It reads the specialisation table, so
+      an Application counts as an ApplicationComponent everywhere. Do not compare element_type with the
+      literal "ApplicationComponent" (tests/test_no_literal_application_component_checks.py ratchets those
+      comparisons) and do not write a second predicate.
+    must_not_create:
+      - id: application-predicate
+        regex: 'def\s+_?is_(an_)?application(_kind|_component|_like|_element)?\s*\('
+
+  - id: application-kind-types
+    concept: The stored type names that count as an application, for SQL IN filters
+    status: active
+    canonical:
+      path: app/models/archimate_element_types.py
+      symbols: [application_kind_types]
+    reuse: >
+      Use archimate_element_types.application_kind_types() in an IN filter where a Python predicate cannot run.
+      It is derived from SPECIALIZATIONS, so a new specialisation joins every filter. Do not write a second
+      tuple or list of application type names.
+    must_not_create:
+      - id: application-types-helper
+        regex: 'def\s+_?application_(kind_|component_)?types\s*\('
+
+  - id: standard-type-table
+    concept: A table keyed by standard ArchiMate type that a specialisation must also read
+    status: active
+    canonical:
+      path: app/models/archimate_element_types.py
+      symbols: [StandardTypeTable]
+    reuse: >
+      Wrap any dict keyed by standard ArchiMate type (layer, label, model, rule) in StandardTypeTable, so an
+      Application finds its parent entry on get, [] and in. Do not write a second wrapper, or a helper that
+      maps a specialisation to its parent by hand; call base_type for a single lookup.
+    must_not_create:
+      - id: type-table-class
+        regex: 'class\s+\w*TypeTable\s*\('

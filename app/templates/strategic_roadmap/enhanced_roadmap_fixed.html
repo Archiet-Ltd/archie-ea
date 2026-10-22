@@ -16,7 +16,7 @@
     {{ page_shell(title='Strategic Roadmap', breadcrumb=[('Home', '/'), ('Strategic Roadmap', none)], subtitle='Strategic capability evolution and work package planning') }}
 
     <!-- Filters Section -->
-    <div class="bg-card rounded-lg shadow-md p-6 mb-8">
+    <div class="bg-card rounded-lg p-6 mb-8">
         <h2 class="text-xl font-semibold mb-4">Filters</h2>
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <!-- Capability Level Filter -->
@@ -93,26 +93,26 @@
 
     <!-- Statistics Cards -->
     <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-        <div class="bg-card rounded-lg shadow-md p-6">
+        <div class="bg-card rounded-lg p-6">
             <h3 class="text-lg font-semibold text-foreground/80">Total Work Packages</h3>
             <p class="text-3xl font-bold text-primary" x-text="formatStat(statistics.totalWorkPackages)"></p>
         </div>
-        <div class="bg-card rounded-lg shadow-md p-6">
+        <div class="bg-card rounded-lg p-6">
             <h3 class="text-lg font-semibold text-foreground/80">Active Initiatives</h3>
             <p class="text-3xl font-bold text-success" x-text="formatStat(statistics.activeInitiatives)"></p>
         </div>
-        <div class="bg-card rounded-lg shadow-md p-6">
+        <div class="bg-card rounded-lg p-6">
             <h3 class="text-lg font-semibold text-foreground/80">Total Investment</h3>
             <p class="text-2xl font-bold text-primary" x-text="formatStat(statistics.totalInvestment, '$', 'K')"></p>
         </div>
-        <div class="bg-card rounded-lg shadow-md p-6">
+        <div class="bg-card rounded-lg p-6">
             <h3 class="text-lg font-semibold text-foreground/80">Completion Rate</h3>
             <p class="text-3xl font-bold text-warning" x-text="formatStat(statistics.completionRate, '', '%')"></p>
         </div>
     </div>
 
     <!-- Timeline View -->
-    <div class="bg-card rounded-lg shadow-md p-6 mb-8">
+    <div class="bg-card rounded-lg p-6 mb-8">
         <h2 class="text-xl font-semibold mb-4">Timeline View</h2>
         <div id="timeline-container" class="overflow-x-auto">
             <!-- Timeline will be rendered here -->
@@ -120,10 +120,10 @@
     </div>
 
     <!-- Work Packages Table -->
-    <div class="bg-card rounded-lg shadow-md p-6">
+    <div class="bg-card rounded-lg p-6">
         <h2 class="text-xl font-semibold mb-4">Work Packages</h2>
         <div class="overflow-x-auto">
-            <table class="min-w-full divide-y divide-border">
+            <table class="dense-table min-w-full divide-y divide-border">
                 <thead class="bg-muted">
                     <tr>
                         <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Name</th>
@@ -165,20 +165,20 @@
          x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0"
          class="modal-root overflow-y-auto fixed inset-0" hidden>
         <div class="flex items-center justify-center min-h-screen px-4">
-            <div class="modal-root fixed inset-0 bg-background/80" @click="closeWorkPackageModal()" ></div>
+            <div class="modal-root fixed inset-0 bg-overlay/50" @click="closeWorkPackageModal()" ></div>
             <div class="relative bg-card border border-border rounded-lg max-w-2xl w-full p-6">
                 <h3 class="text-lg font-semibold mb-4" x-text="editingWorkPackage ? 'Edit Work Package' : 'Add Work Package'"></h3>
                 <form @submit.prevent="saveWorkPackage()">
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="grid grid-cols-1 gap-4">
                         <div>
-                            <label class="block text-sm font-medium text-foreground/80 mb-1">Name</label>
+                            <label class="block text-sm font-medium text-muted-foreground mb-1">Name</label>
                             <input type="text" x-model="workPackageForm.name" required
-                                   class="w-full p-2 border border-border rounded-md" aria-label="Text field">
+                                   class="h-9 w-full p-2 border border-border rounded-md" aria-label="Text field">
                         </div>
                         <div>
-                            <label class="block text-sm font-medium text-foreground/80 mb-1">Capability</label>
+                            <label class="block text-sm font-medium text-muted-foreground mb-1">Capability</label>
                             <select aria-label="Capability" x-model="workPackageForm.capability_id" required
-                                    class="w-full p-2 border border-border rounded-md">
+                                    class="h-9 w-full p-2 border border-border rounded-md">
                                 <option value="">Select Capability</option>
                                 <template x-for="capability in availableCapabilities" :key="capability.id">
                                     <option :value="capability.id" x-text="capability.name"></option>
@@ -186,19 +186,19 @@
                             </select>
                         </div>
                         <div>
-                            <label class="block text-sm font-medium text-foreground/80 mb-1">Start Date</label>
+                            <label class="block text-sm font-medium text-muted-foreground mb-1">Start Date</label>
                             <input type="date" x-model="workPackageForm.start_date" required
-                                   class="w-full p-2 border border-border rounded-md" aria-label="Date field">
+                                   class="h-9 w-full p-2 border border-border rounded-md" aria-label="Date field">
                         </div>
                         <div>
-                            <label class="block text-sm font-medium text-foreground/80 mb-1">End Date</label>
+                            <label class="block text-sm font-medium text-muted-foreground mb-1">End Date</label>
                             <input type="date" x-model="workPackageForm.end_date" required
-                                   class="w-full p-2 border border-border rounded-md" aria-label="Date field">
+                                   class="h-9 w-full p-2 border border-border rounded-md" aria-label="Date field">
                         </div>
                         <div>
-                            <label class="block text-sm font-medium text-foreground/80 mb-1">Status</label>
+                            <label class="block text-sm font-medium text-muted-foreground mb-1">Status</label>
                             <select aria-label="Status" x-model="workPackageForm.status" required
-                                    class="w-full p-2 border border-border rounded-md">
+                                    class="h-9 w-full p-2 border border-border rounded-md">
                                 <option value="Planned">Planned</option>
                                 <option value="In Progress">In Progress</option>
                                 <option value="Completed">Completed</option>
@@ -207,14 +207,14 @@
                             </select>
                         </div>
                         <div>
-                            <label class="block text-sm font-medium text-foreground/80 mb-1">Investment (K)</label>
+                            <label class="block text-sm font-medium text-muted-foreground mb-1">Investment (K)</label>
                             <input type="number" x-model="workPackageForm.investment_cost" min="0" step="0.1"
-                                   class="w-full p-2 border border-border rounded-md" aria-label="Number field">
+                                   class="h-9 w-full p-2 border border-border rounded-md" aria-label="Number field">
                         </div>
                         <div>
-                            <label class="block text-sm font-medium text-foreground/80 mb-1">Assigned To</label>
+                            <label class="block text-sm font-medium text-muted-foreground mb-1">Assigned To</label>
                             <select aria-label="Assigned to" x-model="workPackageForm.assigned_to"
-                                    class="w-full p-2 border border-border rounded-md">
+                                    class="h-9 w-full p-2 border border-border rounded-md">
                                 <option value="">Unassigned</option>
                                 <template x-for="user in availableUsers" :key="user.id">
                                     <option :value="user.id" x-text="user.email"></option>
@@ -222,9 +222,9 @@
                             </select>
                         </div>
                         <div>
-                            <label class="block text-sm font-medium text-foreground/80 mb-1">Strategic Importance</label>
+                            <label class="block text-sm font-medium text-muted-foreground mb-1">Strategic Importance</label>
                             <select aria-label="Strategic importance" x-model="workPackageForm.strategic_importance"
-                                    class="w-full p-2 border border-border rounded-md">
+                                    class="h-9 w-full p-2 border border-border rounded-md">
                                 <option value="">Not Set</option>
                                 <option value="High">High</option>
                                 <option value="Medium">Medium</option>
@@ -233,13 +233,13 @@
                         </div>
                     </div>
                     <div class="mt-4">
-                        <label class="block text-sm font-medium text-foreground/80 mb-1">Description</label>
+                        <label class="block text-sm font-medium text-muted-foreground mb-1">Description</label>
                         <textarea aria-label="Description" x-model="workPackageForm.description" rows="3"
                                   class="w-full p-2 border border-border rounded-md"></textarea>
                     </div>
                     <div class="mt-6 flex justify-end space-x-4">
                         <button type="button" @click="closeWorkPackageModal()"
-                                class="bg-secondary text-secondary-foreground px-4 py-2 rounded-md hover:bg-secondary/80 transition-colors" aria-label="Close">
+                                class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Close">
                             Cancel
                         </button>
                         <button type="submit"

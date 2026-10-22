@@ -29,7 +29,7 @@
             </label>
             {% if field.type == 'select' %}
             <select id="{{ field.id }}" name="{{ field.name }}"
-                class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                 {% for opt_val, opt_label in field.get('options', []) %}
                 <option value="{{ opt_val }}" {% if opt_val == field.value %}selected{% endif %}>{{ opt_label }}</option>
                 {% endfor %}
@@ -39,10 +39,10 @@
                 class="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm resize-vertical focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">{{ field.value or '' }}</textarea>
             {% elif field.type == 'number' %}
             <input type="number" id="{{ field.id }}" name="{{ field.name }}" value="{{ field.value or '' }}"
-                class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
             {% else %}
             <input type="text" id="{{ field.id }}" name="{{ field.name }}" value="{{ field.value or '' }}"
-                class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
             {% endif %}
         </div>
         {% endif %}

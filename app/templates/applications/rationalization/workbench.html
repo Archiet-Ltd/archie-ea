@@ -23,7 +23,7 @@
     {% include 'applications/rationalization/_sub_nav.html' %}
 
     {# ── Filter Bar ───────────────────────────────────────────────── #}
-    <div class="rounded-xl border bg-card p-4 mb-6">
+    <div class="rounded-lg border border-border bg-card p-4 mb-6">
         <div class="flex flex-wrap gap-3">
             <div class="flex-1 min-w-[200px]">
                 <input type="text" placeholder="Search applications..."
@@ -119,7 +119,7 @@
     </div>
 
     {# ── Results Table ────────────────────────────────────────────── #}
-    <div class="rounded-xl border bg-card overflow-hidden mb-8">
+    <div class="rounded-lg border border-border bg-card overflow-hidden mb-8">
         {# Loading skeleton #}
         <template x-if="loading">
             <div class="p-6 space-y-4 animate-pulse">
@@ -152,7 +152,7 @@
         {# Data table #}
         <template x-if="!loading && !error && results.length > 0">
             <div>
-                <table class="w-full text-sm">
+                <table class="dense-table w-full text-sm">
                     <thead class="bg-muted/50">
                         <tr>
                             <th class="px-4 py-3 text-left w-8">
@@ -248,7 +248,7 @@
 
         {# Dimension comparison table #}
         <div class="overflow-x-auto">
-            <table class="w-full text-xs">
+            <table class="dense-table w-full text-xs">
                 <thead class="bg-muted/50">
                     <tr>
                         <th class="px-3 py-2 text-left font-medium text-muted-foreground">Dimension</th>
@@ -278,7 +278,7 @@
     </div>
 
     {# ── Disposition Taxonomy (collapsible) ───────────────────────── #}
-    <div x-data="dispositionTaxonomyPanel()" class="rounded-xl border bg-card mb-8">
+    <div x-data="dispositionTaxonomyPanel()" class="rounded-lg border border-border bg-card mb-8">
         <button type="button" @click="open = !open"
                 class="w-full flex items-center justify-between p-4 text-left">
             <span class="text-sm font-semibold text-foreground">What do the 7R dispositions mean?</span>
@@ -312,9 +312,9 @@
          class="fixed inset-0 z-50" @keydown.escape.window="breakdownOpen = false"
          role="dialog" aria-modal="true">
         {# Backdrop #}
-        <div class="absolute inset-0 bg-black/30" @click="breakdownOpen = false"></div>
+        <div class="absolute inset-0 bg-overlay/50" @click="breakdownOpen = false"></div>
         {# Panel #}
-        <div class="absolute right-0 top-0 bottom-0 w-full max-w-md bg-card border-l border-border shadow-xl overflow-y-auto"
+        <div class="absolute right-0 top-0 bottom-0 w-full max-w-md bg-card border-l border-border overflow-y-auto border"
              x-transition:enter="transition ease-out duration-200"
              x-transition:enter-start="translate-x-full" x-transition:enter-end="translate-x-0"
              x-transition:leave="transition ease-in duration-150"
@@ -323,7 +323,7 @@
                 <div class="flex items-center justify-between mb-4">
                     <h3 class="text-base font-semibold text-foreground" x-text="breakdownAppName || 'Score Breakdown'"></h3>
                     <button type="button" @click="breakdownOpen = false"
-                            class="p-1 rounded-md hover:bg-muted" aria-label="Close breakdown">
+                            class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Close breakdown">
                         <i data-lucide="x" class="h-4 w-4 text-muted-foreground"></i>
                     </button>
                 </div>

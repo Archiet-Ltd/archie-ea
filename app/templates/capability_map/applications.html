@@ -38,8 +38,8 @@
          aria-label="Filter applications..."/>
     </div>
 
-    <div data-slot="card" class="rounded-xl border bg-card shadow-sm">
-        <table class="w-full text-sm" id="apps-table">
+    <div data-slot="card" class="rounded-lg border border-border bg-card">
+        <table class="dense-table w-full text-sm" id="apps-table">
             <thead>
                 <tr class="border-b border-border">
                     <th class="px-6 py-3 text-left font-medium text-muted-foreground">Application</th>
@@ -61,7 +61,7 @@
                         {% elif s == 'retired' or s == 'decommissioned' %}
                         <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-destructive/10 text-destructive-emphasis border border-destructive/30">{{ s|title }}</span>
                         {% elif s == 'planned' %}
-                        <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-primary border border-primary/30">Planned</span>
+                        <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-info-emphasis border border-primary/30">Planned</span>
                         {% else %}
                         <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-muted text-muted-foreground border border-border">{{ s|title }}</span>
                         {% endif %}

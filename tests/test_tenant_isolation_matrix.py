@@ -435,7 +435,6 @@ KNOWN_LEAKS = {
     # PR 421 (one work package store) scoped the deliverable update and delete
     # through the organisation's own work packages; test_known_leak_is_still_open
     # went XPASS(strict) on both, so their entries come out.
-    "DELETE /capability-map/api/archimate-mappings/<int:mapping_id>": "capability store brief",
 }
 
 # Parameters whose record the codebase reading no longer finds, because the lookup moved

@@ -8,7 +8,7 @@
     <!-- Header -->
     {% macro _ps_actions() %}
 <button type="button" @click="createOpen = true"
-                class="inline-flex items-center gap-2 rounded-md bg-primary text-primary-foreground px-4 py-2 text-sm font-medium hover:bg-primary/90 transition-colors">
+                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
             <i data-lucide="plus" class="h-4 w-4"></i>
             New System Boundary
         </button>
@@ -17,12 +17,12 @@
 
     <!-- Success / Error banners -->
     <div x-show="successMsg" x-cloak x-transition
-         class="mb-4 flex items-start gap-3 rounded-lg border border-success/30 bg-success/10 px-4 py-3 text-sm text-success-emphasis">
+         class="mb-4 flex items-start gap-3 rounded-md border border-success/40 bg-success/10 px-4 py-2 text-sm text-success-emphasis">
         <i data-lucide="check-circle-2" class="h-4 w-4 mt-0.5 shrink-0"></i>
         <span x-text="successMsg"></span>
     </div>
     <template x-for="(err, i) in errors" :key="i">
-        <div x-transition class="mb-2 flex items-start gap-3 rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive-emphasis">
+        <div x-transition class="mb-2 flex items-start gap-3 rounded-md border border-destructive/40 bg-destructive/10 px-4 py-2 text-sm text-destructive-emphasis">
             <i data-lucide="x-circle" class="h-4 w-4 mt-0.5 shrink-0"></i>
             <span x-text="err"></span>
         </div>
@@ -30,14 +30,14 @@
 
     <!-- Empty state -->
     <div x-show="boundaries.length === 0 && !loading" x-cloak
-         class="rounded-xl border border-border bg-card p-12 text-center">
+         class="rounded-lg border border-border bg-card p-12 text-center">
         <i data-lucide="layers" class="h-10 w-10 text-muted-foreground mx-auto mb-4"></i>
         <h3 class="text-base font-semibold text-foreground mb-1">No system boundaries yet</h3>  <!-- frontend-quality-ok -->
         <p class="text-sm text-muted-foreground mb-4">
             Create a boundary, add 2+ solutions, then generate docker-compose and inter-service contracts.
         </p>
         <button type="button" @click="createOpen = true"
-                class="inline-flex items-center gap-2 rounded-md bg-primary text-primary-foreground px-4 py-2 text-sm font-medium hover:bg-primary/90 transition-colors">
+                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
             <i data-lucide="plus" class="h-4 w-4"></i>
             Create First Boundary
         </button>
@@ -46,7 +46,7 @@
     <!-- Boundaries list -->
     <div class="space-y-4">
         <template x-for="b in boundaries" :key="b.id">
-            <div class="rounded-xl border border-border bg-card overflow-hidden">
+            <div class="rounded-lg border border-border bg-card overflow-hidden">
                 <!-- Boundary header -->
                 <div class="flex items-center justify-between px-5 py-4 border-b border-border">
                     <div class="flex items-center gap-3">
@@ -64,7 +64,7 @@
                             <i data-lucide="check" class="h-3 w-3"></i> Generated
                         </span>
                         <button type="button" @click="generateArtifacts(b.id)"
-                                class="inline-flex items-center gap-1.5 rounded-md bg-primary text-primary-foreground px-3 py-1.5 text-xs font-medium hover:bg-primary/90 transition-colors"
+                                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center"
                                 :disabled="(b.solution_count || 0) < 2"
                                 :class="(b.solution_count || 0) < 2 ? 'opacity-50 cursor-not-allowed' : ''">
                             <i data-lucide="play" class="h-3 w-3"></i>
@@ -127,7 +127,7 @@
                         </select>
                         <button type="button" @click="addSolution(b.id)"
                                 :disabled="!addSolutionId"
-                                class="inline-flex items-center gap-1 rounded-md bg-primary text-primary-foreground px-3 py-1.5 text-sm font-medium disabled:opacity-50 hover:bg-primary/90 transition-colors">
+                                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                             Add
                         </button>
                         <button aria-label="Cancel adding solution" type="button" @click="addSolutionOpen = null; addSolutionId = ''"
@@ -138,7 +138,7 @@
                 </div>
 
                 <!-- Generated artifacts preview -->
-                <div x-show="b.has_artifacts" x-cloak class="border-t border-border px-5 py-3 bg-muted/5">
+                <div x-show="b.has_artifacts" x-cloak class="border border-t border-border px-5 py-2 bg-muted/5">
                     <div class="flex items-center justify-between">
                         <span class="text-xs text-muted-foreground">
                             Generated <span x-text="b.generated_at ? new Date(b.generated_at).toLocaleString() : ''"></span>
@@ -156,9 +156,9 @@
 
     <!-- Create boundary modal -->
     <div x-show="createOpen" x-cloak x-transition.opacity
-         class="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+         class="fixed inset-0 z-50 flex items-center justify-center bg-overlay/50">
         <div @click.away="createOpen = false"
-             class="w-full max-w-md rounded-xl border border-border bg-card shadow-xl p-6">
+             class="w-full max-w-md rounded-lg border border-border bg-card p-6">
             <h2 class="text-base font-semibold text-foreground mb-4">New System Boundary</h2>
             <div class="space-y-3">
                 <div>
@@ -180,7 +180,7 @@
                     Cancel
                 </button>
                 <button type="button" @click="createBoundary()" :disabled="!newName.trim() || creating"
-                        class="inline-flex items-center gap-2 rounded-md bg-primary text-primary-foreground px-4 py-2 text-sm font-medium disabled:opacity-50 hover:bg-primary/90 transition-colors">
+                        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                     <svg x-show="creating" x-cloak class="h-3.5 w-3.5 animate-spin" viewBox="0 0 24 24" fill="none">
                         <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
                         <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
@@ -193,13 +193,13 @@
 
     <!-- Artifacts viewer modal -->
     <div x-show="artifactsBoundary" x-cloak x-transition.opacity
-         class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+         class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-overlay/50">
         <div @click.away="artifactsBoundary = null"
-             class="w-full max-w-4xl max-h-[90vh] rounded-xl border border-border bg-card shadow-xl flex flex-col">
+             class="w-full max-w-4xl max-h-[90vh] rounded-lg border border-border bg-card flex flex-col">
             <!-- Modal header -->
             <div class="flex items-center justify-between px-5 py-4 border-b border-border shrink-0">
                 <h2 class="text-base font-semibold text-foreground" x-text="artifactsBoundary ? artifactsBoundary.name + ' — Artifacts' : ''"></h2>
-                <button aria-label="Close artifacts panel" type="button" @click="artifactsBoundary = null" class="text-muted-foreground hover:text-foreground">
+                <button aria-label="Close artifacts panel" type="button" @click="artifactsBoundary = null" class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                     <i data-lucide="x" class="h-4 w-4"></i>
                 </button>
             </div>
@@ -262,7 +262,7 @@
                     </div>
                     <div class="space-y-2">
                         <template x-for="(c, i) in (artifactsBoundary && artifactsBoundary.generated_artifacts ? artifactsBoundary.generated_artifacts.contracts : [])" :key="i">
-                            <div class="rounded-lg border border-border bg-muted/10 px-4 py-3">
+                            <div class="rounded-md border border-border bg-muted/10 px-4 py-2">
                                 <div class="flex items-center gap-2 mb-1">
                                     <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-info/10 text-info border border-info/20"
                                           x-text="c.method"></span>
