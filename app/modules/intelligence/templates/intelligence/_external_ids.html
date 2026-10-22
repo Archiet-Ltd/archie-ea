@@ -1,10 +1,11 @@
-<div class="border rounded-lg p-5 space-y-3">
-    <h2 class="text-sm font-semibold uppercase tracking-wide text-muted-foreground">External identifiers</h2>
+{# Sits inside the element page's Record card: a sub-section, not a card of its own. #}
+<div class="space-y-3 border-t border-border pt-4" data-testid="external-identifiers">
+    <h3 class="text-xs font-semibold uppercase tracking-[0.06em] text-muted-foreground">External identifiers</h3>
     {% if external_links %}
     <div class="space-y-3">
         {% for link in external_links %}
         <div class="rounded-md border border-border bg-muted/20 px-3 py-2">
-            <dl class="grid grid-cols-1 gap-2 text-sm sm:grid-cols-2 lg:grid-cols-4">
+            <dl class="grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
                 <div>
                     <dt class="text-muted-foreground">Source system</dt>
                     <dd class="mt-0.5 font-medium">{{ link.source_system }}</dd>
@@ -26,6 +27,6 @@
         {% endfor %}
     </div>
     {% else %}
-    <p class="text-sm text-muted-foreground">No external identifiers have been linked to this element.</p>
+    <p class="text-sm text-muted-foreground">Nothing is linked yet. Link a Jira or GitHub item to trace where this element came from.</p>
     {% endif %}
 </div>
