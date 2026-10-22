@@ -64,17 +64,30 @@ def test_demo_organisation_is_linked_end_to_end(live_server, browser):
     for title, apps in risk_links.items():
         row = rows.filter(has_text=title)
         expect(row).to_have_count(1)
-        touches = row.locator("p", has_text=re.compile(r"Linked to|Touches:"))
-        expect(touches.first).to_be_visible()
-        listed = touches.first.locator("a").all_inner_texts()
-        for app_name in apps:
-            assert app_name in listed, (title, app_name, listed)
+        expect(row.locator("[data-risk-touches]")).to_be_visible()
+        # What the risk is linked to: exactly the applications the seed linked.
+        linked = row.locator("[data-risk-linked]")
+        assert sorted(linked.locator("a").all_inner_texts()) == sorted(apps), (title, linked.inner_text())
         assert 1 <= len(apps) <= 3
+        # What it reaches: the number said once agrees with the reason line, and
+        # with the named elements when all of them are named.
+        reached = row.locator("[data-risk-reached]")
+        if reached.count():
+            shown = int(reached.locator(".tabular-nums").inner_text())
+            reason = row.locator("[data-risk-reason]").inner_text().lower()
+            # The ranking line either says the same number or, when the named
+            # elements do not add up to it, leaves the number to the row.
+            assert ("reaches %d elements" % shown in reason
+                    or "by how far it reaches" in reason), (title, shown, reason)
+            named = reached.locator("a").all_inner_texts()
+            if "including" in reached.inner_text():
+                assert shown > len(named)
+            else:
+                assert shown == len(named), (title, shown, named)
     unlinked = rows.filter(has_text=UNLINKED)
     expect(unlinked.locator("[data-risk-unlinked]")).to_contain_text(
         "Not linked to any application, solution or programme yet")
-    expect(unlinked).not_to_contain_text("Touches:")
-    expect(unlinked).not_to_contain_text("Linked to")
+    expect(unlinked.locator("[data-risk-touches]")).to_have_count(0)
 
     # 2. A link lands on the application, which shows an owner, a cost, and the risk back.
     title = "Calibration Ledger data corruption"
