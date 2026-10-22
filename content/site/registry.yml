@@ -142,7 +142,7 @@ solutions:
 # one links to its place on the /roles hub, which lists all of them.
 roles:
   label: Roles
-  all_link: {label: All 46 roles, href: /roles}
+  all_link: {label: All 47 roles, href: /roles}
   shown_per_family: 6
   families:
     - id: executives
@@ -162,16 +162,17 @@ roles:
       roles:
         - {label: Startup Founder}
         - {label: Business Owner}
-        - {label: Scale-up CTO}
+        - {label: Scale-up CTO, href: /roles/scale-up-cto-and-vp-engineering}
     - id: architecture
       label: Architecture
       roles:
+        - {label: Chief Architect, href: /roles/chief-architects}
         - {label: Enterprise Architect, href: /roles/enterprise-architects}
         - {label: Solution Architect, href: /roles/solution-architects}
-        - {label: Business Architect}
+        - {label: Business Architect, href: /roles/business-architects}
+        - {label: Security Architect, href: /roles/security-architects}
+        - {label: Data Architect, href: /roles/data-architects}
         - {label: Technology Architect}
-        - {label: Security Architect}
-        - {label: Data Architect}
         - {label: AI Architect}
         - {label: Application Architect}
         - {label: Integration Architect}

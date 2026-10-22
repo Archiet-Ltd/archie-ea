@@ -104,6 +104,15 @@ def _role_capture(slug: str, role: str) -> tuple[str, str, str, str, str]:
     )
 
 
+# The screen each role page's hero shows, named in the browser frame (Ask unless listed).
+ROLE_FRAME_LABELS = {
+    "business-architects": "Capability maturity",
+    "security-architects": "Risk register",
+    "data-architects": "Data lineage",
+    "chief-architects": "Capability health",
+    "scale-up-cto-and-vp-engineering": "Import applications",
+}
+
 ROLE_CAPTURES: list[tuple[str, str, str, str, str]] = [
     _role_capture("enterprise-architects", "enterprise architect"),
     _role_capture("cto-and-cio", "CTO or CIO"),
@@ -114,6 +123,12 @@ ROLE_CAPTURES: list[tuple[str, str, str, str, str]] = [
     ("business-architects", "/capability-maturity/heatmap", DEMO_PERSONA,
      "The capability maturity heat map as a business architect sees it: current against target maturity for each capability, the gap and the date it was assessed.",
      "Screenshot of the capability maturity heat map signed in as a business architect, listing capabilities with current and target maturity, the gap and the assessment date."),
+    ("chief-architects", "/strategic/capability-health", DEMO_PERSONA,
+     "The capability health dashboard as a chief architect sees it: average portfolio health, critical capabilities, at-risk hotspots and the domain health index.",
+     "Screenshot of the capability health dashboard signed in as a chief architect, with portfolio health, critical capabilities, at-risk hotspots and a domain health index with a status chart."),
+    ("scale-up-cto-and-vp-engineering", "/applications/import", DEMO_PERSONA,
+     "The application import as a scale-up CTO sees it: a spreadsheet chosen, its first rows previewed and each column matched to an application field.",
+     "Screenshot of the Import Applications dialog with the Upload File tab open, a template download link, merge or duplicate handling and a preview of the first rows of an application spreadsheet."),
     ("security-architects", "/risks/", DEMO_PERSONA,
      "The risk register as a security architect sees it: the top risks ranked by how many elements each reaches, with the elements it touches.",
      "Screenshot of the risk register signed in as a security architect, with the top risks ranked by the number of elements each reaches."),
@@ -553,7 +568,94 @@ TWO_X_MODULE_IMAGES = frozenset({"applications", "arb"})
 TWO_X_ROLE_IMAGES = frozenset({
     "enterprise-architects", "cto-and-cio", "it-portfolio-managers", "solution-architects",
     "business-architects", "security-architects", "data-architects",
+    "chief-architects", "scale-up-cto-and-vp-engineering",
 })
+
+
+# More real screens for each role page, from the captures already committed for the
+# product's own pages (app/static/img/modules). Each role page shows its own hero screen
+# plus these, so a visitor sees the role's job on more than one screen. Entry:
+# (image file under static/img, density, frame label, caption, alt text).
+ROLE_MORE_SCREENS: dict[str, list[tuple[str, int, str, str, str]]] = {
+    "enterprise-architects": [
+        ("modules/arb.webp", 2, "Architecture Review Board",
+         "The review board dashboard: reviews, how many are pending, the approval rate and the average cycle time.",
+         "Screenshot of the Architecture Review Board with total reviews, pending reviews, approval rate and cycle time above a chart of review status."),
+        ("modules/architecture-model.webp", 1, "Architecture model",
+         "The architecture model: every ArchiMate element in a layer, counted and filterable.",
+         "Screenshot of the architecture model for one ArchiMate layer, with element counts, filters and a table of elements and their relationships."),
+    ],
+    "solution-architects": [
+        ("modules/solutions.webp", 1, "Solutions",
+         "The solutions list: each design with its phase, readiness and next action.",
+         "Screenshot of the All Solutions screen with counts of solutions by readiness and a list of solutions with phase, maturity and next action."),
+        ("modules/arb.webp", 2, "Architecture Review Board",
+         "The review board dashboard a design goes to for a decision.",
+         "Screenshot of the Architecture Review Board with total reviews, pending reviews, approval rate and cycle time above a chart of review status."),
+    ],
+    "cto-and-cio": [
+        ("modules/portfolio.webp", 1, "Portfolio",
+         "The portfolio: initiatives with approved budget, spend to date, health and sponsor.",
+         "Screenshot of the portfolio screen with initiative, budget and spend totals above a table of initiatives with phase, budget, spend, variance and sponsor."),
+        ("modules/business-case.webp", 1, "Business cases",
+         "Business cases: options, costs and expected return for each investment.",
+         "Screenshot of the Business Cases list with each case's status, total cost of ownership, return on investment and last update."),
+    ],
+    "it-portfolio-managers": [
+        ("modules/duplicate-detection.webp", 1, "Duplicate detection",
+         "Duplicate detection: groups of applications that do the same job, with the estimated saving.",
+         "Screenshot of the Duplicate Detection screen with duplicate groups, estimated annual saving and priority counts above a filterable list of groups."),
+        ("modules/applications.webp", 2, "Applications",
+         "The application portfolio: lifecycle, owner and capability for every application.",
+         "Screenshot of the Applications screen with active portfolio counts, a data quality notice and a table of applications with type, lifecycle status and capability."),
+    ],
+    "chief-architects": [
+        ("modules/arb.webp", 2, "Architecture Review Board",
+         "The review board dashboard: total reviews, pending reviews, approval rate and cycle time.",
+         "Screenshot of the Architecture Review Board with total reviews, pending reviews, approval rate and cycle time above a chart of review status."),
+    ],
+    "scale-up-cto-and-vp-engineering": [
+        ("modules/applications.webp", 2, "Applications",
+         "The portfolio the import fills, with how many applications have a named owner and a vendor.",
+         "Screenshot of the Applications screen with active portfolio counts, a data quality notice about owners and a table of applications with lifecycle status."),
+    ],
+    "business-architects": [
+        ("modules/projects.webp", 1, "Work packages",
+         "Work packages: the changes that close a gap, with status, priority and progress.",
+         "Screenshot of the Work Packages screen with a table of packages showing status, priority, a progress bar and due date."),
+    ],
+    "security-architects": [
+        ("modules/compliance-frameworks.webp", 1, "Regulatory compliance",
+         "Regulatory compliance: the frameworks in scope and the controls mapped to each.",
+         "Screenshot of the Regulatory Compliance screen with active frameworks and controls counts above a table of frameworks with jurisdiction and enforcement."),
+    ],
+    "data-architects": [
+        ("modules/architecture-model.webp", 1, "Architecture model",
+         "The architecture model: elements by layer, including the data objects lineage is recorded between.",
+         "Screenshot of the architecture model for one ArchiMate layer, with element counts, filters and a table of elements and their relationships."),
+    ],
+}
+
+
+def get_role_more_screens(page: "PublicPage") -> list[dict[str, Any]]:
+    """The extra real screens a role page shows below its hero (ROLE_MORE_SCREENS).
+
+    Only files that exist on disk are returned, so a missing capture can never ship a
+    broken <img>."""
+    if page.page_family != "role" or page.front_matter.get("capture_status") != "live":
+        return []
+    from PIL import Image
+
+    out = []
+    for rel, density, label, caption, alt in ROLE_MORE_SCREENS.get(page.slug, []):
+        path = STATIC_ROOT / "img" / rel
+        if not path.is_file():
+            continue
+        with Image.open(path) as im:
+            width, height = im.size[0] // density, im.size[1] // density
+        out.append({"url": f"/static/img/{rel}", "width": width, "height": height,
+                    "frame_label": f"{label} \u00b7 Demonstration company", "caption": caption, "alt": alt})
+    return out
 
 
 def _screenshot_density(slug: str, page_family: str) -> int:
@@ -625,6 +727,8 @@ def get_page_screenshot(page: "PublicPage") -> dict[str, Any] | None:
         "mobile": mobile,
         "alt": alt,
         "caption": caption,
+        "frame_label": f"{ROLE_FRAME_LABELS.get(page.slug, 'Ask')} \u00b7 Demonstration company"
+        if page.page_family == "role" else None,
     }
 
 

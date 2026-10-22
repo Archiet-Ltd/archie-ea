@@ -1,8 +1,8 @@
 ---
 page_family: role
 role_group: architecture
-state: held
-capture_status: awaiting_capture
+state: on_main
+capture_status: live
 cta: plans
 description: "Chief architect software from Entelim: architecture health, review board throughput, traceability and the technology radar in one model. Start free, see pricing today."
 source: app/utils/role_access.py (ROLE_ENTERPRISE_ARCHITECT, SIDEBAR_ZONES, _MY_WORK_LINKS),

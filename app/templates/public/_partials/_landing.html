@@ -35,7 +35,7 @@
     'mobile_url': screenshot.mobile.url if screenshot.mobile else none,
     'mobile_width': screenshot.mobile.width if screenshot.mobile else none,
     'mobile_height': screenshot.mobile.height if screenshot.mobile else none,
-    'frame_label': 'Ask · Demonstration company',
+    'frame_label': screenshot.frame_label or 'Ask · Demonstration company',
     'alt': screenshot.alt, 'caption': screenshot.caption,
   },
 } %}
@@ -59,6 +59,27 @@
 {% endif %}
 
 <div class="landing-bands">
+  {% if page.family == 'role' and more_screens %}
+  <section class="landing-band" aria-labelledby="role-more-screens-heading" data-testid="role-more-screens">
+    <div class="public-container">
+      <div class="public-page-content prose max-w-none"><h2 id="role-more-screens-heading">More of the product, as you would use it</h2></div>
+      <div class="mt-8 grid gap-8 {% if more_screens | length > 1 %}lg:grid-cols-2{% else %}lg:grid-cols-1{% endif %}">
+        {% for shot in more_screens %}
+        <figure class="home-hero__figure" data-testid="role-more-screens-figure">
+          <div class="home-frame">
+            <div class="home-frame__bar" aria-hidden="true">
+              <span class="home-frame__dot"></span><span class="home-frame__dot"></span><span class="home-frame__dot"></span>
+              <span class="home-frame__url">{{ shot.frame_label }}</span>
+            </div>
+            <img src="{{ shot.url }}" alt="{{ shot.alt }}" width="{{ shot.width }}" height="{{ shot.height }}" loading="lazy" decoding="async" class="home-frame__img">
+          </div>
+          <figcaption class="public-card-body mt-3 text-center">{{ shot.caption }}</figcaption>
+        </figure>
+        {% endfor %}
+      </div>
+    </div>
+  </section>
+  {% endif %}
   {# A use-case page's figure (if any) renders inside its "What Entelim answers" band below
      instead of here -- see the section loop's figure_band branch -- but only when that band
      actually exists. A use-case page with no "What Entelim answers" heading (e.g. one whose
@@ -161,7 +182,7 @@
     <p class="mx-auto max-w-3xl text-3xl font-semibold tracking-tight text-balance text-foreground md:text-5xl">Import your model and get a free, cited answer to what breaks if a system fails, in minutes.</p>
     <div class="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
       <a href="{{ primary_url }}" class="public-btn public-btn--primary">{{ primary_label }}</a>
-      <a href="/contact" class="public-btn public-btn--outline">Get in touch</a>
+      <a href="/contact" class="public-btn public-btn--outline">{{ 'Talk to us' if page.family == 'role' else 'Get in touch' }}</a>
     </div>
   </div>
 </section>

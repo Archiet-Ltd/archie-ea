@@ -2597,7 +2597,9 @@ def test_every_role_page_links_every_sibling(app):
         for url in role_urls:
             html = client.get(url).data.decode()
             assert "<h2>Other roles</h2>" in html
-            links = _hrefs(html)
+            # The strip only: the site navbar and footer link every role page, this page included.
+            strip = html[html.index('aria-label="Other roles"'):]
+            links = _hrefs(strip[: strip.index("</section>")])
             for other in role_urls:
                 assert (other in links) == (other != url), f"{url} vs {other}"
             for _, targets in ROLE_HUB_EXTRA_ENTRIES:

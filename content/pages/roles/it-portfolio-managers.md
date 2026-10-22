@@ -55,7 +55,7 @@ spreadsheet nobody fully trusts.
 
 1. Bring the inventory in. Add applications by hand, import a CSV or Excel spreadsheet, or bring in an
    existing ArchiMate model. Entelim also reads configuration items from a connected ServiceNow CMDB
-   straight into the same inventory — see [ServiceNow](/connectors/servicenow).
+   straight into the same inventory — see [the connectors](/connectors).
 2. Run duplicate detection and score the portfolio. Every application gets a 0 to 100 health score and
    a TIME recommendation, plotted on a TIME quadrant against the whole estate.
 3. Work the Workbench. Open an application's planning page, read its score breakdown and retirement
@@ -76,8 +76,7 @@ it. The whole portfolio as a CSV, Excel or executive summary export for the budg
 
 ## Works with
 
-A CSV, Excel or ArchiMate import puts the whole estate on one list from day one. From there, [connect
-ServiceNow](/connectors/servicenow) to pull configuration items from its CMDB into the same inventory,
+A CSV, Excel or ArchiMate import puts the whole estate on one list from day one. From there, use a [connector](/connectors) to pull configuration items from a ServiceNow CMDB into the same inventory,
 so the applications ServiceNow already knows about arrive with a record ready for an owner, a cost and
 a risk rating.
 

@@ -142,10 +142,10 @@ def test_every_blurb_is_one_short_line_and_every_icon_is_from_the_closed_list():
         assert item["icon"] in allowed, f"{item['label']}: icon {item['icon']!r} is not in public_icons"
 
 
-def test_the_roles_menu_lists_46_roles_in_eight_families(app):
+def test_the_roles_menu_lists_47_roles_in_eight_families(app):
     with app.test_request_context("/"):
         reg = site_registry()
-    assert reg["roles"]["count"] == 46
+    assert reg["roles"]["count"] == 47
     assert [f["label"] for f in reg["roles"]["families"]] == [
         "Executives", "Startups and scale-ups", "Architecture", "Portfolio, programmes and product",
         "IT operations", "Risk, compliance and data", "Finance, sourcing and people", "Consultancies",
@@ -203,7 +203,7 @@ def test_roles_hub_lists_every_role_and_every_menu_role_link_lands_on_it(app):
     with app.test_client() as client:
         html = client.get("/roles").data.decode()
         raw = raw_registry()
-        assert "All 46 roles" in html
+        assert "All 47 roles" in html
         for family in raw["roles"]["families"]:
             assert f'id="{family["id"]}"' in html, f"roles hub has no place for {family['label']}"
             for role in family["roles"]:

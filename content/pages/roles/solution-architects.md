@@ -38,7 +38,6 @@ diagram and a decision log kept in two places that quietly drift apart.
 
 - [What does this design touch?](/modules/digital-twin)
 - [Has the review board approved it, and with which conditions?](/use-cases/architecture-review-board)
-- [Which interfaces change?](/modules/interface-register)
 
 ## The screens you will use
 
@@ -58,7 +57,7 @@ diagram and a decision log kept in two places that quietly drift apart.
   budget](/use-cases/programme-tracking) within [Portfolio](/modules/portfolio).
 - **Interface Register**, recording each interface's type, protocol, criticality and status against
   the roadmap initiative it belongs to, and flagging the gaps between one initiative's interfaces and
-  the next — see [Interface Register](/modules/interface-register).
+  the next — see the Interface Register screen.
 - **AI Chat**, carrying the same questions into a conversation instead of a search through the model —
   see [AI Chat](/modules/ai-chat).
 
@@ -88,9 +87,9 @@ person who asks what changed gets the real answer.
 ## Works with
 
 An imported Archi or Open Exchange model puts a design on the same model your enterprise architects
-use from day one. From there, [connect Jira](/connectors/jira) to carry a design's work into the
-tracker your delivery team already uses, and [connect Microsoft 365 and
-Teams](/connectors/microsoft-365-and-teams) to send a design's exported blueprint to SharePoint and
+use from day one. From there, connect Jira (see [the connectors](/connectors)) to carry a design's work into the
+tracker your delivery team already uses, and connect Microsoft 365 and
+Teams to send a design's exported blueprint to SharePoint and
 post the decision to a Teams channel as soon as the review board approves it.
 
 ## Limits

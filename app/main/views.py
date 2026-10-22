@@ -831,6 +831,7 @@ def public_role(slug):
         get_page_screenshot,
         load_page,
         role_siblings,
+        get_role_more_screens,
     )
 
     merge_target = MERGED_PAGES.get(f"/roles/{slug}")
@@ -844,6 +845,7 @@ def public_role(slug):
     return render_template(
         "public/page.html", page=page, jsonld=build_jsonld(page),
         screenshot=get_page_screenshot(page), siblings=role_siblings(page),
+        more_screens=get_role_more_screens(page),
         landing=build_landing(page),
     )
 

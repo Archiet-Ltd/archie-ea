@@ -1,8 +1,8 @@
 ---
 page_family: role
 role_group: technology-leadership
-state: held
-capture_status: awaiting_capture
+state: on_main
+capture_status: live
 cta: plans
 description: "Entelim for scale-up CTOs and VPs of Engineering: import your application spreadsheet, record who owns what, and ask what breaks if a system fails. Start free."
 source: app/modules/applications/routes/import_export_routes.py (application_import, preview-excel),
