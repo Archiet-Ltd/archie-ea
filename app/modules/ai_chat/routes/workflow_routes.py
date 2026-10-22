@@ -14,6 +14,7 @@ import logging
 from flask import current_app, jsonify, request
 from flask_login import current_user, login_required
 
+from app.core.auth.decorators import require_permission
 from app.decorators import audit_log
 from app.modules.ai_chat.approval_gate import queue_ai_write, tag_ai_action
 from app.modules.architecture.services.architect_workflow_service import ArchitectWorkflowService
@@ -308,6 +309,7 @@ def create_requirement():
 
 @unified_ai_chat_bp.route("/data/update-application/<int:app_id>", methods=["PUT"])
 @login_required
+@require_permission("edit", "application")
 @audit_log("ai_chat_update_application_metadata")
 def update_application_metadata(app_id):
     """
@@ -436,6 +438,7 @@ def generate_archimate():
 
 @unified_ai_chat_bp.route("/apply-archimate", methods=["POST"])
 @login_required
+@require_permission("create", "relationship")
 @audit_log("ai_chat_apply_archimate")
 def apply_archimate():
     """
@@ -533,6 +536,7 @@ def map_apqc():
 
 @unified_ai_chat_bp.route("/apply-apqc", methods=["POST"])
 @login_required
+@require_permission("create", "relationship")
 @audit_log("ai_chat_apply_apqc")
 def apply_apqc():
     """

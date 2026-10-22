@@ -5,7 +5,7 @@
         <input type="hidden" id="roadmap-entry-id">
 
         <!-- Application Info -->
-        <div class="p-4 bg-success/10 border border-success/30 rounded-lg">
+        <div class="px-3 py-2 bg-success/10 border border-success/40 rounded-md">
             <p class="text-sm font-medium text-success-emphasis">Application</p>
             <p class="text-lg font-semibold text-foreground" id="roadmap-app-name"></p>
         </div>
@@ -13,21 +13,21 @@
         <!-- Start Date -->
         <div>
             <label for="roadmap-start-date" class="block text-sm font-medium mb-2">Start Date <span class="text-destructive-emphasis">*</span></label>
-            <input type="date" id="roadmap-start-date" class="w-full px-4 py-2 border border-input rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-ring" required>
+            <input type="date" id="roadmap-start-date" class="w-full px-4 py-2 border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring" required>
             <p class="text-xs text-muted-foreground mt-1">When will consolidation work begin?</p>
         </div>
 
         <!-- End Date -->
         <div>
             <label for="roadmap-end-date" class="block text-sm font-medium mb-2">Target Completion Date <span class="text-destructive-emphasis">*</span></label>
-            <input type="date" id="roadmap-end-date" class="w-full px-4 py-2 border border-input rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-ring" required>
+            <input type="date" id="roadmap-end-date" class="w-full px-4 py-2 border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring" required>
             <p class="text-xs text-muted-foreground mt-1">When should this consolidation be completed?</p>
         </div>
 
         <!-- Target Quarter -->
         <div>
             <label for="roadmap-quarter" class="block text-sm font-medium mb-2">Target Quarter</label>
-            <select id="roadmap-quarter" class="w-full px-4 py-2 border border-input rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-ring">
+            <select id="roadmap-quarter" class="w-full px-4 py-2 border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring">
                 <option value="">-- Select Quarter --</option>
                 <option value="Q1 2026">Q1 2026</option>
                 <option value="Q2 2026">Q2 2026</option>
@@ -43,14 +43,14 @@
         <!-- Owner / Lead -->
         <div>
             <label for="roadmap-owner" class="block text-sm font-medium mb-2">Consolidation Lead <span class="text-destructive-emphasis">*</span></label>
-            <input type="text" id="roadmap-owner" class="w-full px-4 py-2 border border-input rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-ring" placeholder="Name or team responsible" required>
+            <input type="text" id="roadmap-owner" class="w-full px-4 py-2 border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring" placeholder="Name or team responsible" required>
             <p class="text-xs text-muted-foreground mt-1">Who will lead this consolidation effort?</p>
         </div>
 
         <!-- Complexity -->
         <div>
             <label for="roadmap-complexity" class="block text-sm font-medium mb-2">Consolidation Complexity</label>
-            <select id="roadmap-complexity" class="w-full px-4 py-2 border border-input rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-ring">
+            <select id="roadmap-complexity" class="w-full px-4 py-2 border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring">
                 <option value="">-- Select Complexity --</option>
                 <option value="low">Low (Simple decommission)</option>
                 <option value="medium">Medium (Migration + testing)</option>
@@ -63,33 +63,33 @@
         <!-- Estimated Effort -->
         <div>
             <label for="roadmap-effort" class="block text-sm font-medium mb-2">Estimated Effort (hours)</label>
-            <input type="number" id="roadmap-effort" class="w-full px-4 py-2 border border-input rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-ring" placeholder="e.g., 80" min="1">
+            <input type="number" id="roadmap-effort" class="w-full px-4 py-2 border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring" placeholder="e.g., 80" min="1">
             <p class="text-xs text-muted-foreground mt-1">How many person-hours will this require?</p>
         </div>
 
         <!-- Dependencies / Blockers -->
         <div>
             <label for="roadmap-dependencies" class="block text-sm font-medium mb-2">Dependencies / Blockers</label>
-            <textarea id="roadmap-dependencies" rows="3" class="w-full px-4 py-2 border border-input rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-ring" placeholder="List any dependencies or things blocking this work..."></textarea>
+            <textarea id="roadmap-dependencies" rows="3" class="w-full px-4 py-2 border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring" placeholder="List any dependencies or things blocking this work..."></textarea>
             <p class="text-xs text-muted-foreground mt-1">What needs to be done before this consolidation can proceed?</p>
         </div>
 
         <!-- Business Justification -->
         <div>
             <label for="roadmap-justification" class="block text-sm font-medium mb-2">Business Justification</label>
-            <textarea id="roadmap-justification" rows="3" class="w-full px-4 py-2 border border-input rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-ring" placeholder="Why is this consolidation important?"></textarea>
+            <textarea id="roadmap-justification" rows="3" class="w-full px-4 py-2 border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring" placeholder="Why is this consolidation important?"></textarea>
         </div>
 
         <!-- Success Criteria -->
         <div>
             <label for="roadmap-success" class="block text-sm font-medium mb-2">Success Criteria</label>
-            <textarea id="roadmap-success" rows="3" class="w-full px-4 py-2 border border-input rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-ring" placeholder="How will we know this consolidation is successful?"></textarea>
+            <textarea id="roadmap-success" rows="3" class="w-full px-4 py-2 border border-input rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring" placeholder="How will we know this consolidation is successful?"></textarea>
         </div>
     </div>
 
     <!-- Footer -->
     <div class="flex items-center justify-end gap-2 mt-6 pt-6 border-t border-border">
-        <button type="button" @click="Platform.modal.close('roadmap-config')" class="px-4 py-2 border border-input rounded-lg hover:bg-accent transition-colors" aria-label="Close">
+        <button type="button" @click="Platform.modal.close('roadmap-config')" class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Close">
             Cancel
         </button>
         <button type="button" data-action="submitRoadmapConfig" class="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors" aria-label="Action">
