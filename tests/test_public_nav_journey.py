@@ -101,8 +101,8 @@ def test_every_menu_opens_and_every_item_lands_on_a_page_with_content(desktop, b
     for href, label in page.evaluate(LINKS_JS, "footer a"):
         hrefs.setdefault(href, label)
     # Sign in and Start free lead to the account forms by design; they are not content pages.
-    hrefs = {h: l for h, l in hrefs.items()
-             if h and not h.startswith(("#", "mailto:", "/account/")) and l not in ("Sign in", "Start free")}
+    hrefs = {h: text for h, text in hrefs.items()
+             if h and not h.startswith(("#", "mailto:", "/account/")) and text not in ("Sign in", "Start free")}
     assert len(hrefs) > 80, f"only {len(hrefs)} distinct links found in the menus and footer"
 
     by_path = {}
@@ -153,7 +153,7 @@ def test_navbar_and_footer_carry_the_same_items(desktop):
     foot |= set(page.eval_on_selector_all("footer h2", "els => els.map(e => e.textContent.trim())"))
     own = {"Sign in", "Talk to us", "Start free"}
     roles = {label for _, label in page.evaluate(LINKS_JS, "#menu-roles li a")}
-    missing = sorted(l for l in nav if l not in foot and l not in own and l not in roles and not l.startswith("+ "))
+    missing = sorted(text for text in nav if text not in foot and text not in own and text not in roles and not text.startswith("+ "))
     assert missing == [], f"in the navbar but not the footer: {missing}"
     # the footer repeats the Product menu group for group, in the same order
     groups = page.eval_on_selector_all("#menu-product p[id^='p-']", "els => els.map(e => e.textContent.trim())")
