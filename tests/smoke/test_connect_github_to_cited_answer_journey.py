@@ -305,6 +305,17 @@ def test_6_the_applications_are_listed_and_payments_service_shows_its_parts_and_
     table = admin.get_by_role("region", name="Applications table")
     for name in ("Payments Service", "Customer Portal", "Billing Api", "Inventory Service", "Orders Worker", "Mobile App", "Auth", "Gateway"):
         expect(table.get_by_role("row", name=re.compile(r"^Select %s " % name))).to_have_count(1)
+    rows = table.locator("tbody tr")
+    assert rows.count() == 8
+    for row in rows.all():
+        # every application shows what it is and why anything unknown is unknown: no bare dash or dot
+        cells = row.locator("td")
+        assert cells.nth(3).inner_text().strip() == "Application", row.inner_text()
+        assert cells.nth(4).inner_text().strip() in ("Linked", "Not linked"), "the AM dot has no stated meaning: " + row.inner_text()
+        assert cells.nth(6).inner_text().strip() not in ("", "—", "-", "Not mapped"), "the capability says nothing: " + row.inner_text()
+        for cell in (cells.nth(3), cells.nth(6)):
+            assert cell.inner_text().strip() not in ("—", "-", "–")
+    expect(table.get_by_role("button", name="No capability mapped yet: map it").first).to_be_visible()
     shoot(admin, "6-applications")
     table.get_by_role("row", name=re.compile(r"^Select Payments Service ")).get_by_role("link", name=re.compile("Fact sheet")).click()
     admin.wait_for_load_state("domcontentloaded")

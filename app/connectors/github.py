@@ -446,6 +446,8 @@ def _finish_application(org_id, application_id, payload, assigned_by) -> None:
     if element is None or element.organization_id != org_id:
         return
     element.type = "Application"  # a top-level system; its parts are components
+    if not row.component_type:
+        row.component_type = "application"  # what the review showed it to be: a repository classified as an application
     stamp_origin(
         element,
         repository=payload.get("repository"),
