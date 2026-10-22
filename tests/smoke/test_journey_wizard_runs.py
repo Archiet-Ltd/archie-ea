@@ -142,6 +142,48 @@ def _assert_ticks_agree_with_the_screen(page):
     return ticked
 
 
+def _assert_domains_step_agrees_with_itself(page):
+    """The Domains step the run lands on: one list, one count, plain labels."""
+    domains, _ = _strip(page)
+    listed = page.locator("[data-testid='domain-blocker']:visible").count()
+    strip_text = page.locator("[data-testid='blocker-count']")
+    strip_count = int(strip_text.inner_text().split()[0]) if strip_text.count() and strip_text.is_visible() else 0
+    unconfirmed = 7 - (domains or 0)
+    assert strip_count == unconfirmed, "strip says %d blockers, %d domains are unconfirmed" % (strip_count, unconfirmed)
+    assert listed == unconfirmed, "%d unconfirmed domains but %d are listed" % (unconfirmed, listed)
+    assert listed == strip_count, "the list (%d) and the strip (%d) disagree" % (listed, strip_count)
+    cannot = page.evaluate(
+        """() => [...document.querySelectorAll('p')].filter(p => p.offsetParent !== null
+                    && p.textContent.trim().startsWith('Cannot proceed')).length"""
+    )
+    assert cannot == 1, "%d 'Cannot proceed' lists are visible, expected one" % cannot
+    body = _body(page)
+    assert "Confirm using baseline answers only" in body, "'Baselines only' is still unexplained"
+    rows = page.evaluate(
+        """() => [...document.querySelectorAll("button[class*='justify-between']")]
+                   .filter(b => b.offsetParent !== null && /Communication|User Experience/.test(b.textContent))
+                   .map(b => ({text: b.innerText.replace(/\\s+/g, ' ').trim(), align: getComputedStyle(b).textAlign}))"""
+    )
+    assert rows, "the domain rows are not visible"
+    for row in rows:
+        assert not re.search(r"\(\d+\)", row["text"]), "bare count in a domain row: %r" % row["text"]
+        assert re.search(r"\d+ elements?", row["text"]), "the count is not explained: %r" % row["text"]
+        assert re.search(r"(Standard|Important|Differentiating) domain", row["text"]), "the tier is unexplained: %r" % row["text"]
+        assert row["align"] in ("left", "start"), "domain row text is %s-aligned" % row["align"]
+
+
+def _assert_footer_controls_stay_readable(page):
+    """At phone width no footer control wraps onto more than two lines."""
+    tall = page.evaluate(
+        """() => [...document.querySelectorAll("[data-testid='wizard-footer'] a, [data-testid='wizard-footer'] button")]
+                   .filter(e => e.offsetParent !== null)
+                   .map(e => { const lh = parseFloat(getComputedStyle(e).lineHeight) || 16;
+                               return {t: e.textContent.trim().replace(/\\s+/g, ' '), lines: Math.round(e.getBoundingClientRect().height / lh)}; })
+                   .filter(x => x.lines > 2)"""
+    )
+    assert not tall, "footer controls wrap onto too many lines: %s" % tall
+
+
 def _start_solution_design(page, live_server, email):
     """Frame a journey, then start solution design from the hub, as a person does."""
     _login(page, live_server, email)
@@ -234,6 +276,14 @@ def test_ticks_agree_with_the_status_strip_and_the_run_shows_where_it_stopped(pa
         text = _body(page)
         assert "Blueprint populated" not in text
         assert "automatic run stopped at" in text or "capabilities generated" in text, text[-500:]
+
+    # The Domains step the run lands on agrees with itself, on the desktop and the phone.
+    if _state(page)["cur"] == 2:
+        _assert_domains_step_agrees_with_itself(page)
+        page.set_viewport_size({"width": 390, "height": 844})
+        page.wait_for_timeout(600)
+        _assert_footer_controls_stay_readable(page)
+        _assert_domains_step_agrees_with_itself(page)
 
 
 def test_step_three_has_its_controls_and_the_solution_page_opens(page, live_server, started):

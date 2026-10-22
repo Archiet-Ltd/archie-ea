@@ -2018,6 +2018,19 @@
             getDomainElementCount: function (code) {
                 return this.getDomainElements(code).length;
             },
+            /* The one list of domains still to confirm. The strip's count, the panel's list
+             * and the Next Step gate all read it. */
+            unconfirmedDomains: function () {
+                return (this.domainBlockers || []).filter(function (b) { return b.type === 'domain_not_confirmed'; });
+            },
+            getDomainElementLabel: function (code) {
+                const n = this.getDomainElementCount(code);
+                return n + (n === 1 ? ' element' : ' elements');
+            },
+            getDomainTierLabel: function (code) {
+                const t = this.getDomainTier(code);
+                return ({ standard: 'Standard domain', important: 'Important domain', differentiating: 'Differentiating domain' })[t] || 'Standard domain';
+            },
             isDomainExpanded: function (code) { return this.expandedDomains[code] || false; },
             toggleDomainExpand: function (code) { this.expandedDomains[code] = !this.expandedDomains[code]; },
 

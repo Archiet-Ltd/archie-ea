@@ -45,7 +45,7 @@
                 <button type="button" @click="acceptAllBaselinesGlobal()"
                         x-show="domainCoverage < 7"
                         class="text-xs text-muted-foreground hover:text-foreground font-medium whitespace-nowrap">
-                    Baselines only
+                    Confirm using baseline answers only
                 </button>
                 <button type="button" @click="acceptAndConfirmAll()"
                         x-show="domainCoverage < 7"
@@ -56,11 +56,11 @@
             </div>
         </div>
         {# Blocker list — hard blockers prevent progression, soft blockers are warnings #}
-        <template x-if="domainBlockers.filter(function(b) { return b.type === 'domain_not_confirmed'; }).length > 0">
-            <div class="text-xs space-y-0.5">
-                <p class="font-medium text-destructive-emphasis">Cannot proceed to Step 3:</p>
-                <template x-for="b in domainBlockers.filter(function(b) { return b.type === 'domain_not_confirmed'; }).slice(0, 6)" :key="b.domain + b.type">
-                    <p class="text-destructive-emphasis/70 pl-2" x-text="'- ' + b.reason"></p>
+        <template x-if="unconfirmedDomains().length > 0">
+            <div class="text-xs space-y-0.5" data-testid="domain-blockers">
+                <p class="font-medium text-destructive-emphasis">Cannot proceed to Step 3 until these domains are confirmed:</p>
+                <template x-for="b in unconfirmedDomains()" :key="b.domain + b.type">
+                    <p class="text-destructive-emphasis/70 pl-2" data-testid="domain-blocker" x-text="'- ' + b.reason"></p>
                 </template>
             </div>
         </template>
@@ -92,8 +92,8 @@
                  }">
                 {# Domain header #}
                 <button type="button" @click="toggleDomainExpand(code)"
-                        class="w-full flex items-center justify-between px-4 py-2.5 hover:bg-accent/30 transition-colors rounded-t-lg">
-                    <div class="flex items-center gap-2.5">
+                        class="w-full flex items-center justify-between gap-2 px-4 py-2.5 text-left hover:bg-accent/30 transition-colors rounded-t-lg">
+                    <div class="flex min-w-0 flex-wrap items-center gap-x-2.5 gap-y-1">
                         <svg class="w-3 h-3 text-muted-foreground transition-transform"
                              :class="isDomainExpanded(code) ? 'rotate-90' : ''"
                              fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
@@ -101,9 +101,9 @@
                         </svg>
                         <span class="inline-flex items-center px-1.5 py-0.5 rounded text-2xs font-bold uppercase tracking-wider"
                               :class="getDomainBadgeClass(code)" x-text="code"></span>
-                        <span class="text-sm font-medium text-foreground" x-text="getDomainName(code)"></span>
+                        <span class="min-w-0 text-sm font-medium text-foreground" x-text="getDomainName(code)"></span>
                         <span class="text-xs text-muted-foreground"
-                              x-text="'(' + getDomainElementCount(code) + ')'"></span>
+                              x-text="getDomainElementLabel(code)"></span>
                     </div>
                     <div class="flex items-center gap-1.5">
                         <span class="inline-flex items-center px-1.5 py-0.5 rounded text-2xs font-medium"
@@ -112,7 +112,7 @@
                                   'bg-info/10 text-info border border-info/20': getDomainTier(code) === 'important',
                                   'bg-muted-foreground/10 text-muted-foreground border border-muted-foreground/20': getDomainTier(code) === 'standard'
                               }"
-                              x-text="getDomainTier(code)"></span>
+                              x-text="getDomainTierLabel(code)"></span>
                         <template x-if="getDomainStatus(code) === 'confirmed'">
                             <div class="flex items-center gap-1" @click.stop>
                                 <svg class="w-4 h-4 text-success" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>

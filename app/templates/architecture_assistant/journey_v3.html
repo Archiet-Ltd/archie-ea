@@ -147,7 +147,7 @@
                     <div class="flex items-center gap-4">
                         <span><span class="font-semibold text-foreground" x-text="domainCoverage"></span>/7 domains</span>
                         <span><span class="font-semibold text-foreground" x-text="architectureResult ? (architectureResult.total || Object.values(architectureResult.elements_by_layer || {}).reduce((s, a) => s + a.length, 0)) : 0"></span> elements</span>
-                        <span x-show="domainBlockers.length > 0" x-cloak class="text-warning-emphasis font-medium"><span x-text="domainBlockers.length"></span> blockers</span>
+                        <span x-show="unconfirmedDomains().length > 0" x-cloak class="text-warning-emphasis font-medium" data-testid="blocker-count"><span x-text="unconfirmedDomains().length"></span> blockers</span>
                     </div>
                 </template>
                 <template x-if="!domainsPopulated">
@@ -182,16 +182,6 @@
         <button type="button" @click="error = null" class="text-xs text-destructive-emphasis/70 hover:text-destructive-emphasis font-medium ml-4 shrink-0">Dismiss</button>
     </div>
 
-    {# ── Blocker warnings — only shown on Step 2 where user can action them ── #}
-    <template x-if="currentStep === 2 && domainBlockers.filter(b => b.type === 'domain_not_confirmed').length > 0">
-        <div class="rounded-md border border-destructive/40 bg-destructive/10 px-5 py-2 space-y-1">
-            <p class="text-xs font-medium text-destructive-emphasis">Cannot proceed:</p>
-            <template x-for="b in domainBlockers.filter(b => b.type === 'domain_not_confirmed').slice(0, 4)" :key="b.domain + b.type">
-                <p class="text-xs text-destructive-emphasis/70 pl-2" x-text="'— ' + b.reason"></p>
-            </template>
-        </div>
-    </template>
-
     {# ── Step Content (full-width) ── #}
     <div class="min-h-[400px]">
         <div x-show="currentStep === 1" x-cloak>
@@ -225,7 +215,7 @@
     </div>
 
     {# ── Navigation Buttons ── #}
-    <div class="flex items-center justify-between bg-card border border-border rounded-lg px-6 py-3">
+    <div class="flex flex-wrap items-center justify-between gap-2 bg-card border border-border rounded-lg px-4 py-3 sm:px-6" data-testid="wizard-footer">
         <button type="button" @click="prevStep()" x-show="currentStep > 1" x-cloak
                 class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium border border-input rounded-md hover:bg-accent transition-colors">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg>
@@ -233,8 +223,8 @@
         </button>
         <div x-show="currentStep <= 1" x-cloak></div>
 
-        <div class="flex items-center gap-2">
-            <a :href="'/solutions/' + solutionId" class="inline-flex items-center gap-1 px-3 py-2 text-xs text-muted-foreground hover:text-foreground transition-colors">
+        <div class="flex flex-wrap items-center justify-end gap-2">
+            <a :href="'/solutions/' + solutionId" class="inline-flex items-center gap-1 whitespace-nowrap px-3 py-2 text-xs text-muted-foreground hover:text-foreground transition-colors">
                 Open Solution Detail
             </a>
             <template x-if="currentStep === 6 && !codegenUnlocked()">
