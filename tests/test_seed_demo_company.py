@@ -31,7 +31,10 @@ def _row_counts(org_id):
     from app.models.enterprise_intelligence import ApplicationOwnership, OrganizationUnit
     from app.models.cost_fact import CostFact
 
+    from app.models.risk_entity_link import RiskEntityLink
+
     return {
+        "risk_entity_links": RiskEntityLink.query.filter_by(organization_id=org_id).count(),
         "application_ownership": ApplicationOwnership.query.filter_by(organization_id=org_id).count(),
         "organization_units": OrganizationUnit.query.filter_by(organization_id=org_id).count(),
         "cost_facts": CostFact.query.filter_by(organization_id=org_id).count(),
@@ -106,7 +109,7 @@ def test_seed_creates_organisation_and_exits_zero(app, db_session, make_org):
     assert stats["applications_created"] == 20
     assert stats["application_owners_created"] > 0
     assert stats["capabilities_created"] == 24
-    assert stats["risks_created"] == 10
+    assert stats["risks_created"] == 11
     assert stats["programmes_created"] == 5
     assert stats["work_packages_created"] == 12
     assert stats["plateaus_created"] == 5
@@ -130,7 +133,7 @@ def test_seed_creates_organisation_and_exits_zero(app, db_session, make_org):
     assert counts["relationships"] > 150
     assert counts["applications"] == 20
     assert counts["capabilities"] == 24
-    assert counts["risks"] == 10
+    assert counts["risks"] == 11
     assert counts["programmes"] == 5
     assert counts["work_packages"] == 12
     # Every seeded work package must carry the organisation so it is visible
@@ -1006,3 +1009,60 @@ def test_demo_seed_twice_changes_nothing(app, db_session, make_org):
     assert len(work_package_service.addressed_gap_ids(org_id)) == links_before
     assert sum(len(g.plateaus) for g in Gap.query.filter_by(organization_id=org_id)) == plateau_links_before
     assert again["gaps_created"] == 0
+
+
+def test_every_risk_but_one_is_linked_to_one_to_three_applications(app, db_session, make_org):
+    """T-demo-02: the register's own link table carries the demo links, one to
+    three per risk, and exactly one risk is deliberately left unlinked."""
+    os.environ["DEMO_USER_PASSWORD"] = "test-password"
+    try:
+        seed_demo_company()
+        first = None
+        from app.models.organization import Organization
+        org_id = db_session.query(Organization.id).filter_by(slug="lantern-quay").scalar()
+        first = _row_counts(org_id)["risk_entity_links"]
+        stats = seed_demo_company()
+    finally:
+        del os.environ["DEMO_USER_PASSWORD"]
+
+    from app.models.application_portfolio import ApplicationComponent
+    from app.models.risk import Risk
+    from app.models.risk_entity_link import RiskEntityLink
+
+    assert first > 0
+    assert stats["risk_links_created"] == 0
+    assert _row_counts(org_id)["risk_entity_links"] == first
+    risks = Risk.query.filter_by(organization_id=org_id).all()
+    unlinked = []
+    for risk in risks:
+        links = RiskEntityLink.query.filter_by(risk_id=risk.id).all()
+        if not links:
+            unlinked.append(risk.title)
+            continue
+        assert 1 <= len(links) <= 3, risk.title
+        for link in links:
+            assert link.entity_type == "application"
+            assert link.organization_id == org_id
+            assert ApplicationComponent.query.filter_by(id=link.entity_id).first() is not None
+    assert unlinked == ["Supplier price rise not yet assessed"]
+
+
+def test_every_application_has_an_owner_a_cost_and_a_capability(app, db_session, make_org):
+    """T-demo-02: owner, recorded cost and a capability mapping on every application."""
+    os.environ["DEMO_USER_PASSWORD"] = "test-password"
+    try:
+        seed_demo_company()
+    finally:
+        del os.environ["DEMO_USER_PASSWORD"]
+    from app.models.application_portfolio import ApplicationComponent
+    from app.models.application_capability import ApplicationCapabilityMapping
+    from app.models.organization import Organization
+
+    org_id = db_session.query(Organization.id).filter_by(slug="lantern-quay").scalar()
+    apps = ApplicationComponent.query.filter_by(organization_id=org_id).all()
+    assert len(apps) == 20
+    for a in apps:
+        assert a.application_owner, a.name
+        assert a.total_cost_of_ownership and a.total_cost_of_ownership > 0, a.name
+        assert ApplicationCapabilityMapping.query.filter_by(
+            organization_id=org_id, application_component_id=a.id).count() >= 1, a.name

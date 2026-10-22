@@ -991,7 +991,33 @@ _RISKS = [
         "Role-based access control; all access logged to immutable audit trail",
         "Calibration Ledger",
     ),
+    (
+        # The deliberate example of a risk nobody has linked yet: the register
+        # shows its plain empty line. Keep it out of _RISK_LINKS.
+        "Supplier price rise not yet assessed",
+        3, 3, "open", "Procurement Officer",
+        "Ask the three largest suppliers for their next-year price lists and record the effect on unit cost",
+        None,
+    ),
 ]
+
+# Each risk and the one to three applications it threatens, matched on the
+# application name. Written through risk_service.add_risk_link, the same
+# service the register's picker posts to, so the register reads them exactly
+# as user-made links. "Supplier price rise not yet assessed" has no entry on
+# purpose.
+_RISK_LINKS = {
+    "Event Relay single point of failure": ["Event Relay", "Integration Bus", "Monitoring Dashboard"],
+    "Calibration Ledger data corruption": ["Calibration Ledger", "Data Warehouse"],
+    "Sensor Gateway capacity exceeded": ["Sensor Data Hub", "Integration Bus"],
+    "Regulatory non-compliance finding": ["Compliance Reporter", "Document Management"],
+    "Supplier sole-source dependency": ["Supplier Portal", "Inventory Manager"],
+    "Field device firmware bricking": ["Firmware Distribution Service"],
+    "Inventory data staleness": ["Inventory Manager", "Sensor Data Hub"],
+    "API Gateway overload during peak": ["Integration Bus", "Customer Portal"],
+    "Database failover not tested": ["Data Warehouse", "Calibration Ledger", "Finance System"],
+    "Unauthorised access to calibration records": ["Calibration Ledger", "Identity Provider"],
+}
 
 # ── programmes / portfolio initiatives ─────────────────────────────────────
 
@@ -1714,6 +1740,33 @@ def seed_demo_company() -> dict:
             db.session.flush()
         stats["risks_created"] = risks_created
 
+        # ── 8b. risk links (the register's own link mechanism) ──────────
+        from app.models.risk_entity_link import RiskEntityLink
+        from app.services import risk_service
+
+        apps_by_name = _resolve_apps(org_id)
+        risks_by_title = {
+            r.title: r
+            for r in db.session.query(Risk).filter(Risk.organization_id == org_id)
+        }
+        links_created = 0
+        for title, app_names in _RISK_LINKS.items():
+            risk = risks_by_title.get(title)
+            if risk is None:
+                continue
+            for app_name in app_names:
+                target = apps_by_name.get(app_name)
+                if target is None:
+                    continue
+                before = (
+                    db.session.query(RiskEntityLink)
+                    .filter_by(risk_id=risk.id, entity_type="application", entity_id=target.id)
+                    .count()
+                )
+                risk_service.add_risk_link(risk.id, "application", target.id)
+                links_created += 0 if before else 1
+        stats["risk_links_created"] = links_created
+
         # ── 9. programmes ───────────────────────────────────────────────
         existing_progs = {
             p.code
@@ -1990,6 +2043,15 @@ def seed_demo_company() -> dict:
             if wp_name in wp_by_name:
                 work_package_service.link_gap(
                     wp_by_name[wp_name].id, gap.id, organization_id=org_id)
+                # The work package that closes the gap realises the plateau the
+                # gap is closed in, so the plateau is reachable from the work
+                # package's own page. A work package already placed in a
+                # plateau is left where it is.
+                wp = wp_by_name[wp_name]
+                placed = work_package_service.plateau_and_gap_links([wp], org_id)[wp.id]
+                if not placed["plateau_ids"] and target in plateau_by_name:
+                    work_package_service.update_work_package(
+                        wp.id, organization_id=org_id, plateau_id=plateau_by_name[target].id)
         db.session.flush()
 
         db.session.commit()
