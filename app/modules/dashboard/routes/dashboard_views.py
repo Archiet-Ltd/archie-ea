@@ -132,15 +132,23 @@ def _build_overview_context():
     try:
         from sqlalchemy import text
         _org = getattr(g, "current_org_id", None)
-        _cov_where = "WHERE organization_id = :org" if _org is not None else ""
-        row = db.session.execute(text(f"""
+        if _org is not None:
+            row = db.session.execute(text("""
             SELECT
                 COUNT(*) FILTER (WHERE vendor_product_id IS NOT NULL OR vendor_name IS NOT NULL) AS vendor_n,
                 COUNT(*) FILTER (WHERE total_cost_of_ownership IS NOT NULL OR license_cost IS NOT NULL OR maintenance_cost IS NOT NULL) AS cost_n,
                 COUNT(*) FILTER (WHERE business_criticality IS NOT NULL) AS crit_n
             FROM application_components
-            {_cov_where}
-        """), ({"org": _org} if _org is not None else {})).fetchone()
+            WHERE organization_id = :org
+        """), {"org": _org}).fetchone()
+        else:
+            row = db.session.execute(text("""
+            SELECT
+                COUNT(*) FILTER (WHERE vendor_product_id IS NOT NULL OR vendor_name IS NOT NULL) AS vendor_n,
+                COUNT(*) FILTER (WHERE total_cost_of_ownership IS NOT NULL OR license_cost IS NOT NULL OR maintenance_cost IS NOT NULL) AS cost_n,
+                COUNT(*) FILTER (WHERE business_criticality IS NOT NULL) AS crit_n
+            FROM application_components
+        """)).fetchone()
         data_coverage["vendor"] = round(row[0] / total_apps * 100)
         data_coverage["cost"] = round(row[1] / total_apps * 100)
         data_coverage["criticality"] = round(row[2] / total_apps * 100)
@@ -216,15 +224,24 @@ def api_coverage_debug():
         from sqlalchemy import text
         from flask import g as _g
         _org = getattr(_g, "current_org_id", None)
-        _org_where = " WHERE organization_id = :org" if _org is not None else ""
-        row = db.session.execute(text(f"""
+        if _org is not None:
+            row = db.session.execute(text("""
             SELECT
                 COUNT(*) FILTER (WHERE vendor_product_id IS NOT NULL OR vendor_name IS NOT NULL) AS vendor_n,
                 COUNT(*) FILTER (WHERE total_cost_of_ownership IS NOT NULL OR license_cost IS NOT NULL OR maintenance_cost IS NOT NULL) AS cost_n,
                 COUNT(*) FILTER (WHERE business_criticality IS NOT NULL) AS crit_n,
                 COUNT(*) AS total_n
-            FROM application_components{_org_where}
-        """), ({"org": _org} if _org is not None else {})).fetchone()
+            FROM application_components WHERE organization_id = :org
+        """), {"org": _org}).fetchone()
+        else:
+            row = db.session.execute(text("""
+            SELECT
+                COUNT(*) FILTER (WHERE vendor_product_id IS NOT NULL OR vendor_name IS NOT NULL) AS vendor_n,
+                COUNT(*) FILTER (WHERE total_cost_of_ownership IS NOT NULL OR license_cost IS NOT NULL OR maintenance_cost IS NOT NULL) AS cost_n,
+                COUNT(*) FILTER (WHERE business_criticality IS NOT NULL) AS crit_n,
+                COUNT(*) AS total_n
+            FROM application_components
+        """)).fetchone()
         vendor_n, cost_n, crit_n, total_n = row[0], row[1], row[2], row[3]
         owner_n = 0
         if _org is not None:
