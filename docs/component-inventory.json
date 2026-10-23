@@ -34386,7 +34386,7 @@
   {
    "id": "app/templates/archimate_crud/dashboard.html::testid::2",
    "kind": "testid",
-   "label": "select",
+   "label": "div",
    "line": null,
    "mutating": false,
    "rendered_on": [
@@ -34399,7 +34399,7 @@
    "rendered_on_count": 5,
    "target": {},
    "template": "app/templates/archimate_crud/dashboard.html",
-   "testid": "detail-layer-select",
+   "testid": "kind-details-panel",
    "type": null,
    "via_macro": null
   },
@@ -34419,14 +34419,14 @@
    "rendered_on_count": 5,
    "target": {},
    "template": "app/templates/archimate_crud/dashboard.html",
-   "testid": "detail-type-select",
+   "testid": "detail-layer-select",
    "type": null,
    "via_macro": null
   },
   {
    "id": "app/templates/archimate_crud/dashboard.html::testid::4",
    "kind": "testid",
-   "label": "div",
+   "label": "select",
    "line": null,
    "mutating": false,
    "rendered_on": [
@@ -34439,7 +34439,7 @@
    "rendered_on_count": 5,
    "target": {},
    "template": "app/templates/archimate_crud/dashboard.html",
-   "testid": "ai-generate-modal",
+   "testid": "detail-type-select",
    "type": null,
    "via_macro": null
   },
@@ -34459,12 +34459,32 @@
    "rendered_on_count": 5,
    "target": {},
    "template": "app/templates/archimate_crud/dashboard.html",
-   "testid": "ai-generate-error",
+   "testid": "ai-generate-modal",
    "type": null,
    "via_macro": null
   },
   {
    "id": "app/templates/archimate_crud/dashboard.html::testid::6",
+   "kind": "testid",
+   "label": "div",
+   "line": null,
+   "mutating": false,
+   "rendered_on": [
+    "/architecture/",
+    "/architecture/<any(motivation, strategy, business, application, technology, physical, implementation):layer>/<element_type>",
+    "/architecture/<any(motivation, strategy, business, application, technology, physical, implementation):layer>/<element_type>/<int:element_id>/edit",
+    "/architecture/<any(motivation, strategy, business, application, technology, physical, implementation):layer>/<element_type>/new",
+    "/architecture/dashboard"
+   ],
+   "rendered_on_count": 5,
+   "target": {},
+   "template": "app/templates/archimate_crud/dashboard.html",
+   "testid": "ai-generate-error",
+   "type": null,
+   "via_macro": null
+  },
+  {
+   "id": "app/templates/archimate_crud/dashboard.html::testid::7",
    "kind": "testid",
    "label": "select",
    "line": null,
@@ -34484,7 +34504,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/archimate_crud/dashboard.html::testid::7",
+   "id": "app/templates/archimate_crud/dashboard.html::testid::8",
    "kind": "testid",
    "label": "textarea",
    "line": null,
@@ -34504,7 +34524,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/archimate_crud/dashboard.html::testid::8",
+   "id": "app/templates/archimate_crud/dashboard.html::testid::9",
    "kind": "testid",
    "label": "div",
    "line": null,
@@ -34524,7 +34544,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/archimate_crud/dashboard.html::testid::9",
+   "id": "app/templates/archimate_crud/dashboard.html::testid::10",
    "kind": "testid",
    "label": "div",
    "line": null,
@@ -35995,7 +36015,7 @@
   {
    "id": "app/templates/archimate_crud/partials/_repository_workspace.html::button::13",
    "kind": "button",
-   "label": "",
+   "label": "WSJF",
    "line": null,
    "mutating": false,
    "rendered_on": [
@@ -36039,7 +36059,7 @@
   {
    "id": "app/templates/archimate_crud/partials/_repository_workspace.html::button::15",
    "kind": "button",
-   "label": "Edit",
+   "label": "",
    "line": null,
    "mutating": false,
    "rendered_on": [
@@ -36061,6 +36081,28 @@
   {
    "id": "app/templates/archimate_crud/partials/_repository_workspace.html::button::16",
    "kind": "button",
+   "label": "Edit",
+   "line": null,
+   "mutating": false,
+   "rendered_on": [
+    "/architecture/",
+    "/architecture/<any(motivation, strategy, business, application, technology, physical, implementation):layer>/<element_type>",
+    "/architecture/<any(motivation, strategy, business, application, technology, physical, implementation):layer>/<element_type>/<int:element_id>/edit",
+    "/architecture/<any(motivation, strategy, business, application, technology, physical, implementation):layer>/<element_type>/new",
+    "/architecture/dashboard"
+   ],
+   "rendered_on_count": 5,
+   "target": {
+    "button_type": "button"
+   },
+   "template": "app/templates/archimate_crud/partials/_repository_workspace.html",
+   "testid": null,
+   "type": "inline-render",
+   "via_macro": null
+  },
+  {
+   "id": "app/templates/archimate_crud/partials/_repository_workspace.html::button::17",
+   "kind": "button",
    "label": "Delete",
    "line": null,
    "mutating": true,
@@ -36081,7 +36123,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/archimate_crud/partials/_repository_workspace.html::button::17",
+   "id": "app/templates/archimate_crud/partials/_repository_workspace.html::button::18",
    "kind": "button",
    "label": "Quick View",
    "line": null,
@@ -36103,7 +36145,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/archimate_crud/partials/_repository_workspace.html::button::18",
+   "id": "app/templates/archimate_crud/partials/_repository_workspace.html::button::19",
    "kind": "button",
    "label": "Edit",
    "line": null,
@@ -36125,7 +36167,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/archimate_crud/partials/_repository_workspace.html::button::19",
+   "id": "app/templates/archimate_crud/partials/_repository_workspace.html::button::20",
    "kind": "button",
    "label": "Delete",
    "line": null,
@@ -36147,7 +36189,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/archimate_crud/partials/_repository_workspace.html::button::20",
+   "id": "app/templates/archimate_crud/partials/_repository_workspace.html::button::21",
    "kind": "button",
    "label": "Previous",
    "line": null,
@@ -36169,7 +36211,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/archimate_crud/partials/_repository_workspace.html::button::21",
+   "id": "app/templates/archimate_crud/partials/_repository_workspace.html::button::22",
    "kind": "button",
    "label": "Next",
    "line": null,
@@ -101926,19 +101968,19 @@
   }
  ],
  "counts": {
-  "controls": 5565,
+  "controls": 5567,
   "controls_by_kind": {
-   "button": 3145,
+   "button": 3146,
    "form": 253,
    "link": 1017,
    "modal": 193,
    "table": 379,
-   "testid": 578
+   "testid": 579
   },
   "controls_mutating": 755,
   "pages": 471,
   "pages_without_parameters": 341,
-  "routes": 3792,
+  "routes": 3795,
   "templates": 691,
   "templates_not_reached_by_a_route": 110
  },
@@ -122490,6 +122532,63 @@
    ],
    "page": false,
    "rule": "/architecture/api/elements/<int:element_id>",
+   "template_unresolved": [],
+   "templates": [],
+   "templates_missing": []
+  },
+  {
+   "blueprint": "archimate_crud",
+   "closure": [],
+   "endpoint": "archimate_crud.api_element_profile",
+   "guards": [
+    "login_required"
+   ],
+   "has_parameters": true,
+   "id": "archimate_crud.api_element_profile /architecture/api/elements/<int:element_id>/profile",
+   "login_required": true,
+   "methods": [
+    "GET"
+   ],
+   "page": false,
+   "rule": "/architecture/api/elements/<int:element_id>/profile",
+   "template_unresolved": [],
+   "templates": [],
+   "templates_missing": []
+  },
+  {
+   "blueprint": "archimate_crud",
+   "closure": [],
+   "endpoint": "archimate_crud.api_element_set_kind",
+   "guards": [
+    "login_required"
+   ],
+   "has_parameters": true,
+   "id": "archimate_crud.api_element_set_kind /architecture/api/elements/<int:element_id>/profile",
+   "login_required": true,
+   "methods": [
+    "POST"
+   ],
+   "page": false,
+   "rule": "/architecture/api/elements/<int:element_id>/profile",
+   "template_unresolved": [],
+   "templates": [],
+   "templates_missing": []
+  },
+  {
+   "blueprint": "archimate_crud",
+   "closure": [],
+   "endpoint": "archimate_crud.api_element_set_wsjf",
+   "guards": [
+    "login_required"
+   ],
+   "has_parameters": true,
+   "id": "archimate_crud.api_element_set_wsjf /architecture/api/elements/<int:element_id>/profile/wsjf",
+   "login_required": true,
+   "methods": [
+    "POST"
+   ],
+   "page": false,
+   "rule": "/architecture/api/elements/<int:element_id>/profile/wsjf",
    "template_unresolved": [],
    "templates": [],
    "templates_missing": []
@@ -192200,5 +192299,5 @@
   "app/templates/solutions_strategic/partials/_issue_board.html",
   "app/templates/tools/gantt_demo.html"
  ],
- "templates_sha256": "083af36fcc3abdf0774e3a84bf46506f045d1bc80281036e54a56abb472d5396"
+ "templates_sha256": "201d9d88d0d9cfeb759c79e6f6abf7d02379a43891d75cd3fac5a84f3b83e5a8"
 }
