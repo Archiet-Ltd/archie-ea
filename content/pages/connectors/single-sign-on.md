@@ -41,7 +41,7 @@ sent to your identity provider automatically; they do nothing differently to sig
 no separate Entelim password for them to set or remember. Setting up and switching on single
 sign-on is an administrator's job, done once on the settings screen. An administrator who signs in
 this way still completes a one-time code afterwards, the same as after a password sign-in.
-[Security architects](/roles/security-architects) typically own this screen and the certificate
+Security architects typically own this screen and the certificate
 behind it.
 
 ## Set it up
@@ -119,7 +119,6 @@ OpenID Connect single sign-on is included from the Team plan. SAML 2.0 is includ
 
 - [Connectors](/connectors)
 - [Security](/security)
-- [Security architects](/roles/security-architects)
 - [Team annual plan with onboarding](/team-annual-onboarding)
 
 ## Plan
