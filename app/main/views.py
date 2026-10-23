@@ -991,7 +991,8 @@ def public_dogfood():
 
 @main.route(
     "/<any(about, security, privacy, terms, contact, features, pricing, docs, "
-    "'architecture-health-check', 'team-annual-onboarding'):slug>"
+    "'architecture-health-check', 'team-annual-onboarding', "
+    "'data-processing-agreement', 'sub-processors', 'acceptable-use'):slug>"
 )
 def public_site_page(slug):
     """A fixed top-level marketing/legal page (one file per page under content/pages/site/)."""
@@ -1039,8 +1040,7 @@ def public_site_page(slug):
 
 
 @main.route(
-    "/<any('data-processing-agreement', 'cookie-policy', 'refund-policy', "
-    "'commercial-licence'):slug>"
+    "/<any('cookie-policy', 'refund-policy', 'commercial-licence'):slug>"
 )
 def public_legal_page(slug):
     """A legal page whose text awaits approval; 404 until LEGAL_PAGES_ENABLED is on."""

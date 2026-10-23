@@ -289,7 +289,7 @@ Delivered today by: [Architecture Model](/modules/architecture-model) (file impo
 
 <h3 id="administration-and-trust">Administration and Trust</h3>
 
-Enterprise sign-in, access control, proven tenant isolation, audit and billing, so the platform
+Enterprise sign-in, access control, tenant isolation enforced in the database, audit and billing, so the platform
 passes the checks your security team runs first.
 
 **Today:** single sign-on through SAML or OpenID Connect, every record scoped to your organisation, a

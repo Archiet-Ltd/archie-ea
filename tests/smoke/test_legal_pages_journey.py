@@ -19,6 +19,8 @@ PAGES = {
     "terms": "Terms",
     "privacy": "Privacy",
     "data-processing-agreement": "Data processing agreement",
+    "sub-processors": "Sub-processors",
+    "acceptable-use": "Acceptable use",
     "cookie-policy": "Cookie policy",
     "refund-policy": "Refund policy",
     "commercial-licence": "Commercial licence",
@@ -30,7 +32,7 @@ def legal_server(request, ai_protocol_stub, app):
     return boot_live_server(request, ai_protocol_stub, app, extra_env={"LEGAL_PAGES_ENABLED": "true"})
 
 
-@pytest.mark.parametrize("slug", ["data-processing-agreement", "cookie-policy", "refund-policy", "commercial-licence"])
+@pytest.mark.parametrize("slug", ["data-processing-agreement", "sub-processors", "acceptable-use", "cookie-policy", "refund-policy", "commercial-licence"])
 def test_each_new_legal_page_renders(page, legal_server, slug):
     response = page.goto(legal_server + "/" + slug, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
     assert response.status == 200

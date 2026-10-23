@@ -12,13 +12,16 @@ Allow: /vs$
 Allow: /vs/
 Allow: /how-archiet-runs-on-entelim
 Allow: /about
+Allow: /acceptable-use
 Allow: /architecture-health-check
 Allow: /contact
+Allow: /data-processing-agreement
 Allow: /docs
 Allow: /features
 Allow: /pricing
 Allow: /privacy
 Allow: /security
+Allow: /sub-processors
 Allow: /team-annual-onboarding
 Allow: /terms
 Allow: /sitemap.xml
