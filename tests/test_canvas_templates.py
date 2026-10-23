@@ -74,13 +74,18 @@ class TestSchema:
 
     def test_the_canvas_templates_with_the_srs_zone_counts(self):
         # Wave 1 shipped three (business case, business model canvas, lean
-        # canvas); the strategy frameworks add SWOT (the 2x2, four boxes) and
-        # PESTLE (six labelled columns). Still an exact closed set and exact
+        # canvas); the strategy frameworks add all eight, each opening through
+        # this one canvas view. Still an exact closed set and exact
         # per-template counts, not a "contains" check.
         assert sorted(CANVAS_TEMPLATES) == [
-            "business_case", "business_model_canvas", "lean_canvas", "pestle", "swot"
+            "ansoff_matrix", "bcg_matrix", "blue_ocean_strategy",
+            "business_case", "business_model_canvas", "lean_canvas",
+            "pestle", "swot",
         ]
         assert {k: len(CANVAS_TEMPLATES[k]["zones"]) for k in CANVAS_TEMPLATES} == {
+            "ansoff_matrix": 4,
+            "bcg_matrix": 4,
+            "blue_ocean_strategy": 6,
             "business_case": 9,
             "business_model_canvas": 9,
             "lean_canvas": 9,
@@ -165,6 +170,8 @@ class TestSeedIdempotence:
         profile_type_count = len(CANVAS_PROFILE_OPTIONS_BY_TYPE)
         template_count = len(CANVAS_TEMPLATES)
 
+        template_count = len(CANVAS_TEMPLATES)
+
         first = seed_canvas_templates(org_id=org.id)
         assert first == (template_count, 0, profile_type_count, 0)
 
@@ -190,7 +197,9 @@ class TestSeedIdempotence:
         org = make_org("canvas-seed-viewpoints")
 
         seed_viewpoints(org_id=org.id)
-        assert ArchiMateViewpoint.query.filter_by(viewpoint_type="canvas").count() == len(CANVAS_TEMPLATES)
+        assert ArchiMateViewpoint.query.filter_by(viewpoint_type="canvas").count() == len(
+            CANVAS_TEMPLATES
+        )
 
     def test_seed_property_templates_is_idempotent(self, app, db_session):
         from app.config.property_templates import PROPERTY_TEMPLATES
