@@ -274,6 +274,25 @@ def gate_crosswalk_writer_gated(baseline: int) -> Result:
                   "", count, baseline)
 
 
+def gate_write_route_gates(baseline: int) -> Result:
+    """Write routes guarded only by require_roles or login_required (no matrix require_permission).
+
+    The matrix decorator ``require_permission(action, object_type)`` from
+    ``app.core.auth.decorators`` is the one home for permission checks. This
+    ratchet counts write routes (POST, PUT, PATCH, DELETE) that lack it and are
+    instead guarded only by ``require_roles`` or ``login_required`` (or nothing).
+    The baseline can only fall.
+    """
+    proc = _run([sys.executable, "scripts/check_write_route_gates.py", "--count"])
+    try:
+        count = int(proc.stdout.strip().splitlines()[-1])
+    except (ValueError, IndexError):
+        return Result("write-route-gates", FAIL,
+                      f"could not parse count: {proc.stdout!r} {proc.stderr[:300]}")
+    return Result("write-route-gates", PASS if count <= baseline else FAIL,
+                  "", count, baseline)
+
+
 def gate_design_tokens_extended(baseline: int) -> Result:
     """Non-banned colour families (emerald/orange/teal/...) - their own ratchet."""
     proc = _run([sys.executable, "scripts/check_design_tokens.py", "--extended", "--count"])
@@ -1859,6 +1878,12 @@ def build_gates(baseline: dict) -> list[Gate]:
              remediation="call assert_connector_permitted() before the write, or mark "
                           "'crosswalk-gate-ok: <reason>'",
              tags=["static", "fast"]),
+        Gate("write-route-gates",
+             "No write route guarded only by require_roles or login_required (matrix require_permission required)",
+             "ratchet",
+             lambda: gate_write_route_gates(baseline.get("write_route_gates", 1971)),
+             remediation="add @require_permission(action, object_type) from app.core.auth.decorators",
+             tags=["static"]),
         Gate("raw-fetch-sites",
              "No new raw fetch() sites bypassing Platform.fetch",
              "ratchet",

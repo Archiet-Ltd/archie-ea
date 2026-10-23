@@ -722,3 +722,48 @@ def test_g_current_org_id_is_set_by_the_real_before_request_hook(
         f"({response.status_code}) -- g.current_org_id was not resolved to "
         f"their home organisation before admin_required's check ran"
     )
+
+
+def test_canonical_require_roles_carries_the_active_org_check(
+    app, db_session, make_org, client, login_as
+):
+    """The canonical auth module must not hand out a weaker role check.
+
+    ``app._decorators_base.require_roles`` re-derives "admin"/"platform_admin"
+    against the ACTIVE organisation, so a home-org Administrator switched into
+    an organisation they only hold Viewer in cannot satisfy
+    ``require_roles(..., "platform_admin")`` there. A second ``require_roles``
+    living in the canonical file ``app.core.auth.decorators`` lacked that
+    re-derivation: it added the raw ``role_archetype`` string to the caller's
+    roles with no active-organisation scoping, so the same switched Viewer --
+    carrying the legacy default persona "platform_admin" -- was admitted.
+
+    This drives the decorator directly (the two live importers of this name,
+    app/modules/applications/routes/crud_routes.py and app/core/auth/__init__.py,
+    already route through ``app.decorators`` or re-export this one, so only a
+    unit test of the decorator itself pins the behaviour regardless of today's
+    routing), with the exact switched-Viewer attacker the sweep above names.
+    """
+    from werkzeug.exceptions import Forbidden
+
+    from app.core.auth.decorators import require_roles
+
+    attacker, home_org, victim_org = _attacker_switched_into_victim_org(
+        db_session, make_org, client, login_as
+    )
+    # The legacy default persona every pre-cutover account carries.
+    attacker.role_archetype = "platform_admin"
+    db_session.commit()
+
+    @require_roles("admin", "platform_admin")
+    def protected():
+        return "reached"
+
+    with app.test_request_context("/"):
+        from flask import g
+        from flask_login import login_user
+
+        g.current_org_id = victim_org.id
+        login_user(attacker)
+        with pytest.raises(Forbidden):
+            protected()

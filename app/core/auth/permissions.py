@@ -22,7 +22,7 @@ from __future__ import annotations
 from typing import Optional
 
 ACTIONS = ("create", "read", "edit", "delete", "bulk_delete")
-OBJECT_TYPES = ("application", "relationship", "motivation_element")
+OBJECT_TYPES = ("application", "relationship", "motivation_element", "enterprise_record", "review_workflow")
 
 _ALL = frozenset(ACTIONS)
 # Architects create, read, edit and delete one application at a time; deleting
@@ -64,6 +64,25 @@ DEFAULTS = {
         "administrator": _ALL,
         "admin": _ALL,
         "architect": _ARCHITECT,
+        "viewer": _READ,
+    },
+    # The knowledge graph, ArchiMate models, capabilities, vendors and roadmap
+    # read through /api/v2/enterprise. The retired RBAC decorator gave every
+    # signed-in account read on these and administrators everything.
+    "enterprise_record": {
+        "org_admin": _ALL,
+        "administrator": _ALL,
+        "admin": _ALL,
+        "architect": _ARCHITECT,
+        "viewer": _READ,
+    },
+    # Architecture review board workflows. The retired decorator let only
+    # administrators create one; every other account could read.
+    "review_workflow": {
+        "org_admin": _ALL,
+        "administrator": _ALL,
+        "admin": _ALL,
+        "architect": _READ,
         "viewer": _READ,
     },
 }
@@ -148,7 +167,15 @@ def role_key(user, organization_id: Optional[int] = None) -> str:
     names = {str(getattr(user, "role_name", "") or "").lower()}
     archetype = getattr(user, "role_archetype", None)
     if archetype:
-        names.add(str(archetype).lower())
+        # A global ``role_archetype`` of "admin"/"administrator" is NOT the
+        # matrix "admin" key: administrator authority is answered first by
+        # ``can`` through ``_is_administrator`` (scoped to the active
+        # organisation), so reading this global flag as "admin" here would hand
+        # matrix-administrator rights in any organisation the account merely
+        # belongs to without a role row, with no active-organisation scoping.
+        archetype_key = str(archetype).lower()
+        if archetype_key not in ("admin", "administrator"):
+            names.add(archetype_key)
     if "architect" in names:
         return "architect"
     # An account whose persona ends in "_architect" and whose platform role

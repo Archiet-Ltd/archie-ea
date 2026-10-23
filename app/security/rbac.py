@@ -156,46 +156,6 @@ class RBACManager:
         """
         return any(self.check_permission(user, resource_domain, perm) for perm in permissions)
 
-    def require_permission(
-        self,
-        resource_domain: ResourceDomain,
-        permission: Permission,
-        resource_id: Optional[str] = None,
-    ):
-        """
-        Flask decorator to require specific permission.
-
-        Usage:
-            @app.route('/api/architecture')
-            @rbac.require_permission(ResourceDomain.ARCHITECTURE, Permission.READ)
-            def get_architecture():
-                pass
-        """
-
-        def decorator(f):
-            def wrapper(*args, **kwargs):
-                if not current_user or not current_user.is_authenticated:
-                    from flask import abort
-
-                    abort(401, "Authentication required")
-
-                if not self.check_permission(
-                    current_user, resource_domain, permission, resource_id
-                ):
-                    logger.warning(
-                        f"Access denied for user {current_user.id} to {resource_domain.value}:{resource_id}"
-                    )
-                    from flask import abort
-
-                    abort(403, "Insufficient permissions")
-
-                return f(*args, **kwargs)
-
-            wrapper.__name__ = f.__name__
-            return wrapper
-
-        return decorator
-
     def _get_user_permissions(self, user: User, resource_domain: ResourceDomain) -> int:
         """
         Get effective permissions for user in a specific domain.
@@ -297,50 +257,4 @@ def check_permission(
     return rbac_manager.check_permission(current_user, resource_domain, permission, resource_id)
 
 
-def require_permission(
-    resource_domain: ResourceDomain, permission: Permission, resource_id: Optional[str] = None
-):
-    """
-    Decorator to require permission for Flask routes.
 
-    Usage:
-        @app.route('/api/architecture')
-        @require_permission(ResourceDomain.ARCHITECTURE, Permission.READ)
-        def get_architecture():
-            pass
-    """
-
-    def decorator(f):
-        def wrapper(*args, **kwargs):
-            if not current_user or not current_user.is_authenticated:
-                from flask import abort
-
-                abort(401, "Authentication required")
-
-            if not rbac_manager.check_permission(
-                current_user, resource_domain, permission, resource_id
-            ):
-                logger.warning(
-                    f"Access denied for user {current_user.id} to {resource_domain.value}:{resource_id}"
-                )
-                from flask import abort
-
-                abort(403, "Insufficient permissions")
-
-            return f(*args, **kwargs)
-
-        wrapper.__name__ = f.__name__
-
-        # R2-5 (PR 428 round 3): discoverability marker for the url_map
-        # sweep (tests/test_admin_rbac_active_org_enforcement.py), set only
-        # when this (domain, permission) pair is NOT already part of the
-        # non-admin baseline -- see _NON_ADMIN_BASELINE_PERMISSIONS above.
-        # Only then is check_permission's active-org admin bypass the one
-        # path that can grant it, which is exactly what this PR fixed.
-        baseline = _NON_ADMIN_BASELINE_PERMISSIONS.get(resource_domain, Permission.NONE.value)
-        if (baseline & permission.value) != permission.value:
-            wrapper._active_org_rbac_gate = "require_permission"
-
-        return wrapper
-
-    return decorator

@@ -739,3 +739,39 @@ entries:
     must_not_create:
       - id: type-table-class
         regex: 'class\s+\w*TypeTable\s*\('
+
+  - id: permission-check
+    concept: May this user do this to this kind of object (the permission matrix decorator)
+    status: active
+    canonical:
+      path: app/core/auth/decorators.py
+      symbols: [require_permission]
+    reuse: >
+      Guard a route with require_permission(action, object_type) from app.core.auth.decorators; it asks
+      can() in app.core.auth.permissions, the one answer the templates also read. A new kind of object is a
+      new entry in OBJECT_TYPES and DEFAULTS there, equal to today's behaviour. Do not write a second
+      require_permission or has_permission, and do not gate a write route with require_roles or login_required
+      alone. The one role check is require_roles in app/_decorators_base.py (re-exported as
+      app.decorators.require_roles): it re-derives "admin"/"platform_admin" against the active organisation, so
+      do not hand-roll a second requires_permission, permission_required, require_roles, require_role or
+      check_permission beside it either -- the copies that exist today are listed below as known exceptions to
+      retire or repoint, not a licence to add another.
+    must_not_create:
+      - id: new-permission-helper
+        regex: 'def\s+(require_permission|has_permission|requires_permission|permission_required|require_roles|require_role|check_permission)\s*\('
+    known_exceptions:
+      - path: app/auth/decorators.py
+        reason: requires_permission look-alike predating the canonical module; retire or repoint in a follow-up
+      - path: app/_decorators_base.py
+        reason: >
+          holds permission_required and the one active-org-scoped require_roles (re-exported as
+          app.decorators.require_roles, which app.core.auth.decorators.require_roles now delegates to);
+          retire or repoint in a follow-up
+      - path: app/modules/solutions_strategic/v2/routes/strategic_risks_hardened.py
+        reason: local require_roles look-alike; retire or repoint in a follow-up
+      - path: app/utils/rbac.py
+        reason: require_role look-alike; retire or repoint in a follow-up
+      - path: app/services/rbac_service.py
+        reason: require_role method look-alike; retire or repoint in a follow-up
+      - path: app/security/rbac.py
+        reason: check_permission look-alikes; retire or repoint in a follow-up

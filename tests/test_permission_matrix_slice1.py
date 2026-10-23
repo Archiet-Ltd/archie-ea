@@ -360,3 +360,42 @@ class TestOrganisationIsolation:
         rows = PermissionGrant.query.filter_by(subject_key="viewer", action="edit").all()
         assert [r.organization_id for r in rows] == [org_a.id]
         assert org_b.id not in [r.organization_id for r in rows]
+
+
+class TestGlobalAdminArchetypeIsNotAdministratorOfEveryOrganisation:
+    """A global ``role_archetype == "admin"`` is not administrator authority.
+
+    ``can`` already answers administrator authority first, scoped to the active
+    organisation (``_is_administrator`` -> ``rbac_service.is_org_admin``). The
+    matrix role key, reached only for an account with no explicit organisation
+    role, must not separately read a global ``role_archetype`` of "admin" as the
+    matrix "admin" key -- that handed an account administrator-level matrix
+    rights in any organisation it merely belonged to without a role row, with no
+    active-organisation scoping at all.
+    """
+
+    def test_a_global_admin_archetype_user_cannot_create_in_a_foreign_org(
+        self, app, db_session
+    ):
+        from app.core.auth.permissions import can, role_key
+
+        org_a = _org(db_session, "arch-home")
+        org_b = _org(db_session, "arch-foreign")
+        # A non-administrator account (platform role "User") that carries the
+        # global persona label "admin" and has NO organisation role in org B.
+        user = _user(db_session, org_a, "viewer", platform_role="User")
+        user.role_archetype = "admin"
+        db_session.commit()
+
+        # In the foreign organisation it holds no role row, so the matrix falls
+        # through to the role key: that key must not be "admin".
+        assert role_key(user, org_b.id) != "admin"
+        assert not can(user, "create", "application", org_b.id)
+        assert not can(user, "delete", "application", org_b.id)
+        assert not can(user, "bulk_delete", "application", org_b.id)
+        # It still reads, like any signed-in account.
+        assert can(user, "read", "application", org_b.id)
+        # And a real administrator of their own organisation is unaffected.
+        real_admin = _user(db_session, org_a, "org_admin", platform_role="Administrator")
+        db_session.commit()
+        assert can(real_admin, "create", "application", org_a.id)
