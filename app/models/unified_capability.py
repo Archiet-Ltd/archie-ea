@@ -352,6 +352,13 @@ class UnifiedCapability(HybridCapabilityTenantMixin, db.Model, OptimisticLockMix
                 "organization_id IS NOT NULL AND archimate_id IS NOT NULL"
             ),
         ),
+        Index(
+            "uq_unified_capabilities_provenance",
+            "source_table",
+            "source_id",
+            unique=True,
+            postgresql_where=db.text("source_table IS NOT NULL AND source_id IS NOT NULL"),
+        ),
         {"extend_existing": True},
     )
 
