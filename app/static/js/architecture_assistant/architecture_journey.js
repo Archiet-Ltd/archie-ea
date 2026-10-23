@@ -35,7 +35,7 @@
         const key = String(url).split('/').slice(0, 3).join('/');
         const prev = _writeQueues[key] || Promise.resolve();
         const run = prev.then(function () { return _fetchWithRetry(url, opts, 0); });
-        _writeQueues[key] = run.catch(function () { /* the queue goes on after a failure */ });
+        _writeQueues[key] = run.catch(function () { /* swallow-ok: the caller gets this failure from run; this copy only keeps the queue moving */ });
         return run;
     }
     function _fetchWithRetry(url, opts, attempt) {
