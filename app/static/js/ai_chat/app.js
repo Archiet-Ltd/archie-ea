@@ -1092,11 +1092,12 @@ Would you like me to provide more details about the extracted elements or help y
                 userInput.value = `/generate-archimate ${appId}`;
             }
             // A deep link arrives ready to act, not to browse the suggestion cards —
-            // collapse them (keeping the greeting heading itself visible) so the notice
-            // below lands inside the pane's visible area instead of hundreds of px below
-            // the ~1000px of persona/domain cards.
+            // collapse them (keeping the greeting heading itself visible) as belt-and-
+            // braces, and insert the notice above the greeting (placement: 'top') rather
+            // than scrolling to it, so it lands inside the pane's visible area instead of
+            // hundreds of px below the ~1000px of persona/domain cards.
             _hideWelcomeSuggestions();
-            appendSystemMessage(`Application context loaded (ID: ${appId}). Ready to generate ArchiMate model.`, 'info', { noScroll: true });
+            appendSystemMessage(`Application context loaded (ID: ${appId}). Ready to generate ArchiMate model.`, 'info', { placement: 'top' });
         } else if (elementId && contextType && !isNaN(parseInt(elementId))) {
             // Generic entity deep-link: ?element_id=<id>&context_type=<type>&domain=<domain>
             const entityId = parseInt(elementId);
@@ -1118,7 +1119,7 @@ Would you like me to provide more details about the extracted elements or help y
             }
             // Same reasoning as the application deep-link branch above.
             _hideWelcomeSuggestions();
-            appendSystemMessage(`${entityLabel} context loaded (ID: ${entityId}). Ask me anything about this ${contextType.replace(/_/g, ' ')}.`, 'info', { noScroll: true });
+            appendSystemMessage(`${entityLabel} context loaded (ID: ${entityId}). Ask me anything about this ${contextType.replace(/_/g, ' ')}.`, 'info', { placement: 'top' });
         }
     });
 
