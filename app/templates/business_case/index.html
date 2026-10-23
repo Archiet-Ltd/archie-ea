@@ -22,12 +22,17 @@
           {'label': 'Home', 'href': url_for('main.index')},
           {'label': 'Business Cases'}
       ],
-      actions=[
+      actions=([
           {'text': 'New Business Case', 'icon': 'plus', 'onclick': "Platform.modal.open('bc-create-modal')", 'variant': 'default'}
-      ]
+      ] if can_author_models(current_user) else [])
   ) }}
 
   <div class="p-6 space-y-6">
+    {% if not can_author_models(current_user) %}
+    <p class="rounded-md border border-border bg-muted/30 px-4 py-3 text-sm text-muted-foreground" data-testid="bc-read-only-note">
+      Your account can read business cases but not create them. Architects and administrators of your organisation can create one; ask them to add one for you or to change your role.
+    </p>
+    {% endif %}
     {% if business_cases %}
     {% call card.card() %}
       {% call card.card_content(class='p-0') %}
@@ -74,7 +79,7 @@
         icon='file-text',
         title='No Business Cases yet',
         description='Create your first business case to document a problem, the options considered, the recommendation, and its financial justification.',
-        cta_text='New Business Case',
+        cta_text='New Business Case' if can_author_models(current_user) else None,
         cta_onclick="Platform.modal.open('bc-create-modal')",
         cta_icon='plus'
     ) }}

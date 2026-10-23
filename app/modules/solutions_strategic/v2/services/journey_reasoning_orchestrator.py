@@ -211,12 +211,35 @@ class JourneyReasoningOrchestrator:
         from sqlalchemy.orm.attributes import flag_modified
         # Force-refresh from DB to avoid StaleDataError when multiple saves
         # happen in a single method (e.g. _transition save + end-of-method save)
-        self._solution = None
-        db.session.expire_all()
-        sol = self.solution  # re-fetches from DB
-        sol.journey_state = copy.deepcopy(data)
-        flag_modified(sol, "journey_state")
-        db.session.commit()
+        from sqlalchemy.orm.exc import StaleDataError
+
+        # Keys the wizard's own progress save writes. When another request saved
+        # the row between our read and write, those keys belong to the other
+        # writer: take the stored values for them and keep this step's results.
+        wizard_keys = {
+            "schema_version", "current_step", "completed_steps", "enriched_brief",
+            "problem_statement", "clarify_phase", "domains_populated",
+            "structured_intake", "accepted_elements", "updated_at",
+        }
+        for attempt in range(3):
+            self._solution = None
+            db.session.expire_all()
+            sol = self.solution  # re-fetches from DB
+            to_write = copy.deepcopy(data)
+            if attempt:
+                stored = sol.journey_state if isinstance(sol.journey_state, dict) else {}
+                for key in wizard_keys:
+                    if key in stored:
+                        to_write[key] = copy.deepcopy(stored[key])
+            sol.journey_state = to_write
+            flag_modified(sol, "journey_state")
+            try:
+                db.session.commit()
+                break
+            except StaleDataError:
+                db.session.rollback()
+                if attempt == 2:
+                    raise
         self._solution = None  # force reload for next access
 
     def _get_state(self) -> JourneyState:
@@ -538,7 +561,7 @@ class JourneyReasoningOrchestrator:
                 "Database query failed for ApplicationCapabilityMapping (solution %d, capability_ids=%s): %s",
                 self.solution_id, confirmed_ids, e, exc_info=True,
             )
-            raise ValueError(f"Landscape mapping failed — database error querying application-capability mappings: {e}")
+            raise ValueError("Landscape mapping could not read the application-capability mappings. Try again in a moment.")
 
         # Fallback: no mappings exist — allow pipeline to continue
         if not mappings:

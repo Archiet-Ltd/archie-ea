@@ -325,6 +325,44 @@ def _require_solution_org_view(f):
     return decorated
 
 
+_NO_MODEL_HINTS = ("llm provider", "no enabled llm", "provider must be configured", "no llm")
+
+
+def _plain_failure(action, exc, solution_id=None):
+    """One plain answer for a failed wizard step.
+
+    The exception goes to the log, never to the person. Two writers racing for
+    the same solution row is a conflict they can retry; a missing language model
+    is stated as such with the manual way forward; anything else is the standard
+    plain sentence (app/utils/plain_errors.py).
+    """
+    from sqlalchemy.orm.exc import StaleDataError
+
+    from app.utils.plain_errors import PLAIN
+
+    logger.error("%s failed for solution %s: %s", action, solution_id, exc, exc_info=True)
+    try:
+        db.session.rollback()
+    except Exception:  # noqa: BLE001 - the session may already be unusable
+        pass
+    if isinstance(exc, StaleDataError):
+        return api_error(
+            "Another change to this solution was saving at the same moment, so this step did not run. "
+            "Your work is kept. Try the step again.",
+            409,
+            errors={"kind": "conflict"},
+        )
+    if any(h in str(exc).lower() for h in _NO_MODEL_HINTS):
+        return api_error(
+            "This step needs an AI model and none is connected for your organisation. "
+            "You can carry on by hand: add the items yourself on this page, "
+            "or ask an administrator to connect a provider.",
+            503,
+            errors={"kind": "no_model"},
+        )
+    return api_error(PLAIN[500][1] + ". " + PLAIN[500][2], 500)
+
+
 # ---------------------------------------------------------------------------
 # Journey state machine helper — advances state through intermediate steps
 # ---------------------------------------------------------------------------
@@ -3102,6 +3140,12 @@ def generate_architecture(solution_id):
             return api_success(data={"status": "running", "message": "Architecture generation already in progress"})
 
         problem_summary, capabilities, compliance_constraints = _build_arch_gen_args(data, solution_id)
+        if not capabilities:
+            return api_error(
+                "There are no accepted capabilities to build from yet. Accept at least one capability "
+                "on the Capabilities step, or add elements by hand in the layers below.",
+                400,
+            )
 
         _generate_architecture_background(
             current_app._get_current_object().app_context(),
@@ -3136,7 +3180,16 @@ def generate_architecture_status(solution_id):
         if job["status"] == "done":
             return api_success(data={"status": "done", "result": job.get("result")})
         if job["status"] == "failed":
-            return api_success(data={"status": "failed", "error": job.get("error", "Unknown error")})
+            raw = str(job.get("error") or "")
+            logger.error("Architecture generation failed for solution %s: %s", solution_id, raw)
+            if any(h in raw.lower() for h in _NO_MODEL_HINTS):
+                plain = ("This step needs an AI model and none is connected for your organisation. "
+                         "You can carry on by hand: add elements in the layers below, "
+                         "or ask an administrator to connect a provider.")
+            else:
+                plain = ("Architecture generation did not complete. Your capabilities are kept. "
+                         "Try again, or add elements by hand in the layers below.")
+            return api_success(data={"status": "failed", "error": plain})
         return api_success(data={"status": "running"})
     except Exception as e:
         logger.error("Status check failed for solution %d: %s", solution_id, e)
@@ -3528,7 +3581,7 @@ def reasoning_discover_capabilities(solution_id):
         return api_error(str(e), 409)
     except Exception as e:
         logger.error("Capability discovery failed for solution %d: %s", solution_id, e, exc_info=True)
-        return api_error(f"Capability discovery failed: {e}", 500)
+        return _plain_failure("Finding capabilities", e, solution_id)
 
 
 @journey_v2_bp.route("/<int:solution_id>/reasoning/confirm-capabilities", methods=["POST"])
@@ -3629,7 +3682,7 @@ def reasoning_confirm_capabilities(solution_id):
         return api_error(str(e), 409)
     except Exception as e:
         logger.error("Capability confirmation failed for solution %d: %s", solution_id, e, exc_info=True)
-        return api_error(f"Capability confirmation failed: {e}", 500)
+        return _plain_failure("Confirming capabilities", e, solution_id)
 
 
 @journey_v2_bp.route("/<int:solution_id>/reasoning/map-landscape", methods=["POST"])
@@ -3678,7 +3731,7 @@ def reasoning_map_landscape(solution_id):
         return api_error(str(e), 409)
     except Exception as e:
         logger.error("Landscape mapping failed for solution %d: %s", solution_id, e, exc_info=True)
-        return api_error(f"Landscape mapping encountered an error: {e}", 500)
+        return _plain_failure("Mapping your applications", e, solution_id)
 
 
 @journey_v2_bp.route("/<int:solution_id>/reasoning/estimate-costs", methods=["POST"])
@@ -3697,7 +3750,7 @@ def reasoning_estimate_costs(solution_id):
         return api_error(str(e), 409)
     except Exception as e:
         logger.error("Cost estimation failed for solution %d: %s", solution_id, e, exc_info=True)
-        return api_error(f"Cost estimation failed: {e}", 500)
+        return _plain_failure("Estimating costs", e, solution_id)
 
 
 @journey_v2_bp.route("/<int:solution_id>/reasoning/run-inference", methods=["POST"])
@@ -3714,7 +3767,45 @@ def reasoning_run_inference(solution_id):
         return api_success(data=result)
     except Exception as e:
         logger.error("Inference failed for solution %d: %s", solution_id, e, exc_info=True)
-        return api_error(f"Inference engine failed: {e}", 500)
+        return _plain_failure("Inferring relationships", e, solution_id)
+
+
+@journey_v2_bp.route("/<int:solution_id>/vendor-suggestions", methods=["GET"])
+@login_required
+@_require_solution_org_view
+def vendor_suggestions(solution_id):
+    """Vendors that cover the given capabilities, with pricing (existing service)."""
+    try:
+        from app.modules.solutions_strategic.v2.services.vendor_suggestion_service import (
+            VendorSuggestionService,
+        )
+        raw = request.args.get("capability_ids", "")
+        ids = [int(x) for x in raw.split(",") if x.strip().isdigit()][:50]
+        return api_success(data={
+            "capability_suggestions": VendorSuggestionService().get_capability_backed_suggestions(ids),
+        })
+    except Exception as e:
+        return _plain_failure("Loading vendor suggestions", e, solution_id)
+
+
+@journey_v2_bp.route("/<int:solution_id>/vendor-suggestions/confirm", methods=["POST"])
+@login_required
+@_require_solution_owner
+def vendor_suggestions_confirm(solution_id):
+    """Confirm a vendor price suggestion (existing service)."""
+    try:
+        from app.modules.solutions_strategic.v2.services.vendor_suggestion_service import (
+            VendorSuggestionService,
+        )
+        pricing_id = (request.get_json(silent=True) or {}).get("pricing_id")
+        if not isinstance(pricing_id, int):
+            return api_error("Choose a vendor price to confirm.", 400)
+        result = VendorSuggestionService().confirm_suggestion(pricing_id, current_user.id)
+        return api_success(data=dict(result, success=True))
+    except ValueError:
+        return api_error("That vendor price is no longer available.", 404)
+    except Exception as e:
+        return _plain_failure("Confirming the vendor price", e, solution_id)
 
 
 @journey_v2_bp.route("/<int:solution_id>/reasoning/detect-gaps", methods=["POST"])
@@ -3748,7 +3839,7 @@ def reasoning_detect_gaps(solution_id):
         return api_error(str(e), 409)
     except Exception as e:
         logger.error("Gap detection failed for solution %d: %s", solution_id, e, exc_info=True)
-        return api_error(f"Gap detection failed: {e}", 500)
+        return _plain_failure("Finding gaps", e, solution_id)
 
 
 @journey_v2_bp.route("/<int:solution_id>/reasoning/generate-options", methods=["POST"])
@@ -3784,7 +3875,7 @@ def reasoning_generate_options(solution_id):
         return api_error(str(e), 409)
     except Exception as e:
         logger.error("Option generation failed for solution %d: %s", solution_id, e, exc_info=True)
-        return api_error(f"Option generation failed: {e}", 500)
+        return _plain_failure("Preparing options", e, solution_id)
 
 
 @journey_v2_bp.route("/<int:solution_id>/reasoning/select-recommendation", methods=["POST"])
@@ -3808,7 +3899,7 @@ def reasoning_select_recommendation(solution_id):
         return api_error(str(e), 409)
     except Exception as e:
         logger.error("Recommendation selection failed for solution %d: %s", solution_id, e, exc_info=True)
-        return api_error(f"Recommendation selection failed: {e}", 500)
+        return _plain_failure("Choosing a recommendation", e, solution_id)
 
 
 @journey_v2_bp.route("/<int:solution_id>/reasoning/populate-blueprint", methods=["POST"])
@@ -3830,7 +3921,7 @@ def reasoning_populate_blueprint(solution_id):
         return api_error(str(e), 409)
     except Exception as e:
         logger.error("Blueprint population failed for solution %d: %s", solution_id, e, exc_info=True)
-        return api_error(f"Blueprint population failed: {e}", 500)
+        return _plain_failure("Filling the blueprint", e, solution_id)
 
 
 @journey_v2_bp.route("/<int:solution_id>/reasoning/analysis", methods=["GET"])
@@ -3848,7 +3939,7 @@ def reasoning_get_analysis(solution_id):
         return api_success(data=asdict(analysis))
     except Exception as e:
         logger.error("Analysis retrieval failed for solution %d: %s", solution_id, e, exc_info=True)
-        return api_error(f"Failed to retrieve analysis: {e}", 500)
+        return _plain_failure("Loading the analysis", e, solution_id)
 
 
 # ── Structured Intake (Step 1 data persistence) ─────────────────
@@ -4364,7 +4455,7 @@ def save_structured_intake(solution_id):
         logger.error(
             "Structured intake failed for solution %d: %s", solution_id, e, exc_info=True
         )
-        return api_error(f"Failed to save structured intake: {e}", 500)
+        return _plain_failure("Saving your answers", e, solution_id)
 
 
 @journey_v2_bp.route("/landscape-search", methods=["POST"])
@@ -4588,7 +4679,7 @@ def load_structured_intake(solution_id):
         logger.error(
             "Load structured intake failed for solution %d: %s", solution_id, e, exc_info=True
         )
-        return api_error(f"Failed to load structured intake: {e}", 500)
+        return _plain_failure("Loading your answers", e, solution_id)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -5915,9 +6006,9 @@ def import_schema(solution_id):
             parsed = _parse_openapi(content)
         else:
             parsed = _parse_cds(content)
-    except Exception as e:
+    except Exception:
         logger.exception("Schema import parse error for solution %s", solution_id)
-        return api_error(f"Parse failed: {e}", 400)
+        return api_error("That schema could not be read. Check that the format you chose matches the file.", 400)
 
     if not parsed:
         return api_error("No entity or field definitions found in the provided schema", 400)

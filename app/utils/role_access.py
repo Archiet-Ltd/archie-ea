@@ -367,6 +367,37 @@ def can_edit_capabilities(user) -> bool:
         return False
 
 
+def can_author_models(user) -> bool:
+    """True when the user's role lets them create records such as business cases
+    and value streams: the answer the create routes' own role gate gives
+    (require_roles "admin", "architect", "business_architect").
+
+    A read-only Viewer account is refused by those routes whatever persona label
+    it carries, so the screens that offer "New ..." must not offer it to them.
+    """
+    if not user or not getattr(user, "is_authenticated", False):
+        return False
+    try:
+        from app.models.user import Permission
+
+        if not user.can(Permission.GENERAL):
+            return False
+    except Exception:  # noqa: BLE001 - a template gate must not 500 a page
+        return False
+    if is_admin(user):
+        return True
+    try:
+        role_name = str(getattr(getattr(user, "role", None), "name", "") or "").strip().lower()
+        persona = str(getattr(user, "enterprise_role", "") or "").strip().lower()
+        return (
+            role_name in {"architect", "administrator"}
+            or persona.endswith("_architect")
+            or persona == "business_architect"
+        )
+    except Exception:  # noqa: BLE001
+        return False
+
+
 def can_retire_applications(user) -> bool:
     """True when the user may mark an application for retirement.
 
@@ -1208,6 +1239,7 @@ def role_access_context_processor():
     return {
         "can_access_section": can_access_section,
         "can_edit_capabilities": can_edit_capabilities,
+        "can_author_models": can_author_models,
         "can_retire_applications": can_retire_applications,
         "get_visible_sections": get_visible_sections,
         "is_admin": is_admin,

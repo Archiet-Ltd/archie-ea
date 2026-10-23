@@ -9,14 +9,53 @@
      * - Rejects on non-2xx HTTP status (so .catch() fires on 404/500)
      * - Always returns parsed JSON
      */
+    // A person never reads database or exception text. Anything that looks like
+    // it is replaced by the one plain sentence the rest of the product uses.
+    const RAW_ERROR = /UPDATE statement|expected to update|StaleDataError|sqlalchemy|psycopg|IntegrityError|OperationalError|ProgrammingError|\[SQL|\[parameters|Traceback|violates .* constraint|does not exist|NoneType|KeyError|AttributeError|TypeError|ValueError|Exception|Errno/i;
+    const NO_MODEL = /LLM provider|No enabled LLM|AI feature .* not available|provider must be configured|No LLM/i;
+    const PLAIN_NO_MODEL = 'This step needs an AI model and none is connected for your organisation. ' +
+        'You can carry on by hand: add the items yourself on this page, or ask an administrator to connect a provider.';
+    const PLAIN_FAILED = 'Something went wrong on our side. Check whether your changes were saved before trying again. ' +
+        'If it keeps happening, tell your administrator.';
+    function _plainMessage(status, message) {
+        const m = String(message || '');
+        if (NO_MODEL.test(m)) return PLAIN_NO_MODEL;
+        if (RAW_ERROR.test(m)) return PLAIN_FAILED;
+        if (status >= 500 && !m) return PLAIN_FAILED;
+        return m || 'Request failed';
+    }
+
+    // Writes to one solution run one at a time. The wizard used to send the
+    // pipeline's next call, the progress save and the relationship inference at
+    // the same moment, and two of them would race for the same solution row.
+    const _writeQueues = {};
     function _fetch(url, opts) {
+        const method = String((opts && opts.method) || 'GET').toUpperCase();
+        if (method === 'GET') return _fetchNow(url, opts);
+        const key = String(url).split('/').slice(0, 3).join('/');
+        const prev = _writeQueues[key] || Promise.resolve();
+        const run = prev.then(function () { return _fetchWithRetry(url, opts, 0); });
+        _writeQueues[key] = run.catch(function () { /* swallow-ok: the caller gets this failure from run; this copy only keeps the queue moving */ });
+        return run;
+    }
+    function _fetchWithRetry(url, opts, attempt) {
+        return _fetchNow(url, opts).catch(function (e) {
+            if (e && e.status === 409 && e.body && e.body.errors && e.body.errors.kind === 'conflict' && attempt < 2) {
+                return new Promise(function (resolve) { setTimeout(resolve, 500 * (attempt + 1)); })
+                    .then(function () { return _fetchWithRetry(url, opts, attempt + 1); });
+            }
+            throw e;
+        });
+    }
+
+    function _fetchNow(url, opts) {
         // Platform.fetch already handles CSRF, JSON serialization, and error throwing.
         // We preserve the same envelope unwrapping behavior.
         return Platform.fetch(url, opts).then(function (body) {
             // Explicit failure envelope: {success: false, error: "..."} with HTTP 200
             // Treat as a thrown error so callers' .catch() fires — prevents silent empty results.
             if (body && body.success === false) {
-                let err = new Error(body.error || 'Request failed');
+                let err = new Error(_plainMessage(200, body.error || 'Request failed'));
                 err.status = 200; // Platform.fetch throws on non-2xx, so this is a 200 response
                 err.body = body;
                 throw err;
@@ -28,7 +67,7 @@
             // We need to preserve the existing error shape for backward compatibility.
             // The original _fetch attached status and body to the error.
             // PlatformError has e.status and e.data.
-            const err = new Error(e.message || 'Request failed');
+            const err = new Error(e.status === 200 ? (e.message || 'Request failed') : _plainMessage(e.status || 0, e.message));
             err.status = e.status || 0;
             err.body = e.data || null;
             throw err;
@@ -173,6 +212,7 @@
             domainsLoading: false,
             expandedDomains: {},
             domainCoverage: 0,
+            hasAcmDomains: true,
             domainBlockers: [],
             expandedElement: null,  // {code: "APP", id: 123}
             propertyTemplates: {},  // {archimateType: [templates]}
@@ -324,15 +364,18 @@
                 // Load solution name from hidden input
                 const nameEl = document.getElementById('journey-v2-solution-name');
                 if (nameEl) {
-                    self.solutionName = nameEl.value || '';
+                    self.solutionName = /^Untitled Solution/i.test(nameEl.value || '') ? '' : (nameEl.value || '');
                 }
                 // Load governance status for Step 7 lock
                 const govEl = document.getElementById('journey-v2-governance-status');
                 if (govEl) {
                     self.governanceStatus = govEl.value || 'draft';
                 }
+                const acmEl = document.getElementById('journey-v2-acm');
+                if (acmEl) { self.hasAcmDomains = acmEl.value === '1'; }
                 // Restore saved state
                 self._restoreState();
+                if (self.domainsPopulated && !self.architectureResult) { self._loadArchitectureFromPromoted(); }
 
                 // Check if code has already been generated for this solution
                 // (enables skipping to Step 7 and showing deploy panel)
@@ -342,7 +385,7 @@
                 // ever ran — so every freshly created solution opened its journey
                 // behind two error toasts describing a state that is not an error.
                 // The genuine failures are still reported, by the .catch().
-                _fetch(API_BASE + '/' + self.solutionId + '/codegen/file-list', { silent: true })
+                _fetch('/solutions/' + self.solutionId + '/codegen/file-list', { silent: true })
                     .then(function (data) {
                         if (data && data.files && data.files.length > 0) {
                             self.hasGeneratedFiles = true;
@@ -471,6 +514,7 @@
                     this.completedSteps.push(this.currentStep);
                 }
                 const fromStep = this.currentStep;
+                if (fromStep === 1) { this._nameFromProblem(); }
                 // TRAC-001: fire-and-forget chain health check for steps 2-5
                 if (fromStep >= 2 && fromStep <= 5) {
                     this._validateStepChain(fromStep);
@@ -668,6 +712,11 @@
                 });
             },
 
+            // A step is ticked complete only when its content exists.
+            _tick: function (n) {
+                if (this.stepDone(n) && this.completedSteps.indexOf(n) === -1) this.completedSteps.push(n);
+            },
+
             prevStep: function () {
                 this.currentStep = Math.max(this.currentStep - 1, 1);
                 this._autoLoadStepData(this.currentStep);
@@ -708,7 +757,7 @@
                         }
                         break;
                     case 3:
-                        if (this.architectureResult) {
+                        if (this.architectureResult && this.architectureResult.total > 0) {
                             this.copilotMessage = 'Architecture generated. Review elements by layer -- accept or reject each.';
                         } else {
                             this.copilotMessage = 'Click "Generate Architecture" to create ArchiMate elements from your accepted capabilities.';
@@ -1688,7 +1737,7 @@
                     clearInterval(pollTimer);
                     self.llmDegraded.step3 = true;
                     self.error = 'Failed to generate architecture: ' + msg;
-                    self.copilotMessage = 'Architecture generation failed. Check API configuration and retry.';
+                    self.copilotMessage = 'Architecture generation did not complete. Your capabilities are kept.';
                     self.architectureLoading = false;
                 }
 
@@ -1968,6 +2017,19 @@
             },
             getDomainElementCount: function (code) {
                 return this.getDomainElements(code).length;
+            },
+            /* The one list of domains still to confirm. The strip's count, the panel's list
+             * and the Next Step gate all read it. */
+            unconfirmedDomains: function () {
+                return (this.domainBlockers || []).filter(function (b) { return b.type === 'domain_not_confirmed'; });
+            },
+            getDomainElementLabel: function (code) {
+                const n = this.getDomainElementCount(code);
+                return n + (n === 1 ? ' element' : ' elements');
+            },
+            getDomainTierLabel: function (code) {
+                const t = this.getDomainTier(code);
+                return ({ standard: 'Standard domain', important: 'Important domain', differentiating: 'Differentiating domain' })[t] || 'Standard domain';
             },
             isDomainExpanded: function (code) { return this.expandedDomains[code] || false; },
             toggleDomainExpand: function (code) { this.expandedDomains[code] = !this.expandedDomains[code]; },
@@ -2371,7 +2433,7 @@
 
             _refreshCompleteness: function () {
                 let self = this;
-                _fetch(API_BASE + '/' + self.solutionId + '/domain-completeness')
+                return _fetch(API_BASE + '/' + self.solutionId + '/domain-completeness')
                     .then(function (data) {
                         self.domainCoverage = data.domain_coverage || 0;
                         // Merge backend blockers with client-side threshold blockers:
@@ -2579,7 +2641,7 @@
             _loadArchitectureFromPromoted: function () {
                 let self = this;
                 self.architectureLoading = true;
-                _fetch(API_BASE + '/' + self.solutionId + '/promoted-elements')
+                return _fetch(API_BASE + '/' + self.solutionId + '/promoted-elements')
                     .then(function (data) {
                         self.architectureResult = data;
                         // Build accepted state and replace entire object for reactivity
@@ -3097,6 +3159,7 @@
                     body: JSON.stringify({ name: name })
                 }).then(function () {
                     self.solutionNameSaving = false;
+                    self._applyDisplayName();
                 }).catch(function (e) {
                     Platform.toast.error('The solution name did not save — please retry.');
                     self.solutionNameSaving = false;
@@ -3224,13 +3287,112 @@
                        }, 0))
                     : 0;
                 return [
-                    { label: 'Problem statement defined', pass: self.problemStatement.length > 20 },
-                    { label: 'Capabilities confirmed', pass: self.capabilitiesConfirmedForReadiness() },
-                    { label: 'Architecture elements generated', pass: archElemCount > 0 },
-                    { label: 'All 7 domains confirmed', pass: self.domainCoverage === 7 },
-                    { label: 'Decision points reviewed', pass: !!(self.decisionPoints && self.decisionPoints.length > 0) },
-                    { label: 'Migration roadmap generated', pass: !!(self.roadmapData && self.roadmapData.phases && self.roadmapData.phases.length > 0) }
+                    { key: 'problem', label: 'Problem statement defined', pass: self.problemStatement.length > 20 },
+                    { key: 'capabilities', label: 'Capabilities confirmed', pass: self.capabilitiesConfirmedForReadiness() },
+                    { key: 'elements', label: 'Architecture elements generated', pass: archElemCount > 0 },
+                    { key: 'domains', label: 'All 7 domains confirmed', pass: self.domainCoverage === 7 },
+                    { key: 'decisions', label: 'Decision points reviewed', pass: !!(self.decisionPoints && self.decisionPoints.length > 0) },
+                    { key: 'roadmap', label: 'Migration roadmap generated', pass: !!(self.roadmapData && self.roadmapData.phases && self.roadmapData.phases.length > 0) }
                 ];
+            },
+
+            _readiness: function (key) {
+                const hit = this.readinessItems().filter(function (i) { return i.key === key; })[0];
+                return !!(hit && hit.pass);
+            },
+
+            /* A step is done when the readiness list says its own item is done: the
+             * same predicates the ARB readiness panel and the status strip read. */
+            stepDone: function (n) {
+                switch (n) {
+                    case 1: return this._readiness('problem');
+                    case 2: return this.hasAcmDomains ? this._readiness('domains') : this._readiness('capabilities');
+                    case 3: return this._readiness('elements');
+                    case 4: return this._readiness('decisions');
+                    case 5: return this._readiness('roadmap');
+                    case 6: return this.readinessScore() === 100;
+                    default: return this.completedSteps.indexOf(n) !== -1;
+                }
+            },
+
+            tickedSteps: function () {
+                const out = [];
+                for (let n = 1; n <= 8; n++) { if (this.stepDone(n)) out.push(n); }
+                return out;
+            },
+
+            _stepLabel: function (n) {
+                const acm = ['Clarify', 'Domains', 'Architecture', 'Decisions', 'Roadmap', 'ARB Review'];
+                const plain = ['Clarify', 'Capabilities', 'Architecture', 'Options', 'Migration', 'Review'];
+                return (this.hasAcmDomains ? acm : plain)[n - 1] || ('Step ' + n);
+            },
+
+            _stopReason: function (n) {
+                if (n === 1) return 'Add a problem statement of at least 20 characters.';
+                if (n === 2) {
+                    return this.hasAcmDomains
+                        ? ('Your domains are not confirmed yet (' + this.domainCoverage + ' of 7). Review them here and confirm each one to continue.')
+                        : 'No capabilities are confirmed yet. Accept at least one to continue.';
+                }
+                if (n === 3) return 'No architecture elements exist yet. Generate them (this needs an AI model) or add them by hand.';
+                if (n === 4) return 'No decision points have been reviewed yet. Load them from this step.';
+                if (n === 5) return 'No migration roadmap has been built yet. Build it from this step.';
+                return 'Submit the package to the ARB from this step.';
+            },
+
+            firstOpenStep: function () {
+                for (let n = 1; n <= 6; n++) { if (!this.stepDone(n)) return n; }
+                return null;
+            },
+
+            /* After the automatic run: show the step it actually reached and why it stopped. */
+            _finishPipeline: function () {
+                const open = this.firstOpenStep();
+                for (let n = 1; n <= 6; n++) { this._tick(n); }
+                if (open === null) {
+                    this.currentStep = 6;
+                    this.copilotMessage = 'Every step is in place. Review the package and submit it to the ARB.';
+                    return;
+                }
+                this.currentStep = open;
+                this._autoLoadStepData(open);
+                this.copilotMessage = 'The automatic run stopped at ' + this._stepLabel(open) + '. ' + this._stopReason(open);
+            },
+
+            // ── Name ─────────────────────────────────────────────────────
+
+            hasName: function () {
+                const n = (this.solutionName || '').trim();
+                return n.length > 0 && !/^Untitled Solution/i.test(n);
+            },
+
+            displayTitle: function () {
+                return this.hasName() ? this.solutionName.trim() : 'This solution has no name yet';
+            },
+
+            _applyDisplayName: function () {
+                const title = this.displayTitle();
+                const h1 = document.querySelector('main h1, h1');
+                if (h1) h1.textContent = title;
+                const crumb = document.querySelector('nav[aria-label="Breadcrumb"] [aria-current="page"] span');
+                if (crumb) crumb.textContent = title;
+            },
+
+            focusName: function () {
+                this.currentStep = 1;
+                const el = document.querySelector("input[x-model='solutionName']");
+                if (el) { el.scrollIntoView({ block: 'center' }); el.focus(); }
+            },
+
+            /* The person's own words name the solution when they have not named it. */
+            _nameFromProblem: function () {
+                if (this.hasName()) return;
+                const text = (this.enrichedBrief || this.problemStatement || '').replace(/\s+/g, ' ').trim();
+                if (text.length < 20) return;
+                let title = text.split(/(?<=[.!?])\s/)[0];
+                if (title.length > 80) title = title.slice(0, 80).replace(/\s+\S*$/, '') + '\u2026';
+                this.solutionName = title.replace(/[.!?]+$/, '');
+                this.saveSolutionName();
             },
 
             readinessScore: function () {
@@ -3583,7 +3745,6 @@
                     }
 
                     // Step 2 -> 3: Map landscape
-                    self.completedSteps.push(2);
                     self.currentStep = 3;
                     return _fetch(API_BASE + '/' + self.solutionId + '/reasoning/map-landscape', {
                         method: 'POST',
@@ -3591,6 +3752,7 @@
                     });
                 }).then(function (data) {
                     self.reasoningLandscape = data.applications || [];
+                    self._tick(2);
                     const decomCount = data.decommissioning_count || 0;
                     const costedCount = data.costed_count || 0;
                     self.copilotMessage = data.count + ' applications serve your capabilities' +
@@ -3643,7 +3805,7 @@
                     }
 
                     // Step 3 -> 4: Detect gaps
-                    self.completedSteps.push(3);
+                    self._tick(3);
                     self.currentStep = 4;
                     return _fetch(API_BASE + '/' + self.solutionId + '/reasoning/detect-gaps', {
                         method: 'POST',
@@ -3665,7 +3827,7 @@
                     });
                 }).then(function (data) {
                     self.reasoningOptions = data.options || [];
-                    self.completedSteps.push(4);
+                    self._tick(4);
                     self.currentStep = 5;
 
                     // Auto-select first option (hybrid if available)
@@ -3686,7 +3848,7 @@
                     });
                 }).then(function (data) {
                     self.reasoningRecommendation = data;
-                    self.completedSteps.push(5);
+                    self._tick(5);
                     self.currentStep = 6;
 
                     // Step 6: Populate blueprint
@@ -3697,28 +3859,25 @@
                 }).then(function (data) {
                     self.reasoningCompleteness = data.completeness || 0;
                     self.domainsPopulated = true;
-                    self.completedSteps.push(6);
                     self.loading = false;
                     self._pipelineRunning = false;
+                    // Read back what now exists, so the ticks and the status strip say the same thing.
+                    return Promise.all([self._refreshCompleteness(), self._loadArchitectureFromPromoted()]);
+                }).then(function () {
+                    self._finishPipeline();
                     self._saveState();
-
-                    const pct = Math.round(self.reasoningCompleteness * 100);
-                    self.copilotMessage = 'Blueprint populated! Completeness: ' + pct +
-                        '%. ' + (data.sections_populated || 0) + ' sections filled, ' +
-                        (data.gaps_as_risks || 0) + ' gaps registered as risks. ' +
-                        'Open the Solution Blueprint to review and refine.';
                 }).catch(function (e) {
                     self.loading = false;
                     self._pipelineRunning = false;
                     if (e.message !== 'No capabilities' && e.message !== 'No options') {
-                        let stepName = 'step ' + self.currentStep;
-                        if (self.currentStep === 2) stepName = 'discover-capabilities';
-                        else if (self.currentStep === 3) stepName = 'map-landscape / estimate-costs';
-                        else if (self.currentStep === 4) stepName = 'detect-gaps';
-                        else if (self.currentStep === 5) stepName = 'generate-options / select-recommendation';
-                        else if (self.currentStep === 6) stepName = 'populate-blueprint';
-                        self.error = 'Pipeline stopped at "' + stepName + '": ' + (e.message || 'Unknown error');
-                        self.copilotMessage = 'Pipeline stopped at "' + stepName + '". You can continue manually from the current step.';
+                        let stepName = 'this step';
+                        if (self.currentStep === 2) stepName = 'finding capabilities';
+                        else if (self.currentStep === 3) stepName = 'mapping your applications and costs';
+                        else if (self.currentStep === 4) stepName = 'finding gaps';
+                        else if (self.currentStep === 5) stepName = 'preparing options';
+                        else if (self.currentStep === 6) stepName = 'filling the blueprint';
+                        self.error = 'The automatic run stopped while ' + stepName + '. ' + _plainMessage(e.status || 0, e.message);
+                        self.copilotMessage = 'The automatic run stopped while ' + stepName + '. You can continue by hand from the current step.';
                     }
                 });
             },

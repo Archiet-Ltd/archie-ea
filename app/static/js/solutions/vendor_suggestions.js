@@ -22,7 +22,7 @@ function vendorSuggestionsMixin() {
             const params = capabilityIds.join(',');
             // Platform.fetch.get automatically appends query parameters when params is an object.
             // But here we already have a comma-separated string, so we'll build the URL manually.
-            const url = '/api/solutions/' + solutionId + '/suggestions/vendors?capability_ids=' + params;
+            const url = '/architecture-journey/' + solutionId + '/vendor-suggestions?capability_ids=' + params;
             // Use { silent: true } because we set vendorError for inline error display
             Platform.fetch.get(url, {}, { silent: true })
                 .then(function(data) {
@@ -34,20 +34,20 @@ function vendorSuggestionsMixin() {
                 })
                 .catch(function(err) {
                     self.vendorSuggestions = [];
-                    self.vendorError = 'Could not load vendor suggestions — ' + (err && err.message ? err.message : 'request failed');
+                    self.vendorError = 'Vendor suggestions are not available right now. The journey works without them.';
                     self.vendorLoading = false;
                     // Platform.fetch already shows a toast unless silent:true, but we passed silent:true.
                     // However, we still want to show a toast for network errors? The original code did.
                     // The original code showed toast via Platform.toast.error.
                     // Since we passed silent:true, we need to show toast ourselves for consistency.
-                    if (window.Platform && Platform.toast) Platform.toast.error(self.vendorError);
+                    
                 });
         },
 
         confirmVendor: function(solutionId, pricingId, index, vendorIndex) {
             let self = this;
             // Platform.fetch.post automatically handles CSRF and JSON serialization
-            Platform.fetch.post('/api/solutions/' + solutionId + '/suggestions/vendors/confirm', {pricing_id: pricingId})
+            Platform.fetch.post('/architecture-journey/' + solutionId + '/vendor-suggestions/confirm', {pricing_id: pricingId})
                 .then(function(data) {
                     // Platform.fetch returns the parsed response body directly.
                     let payload = (data && data.data !== undefined) ? data.data : data;

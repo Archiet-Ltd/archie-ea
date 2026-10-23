@@ -41,18 +41,30 @@ class JourneyOrchestrator:
         """
         from app.models.solution_models import Solution
         from sqlalchemy.orm.attributes import flag_modified
-        solution = Solution.query.get(self.solution_id)
-        if not solution:
-            return {"error": "Solution not found"}
-        # Preserve server-managed keys (e.g. _arch_gen, _arch_critique) that
-        # the client never includes in its save-state payload.
-        existing = solution.journey_state if isinstance(solution.journey_state, dict) else {}
-        merged = {k: v for k, v in existing.items() if k.startswith("_")}
-        merged.update(state_data)
-        solution.journey_state = merged
-        flag_modified(solution, "journey_state")
-        db.session.commit()
-        return {"saved": True}
+        from sqlalchemy.orm.exc import StaleDataError
+
+        for attempt in range(3):
+            solution = Solution.query.get(self.solution_id)
+            if not solution:
+                return {"error": "Solution not found"}
+            # Preserve server-managed keys (e.g. _arch_gen, _arch_critique) that
+            # the client never includes in its save-state payload.
+            existing = solution.journey_state if isinstance(solution.journey_state, dict) else {}
+            merged = {k: v for k, v in existing.items() if k.startswith("_")}
+            merged.update(state_data)
+            solution.journey_state = merged
+            flag_modified(solution, "journey_state")
+            try:
+                db.session.commit()
+                return {"saved": True}
+            except StaleDataError:
+                # Another request saved this solution between our read and write:
+                # read it again and merge onto what it stored.
+                db.session.rollback()
+                db.session.expire_all()
+                if attempt == 2:
+                    raise
+        return {"saved": False}
 
     def load_state(self) -> dict:
         """Load wizard state + architecture elements from DB."""

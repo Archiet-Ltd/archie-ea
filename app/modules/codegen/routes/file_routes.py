@@ -54,7 +54,8 @@ def get_file_list(solution_id):
 
     gen = CodegenGeneration.query.filter_by(solution_id=solution_id).first()
     if not gen or not gen.generated_files:
-        return jsonify({"error": "No generated files"}), 404
+        # Nothing generated yet is an answer, not an error: every wizard load asks.
+        return jsonify({"success": True, "files": []})
 
     return jsonify({"success": True, "files": sorted(gen.generated_files.keys())})
 
