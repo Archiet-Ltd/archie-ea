@@ -208,3 +208,94 @@ def test_organisation_b_cannot_see_kind(browser, live_server):
 
     finally:
         context.close()
+
+
+def test_kind_filter_works_across_pages(browser, live_server):
+    """30 work packages, 12 marked Epic across 3 pages; filtering to Epic
+    shows 12 with the right page count; options match the registry."""
+    org = create_fresh_org("enterprise_architect")
+    context = browser.new_context(
+        ignore_https_errors=True,
+        viewport={"width": 1440, "height": 1000},
+    )
+    context.add_init_script("localStorage.setItem('archie_onboarding_ts', Date.now().toString());")
+    page = context.new_page()
+    suffix = org["suffix"]
+
+    try:
+        sign_in(page, live_server, org["emails"]["enterprise_architect"])
+
+        # Create 30 WorkPackage elements, mark 12 as Epic.
+        for i in range(30):
+            name = f"Kind Filter Journey {suffix} WP {i:02d}"
+            wp_id = _create_archimate_element(page, org, name, "WorkPackage", "implementation")
+            if i < 12:
+                _set_kind(page, org, wp_id, "Epic")
+
+        # Navigate to the implementation layer dashboard.
+        page.goto(
+            live_server + "/architecture/implementation",
+            wait_until="domcontentloaded",
+            timeout=PAGE_TIMEOUT,
+        )
+
+        # Wait for the page to load.
+        import time
+        time.sleep(2)
+
+        # Open advanced filters to reveal the Kind dropdown.
+        adv_toggle = page.get_by_test_id("advanced-toggle")
+        if adv_toggle.is_visible():
+            adv_toggle.click()
+            time.sleep(1)
+
+        # Verify the Kind dropdown has options from the registry.
+        kind_select = page.locator("#architecture-kind")
+        kind_options = kind_select.locator("option").all_inner_texts()
+        expected_kinds = {"Any kind", "Epic", "Feature", "Capability (SAFe)", "Enabler"}
+        for ek in expected_kinds:
+            assert ek in kind_options, (
+                f"Kind option '{ek}' not found in dropdown; got {kind_options}"
+            )
+
+        # Select "Epic" in the Kind filter.
+        kind_select.select_option("Epic")
+        time.sleep(2)
+
+        # Verify the pagination shows 12 total via the API.
+        status, data = api(page, "GET",
+            "/architecture/api/layer/implementation/elements?kind=Epic&per_page=10&page=1")
+        assert status == 200, f"API returned {status}: {data}"
+        pag = data.get("pagination", {})
+        assert pag.get("total") == 12, (
+            f"Expected total=12 for Epic filter, got {pag.get('total')}"
+        )
+        assert pag.get("pages") == 2, (
+            f"Expected pages=2 for 12 Epics at per_page=10, got {pag.get('pages')}"
+        )
+        assert len(data.get("elements", [])) == 10, (
+            f"Expected 10 elements on page 1, got {len(data.get('elements', []))}"
+        )
+        for el in data.get("elements", []):
+            assert el.get("kind") == "Epic", (
+                f"Element {el.get('name')} has kind={el.get('kind')}, expected Epic"
+            )
+
+        # Page 2 should have the remaining 2 Epics.
+        status2, data2 = api(page, "GET",
+            "/architecture/api/layer/implementation/elements?kind=Epic&per_page=10&page=2")
+        assert status2 == 200
+        assert len(data2.get("elements", [])) == 2, (
+            f"Expected 2 elements on page 2, got {len(data2.get('elements', []))}"
+        )
+
+        # Without kind filter, all 30 elements should be returned.
+        status_all, data_all = api(page, "GET",
+            "/architecture/api/layer/implementation/elements?per_page=50")
+        assert status_all == 200
+        assert data_all.get("pagination", {}).get("total") == 30, (
+            f"Expected total=30 without filter, got {data_all.get('pagination', {}).get('total')}"
+        )
+
+    finally:
+        context.close()
