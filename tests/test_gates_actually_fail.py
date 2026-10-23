@@ -26,7 +26,7 @@ parallel. Each case asserts both directions: the bad tree is non-zero AND the
 clean tree is zero. Asserting only "red" would pass for a checker that returns a
 positive count for everything.
 
-Two checkers are deliberately absent from the --root convention, and naming
+Three checkers are deliberately absent from the --root convention, and naming
 them is the point -- a hollow case in THIS file would defeat the file.
 
 check_canonical_route.py reads a BOOTED url_map, because a static scan of
@@ -40,6 +40,12 @@ check_evidence_contract.py reads real git history and the verify.py registry,
 and has no --root, so a synthetic tree cannot drive it. Its rule-2 substance is covered directly instead, by
 test_every_registered_checker_carries_its_proof below. Naming the exclusion is
 the point -- a hollow case in THIS file would defeat the file.
+
+check_smoke_coverage_on_change.py reads live git diff state (committed,
+uncommitted and untracked) rather than a directory someone hands it, so a
+--root tree cannot drive it either. It IS pinned red-and-green below, by
+loading the module directly and monkeypatching its `_changed_files` function
+with synthetic diff shapes.
 """
 
 import json
@@ -595,3 +601,53 @@ def test_canonical_route_ignores_the_methods_werkzeug_invents():
     # One endpoint, several methods. Werkzeug adds HEAD and OPTIONS on top.
     app.add_url_rule("/thing", "only", lambda: "", methods=["GET", "POST"])
     assert module.collisions(list(app.url_map.iter_rules())) == []
+
+
+def _load_smoke_coverage_module():
+    import importlib.util
+
+    checker = os.path.join(REPO, "scripts", "check_smoke_coverage_on_change.py")
+    spec = importlib.util.spec_from_file_location("_smoke_coverage", checker)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_smoke_coverage_on_change_ignores_a_deleted_watched_file(monkeypatch):
+    """A path that no longer exists cannot need a browser test.
+
+    ``git diff --name-only`` lists a deletion exactly like an edit, so the
+    naive reading of the diff would demand a tests/smoke/ touch (or a
+    first-line escape marker) for a file that has nothing left to render --
+    and no first line left to carry the marker on. That was the actual
+    failure mode this fixes: deleting an unreferenced script tripped the
+    gate with no way to satisfy it.
+
+    Both directions are asserted, same as every other checker in this file:
+    a real, currently-tracked template that is still present and untouched
+    by a smoke test still fires (the gate has not been neutered), while a
+    watched path that does not exist on disk -- the deletion case -- does
+    not, with no escape marker required.
+    """
+    module = _load_smoke_coverage_module()
+
+    edited_but_present = "app/templates/layouts/admin_base.html"
+    assert os.path.exists(os.path.join(REPO, *edited_but_present.split("/"))), (
+        "fixture assumes %s still exists in the tree" % edited_but_present
+    )
+    monkeypatch.setattr(module, "_changed_files", lambda base: {edited_but_present})
+    assert module.find_unverified("HEAD") == [edited_but_present], (
+        "an edited, still-present watched file with no smoke touch and no "
+        "escape marker must still be flagged"
+    )
+
+    deleted = "app/static/js/probe-deleted-file-that-does-not-exist.js"
+    assert not os.path.exists(os.path.join(REPO, *deleted.split("/"))), (
+        "fixture assumes %s does not exist in the tree" % deleted
+    )
+    monkeypatch.setattr(module, "_changed_files", lambda base: {deleted})
+    assert module.find_unverified("HEAD") == [], (
+        "a deleted watched file must not be flagged -- there is nothing left "
+        "for a browser test to cover, and no first line left for an escape "
+        "marker"
+    )
