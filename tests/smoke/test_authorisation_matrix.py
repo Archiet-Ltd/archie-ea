@@ -87,6 +87,7 @@ POLICY = {
     # to the organisation that asked it (an address from another organisation
     # is a 404, pinned in the module tests and the journey).
     "/intelligence/answers":   set(ARCHETYPES),
+    "/intelligence/what-if":   set(ARCHETYPES),
 # Model Health / Drift: carries @login_required and no role gate, so every
     # archetype is expected to reach it.
     "/genome/model-health/":   set(ARCHETYPES),

@@ -199,6 +199,7 @@ def test_solution_architect_my_work_membership():
         # shared by every persona with GENERAL permission.
         "Approval Inbox",
         "Solutions",
+        "What-if comparison",
         "AI Chat",
         "ADM Kanban",
         # 31 Aug 2026: the ARB dashboard was reachable from no persona's
@@ -276,6 +277,7 @@ def test_cto_my_work_membership():
         # surface and was linked from nowhere. It belongs first -- it is the
         # screen this persona opens to answer "what are we doing next".
         "Roadmaps",
+        "What-if comparison",
         # Approval Inbox — one queue for every pending change proposal,
         # shared by every persona with GENERAL permission.
         "Approval Inbox",
