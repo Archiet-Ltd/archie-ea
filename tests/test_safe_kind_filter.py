@@ -148,7 +148,7 @@ def test_kind_filter_matches_the_stored_property(app, db_session, make_org, logi
     across the whole three-page list at per_page=25."""
     org = make_org("kind-stored")
     epic_indices = [2, 5, 8, 11, 14, 17, 20, 23, 26, 29, 32, 35]
-    seeded = _seed_work_packages(db_session, org.id, 55, epic_indices)
+    _seed_work_packages(db_session, org.id, 55, epic_indices)
     user, org_row = _make_architect(db_session, org.id, "kf-sp")
 
     c = app.test_client()
