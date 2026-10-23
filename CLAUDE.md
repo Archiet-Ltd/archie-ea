@@ -507,7 +507,7 @@ counts only the families in `BANNED_FAMILIES` (`scripts/check_design_tokens.py`)
 `orange` or `cyan` class is right per DESIGN.md but moves this number by zero, and a
 line carrying a `token-migration-ok` marker is already excluded from the count.
 
-**All 73 gates, in registry order (`scripts/verify.py`, `build_gates`) — this table
+**All 75 gates, in registry order (`scripts/verify.py`, `build_gates`) — this table
 is a snapshot, not generated. Run `grep -oE '^\s*Gate\("[a-z-]+"' scripts/verify.py`
 to reconfirm the count before trusting it:**
 
@@ -586,6 +586,8 @@ to reconfirm the count before trusting it:**
 | `public-repo-hygiene` | a docs/buckets/ directory or path reference in this public repository | must be 0 |
 | `background-mechanisms` | a background-work mechanism (rq, celery, apscheduler, thread, process pool, detached subprocess) missing from `docs/background-mechanisms.yml`, or a stale entry | ratchet @ 29 thread instances in 22 files; keyed on file, kind and function |
 | `unregistered-checks` | a scripts/check_\*.py with no Gate(...) entry (F500-008) | ratchet @ 33 |
+| `asvs-register` | a security register row whose named test evidence does not exist, or a known-gap row that does not cite the brief that owns it | must be 0 |
+| `two-org-coverage` | a route family that reads organisation data with no two-organisation test; every startup family must stay covered | ratchet @ 130 non-startup, 0 startup |
 
 Per-line escape hatches, each of which makes the exception reviewable rather than
 silent — every one greppable as `<name>-ok` in `scripts/verify.py`/`scripts/check_*.py`:
