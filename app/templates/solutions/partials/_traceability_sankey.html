@@ -10,8 +10,12 @@
 #}
 
 {# D3 + d3-sankey — defer-loaded; parent pages may load these too (harmless double-include) #}
+{# A page that sets sankey_lazy loads them when the diagram is first opened, and already carries the colour-token helper. #}
+{% if not sankey_lazy %}
 <script src="/static/vendor/d3.min.js" defer></script>
 <script src="/static/vendor/d3-sankey.min.js" defer></script>
+<script src="{{ url_for('static', filename='js/shared/css_color_tokens.js') }}"></script>
+{% endif %}
 
 {# The factory MUST be defined before the x-data below is evaluated, so this one
    is neither deferred nor placed at the foot of the partial. It used to be both,
@@ -22,7 +26,7 @@
    at evaluation time, which is the difference. #}
 <script src="/static/js/solutions/traceability_sankey.js"></script>
 
-<div x-data="traceabilitySankey({{ sankey_solution_id | default(0) }}, '{{ sankey_api_url | default('') }}')"
+<div x-data="traceabilitySankey({{ sankey_solution_id | default(0) }}, '{{ sankey_api_url | default('') }}', {{ 'true' if sankey_lazy else 'false' }})"
      x-init="init()"
      class="w-full min-h-[420px]">
 
@@ -72,7 +76,7 @@
     <div class="flex flex-wrap gap-x-3 gap-y-1 mb-3 min-h-[18px]">
       <template x-for="item in activeLegend" :key="item.label">
         <div class="flex items-center gap-1">
-          <span class="w-2.5 h-2.5 rounded-sm shrink-0" :style="`background:${item.color}`"></span>
+          <span class="w-2.5 h-2.5 rounded-sm shrink-0" :class="item.swatch"></span>
           <span class="text-xs text-muted-foreground" x-text="item.label"></span>
         </div>
       </template>
@@ -153,9 +157,9 @@
               <p class="text-xs text-muted-foreground uppercase tracking-wide mb-1">Health score</p>
               <div class="flex items-center gap-2">
                 <div class="flex-1 bg-muted rounded-full h-1.5">
-                  <div class="rounded-full h-1.5 transition-all" :style="`width:${((selectedNode.health||0)/4)*100}%;background:${healthColor(selectedNode)}`"></div>
+                  <div class="rounded-full h-1.5 transition-all" :class="healthSwatch(selectedNode)" :style="`width:${((selectedNode.health||0)/4)*100}%`"></div>
                 </div>
-                <span class="text-xs font-medium" :style="`color:${healthColor(selectedNode)}`" x-text="`${selectedNode.health||0}/4`"></span>
+                <span class="text-xs font-medium text-foreground" x-text="`${selectedNode.health||0}/4`"></span>
               </div>
             </div>
             <div x-show="linkedNodes.length > 0" class="border-t border-border pt-2.5">
@@ -163,7 +167,7 @@
               <ul class="space-y-1">
                 <template x-for="ln in linkedNodes" :key="ln.id">
                   <li class="flex items-center gap-1.5 text-xs text-foreground">
-                    <span class="w-1.5 h-1.5 rounded-full shrink-0" :style="`background:${nodeColor(ln)}`"></span>
+                    <span class="w-1.5 h-1.5 rounded-full shrink-0" :class="nodeSwatch(ln)"></span>
                     <span class="truncate" x-text="ln.name"></span>
                   </li>
                 </template>

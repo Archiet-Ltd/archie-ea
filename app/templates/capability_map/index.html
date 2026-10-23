@@ -1402,6 +1402,7 @@
                 </div>
                 {% set sankey_solution_id = 0 %}
                 {% set sankey_api_url = '/capability-map/api/flow-sankey' %}
+                {% set sankey_lazy = true %}
                 {% include 'solutions/partials/_traceability_sankey.html' %}
             </div>
 
@@ -1850,12 +1851,12 @@
                                     <label for="edit-gap-color" class="block text-sm font-medium text-muted-foreground mb-1">Gap color</label>
                                     <input type="color" id="edit-gap-color" class="w-12 h-9 border border-input rounded cursor-pointer">
                                     <div id="edit-gap-color-presets" class="flex space-x-1">
-                                        <button type="button" @click="setGapColor('#6B7280')" class="w-6 h-6 rounded bg-muted-foreground hover:ring-2 ring-offset-1 ring-muted-foreground" aria-label="Set gap color to gray"></button>
-                                        <button type="button" @click="setGapColor('#EAB308')" class="w-6 h-6 rounded bg-warning hover:ring-2 ring-offset-1 ring-warning" aria-label="Set gap color to warning"></button>
-                                        <button type="button" @click="setGapColor('#EF4444')" class="w-6 h-6 rounded bg-destructive hover:ring-2 ring-offset-1 ring-destructive" aria-label="Set gap color to destructive"></button>
-                                        <button type="button" @click="setGapColor('#A855F7')" class="w-6 h-6 rounded bg-primary hover:ring-2 ring-offset-1 ring-primary" aria-label="Set gap color to purple"></button>
-                                        <button type="button" @click="setGapColor('#3B82F6')" class="w-6 h-6 rounded bg-primary hover:ring-2 ring-offset-1 ring-primary" aria-label="Set gap color to blue"></button>
-                                        <button type="button" @click="setGapColor('#22C55E')" class="w-6 h-6 rounded bg-success hover:ring-2 ring-offset-1 ring-success" aria-label="Set gap color to success"></button>
+                                        <button type="button" @click="setGapColor('muted-foreground')" class="w-6 h-6 rounded bg-muted-foreground hover:ring-2 ring-offset-1 ring-muted-foreground" aria-label="Set gap color to gray"></button>
+                                        <button type="button" @click="setGapColor('warning')" class="w-6 h-6 rounded bg-warning hover:ring-2 ring-offset-1 ring-warning" aria-label="Set gap color to warning"></button>
+                                        <button type="button" @click="setGapColor('destructive')" class="w-6 h-6 rounded bg-destructive hover:ring-2 ring-offset-1 ring-destructive" aria-label="Set gap color to destructive"></button>
+                                        <button type="button" @click="setGapColor('layer-motivation')" class="w-6 h-6 rounded bg-layer-motivation hover:ring-2 ring-offset-1 ring-layer-motivation" aria-label="Set gap color to purple"></button>
+                                        <button type="button" @click="setGapColor('layer-application')" class="w-6 h-6 rounded bg-layer-application hover:ring-2 ring-offset-1 ring-layer-application" aria-label="Set gap color to blue"></button>
+                                        <button type="button" @click="setGapColor('success')" class="w-6 h-6 rounded bg-success hover:ring-2 ring-offset-1 ring-success" aria-label="Set gap color to success"></button>
                                     </div>
                                 </div>
                             </div>
@@ -2281,14 +2282,14 @@
                         <label class="block text-sm font-medium text-muted-foreground mb-1">Color</label>
                         <div class="flex items-center gap-2">
                             <label for="add-roadmap-color" class="block text-sm font-medium text-muted-foreground mb-1">Gap color</label>
-                            <input type="color" id="add-roadmap-color" value="#6B7280" class="w-10 h-9 rounded cursor-pointer">
+                            <input type="color" id="add-roadmap-color" class="w-10 h-9 rounded cursor-pointer">
                             <div class="flex gap-1">
-                                <button type="button" @click="document.getElementById('add-roadmap-color').value='#6B7280'" class="w-6 h-6 rounded-full bg-muted-foreground hover:ring-2 ring-offset-1 ring-muted-foreground" aria-label="Set roadmap color to gray"></button>
-                                <button type="button" @click="document.getElementById('add-roadmap-color').value='#EAB308'" class="w-6 h-6 rounded-full bg-warning hover:ring-2 ring-offset-1 ring-warning" aria-label="Set roadmap color to warning"></button>
-                                <button type="button" @click="document.getElementById('add-roadmap-color').value='#EF4444'" class="w-6 h-6 rounded-full bg-destructive hover:ring-2 ring-offset-1 ring-destructive" aria-label="Set roadmap color to destructive"></button>
-                                <button type="button" @click="document.getElementById('add-roadmap-color').value='#A855F7'" class="w-6 h-6 rounded-full bg-primary hover:ring-2 ring-offset-1 ring-purple-500" aria-label="Set roadmap color to purple"></button><!-- design-tokens-ok: literal purple swatch in a 6-colour roadmap picker (gray/warning/destructive/purple/blue/success) — no semantic token renders true purple, and re-pointing the ring at info/primary would visually merge it with the adjacent blue swatch -->
-                                <button type="button" @click="document.getElementById('add-roadmap-color').value='#3B82F6'" class="w-6 h-6 rounded-full bg-primary hover:ring-2 ring-offset-1 ring-primary" aria-label="Set roadmap color to blue"></button>
-                                <button type="button" @click="document.getElementById('add-roadmap-color').value='#22C55E'" class="w-6 h-6 rounded-full bg-success hover:ring-2 ring-offset-1 ring-success" aria-label="Set roadmap color to success"></button>
+                                <button type="button" @click="setRoadmapColor('muted-foreground')" class="w-6 h-6 rounded-full bg-muted-foreground hover:ring-2 ring-offset-1 ring-muted-foreground" aria-label="Set roadmap color to gray"></button>
+                                <button type="button" @click="setRoadmapColor('warning')" class="w-6 h-6 rounded-full bg-warning hover:ring-2 ring-offset-1 ring-warning" aria-label="Set roadmap color to warning"></button>
+                                <button type="button" @click="setRoadmapColor('destructive')" class="w-6 h-6 rounded-full bg-destructive hover:ring-2 ring-offset-1 ring-destructive" aria-label="Set roadmap color to destructive"></button>
+                                <button type="button" @click="setRoadmapColor('layer-motivation')" class="w-6 h-6 rounded-full bg-layer-motivation hover:ring-2 ring-offset-1 ring-layer-motivation" aria-label="Set roadmap color to purple"></button>
+                                <button type="button" @click="setRoadmapColor('layer-application')" class="w-6 h-6 rounded-full bg-layer-application hover:ring-2 ring-offset-1 ring-layer-application" aria-label="Set roadmap color to blue"></button>
+                                <button type="button" @click="setRoadmapColor('success')" class="w-6 h-6 rounded-full bg-success hover:ring-2 ring-offset-1 ring-success" aria-label="Set roadmap color to success"></button>
                             </div>
                         </div>
                     </div>

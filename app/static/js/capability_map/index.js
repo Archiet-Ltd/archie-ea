@@ -1009,6 +1009,8 @@
                     setTimeout(() => loadBusinessDomainCards(), 100);
                 } else if (tab === 'capability-model') {
                     setTimeout(() => loadCapabilityModelTab(), 100);
+                } else if (tab === 'flow') {
+                    setTimeout(() => window.dispatchEvent(new CustomEvent('load-sankey-0')), 100);
                 } else if (tab === 'manufacturing') {
                     setTimeout(() => loadManufacturingDomainStats(), 100);
                 } else if (tab === 'gaps') {
@@ -1051,13 +1053,24 @@
     let currentEditGapId = null;
     let currentEditWPId = null;
     
-    // Gap type colors
-    const GAP_TYPE_COLORS = {
-        'coverage': '#6B7280',      // Gray
-        'quality': '#EAB308',       // Yellow
-        'retirement': '#EF4444',    // Red
-        'modernization': '#A855F7'  // Purple
+    // A design token as a #rrggbb string, for colours that are saved on a record or
+    // handed to <input type="color">. Resolved when used so it follows the theme.
+    function tokenHex(token) {
+        return window.ArchieColorTokens.cssHex(token, 'muted-foreground');
+    }
+
+    // Gap type colors (token names, resolved by gapTypeColors())
+    const GAP_TYPE_TOKENS = {
+        'coverage': 'muted-foreground',
+        'quality': 'warning',
+        'retirement': 'destructive',
+        'modernization': 'layer-motivation'
     };
+    function gapTypeColors() {
+        const out = {};
+        Object.keys(GAP_TYPE_TOKENS).forEach(k => { out[k] = tokenHex(GAP_TYPE_TOKENS[k]); });
+        return out;
+    }
     
     // Initialize roadmap tab when clicked
     // MEASURED, 31 Aug 2026: this whole roadmap renderer no longer reaches the
@@ -1172,12 +1185,13 @@
     
     // Get color based on primary gap type
     function getGapTypeColor(gapTypes) {
-        if (!gapTypes || gapTypes.length === 0) return '#6B7280';
+        const colors = gapTypeColors();
+        if (!gapTypes || gapTypes.length === 0) return colors.coverage;
         // Priority: retirement > modernization > quality > coverage
-        if (gapTypes.includes('retirement')) return GAP_TYPE_COLORS.retirement;
-        if (gapTypes.includes('modernization')) return GAP_TYPE_COLORS.modernization;
-        if (gapTypes.includes('quality')) return GAP_TYPE_COLORS.quality;
-        return GAP_TYPE_COLORS.coverage;
+        if (gapTypes.includes('retirement')) return colors.retirement;
+        if (gapTypes.includes('modernization')) return colors.modernization;
+        if (gapTypes.includes('quality')) return colors.quality;
+        return colors.coverage;
     }
     
     // Get gap type badge HTML
@@ -1824,7 +1838,7 @@
             // Visual hierarchy: connecting lines
             let hierarchyLines = '';
             for (let i = 1; i < level; i++) {
-                hierarchyLines += `<div class="absolute" style="left: ${12 + (i * 28)}px; top: 0; bottom: 0; width: 1px; background-color: #d1d5db;"></div>`;
+                hierarchyLines += `<div class="absolute bg-border" style="left: ${12 + (i * 28)}px; top: 0; bottom: 0; width: 1px;"></div>`;
             }
     
             html += `
@@ -1834,8 +1848,8 @@
                      data-level="${level}">
                     ${hierarchyLines}
                     ${level > 0 ? `
-                        <div class="absolute" style="left: ${12 + ((level - 1) * 28)}px; top: 0; width: 24px; height: 50%; border-left: 1px solid #d1d5db; border-bottom: 1px solid #d1d5db;"></div>
-                        ${!isLastChild ? `<div class="absolute" style="left: ${12 + ((level - 1) * 28)}px; top: 50%; bottom: 0; width: 1px; background-color: #d1d5db;"></div>` : ''}
+                        <div class="absolute border-l border-b border-border" style="left: ${12 + ((level - 1) * 28)}px; top: 0; width: 24px; height: 50%;"></div>
+                        ${!isLastChild ? `<div class="absolute bg-border" style="left: ${12 + ((level - 1) * 28)}px; top: 50%; bottom: 0; width: 1px;"></div>` : ''}
                     ` : ''}
                     <div class="flex items-center gap-2.5 w-full relative z-10">
                         ${hasChildren ? `
@@ -1907,7 +1921,7 @@
                 <!-- Grid columns -->
                 <div class="absolute inset-0 flex">
                     ${roadmapData.timelinePeriods.map(() =>
-                        `<div style="width: ${columnWidth}px; min-width: ${columnWidth}px; border-right: 1px solid #f3f4f6;"></div>`
+                        `<div class="border-r border-border/50" style="width: ${columnWidth}px; min-width: ${columnWidth}px;"></div>`
                     ).join('')}
                 </div>
                 <!-- Bar -->
@@ -1971,7 +1985,7 @@
                     <!-- Grid columns -->
                     <div class="absolute inset-0 flex">
                         ${roadmapData.timelinePeriods.map(() =>
-                            `<div style="width: ${columnWidth}px; min-width: ${columnWidth}px; border-right: 1px solid #f3f4f6;"></div>`
+                            `<div class="border-r border-border/50" style="width: ${columnWidth}px; min-width: ${columnWidth}px;"></div>`
                         ).join('')}
                     </div>
                     <!-- Work Package Bar with indentation -->
@@ -2002,14 +2016,14 @@
     
     // Get color based on hierarchy level
     function getColorByLevel(level) {
-        const colors = {
-            1: '#60A5FA', // Blue - L1 (Major phases)
-            2: '#34D399', // Green - L2 (Tasks)
-            3: '#F59E0B', // Amber - L3 (Subtasks)
-            4: '#A78BFA', // Purple - L4 (Activities)
-            5: '#EC4899'  // Pink - L5 (Steps)
+        const tokens = {
+            1: 'layer-application', // L1 (Major phases)
+            2: 'success',           // L2 (Tasks)
+            3: 'warning',           // L3 (Subtasks)
+            4: 'layer-motivation',  // L4 (Activities)
+            5: 'layer-risk'         // L5 (Steps)
         };
-        return colors[level] || '#6B7280'; // Gray fallback
+        return tokenHex(tokens[level] || 'muted-foreground');
     }
     
     // Toggle work package expansion
@@ -3479,7 +3493,7 @@
                 useCORS: true,
                 allowTaint: true,
                 logging: false,
-                backgroundColor: '#ffffff',
+                backgroundColor: tokenHex('background'),
                 scrollY: -window.scrollY,
                 scrollX: -window.scrollX,
                 windowWidth: document.documentElement.scrollWidth,
@@ -3545,7 +3559,7 @@
                 useCORS: true,
                 allowTaint: true,
                 logging: false,
-                backgroundColor: '#ffffff',
+                backgroundColor: tokenHex('background'),
                 scrollY: -window.scrollY,
                 scrollX: -window.scrollX,
                 windowWidth: document.documentElement.scrollWidth,
@@ -3874,7 +3888,7 @@
         getEl('edit-gap-status').value = gap.resolution_status || 'identified';
         getEl('edit-gap-start-date').value = gap.start_date || '';
         getEl('edit-gap-end-date').value = gap.end_date || '';
-        getEl('edit-gap-color').value = gap.color || '#6B7280';
+        getEl('edit-gap-color').value = gap.color || tokenHex('muted-foreground');
         getEl('edit-gap-owner').value = gap.business_owner || '';
         getEl('edit-gap-effort').value = gap.estimated_effort_days || '';
         getEl('edit-gap-cost').value = gap.estimated_cost || '';
@@ -3899,10 +3913,19 @@
         currentEditGapId = null;
     }
     
-    function setGapColor(color) {
-        getEl('edit-gap-color').value = color;
+    function setGapColor(token) {
+        getEl('edit-gap-color').value = tokenHex(token);
     }
     
+    function setRoadmapColor(token) {
+        getEl('add-roadmap-color').value = tokenHex(token);
+    }
+
+    window.addEventListener('load', () => {
+        const addColor = document.getElementById('add-roadmap-color');
+        if (addColor) addColor.value = tokenHex('muted-foreground');
+    });
+
     async function loadGapWorkPackages(gapId) {
         const container = getEl('edit-gap-work-packages');
         safeHTML(container, '<p class="text-sm text-muted-foreground">Loading work packages...</p>');
@@ -3918,7 +3941,7 @@
                     safeHTML(container, wps.map(wp => `
                         <div class="flex items-center justify-between p-2 bg-muted/50 rounded border border-border">
                             <div class="flex items-center space-x-2">
-                                <span class="w-3 h-3 rounded" style="background-color: ${wp.color || '#3B82F6'}"></span>
+                                <span class="w-3 h-3 rounded" style="background-color: ${wp.color || tokenHex('layer-application')}"></span>
                                 <span class="text-sm font-medium">${escapeHtml(wp.name)}</span>
                                 <span class="text-xs text-muted-foreground">${escapeHtml(wp.status)}</span>
                             </div>
@@ -4061,7 +4084,7 @@
                 getEl('edit-wp-progress').value = wp.percent_complete || 0;
                 getEl('edit-wp-start-date').value = wp.start_date || '';
                 getEl('edit-wp-end-date').value = wp.end_date || '';
-                getEl('edit-wp-color').value = wp.color || '#3B82F6';
+                getEl('edit-wp-color').value = wp.color || tokenHex('layer-application');
                 getEl('edit-wp-est-hours').value = wp.estimated_effort_hours || '';
                 getEl('edit-wp-act-hours').value = wp.actual_effort_hours || '';
                 getEl('edit-wp-est-cost').value = wp.estimated_cost || '';
@@ -4572,7 +4595,7 @@
                         priority: priority,
                         start_date: today.toISOString().split('T')[0],
                         end_date: endDate.toISOString().split('T')[0],
-                        color: '#6B7280',
+                        color: tokenHex('muted-foreground'),
                         create_work_packages: false
                     },
                     silent: true
@@ -6077,6 +6100,7 @@
     if (typeof closeDeleteConfirmModal !== 'undefined') window.closeDeleteConfirmModal = closeDeleteConfirmModal;
     if (typeof confirmDelete !== 'undefined') window.confirmDelete = confirmDelete;
     if (typeof setGapColor !== 'undefined') window.setGapColor = setGapColor;
+    window.setRoadmapColor = setRoadmapColor;
     
     // Work Package Functions
     if (typeof addWorkPackageToGap !== 'undefined') window.addWorkPackageToGap = addWorkPackageToGap;
