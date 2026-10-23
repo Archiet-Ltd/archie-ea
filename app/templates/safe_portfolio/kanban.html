@@ -1,0 +1,96 @@
+{% extends "layouts/admin_base.html" %}
+{% from 'macros/page_shell.html' import page_shell %}
+{% from 'macros/kanban_board.html' import kanban_board, kanban_move_select %}
+
+{% block title %}SAFe Portfolio Kanban{% endblock %}
+
+{% block content %}
+<div class="p-6 space-y-6">
+    {{ page_shell(
+        title='Portfolio Kanban',
+        subtitle='Epics organized by workflow state, ordered by WSJF priority',
+        breadcrumb=[('SAFe', None), ('Portfolio Kanban', None)]
+    ) }}
+
+    {# Config for the shared board component is handed over as a JSON data
+       island, not inline in x-data: the app runs Alpine's CSP build, whose
+       expression evaluator does not accept an inline object/function literal
+       in an attribute. safePortfolioBoard() reads this and calls the shared
+       kanbanBoard() factory. #}
+    <script type="application/json" id="safe-portfolio-kanban-config">
+      {
+        "columns": {{ columns_config | tojson }},
+        "cards": {{ cards | tojson }},
+        "canWrite": {{ can_write | tojson }},
+        "wipLimits": {{ wip_limits | tojson }},
+        "moveUrl": "/api/safe/portfolio/{id}",
+        "moveField": "kanban_state",
+        "sortBy": "wsjf_score"
+      }
+    </script>
+
+    <div x-data="safePortfolioBoard()">
+
+        <p class="text-xs text-muted-foreground mb-3">
+            Each card shows its WSJF score (Weighted Shortest Job First): Business Value, Time Criticality and Risk Reduction added together, divided by Job Size.
+            Drag a card to a new column, or use its "Move to" menu. The board scrolls sideways when the columns do not fit.
+        </p>
+
+        {% call(state) kanban_board(
+                states=kanban_states,
+                empty_hints=empty_hints,
+                can_write=can_write,
+                stage_group=stage_group,
+                region_label='Portfolio Kanban board, scrolls horizontally') %}
+            <template x-for="card in columnCards('{{ state }}')" :key="card.id">
+                <div draggable="true"
+                     class="kanban-card bg-card border rounded-lg p-3 transition-colors"
+                     :data-card-id="card.id"
+                     :class="{
+                         'opacity-40': draggingCard && draggingCard.id === card.id,
+                         'border-l-2 border-l-primary border-y-border border-r-border': isTopCard(card),
+                         'border-border': !isTopCard(card)
+                     }"
+                     @dragstart="onDragStart($event, card)"
+                     @dragend="onDragEnd()"
+                     :style="canWrite ? 'cursor: grab' : ''">
+
+                    <div class="flex items-start justify-between gap-2 mb-1">
+                        <h3 class="text-sm font-medium text-foreground" x-text="card.name"></h3>
+                        <template x-if="isTopCard(card)">
+                            <span class="shrink-0 text-xs text-primary font-medium" title="Highest WSJF in this column">Top WSJF</span>
+                        </template>
+                    </div>
+                    <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-primary mb-2"
+                          x-text="`WSJF: ${card.wsjf_score}`"></span>
+
+                    <p class="text-xs text-muted-foreground mb-3 line-clamp-2" x-text="card.description" x-show="card.description"></p>
+
+                    <dl class="text-xs space-y-1 mb-1">
+                        <div class="flex justify-between gap-2">
+                            <dt class="text-muted-foreground">Business Value</dt>
+                            <dd class="text-foreground font-medium" x-text="card.business_value"></dd>
+                        </div>
+                        <div class="flex justify-between gap-2">
+                            <dt class="text-muted-foreground">Time Criticality</dt>
+                            <dd class="text-foreground font-medium" x-text="card.time_criticality"></dd>
+                        </div>
+                        <div class="flex justify-between gap-2">
+                            <dt class="text-muted-foreground">Risk Reduction</dt>
+                            <dd class="text-foreground font-medium" x-text="card.risk_reduction"></dd>
+                        </div>
+                        <div class="flex justify-between gap-2">
+                            <dt class="text-muted-foreground">Job Size</dt>
+                            <dd class="text-foreground font-medium" x-text="card.job_size"></dd>
+                        </div>
+                    </dl>
+
+                    {{ kanban_move_select(kanban_states) }}
+                </div>
+            </template>
+        {% endcall %}
+    </div>
+</div>
+
+<script src="{{ url_for('static', filename='js/components/kanban_board.js') }}"></script>
+{% endblock %}
