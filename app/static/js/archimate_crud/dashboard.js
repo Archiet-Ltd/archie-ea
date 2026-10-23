@@ -145,6 +145,14 @@ document.addEventListener('alpine:init', function() {
                 return Array.from(new Set(arr));
             },
 
+            get currentLayerKindOptions() {
+                // The SAFe kinds the active layer's element types may carry,
+                // straight from the profile registry via the dashboard config.
+                let cfg = this.layerConfig[this.activeTab];
+                let arr = (cfg && Array.isArray(cfg.kind_options)) ? cfg.kind_options : [];
+                return Array.from(new Set(arr));
+            },
+
             get aiGenerateLayerTypes() {
                 let cfg = this.layerConfig[this.aiGenerate.layer];
                 let arr = (cfg && Array.isArray(cfg.elements)) ? cfg.elements : [];
@@ -340,6 +348,7 @@ document.addEventListener('alpine:init', function() {
                 this.searchQuery = '';
                 this.typeFilter = '';
                 this.sourceFilter = '';
+                this.kindFilter = '';
                 this.viewpointKey = 'basic';
                 this.viewpointTypeFilter = [];
                 this.filterScope = '';
@@ -354,6 +363,7 @@ document.addEventListener('alpine:init', function() {
             hasActiveFilters() {
                 return !!(
                     this.searchQuery || this.typeFilter || this.sourceFilter ||
+                    this.kindFilter ||
                     this.viewpointKey !== 'basic' || this.filterScope ||
                     this.filterBuildingBlock || this.filterPlateau ||
                     this.filterHasRels || this.cardFilter
@@ -423,6 +433,10 @@ document.addEventListener('alpine:init', function() {
                     ? params.get('source')
                     : '';
                 this.viewpointKey = params.get('viewpoint') || 'basic';
+                let wantedKind = params.get('kind') || '';
+                this.kindFilter = this.currentLayerKindOptions.includes(wantedKind)
+                    ? wantedKind
+                    : '';
                 this.currentPage = Math.max(1, parseInt(params.get('page') || '1', 10) || 1);
                 let wantedPageSize = parseInt(params.get('per_page') || '25', 10);
                 this.perPage = [25, 50, 100].includes(wantedPageSize) ? wantedPageSize : 25;
@@ -441,13 +455,14 @@ document.addEventListener('alpine:init', function() {
                 let params = new URLSearchParams(window.location.search);
                 [
                     'layer', 'search', 'element_type', 'source', 'viewpoint',
-                    'page', 'per_page', 'sort_by', 'sort_order', 'scope',
+                    'kind', 'page', 'per_page', 'sort_by', 'sort_order', 'scope',
                     'building_block', 'plateau', 'has_relationships', 'group',
                 ].forEach(function(key) { params.delete(key); });
                 params.set('layer', this.activeTab);
                 if (this.searchQuery) params.set('search', this.searchQuery);
                 if (this.typeFilter) params.set('element_type', this.typeFilter);
                 if (this.sourceFilter) params.set('source', this.sourceFilter);
+                if (this.kindFilter) params.set('kind', this.kindFilter);
                 if (this.viewpointKey !== 'basic') params.set('viewpoint', this.viewpointKey);
                 if (this.currentPage > 1) params.set('page', String(this.currentPage));
                 if (this.perPage !== 25) params.set('per_page', String(this.perPage));
@@ -471,6 +486,7 @@ document.addEventListener('alpine:init', function() {
                 this.activeTab = layerKey;
                 this.searchQuery = '';
                 this.typeFilter = '';
+                this.kindFilter = '';  // kinds are layer-specific; never carry one across tabs
                 this.currentPage = 1;
                 this.selectedIds = [];
                 this.selectAll = false;

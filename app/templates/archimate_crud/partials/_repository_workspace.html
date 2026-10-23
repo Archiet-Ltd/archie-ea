@@ -193,12 +193,16 @@
                 </select>
             </div>
             <div>
+                {# Kind options come from the profile registry (the active layer's
+               element types), so the control only exists where a layer has
+               kinds, and adding a kind to the registry updates the filter. #}
+            <div x-show="currentLayerKindOptions.length > 0" class="flex items-center gap-2">
                 <label for="architecture-kind" class="mb-1 block text-xs font-medium text-muted-foreground">Kind</label>
                 <select id="architecture-kind" x-model="kindFilter" @change="currentPage = 1; loadElements()" class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm">
                     <option value="">Any kind</option>
-                    {% for kind in kind_options %}
-                    <option value="{{ kind }}">{{ kind }}</option>
-                    {% endfor %}
+                    <template x-for="kind in currentLayerKindOptions" :key="kind">
+                        <option :value="kind" x-text="kind"></option>
+                    </template>
                 </select>
             </div>
             {# No "Solution linkage" filter: the layer elements endpoint returns no
