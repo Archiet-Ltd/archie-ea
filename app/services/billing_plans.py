@@ -154,7 +154,24 @@ def plan_for_price(price_id: Optional[str]) -> Optional[Tuple[Plan, str]]:
 
 
 def configuration_status() -> Dict:
-    """Which billing settings are present. Never returns the values."""
+    """Which billing settings are present. Never returns the values.
+
+    Checkout goes through Monelytics instead of straight to Stripe once
+    MONELYTICS_BASE_URL is set (see billing_service.create_checkout_session,
+    which dispatches there first and only falls back to the direct-Stripe
+    path below when it is not set). When Monelytics is the active provider,
+    this installation needs none of STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET
+    or a plan's price_env vars, so readiness follows Monelytics' own
+    settings instead (monelytics_provider.configuration_status) and
+    "prices" is None, since Monelytics resolves its own plan prices per
+    request rather than this reading them from the environment.
+    """
+    from app.services import monelytics_provider
+
+    if monelytics_provider.configured():
+        status = monelytics_provider.configuration_status()
+        return {"ready": status["ready"], "missing": status["missing"], "prices": None}
+
     missing = [
         name
         for name in ("STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET")
