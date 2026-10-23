@@ -663,15 +663,16 @@ def _assemble_investment_priorities_context():
     call are intentionally NOT caught here — each caller has its own
     fallback behaviour for that case.
     """
-    from app.models.unified_application_capability_mapping import UnifiedApplicationCapabilityMapping
-
-    mapping_count = UnifiedApplicationCapabilityMapping.query.count()
-    if mapping_count == 0:
-        return None, mapping_count
-
     from app.modules.solutions_strategic.v2.services.investment_prioritization_service import (
         InvestmentPrioritizationService,
+        organisation_capability_mappings,
     )
+
+    # This organisation's mappings, reached through the mapped application. The
+    # table has no organisation column, so a bare count is the installation's.
+    mapping_count = organisation_capability_mappings().count()
+    if mapping_count == 0:
+        return None, mapping_count
 
     service = InvestmentPrioritizationService()
     analysis = service.analyze_investment_priorities(include_risk_analysis=True)

@@ -13,8 +13,11 @@ import logging
 from datetime import datetime
 from typing import Dict, List
 
+from app import db
+from app.models.application_portfolio import ApplicationComponent
 from app.models.unified_application_capability_mapping import UnifiedApplicationCapabilityMapping
 from app.models.unified_capability import UnifiedCapability
+from app.utils.tenant import current_organization_id
 from .decorators import transactional
 
 # Timeframe string → integer months for ROI calculator
@@ -25,6 +28,26 @@ _TIMEFRAME_MONTHS: Dict[str, int] = {
 }
 
 logger = logging.getLogger(__name__)
+
+
+def organisation_capability_mappings(organization_id=None):
+    """Application-to-capability mappings of one organisation.
+
+    The mapping table has no organisation column, so the organisation is reached
+    through the mapped application. This is the one definition of "the mappings
+    this organisation has" that the Investment Map's readiness check and its
+    analysis both read; with no organisation the result is empty, never the
+    whole installation.
+    """
+    if organization_id is None:
+        organization_id = current_organization_id()
+    query = UnifiedApplicationCapabilityMapping.query.join(
+        ApplicationComponent,
+        ApplicationComponent.id == UnifiedApplicationCapabilityMapping.application_component_id,
+    )
+    if organization_id is None:
+        return query.filter(db.false())
+    return query.filter(ApplicationComponent.organization_id == organization_id)
 
 
 class InvestmentPrioritizationService:
@@ -58,7 +81,7 @@ class InvestmentPrioritizationService:
         # Batch-load all capability mappings to avoid N+1 queries
         mappings_by_cap = {}
         try:
-            all_mappings = UnifiedApplicationCapabilityMapping.query.all()
+            all_mappings = organisation_capability_mappings().all()
             for m in all_mappings:
                 mappings_by_cap.setdefault(m.unified_capability_id, []).append(m)
         except Exception:
