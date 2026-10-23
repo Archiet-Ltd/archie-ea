@@ -232,6 +232,17 @@ def boot_live_server(request, ai_protocol_stub, app, extra_env=None):
     if ai_protocol_stub is not None:
         env = ai_protocol_stub.child_environment(env)
     env.setdefault("SECRET_KEY", "smoke-only-not-secret-" + "x" * 16)
+    # Generate stable encryption keys for the subprocess so encrypted
+    # credentials can be decrypted by its worker thread. TestingConfig
+    # generates fresh keys at import time (config.py:599-600), so without
+    # this the subprocess gets different keys and InvalidToken fails every
+    # decrypt attempt.
+    if "CREDENTIAL_ENCRYPTION_KEY" not in env:
+        from cryptography.fernet import Fernet
+        env["CREDENTIAL_ENCRYPTION_KEY"] = Fernet.generate_key().decode()
+    if "ORG_ENCRYPTION_MASTER_KEY" not in env:
+        from cryptography.fernet import Fernet
+        env["ORG_ENCRYPTION_MASTER_KEY"] = Fernet.generate_key().decode()
     # "smoke", not "testing": config.py's SmokeTestingConfig is identical to
     # TestingConfig except for ADMIN_MFA_BYPASS, which lets the dozens of
     # admin-archetype fixtures in this suite reach the app shell without a
