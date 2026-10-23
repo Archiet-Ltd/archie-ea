@@ -333,18 +333,18 @@ def test_expanded_chain_marks_an_unresolved_link_instead_of_dropping_it(
     assert "source_id" not in expanded[1]
 
 
-def test_module_registers_exactly_nineteen_routes(app):
+def test_module_registers_exactly_twenty_routes(app):
     """The impact, risk, portfolio, programme, strategy, accountability,
     data, compliance, traceability, value-streams-at-risk, yield, catalogue
-    list, catalogue run and ask routes all mount on this same existing
-    blueprint rather than a new one each. Still exactly one blueprint, now
-    nineteen routes on it -- all six lenses of the catalogue, the L7 data
-    lens, the L6 compliance lens, the traceability check over the impact
-    walk, the Strategic value-streams-at-risk surface,
-    recompute/derived/yield, and R1-B39's query catalogue (list + run) and
-    plain-language ask endpoints, and R1-B30's stored answers (ask, list and
-    open by address -- login_required, fenced to the caller's active
-    organisation, rows in the authorisation matrix).
+    list, catalogue run, ask, suggested-questions and stored-answer routes all
+    mount on this same existing blueprint rather than a new one each. Still
+    exactly one blueprint, now twenty routes on it -- all six lenses of the
+    catalogue, the data lens, the compliance lens, the traceability check over
+    the impact walk, the value-streams-at-risk surface, recompute/derived/yield,
+    the query catalogue (list and run) and plain-language ask endpoints, the
+    suggested questions the Ask page and the dashboard checklist offer, and the
+    stored answers (ask, list and open by address -- login_required, fenced to
+    the caller's active organisation, rows in the authorisation matrix).
     """
     rules = [
         rule for rule in app.url_map.iter_rules() if rule.endpoint.startswith("intelligence_api.")
@@ -367,6 +367,7 @@ def test_module_registers_exactly_nineteen_routes(app):
         "intelligence_api.query_catalogue_list",
         "intelligence_api.query_catalogue_run",
         "intelligence_api.ask_nl_question",
+        "intelligence_api.suggested_questions_for_organisation",
         "intelligence_api.ask_answer",
         "intelligence_api.list_answers",
         "intelligence_api.get_answer",

@@ -107,9 +107,9 @@ def test_a_model_with_links_names_services_that_have_dependents(app, db_session,
 def test_a_model_with_no_links_still_offers_three_answerable_questions(app, db_session, make_org):
     org = make_org("sq-nolinks")
     # Services, but nothing depends on anything: no relationships at all.
-    quiet = _element(db_session, org.id, "Quiet Service")
-    lonely = _element(db_session, org.id, "Lonely Api")
-    orphan = _element(db_session, org.id, "Orphan Worker")
+    _element(db_session, org.id, "Quiet Service")
+    _element(db_session, org.id, "Lonely Api")
+    _element(db_session, org.id, "Orphan Worker")
     db_session.commit()
 
     result = _suggest(app, org.id)
@@ -176,3 +176,69 @@ def test_a_second_organisation_never_sees_the_first_ones_names(app, db_session, 
     result_a = _suggest(app, org_a.id)
     text_a = json.dumps(result_a, default=str)
     assert "Globex" not in text_a
+
+
+# --- the route that serves the questions to a signed-in person --------------
+
+
+def _route_user(db_session, org_id):
+    from app.models.user import User
+
+    import uuid
+
+    user = User(
+        email=f"sqr-{uuid.uuid4().hex[:10]}@example.com",
+        first_name="Sqr",
+        last_name="Tester",
+        organization_id=org_id,
+        confirmed=True,
+        enterprise_role="enterprise_architect",
+    )
+    db_session.add(user)
+    db_session.flush()
+    return user
+
+
+def test_route_serves_the_three_questions_for_a_signed_in_person(
+    app, db_session, make_org, client, login_as
+):
+    org = make_org("sq-route")
+    user = _route_user(db_session, org.id)
+    pay = _element(db_session, org.id, "Routed Payments")
+    dep = _element(db_session, org.id, "Routed Ledger")
+    _relationship(db_session, org.id, pay, dep)
+    db_session.commit()
+
+    login_as(client, user)
+    resp = client.get("/api/v1/intelligence/suggested-questions")
+    assert resp.status_code == 200
+    data = resp.get_json()["data"]
+    assert data["has_links"] is True
+    assert len(data["questions"]) >= 1
+    first = data["questions"][0]
+    assert first["element_name"] == "Routed Payments"
+    assert first["kind"] == "impact"
+    assert first["href"].endswith("element=%s" % pay.id)
+
+
+def test_route_is_not_served_to_an_anonymous_visitor(app, client):
+    resp = client.get("/api/v1/intelligence/suggested-questions")
+    assert resp.status_code in (301, 302, 401)
+
+
+def test_route_never_shows_another_organisations_names(
+    app, db_session, make_org, client, login_as
+):
+    org_a = make_org("sq-route-a")
+    org_b = make_org("sq-route-b")
+    user_b = _route_user(db_session, org_b.id)
+    a_svc = _element(db_session, org_a.id, "Secret Alpha Service")
+    a_dep = _element(db_session, org_a.id, "Secret Alpha Ledger")
+    _relationship(db_session, org_a.id, a_svc, a_dep)
+    _element(db_session, org_b.id, "Bravo Billing")
+    db_session.commit()
+
+    login_as(client, user_b)
+    resp = client.get("/api/v1/intelligence/suggested-questions")
+    assert resp.status_code == 200
+    assert "Secret Alpha" not in resp.get_data(as_text=True)

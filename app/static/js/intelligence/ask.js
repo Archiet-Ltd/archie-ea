@@ -83,6 +83,33 @@ function askSurface() {
             // trailing character and append the real id per lookup.
             var base = this.$el.getAttribute('data-rationalization-planning-url-base') || '';
             this.rationalizationPlanningUrlBase = base ? base.slice(0, -1) : '';
+
+            // A suggested question hands an element and a lens straight across,
+            // so the answer is shown without the person retyping the name. The
+            // server has already dropped a bad element or an unknown lens, so a
+            // present element here is a whole number and the question (if any)
+            // is one of the lenses. The element's own name is read from the
+            // answer the loader fetches, never guessed.
+            var initialElement = parseInt(this.$el.getAttribute('data-initial-element') || '', 10);
+            if (!isNaN(initialElement)) {
+                this.openKey = this.$el.getAttribute('data-initial-question') || 'impact';
+                this.openFromLink(initialElement);
+            }
+        },
+
+        /* A suggested question's element and lens. The element's own name is
+           read from the impact answer's element map (present even when nothing
+           depends on it), so every lens heading reads the real service name,
+           then the chosen lens is answered for it. */
+        async openFromLink(elementId) {
+            var name = '';
+            try {
+                var payload = await Intelligence.fetchImpact(elementId, { maxDepth: 1, includeDerived: false });
+                name = Intelligence.nameOf(payload.elements || {}, elementId) || '';
+            } catch (err) {
+                name = '';
+            }
+            this.dispatchAnswer({ id: elementId, name: name });
         },
 
         toggleQuestion(key) {
@@ -165,6 +192,9 @@ function askSurface() {
                 this.state = this.rows.length ? 'ready' : 'empty';
                 var name = Intelligence.nameOf(payload.elements || {}, elementId) || this.term.trim();
                 this.centreName = name;
+                // A deep link arrives with no typed name; take it from the
+                // answer so the heading reads the service's real name.
+                if (!this.answeredName) this.answeredName = name;
                 this.statusText = Intelligence.connectionsText(this.rows.length, name, answer.withheld);
             } catch (err) {
                 if (seq !== this._loadSeq) return;

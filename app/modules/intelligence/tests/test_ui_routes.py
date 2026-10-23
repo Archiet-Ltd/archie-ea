@@ -192,6 +192,44 @@ def test_twin_map_hands_a_whole_number_element_to_the_page(
     assert 'data-initial-element="42"' in html
 
 
+def test_ask_hands_a_whole_number_element_and_question_to_the_page(
+    app, db_session, make_org, client, login_as
+):
+    """A suggested question links to the Ask page centred on a real element and
+    its lens, so clicking it answers straight away rather than showing a blank
+    picker."""
+    org = make_org("ui-ask-deeplink")
+    user = _user(db_session, org.id)
+    login_as(client, user)
+    html = client.get("/intelligence/ask?element=42&question=impact").get_data(as_text=True)
+    assert 'data-initial-element="42"' in html
+    assert 'data-initial-question="impact"' in html
+
+
+@pytest.mark.parametrize("value", ["abc", "", "4 2", "1e3", "-"])
+def test_ask_ignores_an_element_that_is_not_a_whole_number(
+    app, db_session, make_org, client, login_as, value
+):
+    org = make_org("ui-ask-bad-element")
+    user = _user(db_session, org.id)
+    login_as(client, user)
+    response = client.get("/intelligence/ask", query_string={"element": value})
+    assert response.status_code == 200
+    assert 'data-initial-element=""' in response.get_data(as_text=True)
+
+
+@pytest.mark.parametrize("value", ["banana", "", "IMPACT", "what-breaks"])
+def test_ask_ignores_a_question_that_is_not_one_of_its_lenses(
+    app, db_session, make_org, client, login_as, value
+):
+    org = make_org("ui-ask-bad-question")
+    user = _user(db_session, org.id)
+    login_as(client, user)
+    response = client.get("/intelligence/ask", query_string={"question": value, "element": "7"})
+    assert response.status_code == 200
+    assert 'data-initial-question=""' in response.get_data(as_text=True)
+
+
 @pytest.mark.parametrize("value", ["abc", "", "4 2", "1e3", "-"])
 def test_twin_map_ignores_an_element_that_is_not_a_whole_number(
     app, db_session, make_org, client, login_as, value
