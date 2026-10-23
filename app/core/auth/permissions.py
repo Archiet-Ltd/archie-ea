@@ -167,7 +167,15 @@ def role_key(user, organization_id: Optional[int] = None) -> str:
     names = {str(getattr(user, "role_name", "") or "").lower()}
     archetype = getattr(user, "role_archetype", None)
     if archetype:
-        names.add(str(archetype).lower())
+        # A global ``role_archetype`` of "admin"/"administrator" is NOT the
+        # matrix "admin" key: administrator authority is answered first by
+        # ``can`` through ``_is_administrator`` (scoped to the active
+        # organisation), so reading this global flag as "admin" here would hand
+        # matrix-administrator rights in any organisation the account merely
+        # belongs to without a role row, with no active-organisation scoping.
+        archetype_key = str(archetype).lower()
+        if archetype_key not in ("admin", "administrator"):
+            names.add(archetype_key)
     if "architect" in names:
         return "architect"
     # An account whose persona ends in "_architect" and whose platform role
