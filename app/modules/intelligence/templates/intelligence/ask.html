@@ -98,6 +98,60 @@
         <p id="ask-sentence-{{ question.key }}" class="text-xs text-muted-foreground" x-show="(openKey || 'impact') === '{{ question.key }}'"{% if question.key != 'impact' %} x-cloak{% endif %}>{{ question.before }} <span class="font-mono text-foreground">___</span> {{ question.after }}</p>
         {% endfor %}
     </div>
+
+    {# Plain-language question box. A person types a business question (no owner,
+       what breaks, paying twice, what we run, what came from GitHub) and the one
+       ask path answers it with links to the records the answer rests on. Its own
+       Alpine component so it never disturbs the element-picker lenses above. #}
+    <div class="mx-auto max-w-[760px] space-y-3" x-data="askPlainQuestion()">
+        <form @submit.prevent="submit()" class="space-y-2" aria-label="Ask a plain question">
+            <label for="ask-plain-input" class="block text-sm font-medium text-foreground">Ask a plain question</label>
+            <div class="flex flex-wrap items-center gap-2">
+                <input type="text" id="ask-plain-input" x-model="question" name="question"
+                       autocomplete="off"
+                       placeholder="e.g. Which applications have no owner recorded?"
+                       class="flex h-9 w-full flex-1 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50">
+                <button type="submit" id="ask-plain-submit"
+                        class="inline-flex h-9 items-center justify-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:opacity-50 disabled:pointer-events-none"
+                        :disabled="state === 'loading'">
+                    <span x-show="state !== 'loading'">Answer</span>
+                    <span x-show="state === 'loading'" x-cloak>Answering…</span>
+                </button>
+            </div>
+        </form>
+
+        <div id="ask-plain-answer" x-show="state !== 'idle'" x-cloak class="space-y-2">
+            <template x-if="state === 'loading'">
+                <div role="status" aria-label="Loading" class="h-12 animate-pulse rounded-lg border border-border bg-muted/30"></div>
+            </template>
+            <template x-if="state === 'error'">
+                <p class="text-sm text-destructive">Could not answer that just now. Try again.</p>
+            </template>
+            <template x-if="state === 'none'">
+                <p class="text-sm text-muted-foreground" data-plain-reason x-text="reason"></p>
+            </template>
+            <template x-if="state === 'ready'">
+                <div class="rounded-lg border border-border bg-card p-4 space-y-3" data-plain-answer-card>
+                    <h2 x-ref="plainAnswerHeading" tabindex="-1" class="text-base font-semibold text-foreground focus:outline-none focus-visible:outline-none" x-text="entryTitle || 'Answer'"></h2>
+                    <p class="text-sm text-foreground" x-show="answerText" x-text="answerText"></p>
+                    <p class="text-sm text-muted-foreground" x-show="reason" data-plain-reason x-text="reason"></p>
+                    <div x-show="citations.length" class="space-y-1">
+                        <p class="text-xs font-medium text-muted-foreground">Open the records this rests on</p>
+                        <ul class="space-y-1 text-sm" data-plain-citations aria-label="Records this answer cites">
+                            <template x-for="(c, i) in citations" :key="i">
+                                <li data-plain-citation>
+                                    <a :href="c.target" data-plain-citation-link
+                                       class="underline text-info hover:text-info/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
+                                       x-text="c.name || ('record ' + c.id)"></a>
+                                </li>
+                            </template>
+                        </ul>
+                    </div>
+                    <p class="text-sm text-muted-foreground" x-show="!citations.length && state === 'ready'">No records to open for this answer.</p>
+                </div>
+            </template>
+        </div>
+    </div>
     <div id="ask-results" aria-busy="false" :aria-busy="busy ? 'true' : 'false'" x-show="answeredKey === 'impact' && state !== 'idle'" x-cloak class="space-y-4">
         <h2 id="ask-results-heading" x-ref="resultsHeading" tabindex="-1" class="scroll-mt-24 text-xl font-semibold tracking-[-0.01em] text-foreground focus:outline-none focus-visible:outline-none" x-text="headingText()"></h2>
         {{ impact_states("state === 'loading'") }}

@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from typing import Any, Dict, List, Optional
 
 from app.modules.intelligence.services.query_catalogue import CATALOGUE
@@ -98,7 +99,45 @@ def _keyword_match(question: str) -> Optional[Dict[str, Any]]:
     lowered = question.lower()
     for keywords, entry_id, params in _KEYWORD_RULES:
         if any(kw in lowered for kw in keywords):
-            return {"entry_id": entry_id, "params": dict(params), "confidence": 0.9, "method": "keyword"}
+            resolved = dict(params)
+            if entry_id == "what_breaks_if_fails":
+                # The impact entry needs the service the person named; pull it
+                # out of the question's own phrasing so it can be resolved.
+                service = _extract_service(question)
+                if service:
+                    resolved["service"] = service
+            return {"entry_id": entry_id, "params": resolved, "confidence": 0.9, "method": "keyword"}
+    return None
+
+
+# The service a "what breaks" question names, by the shape of the question.
+# The capturing group is the service phrase; whichever pattern matches first
+# names the service, else nothing (and the entry then asks the person to name
+# the service rather than guess).
+_SERVICE_PATTERNS = [
+    re.compile(r"\bif (?:the |our )?(.+?) (?:goes down|is down|fails|is unavailable)", re.I),
+    re.compile(r"\bwhat depends on (?:the |our )?(.+?)\s*[?.]?\s*$", re.I),
+    re.compile(r"\bif (?:the |our )?(.+?) (?:is|are) (?:down|unavailable)", re.I),
+    re.compile(r"\b(?:services|journeys) (?:break|are affected) if (?:the |our )?(.+?) (?:fails|is)", re.I),
+    re.compile(r"\bbreaks? for .*? if (?:the |our )?(.+?) (?:is down|fails|goes down)", re.I),
+]
+
+
+def _extract_service(question: str) -> Optional[str]:
+    """The service a 'what breaks' question names, or None.
+
+    Reads the service phrase out of the question's own wording (never guesses
+    one); the catalogue entry resolves that phrase to an element through the
+    one entity matcher, and an unmatched phrase is answered honestly rather
+    than with an invented blast radius.
+    """
+    text = (question or "").strip()
+    for pattern in _SERVICE_PATTERNS:
+        found = pattern.search(text)
+        if found:
+            service = found.group(1).strip().rstrip("?.! ")
+            if service:
+                return service
     return None
 
 

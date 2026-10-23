@@ -534,6 +534,72 @@ def _resolve_service_element(organization_id: int, service: Optional[str]):
     ).first()
 
 
+def _single_points_of_failure(organization_id: int, limit: int = 10) -> Dict[str, Any]:
+    """The systems the most other things depend on, by how many
+    relationships point at them (their in-degree) in the one relationship
+    store. These are the single points of failure; each is a record to open."""
+    from app.models.archimate_core import ArchiMateElement, ArchiMateRelationship
+
+    # In-degree per target element, scoped to this organisation's relationships.
+    counts = (
+        db.session.query(
+            ArchiMateRelationship.target_id,
+            db.func.count(ArchiMateRelationship.id).label("in_degree"),
+        )
+        .filter(
+            ArchiMateRelationship.organization_id == organization_id,
+            ArchiMateRelationship.target_id.isnot(None),
+        )
+        .group_by(ArchiMateRelationship.target_id)
+        .having(db.func.count(ArchiMateRelationship.id) > 1)
+        .order_by(db.func.count(ArchiMateRelationship.id).desc(), ArchiMateRelationship.target_id)
+        .limit(limit)
+        .all()
+    )
+    if not counts:
+        return {
+            "answer": "the systems the most depends on",
+            "rows": [],
+            "total": 0,
+            "citations": [],
+            "reason": "nothing in this organisation has more than one thing depending on it yet",
+        }
+
+    target_ids = [target_id for target_id, _ in counts]
+    elements = {
+        e.id: e
+        for e in ArchiMateElement.query.filter(
+            ArchiMateElement.id.in_(target_ids),
+            ArchiMateElement.organization_id == organization_id,
+        ).all()
+    }
+
+    rows = []
+    citations: List[Dict[str, Any]] = []
+    for target_id, in_degree in counts:
+        element = elements.get(target_id)
+        if element is None:
+            continue
+        rows.append(
+            {
+                "id": element.id,
+                "name": element.name,
+                "depends_on_count": int(in_degree),
+                "source_table": "archimate_relationships",
+                "truth_class": truth_class_for("archimate_relationships"),
+            }
+        )
+        citations.append(element_citation(element.id, element.name))
+
+    return {
+        "answer": "the systems the most other things depend on — the single points of failure",
+        "rows": rows,
+        "total": len(rows),
+        "citations": citations,
+        "reason": None if rows else "nothing in this organisation has more than one thing depending on it yet",
+    }
+
+
 def _what_breaks_if_fails(organization_id: int, service: Optional[str] = None, **_: Any) -> Dict[str, Any]:
     """"What breaks if this service fails?" (UC-S2-01) — the one impact
     envelope, called for the named service. Impact is never recomputed here:
@@ -546,16 +612,22 @@ def _what_breaks_if_fails(organization_id: int, service: Optional[str] = None, *
     """
     element = _resolve_service_element(organization_id, service)
     if element is None:
-        return {
-            "answer": "what breaks if a named service fails",
-            "rows": [],
-            "total": 0,
-            "citations": [],
-            "reason": (
-                "name the service you mean — it did not match one system in this organisation"
-                if service else "name the service whose failure you want to trace"
-            ),
-        }
+        if service:
+            # A service was named but matched nothing: say so plainly rather
+            # than trace a guessed element.
+            return {
+                "answer": "what breaks if a named service fails",
+                "rows": [],
+                "total": 0,
+                "citations": [],
+                "reason": "name the service you mean — it did not match one system in this organisation",
+            }
+        # No single service was named ("the single points of failure in our
+        # stack"): the systems the most other things depend on are the single
+        # points of failure. Count how many relationships point at each
+        # element (its in-degree) from the one relationship store; the most
+        # depended-on are the answer, each one a record to open.
+        return _single_points_of_failure(organization_id)
 
     from app.modules.intelligence.services.answer_envelope import (
         KIND_IMPACT,
