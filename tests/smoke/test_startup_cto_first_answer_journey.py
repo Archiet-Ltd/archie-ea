@@ -115,7 +115,7 @@ class Journey:
 
 
 @pytest.fixture(scope="module", params=[(1440, "light"), (390, "dark")], ids=["desktop-light", "phone-dark"])
-def journey(request, browser, live_server):
+def journey(request, browser, live_server, _schema):
     width, theme = request.param
     context = browser.new_context(viewport={"width": width, "height": 900})
     context.set_default_timeout(30000)
@@ -328,8 +328,12 @@ def system_page(journey):
         if "/applications/" not in page.url or "?import" in page.url:
             page.goto(j.base + "/applications/", wait_until="domcontentloaded")
         name = page.locator("main").get_by_text("Monelytics", exact=True).locator("visible=true").first
-        card = name.locator("xpath=ancestor::*[.//a[starts-with(@href, '/applications/')]][1]")
-        card.locator("a[href^='/applications/']:visible").first.click()
+        # A row also carries links to other pages (classify, edit); the one that opens the system is View
+        # (an eye button named "View <system>" on a phone).
+        view = re.compile(r"^View( Monelytics)?$")
+        card = name.locator("xpath=ancestor::*[.//a[normalize-space(.)='View' or @aria-label='View Monelytics']][1]")
+        card.hover()
+        card.get_by_role("link", name=view).locator("visible=true").first.click()
         page.wait_for_url(re.compile(r".*/applications/\d+$"), timeout=30000)
         page.wait_for_timeout(1500)
         j.system_text = j.main_text()
