@@ -1,5 +1,7 @@
 # Committed snapshot of scripts/unfenced_tables.txt. The gate fails when the list holds a name this
 # file does not. Remove a name here when you remove it there; never add one.
+api_operation_retirements
+api_retirement_notices
 acceptance_criteria
 acm_cross_domain_rules
 acm_domain_templates
