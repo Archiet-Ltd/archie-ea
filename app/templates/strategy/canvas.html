@@ -1,0 +1,168 @@
+{% extends 'layouts/admin_base.html' %}
+{% from 'components/page_header.html' import page_header %}
+
+{#
+  One box of the framework. Renders, in order:
+   - the box label;
+   - every accepted point, each with its citation footer (every citation a
+     link that lands on a page with content, or the labelled website profile);
+   - the proposals drafted for this box (accept / edit / reject), shown only
+     after "Draft from my model" has run;
+   - an empty hint with its own "Draft from my model" when the box is empty.
+  Structure only here; behaviour is in strategy/canvas.js.
+#}
+{% macro strategy_box(zone, points) %}
+<section data-testid="strategy-box-{{ zone.box_key }}" data-box-key="{{ zone.box_key }}"
+         class="flex flex-col rounded-lg border border-border bg-card p-4 min-w-[280px]">
+  <div class="flex items-center justify-between gap-2 mb-3">
+    <h2 class="text-sm font-semibold text-foreground">{{ zone.label }}</h2>
+    <span class="inline-flex items-center rounded-full border border-layer-{{ zone.colour }} bg-layer-{{ zone.colour }}/10 px-2 py-0.5 text-xs text-layer-{{ zone.colour }}-emphasis"
+          data-testid="strategy-box-count-{{ zone.box_key }}" x-text="boxCount('{{ zone.box_key }}')"></span>
+  </div>
+
+  {# Accepted points — server-rendered, plus any accepted this session. #}
+  <ul class="space-y-2" data-testid="strategy-accepted-{{ zone.box_key }}">
+    {% for item in points %}
+    <li class="rounded-md border border-border p-3" data-testid="strategy-point" data-element-id="{{ item.id }}">
+      <p class="text-sm text-foreground">{{ item.point }}</p>
+      <div class="mt-2 flex flex-wrap items-center gap-2 text-xs" data-testid="strategy-citations">
+        <span class="text-muted-foreground">Cited:</span>
+        {% for citation in item.citations %}
+          {% if citation.href %}
+          <a href="{{ citation.href }}" data-testid="strategy-citation-link"
+             class="underline text-foreground hover:text-info">{{ citation.label }}</a>
+          {% else %}
+          <span class="text-foreground" data-testid="strategy-citation-text">{{ citation.label }}</span>
+          {% endif %}
+        {% endfor %}
+      </div>
+    </li>
+    {% endfor %}
+    {# Points accepted this session, without a reload. #}
+    <template x-for="item in accepted['{{ zone.box_key }}']" :key="item.element_id">
+      <li class="rounded-md border border-border p-3" data-testid="strategy-point" :data-element-id="item.element_id">
+        <p class="text-sm text-foreground" x-text="item.point"></p>
+        <div class="mt-2 flex flex-wrap items-center gap-2 text-xs" data-testid="strategy-citations">
+          <span class="text-muted-foreground">Cited:</span>
+          <template x-for="c in item.citations" :key="c.label">
+            <template x-if="c.href">
+              <a :href="c.href" data-testid="strategy-citation-link"
+                 class="underline text-foreground hover:text-info" x-text="c.label"></a>
+            </template>
+          </template>
+          <template x-for="c in item.citations" :key="'t-' + c.label">
+            <template x-if="!c.href">
+              <span class="text-foreground" data-testid="strategy-citation-text" x-text="c.label"></span>
+            </template>
+          </template>
+        </div>
+      </li>
+    </template>
+  </ul>
+
+  {# Proposals drafted for this box — accept / edit / reject. #}
+  <ul class="mt-2 space-y-2" data-testid="strategy-proposals-{{ zone.box_key }}">
+    <template x-for="(proposal, index) in proposals['{{ zone.box_key }}']" :key="index">
+      <li class="rounded-md border border-dashed border-border p-3" data-testid="strategy-proposal">
+        <textarea rows="2" x-model="proposal.point" data-testid="strategy-proposal-text"
+          class="w-full rounded-md border border-input bg-background px-2 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring resize-y"></textarea>
+        <div class="mt-2 flex flex-wrap items-center gap-2 text-xs">
+          <span class="text-muted-foreground">Cited:</span>
+          <template x-for="c in proposal.citations" :key="c.label">
+            <span class="text-foreground" data-testid="strategy-proposal-citation" x-text="c.label"></span>
+          </template>
+        </div>
+        <div class="mt-2 flex items-center gap-2">
+          <button type="button" @click="acceptProposal('{{ zone.box_key }}', index)"
+            data-testid="strategy-accept"
+            class="inline-flex items-center gap-1 rounded-md bg-primary text-primary-foreground text-xs font-medium px-2.5 py-1 hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+            Accept
+          </button>
+          <button type="button" @click="rejectProposal('{{ zone.box_key }}', index)"
+            data-testid="strategy-reject"
+            class="inline-flex items-center gap-1 rounded-md border border-input bg-background text-xs font-medium px-2.5 py-1 hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+            Reject
+          </button>
+        </div>
+      </li>
+    </template>
+  </ul>
+
+  {# Empty hint — why it is empty, and the next step, inside the box. #}
+  <div x-show="isBoxEmpty('{{ zone.box_key }}')" x-cloak class="mt-2"
+       data-testid="strategy-empty-{{ zone.box_key }}">
+    <p class="text-xs text-muted-foreground mb-2">Nothing here yet. Draft from your model to propose points for this box.</p>
+    <button type="button" @click="draft()" :disabled="drafting"
+      data-testid="strategy-draft-box-{{ zone.box_key }}"
+      class="inline-flex items-center gap-1 rounded-md border border-input bg-background text-xs font-medium px-2.5 py-1 hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50 disabled:pointer-events-none">
+      <i data-lucide="sparkles" class="h-3 w-3" aria-hidden="true"></i>
+      Draft from my model
+    </button>
+  </div>
+</section>
+{% endmacro %}
+
+{% block title %}{{ framework_name }}{% endblock %}
+
+{% block content %}
+<div class="flex-1 overflow-auto"
+     x-data='strategyCanvas({
+       framework: {{ framework_key | tojson }},
+       draftUrl: {{ url_for("strategy.draft", template_key=framework_key) | tojson }},
+       acceptUrl: {{ url_for("strategy.accept", template_key=framework_key) | tojson }},
+       boxKeys: {{ zones | map(attribute="box_key") | list | tojson }},
+       accepted: {{ boxes | tojson }}
+     })' x-cloak>
+
+  {{ page_header(
+      title=framework_name,
+      description='Drafted from your own model and website profile, each point cited to the record it came from. Accept, edit or reject each one; accepted points are saved to your model.',
+      breadcrumbs=[
+          {'label': 'Home', 'href': url_for('main.index')},
+          {'label': 'Strategy frameworks', 'href': url_for('strategy.index')},
+          {'label': framework_name}
+      ]
+  ) }}
+
+  <div class="p-6 space-y-4">
+    <div class="flex items-center gap-3">
+      <button type="button" @click="draft()" :disabled="drafting"
+        data-testid="strategy-draft"
+        class="inline-flex items-center gap-2 rounded-md bg-primary text-primary-foreground text-sm font-medium px-4 py-2 hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50 disabled:pointer-events-none">
+        <span x-show="drafting" x-cloak class="animate-spin h-4 w-4 border-2 border-current border-t-transparent rounded-full inline-block"></span>
+        <i data-lucide="sparkles" class="h-4 w-4" aria-hidden="true" x-show="!drafting"></i>
+        Draft from my model
+      </button>
+      <span x-show="draftError" x-cloak data-testid="strategy-draft-error"
+            class="text-sm text-destructive-emphasis" x-text="draftError"></span>
+    </div>
+
+    {% if framework_key == 'swot' %}
+    {# 2x2 — strengths/weaknesses over opportunities/threats. Two columns at
+       every width; at 390px the row scrolls sideways rather than stacking, so
+       the recognisable square is kept. #}
+    <div class="overflow-x-auto" data-testid="strategy-grid-swot">
+      <div class="grid grid-cols-2 gap-4 min-w-[600px]">
+        {% for zone in zones %}
+          {{ strategy_box(zone, boxes[zone.box_key]) }}
+        {% endfor %}
+      </div>
+    </div>
+    {% else %}
+    {# PESTLE — six labelled columns. One row of six; at 390px it scrolls
+       sideways rather than stacking into one column. #}
+    <div class="overflow-x-auto" data-testid="strategy-grid-pestle">
+      <div class="grid grid-flow-col auto-cols-[minmax(280px,1fr)] gap-4 min-w-[1740px]">
+        {% for zone in zones %}
+          {{ strategy_box(zone, boxes[zone.box_key]) }}
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_head_js %}
+<script src="{{ url_for('static', filename='js/strategy/canvas.js') }}"></script>
+{% endblock %}

@@ -223,6 +223,9 @@ def _register_optional_standalone(app):
         ("app.modules.business_model_canvas.routes", "business_model_bp", "/business-model"),
         ("app.modules.organization.routes", "organization_bp", "/organization"),
         ("app.modules.business_case.routes", "business_case_bp", "/business-case"),
+        # T-strat-01: SWOT and PESTLE drafted from the organisation's own
+        # model, accepted as Assessment elements, in the recognisable layouts.
+        ("app.modules.strategy.routes", "strategy_bp", "/strategy"),
         # The Business Architecture practice landing page — one front door to
         # the twelve BA outputs, all of which already ship scattered across
         # five generic sidebar zones.

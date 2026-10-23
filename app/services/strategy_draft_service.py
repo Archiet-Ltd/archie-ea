@@ -288,6 +288,90 @@ def draft(template_key: str, organization_id: int) -> Dict[str, Any]:
     return {"framework": template_key, "boxes": boxes}
 
 
+def saved_boxes(template_key: str, organization_id: int) -> Dict[str, List[Dict[str, Any]]]:
+    """The accepted points already on the canvas, grouped by box.
+
+    Reads the organisation's Assessment elements (tenant-scoped) and places
+    each into the box whose profile value it carries in acm_properties — the
+    same membership check a type_profile zone uses. Returns {box_key: [{id,
+    point, citations}, ...]} with every box present (empty when nothing has
+    been accepted into it). An element whose profile is not one of this
+    framework's boxes is simply not shown here; it belongs to another canvas.
+    """
+    from app.models.archimate_core import ArchiMateElement
+
+    profiles = _box_profile(template_key)
+    profile_to_box = {profile: box for box, profile in profiles.items()}
+    boxes: Dict[str, List[Dict[str, Any]]] = {box: [] for box in profiles}
+
+    rows = (
+        ArchiMateElement.query.filter_by(organization_id=organization_id, type="Assessment")
+        .order_by(ArchiMateElement.id)
+        .all()
+    )
+    for row in rows:
+        props = row.acm_properties or {}
+        profile = props.get("profile")
+        box_key = profile_to_box.get(profile)
+        if box_key is None:
+            continue
+        boxes[box_key].append(
+            {
+                "id": row.id,
+                "point": row.name,
+                "citations": props.get("citations") or [],
+            }
+        )
+    return boxes
+
+
+def resolve_citations(
+    citations: List[str], organization_id: int
+) -> List[Dict[str, Any]]:
+    """Turn a point's citation ids into display rows the footer renders.
+
+    Each row is {label, kind, href}. A record id resolves to the element's
+    name and a link to its neighbourhood in the Composer (a page with real
+    content). "website" resolves to the organisation's recorded website
+    profile as a label with no link (there is no separate website page to
+    land on). A citation that no longer resolves to an element in this
+    organisation is dropped rather than shown as a dead link.
+    """
+    from app.models.archimate_core import ArchiMateElement
+
+    rows: List[Dict[str, Any]] = []
+    element_ids = []
+    for c in citations or []:
+        if c == "website":
+            rows.append({"label": "Website profile", "kind": "website", "href": None})
+        else:
+            try:
+                element_ids.append(int(c))
+            except (TypeError, ValueError):
+                continue
+
+    if element_ids:
+        found = {
+            el.id: el
+            for el in ArchiMateElement.query.filter(
+                ArchiMateElement.organization_id == organization_id,
+                ArchiMateElement.id.in_(element_ids),
+            ).all()
+        }
+        for element_id in element_ids:
+            el = found.get(element_id)
+            if el is None:
+                continue
+            rows.append(
+                {
+                    "label": el.name or f"Element {element_id}",
+                    "kind": el.type or "element",
+                    "href": f"/archimate/composer?element={element_id}",
+                }
+            )
+    return rows
+
+
 def accept_point(
     template_key: str,
     box_key: str,
@@ -344,14 +428,17 @@ def accept_point(
             "framework": template_key,
         },
     )
-    # The canvas reads a box's membership from acm_properties["profile"]; the
-    # framework and the point's citations live beside it, so the element
-    # carries where it belongs and what it rests on without a second table.
+    # The canvas reads a box's membership from the RAW string
+    # acm_properties["profile"] (app/services/composer_export_formats.py
+    # canvas_export_reasons compares it to the zone's profile string), so the
+    # profile, the framework and the point's citations are stored as plain
+    # values here rather than through the typed-property writer, whose
+    # {"value": ...} wrapper would make the membership comparison never match.
     props = dict(element.acm_properties or {})
     props["profile"] = profiles[box_key]
     props["framework"] = template_key
     props["citations"] = resolved
-    element.acm_properties = props
+    element.acm_properties = props  # untyped-property-write-ok: canvas membership reads the raw profile string (composer_export_formats.canvas_export_reasons), not a typed {"value":...} entry
     db.session.flush()
 
     return {
