@@ -62,7 +62,7 @@
         actions_caller=_ps_actions
     ) }}
 
-    {% call workspace_gate(home_url) %}
+{% call workspace_gate(home_url, show_body_when_empty=true) %}
     {# Command pattern (design/patterns.json: focused_task): one large input, the
        question lenses as chips beneath it, the answer cascade below. The picker
        is rendered once and always; a chip calls toggleQuestion() in ask.js, which

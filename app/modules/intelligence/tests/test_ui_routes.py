@@ -25,6 +25,9 @@ import pytest
 # directory's conftest, which re-exports the shared ones.
 
 PAGES = ["/intelligence/ask", "/intelligence/twin-map"]
+# Pages whose body is replaced by the setup state when the workspace is empty.
+# The Ask page keeps its questions under that state (test_ask_empty_workspace.py).
+GATED_PAGES = ["/intelligence/twin-map"]
 
 REPO_ROOT = Path(__file__).resolve().parents[4]
 TEMPLATE_DIR = REPO_ROOT / "app" / "modules" / "intelligence" / "templates" / "intelligence"
@@ -250,7 +253,7 @@ def _patch_counts(monkeypatch, counts):
         )
 
 
-@pytest.mark.parametrize("path", PAGES)
+@pytest.mark.parametrize("path", GATED_PAGES)
 def test_an_empty_workspace_shows_the_setup_state_instead_of_the_picker(
     app, db_session, make_org, client, login_as, monkeypatch, path
 ):
@@ -312,7 +315,7 @@ def test_a_populated_workspace_shows_the_picker_and_no_setup_state(
     assert "Nothing is modelled yet" not in html
 
 
-@pytest.mark.parametrize("path", PAGES)
+@pytest.mark.parametrize("path", GATED_PAGES)
 def test_global_vendor_counts_do_not_hide_the_empty_workspace_state(
     app, db_session, make_org, client, login_as, monkeypatch, path
 ):

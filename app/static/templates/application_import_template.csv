@@ -1,0 +1,3 @@
+name,description,type,vendor,lifecycle_status,criticality
+Customer Portal,Web portal where customers manage their orders,Web Application,Acme Software,active,high
+Payroll,Monthly payroll processing for all staff,Packaged Application,Northwind Systems,active,medium

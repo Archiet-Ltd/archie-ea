@@ -1,4 +1,5 @@
 {% extends 'layouts/admin_base.html' %}
+{# smoke-coverage-ok: merge conflict resolution, covered by test_batch_import_journey.py #}
 {% from 'components/page_header.html' import page_header %}
 {% import 'components/card.html' as card %}
 {% import 'components/breadcrumb.html' as breadcrumb %}
@@ -157,6 +158,24 @@
                                             </p>
                                             <p class="text-xs text-muted-foreground mt-1">CSV or Excel files (max 10MB)</p>
                                         </div>
+                                    </div>
+
+                                    <div class="mt-4 text-sm" data-import-template>
+                                        <p>
+                                            <a href="{{ url_for('static', filename='templates/application_import_template.csv') }}"
+                                               download="application_import_template.csv"
+                                               class="font-medium text-primary underline underline-offset-2">Download the application template (CSV)</a>
+                                        </p>
+                                        <p class="mt-2 text-muted-foreground">
+                                            One row per application. Columns read:
+                                            <strong class="text-foreground">name</strong> (required),
+                                            <strong class="text-foreground">description</strong>,
+                                            <strong class="text-foreground">type</strong>,
+                                            <strong class="text-foreground">vendor</strong>,
+                                            <strong class="text-foreground">lifecycle_status</strong> and
+                                            <strong class="text-foreground">criticality</strong>.
+                                            Common alternatives such as application_name, app_name and vendor_name are accepted. Any other column is kept with the row.
+                                        </p>
                                     </div>
 
                                     <!-- Selected File Display -->
