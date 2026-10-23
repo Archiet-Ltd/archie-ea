@@ -1440,7 +1440,76 @@ _CASE_ZONES = [
     ),
 ]
 
+# ── SWOT — the four boxes of the 2x2, each an Assessment carrying the
+# profile value that names its box. One row per box in the design's reading
+# order (strengths, weaknesses, opportunities, threats): the 2x2 is laid out
+# by the page from this order, so order 1-2 are the top row and 3-4 the
+# bottom row. No backing record — a SWOT is read straight from the
+# organisation's own Assessment elements, so `record` is None. ───────────────
+_SWOT_ZONES = [
+    _canvas_zone(
+        "strengths", "Strengths", 1, ["Assessment"], "swot_strength",
+        "type_profile", "motivation",
+    ),
+    _canvas_zone(
+        "weaknesses", "Weaknesses", 2, ["Assessment"], "swot_weakness",
+        "type_profile", "motivation",
+    ),
+    _canvas_zone(
+        "opportunities", "Opportunities", 3, ["Assessment"], "swot_opportunity",
+        "type_profile", "motivation",
+    ),
+    _canvas_zone(
+        "threats", "Threats", 4, ["Assessment"], "swot_threat",
+        "type_profile", "motivation",
+    ),
+]
+
+# ── PESTLE — the six labelled columns, each an Assessment carrying the
+# profile value that names its column, in the framework's own PESTLE order.
+# No backing record, same as SWOT. ───────────────────────────────────────────
+_PESTLE_ZONES = [
+    _canvas_zone(
+        "political", "Political", 1, ["Assessment"], "pestle_political",
+        "type_profile", "motivation",
+    ),
+    _canvas_zone(
+        "economic", "Economic", 2, ["Assessment"], "pestle_economic",
+        "type_profile", "motivation",
+    ),
+    _canvas_zone(
+        "social", "Social", 3, ["Assessment"], "pestle_social",
+        "type_profile", "motivation",
+    ),
+    _canvas_zone(
+        "technological", "Technological", 4, ["Assessment"], "pestle_technological",
+        "type_profile", "motivation",
+    ),
+    _canvas_zone(
+        "legal", "Legal", 5, ["Assessment"], "pestle_legal",
+        "type_profile", "motivation",
+    ),
+    _canvas_zone(
+        "environmental", "Environmental", 6, ["Assessment"], "pestle_environmental",
+        "type_profile", "motivation",
+    ),
+]
+
 CANVAS_TEMPLATES: Dict[str, dict] = {
+    "swot": {
+        "key": "swot",
+        "name": "SWOT",
+        "record": None,
+        "projects": ["motivation"],
+        "zones": _SWOT_ZONES,
+    },
+    "pestle": {
+        "key": "pestle",
+        "name": "PESTLE",
+        "record": None,
+        "projects": ["motivation"],
+        "zones": _PESTLE_ZONES,
+    },
     "lean_canvas": {
         "key": "lean_canvas",
         "name": "Lean Canvas",
@@ -1482,7 +1551,10 @@ def validate_canvas_templates(templates: Optional[Dict[str, dict]] = None) -> No
     templates = CANVAS_TEMPLATES if templates is None else templates
     for tpl_key, tpl in templates.items():
         assert tpl["key"] == tpl_key, f"{tpl_key}: key field does not match its dict key"
-        assert tpl["record"] in ("business_model_canvas", "business_case"), (
+        # A canvas either backs a record (business_model_canvas, business_case)
+        # or reads straight from the organisation's own elements (record None,
+        # e.g. SWOT and PESTLE, which are organisation-scoped, not per-record).
+        assert tpl["record"] in ("business_model_canvas", "business_case", None), (
             f"{tpl_key}: unknown record {tpl['record']!r}"
         )
         assert isinstance(tpl["projects"], list) and tpl["projects"], f"{tpl_key}: no projects"
@@ -1552,7 +1624,14 @@ def validate_canvas_templates(templates: Optional[Dict[str, dict]] = None) -> No
 # spans more than any one zone's own `profile` field.
 CANVAS_PROFILE_OPTIONS_BY_TYPE: Dict[str, List[str]] = {
     "Driver": ["problem", "reason"],
-    "Assessment": ["existing_alternative", "current_state", "risk"],
+    "Assessment": [
+        "existing_alternative", "current_state", "risk",
+        # SWOT — one value per box of the 2x2.
+        "swot_strength", "swot_weakness", "swot_opportunity", "swot_threat",
+        # PESTLE — one value per labelled column.
+        "pestle_political", "pestle_economic", "pestle_social",
+        "pestle_technological", "pestle_legal", "pestle_environmental",
+    ],
     "Stakeholder": ["customer_segment"],
     "Value": ["value_proposition"],
     "Requirement": ["solution_feature"],

@@ -72,9 +72,21 @@ class TestSchema:
     def test_validate_canvas_templates_passes_on_the_real_templates(self):
         validate_canvas_templates()
 
-    def test_three_templates_with_the_srs_zone_counts(self):
-        assert sorted(CANVAS_TEMPLATES) == ["business_case", "business_model_canvas", "lean_canvas"]
-        assert [len(CANVAS_TEMPLATES[k]["zones"]) for k in sorted(CANVAS_TEMPLATES)] == [9, 9, 9]
+    def test_the_canvas_templates_with_the_srs_zone_counts(self):
+        # Wave 1 shipped three (business case, business model canvas, lean
+        # canvas); the strategy frameworks add SWOT (the 2x2, four boxes) and
+        # PESTLE (six labelled columns). Still an exact closed set and exact
+        # per-template counts, not a "contains" check.
+        assert sorted(CANVAS_TEMPLATES) == [
+            "business_case", "business_model_canvas", "lean_canvas", "pestle", "swot"
+        ]
+        assert {k: len(CANVAS_TEMPLATES[k]["zones"]) for k in CANVAS_TEMPLATES} == {
+            "business_case": 9,
+            "business_model_canvas": 9,
+            "lean_canvas": 9,
+            "pestle": 6,
+            "swot": 4,
+        }
 
     def test_bmc_box_keys_equal_the_record_columns(self):
         from app.models.business_model import CANVAS_BLOCKS
