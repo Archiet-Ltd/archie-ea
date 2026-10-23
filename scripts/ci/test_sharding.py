@@ -114,12 +114,24 @@ def _bin_pack(weights: dict[str, int], total: int) -> dict[str, int]:
     """
     ordered = sorted(weights.items(), key=lambda pair: (-pair[1], pair[0]))
     loads = [0] * total
-    loads[0] = SHARD_0_CONNECTOR_HEAD_START_SECONDS * 1000
+    # The head start can never exceed its share of the real work: when the
+    # duration table underestimates the suite, a fixed 246 s would leave shard 0
+    # with nothing to run (exit code 5) and pile everything onto the others.
+    total_weight = sum(weights.values())
+    head_start = min(SHARD_0_CONNECTOR_HEAD_START_SECONDS * 1000, total_weight // (total * 2))
+    loads[0] = head_start
     assignment: dict[str, int] = {}
     for path, weight in ordered:
         shard = min(range(total), key=lambda i: (loads[i], i))
         assignment[path] = shard
         loads[shard] += weight
+    # Every shard runs something: hand the lightest file of the fullest shard to any
+    # shard that ended up empty, so no job exits with "no tests collected".
+    for empty in [i for i in range(total) if not any(s == i for s in assignment.values())]:
+        fullest = max(range(total), key=lambda i: loads[i])
+        donor = min((p for p, s in assignment.items() if s == fullest), key=lambda p: weights[p])
+        assignment[donor] = empty
+        loads[fullest] -= weights[donor]; loads[empty] += weights[donor]
     return assignment
 
 

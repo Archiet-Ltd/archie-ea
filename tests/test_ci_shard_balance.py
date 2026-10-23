@@ -267,3 +267,14 @@ def test_the_balance_check_never_fails_the_job(tmp_path, capsys):
     _junit(xml, [("tests.test_ci_shard_balance", "t", 1)])
     assert check_shard_balance.main([str(xml), "--table", str(tmp_path / "missing.json")]) == 0
     assert "::warning::" in capsys.readouterr().out
+
+
+def test_no_shard_is_left_empty_when_the_head_start_exceeds_the_predicted_work():
+    # A table that underestimates the suite made the fixed 246 s head start larger than all
+    # the predicted work, so shard 0 collected nothing and exited with code 5 (23 Oct 2026).
+    table = {"default_seconds_per_test": 0.3, "files": {}}
+    counts = {f"tests/smoke/test_{i}.py": 5 for i in range(40)}
+    assignment, loads = sharding.plan(counts, 3, table)
+    assert set(assignment.values()) == {0, 1, 2}
+    assert all(load > 0 for load in loads)
+    assert max(loads) <= 2 * min(loads)
