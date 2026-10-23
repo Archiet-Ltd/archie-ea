@@ -832,12 +832,26 @@ BEGIN
         END IF;
 
     ELSIF TG_TABLE_NAME = 'measure_definitions' THEN
-        IF NOT EXISTS (
+        IF NEW.outcome_commitment_id IS NOT NULL AND NOT EXISTS (
             SELECT 1 FROM programme_outcome_commitments o
             WHERE o.id = NEW.outcome_commitment_id
               AND o.organization_id = NEW.organization_id
         ) THEN
             RAISE EXCEPTION 'measure outcome is outside its tenant' USING ERRCODE = '23514';
+        END IF;
+        IF NEW.subject_element_id IS NOT NULL AND NOT EXISTS (
+            SELECT 1 FROM archimate_elements e
+            WHERE e.id = NEW.subject_element_id
+              AND e.organization_id = NEW.organization_id
+        ) THEN
+            RAISE EXCEPTION 'measure subject element is outside its tenant' USING ERRCODE = '23514';
+        END IF;
+        IF NEW.benefit_id IS NOT NULL AND NOT EXISTS (
+            SELECT 1 FROM benefits b
+            WHERE b.id = NEW.benefit_id
+              AND b.organization_id = NEW.organization_id
+        ) THEN
+            RAISE EXCEPTION 'measure benefit is outside its tenant' USING ERRCODE = '23514';
         END IF;
 
     ELSIF TG_TABLE_NAME = 'work_packages' THEN
