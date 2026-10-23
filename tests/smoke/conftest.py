@@ -692,6 +692,36 @@ def _seed_standard_org(request, ai_protocol_stub, fixed_suffix=None):
         ))
         db.session.commit()
 
+        # Strategy canvases (T-strat-03): profiled Products, Business Services,
+        # Assessments and Goals so BCG, Ansoff and Blue Ocean open with real
+        # placed elements, not only their empty states. One BCG quadrant (dogs)
+        # and some Ansoff/Blue-Ocean boxes are deliberately left unprofiled so
+        # an empty box's reason is on the page too.
+        from app.models.archimate_core import ArchiMateElement as _StratElement
+
+        _strat_seed = [
+            ("Smoke flagship %s" % suffix, "Product", "Business", {"profile": "star"}),
+            ("Smoke newcomer %s" % suffix, "Product", "Business", {"profile": "question_mark"}),
+            ("Smoke earner %s" % suffix, "Product", "Business", {"profile": "cash_cow"}),
+            ("Smoke upsell %s" % suffix, "Product", "Business", {"profile": "market_penetration"}),
+            ("Smoke new region %s" % suffix, "BusinessService", "Business",
+             {"profile": "market_development"}),
+            ("Smoke drop paperwork %s" % suffix, "Goal", "Motivation", {"profile": "eliminate"}),
+            ("Smoke lift support %s" % suffix, "Goal", "Motivation", {"profile": "raise"}),
+            ("Smoke price %s" % suffix, "Assessment", "Motivation",
+             {"profile": "competing_factor", "offering_level": 3, "player": "This organisation"}),
+            ("Smoke ease of use %s" % suffix, "Assessment", "Motivation",
+             {"profile": "competing_factor", "offering_level": 8, "player": "This organisation"}),
+            # Unprofiled: counts toward "not yet classified".
+            ("Smoke loose product %s" % suffix, "Product", "Business", {}),
+        ]
+        for _name, _type, _layer, _props in _strat_seed:
+            db.session.add(_StratElement(
+                name=_name, type=_type, layer=_layer,
+                organization_id=org.id, scope="enterprise", acm_properties=_props,
+            ))
+        db.session.commit()
+
     return out
 
 
