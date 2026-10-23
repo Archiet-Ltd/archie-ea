@@ -129,6 +129,8 @@ def _link_visible(endpoint: str, requires: str | None = None) -> bool:
 _MORE_TOOLS_REQUIRES = {
     "framework_config_ui.framework_config_dashboard": "platform_admin",
     "main.framework_management.dashboard": "platform_admin",
+    # /integrations opens the connectors page, which only an administrator can use.
+    "main.integrations": "admin",
 }
 
 _MORE_TOOLS = [
