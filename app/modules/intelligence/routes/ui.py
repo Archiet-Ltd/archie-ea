@@ -149,6 +149,28 @@ def value_streams_at_risk():
     )
 
 
+@intelligence_ui.route("/what-if", methods=["GET"])
+@login_required
+def what_if():
+    """Compare what stops if each of up to three chosen elements stops.
+
+    ``element`` (repeatable) holds the ids to compare. The answer is rendered
+    on the server from the one impact walk; values that are not whole numbers
+    are ignored, and an id outside the caller's organisation renders the same
+    "not found" column as a missing one.
+    """
+    from app.modules.intelligence.services.what_if import compare
+
+    element_ids = request.args.getlist("element", type=int)
+    result = compare(element_ids) if element_ids else None
+    return render_template(
+        "intelligence/what_if.html",
+        result=result,
+        element_ids=[s["element_id"] for s in result["scenarios"]] if result else [],
+        workspace_counts_available=_workspace_counts_available(),
+    )
+
+
 @intelligence_ui.route("/traceability", methods=["GET"])
 @login_required
 def traceability():
