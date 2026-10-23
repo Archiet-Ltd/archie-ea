@@ -531,12 +531,16 @@ def dashboard():
         key: {**config, **LAYER_PRESENTATION[key], "key": key}
         for key, config in LAYER_CONFIG.items()
     }
+    # Kind options from the profile registry, not hard-coded.
+    from app.services.profiles.safe import allowed_kinds_for_type
+    kind_options = allowed_kinds_for_type("WorkPackage")
     return render_template(
         "archimate_crud/dashboard.html",
         layer_config=presentation_config,
         selected_layer=presentation_config[selected_key],
         initial_layer=initial_layer,
         initial_element_type=initial_element_type,
+        kind_options=kind_options,
     )
 
 
@@ -651,6 +655,19 @@ def api_layer_counts():
     # null as an em dash and falls back to the per-layer endpoint for it.
     counts = {layer: _count_layer_elements(layer) for layer in LAYER_CONFIG}
     return jsonify({"counts": counts})
+
+
+def _kind_options_for_layer(layer: str) -> list:
+    """Return the SAFe kind options for the layer's WorkPackage elements.
+
+    Kind options come from the profile registry, not a hard-coded list.
+    Only layers that contain WorkPackage elements have kind options.
+    """
+    layer_types = LAYER_CONFIG.get(layer, {}).get("elements", [])
+    if "WorkPackage" not in layer_types:
+        return []
+    from app.services.profiles.safe import allowed_kinds_for_type
+    return allowed_kinds_for_type("WorkPackage")
 
 
 @archimate_crud.route("/api/layer/<layer>/elements")
@@ -828,48 +845,85 @@ def api_layer_elements(layer):
                         ArchiMateElement.description.ilike(f"%{safe_s}%", escape="\\"),
                     )
                 )
-            for ae in ae_q.all():
-                if (ae.type, ae.id) not in seen_pairs:
-                    _rel_count = ArchiMateRelationship.query.filter(
-                        db.or_(
-                            ArchiMateRelationship.source_id == ae.id,
-                            ArchiMateRelationship.target_id == ae.id,
+            ae_rows = ae_q.all()
+            # Batch-fetch relationship counts for all new elements.
+            new_ae_ids = [
+                ae.id for ae in ae_rows
+                if (ae.type, ae.id) not in seen_pairs
+            ]
+            rel_count_by_ae_id = {}
+            if new_ae_ids:
+                rel_rows = (
+                    db.session.query(ArchiMateRelationship.source_id)
+                    .filter(ArchiMateRelationship.source_id.in_(new_ae_ids))
+                    .union_all(
+                        db.session.query(ArchiMateRelationship.target_id).filter(
+                            ArchiMateRelationship.target_id.in_(new_ae_ids)
                         )
-                    ).count()
-                    ae_dict = {
-                        "id": ae.id,
-                        "name": ae.name or "",
-                        "description": ae.description or "",
-                        "element_type": ae.type,
-                        "status": None,
-                        "layer": layer,
-                        "source": "architecture",
-                        "properties": ae.properties or "",
-                        "plateau": ae.togaf_plateau,
-                        "rel_count": _rel_count,
-                    }
-                    ae_dict["architecture_state"] = ae_dict["plateau"] or ""
-                    # F-08(a): the F-04 dedup fix means every MIRRORED element
-                    # (the overwhelming majority — anything created through
-                    # the normal form) is now listed from here, not from the
-                    # dedicated-table branch above. Without this lookup, this
-                    # branch's elements would still lose their typed fields —
-                    # trading the double-listing bug for a "typed fields only
-                    # populate for the rare unmirrored row" bug instead.
-                    ae_type_config = get_element_config(ae.type)
-                    if ae_type_config:
-                        dedicated_model = MODEL_REGISTRY.get(ae.type)
-                        dedicated_row = None
-                        if dedicated_model is not None and hasattr(dedicated_model, "archimate_element_id"):
-                            dedicated_row = dedicated_model.query.filter_by(
-                                archimate_element_id=ae.id
-                            ).first()
-                        for f in ae_type_config.fields:
-                            if f.name == "architecture_state":
-                                continue
-                            value = getattr(dedicated_row, f.name, None) if dedicated_row else None
-                            ae_dict[f.name] = value if value is not None else ""
-                    all_elements.append(ae_dict)
+                    )
+                    .all()
+                )
+                for (ae_id_hit,) in rel_rows:
+                    rel_count_by_ae_id[ae_id_hit] = rel_count_by_ae_id.get(ae_id_hit, 0) + 1
+            # Batch-fetch dedicated rows for typed fields.
+            dedicated_rows_by_ae_id = {}
+            for ae in ae_rows:
+                if (ae.type, ae.id) in seen_pairs:
+                    continue
+                ae_type_config = get_element_config(ae.type)
+                if ae_type_config:
+                    dedicated_model = MODEL_REGISTRY.get(ae.type)
+                    if dedicated_model is not None and hasattr(dedicated_model, "archimate_element_id"):
+                        if ae.type not in dedicated_rows_by_ae_id:
+                            dedicated_rows_by_ae_id[ae.type] = {}
+            if dedicated_rows_by_ae_id:
+                for etype, _ in dedicated_rows_by_ae_id.items():
+                    type_ids = [
+                        ae.id for ae in ae_rows
+                        if ae.type == etype and (ae.type, ae.id) not in seen_pairs
+                    ]
+                    if not type_ids:
+                        continue
+                    dedicated_model = MODEL_REGISTRY.get(etype)
+                    if dedicated_model is not None and hasattr(dedicated_model, "archimate_element_id"):
+                        for row in dedicated_model.query.filter(
+                            dedicated_model.archimate_element_id.in_(type_ids)
+                        ).all():
+                            dedicated_rows_by_ae_id.setdefault(etype, {})[row.archimate_element_id] = row
+            for ae in ae_rows:
+                if (ae.type, ae.id) in seen_pairs:
+                    continue
+                _rel_count = rel_count_by_ae_id.get(ae.id, 0)
+                ae_dict = {
+                    "id": ae.id,
+                    "name": ae.name or "",
+                    "description": ae.description or "",
+                    "element_type": ae.type,
+                    "status": None,
+                    "layer": layer,
+                    "source": "architecture",
+                    "properties": ae.properties or "",
+                    "plateau": ae.togaf_plateau,
+                    "rel_count": _rel_count,
+                }
+                ae_dict["architecture_state"] = ae_dict["plateau"] or ""
+                # F-08(a): the F-04 dedup fix means every MIRRORED element
+                # (the overwhelming majority — anything created through
+                # the normal form) is now listed from here, not from the
+                # dedicated-table branch above. Without this lookup, this
+                # branch's elements would still lose their typed fields —
+                # trading the double-listing bug for a "typed fields only
+                # populate for the rare unmirrored row" bug instead.
+                ae_type_config = get_element_config(ae.type)
+                if ae_type_config:
+                    type_rows = dedicated_rows_by_ae_id.get(ae.type, {})
+                    dedicated_row = type_rows.get(ae.id)
+                    for f in ae_type_config.fields:
+                        if f.name == "architecture_state":
+                            continue
+                        value = getattr(dedicated_row, f.name, None) if dedicated_row else None
+                        ae_dict[f.name] = value if value is not None else ""
+                all_elements.append(ae_dict)
         except Exception as e:
             current_app.logger.warning(f"Error supplementing from archimate_elements: {e}")
 
@@ -877,16 +931,14 @@ def api_layer_elements(layer):
     if sort_by in ("name", "element_type", "description", "status"):
         all_elements.sort(key=lambda x: (x.get(sort_by) or "").lower(), reverse=reverse)
 
-    total = len(all_elements)
-    pages = math.ceil(total / per_page) if per_page > 0 else 1
-    start = (page - 1) * per_page
-    end = start + per_page
-    page_elements = all_elements[start:end]
-
-    # Enrich WorkPackage elements with their framework profile (kind, WSJF).
+    # Enrich ALL elements with their framework profile (kind, WSJF) — using
+    # the session identity map (elements were loaded by the architecture branch
+    # above), so no extra query is issued for already-loaded elements.
+    # Fixes PR 903: kind_filter was applied after pagination, so filtering
+    # by Epic only scanned the current page and returned wrong totals.
     try:
         from app.services.element_profile_service import read_profile
-        for el in page_elements:
+        for el in all_elements:
             if el.get("element_type") == "WorkPackage":
                 ae = db.session.get(ArchiMateElement, el["id"])
                 if ae is not None:
@@ -896,11 +948,15 @@ def api_layer_elements(layer):
     except Exception as e:
         current_app.logger.warning(f"Could not enrich profiles: {e}")
 
-    # Apply kind filter after enrichment.
+    # Apply kind filter BEFORE pagination so totals reflect the filtered set.
     if kind_filter:
-        page_elements = [el for el in page_elements if el.get("kind") == kind_filter]
-        total = len(all_elements)
-        pages = math.ceil(total / per_page) if per_page > 0 else 1
+        all_elements = [el for el in all_elements if el.get("kind") == kind_filter]
+
+    total = len(all_elements)
+    pages = math.ceil(total / per_page) if per_page > 0 else 1
+    start = (page - 1) * per_page
+    end = start + per_page
+    page_elements = all_elements[start:end]
 
     return jsonify(
         {
@@ -915,6 +971,7 @@ def api_layer_elements(layer):
             },
             "layer": layer,
             "element_types": layer_types,
+            "kind_options": _kind_options_for_layer(layer),
         }
     )
 
