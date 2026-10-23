@@ -77,7 +77,7 @@
                 Reset Filters
             </button>
             <button type="button" @click="exportData('csv')"
-                    class="bg-success text-success-foreground px-4 py-2 rounded-md hover:bg-success/90 transition-colors" aria-label="Export">
+                    class="bg-success/10 text-success-emphasis border border-success/40 px-4 py-2 rounded-md hover:bg-success/20 transition-colors" aria-label="Export">
                 Export CSV
             </button>
             <button type="button" @click="exportData('png')"
@@ -502,11 +502,11 @@ function enhancedStrategicRoadmap() {
 
         getStatusClass(status) {
             const statusClasses = {
-                'Planned': 'bg-primary/10 text-info-emphasis',
-                'In Progress': 'bg-warning/10 text-warning',
-                'Completed': 'bg-success/10 text-success',
+                'Planned': 'bg-info/10 text-info-emphasis',
+                'In Progress': 'bg-warning/10 text-warning-emphasis',
+                'Completed': 'bg-success/10 text-success-emphasis',
                 'On Hold': 'bg-muted text-foreground',
-                'Cancelled': 'bg-destructive/10 text-destructive'
+                'Cancelled': 'bg-destructive/10 text-destructive-emphasis'
             };
             return statusClasses[status] || 'bg-muted text-foreground';
         },
