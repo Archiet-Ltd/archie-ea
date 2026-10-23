@@ -1087,10 +1087,10 @@ function displayAnalysisResults(data) {
             </div>
           ` : ''}
 
-          // Vendor Analysis Summary (NEW)
+          // Vendor selection Summary (NEW)
           ${aiResults.vendor_analysis_summary ? `
             <div class="mt-3 pt-3 border-t border-purple-200">
-              <h6 class="font-medium text-purple-900 mb-2">\ud83c\udfe2 Vendor Analysis Summary</h6>
+              <h6 class="font-medium text-purple-900 mb-2">\ud83c\udfe2 Vendor selection Summary</h6>
               <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm mb-3">
                 <div class="text-center">
                   <div class="text-xl font-bold text-emerald-600">${aiResults.vendor_analysis_summary.vendors_found || 0}</div>
@@ -1365,11 +1365,11 @@ function displayAnalysisResults(data) {
       analysisHtml += '</div>';
     }
 
-    // Vendor Analysis
+    // Vendor selection
     if (data.vendors) {
       analysisHtml += `
         <div class="bg-emerald-500/5 border border-emerald-200 rounded-lg p-4">
-          <h5 class="font-bold text-green-900 mb-3">\ud83c\udfe2 Vendor Analysis</h5>
+          <h5 class="font-bold text-green-900 mb-3">\ud83c\udfe2 Vendor selection</h5>
           <div class="grid grid-cols-3 gap-4 text-sm mb-3">
             <div class="text-center">
               <div class="text-xl font-bold text-emerald-600">${escapeHtml(data.vendors.will_link || 0)}</div>

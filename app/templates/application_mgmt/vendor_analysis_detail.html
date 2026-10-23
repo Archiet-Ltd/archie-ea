@@ -1,5 +1,5 @@
 {% extends 'layouts/admin_base.html' %}
-{% block title %}Vendor Options Analysis{% endblock %}
+{% block title %}Vendor selection{% endblock %}
 
 {% from "components/page_header.html" import page_header %}
 {% from "components/status_badge.html" import status_badge %}
@@ -21,11 +21,11 @@
       <div class="flex items-center gap-2 text-sm text-muted-foreground mb-1">
         <a href="{{ url_for('main.index') }}" class="hover:text-foreground">Home</a>
         <i data-lucide="chevron-right" class="h-3 w-3"></i>
-        <a href="{{ url_for('application_mgmt.vendor_analysis_list') }}" class="hover:text-foreground">Vendor Analysis</a>
+        <a href="{{ url_for('application_mgmt.vendor_analysis_list') }}" class="hover:text-foreground">Vendor selection</a>
         <i data-lucide="chevron-right" class="h-3 w-3"></i>
-        <span class="text-foreground" x-text="analysis.name || 'New Analysis'"></span>
+        <span class="text-foreground" x-text="analysis.name || 'New vendor selection'"></span>
       </div>
-      <h1 class="text-2xl font-bold text-foreground" x-text="analysis.name || 'New Vendor Options Analysis'"></h1>
+      <h1 class="text-2xl font-bold text-foreground" x-text="analysis.name || 'New vendor selection'"></h1>
       <p class="text-sm text-muted-foreground mt-1">Multi-criteria vendor evaluation aligned to enterprise capabilities, APQC processes, and value streams</p>
     </div>
     <div class="flex items-center gap-2">

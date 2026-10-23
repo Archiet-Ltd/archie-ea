@@ -213,7 +213,7 @@ _MORE_TOOLS = [
     ("Product Roadmap", "roadmap_outcome.product_roadmap_page", "map"),
     ("Risk Register", "risk.risk_register", "alert-triangle"),
     ("Usage Analytics", "usage_analytics.analytics_root", "bar-chart-3"),
-    ("Vendor Analysis", "main.vendor_archimate_analysis", "building"),
+    ("Vendor mapping", "main.vendor_archimate_analysis", "building"),
     ("Integrations", "main.integrations", "cloud"),
     ("Architecture Roadmap", "main.archimate_roadmap", "map"),
     ("Enterprise Dashboard", "enterprise.enterprise_dashboard", "layout-dashboard"),
