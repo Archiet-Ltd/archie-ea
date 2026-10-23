@@ -42,7 +42,7 @@ except Exception:
     )
 
 from app.security.audit import AuditEventSeverity, AuditEventType, audit_logger
-from app.services.arb_workflow_service import ARBWorkflowService
+from app.services.arb_governance_service import ARBGovernanceService
 
 # Initialize services
 kg_service = KnowledgeGraphService()
@@ -52,7 +52,8 @@ vendor_service = UnifiedVendorServices()
 application_service = ApplicationCapabilityCatalogService()
 if OptionsAnalysisEngine is not None and options_service is None:
     options_service = OptionsAnalysisEngine()
-arb_service = ARBWorkflowService()
+# The one creator the architecture review pages use (app/modules/architecture/routes/arb_routes.py).
+arb_service = ARBGovernanceService()
 
 logger = logging.getLogger(__name__)
 
@@ -546,21 +547,19 @@ def create_arb_workflow():
 
         title = data.get("title")
         description = data.get("description")
-        artifacts = data.get("artifacts", [])
         reviewers = data.get("reviewers", [])
-        deadline = data.get("deadline")
 
         if not title or not reviewers:
             return jsonify({"success": False, "error": "Title and reviewers required"}), 400
 
-        workflow = arb_service.create_workflow(
+        review = arb_service.submit_for_review(
             title=title,
             description=description,
-            artifacts=artifacts,
-            reviewers=reviewers,
-            deadline=deadline,
-            created_by=current_user.id,
+            review_type="architecture_change",
+            submitter_id=current_user.id,
+            decision_sought=description or title,
         )
+        workflow = review.to_dict(include_details=False)
 
         audit_logger.log_event(
             event_type=AuditEventType.DATA_MODIFICATION,
@@ -586,7 +585,7 @@ def get_arb_workflow(workflow_id):
     Get ARB workflow details
     """
     try:
-        # ARBWorkflowService has no get-workflow-by-id method; return an honest 501
+        # No get-workflow-by-id service method exists; return an honest 501
         # rather than crashing on a missing method.
         return jsonify({
             "success": False,
