@@ -29,6 +29,7 @@ from flask_login import current_user
 
 from app.decorators import admin_required
 from app.extensions import db
+from app.middleware.tenant_context import current_org_id
 from app.services.billing_plans import PlanLimitReached
 from app.services.sso_service import SSODomainConflictError, SSONotConfiguredError, SSOService
 
@@ -299,7 +300,9 @@ def admin_sso():
     from app import db
     from app.models.sso_config import SSOConfig
 
-    org_id = getattr(current_user, "organization_id", None)
+    # The organisation the administrator is working in, which the role check judged, not
+    # their home organisation.
+    org_id = current_org_id()
     config = SSOConfig.query.filter_by(organization_id=org_id).first() if org_id else None
 
     if request.method == "POST":
@@ -311,6 +314,7 @@ def admin_sso():
         idp_sso_url = request.form.get("idp_sso_url", "").strip()
         idp_x509_cert = request.form.get("idp_x509_cert", "").strip()
         sp_entity_id = request.form.get("sp_entity_id", "").strip()
+        idp_entity_id = request.form.get("idp_entity_id", "").strip()
         enabled = request.form.get("enabled") == "on"
 
         # Validate before creating or changing a record: a rejected save must
@@ -322,6 +326,12 @@ def admin_sso():
             flash(
                 "SAML SSO needs an IdP SSO URL and signing certificate "
                 "before it can be enabled.",
+                "error",
+            )
+            return redirect(url_for("sso.admin_sso"))
+        if protocol == "saml" and enabled and not idp_entity_id:
+            flash(
+                "SAML SSO needs the identity provider's entity id before it can be enabled.",
                 "error",
             )
             return redirect(url_for("sso.admin_sso"))
@@ -358,9 +368,14 @@ def admin_sso():
         config.idp_sso_url = idp_sso_url or None
         config.idp_x509_cert = idp_x509_cert or None
         config.sp_entity_id = sp_entity_id or None
+        config.idp_entity_id = idp_entity_id or None
         config.enabled = enabled
 
         try:
+            # One claim row per listed domain, each with its own proof token; a domain taken
+            # out of the list loses its claim. Inside the same handler as the commit, so a
+            # failing flush or a concurrent save is rolled back and reported, not a 500.
+            _svc.sync_domain_claims(org_id, config.email_domains)
             db.session.commit()
             flash("SSO configuration saved.", "success")
         except Exception as exc:
@@ -370,7 +385,23 @@ def admin_sso():
 
         return redirect(url_for("sso.admin_sso"))
 
-    return render_template("admin/sso.html", config=config)
+    claims = _svc.domain_claims_for(org_id) if config is not None else []
+    return render_template(
+        "admin/sso.html",
+        config=config,
+        domain_claims=claims,
+        challenge_names={c.domain: _svc.challenge_record_name(c.domain) for c in claims},
+    )
+
+
+@sso_bp.route("/admin/sso/domains/verify", methods=["POST"])
+@admin_required
+def admin_sso_verify_domain():
+    """Check the DNS proof for one of the working organisation's listed domains."""
+    org_id = current_org_id()
+    ok, message = _svc.verify_domain(org_id, request.form.get("domain", "")) if org_id else (False, "No organisation.")
+    flash(message, "success" if ok else "error")
+    return redirect(url_for("sso.admin_sso"))
 
 
 @sso_bp.route("/admin/sso/test", methods=["GET"])
@@ -388,7 +419,9 @@ def admin_sso_test_initiate():
     """
     from app.models.sso_config import SSOConfig
 
-    org_id = getattr(current_user, "organization_id", None)
+    # The organisation the administrator is working in, which the role check judged, not
+    # their home organisation.
+    org_id = current_org_id()
     config = SSOConfig.query.filter_by(organization_id=org_id).first() if org_id else None
     if config is None:
         flash("Save an SSO configuration before testing it.", "error")

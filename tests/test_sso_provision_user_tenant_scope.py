@@ -49,6 +49,9 @@ def _configure_sso(db_session, org, email_domain):
     )
     db_session.add(config)
     db_session.flush()
+    from tests._sso_claims import verify_domains
+
+    verify_domains(db_session, org, email_domain)
     return config
 
 

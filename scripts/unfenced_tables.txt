@@ -384,7 +384,9 @@ solution_templates
 solution_workflow_tasks
 spec_webhooks
 sprints
+sso_assertion_ids
 sso_configs
+sso_domain_claims
 staging_elements
 stakeholder_communications
 stakeholder_inputs

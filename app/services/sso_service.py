@@ -69,6 +69,7 @@ _MSG_LINKED_ELSEWHERE = (
     "This account is linked to a different sign-in. Contact your administrator."
 )
 _MSG_PASSWORD_ONLY = "This account signs in with a password."
+_MSG_SERVICE_ACCOUNT = "This account is a service account and cannot sign in through single sign-on."
 _MSG_OTHER_ORGANISATION = (
     "This email address belongs to a different organisation's "
     "account and cannot sign in through this organisation's SSO."
@@ -93,6 +94,9 @@ class SSODomainConflictError(SSONotConfiguredError):
     """Two enabled SSO configurations claim the same email domain. Sign-in for
     that domain fails closed: neither SSO nor password is offered."""
 
+
+# The DNS label under which an organisation publishes its one-time proof for a domain.
+_DNS_CHALLENGE_LABEL = "_entelim-challenge"
 
 _MSG_DOMAIN_CONFLICT = (
     "Sign-in for this email domain is unavailable because it is claimed by more "
@@ -164,11 +168,23 @@ class SSOService:
         matches = []
         try:
             from app.models.sso_config import SSOConfig
+            from app.models.sso_domain_claim import SSODomainClaim
 
             # tenant-scoping-ok: resolving SSO config by email domain happens
-            # pre-authentication (no org context yet) -- the domain match
-            # itself is the scoping mechanism.
-            configs = SSOConfig.query.filter_by(enabled=True).all()
+            # pre-authentication (no org context yet) -- the verified domain
+            # claim itself is the scoping mechanism: a configuration answers
+            # for a domain only when its organisation has proved it controls it.
+            owners = [
+                row.organization_id
+                for row in SSODomainClaim.query.filter(
+                    SSODomainClaim.domain == domain, SSODomainClaim.verified_at.isnot(None)
+                ).all()
+            ]
+            configs = (
+                SSOConfig.query.filter(SSOConfig.enabled.is_(True), SSOConfig.organization_id.in_(owners)).all()
+                if owners
+                else []
+            )
             matches = [config for config in configs if domain in config.email_domains]
         except Exception as exc:
             logger.warning("SSO config lookup failed (non-fatal): %s", exc)
@@ -272,18 +288,135 @@ class SSOService:
         if not wanted:
             return {}
         from app.models.sso_config import SSOConfig
+        from app.models.sso_domain_claim import SSODomainClaim
 
         # tenant-scoping-ok: a domain claim is checked against every other
-        # organisation's configuration; only domains and org ids are read.
-        query = SSOConfig.query
+        # organisation's verified claims; only domains and org ids are read.
+        query = SSODomainClaim.query.filter(
+            SSODomainClaim.domain.in_(sorted(wanted)), SSODomainClaim.verified_at.isnot(None)
+        )
         if org_id is not None:
-            query = query.filter(SSOConfig.organization_id != org_id)
+            query = query.filter(SSODomainClaim.organization_id != org_id)
         claimed = {}
-        for config in query.filter(SSOConfig.enabled.is_(True)).all():
-            for domain in config.email_domains:
-                if domain in wanted:
-                    claimed.setdefault(domain, config.organization_id)
+        for claim in query.all():
+            holder = SSOConfig.query.filter_by(organization_id=claim.organization_id).first()
+            # A claim held by a disabled configuration, or one that no longer lists the
+            # domain, holds nothing back.
+            if holder is not None and holder.enabled and claim.domain in holder.email_domains:
+                claimed.setdefault(claim.domain, claim.organization_id)
         return claimed
+
+    # ------------------------------------------------------------------
+    # Domain ownership proof (DNS TXT)
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def challenge_record_name(domain: str) -> str:
+        return f"{_DNS_CHALLENGE_LABEL}.{domain}"
+
+    @staticmethod
+    def _lookup_txt(name: str) -> list:
+        """The TXT strings published at *name*; empty on any failure, so an unanswered,
+        refused or malformed lookup never counts as proof."""
+        try:
+            import dns.resolver
+
+            resolver = dns.resolver.Resolver()
+            resolver.lifetime = 5.0
+            answers = resolver.resolve(name, "TXT")
+            return [b"".join(rdata.strings).decode("utf-8", "replace") for rdata in answers]
+        except Exception as exc:
+            logger.info("DNS TXT lookup for %s found nothing: %s", name, exc)
+            return []
+
+    def sync_domain_claims(self, org_id: int, domains) -> None:
+        """Keep one claim row per domain the organisation lists: a new domain gets a fresh
+        token and no proof; a domain no longer listed loses its claim (and so its proof).
+        Does not commit."""
+        import secrets as _secrets
+
+        from app import db
+        from app.models.sso_domain_claim import SSODomainClaim
+
+        wanted = set(domains)
+        existing = {c.domain: c for c in SSODomainClaim.query.filter_by(organization_id=org_id).all()}
+        for domain, claim in existing.items():
+            if domain not in wanted:
+                db.session.delete(claim)
+        for domain in sorted(wanted - set(existing)):
+            db.session.add(
+                SSODomainClaim(organization_id=org_id, domain=domain, token=_secrets.token_hex(16))
+            )
+        db.session.flush()
+
+    def domain_claims_for(self, org_id: int) -> list:
+        from app.models.sso_domain_claim import SSODomainClaim
+
+        return SSODomainClaim.query.filter_by(organization_id=org_id).order_by(SSODomainClaim.domain).all()
+
+    def verified_domains_for(self, org_id) -> list:
+        """The domains organisation *org_id* has proved it controls."""
+        from app.models.sso_domain_claim import SSODomainClaim
+
+        if org_id is None:
+            return []
+        # tenant-scoping-ok: read before sign-in, keyed by the organisation named in the call.
+        return [
+            c.domain
+            for c in SSODomainClaim.query.filter(
+                SSODomainClaim.organization_id == org_id, SSODomainClaim.verified_at.isnot(None)
+            ).all()
+        ]
+
+    def verify_domain(self, org_id: int, raw_domain: str):
+        """Check the DNS TXT proof for one of the organisation's listed domains.
+
+        Returns ``(True, message)`` once the token is published and the claim is recorded.
+        A domain another organisation holds under an enabled configuration that still lists
+        it is refused; a stale claim (its configuration disabled, or the domain unlisted)
+        is released first. Commits on success.
+        """
+        from datetime import datetime
+
+        from app import db
+        from app.models.sso_config import SSOConfig, normalise_email_domain
+        from app.models.sso_domain_claim import SSODomainClaim
+
+        domain = normalise_email_domain(raw_domain)
+        claim = SSODomainClaim.query.filter_by(organization_id=org_id, domain=domain).first()
+        config = SSOConfig.query.filter_by(organization_id=org_id).first()
+        if claim is None or config is None or domain not in config.email_domains:
+            return False, "Add the domain to your single sign-on settings and save before verifying it."
+        if claim.verified_at is not None:
+            return True, f"{domain} is already verified."
+        name = self.challenge_record_name(domain)
+        if claim.token not in {value.strip() for value in self._lookup_txt(name)}:
+            return False, f"No TXT record with the expected value was found at {name}. DNS changes can take a while to appear."
+        # Two organisations proving the same domain at once must not both pass the holder
+        # check: ownership changes of one domain are serialised on a transaction-scoped lock,
+        # and the holder is read again once the lock is ours.
+        db.session.execute(
+            db.text("SELECT pg_advisory_xact_lock(hashtext(:key))"), {"key": f"sso-domain:{domain}"}
+        )
+        holders = self.domains_claimed_by_other_orgs(org_id, [domain])
+        if domain in holders:
+            return False, f"{domain} is already used by another organisation's single sign-on."
+        # Whatever other verified claim remains is stale (its configuration is disabled or no
+        # longer lists the domain, or the holder check above would have refused): release it.
+        for other in SSODomainClaim.query.filter(
+            SSODomainClaim.domain == domain,
+            SSODomainClaim.organization_id != org_id,
+            SSODomainClaim.verified_at.isnot(None),
+        ).all():
+            other.verified_at = None
+        db.session.flush()
+        claim.verified_at = datetime.utcnow()
+        try:
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+            return False, f"{domain} could not be verified because another organisation holds it."
+        return True, f"{domain} is verified."
 
     def domain_claim_problem(self, org_id, raw_email_domain: Optional[str]) -> Optional[str]:
         """Why organisation *org_id* may not save *raw_email_domain*, or None.
@@ -350,8 +483,26 @@ class SSOService:
             raise SSONotConfiguredError(
                 "The identity provider did not return a valid configuration document"
             ) from exc
+        self._check_issuer_bound_to_address(metadata_url, doc)
         self._discovery_cache[metadata_url] = doc
         return doc
+
+    @staticmethod
+    def _check_issuer_bound_to_address(metadata_url: str, doc: dict) -> None:
+        """The issuer a discovery document names must be the issuer the address it was
+        fetched from implies (OpenID Connect Discovery 4.3): the address minus
+        ``/.well-known/openid-configuration``. A document that names another issuer, or an
+        address that is not a provider's well-known address, is refused, so a configuration
+        can only ever trust tokens from the provider whose address the administrator entered
+        (a shared multi-tenant endpoint whose issuer is a template never matches)."""
+        suffix = "/.well-known/openid-configuration"
+        issuer = str(doc.get("issuer") or "").strip()
+        base = (metadata_url or "").split("?", 1)[0].split("#", 1)[0]
+        if not base.endswith(suffix) or not issuer or issuer.rstrip("/") != base[: -len(suffix)].rstrip("/"):
+            logger.warning("OIDC discovery issuer %r is not bound to address %r", issuer, metadata_url)
+            raise SSONotConfiguredError(
+                "The identity provider's configuration document names a different issuer than its address"
+            )
 
     def _get_jwks(self, jwks_uri: str, *, force: bool = False) -> dict:
         """Return the IdP's key set, from the cache while it is fresh."""
@@ -610,10 +761,30 @@ class SSOService:
             logger.warning("Token exchange failed: %s", exc)
             raise SSONotConfiguredError("Token exchange failed") from exc
 
-        # Prefer userinfo endpoint for claims; fall back to id_token payload
-        userinfo: dict = {}
+        # The signed id_token is the only source of identity. It is required and verified
+        # (signature, issuer, audience, expiry, nonce); an unsigned userinfo response is never
+        # preferred over it. Userinfo may add claims the id_token lacks, but only for the same
+        # subject and never in place of a claim the id_token carries.
+        id_token = token_data.get("id_token", "")
+        if not id_token:
+            raise SSONotConfiguredError("id_token verification failed: the identity provider sent no id_token")
+        try:
+            claims = self._verify_id_token(
+                id_token,
+                config,
+                discovery,
+                expected_nonce or "",
+                access_token=token_data.get("access_token") or None,
+            )
+        except SSONotConfiguredError:
+            raise
+        except Exception as exc:
+            logger.warning("id_token verification failed: %s", exc)
+            raise SSONotConfiguredError("id_token verification failed") from exc
+
         access_token = token_data.get("access_token", "")
         if userinfo_endpoint and access_token:
+            userinfo: dict = {}
             try:
                 check_idp_url(userinfo_endpoint)
                 uinfo_resp = requests.get(
@@ -623,29 +794,18 @@ class SSOService:
                     allow_redirects=False,
                 )
                 if uinfo_resp.status_code == 200:
-                    userinfo = uinfo_resp.json()
+                    parsed = uinfo_resp.json()
+                    userinfo = parsed if isinstance(parsed, dict) else {}
             except Exception as exc:
-                logger.warning("Userinfo fetch failed (falling back to id_token): %s", exc)
+                logger.warning("Userinfo fetch failed (using the id_token alone): %s", exc)
+            if userinfo:
+                if str(userinfo.get("sub", "")) != str(claims.get("sub", "")):
+                    logger.warning("Userinfo subject does not match the id_token subject")
+                    raise SSONotConfiguredError("id_token verification failed: userinfo is for a different subject")
+                for key, value in userinfo.items():
+                    claims.setdefault(key, value)
 
-        # Fall back: verify id_token signature and extract claims
-        if not userinfo:
-            id_token = token_data.get("id_token", "")
-            if id_token:
-                try:
-                    userinfo = self._verify_id_token(
-                        id_token,
-                        config,
-                        discovery,
-                        expected_nonce or "",
-                        access_token=token_data.get("access_token") or None,
-                    )
-                except SSONotConfiguredError:
-                    raise
-                except Exception as exc:
-                    logger.warning("id_token verification failed: %s", exc)
-                    raise SSONotConfiguredError("id_token verification failed") from exc
-
-        return userinfo
+        return claims
 
     # ------------------------------------------------------------------
     # User provisioning
@@ -724,7 +884,12 @@ class SSOService:
                 user.last_name = family_name
 
         config = getattr(org, "sso_config", None) if org is not None else None
-        configured_domains = config.email_domains if config is not None else []
+        verified_domains = set(self.verified_domains_for(org.id)) if config is not None and org is not None else set()
+        configured_domains = (
+            [d for d in config.email_domains if d in verified_domains]
+            if config is not None and org is not None
+            else []
+        )
         domain = email.rsplit("@", 1)[1] if "@" in email else ""
         send_connection_notice = False
 
@@ -746,6 +911,8 @@ class SSOService:
             if linked is not None:
                 if linked.is_platform_admin:
                     raise SSONotConfiguredError(_MSG_PASSWORD_ONLY)
+                if getattr(linked, "is_service_user", False):
+                    raise SSONotConfiguredError(_MSG_SERVICE_ACCOUNT)
                 _refresh_names(linked)
                 if not linked.confirmed:
                     linked.confirmed = True
@@ -778,6 +945,8 @@ class SSOService:
             else:
                 if user.is_platform_admin:
                     raise SSONotConfiguredError(_MSG_PASSWORD_ONLY)
+                if getattr(user, "is_service_user", False):
+                    raise SSONotConfiguredError(_MSG_SERVICE_ACCOUNT)
                 if user.external_id and (
                     user.external_id != sub
                     or (user.sso_provider or _ORG_SSO_PROVIDER) != _ORG_SSO_PROVIDER
@@ -808,7 +977,8 @@ class SSOService:
         The one way a sign-in link is cleared, used by the Team page and by
         the operator runbook. Only a member of organisation *org_id* is
         reached, never a platform administrator. A member with no link is
-        returned unchanged. Each reset writes an ``sso_link_reset`` audit
+        returned unchanged. A reset ends the account's existing sessions and
+        connected assistants. Each reset writes an ``sso_link_reset`` audit
         event that carries neither the old subject nor the address; a failed
         audit write is logged and never undoes the reset.
 
@@ -829,6 +999,14 @@ class SSOService:
             raise PermissionError("A platform administrator's sign-in cannot be reset here.")
         if not user.external_id:
             return user
+
+        # End every session the account holds first. A link that is cleared while the old
+        # sign-in's sessions stay open leaves exactly the access the reset is meant to
+        # remove; ending them first means a failure here leaves the link in place, so the
+        # reset can simply be tried again.
+        from app.services import session_registry
+
+        session_registry.revoke_all_for_user(user.id, "sso_link_reset")
 
         previous_provider = user.sso_provider
         user.external_id = None
