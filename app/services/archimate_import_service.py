@@ -22,11 +22,18 @@ against the ``archimate_elements`` table.
 """
 
 from app.utils import safe_xml  # untrusted XML: entity-expansion safe
+import re
 import logging
+import uuid
 import xml.etree.ElementTree as ET
 from typing import Any, Dict, List, Optional, Union
 
 from app import db
+from app.models.archimate_element_types import (
+    SPECIALIZATION_PROPERTY,
+    application_kind_types,
+    is_application_kind,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -76,6 +83,126 @@ def read_xml_from_request(req, file_fields=("oef_file", "file")) -> Optional[Uni
             return raw
 
     return None
+
+
+_MODELLED_NOTE = re.compile(r"As modelled: ([A-Za-z]+)\.")
+
+
+def _modelled_note_type(description):
+    """The relationship type recorded in an "As modelled: <Type>." note, lower
+    case, or None when the description carries no such note."""
+    match = _MODELLED_NOTE.search(description or "")
+    return match.group(1).lower() if match else None
+
+
+# A property key that names a specialisation in a file written by another tool.
+_PLAIN_SPECIALIZATION_KEY = "specialization"
+_PARENT_RELATIONSHIPS = ("composition", "aggregation")
+
+
+def _specialization_marks(props) -> Dict[str, bool]:
+    """How an element's properties speak about its specialisation (key match ignores case).
+
+    ``application``: the element is stated to be an Application (rule 1).
+    ``entelim``: the element carries Entelim's own property, with any value. A file with
+    such an element was written by Entelim, so promotion does not apply to it.
+    """
+    application = entelim = False
+    for key, value in (props or {}).items():
+        norm = str(key).strip().lower()
+        if norm == SPECIALIZATION_PROPERTY:
+            entelim = True
+        if norm in (SPECIALIZATION_PROPERTY, _PLAIN_SPECIALIZATION_KEY) and str(value).strip() == "Application":
+            application = True
+    return {"application": application, "entelim": entelim}
+
+
+def decision_key(index: int, element: Dict[str, Any]) -> str:
+    """The key under which ``decide_application_kinds`` reports an element."""
+    return element.get("identifier") or f"#{index}"
+
+
+def decide_application_kinds(
+    parsed: Dict[str, Any], *, promote_top_level: bool = True
+) -> Dict[str, Dict[str, Any]]:
+    """Decide, for each application-kind element of a parsed file, Application or component.
+
+    Pure: reads ``parsed["elements"]`` and ``parsed["relationships"]`` and writes nothing.
+    Returns ``{key: {"name", "declared_type", "type", "reason", "stated"}}`` where ``type`` is
+    ``Application`` or ``ApplicationComponent``, ``reason`` is plain English for the preview and
+    ``stated`` is true when the file itself marks the element as an Application (ADR-0014
+    Decision 4, rules 1 to 4).
+    """
+    elements = parsed.get("elements") or []
+    relationships = parsed.get("relationships") or []
+    usable = {
+        e["identifier"]: e
+        for e in elements
+        if e.get("identifier") and not e.get("invalid") and is_application_kind(e.get("type"))
+    }
+
+    # Rule 3 counts only an application-kind element as a parent, by Composition or Aggregation.
+    composed_by: Dict[str, str] = {}
+    aggregated_by: Dict[str, str] = {}
+    for rel in relationships:
+        kind = (rel.get("type") or "").strip().lower()
+        source, target = rel.get("source"), rel.get("target")
+        if kind in _PARENT_RELATIONSHIPS and source in usable and target in usable and source != target:
+            (composed_by if kind == "composition" else aggregated_by).setdefault(target, source)
+
+    marks = {
+        decision_key(i, e): _specialization_marks(e.get("properties")) for i, e in enumerate(elements)
+    }
+    entelim_file = any(m["application"] or m["entelim"] for m in marks.values())
+
+    decisions: Dict[str, Dict[str, Any]] = {}
+    for index, elem in enumerate(elements):
+        if elem.get("invalid") or not is_application_kind(elem.get("type")):
+            continue
+        key = decision_key(index, elem)
+        ident = elem.get("identifier")
+        name = elem.get("name") or ""
+
+        def _name_of(parent_id: str) -> str:
+            return usable[parent_id].get("name") or parent_id
+
+        if marks[key]["application"]:
+            # Rule 1, then rule 4: validity wins over what the file states.
+            if ident in composed_by:
+                type_, stated = "ApplicationComponent", False
+                reason = (
+                    f"The file marks it as an Application, but it is composed by "
+                    f"{_name_of(composed_by[ident])} and an Application cannot be composed by an "
+                    f"application, so it is imported as an application component."
+                )
+            else:
+                type_, stated = "Application", True
+                reason = "The file marks it as an Application."
+        elif entelim_file:
+            type_, stated = "ApplicationComponent", False
+            reason = "Imported as an application component: the file marks its Applications and does not mark this one."
+        elif not promote_top_level:
+            type_, stated = "ApplicationComponent", False
+            reason = "Imported as an application component: treating top-level components as applications is switched off."
+        elif ident in composed_by:
+            type_, stated = "ApplicationComponent", False
+            reason = f"Imported as an application component: it is composed by {_name_of(composed_by[ident])}."
+        elif ident in aggregated_by:
+            type_, stated = "ApplicationComponent", False
+            reason = f"Imported as an application component: it is aggregated by {_name_of(aggregated_by[ident])}."
+        else:
+            type_, stated = "Application", False
+            reason = "Imported as an Application: no application component composes or aggregates it, so it is a top-level system."
+
+        decisions[key] = {
+            "identifier": ident or "",
+            "name": name,
+            "declared_type": elem.get("type"),
+            "type": type_,
+            "reason": reason,
+            "stated": stated,
+        }
+    return decisions
 
 
 class ArchiMateImportService:
@@ -153,13 +280,20 @@ class ArchiMateImportService:
         "ImplementationEvent": "Implementation",
         "Plateau": "Implementation",
         "Gap": "Implementation",
+        # Concepts that belong to no layer. They are known types; the layer
+        # "Other" is their stored layer, so no unknown-type warning is logged.
+        "Grouping": "Other",
+        "Location": "Other",
+        "Junction": "Other",
     }
 
     # Column widths on ``archimate_elements`` (app/models/archimate_core.py).
     # DOGFOOD-001: the parser checks these so preview reports what execute
     # will refuse, instead of one over-long name aborting the whole import
     # with a raw ``StringDataRightTruncation`` from the database.
-    MAX_NAME_LENGTH = 100
+    # The element name column holds 500 characters; 255 is the import limit so a
+    # long Open Exchange name no longer blocks its element.
+    MAX_NAME_LENGTH = 255
     MAX_TYPE_LENGTH = 50
 
     # DOGFOOD-003 (relationship-validity authority audit): this class used to
@@ -203,46 +337,69 @@ class ArchiMateImportService:
         except UnicodeDecodeError:
             return content.decode("latin-1")
 
-    def load(self, content: Union[bytes, str]) -> Dict[str, Any]:
+    def load(self, content: Union[bytes, str], *, promote_top_level: bool = True) -> Dict[str, Any]:
         """Size-check, decode and parse an OEF document."""
         xml_content = self.decode_xml(content)
         try:
-            return self.parse_oef_xml(xml_content)
+            return self.parse_oef_xml(xml_content, promote_top_level=promote_top_level)
         except ValueError as exc:
             raise ImportRequestError(str(exc)) from exc
 
-    def preview_xml(self, content: Union[bytes, str]) -> Dict[str, Any]:
+    def preview_xml(
+        self,
+        content: Union[bytes, str],
+        organization_id: Optional[int] = None,
+        *,
+        promote_top_level: bool = True,
+    ) -> Dict[str, Any]:
         """What ``import_xml`` would do with this document, writing nothing."""
-        parsed = self.load(content)
-        preview = self.preview_import(parsed)
+        parsed = self.load(content, promote_top_level=promote_top_level)
+        preview = self.preview_import(parsed, organization_id=organization_id)
         return {"model_name": parsed.get("model_name", ""), **preview}
 
     def import_xml(
         self,
         content: Union[bytes, str],
         strategy: str = "skip_duplicates",
+        organization_id: Optional[int] = None,
+        *,
+        source_ref: Optional[str] = None,
+        source_label: Optional[str] = None,
+        promote_top_level: bool = True,
     ) -> Dict[str, Any]:
         """Import an OEF document under ``strategy``.
 
         Raises ``ImportRequestError`` for an unknown strategy, an oversized,
         empty or malformed document, or one with no importable elements --
         all before anything is written.
+
+        Provenance parameters:
+        - source_ref: import batch or run id (e.g., ArchitectureModel id)
+        - source_label: uploaded file name
+        - promote_top_level: ADR-0014 rule 3, on by default; False imports every
+          incoming application component as a component
         """
         if strategy not in STRATEGIES:
             raise ImportRequestError(
                 f"Invalid strategy: {strategy}. Must be one of: {', '.join(STRATEGIES)}"
             )
-        parsed = self.load(content)
+        parsed = self.load(content, promote_top_level=promote_top_level)
         if not parsed["elements"]:
             raise ImportRequestError("No valid elements found in the XML file.")
-        result = self.execute_import(parsed, strategy=strategy)
+        result = self.execute_import(
+            parsed,
+            strategy=strategy,
+            organization_id=organization_id,
+            source_ref=source_ref or uuid.uuid4().hex,
+            source_label=source_label,
+        )
         return {"model_name": parsed.get("model_name", ""), **result}
 
     # ------------------------------------------------------------------
     # Parsing
     # ------------------------------------------------------------------
 
-    def parse_oef_xml(self, xml_content: str) -> Dict[str, Any]:
+    def parse_oef_xml(self, xml_content: str, *, promote_top_level: bool = True) -> Dict[str, Any]:
         """Parse an OEF XML string into structured element/relationship lists.
 
         Returns::
@@ -257,7 +414,7 @@ class ArchiMateImportService:
                         "layer": "Business",
                         "description": "..." | None,
                         "properties": {"status": "RULED", ...},
-                        "invalid": "name_too_long (269 chars > 100)",  # only when present
+                        "invalid": "name_too_long (269 chars > 255)",  # only when present
                     }, ...
                 ],
                 "relationships": [
@@ -441,13 +598,45 @@ class ArchiMateImportService:
                     else None
                 )
 
+                rel_props: Dict[str, str] = {}
+                rel_props_container = rel.find(_tag("properties"))
+                if rel_props_container is not None:
+                    for prop in rel_props_container.findall(_tag("property")):
+                        pd_ref = prop.get("propertyDefinitionRef", "")
+                        value_el = prop.find(_tag("value"))
+                        value = (
+                            value_el.text.strip()
+                            if value_el is not None and value_el.text
+                            else ""
+                        )
+                        key = property_defs.get(pd_ref, pd_ref)
+                        if key:
+                            rel_props[key] = value
+
                 relationships.append({
                     "identifier": identifier,
                     "type": rel_type,
                     "source": source,
                     "target": target,
                     "description": rel_description,
+                    "properties": rel_props,
                 })
+
+        # ADR-0014 Decision 4: which application-kind elements are Applications, decided
+        # once, before anything is written, with a plain reason for the preview.
+        decisions = decide_application_kinds(
+            {"elements": elements, "relationships": relationships},
+            promote_top_level=promote_top_level,
+        )
+        for index, elem in enumerate(elements):
+            decision = decisions.get(decision_key(index, elem))
+            if decision is None:
+                continue
+            elem["declared_type"] = elem["type"]
+            elem["type"] = decision["type"]
+            elem["application_kind_decision"] = decision["reason"]
+            elem["stated_application"] = decision["stated"]
+            elem["layer"] = "Application"
 
         return {
             "model_name": model_name,
@@ -455,6 +644,7 @@ class ArchiMateImportService:
             "relationships": relationships,
             "errors": errors,
             "source_xml": xml_content,
+            "application_kind_decisions": decisions,
         }
 
     # ------------------------------------------------------------------
@@ -463,6 +653,26 @@ class ArchiMateImportService:
     # authority consulted is RelationshipValidator, backed by the
     # element-type-keyed matrix in app/config/archimate_relationship_matrix.py.
     # ------------------------------------------------------------------
+
+    @staticmethod
+    def _can_keep_as_association(validator, source_type, target_type, rel_type):
+        """True when only the pairing is refused: both element types and the
+        relationship type are known, and Association is allowed for the pair."""
+        from app.config.archimate_relationship_matrix import RELATIONSHIP_TYPES
+
+        # Composition, aggregation and specialization assert that one thing is
+        # part of, or a kind of, another. Softening a wrong one to a plain
+        # association would hide a modelling error, so those stay refused.
+        if (
+            not rel_type
+            or rel_type == "association"
+            or rel_type not in RELATIONSHIP_TYPES
+            or rel_type in ("composition", "aggregation", "specialization")
+        ):
+            return False
+        return validator.validate_relationship(
+            source_type, target_type, "association"
+        ).is_valid
 
     def _classify_relationships(
         self,
@@ -509,6 +719,7 @@ class ArchiMateImportService:
                 "source": source_ref,
                 "target": target_ref,
                 "description": rel.get("description"),
+                "properties": rel.get("properties") or {},
             }
 
             if source_type is None or target_type is None:
@@ -523,9 +734,32 @@ class ArchiMateImportService:
 
             normalized_type = _normalize_rel_type(rel_type_raw)
             entry["type"] = normalized_type
+            entry["modelled_type"] = normalized_type
             result = validator.validate_relationship(
                 source_type, target_type, normalized_type
             )
+
+            if not result.is_valid and self._can_keep_as_association(
+                validator, source_type, target_type, normalized_type
+            ):
+                # The pair is known and the type is a real ArchiMate type, but
+                # the matrix has no entry for it. Association is permitted
+                # between any two elements (ArchiMate 3.2 section 5.4.3), so
+                # keep the relationship and record what was modelled.
+                modelled = normalized_type.capitalize()
+                note = f"As modelled: {modelled}."
+                prior = (entry.get("description") or "").strip()
+                entry["description"] = f"{prior} {note}".strip()
+                entry["type"] = "association"
+                entry["softened"] = True
+                entry["notice"] = (
+                    f"{modelled} between {source_type} and {target_type} is not "
+                    f"in the ArchiMate 3.2 matrix; stored as Association "
+                    f"(identifier={identifier or 'n/a'})."
+                )
+                result = validator.validate_relationship(
+                    source_type, target_type, "association"
+                )
 
             if not result.is_valid:
                 entry["status"] = "invalid"
@@ -553,8 +787,46 @@ class ArchiMateImportService:
     # Preview (diff against existing DB)
     # ------------------------------------------------------------------
 
+    @staticmethod
+    def _importing_organization_id(explicit: Optional[int]) -> Optional[int]:
+        """The organisation a run reads and writes.
+
+        An explicit id wins (CLI and programme setup have no ambient tenant);
+        then the request's tenant; then the single organisation of a
+        single-tenant install. ``None`` only when none of these exist.
+        """
+        if explicit is not None:
+            return int(explicit)
+        try:
+            from app.utils.tenant import current_organization_id
+
+            ambient = current_organization_id()
+            if ambient is not None:
+                return ambient
+        except Exception:
+            pass
+        from app.models.mixins.core import _default_org_id
+
+        return _default_org_id()
+
+    @classmethod
+    def _require_organization_id(cls, explicit: Optional[int]) -> int:
+        org_id = cls._importing_organization_id(explicit)
+        if org_id is None:
+            raise ImportRequestError(
+                "Name the organisation to import into: several exist and none was given."
+            )
+        return org_id
+
+    @staticmethod
+    def _in_organization(model_cls, org_id: Optional[int]) -> list:
+        """Explicit organisation predicate; the ORM fence is a no-op with no
+        ambient tenant (CLI), so every read here states its own."""
+        assert org_id is not None, "an import always names its organisation"
+        return [model_cls.organization_id == org_id]
+
     def preview_import(
-        self, parsed_data: Dict[str, Any]
+        self, parsed_data: Dict[str, Any], organization_id: Optional[int] = None
     ) -> Dict[str, Any]:
         """Compare parsed elements against the DB and classify each element.
 
@@ -580,6 +852,7 @@ class ArchiMateImportService:
         """
         from app.models.archimate_core import ArchiMateElement
 
+        org_id = self._require_organization_id(organization_id)
         elements = parsed_data.get("elements", [])
         preview_elements: List[Dict[str, Any]] = []
         counts = {"new": 0, "exists": 0, "conflict": 0, "invalid": 0}
@@ -598,10 +871,12 @@ class ArchiMateImportService:
             name_lower = elem["name"].strip().lower()
             elem_type = elem["type"]
 
-            # Duplicate detection: case-insensitive name + exact type match
+            # Duplicate detection: case-insensitive name + exact type match; an
+            # application-kind element matches either kind (ADR-0014 rule 5).
             existing = ArchiMateElement.query.filter(  # model-safety-ok: bounded by XML element count
                 db.func.lower(ArchiMateElement.name) == name_lower,
-                ArchiMateElement.type == elem_type,
+                ArchiMateElement.type.in_(self._match_types(elem_type)),
+                *self._in_organization(ArchiMateElement, org_id),
             ).first()
 
             entry = {**elem}
@@ -652,7 +927,13 @@ class ArchiMateImportService:
             },
             "relationships": relationships_preview,
             "errors": parsed_data.get("errors", []),
+            "application_kind_decisions": parsed_data.get("application_kind_decisions", {}),
         }
+
+    @staticmethod
+    def _match_types(elem_type: str) -> tuple:
+        """The stored types a same-named element may have to count as the same one."""
+        return application_kind_types() if is_application_kind(elem_type) else (elem_type,)
 
     # ------------------------------------------------------------------
     # Execute import
@@ -662,6 +943,10 @@ class ArchiMateImportService:
         self,
         parsed_data: Dict[str, Any],
         strategy: str = "skip_duplicates",
+        organization_id: Optional[int] = None,
+        *,
+        source_ref: Optional[str] = None,
+        source_label: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Create/update ArchiMate elements from parsed OEF data.
 
@@ -728,6 +1013,8 @@ class ArchiMateImportService:
         if strategy not in STRATEGIES:
             raise ValueError(f"Invalid strategy: {strategy}")
 
+        org_id = self._require_organization_id(organization_id)
+        org_kw = {} if org_id is None else {"organization_id": org_id}
         elements = parsed_data.get("elements", [])
         created = 0
         updated = 0
@@ -751,7 +1038,7 @@ class ArchiMateImportService:
         snapshot = import_snapshot_service.begin(
             strategy=strategy, model_name=(parsed_data.get("model_name") or "")[:100]
         )
-        model_id = self._record_model(ArchitectureModel, parsed_data)
+        model_id = self._record_model(ArchitectureModel, parsed_data, org_id)
         if snapshot is not None:
             snapshot.note_model(model_id)
         created_relationship_ids: List[int] = []
@@ -789,7 +1076,13 @@ class ArchiMateImportService:
             layer = elem.get("layer", self.TYPE_TO_LAYER.get(elem_type, "Other"))
             description = elem.get("description")
             identifier = elem.get("identifier", "")
-            props = elem.get("properties") or {}
+            # The type string records the specialisation (ADR-0014 Decision 2), so the
+            # property that carried it in the file is not stored beside it.
+            props = {
+                k: v
+                for k, v in (elem.get("properties") or {}).items()
+                if str(k).strip().lower() != SPECIALIZATION_PROPERTY
+            }
 
             # DOGFOOD-001: the parser already flagged this element (name or
             # type wider than its column). Refuse it here, by name, and carry
@@ -808,13 +1101,30 @@ class ArchiMateImportService:
                 # for every element after it, and the counters/id_map are
                 # touched only after the flush succeeds, so they never
                 # describe a row that does not exist.
+                retyped_row = None
                 with db.session.begin_nested():
                     existing = None
                     if strategy != "create_all":
+                        # ADR-0014 rule 5: an application-kind element matches by name across
+                        # both kinds in this organisation. The stored type is kept unless the
+                        # file itself states the element is an Application.
                         existing = ArchiMateElement.query.filter(  # model-safety-ok: bounded by XML element count
                             db.func.lower(ArchiMateElement.name) == name_lower,
-                            ArchiMateElement.type == elem_type,
+                            ArchiMateElement.type.in_(self._match_types(elem_type)),
+                            *self._in_organization(ArchiMateElement, org_id),
                         ).first()
+                        if (
+                            existing is not None
+                            and elem.get("stated_application")
+                            and existing.type != elem_type
+                            and is_application_kind(existing.type)
+                        ):
+                            if snapshot is not None:
+                                snapshot.note_updated_element(existing)
+                            existing.type = elem_type
+                            existing.layer = layer
+                            db.session.flush()
+                            retyped_row = existing
 
                     if existing is None:
                         new_elem = ArchiMateElement(
@@ -823,6 +1133,11 @@ class ArchiMateImportService:
                             layer=layer,
                             description=description,
                             architecture_id=model_id,
+                            **org_kw,
+                            source_kind="import",
+                            source_ref=source_ref,
+                            source_label=source_label,
+                            source_recorded_at=datetime.now(timezone.utc),
                         )
                         db.session.add(new_elem)
                         _write_properties(new_elem, props, merge=False)
@@ -841,6 +1156,10 @@ class ArchiMateImportService:
                         if description is not None:
                             existing.description = description
                         _write_properties(existing, props, merge=True)
+                        existing.source_kind = "import"
+                        existing.source_ref = source_ref
+                        existing.source_label = source_label
+                        existing.source_recorded_at = datetime.now(timezone.utc)
                         db.session.flush()
                         if identifier:
                             id_map[identifier] = {"db_id": existing.id, "type": existing.type}
@@ -874,6 +1193,8 @@ class ArchiMateImportService:
                 )
                 continue
 
+            if created_row is None and retyped_row is not None:
+                created_row = retyped_row  # an upgraded component needs its inventory row
             if created_row is not None:
                 domain = self._create_domain_row(created_row)
                 if domain is not None and snapshot is not None:
@@ -894,7 +1215,9 @@ class ArchiMateImportService:
 
         relationships_created = 0
         relationships_skipped = 0
+        relationships_softened = 0
         relationships_failed: List[Dict[str, Any]] = []
+        relationship_notices: List[str] = []
 
         for rel in classified:
             if rel["status"] == "invalid":
@@ -925,11 +1248,34 @@ class ArchiMateImportService:
                 # takes the rest of the relationships (or the elements
                 # already flushed) down with it.
                 with db.session.begin_nested():
-                    existing_rel = ArchiMateRelationship.query.filter_by(
-                        source_id=source_db_id, target_id=target_db_id, type=rel["type"],
-                    ).first()
+                    # Identity is (source, target, modelled type), checked
+                    # before softening. The modelled type is read the same way
+                    # on both sides, from the "As modelled: <Type>." note in
+                    # the description that is (or would be) stored, so a
+                    # relationship whose own documentation already carries the
+                    # note matches itself on a second import, and a plain
+                    # Association stays distinct from a softened Serving.
+                    incoming_note = _modelled_note_type(rel.get("description"))
+                    existing_rel = None
+                    for cand in ArchiMateRelationship.query.filter(
+                        ArchiMateRelationship.source_id == source_db_id,
+                        ArchiMateRelationship.target_id == target_db_id,
+                        ArchiMateRelationship.type == rel["type"],
+                        *self._in_organization(ArchiMateRelationship, org_id),
+                    ).all():
+                        if _modelled_note_type(cand.description) == incoming_note:
+                            existing_rel = cand
+                            break
                     if existing_rel is not None:
                         relationships_skipped += 1
+                        if strategy == "update_existing":
+                            existing_rel.source_kind = "import"
+                            existing_rel.source_ref = source_ref
+                            existing_rel.source_label = source_label
+                            existing_rel.source_recorded_at = datetime.now(timezone.utc)
+                            _write_properties(
+                                existing_rel, rel.get("properties") or {}, merge=True
+                            )
                         stored_rel, rel_status = existing_rel, "skipped"
                     else:
                         new_rel = ArchiMateRelationship(
@@ -941,12 +1287,23 @@ class ArchiMateImportService:
                             # exists, and it must survive the import.
                             description=rel.get("description"),
                             architecture_id=model_id,
+                            **org_kw,
+                            source_kind="import",
+                            source_ref=source_ref,
+                            source_label=source_label,
+                            source_recorded_at=datetime.now(timezone.utc),
+                        )
+                        _write_properties(
+                            new_rel, rel.get("properties") or {}, merge=False
                         )
                         db.session.add(new_rel)
                         db.session.flush()
                         relationships_created += 1
                         created_relationship_ids.append(new_rel.id)
                         stored_rel, rel_status = new_rel, "created"
+                        if rel.get("notice"):
+                            relationships_softened += 1
+                            relationship_notices.append(rel["notice"])
                 relationship_results.append({
                     "identifier": rel["identifier"],
                     "id": stored_rel.id,
@@ -1009,11 +1366,14 @@ class ArchiMateImportService:
             "errors": errors,
             "relationships_created": relationships_created,
             "relationships_skipped": relationships_skipped,
+            "relationships_softened": relationships_softened,
             "relationships_failed": relationships_failed,
+            "relationship_notices": relationship_notices,
             "created_ids": created_ids,
             "model_id": model_id,
             "element_results": element_results,
             "relationship_results": relationship_results,
+            "application_kind_decisions": parsed_data.get("application_kind_decisions", {}),
         }
 
     # ------------------------------------------------------------------
@@ -1021,7 +1381,9 @@ class ArchiMateImportService:
     # ------------------------------------------------------------------
 
     @staticmethod
-    def _record_model(model_cls, parsed_data: Dict[str, Any]) -> Optional[int]:
+    def _record_model(
+        model_cls, parsed_data: Dict[str, Any], org_id: Optional[int] = None
+    ) -> Optional[int]:
         """Record this import run as an ArchitectureModel; return its id.
 
         A refused row costs the provenance record only, never the import.
@@ -1037,6 +1399,7 @@ class ArchiMateImportService:
                     name=name[:100],
                     version="1.0",
                     model_data=parsed_data.get("source_xml"),
+                    **({} if org_id is None else {"organization_id": org_id}),
                 )
                 db.session.add(record)
                 db.session.flush()
@@ -1047,7 +1410,7 @@ class ArchiMateImportService:
 
     @staticmethod
     def _create_domain_row(element) -> Optional[Dict[str, Any]]:
-        """Give a newly created Driver / Goal / ApplicationComponent element
+        """Give a newly created Driver / Goal / Application element
         its domain row, linked back by ``archimate_element_id``.
 
         Idempotent per organisation, whatever the strategy: a domain row the
@@ -1055,6 +1418,9 @@ class ArchiMateImportService:
         (case-insensitive), is linked rather than duplicated. ``create_all``
         creates a fresh element on every run; without this, every repeat of
         the same file added another portfolio row for the same application.
+
+        Only an Application gets an inventory row (ADR-0014 rule 6); a component
+        has none.
         """
         from app.models.archimate_core import ArchiMateElement
 
@@ -1062,13 +1428,13 @@ class ArchiMateImportService:
             from app.models.motivation import Driver, Goal
 
             cls = Driver if element.type == "Driver" else Goal
-        elif element.type == "ApplicationComponent":
+        elif element.type == "Application":
             from app.models.application_portfolio import ApplicationComponent
 
             cls = ApplicationComponent
         else:
             return
-        is_portfolio = element.type == "ApplicationComponent"
+        is_portfolio = element.type == "Application"
 
         org_id = element.organization_id
         name_key = (element.name or "").strip().lower()
@@ -1123,6 +1489,7 @@ class ArchiMateImportService:
                         name=element.name,
                         description=element.description,
                         archimate_element_id=element.id,
+                        organization_id=org_id,
                     )
                 else:
                     row = cls(

@@ -64,9 +64,9 @@
     <!-- Filter -->
     <div class="bg-card border border-border rounded-lg p-4">
         <form method="get" class="flex items-center gap-4">
-            <label class="text-sm text-muted-foreground">Show contracts expiring within:</label>
+            <label class="block text-sm font-medium text-muted-foreground mb-1">Show contracts expiring within:</label>
             <select name="days" data-autosubmit
-                    class="px-3 py-2 rounded-md border border-input bg-background text-sm" aria-label="Days">
+                    class="h-9 px-3 rounded-md border border-input bg-background text-sm" aria-label="Days">
                 <option value="30" {% if days_filter|int == 30 %}selected{% endif %}>30 days</option>
                 <option value="60" {% if days_filter|int == 60 %}selected{% endif %}>60 days</option>
                 <option value="90" {% if days_filter|int == 90 %}selected{% endif %}>90 days</option>
@@ -173,7 +173,7 @@
                         <div class="bg-muted/40 border border-border rounded-md p-3 space-y-2 text-sm">
                             <div class="flex items-center gap-2">
                                 <span class="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Stance</span>
-                                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-primary/10 text-primary" x-text="brief.stance"></span>
+                                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-primary/10 text-info-emphasis" x-text="brief.stance"></span>
                             </div>
                             <p x-text="brief.summary"></p>
                             <div x-show="brief.leverage_points && brief.leverage_points.length">

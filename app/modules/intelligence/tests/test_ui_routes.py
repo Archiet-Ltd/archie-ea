@@ -180,7 +180,7 @@ def test_pages_have_a_breadcrumb_and_the_page_shell_wrapper(
         login_as(client, user)
         html = client.get(path).get_data(as_text=True)
         assert 'aria-label="Breadcrumb"' in html
-        assert f'<h1 class="text-2xl font-bold text-foreground">{title}</h1>' in html
+        assert f'<h1 class="text-3xl font-bold tracking-[-0.02em] text-foreground">{title}</h1>' in html
         assert "p-6 space-y-6" in html
         assert "container mx-auto" not in _main_html(html)
 

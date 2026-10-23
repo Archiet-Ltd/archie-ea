@@ -12,10 +12,12 @@ Returns results with a tier indicator:
 Reference: The Open Group ArchiMate 3.2 Specification, Appendix B.
 """
 
+from app.models.archimate_element_types import StandardTypeTable
+
 
 # -- Element type to layer/aspect mapping -----------------------------------
 
-_TYPE_LAYER = {
+_TYPE_LAYER = StandardTypeTable({
     # Business layer
     "BusinessActor": "business",
     "BusinessRole": "business",
@@ -81,9 +83,9 @@ _TYPE_LAYER = {
     "ImplementationEvent": "implementation",
     "Plateau": "implementation",
     "Gap": "implementation",
-}
+})
 
-_TYPE_ASPECT = {
+_TYPE_ASPECT = StandardTypeTable({
     # Active structure
     "BusinessActor": "active", "BusinessRole": "active",
     "BusinessCollaboration": "active", "BusinessInterface": "active",
@@ -124,7 +126,7 @@ _TYPE_ASPECT = {
     "WorkPackage": "implementation", "Deliverable": "implementation",
     "ImplementationEvent": "implementation",
     "Plateau": "implementation", "Gap": "implementation",
-}
+})
 
 
 def _normalize_type(element_type):

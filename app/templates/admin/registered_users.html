@@ -6,15 +6,11 @@
 
 {% block content %}
 <div class="space-y-6">
-    {# A-02: this directory is scoped to the current organisation (deliberately —
-       see the tenant-scoping-ok note in admin_routes.py::registered_users). State
-       that scope explicitly so "2 users" here and "22 users" summed across
-       /admin/organizations read as the same number viewed at two scopes, not a
-       drift or a leak. #}
+    {# Scoped to the current organisation: the count is the number of rows listed. #}
     {{ page_header(
         title='Registered Users',
         description='View and manage users registered to ' ~ (current_org.name if current_org else 'this organization')
-            ~ ' (' ~ users|length ~ ' of ' ~ platform_total_users ~ ' users platform-wide — see Organizations for the full breakdown).',
+            ~ ' (' ~ users|length ~ ' ' ~ ('user' if users|length == 1 else 'users') ~ ').',
         breadcrumbs=[
             {'label': 'Admin', 'href': url_for('admin.index')},
             {'label': 'Registered Users'}
@@ -41,7 +37,7 @@
     {% call card() %}
         {% call card_content(class='p-0') %}
             <div class="overflow-x-auto">
-                <table class="w-full text-sm border-collapse">
+                <table class="dense-table w-full text-sm border-collapse">
                     <thead>
                         <tr class="bg-muted/50 border-b">
                             <th class="h-10 px-4 text-left align-middle font-medium text-muted-foreground">First name</th>
@@ -63,15 +59,15 @@
                             <td class="p-4 align-middle">
                                 <div class="flex items-center justify-end gap-2" @click.stop>
                                     <a href="{{ url_for('admin.user_info', user_id=u.id) }}"
-                                       class="inline-flex items-center justify-center rounded-md border border-input bg-background px-3 py-2 text-sm font-medium text-foreground hover:bg-accent hover:text-accent-foreground transition-colors">
+                                       class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
                                         View
                                     </a>
                                     <a href="{{ url_for('admin.change_account_type', user_id=u.id) }}"
-                                       class="inline-flex items-center justify-center rounded-md border border-input bg-background px-3 py-2 text-sm font-medium text-foreground hover:bg-accent hover:text-accent-foreground transition-colors">
+                                       class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
                                         Edit
                                     </a>
                                     <a href="{{ url_for('admin.set_user_password', user_id=u.id) }}"
-                                       class="inline-flex items-center justify-center rounded-md border border-input bg-background px-3 py-2 text-sm font-medium text-foreground hover:bg-accent hover:text-accent-foreground transition-colors">
+                                       class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
                                         Set password
                                     </a>
                                     <a href="{{ url_for('admin.delete_user_request', user_id=u.id) }}"

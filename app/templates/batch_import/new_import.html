@@ -30,9 +30,9 @@
     ) }}
 
     <form @submit.prevent="submitForm()" class="space-y-6">
-        <div class="grid gap-6 lg:grid-cols-3">
+        <div class="grid gap-6 grid-cols-1">
             <!-- Main Form Section -->
-            <div class="lg:col-span-2 space-y-6">
+            <div class="space-y-6">
                 <!-- Job Configuration Card -->
                 {% call card.card() %}
                     <div class="p-6">
@@ -41,7 +41,7 @@
                         <div class="space-y-4">
                             <!-- Job Name -->
                             <div>
-                                <label for="jobName" class="text-sm font-medium">
+                                <label for="jobName" class="block text-sm font-medium text-muted-foreground mb-1">
                                     Job Name <span class="text-destructive-emphasis">*</span>
                                 </label>
                                 <input
@@ -50,17 +50,17 @@
                                     x-model="form.name"
                                     placeholder="e.g., Q1 2024 Application Import"
                                     required
-                                    class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring mt-1"
+                                    class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring mt-1"
                                 />
                                 <p class="text-xs text-muted-foreground mt-1">A descriptive name to identify this import job</p>
                             </div>
 
                             <!-- ArchiMate Mode -->
                             <div>
-                                <label class="text-sm font-medium">
+                                <label class="block text-sm font-medium text-muted-foreground mb-1">
                                     ArchiMate Generation Mode <span class="text-destructive-emphasis">*</span>
                                 </label>
-                                <div class="grid grid-cols-3 gap-3 mt-2">
+                                <div class="grid grid-cols-1 gap-3 mt-2">
                                     <template x-for="mode in archimateModesOptions" :key="mode.value">
                                         <label
                                             :class="{
@@ -90,9 +90,9 @@
 
                             <!-- PROG-002: Transformation Programme target -->
                             <div>
-                                <label for="programme-target" class="text-sm font-medium">Transformation Programme <span class="text-muted-foreground font-normal">(optional)</span></label>
+                                <label for="programme-target" class="block text-sm font-medium text-muted-foreground mb-1">Transformation Programme <span class="text-muted-foreground font-normal">(optional)</span></label>
                                 <select id="programme-target" x-model="form.programme_initiative_id"
-                                        class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm mt-1">
+                                        class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm mt-1">
                                     <option value="">— None — import without programme linkage —</option>
                                     {# DEF-042, Capgemini dry-run: p.initiative_type is nullable
                                        (StrategicInitiative), and this always interpolated it
@@ -202,7 +202,7 @@
                             {% call tabs.tabs_content(value='paste') %}
                                 <div class="pt-4 space-y-4">
                                     <div>
-                                        <label for="paste-csv-data" class="text-sm font-medium">Paste CSV Data</label>
+                                        <label for="paste-csv-data" class="block text-sm font-medium text-muted-foreground mb-1">Paste CSV Data</label>
                                         <textarea
                                             id="paste-csv-data"
                                             x-model="form.paste_data"
@@ -228,13 +228,13 @@
                                                 x-model="appSearchQuery"
                                                 @input="searchApplications()"
                                                 placeholder="Search applications..."
-                                                class="flex h-10 w-full rounded-md border border-input bg-background pl-10 pr-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                                class="flex h-9 w-full rounded-md border border-input bg-background pl-10 pr-3 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                                              aria-label="Search applications..."/>
                                         </div>
                                         <button
                                             type="button"
                                             @click="selectAllApplications()"
-                                            class="inline-flex items-center justify-center rounded-md text-sm font-medium border border-input bg-background hover:bg-accent h-10 px-4 py-2 transition-colors"
+                                            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center"
                                          aria-label="Action">
                                             Select All
                                         </button>
@@ -288,7 +288,7 @@
                         <div class="space-y-6">
                             <!-- Batch Size -->
                             <div>
-                                <label class="text-sm font-medium">Batch Size</label>
+                                <label class="block text-sm font-medium text-muted-foreground mb-1">Batch Size</label>
                                 <div class="flex items-center gap-4 mt-2">
                                     <input
                                         type="range"
@@ -296,7 +296,7 @@
                                         min="5"
                                         max="50"
                                         step="5"
-                                        class="flex-1 h-2 bg-secondary rounded-lg appearance-none cursor-pointer"
+                                        class="flex-1 h-2 bg-secondary rounded-md appearance-none cursor-pointer"
                                      aria-label="Range field"/>
                                     <span class="text-sm font-medium w-16 text-right" x-text="form.batch_size + ' apps'"></span>
                                 </div>
@@ -308,7 +308,7 @@
                             <!-- Budget Limit -->
                             <div>
                                 <div class="flex items-center justify-between">
-                                    <label class="text-sm font-medium">Budget Limit (Optional)</label>
+                                    <label class="block text-sm font-medium text-muted-foreground mb-1">Budget Limit (Optional)</label>
                                     <button
                                         type="button"
                                         @click="form.budget_limit = form.budget_limit ? null : 10"
@@ -325,7 +325,7 @@
                                             min="1"
                                             step="1"
                                             placeholder="10.00"
-                                            class="flex h-10 w-full rounded-md border border-input bg-background pl-8 pr-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                            class="flex h-9 w-full rounded-md border border-input bg-background pl-8 pr-3 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                                          aria-label="10.00"/>
                                     </div>
                                     <p class="text-xs text-muted-foreground mt-1">
@@ -350,7 +350,7 @@
                                  aria-label="Action">
                                     <span
                                         :class="form.ai_generation ? 'translate-x-5' : 'translate-x-0'"
-                                        class="pointer-events-none block h-5 w-5 rounded-full bg-background shadow-lg ring-0 transition-transform translate-y-0.5 ml-0.5"
+                                        class="pointer-events-none block h-5 w-5 rounded-full bg-background ring-0 transition-transform translate-y-0.5 ml-0.5"
                                     ></span>
                                 </button>
                             </div>
@@ -371,7 +371,7 @@
                                  aria-label="Action">
                                     <span
                                         :class="form.auto_commit ? 'translate-x-5' : 'translate-x-0'"
-                                        class="pointer-events-none block h-5 w-5 rounded-full bg-background shadow-lg ring-0 transition-transform translate-y-0.5 ml-0.5"
+                                        class="pointer-events-none block h-5 w-5 rounded-full bg-background ring-0 transition-transform translate-y-0.5 ml-0.5"
                                     ></span>
                                 </button>
                             </div>
@@ -480,7 +480,7 @@
                                 </div>
 
                                 <template x-if="form.budget_limit && estimatedCost > form.budget_limit">
-                                    <div class="rounded-lg bg-warning/5 border border-warning/20 p-3">
+                                    <div class="rounded-md bg-warning/10 border border-warning/40 px-3 py-2">
                                         <div class="flex items-start gap-2">
                                             <i data-lucide="alert-triangle" class="h-4 w-4 text-warning mt-0.5" aria-hidden="true"></i>
                                             <p class="text-xs text-warning-emphasis">

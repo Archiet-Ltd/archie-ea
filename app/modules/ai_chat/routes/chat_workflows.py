@@ -13,6 +13,8 @@ from flask import current_app, jsonify, request
 from flask_login import current_user, login_required
 
 from app import db
+from app.core.auth.decorators import require_permission
+from app.core.auth.permissions import can
 from app.decorators import audit_log
 from app.services.rate_limiter import rate_limit
 from app.models.application_portfolio import ApplicationComponent
@@ -53,6 +55,10 @@ def generate_archimate_for_application():
             return jsonify(
                 {"success": False, "error": "application_id is required"}
             ), 400
+
+        # A preview writes nothing; saving elements is a model write.
+        if not preview_only and not can(current_user, "create", "relationship"):
+            return jsonify({"success": False, "error": "You do not have permission to change the model."}), 403
 
         # Get application
         app = ApplicationComponent.query.get(application_id)
@@ -156,6 +162,10 @@ def map_apqc_for_application():
         application_id = data.get("application_id")
         preview_only = data.get("preview_only", True)
         apply_high_confidence = data.get("apply_high_confidence", False)
+
+        # Applying mappings writes model records; a preview does not.
+        if (not preview_only or apply_high_confidence) and not can(current_user, "create", "relationship"):
+            return jsonify({"success": False, "error": "You do not have permission to change the model."}), 403
 
         if not application_id:
             return jsonify(
@@ -296,6 +306,7 @@ def map_apqc_for_application():
 
 @unified_ai_chat_bp.route("/chat/save-insights", methods=["POST"])
 @login_required
+@require_permission("edit", "application")
 @audit_log("save_chat_insights_to_application")
 def save_chat_insights_to_application():
     """
@@ -406,6 +417,18 @@ def bulk_process_applications():
         data = request.json or {}
         data.get("application_ids")
         max_applications = data.get("max_applications", 50)
+
+        # Process mapping (on by default), auto_create, ArchiMate generation and
+        # vendor cloning each write model records; only a run with all of them
+        # off is read-only.
+        writes_model = (
+            data.get("map_processes", True)
+            or data.get("auto_create")
+            or data.get("generate_archimate")
+            or data.get("clone_vendor_archimate")
+        )
+        if writes_model and not can(current_user, "create", "relationship"):
+            return jsonify({"success": False, "error": "You do not have permission to change the model."}), 403
 
         result = ApplicationArchitectureMapperService.bulk_auto_map(
             max_applications=max_applications,
