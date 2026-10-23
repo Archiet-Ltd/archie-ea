@@ -403,6 +403,71 @@ def resolve_canvas_saved_diagram_id(record, template_key: str):
     return diagram.id if diagram else None
 
 
+def canvas_profile_key(template_key: str) -> str:
+    """The ``acm_properties`` key a template's box membership is stored under.
+
+    The wave-1 canvases (lean, business model, business case) and the two
+    organisation-scoped Assessment frameworks read straight from the shared
+    ``profile`` key, because their profile vocabularies do not overlap. The
+    element-backed frameworks (BCG and Ansoff over the same Product) would
+    collide on one shared key, so each stores its box value under its own
+    framework-scoped key ``profile:<template_key>``. A Product can then sit in
+    a BCG quadrant and an Ansoff quadrant at once — the two live in different
+    keys — which the single shared key could never express.
+    """
+    from app.config.archimate_viewpoints import CANVAS_TEMPLATES
+
+    tpl = CANVAS_TEMPLATES.get(template_key) or {}
+    if tpl.get("record") == "elements":
+        return f"profile:{template_key}"
+    return "profile"
+
+
+def canvas_membership_profiles(element, template_key: str) -> set:
+    """The set of profile values ``element`` carries for ``template_key``.
+
+    The ONE membership rule, read off an element rather than off a saved
+    diagram: an element belongs to a box when it carries that box's profile
+    value under the template's membership key (see ``canvas_profile_key``).
+    Tolerates both the plain-string store and the provenance-wrapped
+    ``{"value": ...}`` store so an element written by either path is placed.
+    Returns a set because a Blue Ocean competing factor or a multi-type box
+    could, in principle, carry more than one; a quadrant element carries one.
+    """
+    props = getattr(element, "acm_properties", None) or {}
+    raw = props.get(canvas_profile_key(template_key))
+    if isinstance(raw, dict):
+        raw = raw.get("value")
+    if raw in (None, ""):
+        return set()
+    if isinstance(raw, (list, tuple, set)):
+        return {str(v) for v in raw if v}
+    return {str(raw)}
+
+
+def canvas_box_for_element(element, template_key: str):
+    """The box_key ``element`` belongs to in ``template_key``, or ``None``.
+
+    The single place that turns an element's membership profile into a box,
+    used by the canvas view projection and the drafting engine's saved-box
+    reader alike, so there is one membership rule and not three.
+    """
+    from app.config.archimate_viewpoints import CANVAS_TEMPLATES
+
+    tpl = CANVAS_TEMPLATES.get(template_key)
+    if not tpl:
+        return None
+    carried = canvas_membership_profiles(element, template_key)
+    if not carried:
+        return None
+    for zone in tpl.get("zones", []):
+        if zone.get("membership") != "type_profile":
+            continue
+        if zone.get("profile") in carried and element.type in zone.get("element_types", []):
+            return zone["box_key"]
+    return None
+
+
 def canvas_export_reasons(template_key: str, saved_diagram_id=None) -> List[Dict[str, str]]:
     """``[{box_key, reason}, ...]`` for every zone of ``template_key`` with no
     matching entry on the given saved diagram (every zone, when there is
@@ -430,15 +495,10 @@ def canvas_export_reasons(template_key: str, saved_diagram_id=None) -> List[Dict
             if element_ids:
                 els = ArchiMateElement.query.filter(ArchiMateElement.id.in_(element_ids)).all()
                 for el in els:
-                    profile = (el.acm_properties or {}).get("profile")
-                    # The typed-property writer stores an enum as
-                    # {"value": ...} with provenance; an older plain string is
-                    # read as-is. Unwrap so the box-filled check compares a
-                    # string to a string either way.
-                    if isinstance(profile, dict):
-                        profile = profile.get("value")
-                    if profile:
-                        profiles_present.add(profile)
+                    # One membership rule: read the box values this element
+                    # carries for the template, under the template's own
+                    # membership key (plain or framework-scoped).
+                    profiles_present |= canvas_membership_profiles(el, template_key)
 
     reasons = []
     for zone in tpl.get("zones", []):

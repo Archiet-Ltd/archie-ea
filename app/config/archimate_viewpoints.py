@@ -1224,6 +1224,20 @@ VIEWPOINT_CATEGORIES = {
 
 CANVAS_REASON_CODES = frozenset({"canvas_box_empty", "canvas_box_not_derived"})
 
+# The recognisable shape the one canvas view draws a template's boxes in. The
+# page renders every layout from this hint — there is no second canvas
+# renderer. "grid" is the wave-1 default (one box per zone, read in order);
+# the strategy frameworks name the shape their standard is recognised by.
+CANVAS_LAYOUTS = frozenset({
+    "grid",        # wave-1 canvases: boxes laid out in order
+    "grid_2x2",    # SWOT, BCG, Ansoff: a four-quadrant square
+    "columns",     # PESTLE: labelled columns in one scrolling row
+    "table",       # VRIO: one column per question, a row per resource
+    "circles",     # McKinsey 7S: seven labelled circles, shared values centred
+    "forces",      # Porter's five forces: a centre with four surrounding forces
+    "curve",       # Blue Ocean: the value curve plus the four-action grid
+})
+
 CANVAS_MEMBERSHIP_KINDS = frozenset({
     "type_profile",         # entries = elements of the box's type(s) carrying its profile
     "type_profile_anchor",  # as above, plus a relationship to another box's entry (anchor)
@@ -1672,6 +1686,7 @@ CANVAS_TEMPLATES: Dict[str, dict] = {
         "key": "swot",
         "name": "SWOT",
         "record": None,
+        "layout": "grid_2x2",
         "projects": ["motivation"],
         "zones": _SWOT_ZONES,
     },
@@ -1679,6 +1694,7 @@ CANVAS_TEMPLATES: Dict[str, dict] = {
         "key": "pestle",
         "name": "PESTLE",
         "record": None,
+        "layout": "columns",
         "projects": ["motivation"],
         "zones": _PESTLE_ZONES,
     },
@@ -1710,6 +1726,7 @@ CANVAS_TEMPLATES: Dict[str, dict] = {
         "key": "bcg_matrix",
         "name": "BCG matrix",
         "record": "elements",
+        "layout": "grid_2x2",
         "projects": ["strategy", "product"],
         "zones": _BCG_ZONES,
     },
@@ -1717,6 +1734,7 @@ CANVAS_TEMPLATES: Dict[str, dict] = {
         "key": "ansoff_matrix",
         "name": "Ansoff matrix",
         "record": "elements",
+        "layout": "grid_2x2",
         "projects": ["strategy", "product"],
         "zones": _ANSOFF_ZONES,
     },
@@ -1724,6 +1742,7 @@ CANVAS_TEMPLATES: Dict[str, dict] = {
         "key": "blue_ocean_strategy",
         "name": "Blue Ocean strategy canvas",
         "record": "elements",
+        "layout": "curve",
         "projects": ["motivation", "strategy"],
         "zones": _BLUE_OCEAN_ZONES,
     },
@@ -1731,6 +1750,7 @@ CANVAS_TEMPLATES: Dict[str, dict] = {
         "key": "vrio",
         "name": "VRIO",
         "record": "elements",
+        "layout": "table",
         "projects": ["strategy", "motivation"],
         "zones": _VRIO_ZONES,
     },
@@ -1738,6 +1758,7 @@ CANVAS_TEMPLATES: Dict[str, dict] = {
         "key": "mckinsey_7s",
         "name": "McKinsey 7S",
         "record": "elements",
+        "layout": "circles",
         "projects": ["motivation", "strategy", "organization"],
         "zones": _SEVEN_S_ZONES,
     },
@@ -1745,6 +1766,7 @@ CANVAS_TEMPLATES: Dict[str, dict] = {
         "key": "porters_five_forces",
         "name": "Porter's five forces",
         "record": "elements",
+        "layout": "forces",
         "projects": ["strategy", "motivation"],
         "zones": _PORTER_ZONES,
     },
@@ -1774,6 +1796,9 @@ def validate_canvas_templates(templates: Optional[Dict[str, dict]] = None) -> No
         # elements straight), both organisation-scoped rather than per-record.
         assert tpl["record"] in ("business_model_canvas", "business_case", "elements", None), (
             f"{tpl_key}: unknown record {tpl['record']!r}"
+        )
+        assert tpl.get("layout", "grid") in CANVAS_LAYOUTS, (
+            f"{tpl_key}: unknown layout {tpl.get('layout')!r}"
         )
         assert isinstance(tpl["projects"], list) and tpl["projects"], f"{tpl_key}: no projects"
         for vp_key in tpl["projects"]:
