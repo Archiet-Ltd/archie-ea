@@ -1,0 +1,226 @@
+# The design register: the tokens, scales and public components that exist today, and the duplicate
+# map for anything defined more than once. Checked by scripts/check_design_register.py (gate:
+# design-register, tag: static). Read it BEFORE writing a public-page CSS rule or template class:
+#     python scripts/check_design_register.py --entries
+#
+# Built from an inventory of the files named under `scope`, not from a design intent. Every entry
+# names the file that defines it; the checker fails when that definition disappears (a stale entry).
+#
+# scope.css / scope.templates:  the public-page surface this register governs. The authenticated app
+#                               (admin, dashboard) is deliberately out of scope.
+# tokens:       custom properties, with the file and block that declares each set.
+# scales:       type, spacing, radius and elevation values the public surface uses. A literal length,
+#               colour or font stack that is neither here nor baselined is drift.
+# components:   one canonical definition per selector. A second definition of the same selector (with or
+#               without the `.public-site` prefix, in the same media context) is a duplicate, whatever
+#               value it carries.
+# raw_utility:  Tailwind utility strings that re-create a registered component by hand.
+# undecided:    things that are contested or unclear. Nothing here is enforced; each names who decides.
+
+version: 1
+
+scope:
+  css:
+    - app/static/css/public_site.css
+    - app/static/css/public_pricing.css
+  templates:
+    - app/templates/layouts/public_base.html
+    - app/templates/components/public_navbar.html
+    - app/templates/components/public_footer.html
+    - app/templates/components/badge.html
+    - app/templates/macros/pricing_cta.html
+    - app/templates/macros/page_shell.html
+    - app/templates/public/
+    - app/templates/main/index.html
+
+tokens:
+  color:
+    - id: base-palette
+      path: app/static/css/shadcn_tokens.css
+      block: ":root, .dark"
+      names: [--background, --foreground, --card, --popover, --primary, --secondary, --muted, --accent,
+              --destructive, --border, --input, --ring]
+      note: HSL triplets, consumed as hsl(var(--name)). Dark values are declared in .dark.
+    - id: status-palette
+      path: app/static/css/shadcn_tokens.css
+      block: ":root, .dark"
+      names: [--success, --warning, --info, --success-emphasis, --warning-emphasis, --info-emphasis,
+              --destructive-emphasis]
+    - id: marketing-palette
+      path: app/static/css/shadcn_tokens.css
+      block: ".theme-marketing, .dark .theme-marketing"
+      names: [--background, --foreground, --primary, --muted, --muted-foreground, --accent, --border,
+              --input, --ring, --radius]
+      note: Neutral palette scoped to public pages through <body class="theme-marketing">.
+    - id: archimate-layers
+      path: app/static/css/shadcn_tokens.css
+      block: ":root, .dark"
+      names: [--layer-motivation, --layer-strategy, --layer-business, --layer-application,
+              --layer-technology, --layer-implementation, --layer-risk]
+      note: Authenticated-app colours; listed for completeness, not used by the public surface.
+  font:
+    - id: font-sans
+      path: app/static/css/shadcn_tokens.css
+      names: [--font-sans]
+  local:
+    - id: pricing-local
+      path: app/static/css/public_pricing.css
+      names: [--pp-fg, --pp-border]
+      note: Page-local aliases declared in the pricing stylesheet.
+
+scales:
+  radius:
+    - {name: "--radius", value: "0.5rem (0.625rem under .theme-marketing)", path: app/static/css/shadcn_tokens.css}
+    - {name: "button radius", value: "calc(var(--radius) + 4px)", path: app/static/css/public_site.css}
+    - {name: "compact radius", value: "var(--radius)", path: app/static/css/public_site.css}
+    - {name: "card radius", value: "1rem", path: app/static/css/public_site.css}
+    - {name: "pill radius", value: "9999px", path: app/static/css/public_site.css}
+    - {name: "frame radius", value: "0.75rem", path: app/static/css/public_site.css}
+    - {name: "inline code radius", value: "0.25rem", path: app/static/css/public_site.css}
+  type:
+    - {name: "eyebrow", value: "0.75rem / 1rem, uppercase, 0.2em tracking, monospace", path: app/static/css/public_site.css}
+    - {name: "button", value: "0.875rem / 1.25rem, weight 500", path: app/static/css/public_site.css}
+    - {name: "h1", value: "1.875rem/2.25rem, 3rem/3rem from 640px (marketing)", path: app/static/css/public_site.css}
+    - {name: "h2", value: "1.5rem/2rem, 1.875rem/2.25rem from 640px (marketing)", path: app/static/css/public_site.css}
+    - {name: "h3", value: "1rem / 1.5rem, weight 600 (marketing)", path: app/static/css/public_site.css}
+    - {name: "lead", value: "1.125rem/2rem, 1.25rem/2rem from 640px", path: app/static/css/public_site.css}
+    - {name: "body", value: "1rem / 1.75rem", path: app/static/css/public_site.css}
+    - {name: "table", value: "0.875rem / 1.5rem", path: app/static/css/public_site.css}
+  spacing:
+    - {name: "container", value: "max-width 72rem; padding 5rem 1rem, 1.5rem inline from 640px", path: app/static/css/public_site.css}
+    - {name: "prose measure", value: "max-width 42.5rem", path: app/static/css/public_site.css}
+    - {name: "button heights", value: "2.5rem default, 2.25rem sm, 2rem xs", path: app/static/css/public_site.css}
+    - {name: "callout padding", value: "1.5rem", path: app/static/css/public_site.css}
+  elevation:
+    - {name: "button", value: "0 1px 2px 0 rgb(0 0 0 / 0.05)", path: app/static/css/public_site.css}
+    - {name: "focus ring", value: "0 0 0 3px hsl(var(--ring) / 0.5)", path: app/static/css/public_site.css}
+    - {name: "browser frame", value: "0 20px 45px -12px rgb(15 23 42 / 0.22), 0 4px 10px -4px rgb(15 23 42 / 0.12)", path: app/static/css/public_site.css}
+
+# Literals the public stylesheets may carry because they are the scale above. Anything else is drift;
+# drift that already existed is recorded in scripts/design_register_baseline.json, which only falls.
+allowed_literals:
+  px: ["1px", "2px", "3px", "4px", "9999px", "40px", "44px", "639px", "640px", "768px", "1024px", "1280px"]
+  colors: []
+  shadows:
+    - "0 1px 2px 0 rgb(0 0 0 / 0.05)"
+    - "0 20px 45px -12px rgb(15 23 42 / 0.22), 0 4px 10px -4px rgb(15 23 42 / 0.12)"
+  font_stacks:
+    - "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace"
+
+components:
+  - id: public-btn
+    concept: The one public button (base plus fills and sizes)
+    path: app/static/css/public_site.css
+    selector: .public-btn
+    modifiers: [.public-btn--primary, .public-btn--outline, .public-btn--sm, .public-btn--xs]
+    reuse: >
+      Use class="public-btn public-btn--primary" or "public-btn public-btn--outline", with --sm or --xs
+      for the smaller sizes. Do not add a size or fill by writing another .public-btn--* rule beside
+      these, and do not rebuild the button from bg-primary / text-primary-foreground utilities.
+    duplicate_map:
+      - {selector: ".public-btn--sm", note: "defined once here; a second rule with another padding is the collision this register exists to catch"}
+  - id: public-eyebrow
+    concept: Small uppercase monospace label above a section heading
+    path: app/static/css/public_site.css
+    selector: .public-eyebrow
+    reuse: Use class="public-eyebrow"; do not restyle uppercase mono labels inline.
+  - id: public-callout
+    concept: The neutral question card
+    path: app/static/css/public_site.css
+    selector: .public-callout
+    reuse: Use class="public-callout".
+  - id: public-container
+    concept: Wide container for hero and figure sections
+    path: app/static/css/public_site.css
+    selector: .public-container
+    reuse: Use class="public-container" for the 72rem frame; pages do not set their own max-width.
+  - id: public-page-content
+    concept: Prose column (42.5rem measure) and its prose variants
+    path: app/static/css/public_site.css
+    selector: .public-page-content
+    modifiers: [.public-prose, .public-hub, .public-hub-feed, .public-wide]
+    reuse: Use .public-page-content with .public-prose for markdown-rendered pages.
+  - id: public-band
+    concept: Full-bleed tinted band
+    path: app/static/css/public_site.css
+    selector: .public-band
+    reuse: Use class="public-band".
+  - id: public-figure
+    concept: Product screenshot frame
+    path: app/static/css/public_site.css
+    selector: .public-figure
+    reuse: Use class="public-figure"; images are shown at captured width and never stretched.
+  - id: public-footer-plain
+    concept: Footer entries that are not links
+    path: app/static/css/public_site.css
+    selector: .public-footer-plain
+    reuse: Use class="public-footer-plain" for non-link footer text.
+  - id: public-lead
+    concept: Marketing sub-line under the H1
+    path: app/static/css/public_site.css
+    selector: .public-lead
+    reuse: Use class="public-lead" under the H1.
+  - id: public-h1
+    concept: Marketing H1 for pages not using .public-page-content
+    path: app/static/css/public_site.css
+    selector: .public-h1
+    reuse: Use class="public-h1".
+  - id: badge-macro
+    concept: Status badge and category pill (a Jinja macro, utilities only; no CSS selector)
+    path: app/templates/components/badge.html
+    macro: badge
+    reuse: >
+      Import badge from components/badge.html. For a category pill use size='pill'. Do not write another
+      rounded-full border px-4 py-1.5 text-xs chip by hand.
+
+raw_utility:
+  - id: hand-built-public-button
+    component: public-btn
+    concept: A public-btn element that also carries fill or border utilities that the modifier classes own
+    regex: 'class="[^"]*\bpublic-btn\b[^"]*\b(?:bg-primary|bg-card|text-primary-foreground)\b'
+    suffixes: [.html]
+    reuse: Replace the utilities with public-btn--primary or public-btn--outline.
+  - id: hand-built-category-pill
+    component: badge-macro
+    concept: A hand-written category pill that the badge macro already renders
+    regex: 'class="[^"]*\brounded-full\b[^"]*\bborder-border\b[^"]*\bpx-4\b[^"]*\bpy-1\.5\b'
+    suffixes: [.html]
+    reuse: Use badge(size='pill').
+
+undecided:
+  - id: named-but-undefined-navbar-footer
+    item: ".public-navbar, .public-nav-link, .public-footer, .public-inner-page"
+    why: >
+      The task names these as canonical public components, but no CSS rule defines any of them. The navbar
+      (components/public_navbar.html) and footer (components/public_footer.html) are built from raw Tailwind
+      utilities, and .public-inner-page does not appear anywhere in the tree. Whether to introduce the
+      classes or keep the utility markup is a design decision.
+    decides: tech-lead
+  - id: eyebrow-unused
+    component: public-eyebrow
+    item: ".public-eyebrow"
+    why: Defined in public_site.css, used by no template in scope. Keep as the canonical, or retire.
+    decides: product-manager
+  - id: band-unused
+    component: public-band
+    item: ".public-band"
+    why: Defined in public_site.css and used by no template in scope (the landing bands use .landing-band instead).
+    decides: product-manager
+  - id: h1-two-scales
+    item: ".public-page-content h1 (2.25rem/3rem) versus .theme-marketing h1 (1.875rem/3rem)"
+    why: >
+      Two type scales for the same heading are both live: the original one and the marketing one, which
+      overrides it only under .theme-marketing. Neither is declared canonical.
+    decides: tech-lead
+  - id: marketing-radius
+    item: "--radius is 0.5rem in :root and 0.625rem under .theme-marketing"
+    why: One token with two values by design; which the public button radius should follow is unstated.
+    decides: tech-lead
+  - id: pricing-button-system
+    item: "public_pricing.css ('one 44px / 8px system') versus .public-btn (2.5rem / calc(var(--radius) + 4px))"
+    why: The pricing page defines its own button rules with different height and radius. Not changed here.
+    decides: tech-lead
+  - id: badge-pill-vs-eyebrow
+    item: "badge(size='pill') and .public-eyebrow both label sections"
+    why: Different shapes for different jobs, or two answers to one question; not established.
+    decides: product-manager

@@ -1,0 +1,21 @@
+{
+ "_comment": "Duplicate, drift and uncovered-class hits that already existed in the public surface, per key and file. Written by scripts/check_design_register.py --update-baseline, which refuses to raise a count or add a file. Lowering is routine.",
+ "patterns": {
+  "drift:px/-2px": {
+   "app/static/css/public_pricing.css": 1
+  },
+  "drift:raw-utility/hand-built-public-button": {
+   "app/templates/components/public_navbar.html": 1,
+   "app/templates/main/index.html": 3
+  },
+  "duplicate:public-page-content/.public-page-content.public-prose th": {
+   "app/static/css/public_site.css": 1
+  },
+  "duplicate:public-page-content/.public-site.theme-marketing .public-page-content td": {
+   "app/static/css/public_site.css": 1
+  },
+  "duplicate:public-page-content/.public-site.theme-marketing .public-page-content th": {
+   "app/static/css/public_site.css": 1
+  }
+ }
+}
