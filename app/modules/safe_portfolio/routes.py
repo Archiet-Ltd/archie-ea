@@ -7,6 +7,8 @@ from flask import abort, jsonify, render_template, request
 from flask_login import current_user, login_required
 
 from app import db
+from app.core.auth.decorators import require_permission
+from app.core.auth.permissions import can
 from app.middleware.tenant_context import current_org_id
 from app.models.archimate_core import ArchiMateElement
 from app.services.element_profile_service import read_profile, _read_property_value, _write_property
@@ -21,22 +23,45 @@ logger = logging.getLogger(__name__)
 # Kanban column order — sourced from the one SAFe profile registry
 KANBAN_STATES = KINDS["Epic"]["properties"]["kanban_state"]["values"]
 
+# What an empty column means and what to do next, per state. A state with no
+# entry here falls back to a plain sentence in the template.
+EMPTY_COLUMN_HINTS = {
+    "Funnel": {
+        "why": "No new epics are waiting.",
+        "next_write": "Mark a work package as a SAFe Epic and it arrives here.",
+        "next_read": "A work package marked as a SAFe Epic arrives here.",
+    },
+    "Reviewing": {
+        "why": "No epics are being reviewed.",
+        "next_write": "Move an epic here from Funnel when its business case is ready.",
+        "next_read": "Someone with edit access moves an epic here from Funnel when its business case is ready.",
+    },
+    "Analyzing": {
+        "why": "No epics are being analysed.",
+        "next_write": "Move an epic here from Reviewing once it is approved for analysis.",
+        "next_read": "Someone with edit access moves an epic here from Reviewing once it is approved for analysis.",
+    },
+    "Portfolio Backlog": {
+        "why": "No analysed epics are waiting for capacity.",
+        "next_write": "Move an epic here from Analyzing once its analysis is done.",
+        "next_read": "Someone with edit access moves an epic here from Analyzing once its analysis is done.",
+    },
+    "Implementing": {
+        "why": "No epics are being implemented.",
+        "next_write": "Move an epic here from Portfolio Backlog when a team starts work on it.",
+        "next_read": "Someone with edit access moves an epic here from Portfolio Backlog when a team starts work on it.",
+    },
+    "Done": {
+        "why": "No epics have been delivered.",
+        "next_write": "Move an epic here from Implementing when its outcome is delivered.",
+        "next_read": "Someone with edit access moves an epic here from Implementing when its outcome is delivered.",
+    },
+}
+
 
 def _can_write() -> bool:
-    """Check if current user can modify the portfolio kanban."""
-    if not current_user or not current_user.is_authenticated:
-        return False
-    from app.services.rbac_service import rbac_service
-    org_id = current_org_id()
-    if org_id is None:
-        return False
-    # Check RBAC service first (OrgRole table), fall back to enterprise_role
-    if rbac_service.can_edit(org_id, current_user.id):
-        return True
-    role = getattr(current_user, "enterprise_role", "Viewer")
-    return role in ("Architect", "CTO", "Admin", "solution_architect",
-                    "enterprise_architect", "business_architect",
-                    "security_architect", "data_architect")
+    """Whether the signed-in user may edit work packages, per the permission matrix."""
+    return can(current_user, "edit", "motivation_element")
 
 
 def _get_epics() -> List[Dict]:
@@ -122,6 +147,7 @@ def index():
         "safe_portfolio/kanban.html",
         columns=columns,
         kanban_states=KANBAN_STATES,
+        empty_hints=EMPTY_COLUMN_HINTS,
         can_write=can_write,
     )
 
@@ -144,11 +170,9 @@ def api_list():
 
 @safe_portfolio_bp.route("/api/<int:element_id>", methods=["PATCH"])
 @login_required
+@require_permission("edit", "motivation_element")
 def api_update(element_id: int):
     """Update an epic's kanban state or WSJF components."""
-    if not _can_write():
-        return jsonify({"error": "Permission denied"}), 403
-
     org_id = current_org_id()
     if org_id is None:
         abort(404)

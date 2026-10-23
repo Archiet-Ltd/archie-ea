@@ -10,6 +10,7 @@ This journey validates:
 6. Organization B sees an empty board (tenant isolation)
 """
 import os
+import pathlib
 import pytest
 from playwright.sync_api import expect
 
@@ -18,7 +19,66 @@ from .test_archetype_journeys import _login
 
 pytestmark = [pytest.mark.smoke, pytest.mark.journey]
 
-SCREENSHOT_DIR = "/home/ubuntu/verify/seats/fix907/walk"
+SCREENSHOT_DIR = os.environ.get(
+    "SMOKE_SCREENSHOT_DIR",
+    str(pathlib.Path(__file__).resolve().parents[2] / "screenshots" / "portfolio-kanban"),
+)
+STATES = ["Funnel", "Reviewing", "Analyzing", "Portfolio Backlog", "Implementing", "Done"]
+
+
+def _assert_board_keeps_its_shape(page):
+    """Six column headers sit in one row and the board scrolls sideways when it must."""
+    headers = [page.locator(f".kanban-column[data-state='{s}'] h2") for s in STATES]
+    boxes = []
+    for header, state in zip(headers, STATES):
+        assert header.count() == 1, f"Expected one {state} header in the DOM"
+        assert header.inner_text().strip() == state
+        boxes.append(header.bounding_box())
+    tops = {round(b["y"]) for b in boxes}
+    assert len(tops) == 1, f"Column headers are not in one row: {tops}"
+    lefts = [b["x"] for b in boxes]
+    assert lefts == sorted(lefts) and len(set(lefts)) == 6, "Columns are not side by side"
+
+
+def _assert_cards_use_words(page):
+    board_text = page.locator(".kanban-board").inner_text()
+    for label in ("Business Value", "Time Criticality", "Risk Reduction", "Job Size"):
+        assert label in board_text, f"Card label {label!r} missing"
+    for initials in ("BV:", "TC:", "RR:", "JS:"):
+        assert initials not in board_text, f"Bare initials {initials!r} on the board"
+
+
+def _assert_empty_columns_name_the_next_step(page):
+    reviewing = page.locator(".kanban-column[data-state='Reviewing']").inner_text()
+    assert "No epics are being reviewed." in reviewing
+    assert "Move an epic here from Funnel when its business case is ready." in reviewing
+    done = page.locator(".kanban-column[data-state='Done']").inner_text()
+    assert "Move an epic here from Implementing" in done
+
+
+def _shoot(browser, live_server, email, width, height, scheme, name, scroll_to_end=False):
+    context = browser.new_context(viewport={"width": width, "height": height}, color_scheme=scheme)
+    try:
+        page = context.new_page()
+        _login(page, live_server, email)
+        page.goto(live_server + "/safe/portfolio", timeout=PAGE_TIMEOUT)
+        expect(page.get_by_role("heading", name="Portfolio Kanban")).to_be_visible(timeout=PAGE_TIMEOUT)
+        page.wait_for_load_state("networkidle")
+        _assert_board_keeps_its_shape(page)
+        _assert_cards_use_words(page)
+        _assert_empty_columns_name_the_next_step(page)
+
+        scroller = page.locator("[data-kanban-scroll]")
+        metrics = scroller.evaluate("el => ({sw: el.scrollWidth, cw: el.clientWidth})")
+        if width < 1024:
+            assert metrics["sw"] > metrics["cw"], f"Board does not scroll sideways at {width}: {metrics}"
+            assert page.evaluate("document.documentElement.scrollWidth") <= width, "Page itself scrolls sideways"
+        if scroll_to_end:
+            scroller.evaluate("el => { el.scrollLeft = el.scrollWidth; }")
+            assert scroller.evaluate("el => el.scrollLeft") > 0
+        page.screenshot(path=f"{SCREENSHOT_DIR}/{name}.png", full_page=True)
+    finally:
+        context.close()
 
 
 def _seed_epics(org_id):
@@ -95,7 +155,7 @@ def test_portfolio_kanban_journey(browser, live_server, seeded, db_session):
 
         # Save screenshot of the board with three epics in different states
         os.makedirs(SCREENSHOT_DIR, exist_ok=True)
-        page.screenshot(path=f"{SCREENSHOT_DIR}/kanban-1440-light.png", full_page=True)
+        page.screenshot(path=f"{SCREENSHOT_DIR}/kanban-1440-light-all-funnel.png", full_page=True)
 
         # === Step 2: Verify all three epics are in Funnel (default state) ===
         expect(page.get_by_role("heading", name="Customer Portal Epic")).to_be_visible(timeout=PAGE_TIMEOUT)
@@ -161,33 +221,16 @@ def test_portfolio_kanban_journey(browser, live_server, seeded, db_session):
         # The smoke test seeds epics into the shared org; org B would need a second
         # organisation which the seeded fixture does not provide.
 
-        # === Screenshots for walk report ===
-        # 390 light
-        context_390_light = browser.new_context(viewport={"width": 390, "height": 844}, color_scheme="light")
-        page_390_light = context_390_light.new_page()
-        _login(page_390_light, live_server, seeded["emails"]["solution_architect"])
-        page_390_light.goto(live_server + "/safe/portfolio", timeout=PAGE_TIMEOUT)
-        page_390_light.wait_for_load_state("networkidle")
-        page_390_light.screenshot(path=f"{SCREENSHOT_DIR}/kanban-390-light.png", full_page=True)
-        context_390_light.close()
-
-        # 1440 dark
-        context_1440_dark = browser.new_context(viewport={"width": 1440, "height": 900}, color_scheme="dark")
-        page_1440_dark = context_1440_dark.new_page()
-        _login(page_1440_dark, live_server, seeded["emails"]["solution_architect"])
-        page_1440_dark.goto(live_server + "/safe/portfolio", timeout=PAGE_TIMEOUT)
-        page_1440_dark.wait_for_load_state("networkidle")
-        page_1440_dark.screenshot(path=f"{SCREENSHOT_DIR}/kanban-1440-dark.png", full_page=True)
-        context_1440_dark.close()
-
-        # 390 dark
-        context_390_dark = browser.new_context(viewport={"width": 390, "height": 844}, color_scheme="dark")
-        page_390_dark = context_390_dark.new_page()
-        _login(page_390_dark, live_server, seeded["emails"]["solution_architect"])
-        page_390_dark.goto(live_server + "/safe/portfolio", timeout=PAGE_TIMEOUT)
-        page_390_dark.wait_for_load_state("networkidle")
-        page_390_dark.screenshot(path=f"{SCREENSHOT_DIR}/kanban-390-dark.png", full_page=True)
-        context_390_dark.close()
+        # === Step 7: Shape, labels and empty columns at both widths, both schemes ===
+        email = seeded["emails"]["solution_architect"]
+        _assert_board_keeps_its_shape(page)
+        _assert_cards_use_words(page)
+        _assert_empty_columns_name_the_next_step(page)
+        for width, height in ((1440, 900), (390, 844)):
+            for scheme in ("light", "dark"):
+                _shoot(browser, live_server, email, width, height, scheme, f"kanban-{width}-{scheme}")
+        for scheme in ("light", "dark"):
+            _shoot(browser, live_server, email, 390, 844, scheme, f"kanban-390-{scheme}-scrolled", scroll_to_end=True)
 
     finally:
         page.close()

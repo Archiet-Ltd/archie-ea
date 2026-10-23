@@ -275,3 +275,57 @@ def test_portfolio_api_updates_wsjf_components(app, client, test_user, epic_elem
         profile = read_profile(epic_element)
         assert profile["wsjf_score"] == 6.0
 
+
+
+@pytest.fixture
+def viewer_user(db_session, epic_element):
+    """A user holding the organisation's viewer role in the epic's organisation."""
+    from app.models.org_role import OrgRole
+
+    user = User(
+        first_name="Test",
+        last_name="Viewer",
+        email=f"viewer_{epic_element.organization_id}@test.example",
+        organization_id=epic_element.organization_id,
+        enterprise_role="Viewer",
+        confirmed=True,
+    )
+    user.password = "TestPassword123!"
+    db_session.add(user)
+    db_session.flush()
+    OrgRole.set_role(epic_element.organization_id, user.id, "viewer")
+    db_session.commit()
+    return user
+
+
+def test_portfolio_viewer_cannot_move_epic(app, client, viewer_user, epic_element, tenant_ctx, db_session):
+    """The permission matrix, not a role list, refuses a viewer's write."""
+    _login(client, viewer_user.id)
+    with tenant_ctx(epic_element.organization_id):
+        assert client.get("/safe/portfolio/api").get_json()["can_write"] is False
+        response = client.patch(
+            f"/safe/portfolio/api/{epic_element.id}",
+            json={"kanban_state": "Implementing"},
+        )
+        assert response.status_code == 403
+
+        db_session.expire_all()
+        from app.services.element_profile_service import _read_property_value
+        assert _read_property_value(epic_element, "kanban_state") in (None, "Funnel")
+
+
+def test_portfolio_empty_columns_name_the_next_step(app, client, test_user, viewer_user, epic_element, tenant_ctx):
+    """An empty column says why it is empty and what to do next, for each role."""
+    _login(client, test_user.id)
+    with tenant_ctx(epic_element.organization_id):
+        html = client.get("/safe/portfolio/").get_data(as_text=True)
+        assert "No epics are being reviewed. Move an epic here from Funnel when its business case is ready." in html
+        assert "No epics have been delivered. Move an epic here from Implementing when its outcome is delivered." in html
+        assert "Business Value" in html and "Time Criticality" in html
+        assert "Risk Reduction" in html and "Job Size" in html
+        assert "BV:" not in html and "TC:" not in html
+
+    _login(client, viewer_user.id)
+    with tenant_ctx(epic_element.organization_id):
+        html = client.get("/safe/portfolio/").get_data(as_text=True)
+        assert "Someone with edit access moves an epic here from Funnel when its business case is ready." in html
