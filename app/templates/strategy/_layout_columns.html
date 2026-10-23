@@ -1,0 +1,11 @@
+{# Labelled columns in one scrolling row (PESTLE's six). At 390px the row
+   scrolls sideways rather than stacking into one column, so the six-column
+   shape is kept. The min width holds six 240px columns and their five 16px
+   gaps (6*240 + 5*16 = 1520px) so no column is squeezed below its box width. #}
+<div class="overflow-x-auto" data-testid="strategy-grid-{{ framework_key }}">
+  <div class="grid grid-flow-col auto-cols-[minmax(240px,1fr)] gap-4 min-w-[1520px]">
+    {% for zone in zones %}
+      {{ strategy_box(zone, boxes[zone.box_key]) }}
+    {% endfor %}
+  </div>
+</div>

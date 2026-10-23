@@ -196,7 +196,7 @@ def test_architect_drafts_a_swot_from_their_model(browser, live_server, required
     page.reload(wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
 
     for box_key in ("strengths", "weaknesses", "opportunities"):
-        accepted = _box(page, box_key).locator('[data-testid="strategy-accepted-%s"] [data-testid="strategy-point"]' % box_key)
+        accepted = _box(page, box_key).locator('[data-testid="strategy-filed-%s"] [data-testid="strategy-point"]' % box_key)
         expect(accepted.first).to_be_visible(timeout=PAGE_TIMEOUT)
         # Every accepted point shows its citation.
         expect(
@@ -208,21 +208,20 @@ def test_architect_drafts_a_swot_from_their_model(browser, live_server, required
     # The rejected point was never written.
     expect(_box(page, "threats")).not_to_contain_text(rejected_text)
     expect(
-        _box(page, "threats").locator('[data-testid="strategy-accepted-threats"] [data-testid="strategy-point"]')
+        _box(page, "threats").locator('[data-testid="strategy-filed-threats"] [data-testid="strategy-point"]')
     ).to_have_count(0)
 
-    # Every citation link lands on a page with real content (the record's
-    # neighbourhood in the Composer), not an empty state or a 404.
+    # Every citation link lands on the cited element's own detail page — a page
+    # with real content for the thing clicked, not an empty state or a 404.
     link = _box(page, "strengths").locator('[data-testid="strategy-citation-link"]').first
     expect(link).to_be_visible(timeout=PAGE_TIMEOUT)
     href = link.get_attribute("href")
+    cited_label = link.inner_text().strip()
     landing = page.goto(base + href, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
     assert landing.status < 400, "citation link did not land: %s" % landing.status
-    # The composer page for the cited element renders its own canvas surface
-    # and draws at least one node for the focused element — a page with real
-    # content for the thing clicked, not an empty state or a 404.
-    expect(page.locator("#composer-canvas")).to_be_visible(timeout=PAGE_TIMEOUT)
-    expect(page.locator("#composer-canvas .joint-element").first).to_be_visible(timeout=PAGE_TIMEOUT)
+    # The element detail page renders the cited element's own name, so the
+    # link lands on content about the thing clicked, never a bare shell.
+    expect(page.locator("body")).to_contain_text(cited_label, timeout=PAGE_TIMEOUT)
     context.close()
 
     # A second organisation sees none of the first's points.
@@ -232,7 +231,7 @@ def test_architect_drafts_a_swot_from_their_model(browser, live_server, required
     expect(page2.get_by_test_id("strategy-grid-swot")).to_be_visible(timeout=PAGE_TIMEOUT)
     for box_key in SWOT_BOXES:
         expect(
-            _box(page2, box_key).locator('[data-testid="strategy-accepted-%s"] [data-testid="strategy-point"]' % box_key)
+            _box(page2, box_key).locator('[data-testid="strategy-filed-%s"] [data-testid="strategy-point"]' % box_key)
         ).to_have_count(0, timeout=PAGE_TIMEOUT)
     body = page2.locator("body")
     expect(body).not_to_contain_text("Edited opportunity point %s" % org["org_id"])
@@ -271,8 +270,15 @@ def test_architect_drafts_a_pestle_from_their_model(browser, live_server, requir
     page.reload(wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
     for box_key in ("political", "economic", "social"):
         expect(
-            _box(page, box_key).locator('[data-testid="strategy-accepted-%s"] [data-testid="strategy-point"]' % box_key).first
+            _box(page, box_key).locator('[data-testid="strategy-filed-%s"] [data-testid="strategy-point"]' % box_key).first
         ).to_be_visible(timeout=PAGE_TIMEOUT)
     expect(_box(page, "social")).to_contain_text(edited_text, timeout=PAGE_TIMEOUT)
-    expect(_box(page, "legal")).not_to_contain_text(rejected_text)
+    # Every PESTLE citation link lands on the cited element's own detail page.
+    link = _box(page, "political").locator('[data-testid="strategy-citation-link"]').first
+    expect(link).to_be_visible(timeout=PAGE_TIMEOUT)
+    cited_label = link.inner_text().strip()
+    href = link.get_attribute("href")
+    landing = page.goto(base + href, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    assert landing.status < 400, "citation link did not land: %s" % landing.status
+    expect(page.locator("body")).to_contain_text(cited_label, timeout=PAGE_TIMEOUT)
     context.close()

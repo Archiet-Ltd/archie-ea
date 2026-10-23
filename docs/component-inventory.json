@@ -57156,7 +57156,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 457,
+   "rendered_on_count": 454,
    "target": {
     "endpoint": "account.manage",
     "href": "url_for('account.manage')"
@@ -57173,7 +57173,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 457,
+   "rendered_on_count": 454,
    "target": {
     "endpoint": "account.manage",
     "href": "url_for('account.manage')"
@@ -57190,7 +57190,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 457,
+   "rendered_on_count": 454,
    "target": {
     "endpoint": "team.team",
     "href": "url_for('team.team')"
@@ -57207,7 +57207,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 457,
+   "rendered_on_count": 454,
    "target": {
     "endpoint": "account.logout",
     "href": "url_for('account.logout')"
@@ -57224,7 +57224,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 457,
+   "rendered_on_count": 454,
    "target": {
     "button_type": "button"
    },
@@ -57240,7 +57240,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 457,
+   "rendered_on_count": 454,
    "target": {
     "button_type": "button"
    },
@@ -57256,7 +57256,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 457,
+   "rendered_on_count": 454,
    "target": {
     "button_type": "button"
    },
@@ -57272,7 +57272,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 457,
+   "rendered_on_count": 454,
    "target": {
     "button_type": "button"
    },
@@ -57288,7 +57288,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 457,
+   "rendered_on_count": 454,
    "target": {
     "button_type": "button"
    },
@@ -57304,7 +57304,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 457,
+   "rendered_on_count": 454,
    "target": {
     "button_type": "button"
    },
@@ -57320,7 +57320,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 457,
+   "rendered_on_count": 454,
    "target": {
     "button_type": "button"
    },
@@ -57336,7 +57336,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 457,
+   "rendered_on_count": 454,
    "target": {
     "button_type": "button"
    },
@@ -57352,7 +57352,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 457,
+   "rendered_on_count": 454,
    "target": {
     "button_type": "button"
    },
@@ -57368,7 +57368,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 457,
+   "rendered_on_count": 454,
    "target": {
     "button_type": "button"
    },
@@ -57384,7 +57384,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 457,
+   "rendered_on_count": 454,
    "target": {
     "modal_id": "search-modal"
    },
@@ -57400,7 +57400,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 457,
+   "rendered_on_count": 454,
    "target": {},
    "template": "app/templates/components/admin_header.html",
    "testid": "active-organization-chip",
@@ -57414,7 +57414,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 457,
+   "rendered_on_count": 454,
    "target": {
     "endpoint": "dashboard.overview",
     "href": "url_for('dashboard.overview')"
@@ -57431,7 +57431,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 457,
+   "rendered_on_count": 454,
    "target": {
     "endpoint": "modules_directory.index",
     "href": "url_for('modules_directory.index')"
@@ -57448,7 +57448,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 457,
+   "rendered_on_count": 454,
    "target": {
     "endpoint": "modules_directory.index",
     "href": "url_for('modules_directory.index')"
@@ -57465,7 +57465,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 457,
+   "rendered_on_count": 454,
    "target": {
     "endpoint": "account.logout",
     "href": "url_for('account.logout')"
@@ -57482,7 +57482,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 457,
+   "rendered_on_count": 454,
    "target": {
     "endpoint": "account.login",
     "href": "url_for('account.login')"
@@ -57499,7 +57499,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 457,
+   "rendered_on_count": 454,
    "target": {
     "button_type": "button"
    },
@@ -57515,7 +57515,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 457,
+   "rendered_on_count": 454,
    "target": {
     "button_type": "button"
    },
@@ -57531,7 +57531,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 457,
+   "rendered_on_count": 454,
    "target": {
     "button_type": "button"
    },
@@ -57547,7 +57547,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 457,
+   "rendered_on_count": 454,
    "target": {},
    "template": "app/templates/components/admin_sidebar.html",
    "testid": "sidebar",
@@ -57561,7 +57561,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 457,
+   "rendered_on_count": 454,
    "target": {},
    "template": "app/templates/components/admin_sidebar.html",
    "testid": "sidebar-search-results",
@@ -59058,7 +59058,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 457,
+   "rendered_on_count": 454,
    "target": {
     "button_type": "button"
    },
@@ -59074,7 +59074,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 457,
+   "rendered_on_count": 454,
    "target": {},
    "template": "app/templates/components/drawer.html",
    "testid": null,
@@ -59202,7 +59202,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 61,
+   "rendered_on_count": 59,
    "target": {
     "href": "cta_href"
    },
@@ -59218,7 +59218,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 61,
+   "rendered_on_count": 59,
    "target": {
     "href": "secondary_cta_href"
    },
@@ -59234,7 +59234,7 @@
    "line": null,
    "mutating": true,
    "rendered_on": null,
-   "rendered_on_count": 61,
+   "rendered_on_count": 59,
    "target": {
     "button_type": "submit",
     "form_method": "POST"
@@ -59251,7 +59251,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 61,
+   "rendered_on_count": 59,
    "target": {
     "button_type": "button"
    },
@@ -59267,7 +59267,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 61,
+   "rendered_on_count": 59,
    "target": {
     "button_type": "button"
    },
@@ -59283,7 +59283,7 @@
    "line": null,
    "mutating": true,
    "rendered_on": null,
-   "rendered_on_count": 61,
+   "rendered_on_count": 59,
    "target": {
     "action": "cta_href",
     "fields": [
@@ -59303,7 +59303,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 61,
+   "rendered_on_count": 59,
    "target": {},
    "template": "app/templates/components/empty_state.html",
    "testid": "heading_testid",
@@ -59317,7 +59317,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 61,
+   "rendered_on_count": 59,
    "target": {},
    "template": "app/templates/components/empty_state.html",
    "testid": "description_testid",
@@ -60669,7 +60669,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 457,
+   "rendered_on_count": 454,
    "target": {
     "button_type": "button"
    },
@@ -60685,7 +60685,7 @@
    "line": null,
    "mutating": true,
    "rendered_on": null,
-   "rendered_on_count": 457,
+   "rendered_on_count": 454,
    "target": {
     "button_type": "submit",
     "form_method": "GET"
@@ -60702,7 +60702,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 457,
+   "rendered_on_count": 454,
    "target": {
     "method": "GET"
    },
@@ -60718,7 +60718,7 @@
    "line": 3,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 457,
+   "rendered_on_count": 454,
    "target": {
     "modal_id": "page-guide"
    },
@@ -60734,7 +60734,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 284,
+   "rendered_on_count": 282,
    "target": {
     "href": "crumb.href"
    },
@@ -60750,7 +60750,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 284,
+   "rendered_on_count": 282,
    "target": {
     "href": "action.href"
    },
@@ -60766,7 +60766,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 284,
+   "rendered_on_count": 282,
    "target": {
     "button_type": "button"
    },
@@ -62923,7 +62923,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 457,
+   "rendered_on_count": 454,
    "target": {
     "href": "href"
    },
@@ -62939,7 +62939,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 457,
+   "rendered_on_count": 454,
    "target": {
     "href": "href"
    },
@@ -62955,7 +62955,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 457,
+   "rendered_on_count": 454,
    "target": {
     "button_type": "button"
    },
@@ -63125,113 +63125,13 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/components/strategy_canvas_box.html::link::0",
-   "kind": "link",
-   "label": "entry.name",
-   "line": null,
-   "mutating": false,
-   "rendered_on": [],
-   "rendered_on_count": 0,
-   "target": {
-    "endpoint": "archimate_crud.detail_element",
-    "href": "url_for('archimate_crud.detail_element', layer=entry.layer, element_type='ArchiMateElement', element_id=entry.id)"
-   },
-   "template": "app/templates/components/strategy_canvas_box.html",
-   "testid": "canvas-entry-{{ zone.box_key }}-{{ entry.id }}",
-   "type": null,
-   "via_macro": null
-  },
-  {
-   "id": "app/templates/components/strategy_canvas_box.html::button::0",
-   "kind": "button",
-   "label": "Add",
-   "line": null,
-   "mutating": true,
-   "rendered_on": [],
-   "rendered_on_count": 0,
-   "target": {
-    "button_type": "submit",
-    "form_method": "POST"
-   },
-   "template": "app/templates/components/strategy_canvas_box.html",
-   "testid": "canvas-add-submit-{{ zone.box_key }}",
-   "type": "noop",
-   "via_macro": null
-  },
-  {
-   "id": "app/templates/components/strategy_canvas_box.html::form::0",
-   "kind": "form",
-   "label": "",
-   "line": null,
-   "mutating": true,
-   "rendered_on": [],
-   "rendered_on_count": 0,
-   "target": {
-    "action": "{{ url_for('strategy_canvas.detail', template_key=template_key) }}/add",
-    "endpoint": "strategy_canvas.detail",
-    "endpoint_registered": false,
-    "fields": [
-     "box_key",
-     "csrf_token",
-     "name"
-    ],
-    "method": "POST"
-   },
-   "template": "app/templates/components/strategy_canvas_box.html",
-   "testid": "canvas-add-form-{{ zone.box_key }}",
-   "type": null,
-   "via_macro": null
-  },
-  {
-   "id": "app/templates/components/strategy_canvas_box.html::testid::0",
-   "kind": "testid",
-   "label": "ul",
-   "line": null,
-   "mutating": false,
-   "rendered_on": [],
-   "rendered_on_count": 0,
-   "target": {},
-   "template": "app/templates/components/strategy_canvas_box.html",
-   "testid": "canvas-entries-{{ zone.box_key }}",
-   "type": null,
-   "via_macro": null
-  },
-  {
-   "id": "app/templates/components/strategy_canvas_box.html::testid::1",
-   "kind": "testid",
-   "label": "p",
-   "line": null,
-   "mutating": false,
-   "rendered_on": [],
-   "rendered_on_count": 0,
-   "target": {},
-   "template": "app/templates/components/strategy_canvas_box.html",
-   "testid": "canvas-box-reason-{{ zone.box_key }}",
-   "type": null,
-   "via_macro": null
-  },
-  {
-   "id": "app/templates/components/strategy_canvas_box.html::testid::2",
-   "kind": "testid",
-   "label": "input",
-   "line": null,
-   "mutating": false,
-   "rendered_on": [],
-   "rendered_on_count": 0,
-   "target": {},
-   "template": "app/templates/components/strategy_canvas_box.html",
-   "testid": "canvas-add-input-{{ zone.box_key }}",
-   "type": null,
-   "via_macro": null
-  },
-  {
    "id": "app/templates/components/switch.html::button::0",
    "kind": "button",
    "label": "",
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 457,
+   "rendered_on_count": 454,
    "target": {
     "button_type": "button"
    },
@@ -63247,7 +63147,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 457,
+   "rendered_on_count": 454,
    "target": {
     "button_type": "button"
    },
@@ -76996,7 +76896,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 455,
+   "rendered_on_count": 452,
    "target": {
     "href": "#main-content"
    },
@@ -77012,7 +76912,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 455,
+   "rendered_on_count": 452,
    "target": {
     "href": "#sidebar-nav"
    },
@@ -77028,7 +76928,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 455,
+   "rendered_on_count": 452,
    "target": {
     "href": "#search-modal-trigger"
    },
@@ -77044,7 +76944,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 455,
+   "rendered_on_count": 452,
    "target": {
     "endpoint": "service_status.status_page",
     "href": "url_for('service_status.status_page')"
@@ -77061,7 +76961,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 455,
+   "rendered_on_count": 452,
    "target": {
     "button_type": "button"
    },
@@ -77077,7 +76977,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 455,
+   "rendered_on_count": 452,
    "target": {
     "button_type": "button"
    },
@@ -77093,7 +76993,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 455,
+   "rendered_on_count": 452,
    "target": {
     "button_type": "button"
    },
@@ -77109,7 +77009,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 455,
+   "rendered_on_count": 452,
    "target": {
     "button_type": "button"
    },
@@ -77125,7 +77025,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 455,
+   "rendered_on_count": 452,
    "target": {
     "button_type": "button",
     "handler": "dismissOnboarding(); window.location.href = (primaryCTA[selectedRole]?.href || '/dashboard/overview')"
@@ -77142,7 +77042,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 455,
+   "rendered_on_count": 452,
    "target": {
     "button_type": "button"
    },
@@ -77158,7 +77058,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 455,
+   "rendered_on_count": 452,
    "target": {
     "button_type": "button"
    },
@@ -77174,7 +77074,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 455,
+   "rendered_on_count": 452,
    "target": {
     "button_type": "button"
    },
@@ -77190,7 +77090,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 455,
+   "rendered_on_count": 452,
    "target": {
     "button_type": "button"
    },
@@ -77206,7 +77106,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 455,
+   "rendered_on_count": 452,
    "target": {
     "button_type": "button"
    },
@@ -77222,7 +77122,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 455,
+   "rendered_on_count": 452,
    "target": {},
    "template": "app/templates/layouts/admin_base.html",
    "testid": "app-footer",
@@ -77580,7 +77480,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 181,
+   "rendered_on_count": 179,
    "target": {
     "href": "href"
    },
@@ -77596,7 +77496,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 181,
+   "rendered_on_count": 179,
    "target": {
     "href": "_parent[1]"
    },
@@ -77612,7 +77512,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 181,
+   "rendered_on_count": 179,
    "target": {
     "href": "href"
    },
@@ -77628,7 +77528,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 181,
+   "rendered_on_count": 179,
    "target": {
     "href": "href"
    },
@@ -77644,7 +77544,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 181,
+   "rendered_on_count": 179,
    "target": {
     "href": "cta_href"
    },
@@ -100048,7 +99948,201 @@
    "via_macro": null
   },
   {
+   "id": "app/templates/strategy/_layout_circles.html::testid::0",
+   "kind": "testid",
+   "label": "div",
+   "line": null,
+   "mutating": false,
+   "rendered_on": [
+    "/strategy/<template_key>"
+   ],
+   "rendered_on_count": 1,
+   "target": {},
+   "template": "app/templates/strategy/_layout_circles.html",
+   "testid": "strategy-grid-{{ framework_key }}",
+   "type": null,
+   "via_macro": null
+  },
+  {
+   "id": "app/templates/strategy/_layout_columns.html::testid::0",
+   "kind": "testid",
+   "label": "div",
+   "line": null,
+   "mutating": false,
+   "rendered_on": [
+    "/strategy/<template_key>"
+   ],
+   "rendered_on_count": 1,
+   "target": {},
+   "template": "app/templates/strategy/_layout_columns.html",
+   "testid": "strategy-grid-{{ framework_key }}",
+   "type": null,
+   "via_macro": null
+  },
+  {
+   "id": "app/templates/strategy/_layout_curve.html::testid::0",
+   "kind": "testid",
+   "label": "div",
+   "line": null,
+   "mutating": false,
+   "rendered_on": [
+    "/strategy/<template_key>"
+   ],
+   "rendered_on_count": 1,
+   "target": {},
+   "template": "app/templates/strategy/_layout_curve.html",
+   "testid": "strategy-grid-{{ framework_key }}",
+   "type": null,
+   "via_macro": null
+  },
+  {
+   "id": "app/templates/strategy/_layout_curve.html::testid::1",
+   "kind": "testid",
+   "label": "section",
+   "line": null,
+   "mutating": false,
+   "rendered_on": [
+    "/strategy/<template_key>"
+   ],
+   "rendered_on_count": 1,
+   "target": {},
+   "template": "app/templates/strategy/_layout_curve.html",
+   "testid": "strategy-box-value_curve",
+   "type": null,
+   "via_macro": null
+  },
+  {
+   "id": "app/templates/strategy/_layout_curve.html::testid::2",
+   "kind": "testid",
+   "label": "canvas",
+   "line": null,
+   "mutating": false,
+   "rendered_on": [
+    "/strategy/<template_key>"
+   ],
+   "rendered_on_count": 1,
+   "target": {},
+   "template": "app/templates/strategy/_layout_curve.html",
+   "testid": "strategy-value-curve",
+   "type": null,
+   "via_macro": null
+  },
+  {
+   "id": "app/templates/strategy/_layout_curve.html::testid::3",
+   "kind": "testid",
+   "label": "p",
+   "line": null,
+   "mutating": false,
+   "rendered_on": [
+    "/strategy/<template_key>"
+   ],
+   "rendered_on_count": 1,
+   "target": {},
+   "template": "app/templates/strategy/_layout_curve.html",
+   "testid": "strategy-value-curve-empty",
+   "type": null,
+   "via_macro": null
+  },
+  {
+   "id": "app/templates/strategy/_layout_curve.html::testid::4",
+   "kind": "testid",
+   "label": "div",
+   "line": null,
+   "mutating": false,
+   "rendered_on": [
+    "/strategy/<template_key>"
+   ],
+   "rendered_on_count": 1,
+   "target": {},
+   "template": "app/templates/strategy/_layout_curve.html",
+   "testid": "strategy-four-actions",
+   "type": null,
+   "via_macro": null
+  },
+  {
+   "id": "app/templates/strategy/_layout_forces.html::testid::0",
+   "kind": "testid",
+   "label": "div",
+   "line": null,
+   "mutating": false,
+   "rendered_on": [
+    "/strategy/<template_key>"
+   ],
+   "rendered_on_count": 1,
+   "target": {},
+   "template": "app/templates/strategy/_layout_forces.html",
+   "testid": "strategy-grid-{{ framework_key }}",
+   "type": null,
+   "via_macro": null
+  },
+  {
+   "id": "app/templates/strategy/_layout_grid.html::testid::0",
+   "kind": "testid",
+   "label": "div",
+   "line": null,
+   "mutating": false,
+   "rendered_on": [
+    "/strategy/<template_key>"
+   ],
+   "rendered_on_count": 1,
+   "target": {},
+   "template": "app/templates/strategy/_layout_grid.html",
+   "testid": "strategy-grid-{{ framework_key }}",
+   "type": null,
+   "via_macro": null
+  },
+  {
+   "id": "app/templates/strategy/_layout_grid_2x2.html::testid::0",
+   "kind": "testid",
+   "label": "div",
+   "line": null,
+   "mutating": false,
+   "rendered_on": [
+    "/strategy/<template_key>"
+   ],
+   "rendered_on_count": 1,
+   "target": {},
+   "template": "app/templates/strategy/_layout_grid_2x2.html",
+   "testid": "strategy-grid-{{ framework_key }}",
+   "type": null,
+   "via_macro": null
+  },
+  {
+   "id": "app/templates/strategy/_layout_table.html::testid::0",
+   "kind": "testid",
+   "label": "div",
+   "line": null,
+   "mutating": false,
+   "rendered_on": [
+    "/strategy/<template_key>"
+   ],
+   "rendered_on_count": 1,
+   "target": {},
+   "template": "app/templates/strategy/_layout_table.html",
+   "testid": "strategy-grid-{{ framework_key }}",
+   "type": null,
+   "via_macro": null
+  },
+  {
    "id": "app/templates/strategy/canvas.html::link::0",
+   "kind": "link",
+   "label": "item.name or item.point",
+   "line": null,
+   "mutating": false,
+   "rendered_on": [
+    "/strategy/<template_key>"
+   ],
+   "rendered_on_count": 1,
+   "target": {
+    "href": "item.detail_href"
+   },
+   "template": "app/templates/strategy/canvas.html",
+   "testid": "strategy-point-link",
+   "type": null,
+   "via_macro": null
+  },
+  {
+   "id": "app/templates/strategy/canvas.html::link::1",
    "kind": "link",
    "label": "citation.label",
    "line": null,
@@ -100066,7 +100160,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/strategy/canvas.html::link::1",
+   "id": "app/templates/strategy/canvas.html::link::2",
    "kind": "link",
    "label": "",
    "line": null,
@@ -100138,6 +100232,25 @@
   {
    "id": "app/templates/strategy/canvas.html::button::3",
    "kind": "button",
+   "label": "Add",
+   "line": null,
+   "mutating": true,
+   "rendered_on": [
+    "/strategy/<template_key>"
+   ],
+   "rendered_on_count": 1,
+   "target": {
+    "button_type": "submit",
+    "form_method": "POST"
+   },
+   "template": "app/templates/strategy/canvas.html",
+   "testid": "strategy-add-submit-{{ zone.box_key }}",
+   "type": "noop",
+   "via_macro": null
+  },
+  {
+   "id": "app/templates/strategy/canvas.html::button::4",
+   "kind": "button",
    "label": "Draft from my model",
    "line": null,
    "mutating": false,
@@ -100151,6 +100264,33 @@
    "template": "app/templates/strategy/canvas.html",
    "testid": "strategy-draft",
    "type": "inline-render",
+   "via_macro": null
+  },
+  {
+   "id": "app/templates/strategy/canvas.html::form::0",
+   "kind": "form",
+   "label": "",
+   "line": null,
+   "mutating": true,
+   "rendered_on": [
+    "/strategy/<template_key>"
+   ],
+   "rendered_on_count": 1,
+   "target": {
+    "action": "url_for('strategy.add', template_key=framework_key)",
+    "endpoint": "strategy.add",
+    "fields": [
+     "box_key",
+     "element_type",
+     "name",
+     "offering_level",
+     "player"
+    ],
+    "method": "POST"
+   },
+   "template": "app/templates/strategy/canvas.html",
+   "testid": "strategy-add-form-{{ zone.box_key }}",
+   "type": null,
    "via_macro": null
   },
   {
@@ -100197,7 +100337,7 @@
    "rendered_on_count": 1,
    "target": {},
    "template": "app/templates/strategy/canvas.html",
-   "testid": "strategy-accepted-{{ zone.box_key }}",
+   "testid": "strategy-filed-{{ zone.box_key }}",
    "type": null,
    "via_macro": null
   },
@@ -100364,6 +100504,22 @@
   {
    "id": "app/templates/strategy/canvas.html::testid::13",
    "kind": "testid",
+   "label": "p",
+   "line": null,
+   "mutating": false,
+   "rendered_on": [
+    "/strategy/<template_key>"
+   ],
+   "rendered_on_count": 1,
+   "target": {},
+   "template": "app/templates/strategy/canvas.html",
+   "testid": "strategy-proposal-error",
+   "type": null,
+   "via_macro": null
+  },
+  {
+   "id": "app/templates/strategy/canvas.html::testid::14",
+   "kind": "testid",
    "label": "div",
    "line": null,
    "mutating": false,
@@ -100374,22 +100530,6 @@
    "target": {},
    "template": "app/templates/strategy/canvas.html",
    "testid": "strategy-empty-{{ zone.box_key }}",
-   "type": null,
-   "via_macro": null
-  },
-  {
-   "id": "app/templates/strategy/canvas.html::testid::14",
-   "kind": "testid",
-   "label": "span",
-   "line": null,
-   "mutating": false,
-   "rendered_on": [
-    "/strategy/<template_key>"
-   ],
-   "rendered_on_count": 1,
-   "target": {},
-   "template": "app/templates/strategy/canvas.html",
-   "testid": "strategy-draft-error",
    "type": null,
    "via_macro": null
   },
@@ -100405,14 +100545,14 @@
    "rendered_on_count": 1,
    "target": {},
    "template": "app/templates/strategy/canvas.html",
-   "testid": "strategy-grid-swot",
+   "testid": "strategy-add-error",
    "type": null,
    "via_macro": null
   },
   {
    "id": "app/templates/strategy/canvas.html::testid::16",
    "kind": "testid",
-   "label": "div",
+   "label": "span",
    "line": null,
    "mutating": false,
    "rendered_on": [
@@ -100421,7 +100561,23 @@
    "rendered_on_count": 1,
    "target": {},
    "template": "app/templates/strategy/canvas.html",
-   "testid": "strategy-grid-pestle",
+   "testid": "strategy-draft-error",
+   "type": null,
+   "via_macro": null
+  },
+  {
+   "id": "app/templates/strategy/canvas.html::testid::17",
+   "kind": "testid",
+   "label": "span",
+   "line": null,
+   "mutating": false,
+   "rendered_on": [
+    "/strategy/<template_key>"
+   ],
+   "rendered_on_count": 1,
+   "target": {},
+   "template": "app/templates/strategy/canvas.html",
+   "testid": "strategy-unclassified",
    "type": null,
    "via_macro": null
   },
@@ -100436,8 +100592,7 @@
    ],
    "rendered_on_count": 1,
    "target": {
-    "endpoint": "strategy.canvas",
-    "href": "url_for('strategy.canvas', template_key=framework.key)"
+    "href": "framework.href"
    },
    "template": "app/templates/strategy/index.html",
    "testid": "strategy-open-{{ framework.key }}",
@@ -100457,706 +100612,6 @@
    "target": {},
    "template": "app/templates/strategy/index.html",
    "testid": "strategy-framework-grid",
-   "type": null,
-   "via_macro": null
-  },
-  {
-   "id": "app/templates/strategy_canvas/index.html::link::0",
-   "kind": "link",
-   "label": "{{ canvas.name }} {{ canvas.purpose }}",
-   "line": null,
-   "mutating": false,
-   "rendered_on": [
-    "/strategy-canvas/"
-   ],
-   "rendered_on_count": 1,
-   "target": {
-    "href": "canvas.href"
-   },
-   "template": "app/templates/strategy_canvas/index.html",
-   "testid": "strategy-canvas-link-{{ canvas.key }}",
-   "type": null,
-   "via_macro": null
-  },
-  {
-   "id": "app/templates/strategy_canvas/index.html::testid::0",
-   "kind": "testid",
-   "label": "div",
-   "line": null,
-   "mutating": false,
-   "rendered_on": [
-    "/strategy-canvas/"
-   ],
-   "rendered_on_count": 1,
-   "target": {},
-   "template": "app/templates/strategy_canvas/index.html",
-   "testid": "strategy-canvas-list",
-   "type": null,
-   "via_macro": null
-  },
-  {
-   "id": "app/templates/strategy_canvas/mckinsey_7s.html::testid::0",
-   "kind": "testid",
-   "label": "div",
-   "line": null,
-   "mutating": false,
-   "rendered_on": [],
-   "rendered_on_count": 0,
-   "target": {},
-   "template": "app/templates/strategy_canvas/mckinsey_7s.html",
-   "testid": "seven-s-circle-{{ zone.box_key }}",
-   "type": null,
-   "via_macro": null
-  },
-  {
-   "id": "app/templates/strategy_canvas/mckinsey_7s.html::testid::1",
-   "kind": "testid",
-   "label": "div",
-   "line": null,
-   "mutating": false,
-   "rendered_on": [],
-   "rendered_on_count": 0,
-   "target": {},
-   "template": "app/templates/strategy_canvas/mckinsey_7s.html",
-   "testid": "strategy-canvas-mckinsey_7s",
-   "type": null,
-   "via_macro": null
-  },
-  {
-   "id": "app/templates/strategy_canvas/mckinsey_7s.html::testid::2",
-   "kind": "testid",
-   "label": "section",
-   "line": null,
-   "mutating": false,
-   "rendered_on": [],
-   "rendered_on_count": 0,
-   "target": {},
-   "template": "app/templates/strategy_canvas/mckinsey_7s.html",
-   "testid": "seven-s-hard-group",
-   "type": null,
-   "via_macro": null
-  },
-  {
-   "id": "app/templates/strategy_canvas/mckinsey_7s.html::testid::3",
-   "kind": "testid",
-   "label": "section",
-   "line": null,
-   "mutating": false,
-   "rendered_on": [],
-   "rendered_on_count": 0,
-   "target": {},
-   "template": "app/templates/strategy_canvas/mckinsey_7s.html",
-   "testid": "seven-s-soft-group",
-   "type": null,
-   "via_macro": null
-  },
-  {
-   "id": "app/templates/strategy_canvas/mckinsey_7s.html::testid::4",
-   "kind": "testid",
-   "label": "section",
-   "line": null,
-   "mutating": false,
-   "rendered_on": [],
-   "rendered_on_count": 0,
-   "target": {},
-   "template": "app/templates/strategy_canvas/mckinsey_7s.html",
-   "testid": "seven-s-centre-group",
-   "type": null,
-   "via_macro": null
-  },
-  {
-   "id": "app/templates/strategy_canvas/mckinsey_7s.html::testid::5",
-   "kind": "testid",
-   "label": "div",
-   "line": null,
-   "mutating": false,
-   "rendered_on": [],
-   "rendered_on_count": 0,
-   "target": {},
-   "template": "app/templates/strategy_canvas/mckinsey_7s.html",
-   "testid": "seven-s-centre-{{ zones_by_key['shared_values'].box_key }}",
-   "type": null,
-   "via_macro": null
-  },
-  {
-   "id": "app/templates/strategy_canvas/mckinsey_7s.html::testid::6",
-   "kind": "testid",
-   "label": "div",
-   "line": null,
-   "mutating": false,
-   "rendered_on": [],
-   "rendered_on_count": 0,
-   "target": {},
-   "template": "app/templates/strategy_canvas/mckinsey_7s.html",
-   "testid": "canvas-unclassified",
-   "type": null,
-   "via_macro": null
-  },
-  {
-   "id": "app/templates/strategy_canvas/porters_five_forces.html::testid::0",
-   "kind": "testid",
-   "label": "div",
-   "line": null,
-   "mutating": false,
-   "rendered_on": [],
-   "rendered_on_count": 0,
-   "target": {},
-   "template": "app/templates/strategy_canvas/porters_five_forces.html",
-   "testid": "porter-force-{{ zone.box_key }}",
-   "type": null,
-   "via_macro": null
-  },
-  {
-   "id": "app/templates/strategy_canvas/porters_five_forces.html::testid::1",
-   "kind": "testid",
-   "label": "div",
-   "line": null,
-   "mutating": false,
-   "rendered_on": [],
-   "rendered_on_count": 0,
-   "target": {},
-   "template": "app/templates/strategy_canvas/porters_five_forces.html",
-   "testid": "strategy-canvas-porters_five_forces",
-   "type": null,
-   "via_macro": null
-  },
-  {
-   "id": "app/templates/strategy_canvas/porters_five_forces.html::testid::2",
-   "kind": "testid",
-   "label": "div",
-   "line": null,
-   "mutating": false,
-   "rendered_on": [],
-   "rendered_on_count": 0,
-   "target": {},
-   "template": "app/templates/strategy_canvas/porters_five_forces.html",
-   "testid": "porter-grid",
-   "type": null,
-   "via_macro": null
-  },
-  {
-   "id": "app/templates/strategy_canvas/porters_five_forces.html::testid::3",
-   "kind": "testid",
-   "label": "div",
-   "line": null,
-   "mutating": false,
-   "rendered_on": [],
-   "rendered_on_count": 0,
-   "target": {},
-   "template": "app/templates/strategy_canvas/porters_five_forces.html",
-   "testid": "canvas-unclassified",
-   "type": null,
-   "via_macro": null
-  },
-  {
-   "id": "app/templates/strategy_canvas/view.html::link::0",
-   "kind": "link",
-   "label": "entry.name",
-   "line": null,
-   "mutating": false,
-   "rendered_on": [
-    "/strategy-canvas/<canvas_key>"
-   ],
-   "rendered_on_count": 1,
-   "target": {
-    "href": "entry.detail_href"
-   },
-   "template": "app/templates/strategy_canvas/view.html",
-   "testid": "canvas-entry-{{ box_key }}-{{ entry.id }}",
-   "type": null,
-   "via_macro": null
-  },
-  {
-   "id": "app/templates/strategy_canvas/view.html::button::0",
-   "kind": "button",
-   "label": "Add",
-   "line": null,
-   "mutating": true,
-   "rendered_on": [
-    "/strategy-canvas/<canvas_key>"
-   ],
-   "rendered_on_count": 1,
-   "target": {
-    "button_type": "submit",
-    "form_method": "POST"
-   },
-   "template": "app/templates/strategy_canvas/view.html",
-   "testid": "canvas-add-submit-{{ box_key }}",
-   "type": "noop",
-   "via_macro": null
-  },
-  {
-   "id": "app/templates/strategy_canvas/view.html::button::1",
-   "kind": "button",
-   "label": "Add factor",
-   "line": null,
-   "mutating": true,
-   "rendered_on": [
-    "/strategy-canvas/<canvas_key>"
-   ],
-   "rendered_on_count": 1,
-   "target": {
-    "button_type": "submit",
-    "form_method": "POST"
-   },
-   "template": "app/templates/strategy_canvas/view.html",
-   "testid": "canvas-add-submit-competing_factors",
-   "type": "noop",
-   "via_macro": null
-  },
-  {
-   "id": "app/templates/strategy_canvas/view.html::form::0",
-   "kind": "form",
-   "label": "",
-   "line": null,
-   "mutating": true,
-   "rendered_on": [
-    "/strategy-canvas/<canvas_key>"
-   ],
-   "rendered_on_count": 1,
-   "target": {
-    "action": "url_for('strategy_canvas.add', canvas_key=canvas_key)",
-    "endpoint": "strategy_canvas.add",
-    "fields": [
-     "box_key",
-     "csrf_token",
-     "name"
-    ],
-    "method": "POST"
-   },
-   "template": "app/templates/strategy_canvas/view.html",
-   "testid": "canvas-add-form-{{ box_key }}",
-   "type": null,
-   "via_macro": null
-  },
-  {
-   "id": "app/templates/strategy_canvas/view.html::form::1",
-   "kind": "form",
-   "label": "",
-   "line": null,
-   "mutating": true,
-   "rendered_on": [
-    "/strategy-canvas/<canvas_key>"
-   ],
-   "rendered_on_count": 1,
-   "target": {
-    "action": "url_for('strategy_canvas.add', canvas_key=canvas_key)",
-    "endpoint": "strategy_canvas.add",
-    "fields": [
-     "box_key",
-     "csrf_token",
-     "name",
-     "offering_level",
-     "player"
-    ],
-    "method": "POST"
-   },
-   "template": "app/templates/strategy_canvas/view.html",
-   "testid": "canvas-add-form-competing_factors",
-   "type": null,
-   "via_macro": null
-  },
-  {
-   "id": "app/templates/strategy_canvas/view.html::testid::0",
-   "kind": "testid",
-   "label": "div",
-   "line": null,
-   "mutating": false,
-   "rendered_on": [
-    "/strategy-canvas/<canvas_key>"
-   ],
-   "rendered_on_count": 1,
-   "target": {},
-   "template": "app/templates/strategy_canvas/view.html",
-   "testid": "canvas-box-{{ box_key }}",
-   "type": null,
-   "via_macro": null
-  },
-  {
-   "id": "app/templates/strategy_canvas/view.html::testid::1",
-   "kind": "testid",
-   "label": "span",
-   "line": null,
-   "mutating": false,
-   "rendered_on": [
-    "/strategy-canvas/<canvas_key>"
-   ],
-   "rendered_on_count": 1,
-   "target": {},
-   "template": "app/templates/strategy_canvas/view.html",
-   "testid": "canvas-box-count-{{ box_key }}",
-   "type": null,
-   "via_macro": null
-  },
-  {
-   "id": "app/templates/strategy_canvas/view.html::testid::2",
-   "kind": "testid",
-   "label": "ul",
-   "line": null,
-   "mutating": false,
-   "rendered_on": [
-    "/strategy-canvas/<canvas_key>"
-   ],
-   "rendered_on_count": 1,
-   "target": {},
-   "template": "app/templates/strategy_canvas/view.html",
-   "testid": "canvas-entries-{{ box_key }}",
-   "type": null,
-   "via_macro": null
-  },
-  {
-   "id": "app/templates/strategy_canvas/view.html::testid::3",
-   "kind": "testid",
-   "label": "p",
-   "line": null,
-   "mutating": false,
-   "rendered_on": [
-    "/strategy-canvas/<canvas_key>"
-   ],
-   "rendered_on_count": 1,
-   "target": {},
-   "template": "app/templates/strategy_canvas/view.html",
-   "testid": "canvas-box-reason-{{ box_key }}",
-   "type": null,
-   "via_macro": null
-  },
-  {
-   "id": "app/templates/strategy_canvas/view.html::testid::4",
-   "kind": "testid",
-   "label": "input",
-   "line": null,
-   "mutating": false,
-   "rendered_on": [
-    "/strategy-canvas/<canvas_key>"
-   ],
-   "rendered_on_count": 1,
-   "target": {},
-   "template": "app/templates/strategy_canvas/view.html",
-   "testid": "canvas-add-name-{{ box_key }}",
-   "type": null,
-   "via_macro": null
-  },
-  {
-   "id": "app/templates/strategy_canvas/view.html::testid::5",
-   "kind": "testid",
-   "label": "div",
-   "line": null,
-   "mutating": false,
-   "rendered_on": [
-    "/strategy-canvas/<canvas_key>"
-   ],
-   "rendered_on_count": 1,
-   "target": {},
-   "template": "app/templates/strategy_canvas/view.html",
-   "testid": "canvas-matrix",
-   "type": null,
-   "via_macro": null
-  },
-  {
-   "id": "app/templates/strategy_canvas/view.html::testid::6",
-   "kind": "testid",
-   "label": "span",
-   "line": null,
-   "mutating": false,
-   "rendered_on": [
-    "/strategy-canvas/<canvas_key>"
-   ],
-   "rendered_on_count": 1,
-   "target": {},
-   "template": "app/templates/strategy_canvas/view.html",
-   "testid": "canvas-axis-y",
-   "type": null,
-   "via_macro": null
-  },
-  {
-   "id": "app/templates/strategy_canvas/view.html::testid::7",
-   "kind": "testid",
-   "label": "span",
-   "line": null,
-   "mutating": false,
-   "rendered_on": [
-    "/strategy-canvas/<canvas_key>"
-   ],
-   "rendered_on_count": 1,
-   "target": {},
-   "template": "app/templates/strategy_canvas/view.html",
-   "testid": "canvas-axis-x-low",
-   "type": null,
-   "via_macro": null
-  },
-  {
-   "id": "app/templates/strategy_canvas/view.html::testid::8",
-   "kind": "testid",
-   "label": "span",
-   "line": null,
-   "mutating": false,
-   "rendered_on": [
-    "/strategy-canvas/<canvas_key>"
-   ],
-   "rendered_on_count": 1,
-   "target": {},
-   "template": "app/templates/strategy_canvas/view.html",
-   "testid": "canvas-axis-x",
-   "type": null,
-   "via_macro": null
-  },
-  {
-   "id": "app/templates/strategy_canvas/view.html::testid::9",
-   "kind": "testid",
-   "label": "span",
-   "line": null,
-   "mutating": false,
-   "rendered_on": [
-    "/strategy-canvas/<canvas_key>"
-   ],
-   "rendered_on_count": 1,
-   "target": {},
-   "template": "app/templates/strategy_canvas/view.html",
-   "testid": "canvas-axis-x-high",
-   "type": null,
-   "via_macro": null
-  },
-  {
-   "id": "app/templates/strategy_canvas/view.html::testid::10",
-   "kind": "testid",
-   "label": "div",
-   "line": null,
-   "mutating": false,
-   "rendered_on": [
-    "/strategy-canvas/<canvas_key>"
-   ],
-   "rendered_on_count": 1,
-   "target": {},
-   "template": "app/templates/strategy_canvas/view.html",
-   "testid": "canvas-value-curve",
-   "type": null,
-   "via_macro": null
-  },
-  {
-   "id": "app/templates/strategy_canvas/view.html::testid::11",
-   "kind": "testid",
-   "label": "svg",
-   "line": null,
-   "mutating": false,
-   "rendered_on": [
-    "/strategy-canvas/<canvas_key>"
-   ],
-   "rendered_on_count": 1,
-   "target": {},
-   "template": "app/templates/strategy_canvas/view.html",
-   "testid": "canvas-value-curve-svg",
-   "type": null,
-   "via_macro": null
-  },
-  {
-   "id": "app/templates/strategy_canvas/view.html::testid::12",
-   "kind": "testid",
-   "label": "polyline",
-   "line": null,
-   "mutating": false,
-   "rendered_on": [
-    "/strategy-canvas/<canvas_key>"
-   ],
-   "rendered_on_count": 1,
-   "target": {},
-   "template": "app/templates/strategy_canvas/view.html",
-   "testid": "canvas-curve-series-{{ loop.index0 }}",
-   "type": null,
-   "via_macro": null
-  },
-  {
-   "id": "app/templates/strategy_canvas/view.html::testid::13",
-   "kind": "testid",
-   "label": "ul",
-   "line": null,
-   "mutating": false,
-   "rendered_on": [
-    "/strategy-canvas/<canvas_key>"
-   ],
-   "rendered_on_count": 1,
-   "target": {},
-   "template": "app/templates/strategy_canvas/view.html",
-   "testid": "canvas-curve-legend",
-   "type": null,
-   "via_macro": null
-  },
-  {
-   "id": "app/templates/strategy_canvas/view.html::testid::14",
-   "kind": "testid",
-   "label": "p",
-   "line": null,
-   "mutating": false,
-   "rendered_on": [
-    "/strategy-canvas/<canvas_key>"
-   ],
-   "rendered_on_count": 1,
-   "target": {},
-   "template": "app/templates/strategy_canvas/view.html",
-   "testid": "canvas-box-reason-value_curve",
-   "type": null,
-   "via_macro": null
-  },
-  {
-   "id": "app/templates/strategy_canvas/view.html::testid::15",
-   "kind": "testid",
-   "label": "input",
-   "line": null,
-   "mutating": false,
-   "rendered_on": [
-    "/strategy-canvas/<canvas_key>"
-   ],
-   "rendered_on_count": 1,
-   "target": {},
-   "template": "app/templates/strategy_canvas/view.html",
-   "testid": "canvas-add-name-competing_factors",
-   "type": null,
-   "via_macro": null
-  },
-  {
-   "id": "app/templates/strategy_canvas/view.html::testid::16",
-   "kind": "testid",
-   "label": "input",
-   "line": null,
-   "mutating": false,
-   "rendered_on": [
-    "/strategy-canvas/<canvas_key>"
-   ],
-   "rendered_on_count": 1,
-   "target": {},
-   "template": "app/templates/strategy_canvas/view.html",
-   "testid": "canvas-add-player",
-   "type": null,
-   "via_macro": null
-  },
-  {
-   "id": "app/templates/strategy_canvas/view.html::testid::17",
-   "kind": "testid",
-   "label": "input",
-   "line": null,
-   "mutating": false,
-   "rendered_on": [
-    "/strategy-canvas/<canvas_key>"
-   ],
-   "rendered_on_count": 1,
-   "target": {},
-   "template": "app/templates/strategy_canvas/view.html",
-   "testid": "canvas-add-level",
-   "type": null,
-   "via_macro": null
-  },
-  {
-   "id": "app/templates/strategy_canvas/view.html::testid::18",
-   "kind": "testid",
-   "label": "div",
-   "line": null,
-   "mutating": false,
-   "rendered_on": [
-    "/strategy-canvas/<canvas_key>"
-   ],
-   "rendered_on_count": 1,
-   "target": {},
-   "template": "app/templates/strategy_canvas/view.html",
-   "testid": "canvas-errc-grid",
-   "type": null,
-   "via_macro": null
-  },
-  {
-   "id": "app/templates/strategy_canvas/view.html::testid::19",
-   "kind": "testid",
-   "label": "div",
-   "line": null,
-   "mutating": false,
-   "rendered_on": [
-    "/strategy-canvas/<canvas_key>"
-   ],
-   "rendered_on_count": 1,
-   "target": {},
-   "template": "app/templates/strategy_canvas/view.html",
-   "testid": "canvas-unclassified",
-   "type": null,
-   "via_macro": null
-  },
-  {
-   "id": "app/templates/strategy_canvas/vrio.html::table::0",
-   "kind": "table",
-   "label": "",
-   "line": null,
-   "mutating": false,
-   "rendered_on": [],
-   "rendered_on_count": 0,
-   "target": {},
-   "template": "app/templates/strategy_canvas/vrio.html",
-   "testid": null,
-   "type": null,
-   "via_macro": null
-  },
-  {
-   "id": "app/templates/strategy_canvas/vrio.html::testid::0",
-   "kind": "testid",
-   "label": "div",
-   "line": null,
-   "mutating": false,
-   "rendered_on": [],
-   "rendered_on_count": 0,
-   "target": {},
-   "template": "app/templates/strategy_canvas/vrio.html",
-   "testid": "strategy-canvas-vrio",
-   "type": null,
-   "via_macro": null
-  },
-  {
-   "id": "app/templates/strategy_canvas/vrio.html::testid::1",
-   "kind": "testid",
-   "label": "div",
-   "line": null,
-   "mutating": false,
-   "rendered_on": [],
-   "rendered_on_count": 0,
-   "target": {},
-   "template": "app/templates/strategy_canvas/vrio.html",
-   "testid": "vrio-table-wrap",
-   "type": null,
-   "via_macro": null
-  },
-  {
-   "id": "app/templates/strategy_canvas/vrio.html::testid::2",
-   "kind": "testid",
-   "label": "th",
-   "line": null,
-   "mutating": false,
-   "rendered_on": [],
-   "rendered_on_count": 0,
-   "target": {},
-   "template": "app/templates/strategy_canvas/vrio.html",
-   "testid": "vrio-col-{{ zone.box_key }}",
-   "type": null,
-   "via_macro": null
-  },
-  {
-   "id": "app/templates/strategy_canvas/vrio.html::testid::3",
-   "kind": "testid",
-   "label": "td",
-   "line": null,
-   "mutating": false,
-   "rendered_on": [],
-   "rendered_on_count": 0,
-   "target": {},
-   "template": "app/templates/strategy_canvas/vrio.html",
-   "testid": "vrio-cell-{{ zone.box_key }}",
-   "type": null,
-   "via_macro": null
-  },
-  {
-   "id": "app/templates/strategy_canvas/vrio.html::testid::4",
-   "kind": "testid",
-   "label": "div",
-   "line": null,
-   "mutating": false,
-   "rendered_on": [],
-   "rendered_on_count": 0,
-   "target": {},
-   "template": "app/templates/strategy_canvas/vrio.html",
-   "testid": "canvas-unclassified",
    "type": null,
    "via_macro": null
   },
@@ -103181,21 +102636,21 @@
   }
  ],
  "counts": {
-  "controls": 5642,
+  "controls": 5607,
   "controls_by_kind": {
-   "button": 3153,
-   "form": 256,
-   "link": 1023,
+   "button": 3151,
+   "form": 254,
+   "link": 1021,
    "modal": 193,
-   "table": 380,
-   "testid": 637
+   "table": 379,
+   "testid": 609
   },
-  "controls_mutating": 763,
-  "pages": 475,
-  "pages_without_parameters": 343,
-  "routes": 3802,
+  "controls_mutating": 759,
+  "pages": 473,
+  "pages_without_parameters": 342,
+  "routes": 3800,
   "templates": 700,
-  "templates_not_reached_by_a_route": 114
+  "templates_not_reached_by_a_route": 110
  },
  "routes": [
   {
@@ -171833,6 +171288,26 @@
   },
   {
    "blueprint": "strategy",
+   "closure": [],
+   "endpoint": "strategy.add",
+   "guards": [
+    "login_required",
+    "require_roles"
+   ],
+   "has_parameters": true,
+   "id": "strategy.add /strategy/<template_key>/add",
+   "login_required": true,
+   "methods": [
+    "POST"
+   ],
+   "page": false,
+   "rule": "/strategy/<template_key>/add",
+   "template_unresolved": [],
+   "templates": [],
+   "templates_missing": []
+  },
+  {
+   "blueprint": "strategy",
    "closure": [
     "app/templates/components/_breadcrumb_root.html",
     "app/templates/components/admin_header.html",
@@ -171847,6 +171322,13 @@
     "app/templates/partials/_data_load_error.html",
     "app/templates/partials/_head.html",
     "app/templates/partials/_scripts_common.html",
+    "app/templates/strategy/_layout_circles.html",
+    "app/templates/strategy/_layout_columns.html",
+    "app/templates/strategy/_layout_curve.html",
+    "app/templates/strategy/_layout_forces.html",
+    "app/templates/strategy/_layout_grid.html",
+    "app/templates/strategy/_layout_grid_2x2.html",
+    "app/templates/strategy/_layout_table.html",
     "app/templates/strategy/canvas.html"
    ],
    "endpoint": "strategy.canvas",
@@ -171921,121 +171403,6 @@
    "template_unresolved": [],
    "templates": [
     "app/templates/strategy/index.html"
-   ],
-   "templates_missing": []
-  },
-  {
-   "blueprint": "strategy_canvas",
-   "closure": [
-    "app/templates/components/_breadcrumb_root.html",
-    "app/templates/components/admin_header.html",
-    "app/templates/components/admin_sidebar.html",
-    "app/templates/components/drawer.html",
-    "app/templates/components/empty_state.html",
-    "app/templates/components/page_guide_drawer.html",
-    "app/templates/components/sidebar_nav.html",
-    "app/templates/components/switch.html",
-    "app/templates/components/toast-container.html",
-    "app/templates/layouts/admin_base.html",
-    "app/templates/macros/page_shell.html",
-    "app/templates/partials/_data_load_error.html",
-    "app/templates/partials/_head.html",
-    "app/templates/partials/_scripts_common.html",
-    "app/templates/strategy_canvas/not_found.html"
-   ],
-   "endpoint": "strategy_canvas.add",
-   "guards": [
-    "login_required",
-    "require_roles"
-   ],
-   "has_parameters": true,
-   "id": "strategy_canvas.add /strategy-canvas/<canvas_key>/add",
-   "login_required": true,
-   "methods": [
-    "POST"
-   ],
-   "page": false,
-   "rule": "/strategy-canvas/<canvas_key>/add",
-   "template_unresolved": [],
-   "templates": [
-    "app/templates/strategy_canvas/not_found.html"
-   ],
-   "templates_missing": []
-  },
-  {
-   "blueprint": "strategy_canvas",
-   "closure": [
-    "app/templates/components/_breadcrumb_root.html",
-    "app/templates/components/admin_header.html",
-    "app/templates/components/admin_sidebar.html",
-    "app/templates/components/card.html",
-    "app/templates/components/drawer.html",
-    "app/templates/components/page_guide_drawer.html",
-    "app/templates/components/page_header.html",
-    "app/templates/components/sidebar_nav.html",
-    "app/templates/components/switch.html",
-    "app/templates/components/toast-container.html",
-    "app/templates/layouts/admin_base.html",
-    "app/templates/partials/_data_load_error.html",
-    "app/templates/partials/_head.html",
-    "app/templates/partials/_scripts_common.html",
-    "app/templates/strategy_canvas/index.html"
-   ],
-   "endpoint": "strategy_canvas.index",
-   "guards": [
-    "login_required"
-   ],
-   "has_parameters": false,
-   "id": "strategy_canvas.index /strategy-canvas/",
-   "login_required": true,
-   "methods": [
-    "GET"
-   ],
-   "page": true,
-   "rule": "/strategy-canvas/",
-   "template_unresolved": [],
-   "templates": [
-    "app/templates/strategy_canvas/index.html"
-   ],
-   "templates_missing": []
-  },
-  {
-   "blueprint": "strategy_canvas",
-   "closure": [
-    "app/templates/components/_breadcrumb_root.html",
-    "app/templates/components/admin_header.html",
-    "app/templates/components/admin_sidebar.html",
-    "app/templates/components/drawer.html",
-    "app/templates/components/empty_state.html",
-    "app/templates/components/page_guide_drawer.html",
-    "app/templates/components/page_header.html",
-    "app/templates/components/sidebar_nav.html",
-    "app/templates/components/switch.html",
-    "app/templates/components/toast-container.html",
-    "app/templates/layouts/admin_base.html",
-    "app/templates/macros/page_shell.html",
-    "app/templates/partials/_data_load_error.html",
-    "app/templates/partials/_head.html",
-    "app/templates/partials/_scripts_common.html",
-    "app/templates/strategy_canvas/not_found.html",
-    "app/templates/strategy_canvas/view.html"
-   ],
-   "endpoint": "strategy_canvas.view",
-   "guards": [
-    "login_required"
-   ],
-   "has_parameters": true,
-   "id": "strategy_canvas.view /strategy-canvas/<canvas_key>",
-   "login_required": true,
-   "methods": [
-    "GET"
-   ],
-   "page": true,
-   "rule": "/strategy-canvas/<canvas_key>",
-   "template_unresolved": [],
-   "templates": [
-    "app/templates/strategy_canvas/not_found.html",
-    "app/templates/strategy_canvas/view.html"
    ],
    "templates_missing": []
   },
@@ -189191,7 +188558,7 @@
    "includes": [],
    "name": "components/_breadcrumb_root.html",
    "parse_errors": [],
-   "rendered_on_count": 453,
+   "rendered_on_count": 450,
    "unresolved_refs": []
   },
   "app/templates/components/accessibility_helpers.html": {
@@ -189211,7 +188578,7 @@
    "includes": [],
    "name": "components/admin_header.html",
    "parse_errors": [],
-   "rendered_on_count": 457,
+   "rendered_on_count": 454,
    "unresolved_refs": []
   },
   "app/templates/components/admin_sidebar.html": {
@@ -189222,7 +188589,7 @@
    "includes": [],
    "name": "components/admin_sidebar.html",
    "parse_errors": [],
-   "rendered_on_count": 457,
+   "rendered_on_count": 454,
    "unresolved_refs": []
   },
   "app/templates/components/alert.html": {
@@ -189374,7 +188741,7 @@
    "includes": [],
    "name": "components/card.html",
    "parse_errors": [],
-   "rendered_on_count": 69,
+   "rendered_on_count": 68,
    "unresolved_refs": []
   },
   "app/templates/components/checkbox.html": {
@@ -189455,7 +188822,7 @@
    "includes": [],
    "name": "components/drawer.html",
    "parse_errors": [],
-   "rendered_on_count": 457,
+   "rendered_on_count": 454,
    "unresolved_refs": []
   },
   "app/templates/components/dropdown_menu.html": {
@@ -189473,7 +188840,7 @@
    "includes": [],
    "name": "components/empty_state.html",
    "parse_errors": [],
-   "rendered_on_count": 61,
+   "rendered_on_count": 59,
    "unresolved_refs": []
   },
   "app/templates/components/error_boundary.html": {
@@ -189648,7 +189015,7 @@
    "includes": [],
    "name": "components/page_guide_drawer.html",
    "parse_errors": [],
-   "rendered_on_count": 457,
+   "rendered_on_count": 454,
    "unresolved_refs": []
   },
   "app/templates/components/page_header.html": {
@@ -189659,7 +189026,7 @@
    "includes": [],
    "name": "components/page_header.html",
    "parse_errors": [],
-   "rendered_on_count": 284,
+   "rendered_on_count": 282,
    "unresolved_refs": []
   },
   "app/templates/components/pagination_controls.html": {
@@ -189820,7 +189187,7 @@
    "includes": [],
    "name": "components/sidebar_nav.html",
    "parse_errors": [],
-   "rendered_on_count": 457,
+   "rendered_on_count": 454,
    "unresolved_refs": []
   },
   "app/templates/components/skeleton.html": {
@@ -189868,22 +189235,13 @@
    "rendered_on_count": 1,
    "unresolved_refs": []
   },
-  "app/templates/components/strategy_canvas_box.html": {
-   "extends": [],
-   "imports": [],
-   "includes": [],
-   "name": "components/strategy_canvas_box.html",
-   "parse_errors": [],
-   "rendered_on_count": 0,
-   "unresolved_refs": []
-  },
   "app/templates/components/switch.html": {
    "extends": [],
    "imports": [],
    "includes": [],
    "name": "components/switch.html",
    "parse_errors": [],
-   "rendered_on_count": 457,
+   "rendered_on_count": 454,
    "unresolved_refs": []
   },
   "app/templates/components/table.html": {
@@ -189910,7 +189268,7 @@
    "includes": [],
    "name": "components/toast-container.html",
    "parse_errors": [],
-   "rendered_on_count": 474,
+   "rendered_on_count": 471,
    "unresolved_refs": []
   },
   "app/templates/components/traceability_panel.html": {
@@ -191479,7 +190837,7 @@
    ],
    "name": "layouts/admin_base.html",
    "parse_errors": [],
-   "rendered_on_count": 455,
+   "rendered_on_count": 452,
    "unresolved_refs": []
   },
   "app/templates/layouts/base.html": {
@@ -191582,7 +190940,7 @@
    "includes": [],
    "name": "macros/page_shell.html",
    "parse_errors": [],
-   "rendered_on_count": 181,
+   "rendered_on_count": 179,
    "unresolved_refs": []
   },
   "app/templates/macros/pricing_cta.html": {
@@ -191816,7 +191174,7 @@
    "includes": [],
    "name": "partials/_data_load_error.html",
    "parse_errors": [],
-   "rendered_on_count": 455,
+   "rendered_on_count": 452,
    "unresolved_refs": []
   },
   "app/templates/partials/_filter_section.html": {
@@ -191852,7 +191210,7 @@
    "includes": [],
    "name": "partials/_head.html",
    "parse_errors": [],
-   "rendered_on_count": 474,
+   "rendered_on_count": 471,
    "unresolved_refs": []
   },
   "app/templates/partials/_head_common.html": {
@@ -191897,7 +191255,7 @@
    "includes": [],
    "name": "partials/_scripts_common.html",
    "parse_errors": [],
-   "rendered_on_count": 474,
+   "rendered_on_count": 471,
    "unresolved_refs": []
   },
   "app/templates/partials/_seo_meta.html": {
@@ -193452,6 +192810,69 @@
    "rendered_on_count": 1,
    "unresolved_refs": []
   },
+  "app/templates/strategy/_layout_circles.html": {
+   "extends": [],
+   "imports": [],
+   "includes": [],
+   "name": "strategy/_layout_circles.html",
+   "parse_errors": [],
+   "rendered_on_count": 1,
+   "unresolved_refs": []
+  },
+  "app/templates/strategy/_layout_columns.html": {
+   "extends": [],
+   "imports": [],
+   "includes": [],
+   "name": "strategy/_layout_columns.html",
+   "parse_errors": [],
+   "rendered_on_count": 1,
+   "unresolved_refs": []
+  },
+  "app/templates/strategy/_layout_curve.html": {
+   "extends": [],
+   "imports": [],
+   "includes": [],
+   "name": "strategy/_layout_curve.html",
+   "parse_errors": [],
+   "rendered_on_count": 1,
+   "unresolved_refs": []
+  },
+  "app/templates/strategy/_layout_forces.html": {
+   "extends": [],
+   "imports": [],
+   "includes": [],
+   "name": "strategy/_layout_forces.html",
+   "parse_errors": [],
+   "rendered_on_count": 1,
+   "unresolved_refs": []
+  },
+  "app/templates/strategy/_layout_grid.html": {
+   "extends": [],
+   "imports": [],
+   "includes": [],
+   "name": "strategy/_layout_grid.html",
+   "parse_errors": [],
+   "rendered_on_count": 1,
+   "unresolved_refs": []
+  },
+  "app/templates/strategy/_layout_grid_2x2.html": {
+   "extends": [],
+   "imports": [],
+   "includes": [],
+   "name": "strategy/_layout_grid_2x2.html",
+   "parse_errors": [],
+   "rendered_on_count": 1,
+   "unresolved_refs": []
+  },
+  "app/templates/strategy/_layout_table.html": {
+   "extends": [],
+   "imports": [],
+   "includes": [],
+   "name": "strategy/_layout_table.html",
+   "parse_errors": [],
+   "rendered_on_count": 1,
+   "unresolved_refs": []
+  },
   "app/templates/strategy/canvas.html": {
    "extends": [
     "app/templates/layouts/admin_base.html"
@@ -193459,7 +192880,15 @@
    "imports": [
     "app/templates/components/page_header.html"
    ],
-   "includes": [],
+   "includes": [
+    "app/templates/strategy/_layout_circles.html",
+    "app/templates/strategy/_layout_columns.html",
+    "app/templates/strategy/_layout_curve.html",
+    "app/templates/strategy/_layout_forces.html",
+    "app/templates/strategy/_layout_grid.html",
+    "app/templates/strategy/_layout_grid_2x2.html",
+    "app/templates/strategy/_layout_table.html"
+   ],
    "name": "strategy/canvas.html",
    "parse_errors": [],
    "rendered_on_count": 1,
@@ -193477,89 +192906,6 @@
    "name": "strategy/index.html",
    "parse_errors": [],
    "rendered_on_count": 1,
-   "unresolved_refs": []
-  },
-  "app/templates/strategy_canvas/index.html": {
-   "extends": [
-    "app/templates/layouts/admin_base.html"
-   ],
-   "imports": [
-    "app/templates/components/card.html",
-    "app/templates/components/page_header.html"
-   ],
-   "includes": [],
-   "name": "strategy_canvas/index.html",
-   "parse_errors": [],
-   "rendered_on_count": 1,
-   "unresolved_refs": []
-  },
-  "app/templates/strategy_canvas/mckinsey_7s.html": {
-   "extends": [
-    "app/templates/layouts/admin_base.html"
-   ],
-   "imports": [
-    "app/templates/components/strategy_canvas_box.html",
-    "app/templates/macros/page_shell.html"
-   ],
-   "includes": [],
-   "name": "strategy_canvas/mckinsey_7s.html",
-   "parse_errors": [],
-   "rendered_on_count": 0,
-   "unresolved_refs": []
-  },
-  "app/templates/strategy_canvas/not_found.html": {
-   "extends": [
-    "app/templates/layouts/admin_base.html"
-   ],
-   "imports": [
-    "app/templates/components/empty_state.html",
-    "app/templates/macros/page_shell.html"
-   ],
-   "includes": [],
-   "name": "strategy_canvas/not_found.html",
-   "parse_errors": [],
-   "rendered_on_count": 2,
-   "unresolved_refs": []
-  },
-  "app/templates/strategy_canvas/porters_five_forces.html": {
-   "extends": [
-    "app/templates/layouts/admin_base.html"
-   ],
-   "imports": [
-    "app/templates/components/strategy_canvas_box.html",
-    "app/templates/macros/page_shell.html"
-   ],
-   "includes": [],
-   "name": "strategy_canvas/porters_five_forces.html",
-   "parse_errors": [],
-   "rendered_on_count": 0,
-   "unresolved_refs": []
-  },
-  "app/templates/strategy_canvas/view.html": {
-   "extends": [
-    "app/templates/layouts/admin_base.html"
-   ],
-   "imports": [
-    "app/templates/components/page_header.html"
-   ],
-   "includes": [],
-   "name": "strategy_canvas/view.html",
-   "parse_errors": [],
-   "rendered_on_count": 1,
-   "unresolved_refs": []
-  },
-  "app/templates/strategy_canvas/vrio.html": {
-   "extends": [
-    "app/templates/layouts/admin_base.html"
-   ],
-   "imports": [
-    "app/templates/components/strategy_canvas_box.html",
-    "app/templates/macros/page_shell.html"
-   ],
-   "includes": [],
-   "name": "strategy_canvas/vrio.html",
-   "parse_errors": [],
-   "rendered_on_count": 0,
    "unresolved_refs": []
   },
   "app/templates/tech_radar/index.html": {
@@ -193794,7 +193140,6 @@
   "app/templates/components/select.html",
   "app/templates/components/sidebar_breadcrumb.html",
   "app/templates/components/status_indicator.html",
-  "app/templates/components/strategy_canvas_box.html",
   "app/templates/components/traceability_panel.html",
   "app/templates/errors/401.html",
   "app/templates/errors/403.html",
@@ -193858,10 +193203,7 @@
   "app/templates/solutions/transformation_room/outcomes.html",
   "app/templates/solutions_strategic/partials/_gantt_chart.html",
   "app/templates/solutions_strategic/partials/_issue_board.html",
-  "app/templates/strategy_canvas/mckinsey_7s.html",
-  "app/templates/strategy_canvas/porters_five_forces.html",
-  "app/templates/strategy_canvas/vrio.html",
   "app/templates/tools/gantt_demo.html"
  ],
- "templates_sha256": "4ab7af228ae75944fe5c6e3599d1c2248ea9c391f1fc1bef1a94d473d903fadc"
+ "templates_sha256": "0a944ade9d53206d3551da7d251578fa95d7c33dab52fba3dddcc1f6b086e7ea"
 }

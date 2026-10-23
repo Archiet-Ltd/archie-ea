@@ -1,0 +1,21 @@
+{# McKinsey 7S: seven boxes with Shared values at the centre and the other six
+   around it. A 3x3 grid places Shared values in the middle cell; the six
+   others fill the ring. At 390px the grid scrolls sideways and keeps its
+   three columns, so the centred shape holds and nothing stacks into one list. #}
+{% set by_key = {} %}
+{% for z in zones %}{% set _ = by_key.update({z.box_key: z}) %}{% endfor %}
+{# Ring order clockwise from top-left, with the centre in the middle. #}
+{% set ring = ['strategy', 'structure', 'systems', 'style', 'shared_values', 'staff', 'skills'] %}
+{# Lay out as: row1 strategy structure systems / row2 style shared_values staff / row3 . skills . #}
+{% set cells = ['strategy', 'structure', 'systems', 'style', 'shared_values', 'staff', None, 'skills', None] %}
+<div class="overflow-x-auto" data-testid="strategy-grid-{{ framework_key }}">
+  <div class="grid grid-cols-3 gap-4 min-w-[720px]">
+    {% for key in cells %}
+      {% if key and by_key.get(key) %}
+        {{ strategy_box(by_key[key], boxes[key]) }}
+      {% else %}
+        <div aria-hidden="true"></div>
+      {% endif %}
+    {% endfor %}
+  </div>
+</div>

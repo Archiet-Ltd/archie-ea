@@ -223,12 +223,11 @@ def _register_optional_standalone(app):
         ("app.modules.business_model_canvas.routes", "business_model_bp", "/business-model"),
         ("app.modules.organization.routes", "organization_bp", "/organization"),
         ("app.modules.business_case.routes", "business_case_bp", "/business-case"),
-        # Strategy frameworks open through the one Composer canvas view; the
-        # drafting engine is a service and a panel on that view. The two
-        # legacy blueprints below are superseded and removed during the
-        # one-view consolidation on this branch.
+        # Every strategy framework (SWOT, PESTLE, VRIO, McKinsey 7S, Porter's
+        # five forces, BCG, Ansoff, Blue Ocean) opens through this one canvas
+        # view; the drafting engine is a service and a panel on it. There is
+        # no second strategy canvas blueprint.
         ("app.modules.strategy.routes", "strategy_bp", "/strategy"),
-        ("app.modules.strategy_canvas.routes", "strategy_canvas_bp", "/strategy-canvas"),
         # The Business Architecture practice landing page — one front door to
         # the twelve BA outputs, all of which already ship scattered across
         # five generic sidebar zones.

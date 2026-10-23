@@ -111,7 +111,10 @@ class TestCanvasPage:
         link = box.find(attrs={"data-testid": "strategy-citation-link"})
         assert link is not None
         assert link.get_text().strip() == "Payroll System"
-        assert f"element={el.id}" in link["href"]
+        # The link lands on the cited element's own detail page (its id and
+        # layer in the path), not a bare id or a composer query string.
+        assert f"/{el.id}" in link["href"]
+        assert "/application/" in link["href"]
 
     def test_an_unknown_framework_is_not_found(self, app, db_session, make_org, client, login_as):
         org = make_org("swot-nf")
@@ -145,7 +148,8 @@ class TestDraftRoute:
         strengths = body["boxes"]["strengths"]
         assert len(strengths) == 1
         assert strengths[0]["citations"][0]["label"] == "Payroll System"
-        assert f"element={el.id}" in strengths[0]["citations"][0]["href"]
+        assert f"/{el.id}" in strengths[0]["citations"][0]["href"]
+        assert "/application/" in strengths[0]["citations"][0]["href"]
 
 
 class TestAcceptRoute:

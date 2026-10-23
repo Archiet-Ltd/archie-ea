@@ -47,9 +47,9 @@ MAX_RECORDS = 120
 MODEL_TIMEOUT_SECONDS = 25
 
 
-# The ArchiMate layer each element type the strategy frameworks use belongs
-# to, so a citation or a placed element links to its detail page under the
-# right layer segment (archimate_crud.detail_element(layer, type, id)).
+# The ArchiMate layer the strategy frameworks' own writer records a new
+# element under (create_backbone_element takes a capitalised layer). A cited
+# record, by contrast, links to its OWN recorded layer, read off the element.
 _LAYER_FOR_TYPE = {
     "Product": "business",
     "BusinessService": "business",
@@ -58,16 +58,24 @@ _LAYER_FOR_TYPE = {
     "Driver": "motivation",
 }
 
+# The layer segments the element detail route accepts; a cited element links
+# to its detail page only when its recorded layer is one of these.
+_DETAIL_LAYERS = frozenset(
+    {"motivation", "strategy", "business", "application", "technology", "physical", "implementation"}
+)
+
 
 def _detail_href(element) -> Optional[str]:
     """A link to the element's own detail page — a page that renders its
-    fields and relationships — or None when its type has no detail route, so
-    the footer shows a label without a dead link rather than landing nowhere.
+    fields and relationships — or None when its recorded layer has no detail
+    route, so the footer shows a label without a dead link rather than
+    landing nowhere. The layer is read off the element, not re-derived here,
+    so there is no second type-to-layer map to drift from the real one.
     """
     from flask import url_for
 
-    layer = _LAYER_FOR_TYPE.get(element.type)
-    if not layer:
+    layer = str(getattr(element, "layer", "") or "").strip().lower()
+    if layer not in _DETAIL_LAYERS:
         return None
     try:
         return url_for(
@@ -392,6 +400,182 @@ def saved_boxes(template_key: str, organization_id: int) -> Dict[str, List[Dict[
             }
         )
     return boxes
+
+
+def project(template_key: str, organization_id: int) -> Dict[str, List[Dict[str, Any]]]:
+    """Place the organisation's own profiled elements into the template's boxes.
+
+    One projection for every framework, keyed by box_key. A type_profile box
+    maps to the element rows (id, name, type, detail_href) filed in it through
+    the one membership rule; the Blue Ocean value_curve attribute box maps to
+    one curve point per competing-factor Assessment (factor, player, level,
+    detail_href), a missing level staying None so the curve shows a gap, never
+    a fabricated zero. An empty organisation returns every box present but
+    empty. Reused by the canvas view and by the two-organisation tests.
+    """
+    from app.models.archimate_core import ArchiMateElement
+    from app.services.composer_export_formats import canvas_box_for_element
+
+    tpl = _template(template_key)
+    placed: Dict[str, List[Dict[str, Any]]] = {z["box_key"]: [] for z in tpl["zones"]}
+    if not organization_id:
+        return placed
+
+    element_types = sorted({t for z in tpl["zones"] for t in z["element_types"]})
+    if not element_types:
+        return placed
+
+    rows = ArchiMateElement.query.filter(
+        ArchiMateElement.organization_id == organization_id,
+        ArchiMateElement.type.in_(element_types),
+    ).all()
+
+    # type_profile boxes, through the one membership rule.
+    by_box: Dict[str, List] = {}
+    for row in rows:
+        box_key = canvas_box_for_element(row, template_key)
+        if box_key is not None:
+            by_box.setdefault(box_key, []).append(row)
+
+    for zone in tpl["zones"]:
+        if zone["membership"] == "type_profile":
+            matched = sorted(by_box.get(zone["box_key"], []), key=lambda el: (el.name or "").lower())
+            rows_out = []
+            for el in matched:
+                row = {
+                    "id": el.id,
+                    "name": el.name,
+                    "type": el.type,
+                    "detail_href": _detail_href(el),
+                }
+                # A drafted Assessment point carries the records it rests on;
+                # surface them so the footer can resolve each to a link.
+                cites = (el.acm_properties or {}).get("citations")
+                if cites:
+                    row["citations"] = cites
+                rows_out.append(row)
+            placed[zone["box_key"]] = rows_out
+        elif zone["membership"] == "attribute" and zone.get("anchor_box"):
+            # The value curve reads every element in its anchor box that
+            # carries an offering level; a factor with no level is a gap.
+            anchor_rows = by_box.get(zone["anchor_box"], [])
+            points = []
+            for el in anchor_rows:
+                props = el.acm_properties or {}
+                level = props.get("offering_level")
+                if isinstance(level, dict):
+                    level = level.get("value")
+                try:
+                    level = None if level in (None, "") else int(level)
+                except (TypeError, ValueError):
+                    level = None
+                player = props.get("player")
+                if isinstance(player, dict):
+                    player = player.get("value")
+                points.append(
+                    {
+                        "id": el.id,
+                        "factor": el.name,
+                        "player": player,
+                        "offering_level": level,
+                        "detail_href": _detail_href(el),
+                    }
+                )
+            points.sort(key=lambda p: (p["factor"] or "").lower())
+            placed[zone["box_key"]] = points
+    return placed
+
+
+def unclassified_count(template_key: str, organization_id: int) -> int:
+    """How many of the organisation's elements of this framework's box types
+    carry no box value FOR THIS FRAMEWORK — the honest "not yet classified"
+    figure, counted per framework through the one membership rule. A product
+    classified in BCG but not Ansoff counts as unclassified in Ansoff only,
+    never in both, because each framework reads its own membership key.
+    """
+    from app.models.archimate_core import ArchiMateElement
+    from app.services.composer_export_formats import canvas_box_for_element
+
+    tpl = _template(template_key)
+    if not organization_id:
+        return 0
+    element_types = sorted(
+        {t for z in tpl["zones"] if z["membership"] == "type_profile" for t in z["element_types"]}
+    )
+    if not element_types:
+        return 0
+
+    rows = ArchiMateElement.query.filter(
+        ArchiMateElement.organization_id == organization_id,
+        ArchiMateElement.type.in_(element_types),
+    ).all()
+    return sum(1 for row in rows if canvas_box_for_element(row, template_key) is None)
+
+
+def add_element(
+    template_key: str,
+    box_key: str,
+    name: str,
+    organization_id: int,
+    *,
+    element_type: Optional[str] = None,
+    offering_level=None,
+    player: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Create an element in a box and file it there through the one writer.
+
+    For an element-backed framework (a Product in a BCG quadrant, a competing
+    factor on the Blue Ocean curve) this is how a person adds directly from
+    the canvas. The box value is stored under the template's membership key,
+    so a product filed in a BCG quadrant and an Ansoff quadrant carries both.
+    Raises ValueError on a blank name, an unknown box, a wrong type, or no
+    active organisation — surfaced to the person, never swallowed.
+    """
+    name = (name or "").strip()
+    if not name:
+        raise ValueError("A name is required.")
+    if not organization_id:
+        raise ValueError("An organisation is required.")
+
+    tpl = _template(template_key)
+    zone = next((z for z in tpl["zones"] if z["box_key"] == box_key), None)
+    if zone is None:
+        raise ValueError(f"{template_key!r} has no box {box_key!r}.")
+    if zone["membership"] != "type_profile":
+        raise ValueError(f"Box {box_key!r} is not one an element can be added to.")
+
+    chosen_type = element_type or zone["element_types"][0]
+    if chosen_type not in zone["element_types"]:
+        raise ValueError(
+            f"Box {box_key!r} holds {zone['element_types']}, not {chosen_type!r}."
+        )
+
+    from app import db
+    from app.services.archimate_backbone import create_backbone_element
+    from app.services.composer_export_formats import canvas_profile_key
+
+    element = create_backbone_element(
+        element_type=chosen_type,
+        layer=_LAYER_FOR_TYPE.get(chosen_type, "Business").capitalize(),
+        name=name,
+        organization_id=organization_id,
+        provenance={"source_model": "strategy_canvas", "framework": template_key},
+    )
+    props = dict(element.acm_properties or {})
+    props[canvas_profile_key(template_key)] = zone["profile"]
+    props["framework"] = template_key
+    # The Blue Ocean value curve reads a competing factor's player and 0–10
+    # level off the element; both are plain values, never a derived score.
+    if offering_level not in (None, ""):
+        try:
+            props["offering_level"] = max(0, min(10, int(offering_level)))
+        except (TypeError, ValueError):
+            raise ValueError("Offering level must be a whole number from 0 to 10.")
+    if player:
+        props["player"] = player.strip()
+    element.acm_properties = props  # untyped-property-write-ok: canvas membership reads the raw profile string (composer_export_formats.canvas_box_for_element), not a typed {"value":...} entry
+    db.session.flush()
+    return {"element_id": element.id, "box_key": box_key, "name": name}
 
 
 def resolve_citations(

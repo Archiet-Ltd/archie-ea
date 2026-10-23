@@ -2,40 +2,69 @@
 {% from 'components/page_header.html' import page_header %}
 
 {#
-  One box of the framework. Renders, in order:
-   - the box label;
-   - every accepted point, each with its citation footer (every citation a
-     link that lands on a page with content, or the labelled website profile);
-   - the proposals drafted for this box (accept / edit / reject), shown only
-     after "Draft from my model" has run;
-   - an empty hint with its own "Draft from my model" when the box is empty.
-  Structure only here; behaviour is in strategy/canvas.js.
+  The one canvas view for every strategy framework. The arrangement of the
+  boxes is chosen by the template's `layout` hint (grid_2x2, columns, table,
+  circles, forces, curve); the box contents are the same macro everywhere, so
+  there is one renderer, not one per framework. Behaviour (draft, accept,
+  reject, add) is in strategy/canvas.js.
+
+  Layer colours are mapped to fully-spelled Tailwind classes below rather than
+  built from `zone.colour` in the markup, so every class a box uses exists in
+  the built stylesheet (a class assembled in Jinja is never generated).
 #}
+
+{# layer name -> {border, badge background, badge text} static classes #}
+{% set LAYER_BORDER = {
+  'motivation': 'border-layer-motivation',
+  'strategy': 'border-layer-strategy',
+  'business': 'border-layer-business',
+  'application': 'border-layer-application',
+  'technology': 'border-layer-technology',
+  'implementation': 'border-layer-implementation',
+  'composite': 'border-border',
+} %}
+{% set LAYER_TEXT = {
+  'motivation': 'text-layer-motivation-emphasis',
+  'strategy': 'text-layer-strategy-emphasis',
+  'business': 'text-layer-business-emphasis',
+  'application': 'text-layer-application-emphasis',
+  'technology': 'text-layer-technology-emphasis',
+  'implementation': 'text-layer-implementation-emphasis',
+  'composite': 'text-foreground',
+} %}
+
 {% macro strategy_box(zone, points) %}
 <section data-testid="strategy-box-{{ zone.box_key }}" data-box-key="{{ zone.box_key }}"
-         class="flex flex-col rounded-lg border border-border bg-card p-4 min-w-[280px]">
+         class="flex flex-col rounded-lg border {{ LAYER_BORDER.get(zone.colour, 'border-border') }} bg-card p-4 min-w-[260px] h-full">
   <div class="flex items-center justify-between gap-2 mb-3">
     <h2 class="text-sm font-semibold text-foreground">{{ zone.label }}</h2>
-    <span class="inline-flex items-center rounded-full border border-layer-{{ zone.colour }} bg-layer-{{ zone.colour }}/10 px-2 py-0.5 text-xs text-layer-{{ zone.colour }}-emphasis"
+    <span class="inline-flex items-center rounded-full border {{ LAYER_BORDER.get(zone.colour, 'border-border') }} px-2 py-0.5 text-xs {{ LAYER_TEXT.get(zone.colour, 'text-foreground') }}"
           data-testid="strategy-box-count-{{ zone.box_key }}" x-text="boxCount('{{ zone.box_key }}')"></span>
   </div>
 
-  {# Accepted points — server-rendered, plus any accepted this session. #}
-  <ul class="space-y-2" data-testid="strategy-accepted-{{ zone.box_key }}">
+  {# Filed points / elements — server-rendered, plus any accepted this session. #}
+  <ul class="space-y-2" data-testid="strategy-filed-{{ zone.box_key }}">
     {% for item in points %}
     <li class="rounded-md border border-border p-3" data-testid="strategy-point" data-element-id="{{ item.id }}">
-      <p class="text-sm text-foreground">{{ item.point }}</p>
+      {% if item.detail_href %}
+      <a href="{{ item.detail_href }}" data-testid="strategy-point-link"
+         class="text-sm text-foreground underline hover:text-primary">{{ item.name or item.point }}</a>
+      {% else %}
+      <p class="text-sm text-foreground">{{ item.name or item.point }}</p>
+      {% endif %}
+      {% if item.citations is defined and item.citations %}
       <div class="mt-2 flex flex-wrap items-center gap-2 text-xs" data-testid="strategy-citations">
         <span class="text-muted-foreground">Cited:</span>
         {% for citation in item.citations %}
           {% if citation.href %}
           <a href="{{ citation.href }}" data-testid="strategy-citation-link"
-             class="underline text-foreground hover:text-info">{{ citation.label }}</a>
+             class="underline text-foreground hover:text-primary">{{ citation.label }}</a>
           {% else %}
           <span class="text-foreground" data-testid="strategy-citation-text">{{ citation.label }}</span>
           {% endif %}
         {% endfor %}
       </div>
+      {% endif %}
     </li>
     {% endfor %}
     {# Points accepted this session, without a reload. #}
@@ -44,70 +73,98 @@
         <p class="text-sm text-foreground" x-text="item.point"></p>
         <div class="mt-2 flex flex-wrap items-center gap-2 text-xs" data-testid="strategy-citations">
           <span class="text-muted-foreground">Cited:</span>
-          <template x-for="c in item.citations" :key="c.label">
-            <template x-if="c.href">
-              <a :href="c.href" data-testid="strategy-citation-link"
-                 class="underline text-foreground hover:text-info" x-text="c.label"></a>
-            </template>
-          </template>
-          <template x-for="c in item.citations" :key="'t-' + c.label">
-            <template x-if="!c.href">
-              <span class="text-foreground" data-testid="strategy-citation-text" x-text="c.label"></span>
-            </template>
+          <template x-for="(c, ci) in item.citations" :key="ci">
+            <span>
+              <template x-if="c.href"><a :href="c.href" data-testid="strategy-citation-link" class="underline text-foreground hover:text-primary" x-text="c.label"></a></template>
+              <template x-if="!c.href"><span class="text-foreground" data-testid="strategy-citation-text" x-text="c.label"></span></template>
+            </span>
           </template>
         </div>
       </li>
     </template>
   </ul>
 
+  {% if draftable %}
   {# Proposals drafted for this box — accept / edit / reject. #}
   <ul class="mt-2 space-y-2" data-testid="strategy-proposals-{{ zone.box_key }}">
     <template x-for="(proposal, index) in proposals['{{ zone.box_key }}']" :key="index">
       <li class="rounded-md border border-dashed border-border p-3" data-testid="strategy-proposal">
+        <label class="sr-only">Proposed point</label>
         <textarea rows="2" x-model="proposal.point" data-testid="strategy-proposal-text"
           class="w-full rounded-md border border-input bg-background px-2 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring resize-y"></textarea>
         <div class="mt-2 flex flex-wrap items-center gap-2 text-xs">
           <span class="text-muted-foreground">Cited:</span>
-          <template x-for="c in proposal.citations" :key="c.label">
+          <template x-for="(c, ci) in proposal.citations" :key="ci">
             <span class="text-foreground" data-testid="strategy-proposal-citation" x-text="c.label"></span>
           </template>
         </div>
         <div class="mt-2 flex items-center gap-2">
           <button type="button" @click="acceptProposal('{{ zone.box_key }}', index)"
-            data-testid="strategy-accept"
-            class="inline-flex items-center gap-1 rounded-md bg-primary text-primary-foreground text-xs font-medium px-2.5 py-1 hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+            :disabled="proposal.saving" data-testid="strategy-accept"
+            class="inline-flex items-center gap-1 rounded-md bg-primary text-primary-foreground text-xs font-medium px-2.5 py-1 hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50 disabled:pointer-events-none">
             Accept
           </button>
           <button type="button" @click="rejectProposal('{{ zone.box_key }}', index)"
-            data-testid="strategy-reject"
-            class="inline-flex items-center gap-1 rounded-md border border-input bg-background text-xs font-medium px-2.5 py-1 hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+            :disabled="proposal.saving" data-testid="strategy-reject"
+            class="inline-flex items-center gap-1 rounded-md border border-input bg-background text-xs font-medium px-2.5 py-1 hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50 disabled:pointer-events-none">
             Reject
           </button>
         </div>
+        <p x-show="proposal.error" x-cloak class="mt-1 text-xs text-destructive-emphasis" x-text="proposal.error" data-testid="strategy-proposal-error"></p>
       </li>
     </template>
   </ul>
+  {% endif %}
 
-  {# Empty hint — why it is empty, and the next step, inside the box. #}
+  {# Empty hint — why it is empty, and the next step, said in the box. #}
   <div x-show="isBoxEmpty('{{ zone.box_key }}')" x-cloak class="mt-2"
        data-testid="strategy-empty-{{ zone.box_key }}">
-    <p class="text-xs text-muted-foreground mb-2">Nothing here yet. Draft from your model to propose points for this box.</p>
+    <p class="text-xs text-muted-foreground mb-2">{{ empty_reasons[zone.box_key] }}</p>
+    {% if draftable %}
     <button type="button" @click="draft()" :disabled="drafting"
       data-testid="strategy-draft-box-{{ zone.box_key }}"
       class="inline-flex items-center gap-1 rounded-md border border-input bg-background text-xs font-medium px-2.5 py-1 hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50 disabled:pointer-events-none">
       <i data-lucide="sparkles" class="h-3 w-3" aria-hidden="true"></i>
       Draft from my model
     </button>
+    {% endif %}
   </div>
+
+  {# Add directly to this box — only when the person may write and the box
+     takes an element (a quadrant, a factor, a force), through the one role
+     helper. A read-only viewer is shown no form. #}
+  {% if can_edit_strategy(current_user) and zone.membership == 'type_profile' %}
+  <form method="post" action="{{ url_for('strategy.add', template_key=framework_key) }}"
+        class="mt-3 border-t border-border pt-3 space-y-2" data-testid="strategy-add-form-{{ zone.box_key }}">
+    {{ csrf_field() if csrf_field is defined }}
+    <input type="hidden" name="box_key" value="{{ zone.box_key }}">
+    <input type="hidden" name="element_type" value="{{ zone.element_types[0] }}">
+    <label class="block text-xs text-muted-foreground" for="add-{{ zone.box_key }}">Add to {{ zone.label }}</label>
+    <input id="add-{{ zone.box_key }}" name="name" required
+           class="w-full rounded-md border border-input bg-background px-2 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+           placeholder="Name">
+    {% if framework_key == 'blue_ocean_strategy' and zone.box_key == 'competing_factors' %}
+    <input name="player" class="w-full rounded-md border border-input bg-background px-2 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" placeholder="Player (optional)">
+    <input name="offering_level" type="number" min="0" max="10" class="w-full rounded-md border border-input bg-background px-2 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" placeholder="Offering level 0-10">
+    {% endif %}
+    <button type="submit" data-testid="strategy-add-submit-{{ zone.box_key }}"
+      class="inline-flex items-center gap-1 rounded-md bg-primary text-primary-foreground text-xs font-medium px-2.5 py-1 hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+      Add
+    </button>
+  </form>
+  {% endif %}
 </section>
 {% endmacro %}
 
 {% block title %}{{ framework_name }}{% endblock %}
 
 {% block content %}
+{% set zone_by_key = {} %}
+{% for z in zones %}{% set _ = zone_by_key.update({z.box_key: z}) %}{% endfor %}
 <div class="flex-1 overflow-auto"
      x-data='strategyCanvas({
        framework: {{ framework_key | tojson }},
+       draftable: {{ draftable | tojson }},
        draftUrl: {{ url_for("strategy.draft", template_key=framework_key) | tojson }},
        acceptUrl: {{ url_for("strategy.accept", template_key=framework_key) | tojson }},
        boxKeys: {{ zones | map(attribute="box_key") | list | tojson }},
@@ -116,7 +173,7 @@
 
   {{ page_header(
       title=framework_name,
-      description='Drafted from your own model and website profile, each point cited to the record it came from. Accept, edit or reject each one; accepted points are saved to your model.',
+      description='Filled from your own model, each point cited to the record it came from. Accept, edit or reject a drafted point; accepted points are saved to your model.',
       breadcrumbs=[
           {'label': 'Home', 'href': url_for('main.index')},
           {'label': 'Strategy frameworks', 'href': url_for('strategy.index')},
@@ -125,39 +182,46 @@
   ) }}
 
   <div class="p-6 space-y-4">
-    <div class="flex items-center gap-3">
+    {# A failed add is shown here, never swallowed. #}
+    {% if request.args.get('add_error') %}
+    <div class="rounded-md border border-destructive bg-card p-3 text-sm text-destructive-emphasis" data-testid="strategy-add-error" role="alert">
+      {{ request.args.get('add_error') }}
+    </div>
+    {% endif %}
+
+    <div class="flex flex-wrap items-center gap-3">
+      {% if draftable %}
       <button type="button" @click="draft()" :disabled="drafting"
         data-testid="strategy-draft"
         class="inline-flex items-center gap-2 rounded-md bg-primary text-primary-foreground text-sm font-medium px-4 py-2 hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50 disabled:pointer-events-none">
         <span x-show="drafting" x-cloak class="animate-spin h-4 w-4 border-2 border-current border-t-transparent rounded-full inline-block"></span>
         <i data-lucide="sparkles" class="h-4 w-4" aria-hidden="true" x-show="!drafting"></i>
-        Draft from my model
+        <span x-text="drafting ? 'Drafting…' : 'Draft from my model'">Draft from my model</span>
       </button>
       <span x-show="draftError" x-cloak data-testid="strategy-draft-error"
             class="text-sm text-destructive-emphasis" x-text="draftError"></span>
+      {% endif %}
+      {% if unclassified and layout in ('grid_2x2',) %}
+      <span class="text-sm text-muted-foreground" data-testid="strategy-unclassified">{{ unclassified }} not yet classified</span>
+      {% endif %}
     </div>
 
-    {% if framework_key == 'swot' %}
-    {# 2x2 — strengths/weaknesses over opportunities/threats. Two columns at
-       every width; at 390px the row scrolls sideways rather than stacking, so
-       the recognisable square is kept. #}
-    <div class="overflow-x-auto" data-testid="strategy-grid-swot">
-      <div class="grid grid-cols-2 gap-4 min-w-[600px]">
-        {% for zone in zones %}
-          {{ strategy_box(zone, boxes[zone.box_key]) }}
-        {% endfor %}
-      </div>
-    </div>
+    {# Dispatch on the template's layout hint to the one arrangement for that
+       shape. Each is a literal include so the reference is resolvable. #}
+    {% if layout == 'grid_2x2' %}
+      {% include 'strategy/_layout_grid_2x2.html' %}
+    {% elif layout == 'columns' %}
+      {% include 'strategy/_layout_columns.html' %}
+    {% elif layout == 'table' %}
+      {% include 'strategy/_layout_table.html' %}
+    {% elif layout == 'circles' %}
+      {% include 'strategy/_layout_circles.html' %}
+    {% elif layout == 'forces' %}
+      {% include 'strategy/_layout_forces.html' %}
+    {% elif layout == 'curve' %}
+      {% include 'strategy/_layout_curve.html' %}
     {% else %}
-    {# PESTLE — six labelled columns. One row of six; at 390px it scrolls
-       sideways rather than stacking into one column. #}
-    <div class="overflow-x-auto" data-testid="strategy-grid-pestle">
-      <div class="grid grid-flow-col auto-cols-[minmax(280px,1fr)] gap-4 min-w-[1740px]">
-        {% for zone in zones %}
-          {{ strategy_box(zone, boxes[zone.box_key]) }}
-        {% endfor %}
-      </div>
-    </div>
+      {% include 'strategy/_layout_grid.html' %}
     {% endif %}
   </div>
 </div>
@@ -165,4 +229,9 @@
 
 {% block extra_head_js %}
 <script src="{{ url_for('static', filename='js/strategy/canvas.js') }}"></script>
+{% if layout == 'curve' %}
+<script src="{{ url_for('static', filename='vendor/chart.umd.min.js') }}"></script>
+<script src="{{ url_for('static', filename='js/shared/css_color_tokens.js') }}"></script>
+<script src="{{ url_for('static', filename='js/strategy/value_curve.js') }}"></script>
+{% endif %}
 {% endblock %}

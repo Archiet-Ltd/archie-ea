@@ -367,6 +367,30 @@ def can_edit_capabilities(user) -> bool:
         return False
 
 
+def can_edit_strategy(user) -> bool:
+    """True when the user may add to or draft on a strategy framework canvas.
+
+    Mirrors the strategy canvas write routes' own rule, require_roles("admin",
+    "architect", "business_architect", "enterprise_architect"): an
+    administrator, or a user whose enterprise_role owns the strategy model.
+    The template renders the add form and the draft panel only when this is
+    true, so a read-only viewer is shown neither — one place the role is
+    decided, shared by the template gate and the route gate.
+    """
+    if not user:
+        return False
+    if is_admin(user):
+        return True
+    if get_user_role(user) in CAPABILITY_EDITOR_ROLES:
+        return True
+    try:
+        role = getattr(user, "role", None)
+        name = str(getattr(role, "name", "") or "").strip().lower()
+        return name == "architect"
+    except Exception:  # noqa: BLE001 - a template gate must not 500 a page
+        return False
+
+
 def can_retire_applications(user) -> bool:
     """True when the user may mark an application for retirement.
 
@@ -1208,6 +1232,7 @@ def role_access_context_processor():
     return {
         "can_access_section": can_access_section,
         "can_edit_capabilities": can_edit_capabilities,
+        "can_edit_strategy": can_edit_strategy,
         "can_retire_applications": can_retire_applications,
         "get_visible_sections": get_visible_sections,
         "is_admin": is_admin,
