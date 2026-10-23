@@ -14,7 +14,7 @@ from .. import db
 from ..models.application_portfolio import ApplicationComponent
 from ..models.models import ArchiMateElement, ArchiMateRelationship
 from ..models.requirements import Requirement
-from ..services.application_cost_accessor import set_annual_cost
+from ..services.application_cost_accessor import set_annual_cost, set_cost_column
 from ..utils.html_sanitizer import sanitize_html
 from ..utils.validators import (
     validate_application_name,
@@ -25,6 +25,9 @@ from ..utils.validators import (
 from . import application_mgmt
 from .forms import ApplicationComponentForm
 from .routes import _build_vendor_product_choices, _sync_vendor_products
+
+# Form fields that record an application cost; each is written with its cost fact.
+_FORM_COST_COLUMNS = ("license_cost_annual", "infrastructure_cost_monthly", "development_cost_annual")
 
 @application_mgmt.route("/applications/create", methods=["GET", "POST"])
 @login_required
@@ -312,6 +315,9 @@ def application_create():
             notes=form.notes.data,
         )
 
+        for _column in _FORM_COST_COLUMNS:
+            if getattr(form, _column).data is not None:
+                set_cost_column(app, _column, getattr(form, _column).data)
         if form.total_cost_of_ownership.data is not None:
             set_annual_cost(app, Decimal(str(form.total_cost_of_ownership.data)))
 
@@ -470,9 +476,9 @@ def application_edit(id):
         app.data_classification = form.data_classification.data
         app.master_data_source = form.master_data_source.data
         app.license_type = form.license_type.data
-        app.license_cost_annual = form.license_cost_annual.data
-        app.infrastructure_cost_monthly = form.infrastructure_cost_monthly.data
-        app.development_cost_annual = form.development_cost_annual.data
+        for _column in _FORM_COST_COLUMNS:
+            data = getattr(form, _column).data
+            set_cost_column(app, _column, data)
         app.maintenance_cost_annual = form.maintenance_cost_annual.data
         if form.total_cost_of_ownership.data is not None:
             set_annual_cost(app, Decimal(str(form.total_cost_of_ownership.data)))

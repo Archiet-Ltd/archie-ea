@@ -2216,22 +2216,32 @@ def render_application_detail(id):
     }
 
     # --- Financial metrics ---
+    # Costs come from the cost fact store (reporting currency); a cost with no
+    # fact, or no exchange rate, shows as 0 in the cards as before.
+    from app.services.application_cost_accessor import get_costs_by_column
+
+    _costs = get_costs_by_column(app_obj)
+
+    def _c(column):
+        return float(_costs.get(column) or 0)
+
     def _f(attr):
         return float(getattr(app_obj, attr, None) or 0)
 
     cost_breakdown = {
-        "license_annual": _f("license_cost_annual"),
-        "infrastructure_monthly": _f("infrastructure_cost_monthly"),
-        "infrastructure_annual": _f("infrastructure_cost_monthly") * 12,
-        "development_annual": _f("development_cost_annual"),
-        "maintenance_annual": _f("maintenance_cost"),
-        "total_tco": _f("total_cost_of_ownership"),
+        "license_annual": _c("license_cost_annual"),
+        "infrastructure_monthly": _c("infrastructure_cost_monthly"),
+        "infrastructure_annual": _c("infrastructure_cost_monthly") * 12,
+        "development_annual": _c("development_cost_annual"),
+        "maintenance_annual": _c("maintenance_cost"),
+        "total_tco": _c("total_cost_of_ownership"),
         "calculated_total": (
-            _f("license_cost_annual")
-            + _f("infrastructure_cost_monthly") * 12
-            + _f("development_cost_annual")
-            + _f("maintenance_cost")
+            _c("license_cost_annual")
+            + _c("infrastructure_cost_monthly") * 12
+            + _c("development_cost_annual")
+            + _c("maintenance_cost")
         ),
+        "has_cost": bool(_costs.get("total_cost_of_ownership") or _costs.get("license_cost_annual")),
     }
 
     health_metrics = {

@@ -96,6 +96,10 @@ EXPECTED = {
         "app.models.application_portfolio.ApplicationComponent",
         "app.models.enterprise_intelligence.ApplicationCost",
     ],
+    "application annual cost": [
+        "app.models.application_portfolio.ApplicationComponent",
+        "app.models.cost_fact.CostFact",
+    ],
     "contracts": [
         "app.models.application_portfolio.VendorContract",
         "app.models.archimate_business.Contract",
@@ -672,3 +676,52 @@ def test_work_packages_concept_reports_one_unmerged_retired_row(
     assert "[retired-store-unmerged]" in findings[0]
     assert "orm:RoadmapWorkPackage(unmerged)" in findings[0]
     assert "1 row(s)" in findings[0]
+
+
+def test_application_annual_cost_concept_fails_on_drift_and_passes_when_in_step(
+        app, db_session, make_org, tenant_ctx):
+    """The annual-cost column and its cost fact must hold the same applications,
+    for each organisation separately."""
+    from app.models.application_portfolio import ApplicationComponent
+    from app.services.application_cost_accessor import set_annual_cost
+    from app.services.cost_fact_store import clear_facts
+
+    concept = "application annual cost"
+    results = {}
+    for slug, applications in (("cost-agree-a", 2), ("cost-agree-b", 3)):
+        org = make_org(slug)
+        user = _make_user(db_session, org)
+        rows = []
+        for i in range(applications):
+            row = ApplicationComponent(
+                name="Costed %s %s" % (i, uuid.uuid4().hex[:6]), organization_id=org.id)
+            db_session.add(row)
+            db_session.flush()
+            set_annual_cost(row, 1000 + i)
+            rows.append(row)
+        db_session.flush()
+        findings, notes, observations = _live_findings(
+            app, tenant_ctx, org.id, user, [concept], http=False)
+        assert findings == [], (slug, findings, notes)
+        assert {r[0]: r[1] for r in observations[concept]} == {
+            "orm:ApplicationComponent(total cost column)": applications,
+            "orm:CostFact(application annual cost)": applications}
+        results[slug] = (org, user, rows)
+
+    # Drift in organisation A only: the column still holds a cost, its fact is gone.
+    org_a, user_a, rows_a = results["cost-agree-a"]
+    with tenant_ctx(org_a.id):
+        clear_facts(org_a.id, "application", rows_a[0].id, "application_cost_accessor",
+                    source_id="%s:total_cost_of_ownership" % rows_a[0].id)
+    db_session.flush()
+    findings, _notes, _obs = _live_findings(
+        app, tenant_ctx, org_a.id, user_a, [concept], http=False)
+    assert len(findings) == 1 and "[store-disagreement]" in findings[0], findings
+    assert "orm:ApplicationComponent(total cost column)=2" in findings[0]
+    assert "orm:CostFact(application annual cost)=1" in findings[0]
+
+    # Organisation B is untouched by A's drift.
+    org_b, user_b, _rows_b = results["cost-agree-b"]
+    findings, _notes, _obs = _live_findings(
+        app, tenant_ctx, org_b.id, user_b, [concept], http=False)
+    assert findings == [], findings

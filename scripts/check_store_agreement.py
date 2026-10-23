@@ -513,6 +513,22 @@ CONCEPTS = {
                 filter_eq={"element_type": "application"},
                 distinct="element_id"),
     ],
+    # The application cost screens read the cost fact store; the annual-cost
+    # column they used to read is still written beside it. Both must hold the
+    # same applications, or a screen would show a cost the column does not (or
+    # the reverse). The fact filter is the fact the accessor writes for the
+    # annual total, not the fiscal-period facts the backfill adds.
+    "application annual cost": [
+        Surface("orm:ApplicationComponent(total cost column)", "orm",
+                "app.models.application_portfolio.ApplicationComponent",
+                filter_not_null="total_cost_of_ownership"),
+        Surface("orm:CostFact(application annual cost)", "orm",
+                "app.models.cost_fact.CostFact",
+                filter_eq={"element_type": "application", "category": "total",
+                           "source": "application_cost_accessor",
+                           "kind": "actual", "period": "annual"},
+                distinct="element_id"),
+    ],
     # /procurement/contracts renders VendorContract for the organisation as
     # HTML; its query is the orm:VendorContract surface.
     "contracts": [

@@ -100,6 +100,7 @@ class TestCostAccessorBasics:
             app_comp = ApplicationComponent(name="Test App", organization_id=org.id, total_cost_of_ownership=50000)
             db_session.add(app_comp)
             db_session.commit()
+            set_annual_cost(app_comp, 50000)  # recorded through the accessor, so the cost fact exists
 
             set_annual_cost(app_comp, None)
             db_session.commit()
@@ -403,6 +404,7 @@ class TestApplyCostGuard:
             app_comp = ApplicationComponent(name="Test App", organization_id=org.id, total_cost_of_ownership=50000)
             db_session.add(app_comp)
             db_session.commit()
+            set_annual_cost(app_comp, 50000)  # recorded through the accessor, so the cost fact exists
 
             # Missing key — should not clear
             apply_cost_to_application(app_comp, {})
@@ -415,6 +417,7 @@ class TestApplyCostGuard:
             app_comp = ApplicationComponent(name="Test App", organization_id=org.id, total_cost_of_ownership=50000)
             db_session.add(app_comp)
             db_session.commit()
+            set_annual_cost(app_comp, 50000)  # recorded through the accessor, so the cost fact exists
 
             # Only license cost — should not clear TCO
             apply_cost_to_application(app_comp, {"license_cost_annual": Decimal("30000")})
@@ -427,6 +430,7 @@ class TestApplyCostGuard:
             app_comp = ApplicationComponent(name="Test App", organization_id=org.id, total_cost_of_ownership=50000)
             db_session.add(app_comp)
             db_session.commit()
+            set_annual_cost(app_comp, 50000)  # recorded through the accessor, so the cost fact exists
 
             apply_cost_to_application(app_comp, {"total_cost_of_ownership": Decimal("75000")})
             db_session.commit()
@@ -476,6 +480,7 @@ class TestCurrencyRejection:
             existing = ApplicationComponent(name="Existing", organization_id=org.id, total_cost_of_ownership=50000)
             db_session.add(existing)
             db_session.flush()
+            set_annual_cost(existing, 50000)  # recorded through the accessor, so the cost fact exists
 
             import_app = BatchImportApplication(
                 batch_id=1, row_number=1,
@@ -558,6 +563,7 @@ class TestWritePathIntegration:
             existing = ApplicationComponent(name="Existing", organization_id=org.id, total_cost_of_ownership=50000)
             db_session.add(existing)
             db_session.commit()
+            set_annual_cost(existing, 50000)  # recorded through the accessor, so the cost fact exists
 
             row = {"name": "Existing Updated"}
             columns = ["name"]
@@ -576,6 +582,7 @@ class TestWritePathIntegration:
             existing = ApplicationComponent(name="Existing", organization_id=org.id, total_cost_of_ownership=50000)
             db_session.add(existing)
             db_session.commit()
+            set_annual_cost(existing, 50000)  # recorded through the accessor, so the cost fact exists
 
             row = {"name": "Existing Updated", "tco": "75000"}
             columns = ["name", "tco"]
@@ -595,6 +602,7 @@ class TestWritePathIntegration:
             existing = ApplicationComponent(name="Existing", organization_id=org.id, total_cost_of_ownership=50000)
             db_session.add(existing)
             db_session.flush()
+            set_annual_cost(existing, 50000)  # recorded through the accessor, so the cost fact exists
 
             import_app = BatchImportApplication(
                 batch_id=1, row_number=1,

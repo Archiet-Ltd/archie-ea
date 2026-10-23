@@ -21,6 +21,7 @@ import logging
 from typing import Any, Dict
 
 from app.modules.ai_chat.services.llm_service_impl import LLMService
+from app.services.application_cost_accessor import get_annual_cost
 
 logger = logging.getLogger(__name__)
 
@@ -45,6 +46,11 @@ class ApplicationHealthAIError(Exception):
     """
 
 
+def _annual_cost_or_none(app):
+    cost = get_annual_cost(app)
+    return None if cost is None else float(cost)
+
+
 def _build_context(app) -> Dict[str, Any]:
     """Assemble only the context this function actually reads.
 
@@ -58,7 +64,7 @@ def _build_context(app) -> Dict[str, Any]:
         "health_status": app.health_status or None,
         "business_criticality": app.business_criticality or None,
         "deployment_status": app.deployment_status or None,
-        "total_cost_of_ownership": app.total_cost_of_ownership,
+        "total_cost_of_ownership": _annual_cost_or_none(app),
     }
 
     vendor_product = getattr(app, "primary_vendor_product", None)

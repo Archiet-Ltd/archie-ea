@@ -18,7 +18,7 @@ from datetime import date
 from typing import Any, Dict, List, Optional
 
 from app import db
-from app.services.application_cost_accessor import get_annual_cost
+from app.services.application_cost_accessor import get_annual_cost, get_cost_by_column
 
 
 # The fields that a well-governed application record should carry. Weighted so
@@ -224,7 +224,7 @@ def build_fact_sheet(app: Any) -> Dict[str, Any]:
     """Assemble the full fact sheet for one ApplicationComponent instance."""
     org_id = getattr(app, "organization_id", None)
     annual_cost = get_annual_cost(app)
-    license_cost = getattr(app, "license_cost_annual", None)
+    license_cost = get_cost_by_column(app, "license_cost_annual")
     from app.models.application_owner import ApplicationOwner  # noqa: PLC0415
 
     application_owners = ApplicationOwner.get_display_rows_for_application(app.id, org_id) if org_id else []

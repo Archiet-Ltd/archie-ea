@@ -64,15 +64,60 @@ def get_annual_cost(app: ApplicationComponent) -> Optional[Decimal]:
     Return the application's annual cost as Decimal, or None if not recorded.
 
     All screens, reports and exports that need "the annual cost of this
-    application" must call this.
+    application" must call this. For a stored application the answer comes
+    from the cost fact store, in the organisation's reporting currency; None
+    also means the amount is in a currency with no exchange rate on file.
     """
-    value = getattr(app, _ANNUAL_COST_COLUMN, None)
-    if value is None:
-        return None
-    try:
-        return Decimal(str(value))
-    except (InvalidOperation, ValueError, TypeError):
-        return None
+    return get_cost_by_column(app, _ANNUAL_COST_COLUMN)
+
+
+def get_cost_by_column(app: ApplicationComponent, column: str) -> Optional[Decimal]:
+    """One of the application's recorded costs (a ``FACT_COLUMNS`` key), read
+    from the cost fact store and converted to the reporting currency.
+
+    A new application that has not been flushed has no fact yet (the fact is
+    written when it gets its id), so only that case reads the column.
+    """
+    return get_costs_by_column(app).get(column)
+
+
+def get_costs_by_column(app: ApplicationComponent) -> Dict[str, Optional[Decimal]]:
+    """Every ``FACT_COLUMNS`` cost of the application in one store read."""
+    if app.id is None or app.organization_id is None:
+        out: Dict[str, Optional[Decimal]] = {}
+        for column in FACT_COLUMNS:
+            raw = getattr(app, column, None)
+            try:
+                out[column] = None if raw is None else Decimal(str(raw))
+            except (InvalidOperation, ValueError, TypeError):
+                out[column] = None
+        return out
+    return costs_by_application(app.organization_id, [app.id]).get(
+        app.id, {column: None for column in FACT_COLUMNS})
+
+
+def costs_by_application(organization_id: int, application_ids) -> Dict[int, Dict[str, Optional[Decimal]]]:
+    """``{application id: {column: amount}}`` for a page of applications, from
+    one query. Amounts are in the organisation's reporting currency; a column
+    with no fact, or whose currency has no rate for its period, is None."""
+    from app.services.cost_fact_store import list_facts
+    from app.services.currency_service import convert_total
+
+    ids = list(application_ids)
+    result = {i: {column: None for column in FACT_COLUMNS} for i in ids}
+    if not ids:
+        return result
+    by_source_id = {}
+    for fact in list_facts(organization_id, element_type=ELEMENT_APPLICATION, element_ids=ids):
+        if fact.source == FACT_SOURCE:
+            by_source_id[fact.source_id] = fact
+    reporting = get_reporting_currency(organization_id)
+    for app_id in ids:
+        for column in FACT_COLUMNS:
+            fact = by_source_id.get(f"{app_id}:{column}")
+            if fact is not None:
+                result[app_id][column] = convert_total([fact], reporting).amount
+    return result
 
 
 def get_annual_cost_float(app: ApplicationComponent) -> Optional[float]:
@@ -134,6 +179,19 @@ def set_annual_cost(app: ApplicationComponent, value: Optional[Decimal],
     """
     _write_column(app, _ANNUAL_COST_COLUMN, value)
     sync_cost_fact(app, _ANNUAL_COST_COLUMN, currency)
+
+
+def set_cost_column(app: ApplicationComponent, column: str, value: Any,
+                    currency: Optional[str] = None) -> None:
+    """Write one cost column and its cost fact together (``FACT_COLUMNS`` keys).
+
+    The same rules as ``set_annual_cost``: None clears, a negative or
+    unparseable value is treated as not recorded, never stored as 0.
+    """
+    if column not in FACT_COLUMNS:
+        raise ValueError(f"{column} is not an application cost column")
+    _write_column(app, column, value)
+    sync_cost_fact(app, column, currency)
 
 
 def _write_column(app: ApplicationComponent, column: str, value: Any) -> None:

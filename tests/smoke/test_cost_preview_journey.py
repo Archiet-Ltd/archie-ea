@@ -165,3 +165,37 @@ def test_cost_preview_journey(browser, live_server, seeded):
     expect(tco_card.first).to_be_visible(timeout=PAGE_TIMEOUT)
 
     context.close()
+
+def test_application_cost_page_shows_the_recorded_cost_fact(browser, live_server, seeded):
+    """The application's cost page shows the cost fact: a column that has
+    drifted from its fact does not change what the portfolio manager sees."""
+    from decimal import Decimal
+    from app import create_app, db
+    from app.models.application_portfolio import ApplicationComponent
+    from app.services.application_cost_accessor import set_annual_cost
+
+    verifier = create_app("testing")
+    with verifier.app_context():
+        app_comp = ApplicationComponent(
+            name="CostFactApp %s" % uuid.uuid4().hex[:6],
+            organization_id=seeded["ids"]["org"],
+        )
+        db.session.add(app_comp)
+        db.session.flush()
+        set_annual_cost(app_comp, Decimal("61234"))
+        db.session.commit()
+        app_comp.total_cost_of_ownership = Decimal("99999")  # drift: column only
+        db.session.commit()
+        app_id = app_comp.id
+
+    context = browser.new_context(ignore_https_errors=True, viewport={"width": 1920, "height": 1080})
+    page = context.new_page()
+    _login(page, live_server, seeded["emails"]["portfolio_manager"])
+    page.goto(live_server + "/applications/%d?tab=cost" % app_id,
+              wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    page.wait_for_timeout(2000)
+    card = page.locator('[data-slot="card"]:has-text("Total cost of ownership")').first
+    expect(card).to_be_visible(timeout=PAGE_TIMEOUT)
+    expect(card).to_contain_text("61,234")
+    assert "99,999" not in page.content()
+    context.close()
