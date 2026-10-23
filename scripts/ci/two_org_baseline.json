@@ -1,0 +1,745 @@
+{
+  "_comment": "Dated, accountable ratchet for two-organisation coverage. Each entry under 'accepted_uncovered' is a NON-startup route family that reads organisation data yet has no family-targeted two-organisation test today. An entry names the family, the brief (T-<area>-<n>) that will add its test, and the expiry date by which that test must exist. The gate requires the measured set of non-startup uncovered families to EQUAL the set of still-valid (not past expiry) accepted families: a family past its expiry fails naming family, brief and date; a newly uncovered family with no entry fails; a family that gained coverage must have its entry removed (the set can only shrink, never grow silently). Startup families (account, admin connectors, intelligence, applications, admin billing, admin team, dashboard) must always be 0 uncovered and can NEVER be excused by an entry. The Investment Analysis cross-organisation leak surfaces here as the vendor_analysis and advanced_tco families, time-boxed to T-qa-22.",
+  "accepted_uncovered": [
+    {
+      "family": "abacus_consolidation",
+      "brief": "T-qa-23",
+      "expiry": "2027-06-30"
+    },
+    {
+      "family": "acm",
+      "brief": "T-qa-23",
+      "expiry": "2027-06-30"
+    },
+    {
+      "family": "adm_kanban",
+      "brief": "T-qa-23",
+      "expiry": "2027-06-30"
+    },
+    {
+      "family": "adm_kanban_v2",
+      "brief": "T-qa-23",
+      "expiry": "2027-06-30"
+    },
+    {
+      "family": "admin_security",
+      "brief": "T-qa-23",
+      "expiry": "2027-06-30"
+    },
+    {
+      "family": "adrs",
+      "brief": "T-qa-23",
+      "expiry": "2027-06-30"
+    },
+    {
+      "family": "advanced_tco",
+      "brief": "T-qa-22",
+      "expiry": "2027-03-31"
+    },
+    {
+      "family": "agent_registry",
+      "brief": "T-qa-23",
+      "expiry": "2027-06-30"
+    },
+    {
+      "family": "ai",
+      "brief": "T-qa-23",
+      "expiry": "2027-06-30"
+    },
+    {
+      "family": "ai_assistance",
+      "brief": "T-qa-23",
+      "expiry": "2027-06-30"
+    },
+    {
+      "family": "ai_data_interaction",
+      "brief": "T-qa-23",
+      "expiry": "2027-06-30"
+    },
+    {
+      "family": "ai_gap_detection",
+      "brief": "T-qa-23",
+      "expiry": "2027-06-30"
+    },
+    {
+      "family": "ai_systems_genome",
+      "brief": "T-qa-23",
+      "expiry": "2027-06-30"
+    },
+    {
+      "family": "api_pipeline",
+      "brief": "T-qa-23",
+      "expiry": "2027-06-30"
+    },
+    {
+      "family": "api_v1.capabilities_v1",
+      "brief": "T-qa-23",
+      "expiry": "2027-06-30"
+    },
+    {
+      "family": "api_v1.dashboard_v1",
+      "brief": "T-qa-23",
+      "expiry": "2027-06-30"
+    },
+    {
+      "family": "api_v1.enterprise_v1",
+      "brief": "T-qa-23",
+      "expiry": "2027-06-30"
+    },
+    {
+      "family": "api_v1.llm",
+      "brief": "T-qa-23",
+      "expiry": "2027-06-30"
+    },
+    {
+      "family": "api_v1.mappings_v1",
+      "brief": "T-qa-23",
+      "expiry": "2027-06-30"
+    },
+    {
+      "family": "api_v1.vendors_v1",
+      "brief": "T-qa-23",
+      "expiry": "2027-06-30"
+    },
+    {
+      "family": "application_merging",
+      "brief": "T-qa-23",
+      "expiry": "2027-06-30"
+    },
+    {
+      "family": "apqc",
+      "brief": "T-qa-23",
+      "expiry": "2027-06-30"
+    },
+    {
+      "family": "apqc_hierarchy",
+      "brief": "T-qa-23",
+      "expiry": "2027-06-30"
+    },
+    {
+      "family": "arb",
+      "brief": "T-qa-23",
+      "expiry": "2027-06-30"
+    },
+    {
+      "family": "arb_conditions_api",
+      "brief": "T-qa-23",
+      "expiry": "2027-06-30"
+    },
+    {
+      "family": "arb_conditions_html",
+      "brief": "T-qa-23",
+      "expiry": "2027-06-30"
+    },
+    {
+      "family": "arb_workflow",
+      "brief": "T-qa-23",
+      "expiry": "2027-06-30"
+    },
+    {
+      "family": "archimate_api",
+      "brief": "T-qa-23",
+      "expiry": "2027-06-30"
+    },
+    {
+      "family": "archimate_crud",
+      "brief": "T-qa-23",
+      "expiry": "2027-06-30"
+    },
+    {
+      "family": "archimate_export",
+      "brief": "T-qa-23",
+      "expiry": "2027-06-30"
+    },
+    {
+      "family": "archimate_generation",
+      "brief": "T-qa-23",
+      "expiry": "2027-06-30"
+    },
+    {
+      "family": "archimate_layers",
+      "brief": "T-qa-23",
+      "expiry": "2027-06-30"
+    },
+    {
+      "family": "architect_ui",
+      "brief": "T-qa-23",
+      "expiry": "2027-06-30"
+    },
+    {
+      "family": "architecture",
+      "brief": "T-qa-23",
+      "expiry": "2027-06-30"
+    },
+    {
+      "family": "architecture_assistant",
+      "brief": "T-qa-23",
+      "expiry": "2027-06-30"
+    },
+    {
+      "family": "architecture_journey",
+      "brief": "T-qa-23",
+      "expiry": "2027-06-30"
+    },
+    {
+      "family": "ba_phase_b",
+      "brief": "T-qa-23",
+      "expiry": "2027-06-30"
+    },
+    {
+      "family": "batch_import_api",
+      "brief": "T-qa-23",
+      "expiry": "2027-06-30"
+    },
+    {
+      "family": "batch_import_view",
+      "brief": "T-qa-23",
+      "expiry": "2027-06-30"
+    },
+    {
+      "family": "batch_processing",
+      "brief": "T-qa-23",
+      "expiry": "2027-06-30"
+    },
+    {
+      "family": "business_architecture",
+      "brief": "T-qa-23",
+      "expiry": "2027-06-30"
+    },
+    {
+      "family": "business_case",
+      "brief": "T-qa-23",
+      "expiry": "2027-06-30"
+    },
+    {
+      "family": "business_model",
+      "brief": "T-qa-23",
+      "expiry": "2027-06-30"
+    },
+    {
+      "family": "capability_archimate",
+      "brief": "T-qa-23",
+      "expiry": "2027-06-30"
+    },
+    {
+      "family": "capability_governance",
+      "brief": "T-qa-23",
+      "expiry": "2027-06-30"
+    },
+    {
+      "family": "capability_management",
+      "brief": "T-qa-23",
+      "expiry": "2027-06-30"
+    },
+    {
+      "family": "capability_merge_report",
+      "brief": "T-qa-23",
+      "expiry": "2027-06-30"
+    },
+    {
+      "family": "capability_taxonomy",
+      "brief": "T-qa-23",
+      "expiry": "2027-06-30"
+    },
+    {
+      "family": "code_generation",
+      "brief": "T-qa-23",
+      "expiry": "2027-06-30"
+    },
+    {
+      "family": "codegen",
+      "brief": "T-qa-23",
+      "expiry": "2027-06-30"
+    },
+    {
+      "family": "communication_log",
+      "brief": "T-qa-23",
+      "expiry": "2027-06-30"
+    },
+    {
+      "family": "completeness",
+      "brief": "T-qa-23",
+      "expiry": "2027-06-30"
+    },
+    {
+      "family": "confidence_review",
+      "brief": "T-qa-23",
+      "expiry": "2027-06-30"
+    },
+    {
+      "family": "confidence_review_dashboard",
+      "brief": "T-qa-23",
+      "expiry": "2027-06-30"
+    },
+    {
+      "family": "consolidation",
+      "brief": "T-qa-23",
+      "expiry": "2027-06-30"
+    },
+    {
+      "family": "consolidation_list",
+      "brief": "T-qa-23",
+      "expiry": "2027-06-30"
+    },
+    {
+      "family": "coverage_matrix",
+      "brief": "T-qa-23",
+      "expiry": "2027-06-30"
+    },
+    {
+      "family": "cto_scorecard",
+      "brief": "T-qa-23",
+      "expiry": "2027-06-30"
+    },
+    {
+      "family": "data_architecture",
+      "brief": "T-qa-23",
+      "expiry": "2027-06-30"
+    },
+    {
+      "family": "data_governance",
+      "brief": "T-qa-23",
+      "expiry": "2027-06-30"
+    },
+    {
+      "family": "deprecation",
+      "brief": "T-qa-23",
+      "expiry": "2027-06-30"
+    },
+    {
+      "family": "dod_api",
+      "brief": "T-qa-23",
+      "expiry": "2027-06-30"
+    },
+    {
+      "family": "dod_ui",
+      "brief": "T-qa-23",
+      "expiry": "2027-06-30"
+    },
+    {
+      "family": "dynamic_dashboards",
+      "brief": "T-qa-23",
+      "expiry": "2027-06-30"
+    },
+    {
+      "family": "ea_phase_summary",
+      "brief": "T-qa-23",
+      "expiry": "2027-06-30"
+    },
+    {
+      "family": "enterprise",
+      "brief": "T-qa-23",
+      "expiry": "2027-06-30"
+    },
+    {
+      "family": "enterprise_api",
+      "brief": "T-qa-23",
+      "expiry": "2027-06-30"
+    },
+    {
+      "family": "enterprise_crud",
+      "brief": "T-qa-23",
+      "expiry": "2027-06-30"
+    },
+    {
+      "family": "enterprise_entity_api",
+      "brief": "T-qa-23",
+      "expiry": "2027-06-30"
+    },
+    {
+      "family": "enterprise_export",
+      "brief": "T-qa-23",
+      "expiry": "2027-06-30"
+    },
+    {
+      "family": "enterprise_genome",
+      "brief": "T-qa-23",
+      "expiry": "2027-06-30"
+    },
+    {
+      "family": "epic_bp",
+      "brief": "T-qa-23",
+      "expiry": "2027-06-30"
+    },
+    {
+      "family": "epic_ui_bp",
+      "brief": "T-qa-23",
+      "expiry": "2027-06-30"
+    },
+    {
+      "family": "error_events",
+      "brief": "T-qa-23",
+      "expiry": "2027-06-30"
+    },
+    {
+      "family": "flow_analytics",
+      "brief": "T-qa-23",
+      "expiry": "2027-06-30"
+    },
+    {
+      "family": "formula_register",
+      "brief": "T-qa-23",
+      "expiry": "2027-06-30"
+    },
+    {
+      "family": "framework_config",
+      "brief": "T-qa-23",
+      "expiry": "2027-06-30"
+    },
+    {
+      "family": "framework_config_ui",
+      "brief": "T-qa-23",
+      "expiry": "2027-06-30"
+    },
+    {
+      "family": "genome_coverage",
+      "brief": "T-qa-23",
+      "expiry": "2027-06-30"
+    },
+    {
+      "family": "genome_data",
+      "brief": "T-qa-23",
+      "expiry": "2027-06-30"
+    },
+    {
+      "family": "genome_drift",
+      "brief": "T-qa-23",
+      "expiry": "2027-06-30"
+    },
+    {
+      "family": "genome_roadmap",
+      "brief": "T-qa-23",
+      "expiry": "2027-06-30"
+    },
+    {
+      "family": "governance",
+      "brief": "T-qa-23",
+      "expiry": "2027-06-30"
+    },
+    {
+      "family": "governance_api",
+      "brief": "T-qa-23",
+      "expiry": "2027-06-30"
+    },
+    {
+      "family": "import_history",
+      "brief": "T-qa-23",
+      "expiry": "2027-06-30"
+    },
+    {
+      "family": "industry_apqc",
+      "brief": "T-qa-23",
+      "expiry": "2027-06-30"
+    },
+    {
+      "family": "integration",
+      "brief": "T-qa-23",
+      "expiry": "2027-06-30"
+    },
+    {
+      "family": "integration_contract_api",
+      "brief": "T-qa-23",
+      "expiry": "2027-06-30"
+    },
+    {
+      "family": "interface_register",
+      "brief": "T-qa-23",
+      "expiry": "2027-06-30"
+    },
+    {
+      "family": "issue_tracking",
+      "brief": "T-qa-23",
+      "expiry": "2027-06-30"
+    },
+    {
+      "family": "main.capability_framework",
+      "brief": "T-qa-23",
+      "expiry": "2027-06-30"
+    },
+    {
+      "family": "main.framework_management",
+      "brief": "T-qa-23",
+      "expiry": "2027-06-30"
+    },
+    {
+      "family": "maturity_management",
+      "brief": "T-qa-23",
+      "expiry": "2027-06-30"
+    },
+    {
+      "family": "metamodel_properties",
+      "brief": "T-qa-23",
+      "expiry": "2027-06-30"
+    },
+    {
+      "family": "modules_directory",
+      "brief": "T-qa-23",
+      "expiry": "2027-06-30"
+    },
+    {
+      "family": "motivation_api",
+      "brief": "T-qa-23",
+      "expiry": "2027-06-30"
+    },
+    {
+      "family": "organization",
+      "brief": "T-qa-23",
+      "expiry": "2027-06-30"
+    },
+    {
+      "family": "phase_a",
+      "brief": "T-qa-23",
+      "expiry": "2027-06-30"
+    },
+    {
+      "family": "phase_d",
+      "brief": "T-qa-23",
+      "expiry": "2027-06-30"
+    },
+    {
+      "family": "phase_f",
+      "brief": "T-qa-23",
+      "expiry": "2027-06-30"
+    },
+    {
+      "family": "phase_g",
+      "brief": "T-qa-23",
+      "expiry": "2027-06-30"
+    },
+    {
+      "family": "policy_monitoring",
+      "brief": "T-qa-23",
+      "expiry": "2027-06-30"
+    },
+    {
+      "family": "portfolio",
+      "brief": "T-qa-23",
+      "expiry": "2027-06-30"
+    },
+    {
+      "family": "prioritisation",
+      "brief": "T-qa-23",
+      "expiry": "2027-06-30"
+    },
+    {
+      "family": "procurement",
+      "brief": "T-qa-23",
+      "expiry": "2027-06-30"
+    },
+    {
+      "family": "review_queue",
+      "brief": "T-qa-23",
+      "expiry": "2027-06-30"
+    },
+    {
+      "family": "roadmap_builder",
+      "brief": "T-qa-23",
+      "expiry": "2027-06-30"
+    },
+    {
+      "family": "roadmap_outcome",
+      "brief": "T-qa-23",
+      "expiry": "2027-06-30"
+    },
+    {
+      "family": "sa_phase_c",
+      "brief": "T-qa-23",
+      "expiry": "2027-06-30"
+    },
+    {
+      "family": "security",
+      "brief": "T-qa-23",
+      "expiry": "2027-06-30"
+    },
+    {
+      "family": "service_status",
+      "brief": "T-qa-23",
+      "expiry": "2027-06-30"
+    },
+    {
+      "family": "sidebar_api",
+      "brief": "T-qa-23",
+      "expiry": "2027-06-30"
+    },
+    {
+      "family": "sidebar_mgmt",
+      "brief": "T-qa-23",
+      "expiry": "2027-06-30"
+    },
+    {
+      "family": "solution_archimate",
+      "brief": "T-qa-23",
+      "expiry": "2027-06-30"
+    },
+    {
+      "family": "solution_architect",
+      "brief": "T-qa-23",
+      "expiry": "2027-06-30"
+    },
+    {
+      "family": "solution_composer",
+      "brief": "T-qa-23",
+      "expiry": "2027-06-30"
+    },
+    {
+      "family": "solution_design",
+      "brief": "T-qa-23",
+      "expiry": "2027-06-30"
+    },
+    {
+      "family": "solution_export",
+      "brief": "T-qa-23",
+      "expiry": "2027-06-30"
+    },
+    {
+      "family": "solution_generate",
+      "brief": "T-qa-23",
+      "expiry": "2027-06-30"
+    },
+    {
+      "family": "solution_product",
+      "brief": "T-qa-23",
+      "expiry": "2027-06-30"
+    },
+    {
+      "family": "solution_prompt_admin",
+      "brief": "T-qa-23",
+      "expiry": "2027-06-30"
+    },
+    {
+      "family": "solution_sad",
+      "brief": "T-qa-23",
+      "expiry": "2027-06-30"
+    },
+    {
+      "family": "solutions_risk",
+      "brief": "T-qa-23",
+      "expiry": "2027-06-30"
+    },
+    {
+      "family": "sprint",
+      "brief": "T-qa-23",
+      "expiry": "2027-06-30"
+    },
+    {
+      "family": "sprint_view",
+      "brief": "T-qa-23",
+      "expiry": "2027-06-30"
+    },
+    {
+      "family": "sso",
+      "brief": "T-qa-23",
+      "expiry": "2027-06-30"
+    },
+    {
+      "family": "stakeholder_map",
+      "brief": "T-qa-23",
+      "expiry": "2027-06-30"
+    },
+    {
+      "family": "stakeholder_map_api",
+      "brief": "T-qa-23",
+      "expiry": "2027-06-30"
+    },
+    {
+      "family": "strategic_risks_hardened",
+      "brief": "T-qa-23",
+      "expiry": "2027-06-30"
+    },
+    {
+      "family": "suggestions",
+      "brief": "T-qa-23",
+      "expiry": "2027-06-30"
+    },
+    {
+      "family": "tech_radar",
+      "brief": "T-qa-23",
+      "expiry": "2027-06-30"
+    },
+    {
+      "family": "unified_duplicate",
+      "brief": "T-qa-23",
+      "expiry": "2027-06-30"
+    },
+    {
+      "family": "unified_import",
+      "brief": "T-qa-23",
+      "expiry": "2027-06-30"
+    },
+    {
+      "family": "unified_vendors",
+      "brief": "T-qa-23",
+      "expiry": "2027-06-30"
+    },
+    {
+      "family": "unified_vendors_api",
+      "brief": "T-qa-23",
+      "expiry": "2027-06-30"
+    },
+    {
+      "family": "usage_analytics",
+      "brief": "T-qa-23",
+      "expiry": "2027-06-30"
+    },
+    {
+      "family": "value_stream",
+      "brief": "T-qa-23",
+      "expiry": "2027-06-30"
+    },
+    {
+      "family": "vendor",
+      "brief": "T-qa-23",
+      "expiry": "2027-06-30"
+    },
+    {
+      "family": "vendor_analysis",
+      "brief": "T-qa-22",
+      "expiry": "2027-03-31"
+    },
+    {
+      "family": "vendor_discovery",
+      "brief": "T-qa-23",
+      "expiry": "2027-06-30"
+    },
+    {
+      "family": "vendor_management",
+      "brief": "T-qa-23",
+      "expiry": "2027-06-30"
+    },
+    {
+      "family": "vendor_mdm",
+      "brief": "T-qa-23",
+      "expiry": "2027-06-30"
+    },
+    {
+      "family": "vendor_product",
+      "brief": "T-qa-23",
+      "expiry": "2027-06-30"
+    },
+    {
+      "family": "vendors_api",
+      "brief": "T-qa-23",
+      "expiry": "2027-06-30"
+    },
+    {
+      "family": "viewpoint_api",
+      "brief": "T-qa-23",
+      "expiry": "2027-06-30"
+    },
+    {
+      "family": "webhook",
+      "brief": "T-qa-23",
+      "expiry": "2027-06-30"
+    },
+    {
+      "family": "wizard_ai",
+      "brief": "T-qa-23",
+      "expiry": "2027-06-30"
+    },
+    {
+      "family": "workflow_optimization",
+      "brief": "T-qa-23",
+      "expiry": "2027-06-30"
+    }
+  ]
+}

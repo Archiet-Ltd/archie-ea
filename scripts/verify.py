@@ -911,6 +911,93 @@ def gate_unregistered_checks(baseline: int) -> Result:
     return Result("unregistered-checks", PASS if count <= baseline else FAIL, detail, count, baseline)
 
 
+def gate_asvs_register() -> Result:
+    """Every test node id the ASVS level 2 security register names as evidence
+    actually exists, and every recorded gap cites the brief that owns it.
+    Gated at ZERO.
+
+    docs/security/asvs-l2.yml maps the OWASP ASVS level 2 requirements to a test
+    node id (or a recorded control) per route family. A register row whose named
+    evidence has been renamed or deleted is worse than silence: it reads as proof
+    while proving nothing. scripts/check_asvs_register.py AST-scans every
+    referenced test file (it never imports one) so the register cannot drift away
+    from the suite it claims to rest on.
+
+    Proven-against: a referenced test function renamed in its file -- red, naming
+    the now-missing node; green again once the name is restored.
+    """
+    proc = _run([sys.executable, "scripts/check_asvs_register.py", "--count"])
+    try:
+        count = int(proc.stdout.strip().splitlines()[-1])
+    except (ValueError, IndexError):
+        return Result("asvs-register", FAIL,
+                      f"could not parse count: {proc.stdout!r} {proc.stderr[:300]}")
+    detail = ""
+    if count:
+        detail = _run([sys.executable, "scripts/check_asvs_register.py"]).stdout[-1800:]
+    return Result("asvs-register", PASS if count == 0 else FAIL, detail, count, 0)
+
+
+def gate_two_org_coverage() -> Result:
+    """Every route family that reads organisation data carries a two-organisation
+    test, and every startup family stays covered.
+
+    A tenant-scoped surface with no cross-organisation test is an untested
+    isolation boundary: nothing proves one organisation cannot read another's
+    rows. scripts/check_two_org_coverage.py groups the route inventory into
+    families and finds the two-organisation suites by static AST search (no boot,
+    no database). Association is family-targeted: a suite covers a family only
+    when it drives one of that family's own route rules, so a bare keyword
+    cannot stand in for a real cross-organisation test. The non-startup uncovered
+    count is a ratchet read from scripts/ci/two_org_baseline.json
+    (accepted_uncovered); it can only fall. The gate fails when the measured
+    count rises ABOVE the baseline AND when the baseline sits above the measured
+    count (an un-ratcheted number that cannot be justified from the diff):
+    equal is the only accepted state. The seven startup families must always
+    resolve to zero uncovered, regardless of that baseline.
+
+    Proven-against: on a scratch edit, remove the authorisation matrix's second
+    organisation -- in tests/smoke/test_authorisation_matrix.py rename the
+    other_org fixture and the test that uses it, so the file no longer builds a
+    second organisation. The admin billing startup family, which only that suite
+    covers through its /admin/billing rows, goes uncovered, the startup count
+    rises above zero and the gate exits non-zero. Restore the file with
+    git checkout -- and it is green at zero startup uncovered again.
+    """
+    # One decision, shared with the script's own main(): import the gate's
+    # public evaluate() rather than re-deriving a pass/fail from counts here, so
+    # the gate verdict and the script exit code can never disagree. The script
+    # path is still named here so the unregistered-checks gate recognises
+    # "scripts/check_two_org_coverage.py" as a registered check.
+    script = "scripts/check_two_org_coverage.py"
+    scripts_dir = str(REPO_ROOT / "scripts")
+    if scripts_dir not in sys.path:
+        sys.path.insert(0, scripts_dir)
+    try:
+        import check_two_org_coverage as two_org  # noqa: PLC0415
+    except Exception as exc:  # noqa: BLE001 - surface an import failure as a gate failure
+        return Result("two-org-coverage", FAIL,
+                      f"could not import {script}: {exc}")
+
+    try:
+        verdict = two_org.evaluate(str(REPO_ROOT))
+    except (two_org.InventoryError, two_org.BaselineError) as exc:
+        return Result("two-org-coverage", FAIL, str(exc))
+
+    detail = ""
+    if not verdict.ok:
+        detail = "\n".join(verdict.messages)[-1800:]
+    # The reported number is the full (non-startup) uncovered count; the dated
+    # baseline's still-valid accepted set is the ratchet the detail explains.
+    return Result(
+        "two-org-coverage",
+        PASS if verdict.ok else FAIL,
+        detail,
+        verdict.other_count,
+        verdict.other_count,
+    )
+
+
 def gate_background_mechanisms(baseline: int, instances_baseline: int) -> Result:
     """Every background-work mechanism is in docs/background-mechanisms.yml. RATCHET.
 
@@ -2121,6 +2208,18 @@ def build_gates(baseline: dict) -> list[Gate]:
                          "(DELIVERY_CONTRACT.md Rule 2), or mark its first line "
                          "'unregistered-check-ok: <reason>'",
              tags=["static", "qa"]),
+        Gate("asvs-register",
+             "every security-register test node id exists and every gap cites its brief",
+             "zero", gate_asvs_register,
+             remediation="run scripts/check_asvs_register.py; point the row at a test "
+                         "that exists, or cite the brief that owns the gap",
+             tags=["static", "security"]),
+        Gate("two-org-coverage",
+             "every org-data route family has a two-organisation test; startup families stay covered",
+             "ratchet", gate_two_org_coverage,
+             remediation="run scripts/check_two_org_coverage.py; add a two-organisation "
+                         "test for the family, or mark 'two-org-coverage-ok: <reason>'",
+             tags=["static", "security"]),
         Gate("null-filters", "default() never feeds a len()-calling filter", "zero",
              gate_null_filters,
              remediation="add the boolean argument: default('x', true) - plain "

@@ -246,6 +246,8 @@ scripts/check_*.py
 !scripts/check_composer_url_params.py
 !scripts/check_crosswalk_writer_gated.py
 !scripts/check_is_admin_called.py
+!scripts/check_two_org_coverage.py
+!scripts/check_asvs_register.py
 scripts/patch_*.py
 scripts/find_*.py
 scripts/delete_*.py
