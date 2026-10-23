@@ -27,6 +27,11 @@
         {% endfor %}
     </div>
     {% else %}
-    <p class="text-sm text-muted-foreground">Nothing is linked yet. Link a Jira or GitHub item to trace where this element came from.</p>
+    {% set live_connectors = live_connectors|default([]) %}
+    {% if 'github' in live_connectors %}
+    <p class="text-sm text-muted-foreground">Nothing is linked yet. Link a GitHub item to trace where this element came from.</p>
+    {% else %}
+    <p class="text-sm text-muted-foreground">Nothing is linked yet. Connect a source on the <a href="{{ connectors_url }}" class="text-primary hover:underline">Connectors page</a> to trace where this element came from.</p>
+    {% endif %}
     {% endif %}
 </div>

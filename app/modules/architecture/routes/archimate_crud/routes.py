@@ -1296,6 +1296,16 @@ def detail_element(layer, element_type, element_id):
     elif element_type == "Capability":
         owner_assign_url = url_for("capability_map.index", cap=element.id)
 
+    # The external-identifiers help names only connectors this organisation
+    # can use today, read from the one connector registry. When none are live
+    # it points at the Connectors page instead.
+    from app.models.connector_config import ConnectorConfig
+
+    live_connectors = ConnectorConfig.live_connector_types(
+        getattr(element, "organization_id", None)
+    )
+    connectors_url = url_for("m365_connector.connectors_index")
+
     page = _element_page(element, element_type, ae_id, relationships)
 
     return render_template(
@@ -1311,6 +1321,8 @@ def detail_element(layer, element_type, element_id):
         owner_rows=owner_rows,
         owner_assign_url=owner_assign_url,
         external_links=external_links,
+        live_connectors=live_connectors,
+        connectors_url=connectors_url,
         layer_config=LAYER_CONFIG,
     )
 

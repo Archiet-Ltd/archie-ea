@@ -323,7 +323,7 @@
                 {% endif %}
             </dl>
 
-            {% with external_links = external_links|default([]) %}
+            {% with external_links = external_links|default([]), live_connectors = live_connectors|default([]), connectors_url = connectors_url %}
             {% include 'intelligence/_external_ids.html' %}
             {% endwith %}
 
