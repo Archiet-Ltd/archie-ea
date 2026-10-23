@@ -23,7 +23,7 @@
             const capId = parseInt(this.selectedIds[index]);
             if (!capId) return;
 
-            const capability = this.capabilities.find(c => c.id === capId);
+            const capability = this.capabilities.find(c => c.capability_id === capId);
             if (!capability) return;
 
             const saved = loadScenario(capId);
@@ -228,8 +228,8 @@
                                 class="flex-1 px-3 py-2 text-sm border border-input rounded-md bg-background focus:ring-2 focus:ring-ring focus:border-transparent"
                              aria-label="Select capability...">
                                 <option value="">Select capability...</option>
-                                <template x-for="cap in capabilities" :key="cap.id">
-                                    <option :value="cap.id" x-text="cap.name"></option>
+                                <template x-for="cap in capabilities" :key="cap.capability_id">
+                                    <option :value="cap.capability_id" x-text="cap.name"></option>
                                 </template>
                             </select>
                             <button type="button"
