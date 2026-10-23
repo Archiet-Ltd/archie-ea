@@ -21,6 +21,8 @@ from sqlalchemy import func
 from app import db
 from app.models.adm_kanban import ADMPhase, KanbanCard
 from app.models.adm_phase_approval import ADMPhaseApproval, ADMComplianceCheckpoint, ADMStakeholderConcurrence
+from app.models.adm_kanban_junctions import CardArchiMateElement
+from app.models.archimate_core import ArchiMateElement
 
 logger = logging.getLogger(__name__)
 
@@ -356,6 +358,79 @@ class ADMAnalyticsService:
             "cards_with_dependencies": cards_with_deps,
             "total_cards": total,
         }
+
+    # ------------------------------------------------------------------
+    # Derived views: which elements a phase / deliverable produced, and which
+    # phases an element belongs to. Read-only, computed from the card to
+    # element links; every one is scoped to the organisation passed in.
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _linked_elements(organization_id, *card_filters) -> List[Dict[str, Any]]:
+        if organization_id is None:
+            return []
+        cols = (ArchiMateElement.id, ArchiMateElement.name, ArchiMateElement.type, ArchiMateElement.layer)
+        rows = (
+            db.session.query(*cols)
+            .join(CardArchiMateElement, CardArchiMateElement.archimate_element_id == ArchiMateElement.id)
+            .join(KanbanCard, KanbanCard.id == CardArchiMateElement.card_id)
+            .filter(
+                KanbanCard.organization_id == organization_id,
+                ArchiMateElement.organization_id == organization_id,
+                *card_filters,
+            )
+            .distinct()
+            .order_by(ArchiMateElement.id)
+            .all()
+        )
+        return [{"id": r[0], "name": r[1], "type": r[2], "layer": r[3]} for r in rows]
+
+    @staticmethod
+    def elements_for_phase(phase, organization_id) -> List[Dict[str, Any]]:
+        """Elements linked to any card of the phase (an ADMPhase, its id or its code)."""
+        if isinstance(phase, ADMPhase):
+            phase_id = phase.id
+        elif isinstance(phase, int):
+            phase_id = phase
+        else:
+            found = ADMPhase.query.filter_by(code=str(phase)).first()
+            phase_id = found.id if found else None
+        if phase_id is None:
+            return []
+        return ADMAnalyticsService._linked_elements(organization_id, KanbanCard.adm_phase_id == phase_id)
+
+    @staticmethod
+    def elements_for_deliverable(deliverable, organization_id) -> List[Dict[str, Any]]:
+        """Elements linked to any card that names the deliverable (an ADMDeliverable or its name)."""
+        name = getattr(deliverable, "name", deliverable)
+        if not name:
+            return []
+        return ADMAnalyticsService._linked_elements(organization_id, KanbanCard.togaf_deliverable == str(name))
+
+    @staticmethod
+    def phase_for_element(element, organization_id) -> List[Dict[str, Any]]:
+        """Every ADM phase the element belongs to through its cards, in phase order."""
+        element_id = getattr(element, "id", element)
+        if organization_id is None or element_id is None:
+            return []
+        rows = (
+            db.session.query(ADMPhase, func.count(KanbanCard.id))
+            .join(KanbanCard, KanbanCard.adm_phase_id == ADMPhase.id)
+            .join(CardArchiMateElement, CardArchiMateElement.card_id == KanbanCard.id)
+            .join(ArchiMateElement, ArchiMateElement.id == CardArchiMateElement.archimate_element_id)
+            .filter(
+                CardArchiMateElement.archimate_element_id == element_id,
+                KanbanCard.organization_id == organization_id,
+                ArchiMateElement.organization_id == organization_id,
+            )
+            .group_by(ADMPhase.id)
+            .order_by(ADMPhase.order)
+            .all()
+        )
+        return [
+            {"phase_id": p.id, "code": p.code, "name": p.name, "order": p.order, "card_count": n}
+            for p, n in rows
+        ]
 
     def _calculate_phase_distribution(self, board_id: int = None) -> Dict[str, Any]:
         """Calculate card distribution across ADM phases."""

@@ -16,8 +16,10 @@ feed the next phase's input types.
 """
 import logging
 
-from flask import Blueprint, jsonify
+from flask import Blueprint, jsonify, request
 from flask_login import login_required
+
+from app.middleware.tenant_context import current_org_id
 
 logger = logging.getLogger(__name__)
 
@@ -120,7 +122,48 @@ def get_archimate_summary():
                 "coverage_percent": 0.0,
             }
 
+    # Elements linked to the organisation's ADM cards in each phase (derived
+    # from the card to element links), alongside the viewpoint counts.
+    from app.services.adm_analytics_service import ADMAnalyticsService
+
+    org_id = current_org_id()
+    for phase_code, entry in summary.items():
+        letter = phase_code.split("_")[2] if phase_code.count("_") >= 2 else phase_code
+        try:
+            entry["linked_element_count"] = len(ADMAnalyticsService.elements_for_phase(letter, org_id))
+        except Exception as exc:
+            logger.warning("archimate-summary: linked elements for %s failed: %s", phase_code, exc)
+            entry["linked_element_count"] = 0
+
     return jsonify(summary), 200
+
+
+@ea_phase_summary_bp.route("/api/ea/adm-links", methods=["GET"])
+@login_required
+def get_adm_element_links():
+    """Derived card-to-element views, scoped to the active organisation.
+
+    Exactly one query parameter: ``phase`` (ADM phase code) returns the elements
+    of that phase, ``deliverable`` (name) the elements of that deliverable,
+    ``element_id`` the phases the element belongs to.
+    """
+    from app.services.adm_analytics_service import ADMAnalyticsService
+
+    org_id = current_org_id()
+    if org_id is None:
+        return jsonify({"error": "No active organisation"}), 403
+    given = [k for k in ("phase", "deliverable", "element_id") if request.args.get(k)]
+    if len(given) != 1:
+        return jsonify({"error": "Give exactly one of phase, deliverable, element_id"}), 400
+    if given[0] == "phase":
+        return jsonify({"elements": ADMAnalyticsService.elements_for_phase(request.args["phase"], org_id)}), 200
+    if given[0] == "deliverable":
+        return jsonify({"elements": ADMAnalyticsService.elements_for_deliverable(request.args["deliverable"], org_id)}), 200
+    try:
+        element_id = int(request.args["element_id"])
+    except ValueError:
+        return jsonify({"error": "element_id must be an integer"}), 400
+    return jsonify({"phases": ADMAnalyticsService.phase_for_element(element_id, org_id)}), 200
 
 
 @ea_phase_summary_bp.route("/api/ea/phases/<string:phase_code>/viewpoint", methods=["GET"])
