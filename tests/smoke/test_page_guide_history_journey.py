@@ -86,6 +86,16 @@ def history_records(providerless_guide_configuration, app, seeded):
                 row = ChatMessageEmbedding(
                     user_id=user_id, chat_session_id=f'guide_user_{user_id}_{page_key}_{scope_key}',
                     message_role=role, message_text=text, domain='guide',
+                    # The organisation the message belongs to, as the product writes
+                    # it inside a tenant request. This fixture seeds outside a request,
+                    # where the organization_id column default cannot resolve the
+                    # active organisation once more than one exists in the database
+                    # (every CI run, where earlier journeys have already made some) —
+                    # it returns None, and the org-scoped history read then skips the
+                    # row and the page comes back empty. Setting it here seeds the row
+                    # the product's own save path would, in the organisation these
+                    # users belong to; the cross-organisation guard is #861.
+                    organization_id=seeded['ids']['org'],
                     created_at=datetime(2026, 1, 1) + timedelta(seconds=index),
                     metadata_json={'guide_mode': True, 'page_key': page_key, 'scope_key': scope_key})
                 db.session.add(row)
