@@ -58,28 +58,62 @@
         </div>
     </form>
 
+    {# The other two ways to start, shown from the first moment and not only after a
+       failure: a person who has no GitHub organisation, or who would rather not
+       connect one now, can still get a model. #}
+    <section class="mt-8" aria-labelledby="github-other-ways-heading" data-testid="github-other-ways">
+        <h2 id="github-other-ways-heading" class="text-sm font-semibold mb-2">No GitHub to connect?</h2>
+        <div data-slot="card" class="rounded-lg border border-border bg-card p-4 sm:p-6">
+            <ul class="space-y-3 text-sm">
+                {% if 'unified_applications.application_list' in flask.current_app.view_functions %}
+                <li class="flex flex-wrap items-center justify-between gap-3">
+                    <span class="text-foreground">Already have your applications in a spreadsheet? Import them instead.</span>
+                    <a href="{{ url_for('unified_applications.application_list', **{'import': 1}) }}" data-testid="github-exit-import"
+                        class="inline-flex items-center justify-center rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring h-9 px-4 shrink-0">
+                        Import from a spreadsheet
+                    </a>
+                </li>
+                {% endif %}
+                {% if 'main.demo_lantern_quay' in flask.current_app.view_functions %}
+                <li class="flex flex-wrap items-center justify-between gap-3">
+                    <span class="text-foreground">Want to see what a finished model looks like first? Explore a sample company.</span>
+                    <a href="{{ url_for('main.demo_lantern_quay') }}" data-testid="github-exit-sample"
+                        class="inline-flex items-center justify-center rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring h-9 px-4 shrink-0">
+                        Try with sample data
+                    </a>
+                </li>
+                {% endif %}
+            </ul>
+        </div>
+    </section>
+
     {% if status.state != 'not_connected' %}
     <section class="mt-8" aria-labelledby="github-progress-heading" data-testid="github-progress">
         <h2 id="github-progress-heading" class="text-sm font-semibold mb-2">Progress</h2>
         <div data-slot="card" class="rounded-lg border border-border bg-card p-4 sm:p-6 text-sm" aria-live="polite" id="github-progress-body">
             <p id="github-progress-line" class="text-foreground">
                 {% if status.state == 'waiting' %}Waiting to start. This usually takes under a minute.
-                {% elif status.state == 'reading' %}Reading your repositories. This usually takes a few minutes.
-                {% elif status.state == 'done' %}Read {{ status.counts.repositories }} repositories. {{ status.counts.pending }} proposals are ready for you to review.
-                {% elif status.state == 'failed' %}{{ status.job.error if status.job and status.job.error else 'The read did not finish.' }}
+                {% elif status.state == 'reading' %}Reading your repositories. Naming your applications and the links between them as it goes.
+                {% elif status.state == 'done' %}Read {{ status.counts.repositories }} repositories, {{ status.counts.services }} services found. {{ status.counts.pending }} proposals are ready for you to review.
+                {% elif status.state == 'no_links' %}We found {{ status.counts.repositories }} repositories and no links between them yet. {{ status.counts.services }} services are ready to review; you can add the links yourself once they are in your model.
+                {% elif status.state == 'no_repositories' %}We read the organisation but found no repositories the token can see. Check the token has read access to this organisation's repositories, or import from a spreadsheet instead.
+                {% elif status.state == 'failed' %}{{ status.job.error if status.job and status.job.error else 'The read did not finish; try again.' }}
                 {% else %}Connected to {{ status.organization }}.{% endif %}
             </p>
-            <dl class="mt-3 grid grid-cols-3 gap-4 text-xs text-muted-foreground">
-                <div><dt>Applications in your model</dt><dd class="text-base text-foreground tabular-nums" id="github-count-applications">{{ status.counts.applications }}</dd></div>
-                <div><dt>Parts</dt><dd class="text-base text-foreground tabular-nums" id="github-count-components">{{ status.counts.components }}</dd></div>
-                <div><dt>Links</dt><dd class="text-base text-foreground tabular-nums" id="github-count-relationships">{{ status.counts.relationships }}</dd></div>
+            <dl class="mt-3 grid grid-cols-4 gap-4 text-xs text-muted-foreground">
+                <div><dt>Repositories read</dt><dd class="text-base text-foreground tabular-nums" id="github-count-repositories">{{ status.counts.repositories }}</dd></div>
+                <div><dt>Services found</dt><dd class="text-base text-foreground tabular-nums" id="github-count-services">{{ status.counts.services }}</dd></div>
+                <div><dt>Links found</dt><dd class="text-base text-foreground tabular-nums" id="github-count-links">{{ status.counts.links }}</dd></div>
+                <div><dt>In your model</dt><dd class="text-base text-foreground tabular-nums" id="github-count-applications">{{ status.counts.applications }}</dd></div>
             </dl>
+            {% if status.state in ('done', 'no_links', 'failed', 'connected', 'waiting', 'reading') %}
             <div class="mt-4 flex items-center justify-end gap-3">
                 <a href="{{ review_url }}"
                     class="inline-flex items-center justify-center rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring h-9 px-4">
                     Review what was found
                 </a>
             </div>
+            {% endif %}
         </div>
     </section>
     {% endif %}
@@ -93,16 +127,20 @@
     var tries = 0;
     function show(s) {
         var c = s.counts || {};
-        ['applications', 'components', 'relationships'].forEach(function (k) {
+        ['repositories', 'services', 'links', 'applications'].forEach(function (k) {
             var el = document.getElementById('github-count-' + k);
             if (el) { el.textContent = c[k] || 0; }
         });
         if (s.state === 'done') {
-            line.textContent = 'Read ' + (c.repositories || 0) + ' repositories. ' + (c.pending || 0) + ' proposals are ready for you to review.';
+            line.textContent = 'Read ' + (c.repositories || 0) + ' repositories, ' + (c.services || 0) + ' services found. ' + (c.pending || 0) + ' proposals are ready for you to review.';
+        } else if (s.state === 'no_links') {
+            line.textContent = 'We found ' + (c.repositories || 0) + ' repositories and no links between them yet. ' + (c.services || 0) + ' services are ready to review; you can add the links yourself once they are in your model.';
+        } else if (s.state === 'no_repositories') {
+            line.textContent = 'We read the organisation but found no repositories the token can see. Check the token has read access to this organisation\u2019s repositories, or import from a spreadsheet instead.';
         } else if (s.state === 'failed') {
-            line.textContent = (s.job && s.job.error) || 'The read did not finish.';
+            line.textContent = (s.job && s.job.error) || 'The read did not finish; try again.';
         } else if (s.state === 'reading') {
-            line.textContent = 'Reading your repositories. This usually takes a few minutes.';
+            line.textContent = 'Reading your repositories. Naming your applications and the links between them as it goes.';
         }
     }
     function poll() {
