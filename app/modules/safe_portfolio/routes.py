@@ -22,6 +22,29 @@ logger = logging.getLogger(__name__)
 # Kanban column order — sourced from the one SAFe profile registry
 KANBAN_STATES = KINDS["Epic"]["properties"]["kanban_state"]["values"]
 
+# SAFe portfolio WIP limits per column. Funnel and Done have no limit; the four
+# middle columns do (recognisable-form reference, Portfolio Kanban conventions).
+# The header shows "count / limit" and turns to the destructive token with a
+# lock icon when a column is at its limit.
+WIP_LIMITS = {
+    "Reviewing": 4,
+    "Analyzing": 3,
+    "Portfolio Backlog": 6,
+    "Implementing": 5,
+}
+
+# Which band each column belongs to, so the shared board can tint its headers:
+# discovery stages in the info/blue token, execution stages in the
+# success/green token, Done neutral.
+STAGE_GROUP = {
+    "Funnel": "discovery",
+    "Reviewing": "discovery",
+    "Analyzing": "discovery",
+    "Portfolio Backlog": "execution",
+    "Implementing": "execution",
+    "Done": "done",
+}
+
 # What an empty column means and what to do next, per state. A state with no
 # entry here falls back to a plain sentence in the template.
 EMPTY_COLUMN_HINTS = {
@@ -106,6 +129,10 @@ def _get_epics() -> List[Dict]:
                 "id": element.id,
                 "name": element.name,
                 "description": element.description or "",
+                # `state` is the column key the shared board component reads;
+                # `kanban_state` is kept for the PATCH endpoint and any caller
+                # that still reads it.
+                "state": kanban_state,
                 "kanban_state": kanban_state,
                 "wsjf_score": wsjf_score,
                 "business_value": bv,
@@ -139,13 +166,19 @@ def _organize_by_state(epics: List[Dict]) -> Dict[str, List[Dict]]:
 def index():
     """Portfolio Kanban board view."""
     epics = _get_epics()
-    columns = _organize_by_state(epics)
     can_write = _can_write()
+
+    columns_config = [
+        {"id": state, "label": state, "state": state} for state in KANBAN_STATES
+    ]
 
     return render_template(
         "safe_portfolio/kanban.html",
-        columns=columns,
+        cards=epics,
+        columns_config=columns_config,
         kanban_states=KANBAN_STATES,
+        wip_limits=WIP_LIMITS,
+        stage_group=STAGE_GROUP,
         empty_hints=EMPTY_COLUMN_HINTS,
         can_write=can_write,
     )
