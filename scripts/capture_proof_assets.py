@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Capture the proof screenshots the public site shows: home hero, Applications, ARB.
+"""Capture the proof screenshots the public site shows: home hero, Applications, ARB, role workspaces.
 
 Why this exists (marketing visual design review v1, S3 / P-03 / P-06): nine of the
 eleven revenue pages showed no product at all, and the two that did showed a
@@ -46,6 +46,14 @@ DEMO_EMAIL = "demo@lantern-quay.example.com"
 IMG = REPO / "app" / "static" / "img"
 DPR = 2
 SUBJECT = "Calibration Ledger"
+
+# Role page slug -> the enterprise role whose workspace it shows (tests/smoke/conftest.py ARCHETYPES).
+ROLE_PAGES = (
+    ("enterprise-architects", "enterprise_architect"),
+    ("cto-and-cio", "cto"),
+    ("it-portfolio-managers", "portfolio_manager"),
+    ("solution-architects", "solution_architect"),
+)
 
 
 def _webp(png: bytes, dest: pathlib.Path) -> tuple[int, int]:
@@ -277,10 +285,104 @@ def capture_home_product(browser, base, password, wide: bool) -> tuple[int, int]
     ctx.close()
     return size
 
+def role_email(archetype: str) -> str:
+    return "smoke.%s.proof@example.com" % archetype.replace("_", "-")
+
+
+def seed_role_users(password: str) -> None:
+    """Give the demonstration organisation one user per role page (idempotent).
+
+    Same shape as the smoke harness's archetype users (tests/smoke/conftest.py), placed on the
+    Lantern Quay organisation so each role signs in to the data the other captures photograph.
+    """
+    from werkzeug.security import generate_password_hash
+
+    from app import create_app, db
+    from app.models.organization import Organization
+    from app.models.user import Role, User
+
+    app = create_app()
+    with app.app_context():
+        org = Organization.query.filter_by(name="Lantern Quay Systems").first()
+        if org is None:
+            raise SystemExit("roles: demonstration organisation missing; run seed-demo-company first")
+        Role.insert_roles()
+        role = Role.query.filter_by(name="Viewer").first()
+        for _, archetype in ROLE_PAGES:
+            if User.query.filter_by(email=role_email(archetype)).first():
+                continue
+            db.session.add(User(
+                email=role_email(archetype), first_name="Proof", last_name=archetype[:12],
+                organization_id=org.id, enterprise_role=archetype, confirmed=True, role=role,
+                password_hash=generate_password_hash(password),
+            ))
+        db.session.commit()
+
+
+def capture_role(browser, base, password, slug: str, archetype: str, wide: bool = True) -> tuple[bool, str]:
+    """The role's workspace: Ask open on the impact question with one answer shown.
+
+    Returns (captured, reason). An empty state or a 403 is reported and nothing is written, so the
+    page stays held rather than shipping a bad image.
+    """
+    # 1408px leaves a 1104px crop, the public figure column, so the desktop crop is shown 1:1 (as capture_applications).
+    vw, vh = (1408, 1600) if wide else (390, 1400)
+    ctx = browser.new_context(viewport={"width": vw, "height": vh}, device_scale_factor=DPR)
+    page = ctx.new_page()
+    try:
+        _login(page, base, role_email(archetype), password)
+        response = page.goto(base + "/intelligence/ask", wait_until="networkidle")
+        page.wait_for_timeout(1500)
+        _dismiss_onboarding(page)
+        if response is None or response.status != 200:
+            return False, "Ask answered HTTP %s for %s" % (response.status if response else "none", archetype)
+        page.click("#ask-question-impact")
+        page.fill("#ask-picker-input", SUBJECT)
+        page.wait_for_selector("#ask-picker-listbox [role=option]", timeout=20000)
+        page.locator("#ask-picker-listbox [role=option]").first.click()
+        try:
+            page.wait_for_selector("[data-ask-row]", timeout=30000)
+        except Exception:
+            return False, "no answer rows appeared for %s (empty state)" % archetype
+        button = page.get_by_role("button", name="Work them out now")
+        if button.count():
+            # A 409 (busy) or 500 leaves the earlier rows on screen, so the row selector alone
+            # cannot tell a refreshed answer from a failed recalculation: require the request to succeed.
+            try:
+                with page.expect_response(lambda r: "/derivation/recompute" in r.url, timeout=60000) as sent:
+                    button.click()
+            except Exception:
+                return False, "recalculation did not complete for %s" % archetype
+            if not sent.value.ok:
+                return False, "recalculation answered HTTP %s for %s" % (sent.value.status, archetype)
+            page.wait_for_load_state("networkidle")
+            if page.locator("[data-recompute-button]").count() and page.locator("[data-recompute-button]").first.is_visible():
+                return False, "recalculation notice still shown for %s" % archetype
+        page.wait_for_selector("[data-ask-row]", timeout=30000)
+        page.wait_for_timeout(1000)
+        _tidy(page)
+        # Ask scrolls to its results; measure from the top, the same position _shoot() clips from.
+        page.evaluate("window.scrollTo(0, 0)")
+        h1 = _box(page, "h1")
+        main = _box(page, "main")
+        row = _box(page, "[data-ask-row]", 0)
+        pad = 24 if wide else 16
+        clip = {
+            "x": main["x"] + pad, "y": h1["y"] - 16, "width": main["width"] - 2 * pad,
+            "height": row["y"] + row["height"] + 12 - (h1["y"] - 16),
+        }
+        name = "%s.webp" % slug if wide else "%s-mobile.webp" % slug
+        _webp(_shoot(page, clip), IMG / "roles" / name)
+        return True, "captured"
+    finally:
+        ctx.close()
+
 
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--base", default="http://127.0.0.1:5100")
+    parser.add_argument("--roles", action="store_true",
+                        help="capture only the four role-page workspaces (seeds their users first)")
     parser.add_argument("--chromium", default=os.environ.get("PROOF_CHROMIUM"))
     args = parser.parse_args()
     password = os.environ.get("DEMO_USER_PASSWORD")
@@ -289,10 +391,19 @@ def main() -> int:
 
     from playwright.sync_api import sync_playwright
 
+    if args.roles:
+        seed_role_users(password)
+
     with sync_playwright() as pw:
         launch = {"executable_path": args.chromium, "args": ["--no-sandbox"]} if args.chromium else {}
         browser = pw.chromium.launch(**launch)
         try:
+            if args.roles:
+                for slug, archetype in ROLE_PAGES:
+                    for wide in (True, False):
+                        ok, reason = capture_role(browser, args.base, password, slug, archetype, wide)
+                        print(f"{slug:24s} {'desktop' if wide else 'mobile '} {'CAPTURED' if ok else 'REFUSED '} {reason}")
+                return 0
             for label, fn in (
                 ("home impact answer", capture_home_impact),
                 ("home product window", capture_home_product),

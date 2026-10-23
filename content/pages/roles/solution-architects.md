@@ -1,8 +1,8 @@
 ---
 page_family: role
 role_group: architecture
-state: held
-capture_status: awaiting_capture
+state: on_main
+capture_status: live
 cta: plans
 description: "Solution architect tools from Entelim: ADM kanban, review board decisions and impact analysis on one shared model. Start free, see pricing today."
 source: app/utils/role_access.py (ROLE_SOLUTION_ARCHITECT, SIDEBAR_ZONES, _MY_WORK_LINKS),

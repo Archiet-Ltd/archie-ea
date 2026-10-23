@@ -80,6 +80,7 @@ FEATURE_INTEREST_CONSENT_TEXT = (
 )
 IMG_MODULES_DIR = STATIC_ROOT / "img" / "modules"
 IMG_USE_CASES_DIR = STATIC_ROOT / "img" / "use-cases"
+IMG_ROLES_DIR = STATIC_ROOT / "img" / "roles"
 VIDEO_USE_CASES_DIR = STATIC_ROOT / "video" / "use-cases"
 
 # ── seeded demo personas (Lantern Quay Systems -- app/commands/seed_demo_company.py) ──
@@ -90,6 +91,26 @@ DEMO_PERSONA = "demo@lantern-quay.example.com"
 ITOPS_ADMIN_PERSONA = "sage.itops@lantern-quay.example.com"
 APP_MANAGER_PERSONA = "casey.inventory@lantern-quay.example.com"
 PROCUREMENT_PERSONA = "taylor.procurement@lantern-quay.example.com"
+
+# Role pages: each role's workspace in Ask, open on the impact question for the
+# Calibration Ledger application with its first answer row shown
+# (scripts/capture_proof_assets.py --roles). Same 5-tuple shape as MODULE_CAPTURES.
+def _role_capture(slug: str, role: str) -> tuple[str, str, str, str, str]:
+    article = "an" if role[0] in "AEIOUaeiou" or role.startswith("IT ") else "a"
+    return (
+        slug, "/intelligence/ask", DEMO_PERSONA,
+        f"The Ask panel as {article} {role} sees it: the impact question put to Calibration Ledger, with the first row of the answer showing what depends on it.",
+        f"Screenshot of the Ask panel signed in as {article} {role}, with the impact question asked of Calibration Ledger and the first result row displayed.",
+    )
+
+
+ROLE_CAPTURES: list[tuple[str, str, str, str, str]] = [
+    _role_capture("enterprise-architects", "enterprise architect"),
+    _role_capture("cto-and-cio", "CTO or CIO"),
+    _role_capture("it-portfolio-managers", "IT portfolio manager"),
+    _role_capture("solution-architects", "solution architect"),
+]
+
 
 # ── module & use-case screenshot/recording registry ─────────────────────────
 # Single source of truth for which live pages get a captured screen: the path
@@ -517,10 +538,18 @@ def use_case_redirect_target(old_filename_slug: str) -> str | None:
 # pixels are twice their CSS size, so the <img> width/height attributes halve them and the
 # image displays 1:1. Every other module image is a 1x capture and keeps its file size.
 TWO_X_MODULE_IMAGES = frozenset({"applications", "arb"})
+# The four role-page captures are 2x as well (capture_role in the same script).
+TWO_X_ROLE_IMAGES = frozenset({
+    "enterprise-architects", "cto-and-cio", "it-portfolio-managers", "solution-architects",
+})
 
 
 def _screenshot_density(slug: str, page_family: str) -> int:
-    return 2 if page_family == "module" and slug in TWO_X_MODULE_IMAGES else 1
+    if page_family == "module" and slug in TWO_X_MODULE_IMAGES:
+        return 2
+    if page_family == "role" and slug in TWO_X_ROLE_IMAGES:
+        return 2
+    return 1
 
 
 def get_page_screenshot(page: "PublicPage") -> dict[str, Any] | None:
@@ -543,6 +572,10 @@ def get_page_screenshot(page: "PublicPage") -> dict[str, Any] | None:
         registry = USE_CASE_SCREENSHOT_CAPTURES
         static_dir = IMG_USE_CASES_DIR
         url_prefix = "/static/img/use-cases"
+    elif page.page_family == "role":
+        registry = ROLE_CAPTURES
+        static_dir = IMG_ROLES_DIR
+        url_prefix = "/static/img/roles"
     else:
         return None
 
