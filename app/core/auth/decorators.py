@@ -130,52 +130,25 @@ def permission_required(permission):
 def require_roles(*allowed_roles):
     """Require user to have one of the specified roles.
 
+    Delegates to the one canonical role check in ``app._decorators_base``
+    (re-exported as ``app.decorators.require_roles``). That implementation
+    re-derives "admin"/"platform_admin" against the ACTIVE organisation
+    (``g.current_org_id``), so a home-org Administrator switched into an
+    organisation they only hold Viewer in cannot satisfy a role check there.
+
+    This module used to carry its own, weaker copy that added the raw
+    ``role_archetype`` string to the caller's roles with no active-organisation
+    scoping, so the same switched Viewer -- carrying the legacy default persona
+    "platform_admin" -- was admitted. The canonical auth module must never hand
+    out that weaker variant, so it now defers to the single implementation
+    rather than re-deriving role logic here.
+
     Args:
         *allowed_roles: Role names (strings) the user must have at least one of.
-
-    Source: app/decorators.py
     """
+    from app._decorators_base import require_roles as _canonical_require_roles
 
-    def decorator(f):
-        @wraps(f)
-        def decorated_function(*args, **kwargs):
-            if not current_user.is_authenticated:
-                abort(401)
-
-            user_roles = set()
-
-            if hasattr(current_user, "roles"):
-                for role in current_user.roles:
-                    if hasattr(role, "name"):
-                        user_roles.add(role.name.lower())
-                    elif isinstance(role, str):
-                        user_roles.add(role.lower())
-
-            if hasattr(current_user, "role_names"):
-                user_roles.update(r.lower() for r in current_user.role_names)
-
-            if hasattr(current_user, "role"):
-                user_roles.add(str(current_user.role).lower())
-
-            archetype = getattr(current_user, "role_archetype", None)
-            if archetype and str(archetype).lower() != "admin":
-                user_roles.add(str(archetype).lower())
-
-            required = set(r.lower() for r in allowed_roles)
-
-            if not user_roles & required:
-                current_app.logger.warning(
-                    f"Access denied to {f.__name__}: user "
-                    f"{getattr(current_user, 'username', None) or current_user.id} "
-                    f"has roles {user_roles}, required {required}"
-                )
-                abort(403)
-
-            return f(*args, **kwargs)
-
-        return decorated_function
-
-    return decorator
+    return _canonical_require_roles(*allowed_roles)
 
 
 def require_permission(action, object_type):
