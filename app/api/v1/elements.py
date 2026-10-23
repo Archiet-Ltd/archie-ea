@@ -13,11 +13,12 @@ alone, so both are tenant-scoped reads.
 
 from __future__ import annotations
 
-from flask import Blueprint, g
+from flask import Blueprint, g, request
 
 from app.modules.oauth_provider.scopes import API_READ_SCOPE, require_api_scope
+from app.modules.architecture.services.architecture_search_service import apply_element_search_filters
 from app.utils.api_response import not_found_response, success_response
-from app.utils.pagination import get_pagination_params
+from app.utils.pagination import get_pagination_params, safe_int_arg
 
 elements_v1_bp = Blueprint("elements_v1", __name__)
 
@@ -78,5 +79,39 @@ def get_element(element_id):
             "scope": element.scope or "",
             "building_block_type": element.building_block_type or "",
             "plateau": element.togaf_plateau or "",
+        }
+    )
+
+
+@elements_v1_bp.route("/search", methods=["GET"])
+@require_api_scope(API_READ_SCOPE)
+def search_elements():
+    """Search the calling organisation's elements by name, type and layer."""
+    from app.models.archimate_core import ArchiMateElement
+
+    if g.current_org_id is None:
+        return not_found_response("Organisation")
+
+    name = request.args.get("q", "").strip()
+    elem_type = request.args.get("type", "").strip()
+    layer = request.args.get("layer", "").strip()
+    limit = safe_int_arg("limit", 30, minimum=1, maximum=200)
+
+    query = ArchiMateElement.query.filter_by(organization_id=g.current_org_id)
+    query = apply_element_search_filters(query, name, elem_type, layer)
+
+    elements = query.order_by(ArchiMateElement.name).limit(limit).all()
+    return success_response(
+        {
+            "elements": [
+                {
+                    "id": element.id,
+                    "name": element.name,
+                    "type": element.type,
+                    "layer": element.layer,
+                    "description": element.description or "",
+                }
+                for element in elements
+            ]
         }
     )

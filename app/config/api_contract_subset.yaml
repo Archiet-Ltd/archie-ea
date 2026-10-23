@@ -1,7 +1,7 @@
 # API Contract Subset — auto-generated
-# Source: api-model-v1.yaml
-# SHA256: f34b68f30dd7d8e52334a523eae0af7f025f379232f3280754811be6a74204fc
-# Body-SHA256: 5cdc00221071f6f0861a8b7e8e375e92110fc2895a527607536e7aaf6c0a5e79
+# Source: api_contract_subset.yaml
+# SHA256: 7b651a2d1828e24aa3a962ea203e08699cc08e4bd7f2595dfdd7d1034fcd8211
+# Body-SHA256: b090ac4858d8cae8afe175479b06934f5c24d0a7b85334857132770740ed3639
 # Do not edit by hand.
 openapi: 3.1.0
 info:
@@ -47,9 +47,70 @@ servers:
 security:
 - entelimOAuth: []
 tags:
+- name: Intelligence
+  description: Intelligence operations
 - name: Model
   description: Model operations
 paths:
+  /answers:
+    get:
+      operationId: listAnswers
+      summary: List the organisation's stored answers
+      description: The calling organisation's most recent stored answers, newest first,
+        without their full rows.
+      tags:
+      - Intelligence
+      responses:
+        '200':
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnswerListPage'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalError'
+      security:
+      - entelimOAuth:
+        - model:read
+      x-rate-limit-tier: read
+  /answers/{address}:
+    get:
+      operationId: getAnswer
+      summary: Get one stored answer by its permanent address
+      description: The stored envelope at its permanent address, only when it belongs
+        to the calling organisation; an address issued to another organisation, or
+        one never issued, answers not found.
+      tags:
+      - Intelligence
+      parameters:
+      - $ref: '#/components/parameters/Address'
+      responses:
+        '200':
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnswerEnvelope'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalError'
+      security:
+      - entelimOAuth:
+        - model:read
+      x-rate-limit-tier: read
   /elements:
     get:
       operationId: listElements
@@ -82,6 +143,57 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ElementListPage'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalError'
+      security:
+      - entelimOAuth:
+        - model:read
+      x-rate-limit-tier: read
+  /elements/search:
+    get:
+      operationId: searchElements
+      summary: Search the organisation's elements by name
+      description: Elements of the calling organisation whose name contains the given
+        text, optionally filtered by type and layer, sorted by name.
+      tags:
+      - Model
+      parameters:
+      - name: q
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: type
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: layer
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 200
+          default: 30
+      responses:
+        '200':
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ElementSearchResults'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -149,6 +261,14 @@ components:
       example: Bearer resource_metadata="https://entelim.org/.well-known/oauth-protected-resource",
         error="invalid_token"
   parameters:
+    Address:
+      name: address
+      in: path
+      required: true
+      description: The answer's permanent address.
+      schema:
+        type: string
+        pattern: ^[0-9a-f]{32}$
     Id:
       name: id
       in: path
@@ -213,6 +333,60 @@ components:
           schema:
             $ref: '#/components/schemas/Problem'
   schemas:
+    Answer:
+      type: object
+      required:
+      - address
+      - question_kind
+      properties:
+        address:
+          type: string
+        page_url:
+          type: string
+        api_url:
+          type: string
+        question_kind:
+          type: string
+        params:
+          type: object
+        truth_class:
+          type: string
+        confidence:
+          type: number
+        confidence_basis:
+          type: string
+        confidence_percent:
+          type: integer
+        summary:
+          type: object
+        reasons:
+          type: array
+        freshness:
+          type: object
+        truncated:
+          type: boolean
+        computed_at:
+          type: string
+    AnswerEnvelope:
+      allOf:
+      - $ref: '#/components/schemas/Answer'
+      - type: object
+        properties:
+          rows:
+            type: array
+          elements:
+            type: object
+          citations:
+            type: array
+    AnswerListPage:
+      type: object
+      required:
+      - answers
+      properties:
+        answers:
+          type: array
+          items:
+            $ref: '#/components/schemas/Answer'
     ElementDetail:
       allOf:
       - $ref: '#/components/schemas/ElementSummary'
@@ -250,6 +424,15 @@ components:
               type: integer
             pages:
               type: integer
+    ElementSearchResults:
+      type: object
+      required:
+      - elements
+      properties:
+        elements:
+          type: array
+          items:
+            $ref: '#/components/schemas/ElementSummary'
     ElementSummary:
       type: object
       required:

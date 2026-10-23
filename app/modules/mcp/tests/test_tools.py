@@ -62,8 +62,14 @@ def _mcp_resource(app) -> str:
     return f"{base}/mcp"
 
 
-def _mint_oauth_token(client, db_session, org, user, login_as_fn, app=None) -> str:
-    """Mint an OAuth access token through the real authorization-code flow."""
+def _mint_oauth_token(client, db_session, org, user, login_as_fn, app=None,
+                      scope="mcp:read", resource=None) -> str:
+    """Mint an OAuth access token through the real authorization-code flow.
+
+    ``scope`` and ``resource`` default to the MCP values; callers that need a
+    different namespace (for example ``api:read`` against ``/api/v1``) pass
+    them explicitly.
+    """
     from flask import current_app
 
     from app.modules.oauth_provider.models import OAuthClient
@@ -81,7 +87,8 @@ def _mint_oauth_token(client, db_session, org, user, login_as_fn, app=None) -> s
     digest = hashlib.sha256(verifier.encode("ascii")).digest()
     challenge = base64.urlsafe_b64encode(digest).rstrip(b"=").decode("ascii")
 
-    resource = _mcp_resource(app if app is not None else current_app)
+    if resource is None:
+        resource = _mcp_resource(app if app is not None else current_app)
 
     login_as_fn(client, user)
 
@@ -92,7 +99,7 @@ def _mint_oauth_token(client, db_session, org, user, login_as_fn, app=None) -> s
             "redirect_uri": "http://localhost/callback",
             "code_challenge": challenge,
             "code_challenge_method": "S256",
-            "scope": "mcp:read",
+            "scope": scope,
             "resource": resource,
             # The POST branch of authorize() requires an explicit "allow"/
             # "deny" decision (the consent form's two buttons) -- without it,
