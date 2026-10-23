@@ -2,18 +2,18 @@
 
 Review and approve/reject integration facts before they are applied.
 """
-import json
 import logging
 from flask import Blueprint, g, jsonify, render_template, request
+from flask_login import current_user, login_required
 
 from app import db
 from app.models.integration_fact import IntegrationFact, IntegrationFactStatus
 from app.modules.ai_chat.services.ai_chat_approval_service import create_approval_record
-from app.utils.auth import login_required
+from app.models.user import Permission
 
 logger = logging.getLogger(__name__)
 
-integrations_bp = Blueprint("integrations", __name__, url_prefix="/integrations")
+integrations_bp = Blueprint("integration_review", __name__, url_prefix="/integrations")
 
 
 @integrations_bp.route("/review")
@@ -42,42 +42,66 @@ def review_page():
             }
         facts_by_item[fact.external_id]["facts"].append(fact)
 
+    from app.integrations.model_mapping import MAPPINGS
+    import app.integrations.mappings  # noqa: F401  (registers the mappings)
+
+    mapping = MAPPINGS.get(system)
     return render_template(
         "integrations/review.html",
         system=system,
+        system_label=(mapping.display_name if mapping else "") or system.title(),
         facts_by_item=facts_by_item,
     )
+
+
+_APPLY_ORDER = {"element": 0, "relationship": 1, "owner": 2}
+
+
+def _requested_fact_ids():
+    data = request.get_json(silent=True) or {}
+    ids = data.get("fact_ids", [])
+    return data, [i for i in ids if isinstance(i, int) and not isinstance(i, bool)] if isinstance(ids, list) else []
+
+
+def _may_decide():
+    return current_user.can(Permission.GENERAL)
 
 
 @integrations_bp.route("/approve", methods=["POST"])
 @login_required
 def approve_facts():
     """Approve integration facts."""
-    data = request.get_json()
-    fact_ids = data.get("fact_ids", [])
+    _, fact_ids = _requested_fact_ids()
     organization_id = g.current_org_id
 
     if not fact_ids:
         return jsonify({"success": False, "error": "No facts specified"}), 400
+    if not _may_decide():
+        return jsonify({"success": False, "error": "Your role does not include approval permission"}), 403
 
     approved = []
     errors = []
 
+    pending = {
+        fact.id: fact
+        for fact in IntegrationFact.query.filter(
+            IntegrationFact.id.in_(fact_ids),
+            IntegrationFact.organization_id == organization_id,
+            IntegrationFact.status == IntegrationFactStatus.PENDING,
+        )
+    }
     for fact_id in fact_ids:
-        fact = IntegrationFact.query.filter_by(
-            id=fact_id,
-            organization_id=organization_id,
-            status=IntegrationFactStatus.PENDING,
-        ).first()
-
-        if not fact:
+        if fact_id not in pending:
             errors.append(f"Fact {fact_id} not found or not pending")
-            continue
 
-        # Create approval record
+    # An owner or relationship is applied to the elements its item's element
+    # facts created, so the elements go first.
+    for fact in sorted(pending.values(), key=lambda f: (_APPLY_ORDER.get(f.fact_type, 3), f.id)):
+        fact_id = fact.id
         try:
-            from flask_login import current_user
-
+            # The integration proposes; the signed-in person decides. The
+            # approval has no requesting user, so the approver is never refused
+            # as approving their own request.
             approval = create_approval_record(
                 organization_id=organization_id,
                 operation_type="create",
@@ -89,7 +113,9 @@ def approve_facts():
                     "system": fact.system,
                     "external_id": fact.external_id,
                 },
-                user_id=current_user.id,
+                user_id=None,
+                source_table="integration_facts",
+                source_id=fact.id,
             )
             db.session.commit()
 
@@ -119,13 +145,14 @@ def approve_facts():
 @login_required
 def reject_facts():
     """Reject integration facts."""
-    data = request.get_json()
-    fact_ids = data.get("fact_ids", [])
-    reason = data.get("reason", "Rejected by user")
+    data, fact_ids = _requested_fact_ids()
+    reason = data.get("reason") or "Rejected by user"
     organization_id = g.current_org_id
 
     if not fact_ids:
         return jsonify({"success": False, "error": "No facts specified"}), 400
+    if not _may_decide():
+        return jsonify({"success": False, "error": "Your role does not include approval permission"}), 403
 
     from app.integrations.fact_store import reject_fact
 

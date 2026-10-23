@@ -762,6 +762,8 @@ class AIChatApprovalService:
                         return {"success": False, "error": "Integration fact not found"}
                     success = apply_fact(fact, commit=False)
                     result = {"success": success}
+                    if not success:
+                        result["error"] = "The fact could not be applied to the model"
                 else:
                     return {"success": False, "error": f"Unknown entity type: {approval.entity_type}"}
 

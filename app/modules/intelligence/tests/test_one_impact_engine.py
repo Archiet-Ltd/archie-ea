@@ -863,15 +863,16 @@ def test_owner_fetch_query_count(app, db_session, make_org):
 
     # What the test is about: the owner fetch does not grow with the page.
     # The ApplicationComponent and enterprise-ownership lookups, the one
-    # batched ApplicationOwner read and the one batched user read make a
-    # small constant (five today); one user read per row would make the
-    # delta at 50 rows far larger than at 2.
+    # batched ApplicationOwner read and the one batched user read, plus the one
+    # batched read of the teams assigned to the rows, make a small constant
+    # (six today); one user read per row would make the delta at 50 rows far
+    # larger than at 2.
     assert len(set(deltas)) == 1, (
         f"owner fetch read counts differ by page size (2, 10, 50): {deltas}; "
         f"the user-name resolution is running once per row"
     )
-    assert 2 <= deltas[0] <= 5, (
-        f"owner fetch added {deltas[0]} reads, expected a small constant (at most 5)"
+    assert 2 <= deltas[0] <= 6, (
+        f"owner fetch added {deltas[0]} reads, expected a small constant (at most 6)"
     )
 
 

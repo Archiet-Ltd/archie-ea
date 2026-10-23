@@ -387,6 +387,13 @@ def _resolve_application_owners_batch(
             for o in owners
         ]
 
+    # A team is assigned to the element it owns (any element type), so it is
+    # read for every id, after the people.
+    from app.services.element_ownership_service import team_owners_for_elements
+
+    for eid, teams in team_owners_for_elements(distinct_ids, org_id).items():
+        results[eid] = results[eid] + teams
+
     return results
 
 

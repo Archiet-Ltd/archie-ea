@@ -9,7 +9,6 @@ from app.integrations.model_mapping import (
     ElementFact,
     ModelMapping,
     OwnerFact,
-    RelationshipFact,
     SourceRef,
     register_mapping,
 )
@@ -20,6 +19,7 @@ class GitHubMapping(ModelMapping):
     """Maps GitHub repositories to ArchiMate ApplicationComponent."""
 
     system_name = "github"
+    display_name = "GitHub"
 
     def map_item(
         self,

@@ -89,6 +89,7 @@ class ModelMapping:
     """
 
     system_name: str = ""  # e.g., "github", "jira"
+    display_name: str = ""  # how people read the system, e.g. "GitHub"
 
     def map_item(
         self,

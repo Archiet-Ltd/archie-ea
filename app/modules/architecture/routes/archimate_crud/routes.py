@@ -1241,8 +1241,28 @@ def detail_element(layer, element_type, element_id):
         source_ae_id=ae_id,
         display_fields=display_fields,
         external_links=external_links,
+        integration_source=_integration_source(ae_id or element.id),
         layer_config=LAYER_CONFIG,
     )
+
+
+def _integration_source(element_id):
+    """Where a connector-derived element came from, ready to show; else None."""
+    from app.integrations.fact_store import sources_for_elements
+    from app.integrations.model_mapping import MAPPINGS
+    import app.integrations.mappings  # noqa: F401  (registers the mappings)
+    from app.middleware.tenant_context import current_org_id
+
+    source = sources_for_elements([element_id], current_org_id()).get(element_id)
+    if source is None:
+        return None
+    mapping = MAPPINGS.get(source["system"])
+    read_at = datetime.fromisoformat(source["read_at"]) if source["read_at"] else None
+    return {
+        **source,
+        "system_label": (mapping.display_name if mapping else "") or source["system"].title(),
+        "read_on": read_at.strftime("%d %B %Y").lstrip("0") if read_at else None,
+    }
 
 
 @archimate_crud.route(

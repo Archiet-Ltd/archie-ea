@@ -144,6 +144,58 @@ def set_element_owner(
     return record
 
 
+TEAM_OWNER_ROLE = "Team"
+
+
+def team_owners_for_elements(element_ids: Iterable[int], organization_id: int) -> dict:
+    """{element_id: [{"name", "role"}]} for the teams that own each element.
+
+    A team owner is a BusinessActor assigned to the element by an assignment
+    relationship, in one organisation-fenced read for every id. An element no
+    team is assigned to has no entry.
+    """
+    from app.models.models import ArchiMateElement, ArchiMateRelationship
+
+    ids = sorted({i for i in element_ids if i is not None})
+    if not ids or organization_id is None:
+        return {}
+    rows = db.session.execute(
+        db.select(ArchiMateRelationship.target_id, ArchiMateElement.name)
+        .join(ArchiMateElement, ArchiMateElement.id == ArchiMateRelationship.source_id)
+        .where(ArchiMateRelationship.target_id.in_(ids))
+        .where(db.func.lower(ArchiMateRelationship.type) == "assignment")
+        .where(ArchiMateRelationship.organization_id == organization_id)
+        .where(ArchiMateElement.organization_id == organization_id)
+        .where(ArchiMateElement.type == "BusinessActor")
+        .order_by(ArchiMateRelationship.id)
+    ).all()
+    teams: dict = {}
+    for element_id, name in rows:
+        owners = teams.setdefault(element_id, [])
+        owner = {"name": name, "role": TEAM_OWNER_ROLE}
+        if owner not in owners:
+            owners.append(owner)
+    return teams
+
+
+def owners_of(element_id: int, organization_id: int) -> list:
+    """Every recorded owner of an ArchiMate element, people first and then teams.
+
+    ``[{"name", "role"}]``: a person is read from the ownership record of the
+    application or capability the element is the mirror of, a team from the
+    BusinessActor assigned to the element. An element that does not exist in
+    the organisation has no owners.
+    """
+    from app.models.models import ArchiMateElement
+    from app.modules.intelligence.services.query_service import _resolve_application_owners_batch
+
+    element = ArchiMateElement.query.filter_by(id=element_id, organization_id=organization_id).first()
+    if element is None:
+        return []
+    elements = {str(element.id): {"id": element.id, "name": element.name, "type": element.type, "layer": element.layer}}
+    return _resolve_application_owners_batch([element.id], organization_id, elements).get(element.id, [])
+
+
 def _delete_other_owners_of_type(key: dict, organization_id: int, ownership_type: str, keep=None) -> None:
     for row in ApplicationOwner.query.filter_by(
         organization_id=organization_id, ownership_type=ownership_type, **key,
