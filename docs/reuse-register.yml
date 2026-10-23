@@ -666,7 +666,7 @@ entries:
       - path: app/static/css/tailwind-output*
         reason: generated Tailwind utility output (minified), rebuilt from templates by scripts/build_css.py
 
-- id: permission-check
+  - id: permission-check
     concept: May this user do this to this kind of object (the permission matrix decorator)
     status: active
     canonical:
