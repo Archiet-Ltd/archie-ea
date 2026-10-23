@@ -49,19 +49,22 @@ def test_investment_analysis_api_isolation(db_session, make_org, tenant_ctx):
         db_session.add_all([app_a1, app_a2])
         db_session.commit()
 
-        mapping_a1 = UnifiedApplicationCapabilityMapping(
-            unified_capability_id=cap_finance_id,
-            application_component_id=app_a1.id,
-            support_level="full",
-            coverage_percentage=90,
+        db_session.add(
+            UnifiedApplicationCapabilityMapping(
+                unified_capability_id=cap_finance_id,
+                application_component_id=app_a1.id,
+                support_level="full",
+                coverage_percentage=90,
+            )
         )
-        mapping_a2 = UnifiedApplicationCapabilityMapping(
-            unified_capability_id=cap_hr_id,
-            application_component_id=app_a2.id,
-            support_level="full",
-            coverage_percentage=85,
+        db_session.add(
+            UnifiedApplicationCapabilityMapping(
+                unified_capability_id=cap_hr_id,
+                application_component_id=app_a2.id,
+                support_level="full",
+                coverage_percentage=85,
+            )
         )
-        db_session.add_all([mapping_a1, mapping_a2])
         db_session.commit()
 
     # Create applications and mappings for Org B (3 mappings)
@@ -84,25 +87,30 @@ def test_investment_analysis_api_isolation(db_session, make_org, tenant_ctx):
         db_session.add_all([app_b1, app_b2, app_b3])
         db_session.commit()
 
-        mapping_b1 = UnifiedApplicationCapabilityMapping(
-            unified_capability_id=cap_finance_id,
-            application_component_id=app_b1.id,
-            support_level="full",
-            coverage_percentage=95,
+        db_session.add(
+            UnifiedApplicationCapabilityMapping(
+                unified_capability_id=cap_finance_id,
+                application_component_id=app_b1.id,
+                support_level="full",
+                coverage_percentage=95,
+            )
         )
-        mapping_b2 = UnifiedApplicationCapabilityMapping(
-            unified_capability_id=cap_hr_id,
-            application_component_id=app_b2.id,
-            support_level="partial",
-            coverage_percentage=60,
+        db_session.add(
+            UnifiedApplicationCapabilityMapping(
+                unified_capability_id=cap_hr_id,
+                application_component_id=app_b2.id,
+                support_level="partial",
+                coverage_percentage=60,
+            )
         )
-        mapping_b3 = UnifiedApplicationCapabilityMapping(
-            unified_capability_id=cap_finance_id,
-            application_component_id=app_b3.id,
-            support_level="partial",
-            coverage_percentage=50,
+        db_session.add(
+            UnifiedApplicationCapabilityMapping(
+                unified_capability_id=cap_finance_id,
+                application_component_id=app_b3.id,
+                support_level="partial",
+                coverage_percentage=50,
+            )
         )
-        db_session.add_all([mapping_b1, mapping_b2, mapping_b3])
         db_session.commit()
 
     # Check as Org A
