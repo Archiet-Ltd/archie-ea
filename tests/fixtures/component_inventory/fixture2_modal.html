@@ -1,0 +1,16 @@
+{% from 'components/modal_form.html' import modal_form %}
+{% from 'components/button.html' import button %}
+
+<!-- Modal form definition -->
+{{ modal_form(id='create-x', title='Create New Item', action=url_for('items.create')) }}
+  <input name="name" type="text" placeholder="Name" required>
+  <input name="description" type="text" placeholder="Description">
+  {{ button('Create', variant='primary', type='submit') }}
+  {{ button('Cancel', variant='secondary', data_action='close-modal') }}
+{{ end_macro }}
+
+<!-- Opener button with data-modal-open -->
+<button data-modal-open="create-x" class="public-btn">Open Create Modal</button>
+
+<!-- Another opener using Platform.modal.open -->
+<button onclick="Platform.modal.open('create-x')" class="public-btn">Open via Platform</button>
