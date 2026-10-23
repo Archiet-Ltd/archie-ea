@@ -43,6 +43,7 @@ video step, ffmpeg on PATH.
 from __future__ import annotations
 
 import argparse
+import datetime as _dt
 import json
 import os
 import pathlib
@@ -300,20 +301,31 @@ def _seed_module_screen_data(org_id: int, demo_user_id: int) -> None:
         # ── Saved ArchiMate diagrams (archimate.diagrams_library) ───────────
         from app.models.archimate_core import SavedDiagram, SavedDiagramElement
 
-        diagram_names = [
-            "Calibration estate overview",
-            "Event backbone target state",
-            "Supplier integration landscape",
+        # Each diagram's elements are laid out in rows of four: a saved
+        # diagram whose elements all sit at the origin opens as one stacked box.
+        calibration_service = [
+            "Calibration Approver", "Evaluate calibration", "Compute drift trend",
+            "Generate calibration certificate", "Calibration Ledger", "Calibration Lookup",
+            "Calibration result", "Sensor reading",
         ]
-        element_ids = [el.id for el in list(elements.values())[:6]]
-        for name in diagram_names:
+        first_six = [el.id for el in list(elements.values())[:6]]
+        diagrams = {
+            "Calibration estate overview": [elements[n].id for n in calibration_service],
+            "Event backbone target state": first_six,
+            "Supplier integration landscape": first_six,
+        }
+        for name, element_ids in diagrams.items():
             if SavedDiagram.query.filter_by(name=name).first():
                 continue
             diagram = SavedDiagram(name=name, created_by_id=demo_user_id)
             db.session.add(diagram)
             db.session.flush()
-            for element_id in element_ids:
-                db.session.add(SavedDiagramElement(diagram_id=diagram.id, element_id=element_id))
+            for index, element_id in enumerate(element_ids):
+                db.session.add(SavedDiagramElement(
+                    diagram_id=diagram.id, element_id=element_id,
+                    position_x=40 + (index % 4) * 260, position_y=40 + (index // 4) * 190,
+                    width=200, height=130,
+                ))
         db.session.flush()
 
         # ── Duplicate detection: one real duplicate, then run it ───────────
@@ -639,7 +651,85 @@ def _seed_lantern_quay(demo_password: str) -> None:
 
         org = Organization.query.filter_by(slug="lantern-quay").first()
         demo_user = User.query.filter_by(email=DEMO_EMAIL).first()
-        _seed_module_screen_data(org.id, demo_user.id)
+        org_id, demo_user_id = org.id, demo_user.id
+        _seed_module_screen_data(org_id, demo_user_id)
+        _seed_tech_radar(org_id, demo_user_id)
+
+
+def _seed_tech_radar(org_id: int, demo_user_id: int) -> None:
+    """Classify a handful of the seeded technology elements on the Tech Radar.
+
+    The radar's candidates are the Technology-layer elements seed_demo_company()
+    already models; what is missing is an architect's adopt/trial/assess/hold
+    call on them, which is user-entered data, not seed data. Goes through the
+    module's own service so the rows are exactly what the Classify control
+    writes. Idempotent: classify() updates an existing entry.
+    """
+    from app.jobs.tenant_safe_job import tenant_scope
+    from app.modules.tech_radar import service as radar
+
+    calls = [
+        ("Relational Database", "adopt", "Standard for transactional systems; supported by the platform team.", _dt.date(2027, 3, 31)),
+        ("Container Orchestrator", "adopt", "Runs all new workloads.", _dt.date(2027, 6, 30)),
+        ("Message Broker", "adopt", "Single approved broker for asynchronous integration.", _dt.date(2027, 3, 31)),
+        ("Service Mesh", "trial", "Trial on the fulfilment services only.", _dt.date(2027, 1, 31)),
+        ("Feature Flag Service", "trial", "Two teams trialling it for staged releases.", _dt.date(2027, 2, 28)),
+        ("Time-Series Database", "assess", "Candidate for sensor telemetry from the plants.", None),
+        ("Schema Registry", "assess", "Needed if event contracts spread beyond one team.", None),
+        ("Web Server", "hold", "No new deployments; being replaced by the API Gateway.", _dt.date(2026, 12, 31)),
+    ]
+    with tenant_scope(org_id):
+        by_name = {e.name: e for e in radar.technology_candidates()}
+        for name, ring, rationale, review in calls:
+            element = by_name.get(name)
+            if element is None:
+                raise SystemExit(f"tech radar seed: technology element {name!r} not in the demo model")
+            radar.classify(element.id, ring, rationale, demo_user_id, review_date=review)
+
+
+def _prepare_ask_proof(page, base: str) -> None:
+    """Ask the impact question of Calibration Ledger, work out the indirect
+    connections, and open the proof drawer on a worked-out row.
+
+    /intelligence/ask on its own is the question list; the page's promise is
+    the answer and the reasoning behind it, so that is what gets photographed.
+    """
+    page.locator("#ask-question-impact").click()
+    page.locator("#ask-picker-input").fill("Calibration Ledger")
+    page.get_by_role("option", name="Calibration Ledger").first.click()
+    page.get_by_text("connections for Calibration Ledger").wait_for(timeout=30000)
+    work_out = page.get_by_role("button", name="Work them out now")
+    if work_out.count():
+        work_out.click()
+    page.locator("p:visible", has_text="We worked this out").first.wait_for(timeout=60000)
+    page.get_by_role("button", name="Why?").last.click()
+    page.get_by_text("The links behind this").first.wait_for(timeout=30000)
+    page.wait_for_timeout(500)
+    page.evaluate("document.querySelectorAll('*').forEach(e => { if (e.scrollTop) e.scrollTop = 0; })")
+
+
+def _prepare_saved_diagram(page, base: str) -> None:
+    """Open a saved diagram from the library in the Composer.
+
+    The library page only lists diagram names; the page's promise is the
+    diagram itself, so this follows the library's Open link for one of the
+    diagrams _seed_module_screen_data() saves.
+    """
+    row = page.locator("tr", has_text="Calibration estate overview")
+    row.get_by_role("link", name="Open").click()
+    page.get_by_text("Loaded: Calibration estate overview").wait_for(timeout=60000)
+    page.wait_for_timeout(1500)
+    # The first-use tip toast is not part of the screen being shown.
+    page.get_by_role("button", name="Close").first.click(timeout=2000) if page.get_by_text("Drag from a blue port dot").count() else None
+    _dismiss_onboarding(page)
+
+
+# Slugs whose screen needs steps beyond loading the path; run after the page
+# has loaded and before it is photographed.
+PAGE_PREPARE = {
+    "digital-twin": _prepare_ask_proof,
+    "diagrams": _prepare_saved_diagram,
+}
 
 
 def _boot(port: int, log_path: pathlib.Path):
@@ -867,18 +957,23 @@ def run_public_pages_capture() -> int:
 
     try:
         with sync_playwright() as pw:
-            browser = pw.chromium.launch()
+            browser = pw.chromium.launch(executable_path=os.environ.get("CAPTURE_CHROMIUM") or None)
             try:
                 # ── module + use-case screenshots ──────────────────────────
                 image_jobs = [(slug, path, email, IMG_MODULES_DIR) for slug, path, email, _, _ in MODULES]
                 image_jobs += [(slug, path, email, IMG_USE_CASES_DIR)
                                for slug, path, email, _, _ in USE_CASE_SCREENSHOTS]
+                only = {x for x in os.environ.get("CAPTURE_ONLY", "").split(",") if x}
                 for slug, path, email, out_dir in image_jobs:
+                    if only and slug not in only:
+                        continue
                     try:
                         context = browser.new_context(viewport=IMAGE_CAPTURE_VIEWPORT)
                         page = context.new_page()
                         _login(page, base, email, demo_password)
                         _visit_and_check(page, base, path, slug)
+                        if slug in PAGE_PREPARE:
+                            PAGE_PREPARE[slug](page, base)
                         png_bytes = page.screenshot(full_page=False)
                         dest = out_dir / f"{slug}.webp"
                         width, height = compress_to_webp(png_bytes, dest, IMAGE_TARGET_WIDTH)

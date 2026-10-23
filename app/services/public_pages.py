@@ -122,6 +122,12 @@ MODULE_CAPTURES: list[tuple[str, str, str, str, str]] = [
     ("compliance-frameworks", "/dashboard/compliance", DEMO_PERSONA,
      "The compliance frameworks dashboard, tracking framework coverage across the estate.",
      "Screenshot of the Compliance Frameworks module's dashboard."),
+    ("digital-twin", "/intelligence/ask", DEMO_PERSONA,
+     "Ask answering what depends on Calibration Ledger, with the proof drawer open on a connection Entelim worked out: the recorded links it was built from.",
+     "Screenshot of the Ask screen showing the impact answer for the Calibration Ledger application, with the proof drawer open on a worked-out connection and the two recorded relationships behind it."),
+    ("diagrams", "/archimate/diagrams", DEMO_PERSONA,
+     "The Composer with a saved diagram open: a role, three business functions, an application with its service and two data objects, and the relationships between them.",
+     "Screenshot of the ArchiMate Composer with the saved diagram Calibration estate overview open, showing a business role and three business functions above an application component, an application service and two data objects."),
     ("duplicate-detection", "/duplicate-detection/simple", DEMO_PERSONA,
      "The duplicate detection dashboard, flagging applications that may overlap in function.",
      "Screenshot of the Duplicate Detection module's dashboard."),
@@ -143,6 +149,9 @@ MODULE_CAPTURES: list[tuple[str, str, str, str, str]] = [
     ("solutions", "/solutions/", DEMO_PERSONA,
      "The solutions list, tracking each solution's design progress and next action.",
      "Screenshot of the Solutions module's solution list."),
+    ("tech-radar", "/technology/radar/", DEMO_PERSONA,
+     "The Tech Radar: technologies already in the model sorted into adopt, trial, assess and hold, each with its recorded rationale and review date.",
+     "Screenshot of the Tech Radar showing eight technologies classified into the adopt, trial, assess and hold rings, with rationale and review dates."),
     ("vendors", "/applications/vendors", DEMO_PERSONA,
      "The vendor catalogue, with each vendor's type, products and contract status.",
      "Screenshot of the Vendors module's vendor catalogue."),
@@ -188,10 +197,6 @@ MODULE_CAPTURE_PENDING: dict[str, str] = {
         "organisation chart itself -- needs actors/hierarchy seeded and the "
         "/organization/chart route captured instead"
     ),
-    "diagrams": (
-        "captured screen was a list of diagram names, not a rendered diagram -- "
-        "needs a diagram actually open in the Composer"
-    ),
     "industry-apqc": "0 processes shown on every seeded framework",
     "investment-analysis": "domain Unknown and 0 apps coverage on every capability row",
     "gap-analysis": "type None on every row",
@@ -201,12 +206,6 @@ MODULE_CAPTURE_PENDING: dict[str, str] = {
     ),
     "roadmaps": "0 gaps detected; plateaus with no description and 0 gaps",
     "value-streams": "0 stages and 0 capabilities on every value stream",
-    "digital-twin": (
-        "no seeded demonstration organisation or browser available when the "
-        "page was written to capture Ask with an impact answer and the "
-        "provenance drawer open, the twin map, or model history with a "
-        "seeded change -- needs a real capture run, not a placeholder"
-    ),
 }
 
 # The one live use-case page: same screen as the capability-maturity module
