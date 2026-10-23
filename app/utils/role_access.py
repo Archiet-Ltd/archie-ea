@@ -545,6 +545,8 @@ _LIBRARY_LINKS = [
     # elsewhere in this file and reads directly as "a library of frameworks".
     _link("Frameworks", "maturity_management.frameworks_overview", "library"),
     _link("Vendors", "unified_applications.vendors", "building"),
+    _link("Vendor selection", "application_mgmt.vendor_analysis_list", "filter"),
+    _link("Vendor mapping", "main.vendor_archimate_analysis", "map-pin"),
     _link("Architecture", "archimate_crud.dashboard", "table"),
     _link("Diagrams", "archimate.diagrams_library", "layout-panel-top"),
 ]
@@ -623,7 +625,7 @@ _ADMIN_LINKS = [
 # asserted exactly by tests/test_sidebar_budgets.py.
 _MY_WORK_LINKS = {
     ROLE_SOLUTION_ARCHITECT: [
-        _link("Architecture Journey", "architecture_journey.index", "compass"),
+        _link("Architecture journey", "architecture_journey.index", "compass"),
         _APPROVAL_INBOX_LINK,
         _link("Solutions", "solution_design.list_solutions", "wrench"),
         _link("AI Chat", "unified_ai_chat.index", "message-square"),
@@ -686,6 +688,9 @@ _MY_WORK_LINKS = {
         # over /enterprise/api/work-packages.
         _link("Gap Analysis", "enterprise.gap_analysis", "git-compare"),
         _link("Work Packages", "enterprise.work_packages", "package"),
+        # Change group (after Gap Analysis): Solutions and Architecture journey
+        _link("Solutions", "solution_design.list_solutions", "palette"),
+        _link("Architecture journey", "architecture_journey.index", "compass"),
         # S-11 remainder (18 Aug 2026, QA Update 6/8): these were
         # directory-only — reachable from /modules/ but from no sidebar zone
         # of any role. Both are EA-shaped working pages.
@@ -761,7 +766,7 @@ _MY_WORK_LINKS = {
         # never that a page was missing, it was that twelve outputs were spread
         # over five generic zones with no page that presents them as one
         # practice. /business-architecture is that page.
-        _link("Architecture Journey", "architecture_journey.index", "compass"),
+        _link("Architecture journey", "architecture_journey.index", "compass"),
         _APPROVAL_INBOX_LINK,
         # "Capability Map" folded out in the canvas/framework UI fix, round 2
         # (25 Sep 2026): it pointed at capability_map.index, the exact
@@ -788,6 +793,8 @@ _MY_WORK_LINKS = {
         _link("Gap Analysis", "enterprise.gap_analysis", "search-x"),
         _link("Roadmaps", "main.capability_roadmap", "milestone"),
         _link("Work Packages", "enterprise.work_packages", "package"),
+        # Change group (after Gap Analysis): Solutions
+        _link("Solutions", "solution_design.list_solutions", "palette"),
         _link("Traceability Matrix", "architect_ui.traceability_matrix", "git-compare"),
         _link("Capability Health", "strategic.capability_health", "activity"),
         # Same link and icon as enterprise_architect's.
@@ -901,7 +908,7 @@ _MY_WORK_LINKS = {
         # app/models/user.py), so a page that exists only for the two architect
         # roles is invisible to most real accounts. Rendered total for this
         # role goes 25 -> 26, still under SIDEBAR_LINK_BUDGET (27).
-        _link("Architecture Journey", "architecture_journey.index", "compass"),
+        _link("Architecture journey", "architecture_journey.index", "compass"),
         # R1-B56: agent owner/charter/lifecycle registry.
         _link("Agent Registry", "agent_registry.index", "bot"),
     ],
