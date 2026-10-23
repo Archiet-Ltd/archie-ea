@@ -1,15 +1,15 @@
 {% from 'components/skeleton.html' import skeleton_table %}
 
-{% macro repository_metric(label, value_expression, hint_expression, icon) %}
-<div class="rounded-lg border border-border bg-card p-5 text-card-foreground" data-slot="metric-card">
+{% macro repository_metric(label, value_expression, hint_expression, icon, card_testid='') %}
+<div class="rounded-lg border border-border bg-card p-5 text-card-foreground" data-slot="metric-card"{% if card_testid %} data-testid="{{ card_testid }}"{% endif %}>
     <div class="flex items-start gap-3">
         <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-muted">
             <i data-lucide="{{ icon }}" class="h-4 w-4 text-muted-foreground" aria-hidden="true"></i>
         </div>
         <div class="min-w-0">
             <p class="text-sm font-medium text-muted-foreground">{{ label }}</p>
-            <p class="mt-1 text-2xl font-semibold tabular-nums text-foreground" x-text="{{ value_expression }}">&mdash;</p>
-            <p class="mt-1 text-xs text-muted-foreground" x-text="{{ hint_expression }}"></p>
+            <p class="mt-1 text-2xl font-semibold tabular-nums text-foreground"{% if card_testid %} data-testid="{{ card_testid }}-value"{% endif %} x-text="{{ value_expression }}">&mdash;</p>
+            <p class="mt-1 text-xs text-muted-foreground"{% if card_testid %} data-testid="{{ card_testid }}-hint"{% endif %} x-text="{{ hint_expression }}"></p>
         </div>
     </div>
 </div>
@@ -70,7 +70,7 @@
 </script>
 
 <section class="grid grid-cols-2 gap-3 lg:grid-cols-4" aria-label="{{ selected_layer.short_name }} repository metrics">
-    {{ repository_metric('Elements', "layerTotalKnown ? layerTotal : '—'", "layerTotalKnown ? 'Repository-wide in this layer' : 'Repository total unavailable'", 'layers') }}
+    {{ repository_metric('Elements', "layerTotalKnown ? layerTotal : '—'", "layerTotalKnown ? 'Repository-wide in this layer' : 'Repository total unavailable'", 'layers', 'architecture-elements-metric') }}
     {{ repository_metric('Connected', "relationshipMetrics.known ? relationshipMetrics.connected : '—'", "relationshipHint", 'git-branch') }}
     {{ repository_metric('Documentation', "pageCount ? documentationPercent + '%' : '—'", "documentationHint", 'file-text') }}
     {{ repository_metric('Validation posture', "validationSummary.value", "validationSummary.hint", 'shield-check') }}
@@ -82,8 +82,13 @@
             <h2 class="text-base font-semibold text-foreground">{{ selected_layer.short_name }} elements</h2>
             <p class="text-xs text-muted-foreground">Names, provenance, documentation and connections for the selected layer.</p>
         </div>
+        {# "12 of 55" while a filter narrows the layer, "55 total" unfiltered. The
+           list total always matches the pagination "1–12 of 12" below it, and the
+           "of 55" denominator is the same number the Elements stat card and the
+           sidebar tab show, so no figure contradicts another. #}
         <span class="rounded-full bg-muted px-2.5 py-1 text-xs font-medium tabular-nums text-muted-foreground"
-              x-text="layerTotalKnown ? layerTotal + ' total' : '— total'">&mdash; total</span>
+              data-testid="architecture-list-total"
+              x-text="listCountLabel">&mdash; total</span>
     </div>
 
     <div class="border border-b border-border bg-muted/20 px-4 py-2" data-testid="architecture-filter-bar">
@@ -192,11 +197,13 @@
                     <option value="">Any state</option><option value="yes">Connected</option><option value="no">Orphaned</option>
                 </select>
             </div>
-            <div>
-                {# Kind options come from the profile registry (the active layer's
+            {# Kind options come from the profile registry (the active layer's
                element types), so the control only exists where a layer has
-               kinds, and adding a kind to the registry updates the filter. #}
-            <div x-show="currentLayerKindOptions.length > 0" class="flex items-center gap-2">
+               kinds, and adding a kind to the registry updates the filter. The
+               cell sits in the same grid as the other filters, with its label
+               stacked above the select, so Kind lines up with Scope, Building
+               block, Plateau and Relationships at every width. #}
+            <div x-show="currentLayerKindOptions.length > 0">
                 <label for="architecture-kind" class="mb-1 block text-xs font-medium text-muted-foreground">Kind</label>
                 <select id="architecture-kind" x-model="kindFilter" @change="currentPage = 1; loadElements()" class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm">
                     <option value="">Any kind</option>
