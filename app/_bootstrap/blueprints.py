@@ -223,6 +223,10 @@ def _register_optional_standalone(app):
         ("app.modules.business_model_canvas.routes", "business_model_bp", "/business-model"),
         ("app.modules.organization.routes", "organization_bp", "/organization"),
         ("app.modules.business_case.routes", "business_case_bp", "/business-case"),
+        # T-strat-03: BCG, Ansoff and Blue Ocean strategy canvases — each
+        # opens the organisation's own profiled elements in the framework's
+        # recognisable layout.
+        ("app.modules.strategy_canvas.routes", "strategy_canvas_bp", "/strategy-canvas"),
         # The Business Architecture practice landing page — one front door to
         # the twelve BA outputs, all of which already ship scattered across
         # five generic sidebar zones.
