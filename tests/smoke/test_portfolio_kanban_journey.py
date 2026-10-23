@@ -9,6 +9,7 @@ This journey validates:
 5. Viewer role sees the board but cannot move epics
 6. Organization B sees an empty board (tenant isolation)
 """
+import os
 import pytest
 from playwright.sync_api import expect
 
@@ -16,6 +17,8 @@ from .conftest import PAGE_TIMEOUT
 from .test_archetype_journeys import _login
 
 pytestmark = [pytest.mark.smoke, pytest.mark.journey]
+
+SCREENSHOT_DIR = "/home/ubuntu/verify/seats/fix907/walk"
 
 
 def _seed_epics(org_id):
@@ -90,6 +93,10 @@ def test_portfolio_kanban_journey(browser, live_server, seeded, db_session):
         assert response.status == 200
         expect(page.get_by_role("heading", name="Portfolio Kanban")).to_be_visible(timeout=PAGE_TIMEOUT)
 
+        # Save screenshot of the board with three epics in different states
+        os.makedirs(SCREENSHOT_DIR, exist_ok=True)
+        page.screenshot(path=f"{SCREENSHOT_DIR}/kanban-1440-light.png", full_page=True)
+
         # === Step 2: Verify all three epics are in Funnel (default state) ===
         expect(page.get_by_role("heading", name="Customer Portal Epic")).to_be_visible(timeout=PAGE_TIMEOUT)
         expect(page.get_by_role("heading", name="Legacy Migration Epic")).to_be_visible(timeout=PAGE_TIMEOUT)
@@ -153,6 +160,34 @@ def test_portfolio_kanban_journey(browser, live_server, seeded, db_session):
         # Note: org B isolation is tested in test_safe_portfolio_api.py unit tests
         # The smoke test seeds epics into the shared org; org B would need a second
         # organisation which the seeded fixture does not provide.
+
+        # === Screenshots for walk report ===
+        # 390 light
+        context_390_light = browser.new_context(viewport={"width": 390, "height": 844}, color_scheme="light")
+        page_390_light = context_390_light.new_page()
+        _login(page_390_light, live_server, seeded["emails"]["solution_architect"])
+        page_390_light.goto(live_server + "/safe/portfolio", timeout=PAGE_TIMEOUT)
+        page_390_light.wait_for_load_state("networkidle")
+        page_390_light.screenshot(path=f"{SCREENSHOT_DIR}/kanban-390-light.png", full_page=True)
+        context_390_light.close()
+
+        # 1440 dark
+        context_1440_dark = browser.new_context(viewport={"width": 1440, "height": 900}, color_scheme="dark")
+        page_1440_dark = context_1440_dark.new_page()
+        _login(page_1440_dark, live_server, seeded["emails"]["solution_architect"])
+        page_1440_dark.goto(live_server + "/safe/portfolio", timeout=PAGE_TIMEOUT)
+        page_1440_dark.wait_for_load_state("networkidle")
+        page_1440_dark.screenshot(path=f"{SCREENSHOT_DIR}/kanban-1440-dark.png", full_page=True)
+        context_1440_dark.close()
+
+        # 390 dark
+        context_390_dark = browser.new_context(viewport={"width": 390, "height": 844}, color_scheme="dark")
+        page_390_dark = context_390_dark.new_page()
+        _login(page_390_dark, live_server, seeded["emails"]["solution_architect"])
+        page_390_dark.goto(live_server + "/safe/portfolio", timeout=PAGE_TIMEOUT)
+        page_390_dark.wait_for_load_state("networkidle")
+        page_390_dark.screenshot(path=f"{SCREENSHOT_DIR}/kanban-390-dark.png", full_page=True)
+        context_390_dark.close()
 
     finally:
         page.close()
