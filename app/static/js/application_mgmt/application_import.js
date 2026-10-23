@@ -420,11 +420,16 @@ async function processExcelImport() {
       formData.append('confidence_threshold', '0.7');
   }
 
-  // Show loading state
-  const importBtn = event.target;
-  const originalText = importBtn.textContent;
-  importBtn.disabled = true;
-  importBtn.textContent = 'Importing...';
+  // Show loading state. The button is found by id rather than from a global
+  // ``event`` (which Alpine's @click does not set), so the control works when
+  // invoked from the modal, not only from a raw DOM handler.
+  const importBtn = document.getElementById('import-applications-btn')
+    || (typeof event !== 'undefined' && event ? event.target : null);
+  const originalText = importBtn ? importBtn.textContent : 'Import Applications';
+  if (importBtn) {
+    importBtn.disabled = true;
+    importBtn.textContent = 'Importing...';
+  }
 
   try {
     // Platform.fetch.post will throw on non-ok responses, and automatically inject CSRF token.
@@ -436,17 +441,16 @@ async function processExcelImport() {
     // The current code treats any non-JSON response as a redirect and reloads.
     // We'll mimic that by catching the error and checking if it's a redirect.
     const data = await Platform.fetch.post('/applications/import', formData, { silent: true });
-    // If we reach here, the response was JSON (success or error).
-    if (data.error) {
-      importBtn.disabled = false;
-      importBtn.textContent = originalText;
+    // If we reach here, the response was JSON (success or error) or the followed
+    // redirect's HTML (a string, which has no .error).
+    if (data && typeof data === 'object' && data.error) {
+      if (importBtn) { importBtn.disabled = false; importBtn.textContent = originalText; }
       _importInProgress = false;  // AUDIT-IMP-005: Reset guard on error
       Platform.toast.error('Error: ' + data.error);
       return;
     }
 
-    importBtn.disabled = false;
-    importBtn.textContent = originalText;
+    if (importBtn) { importBtn.disabled = false; importBtn.textContent = originalText; }
     _importInProgress = false;  // AUDIT-IMP-005: Reset guard on success
 
     // Import succeeded, reload to see flash messages
@@ -464,8 +468,7 @@ async function processExcelImport() {
       window.location.reload();
       return;
     }
-    importBtn.disabled = false;
-    importBtn.textContent = originalText;
+    if (importBtn) { importBtn.disabled = false; importBtn.textContent = originalText; }
     _importInProgress = false;  // AUDIT-IMP-005: Reset guard on failure
     Platform.toast.error('Error importing: ' + error.message);
   }
@@ -806,6 +809,151 @@ function analyzeImportFile(analysisType) {
     // Go directly to standard analysis
     performRegularAnalysis();
   }
+}
+
+// Read the chosen file and show the review: which rows arrive, and which are
+// refused with the reason and the cell. Reuses the one importer analysis
+// endpoint (/applications/analyze-import-duplicates); it does the parsing,
+// duplicate check and field validation, so this never second-guesses what "the
+// same" or "a valid date" means. Streaming is not available here, so it reads
+// the same way — one request, then the review.
+async function performRegularAnalysis() {
+  const analysisContent = document.getElementById('analysis-content');
+  if (!selectedExcelFile || !analysisContent) return;
+
+  const formData = new FormData();
+  formData.append('file', selectedExcelFile);
+  const mappingsToSend = {};
+  for (const [colIdx, targetField] of Object.entries(fieldMappings)) {
+    if (targetField && currentHeaders[colIdx]) {
+      mappingsToSend[currentHeaders[colIdx]] = targetField;
+    }
+  }
+  if (Object.keys(mappingsToSend).length > 0) {
+    formData.append('field_mappings', JSON.stringify(mappingsToSend));
+  }
+
+  try {
+    const data = await Platform.fetch.post('/applications/analyze-import-duplicates', formData, { silent: true });
+    if (!data || data.success !== true) {
+      throw new Error((data && data.error) || 'The file could not be read.');
+    }
+    renderImportReview(data);
+    // The rows that arrive are safe to import, so offer the action now.
+    const btn = document.getElementById('import-applications-btn');
+    if (btn) btn.classList.remove('hidden');
+  } catch (error) {
+    // Render the failure, never a plausible-but-empty review.
+    safeHTML(analysisContent, `
+      <div class="rounded-lg border border-destructive/30 bg-destructive/5 p-4" data-testid="import-review-error">
+        <p class="text-sm font-medium text-destructive">The file could not be read.</p>
+        <p class="mt-1 text-sm text-muted-foreground">${escapeHtml(error.message || 'Please check the file and try again.')}</p>
+      </div>
+    `);
+    Platform.toast.error('Could not read the file: ' + (error.message || 'request failed') + '.');
+  }
+}
+
+// Streaming analysis is not wired here; read the file the one supported way.
+function performStreamingAnalysis() {
+  performRegularAnalysis();
+}
+
+// Render the import review: the figures a person reads, then every refused row
+// with its reason and the cell it is about, then the rows that will arrive.
+function renderImportReview(data) {
+  const analysisContent = document.getElementById('analysis-content');
+  if (!analysisContent) return;
+  const accepted = Array.isArray(data.accepted) ? data.accepted : [];
+  const refused = Array.isArray(data.refused) ? data.refused : [];
+  const acceptedCount = Number.isInteger(data.accepted_count) ? data.accepted_count : accepted.length;
+  const refusedCount = Number.isInteger(data.refused_count) ? data.refused_count : refused.length;
+  const totalRows = Number.isInteger(data.total_rows) ? data.total_rows : (acceptedCount + refusedCount);
+
+  let html = '<div class="space-y-4" data-testid="import-review">';
+
+  // The figures. A zero accepted or refused is stated plainly, never a dash.
+  html += `
+    <div class="grid grid-cols-3 gap-3">
+      <div class="rounded-lg border border-border bg-card p-4 text-center">
+        <p class="text-28 font-semibold tabular-nums text-foreground" data-testid="review-total">${escapeHtml(totalRows)}</p>
+        <p class="text-xs text-muted-foreground">rows in the file</p>
+      </div>
+      <div class="rounded-lg border border-success/30 bg-success/5 p-4 text-center">
+        <p class="text-28 font-semibold tabular-nums text-success-emphasis" data-testid="review-accepted">${escapeHtml(acceptedCount)}</p>
+        <p class="text-xs text-muted-foreground">accepted</p>
+      </div>
+      <div class="rounded-lg border border-warning/30 bg-warning/5 p-4 text-center">
+        <p class="text-28 font-semibold tabular-nums text-warning-emphasis" data-testid="review-refused">${escapeHtml(refusedCount)}</p>
+        <p class="text-xs text-muted-foreground">refused</p>
+      </div>
+    </div>
+  `;
+
+  // Refusals: each row with its reason and the cell it is about, so nothing is
+  // dropped without the person seeing why and where.
+  if (refusedCount > 0) {
+    html += `
+      <div class="rounded-lg border border-border overflow-hidden" data-testid="review-refused-list">
+        <div class="border-b border-border bg-muted/50 px-4 py-2">
+          <h4 class="text-sm font-semibold text-foreground">Refused rows — fix these and upload again</h4>
+        </div>
+        <div class="max-h-64 overflow-y-auto">
+          <table class="min-w-full divide-y divide-border">
+            <thead class="bg-card">
+              <tr>
+                <th class="px-4 py-2 text-left text-2xs font-semibold uppercase tracking-wider text-muted-foreground">Cell</th>
+                <th class="px-4 py-2 text-left text-2xs font-semibold uppercase tracking-wider text-muted-foreground">Why it was refused</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-border">
+              ${refused.map(r => `
+                <tr data-review-refused-row>
+                  <td class="px-4 py-2 text-sm font-medium text-foreground tabular-nums whitespace-nowrap">${escapeHtml(r.cell || ('row ' + r.row))}</td>
+                  <td class="px-4 py-2 text-sm text-muted-foreground">${escapeHtml(r.reason || 'Refused.')}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    `;
+  } else {
+    html += `
+      <div class="rounded-lg border border-success/30 bg-success/5 px-4 py-3" data-testid="review-none-refused">
+        <p class="text-sm text-success-emphasis">Every row can be imported. Nothing was refused.</p>
+      </div>
+    `;
+  }
+
+  // The rows that arrive, so the person sees what will land before they commit.
+  if (acceptedCount > 0) {
+    html += `
+      <div class="rounded-lg border border-border overflow-hidden" data-testid="review-accepted-list">
+        <div class="border-b border-border bg-muted/50 px-4 py-2">
+          <h4 class="text-sm font-semibold text-foreground">Rows that will arrive</h4>
+        </div>
+        <div class="max-h-64 overflow-y-auto">
+          <table class="min-w-full divide-y divide-border">
+            <tbody class="divide-y divide-border">
+              ${accepted.map(a => `
+                <tr data-review-accepted-row>
+                  <td class="px-4 py-2 text-sm text-foreground">${escapeHtml(a.name || '(unnamed)')}</td>
+                  <td class="px-4 py-2 text-sm text-muted-foreground tabular-nums whitespace-nowrap">row ${escapeHtml(a.row)}</td>
+                  <td class="px-4 py-2 text-sm text-muted-foreground">${a.outcome === 'update' ? 'updates an existing application' : 'new application'}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    `;
+  }
+
+  // Both routes have failed only when there is nothing to show at all; the
+  // caller handles that, here the review always has a shape.
+  html += '</div>';
+  safeHTML(analysisContent, html);
 }
 
 // Callback when review is confirmed
