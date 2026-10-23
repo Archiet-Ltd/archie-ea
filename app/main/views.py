@@ -452,6 +452,15 @@ def vendor_templates_redirect(subpath=None):
     return redirect(url_for("architecture.vendor_templates"), code=301)
 
 
+@main.route("/vendor-analysis")
+@main.route("/vendor-analysis/<path:subpath>")
+def vendor_analysis_redirect(subpath=None):
+    """Redirect /vendor-analysis to canonical /dashboard/vendor-analysis."""
+    if subpath:
+        return redirect("/dashboard/vendor-analysis/" + subpath, code=301)
+    return redirect("/dashboard/vendor-analysis", code=301)
+
+
 # ============================================================================
 # UTILITY ENDPOINTS
 # ============================================================================
