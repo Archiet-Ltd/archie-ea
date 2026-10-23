@@ -435,8 +435,15 @@
           {{ edit_row('Development Team', 'devTeam', app.development_team) }}
           {{ edit_row('Support Team', 'supportLevel', app.support_team) }}
           {% else %}
-          {% set has_any_owner = app.application_owner or app.business_owner or app.technical_owner or app.technical_lead or app.product_manager or app.development_team or app.support_team %}
+          {% set owner_rows = owner_rows | default([]) %}
+          {% set has_any_owner = owner_rows or app.application_owner or app.business_owner or app.technical_owner or app.technical_lead or app.product_manager or app.development_team or app.support_team %}
           {% if has_any_owner %}
+          {% if owner_rows %}
+          <div class="flex items-start justify-between gap-4" data-testid="application-owner">
+            <span class="text-muted-foreground">Owner</span>
+            <span class="text-right font-medium">{{ owner_rows | map(attribute='user_name') | select | join(', ') }}</span>
+          </div>
+          {% endif %}
           {{ detail_row('Application Owner', app.application_owner) }}
           {{ detail_row('Business Owner', app.business_owner) }}
           {{ detail_row('Technical Owner', app.technical_owner) }}
@@ -445,11 +452,20 @@
           {{ detail_row('Development Team', app.development_team) }}
           {{ detail_row('Support Team', app.support_team) }}
           {% else %}
-          <div class="py-3 text-center">
-            <p class="text-sm text-muted-foreground">No ownership data</p>
-            {% if can('edit', 'application') %}
-            <a href="{{ url_for('unified_applications.application_edit', id=app.id) }}"
-               class="text-xs text-primary hover:underline mt-1 inline-block">Add via Edit page</a>
+          <div class="py-3" data-testid="application-owner-empty">
+            <p class="text-sm text-muted-foreground">No owner recorded.</p>
+            {% if can('edit', 'application') and owner_assign_url %}
+            <div class="mt-3 space-y-2" data-owner-picker data-owners-url="{{ owner_assign_url }}">
+              <p class="text-sm font-medium text-foreground">Assign owner</p>
+              <div class="relative">
+                <input type="text" data-owner-search autocomplete="off"
+                       placeholder="Search by name"
+                       class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+                <div data-owner-results class="hidden absolute z-10 mt-1 w-full rounded-md border border-border bg-card max-h-48 overflow-y-auto"></div>
+              </div>
+              <button type="button" data-owner-save disabled
+                      class="inline-flex h-9 items-center justify-center rounded-md border border-input bg-background px-3 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50">Save owner</button>
+            </div>
             {% endif %}
           </div>
           {% endif %}
@@ -2086,4 +2102,14 @@
 {% endif %}
 {% include "components/unified_mapping_modal.html" %}
 {% endif %}{# /if app — modals #}
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+{% if app %}
+{# The one owner picker: it initialises every [data-owner-picker] on load,
+   so the Ownership card's "Assign owner" step drives the same assign flow
+   the application edit page and the AI systems register use. #}
+<script src="{{ url_for('static', filename='js/applications/owner_picker.js') }}"></script>
+{% endif %}
 {% endblock %}
