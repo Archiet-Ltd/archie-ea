@@ -272,3 +272,50 @@ def login_as(app):
                 delattr(g, cached)
 
     return _login
+
+# --- Pool-of-one run (ARCHIE_TEST_POOL=one) ---------------------------------
+# ADR 0013 requirement 15: the whole suite runs on one pooled connection so that
+# every test reuses the same physical connection. The run proves it did: each
+# backend process id is recorded at checkout, and the session fails when no
+# process id was ever seen twice (a suite that quietly fell back to a fresh
+# connection per test would otherwise pass for the wrong reason).
+_POOL_PIDS: dict[int, int] = {}
+
+
+def _backend_pid(dbapi_connection):
+    getter = getattr(dbapi_connection, "get_backend_pid", None)  # psycopg2
+    if getter is not None:
+        return getter()
+    info = getattr(dbapi_connection, "info", None)  # psycopg 3
+    return getattr(info, "backend_pid", None)
+
+
+if os.environ.get("ARCHIE_TEST_POOL", "").strip().lower() == "one":
+    from sqlalchemy import event as _sa_event
+    from sqlalchemy.pool import Pool as _Pool
+
+    @_sa_event.listens_for(_Pool, "checkout")
+    def _record_backend_pid(dbapi_connection, connection_record, connection_proxy):
+        try:
+            pid = _backend_pid(dbapi_connection)
+        except Exception:  # a closed connection is handled by the pool itself
+            return
+        if pid:
+            _POOL_PIDS[pid] = _POOL_PIDS.get(pid, 0) + 1
+
+
+def pytest_sessionfinish(session, exitstatus):
+    if os.environ.get("ARCHIE_TEST_POOL", "").strip().lower() != "one":
+        return
+    if getattr(session.config, "workerinput", None) is not None:
+        return  # an xdist worker; the controller has no pids to judge
+    if session.config.option.collectonly or session.testscollected == 0:
+        return
+    reused = {pid: n for pid, n in _POOL_PIDS.items() if n > 1}
+    print(
+        f"\npool-of-one: {len(_POOL_PIDS)} backend process ids seen at checkout, "
+        f"{len(reused)} seen more than once, most reused {max(_POOL_PIDS.values(), default=0)} times"
+    )
+    if not reused:
+        print("pool-of-one: FAIL - no backend process id was seen more than once")
+        session.exitstatus = 1
