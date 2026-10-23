@@ -32,7 +32,7 @@
 
   {# ── Graph + side panel ──────────────────────────────────────────────── #}
   <div class="grid grid-cols-1 lg:grid-cols-[1fr_280px] gap-4">
-    <div class="rounded-xl border border-border bg-card overflow-hidden relative">
+    <div class="rounded-lg border border-border bg-card overflow-hidden relative">
       <svg id="impact-svg" class="w-full block"
            style="height:600px"  {# inline-style-ok: fixed graph canvas height #}
            data-element-id="{{ element.id }}"
@@ -47,7 +47,7 @@
       </div>
     </div>
 
-    <aside class="rounded-xl border border-border bg-card p-4">
+    <aside class="rounded-lg border border-border bg-card p-4">
       <h2 class="text-sm font-semibold text-foreground mb-3">Legend</h2>
       <ul class="space-y-1.5 text-sm">
         <li class="flex items-center gap-2"><span class="inline-block h-3 w-3 rounded-full" style="background:#B9770E">{# inline-style-ok #}</span> Business</li>
@@ -85,7 +85,7 @@
         <p class="text-sm text-muted-foreground">No decision is recorded against this element yet.</p>
         {% endif %}
         <a href="{{ url_for('arch_decisions.create_decision', element_id=element.id) }}"
-           class="mt-3 inline-flex h-8 items-center gap-1.5 rounded-md border border-input bg-background px-3 text-sm font-medium text-foreground hover:bg-accent hover:text-accent-foreground">
+           class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 mt-3 items-center">
           <i data-lucide="plus" class="h-4 w-4" aria-hidden="true"></i>Record a decision
         </a>
       </section>
@@ -98,7 +98,7 @@
     {% for key, heading, hint in [
          ('consumers', 'Consumers (depend on this)', 'A change to this element can reach each of these.'),
          ('providers', 'Providers (this depends on)', 'A change to any of these can reach this element.')] %}
-    <section class="rounded-xl border border-border bg-card p-4" aria-labelledby="impact-{{ key }}-title"
+    <section class="rounded-lg border border-border bg-card p-4" aria-labelledby="impact-{{ key }}-title"
              data-testid="impact-{{ key }}">
       <h2 id="impact-{{ key }}-title" class="text-sm font-semibold text-foreground">{{ heading }}</h2>
       <p class="text-xs text-muted-foreground mt-0.5 mb-3">{{ hint }}</p>

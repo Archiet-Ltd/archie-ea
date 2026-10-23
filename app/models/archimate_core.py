@@ -100,6 +100,18 @@ if _FAST_INIT:
         superseded_at = db.Column(db.DateTime, nullable=True)
         last_confirmed = db.Column(db.DateTime, nullable=True)
 
+        # Provenance origin: where this element came from.
+        # source_kind: 'manual', 'import', 'connector', 'derived'
+        # source_ref: import batch id, connector run id, or user id as text
+        # source_label: file name, connector name, or person's display name
+        # source_recorded_at: when the origin was recorded
+        # Nullable so every existing row stays valid; existing rows read as
+        # 'manual' with created_by_id when columns are null (no backfill).
+        source_kind = db.Column(db.String(20), nullable=True)
+        source_ref = db.Column(db.Text, nullable=True)
+        source_label = db.Column(db.Text, nullable=True)
+        source_recorded_at = db.Column(db.DateTime, nullable=True)
+
         # Relationships
         # Note: app_component relationship is handled in the main ArchiMateElement model
         # to avoid conflicts with the duplicate class definition
@@ -175,6 +187,20 @@ if _FAST_INIT:
         # so every pre-existing relationship renders (in creation order) instead
         # of being dropped for lacking a value reconcile-schema cannot backfill.
         sequence_order = db.Column(db.Integer, nullable=True)
+
+        # Provenance origin: where this relationship came from.
+        # source_kind: 'manual', 'import', 'connector', 'derived'
+        # source_ref: import batch id, connector run id, or user id as text
+        # source_label: file name, connector name, or person's display name
+        # source_recorded_at: when the origin was recorded
+        # Nullable so every existing row stays valid; existing rows read as
+        # 'manual' with created_by_id when columns are null (no backfill).
+        source_kind = db.Column(db.String(20), nullable=True)
+        source_ref = db.Column(db.Text, nullable=True)
+        source_label = db.Column(db.Text, nullable=True)
+        source_recorded_at = db.Column(db.DateTime, nullable=True)
+        # Properties read from the exchange file for this relationship.
+        custom_properties = db.Column(db.JSON, nullable=True)
 
         # Model history -- same columns as the normal-runtime twin
         # in app/models/models.py.

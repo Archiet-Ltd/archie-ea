@@ -480,7 +480,7 @@ def test_the_picker_is_an_aria_combobox_and_works_from_the_keyboard(
     ids = [options.nth(i).get_attribute("id") for i in range(4)]
     assert all(ids) and len(set(ids)) == 4
 
-    status = page.locator("#ask-question-panel-impact [role=status]")
+    status = page.locator("#ask-question-panel [role=status]")
     assert status.inner_text() == "4 results for %s" % graph["noun"]
     assert status.get_attribute("aria-live") == "polite"
     assert status.get_attribute("aria-atomic") == "true"
@@ -1338,7 +1338,7 @@ def test_ask_still_shows_a_stale_connection_marked_with_a_notice_and_an_action(
     expect(page.locator("[data-not-computed-notice]")).to_be_hidden()
 
     # Nothing is hidden from the count: it names every connection on the page.
-    expect(page.locator("#ask-question-panel-impact [role=status]")).to_have_text(
+    expect(page.locator("#ask-question-panel [role=status]")).to_have_text(
         "4 connections for %s" % names["service"])
 
     # The drawer says the same, and is named for what is true of the connection.
@@ -1496,7 +1496,7 @@ def test_an_answer_that_leaves_worked_out_connections_out_says_so_in_its_counts(
     notice = page.locator("[data-stale-notice]")
     expect(notice).to_contain_text("Some connections we worked out are not shown because they may be out of date.")
     expect(notice.get_by_role("button", name="Work them out now")).to_be_visible()
-    expect(page.locator("#ask-question-panel-impact [role=status]")).to_have_text(
+    expect(page.locator("#ask-question-panel [role=status]")).to_have_text(
         "3 connections for %s, worked-out connections not shown" % names["service"])
 
     _open_twin_map(page, live_server, stale_tenant["service"])
@@ -1519,7 +1519,7 @@ def test_the_status_region_counts_results_after_typing_and_connections_after_cho
     _open_ask(page, live_server)
     _open_question(page)
     box = page.locator("#ask-picker-input")
-    status = page.locator("#ask-question-panel-impact [role=status]")
+    status = page.locator("#ask-question-panel [role=status]")
 
     box.press_sequentially(bare_tenant["head_name"], delay=15)
     expect(box).to_have_value(bare_tenant["head_name"])

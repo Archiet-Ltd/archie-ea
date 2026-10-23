@@ -34,7 +34,7 @@
   </div>
 
   {% if rollup.over_budget %}
-  <div data-testid="over-budget-indicator" role="alert" class="border border-destructive/40 bg-destructive/10 text-destructive-emphasis rounded-lg p-4 mb-6 flex items-center gap-2">
+  <div data-testid="over-budget-indicator" role="alert" class="border border-destructive/40 bg-destructive/10 text-destructive-emphasis rounded-md px-3 py-2 mb-6 flex items-center gap-2">
     <span class="inline-flex items-center rounded-full bg-destructive/20 px-2.5 py-0.5 text-xs font-medium text-destructive-emphasis">Over budget</span>
     <p class="text-sm">Committed cost exceeds the investment budget by {{ rollup.overage | currency if rollup.overage is not none else rollup.overage | dash }}.</p>
   </div>

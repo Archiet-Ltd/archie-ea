@@ -21,7 +21,7 @@
             x-show="selectOpen" x-cloak @keydown.escape.window="selectOpen = false" role="dialog" aria-modal="true"
             @click.away="selectOpen = false"
             x-transition
-            class="absolute z-50 mt-1 w-full rounded-md border bg-popover text-popover-foreground shadow-md hidden" >
+            class="absolute z-50 mt-1 w-full rounded-md border border-border bg-popover text-popover-foreground hidden" >
             <div class="p-1">
                 {% for value, label in options %}
                     <button

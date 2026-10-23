@@ -40,6 +40,7 @@ from app.models.archimate import ElementType, RelationshipType
 from app.models.models import ArchiMateElement, ArchiMateRelationship
 from app.models.unified_application_capability_mapping import UnifiedApplicationCapabilityMapping
 from app.models.unified_capability import BusinessDomain, UnifiedCapability
+from app.models.archimate_element_types import application_kind_types
 
 logger = logging.getLogger(__name__)
 
@@ -198,7 +199,7 @@ class ArchiMateViewpointGenerator:
 
         # Get application components
         query = ArchiMateElement.query.filter(
-            ArchiMateElement.type == "ApplicationComponent"
+            ArchiMateElement.type.in_(application_kind_types())
         )
 
         if capability_ids:
@@ -373,7 +374,7 @@ class ArchiMateViewpointGenerator:
 
         # Get application elements
         app_query = ArchiMateElement.query.filter(
-            ArchiMateElement.type == "ApplicationComponent"
+            ArchiMateElement.type.in_(application_kind_types())
         )
         if application_ids:
             app_query = app_query.filter(ArchiMateElement.id.in_(application_ids))

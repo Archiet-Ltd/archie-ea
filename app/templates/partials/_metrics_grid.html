@@ -21,7 +21,7 @@
 
 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-6">
   {% for metric in metrics %}
-  <div class="rounded-xl border-2 border-input bg-background hover:border-primary/50 hover:shadow-sm transition-all duration-200 p-5">
+  <div class="rounded-xl border-2 border-input bg-background hover:border-primary/50 transition-all duration-200 p-5">
     <div class="flex items-start gap-4">
       <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg {{ metric.icon_gradient }}">
         <i data-lucide="{{ metric.icon }}" class="h-5 w-5 text-primary-foreground"></i>

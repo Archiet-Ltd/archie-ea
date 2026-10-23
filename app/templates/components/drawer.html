@@ -52,8 +52,7 @@
         x-transition:leave-start="opacity-100"
         x-transition:leave-end="opacity-0"
         @click="drawerOpen = false"
-        class="modal-backdrop fixed inset-0 bg-background/80 transition-opacity duration-200 overflow-y-auto"
-        style="z-index: var(--modal-z, 1000);" aria-hidden="true"
+        class="modal-backdrop fixed inset-0 transition-opacity duration-200 overflow-y-auto bg-overlay/50" aria-hidden="true"
     ></div>
 
     <!-- Panel -->
@@ -74,8 +73,7 @@
         x-transition:leave="transition ease-in duration-200"
         x-transition:leave-start="translate-x-0"
         x-transition:leave-end="translate-x-full"
-        class="modal-panel fixed right-0 top-0 h-full w-full {{ width_class }} bg-background border-l border-border shadow-xl flex flex-col"
-        style="z-index: calc(var(--modal-z, 1000) + 1);"
+        class="modal-panel fixed right-0 top-0 h-full w-full {{ width_class }} bg-background border-l border-border flex flex-col"
         role="dialog"
         aria-modal="true"
         aria-labelledby="drawer-title-{{ id }}"
@@ -93,7 +91,7 @@
             </div>
             <button type="button"
                 @click="drawerOpen = false"
-                class="ml-4 h-8 w-8 rounded-md hover:bg-muted flex items-center justify-center shrink-0 transition-colors"
+                class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ml-4 shrink-0"
                 aria-label="Close drawer"
             >
                 <i data-lucide="x" class="h-4 w-4" aria-hidden="true"></i>

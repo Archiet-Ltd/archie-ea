@@ -11,7 +11,7 @@
     ) }}
 
     <div class="flex items-center gap-3 mb-6 text-sm text-muted-foreground">
-        <span class="px-2 py-1 rounded-full bg-primary/10 text-primary font-medium">{{ total }} template element{{ '' if total == 1 else 's' }}</span>
+        <span class="px-2 py-1 rounded-full bg-primary/10 text-info-emphasis font-medium">{{ total }} template element{{ '' if total == 1 else 's' }}</span>
         {% if version %}<span>Template version {{ version }}</span>{% endif %}
         <span>{{ grouped|length }} vendor{{ '' if grouped|length == 1 else 's' }}</span>
     </div>
@@ -30,7 +30,7 @@
                 <span class="text-xs text-muted-foreground">{{ rows|length }} element{{ '' if rows|length == 1 else 's' }}</span>
             </div>
             <div class="overflow-x-auto">
-                <table class="w-full text-sm">
+                <table class="dense-table w-full text-sm">
                     <thead>
                         <tr class="text-left text-xs uppercase tracking-wide text-muted-foreground border-b border-border">
                             <th class="px-6 py-3 font-medium">Element</th>
@@ -51,7 +51,7 @@
                             </td>
                             <td class="px-6 py-3">
                                 {% if t.mandatory %}
-                                <span class="px-2 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary">Mandatory</span>
+                                <span class="px-2 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-info-emphasis">Mandatory</span>
                                 {% else %}
                                 <span class="px-2 py-0.5 rounded-full text-xs font-medium bg-muted text-muted-foreground">Suggested</span>
                                 {% endif %}
