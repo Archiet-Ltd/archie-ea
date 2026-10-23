@@ -487,6 +487,7 @@
                 {% endif %}
                 <div class="relative" x-data="{ mapOpen: false }"
                   data-app-map-id="{{ app.id }}"
+                  data-can-map="{{ 'true' if can_edit_capabilities(current_user) else 'false' }}"
                   data-app-map-name="{{ app.name | e }}">
                   <button type="button" @click="mapOpen = !mapOpen" @click.outside="mapOpen = false" @keydown.escape="mapOpen = false"
                     :aria-expanded="mapOpen.toString()" aria-haspopup="menu"
@@ -632,6 +633,7 @@
             {% endif %}
             <div class="relative" x-data="{ mapOpen: false }"
               data-app-map-id="{{ app.id }}"
+              data-can-map="{{ 'true' if can_edit_capabilities(current_user) else 'false' }}"
               data-app-map-name="{{ app.name | e }}">
               <button type="button" @click="mapOpen = !mapOpen" @click.outside="mapOpen = false" @keydown.escape="mapOpen = false"
                 :aria-expanded="mapOpen.toString()" aria-haspopup="menu"

@@ -757,7 +757,7 @@ async function loadUnifiedApplications(targetId) {
         UnifiedMappingModal.selectedApplications.clear();
         let preIds = UnifiedMappingModal.preSelectIds || [];
         UnifiedMappingModal.applicationsData.forEach(function(app) {
-            if (app.is_mapped || preIds.indexOf(app.id) !== -1) {
+            if (app.is_mapped || preIds.map(String).indexOf(String(app.id)) !== -1) {
                 UnifiedMappingModal.selectedApplications.set(app.id, {
                     application_id: app.id,
                     mapping_id: app.mapping_id || null,
@@ -1306,7 +1306,7 @@ async function _saveUnifiedMappingsInner() {
             url = '/capability-map/api/save-archimate-mappings';
             bodyKey = 'element_id';
         } else if (UnifiedMappingModal.context === 'vendor') {
-            url = '/api/vendors/application-mappings';
+            url = '/capability-map/api/vendors/application-mappings';
             bodyKey = 'vendor_product_id';
         }
 

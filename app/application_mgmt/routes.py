@@ -2094,6 +2094,43 @@ def render_application_detail(id):
         "product_count": 0,
         "has_archimate": bool(app_obj.archimate_element_id),
     }
+    # Vendor products linked to this application (the modal's vendor mapping
+    # and the vendor footprint form both write application_component_vendor_products).
+    try:
+        from app.models.relationship_tables import application_component_vendor_products as _acvp
+
+        linked_rows = db.session.execute(
+            db.select(
+                VendorProduct.id,
+                VendorProduct.name,
+                VendorOrganization.name.label("vendor_name"),
+                _acvp.c.deployment_type,
+                _acvp.c.criticality,
+                _acvp.c.relationship_type,
+            )
+            .select_from(_acvp)
+            .join(VendorProduct, VendorProduct.id == _acvp.c.vendor_product_id)
+            .join(VendorOrganization, VendorOrganization.id == VendorProduct.vendor_organization_id)
+            .where(_acvp.c.application_component_id == app_obj.id)
+            .order_by(VendorOrganization.name, VendorProduct.name)
+        ).all()
+        vendor_footprint = [
+            {
+                "id": r.id,
+                "vendor_name": r.vendor_name,
+                "product_name": r.name,
+                "deployment_type": r.deployment_type,
+                "criticality": r.criticality,
+                "status": r.relationship_type,
+            }
+            for r in linked_rows
+        ]
+        vendor_summary["product_count"] = len(vendor_footprint)
+        vendor_summary["vendor_count"] = len({r.vendor_name for r in linked_rows})
+    except Exception:
+        logger.exception("Could not load vendor products for application %s", app_obj.id)
+        db.session.rollback()
+
     # Populate vendor product dropdown from VendorProduct table
     all_products = []
     try:
@@ -2205,13 +2242,44 @@ def render_application_detail(id):
             })
         cap_table["rows"] = cap_rows
 
+    # Processes this application supports (the modal's APQC mapping writes
+    # ProcessApplicationMapping).
+    process_table = _empty_table()
+    try:
+        from app.models.apqc_process import APQCProcess, ProcessApplicationMapping
+        from app.services.apqc_mapping_tenant_fence import fenced_application_mappings_query
+
+        process_pairs = (
+            fenced_application_mappings_query()
+            .filter(ProcessApplicationMapping.application_id == id)
+            .join(APQCProcess, APQCProcess.id == ProcessApplicationMapping.apqc_process_id)
+            .add_entity(APQCProcess)
+            .order_by(APQCProcess.process_code)
+            .all()
+        )
+        process_table["rows"] = [
+            {
+                "code": proc.process_code,
+                "name": proc.process_name,
+                "support_type": (mapping.support_level or "").replace("_", " ").title() or "\u2014",
+                "automation": mapping.automation_level if mapping.automation_level is not None else "\u2014",
+                "criticality": "\u2014",
+                "integration": "\u2014",
+                "transactions": "\u2014",
+            }
+            for mapping, proc in process_pairs
+        ]
+    except Exception:
+        logger.exception("Could not load process mappings for application %s", id)
+        db.session.rollback()
+
     dashboard_config = {
         "charts": {},
         "tables": {
             "application-relationships": _empty_table(),
             "application-capabilities": cap_table,
             "application-archimate-links": _empty_table(),
-            "application-processes": _empty_table(),
+            "application-processes": process_table,
         },
     }
 
@@ -2338,7 +2406,7 @@ def render_application_detail(id):
         value_streams=[],
         courses_of_action=[],
         business_services=[],
-        business_processes=[],
+        business_processes=process_table["rows"],
         business_actors=[],
         business_roles=[],
         business_collaborations=[],
