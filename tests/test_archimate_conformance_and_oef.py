@@ -31,15 +31,13 @@ import pytest
 
 NS = "{http://www.opengroup.org/xsd/archimate/3.0/}"
 
-
-@pytest.fixture(scope="module")
-def app():
-    from app import create_app
-
-    application = create_app("testing")
-    application.config["TESTING"] = True
-    application.config["WTF_CSRF_ENABLED"] = False
-    return application
+# Tests below that need the app (the OEF export fixture, and the empty-model
+# export test) use the shared session-scoped ``app`` fixture from
+# tests/conftest.py rather than defining their own — a hand-rolled copy used
+# to live here, and the OEF fixture also used to insert its own Organization
+# row (falling back to "seed one if the table is empty") through a plain
+# request context with no cleanup, which was the leak this file used to leave
+# behind on every run against an empty database.
 
 
 # ---------------------------------------------------------------- conformance
@@ -168,12 +166,22 @@ class TestRelationshipConformance:
 # ---------------------------------------------------------------- OEF export
 
 
-@pytest.fixture(scope="module")
-def exported_model(app):
-    """Build a small model with properties and a laid-out diagram, then export it."""
+@pytest.fixture
+def exported_model(db_session, make_org):
+    """Build a small model with properties and a laid-out diagram, then export it.
+
+    Function-scoped (was module-scoped): every row this creates now lives
+    inside ``db_session``'s per-test savepoint, which is always rolled back,
+    so nothing needs manual deletion. The ``db_session.commit()`` below is not
+    a real commit — ``join_transaction_mode="create_savepoint"``
+    (tests/conftest.py) turns it into a SAVEPOINT release inside that outer,
+    rolled-back transaction. ``service.export_to_xml`` reads through the same
+    session, so the export sees those rows regardless.
+    """
     import xml.etree.ElementTree as ET
 
-    from app import db
+    from flask import g
+
     from app.models import ArchitectureModel
     from app.models.archimate_core import (
         SavedDiagram,
@@ -184,104 +192,67 @@ def exported_model(app):
     from app.modules.architecture.services import archimate_xml_export_service as service
 
     suffix = uuid.uuid4().hex[:8]
-    created = {}
 
-    with app.test_request_context("/"):
-        from flask import g
+    org = make_org("oef")
+    g.current_org_id = org.id
 
-        org = db.session.execute(
-            db.text("SELECT id FROM organizations ORDER BY id LIMIT 1")
-        ).scalar()
-        if org is None:
-            from app.models.organization import Organization
+    model = ArchitectureModel(name=f"OEF Test Model {suffix}")
+    db_session.add(model)
+    db_session.flush()
 
-            seeded = Organization(name=f"OEF Org {suffix}", slug=f"oef-{suffix}")
-            db.session.add(seeded)
-            db.session.flush()
-            org = seeded.id
-        g.current_org_id = org
+    component = ArchiMateElement(
+        name="Order Management",
+        type="application_component",
+        architecture_id=model.id,
+        description="Core ordering application",
+        # `properties` is a Text column holding JSON, not a JSON column.
+        properties=json.dumps({"Owner": "Alice", "Criticality": "High"}),
+    )
+    record = ArchiMateElement(
+        name="Customer Record", type="business_object", architecture_id=model.id
+    )
+    db_session.add_all([component, record])
+    db_session.flush()
 
-        model = ArchitectureModel(name=f"OEF Test Model {suffix}")
-        db.session.add(model)
-        db.session.flush()
+    rel = ArchiMateRelationship(
+        type="access",
+        architecture_id=model.id,
+        source_id=component.id,
+        target_id=record.id,
+    )
+    db_session.add(rel)
+    db_session.flush()
 
-        component = ArchiMateElement(
-            name="Order Management",
-            type="application_component",
-            architecture_id=model.id,
-            description="Core ordering application",
-            # `properties` is a Text column holding JSON, not a JSON column.
-            properties=json.dumps({"Owner": "Alice", "Criticality": "High"}),
-        )
-        record = ArchiMateElement(
-            name="Customer Record", type="business_object", architecture_id=model.id
-        )
-        db.session.add_all([component, record])
-        db.session.flush()
+    diagram = SavedDiagram(name=f"Layout {suffix}")
+    db_session.add(diagram)
+    db_session.flush()
+    db_session.add_all(
+        [
+            SavedDiagramElement(
+                diagram_id=diagram.id,
+                element_id=component.id,
+                position_x=10,
+                position_y=20,
+                width=200,
+                height=80,
+            ),
+            SavedDiagramElement(
+                diagram_id=diagram.id, element_id=record.id, position_x=300, position_y=20
+            ),
+            SavedDiagramRelationship(diagram_id=diagram.id, relationship_id=rel.id),
+        ]
+    )
+    db_session.commit()
 
-        rel = ArchiMateRelationship(
-            type="access",
-            architecture_id=model.id,
-            source_id=component.id,
-            target_id=record.id,
-        )
-        db.session.add(rel)
-        db.session.flush()
+    xml = service.export_to_xml(model.id)
 
-        diagram = SavedDiagram(name=f"Layout {suffix}")
-        db.session.add(diagram)
-        db.session.flush()
-        db.session.add_all(
-            [
-                SavedDiagramElement(
-                    diagram_id=diagram.id,
-                    element_id=component.id,
-                    position_x=10,
-                    position_y=20,
-                    width=200,
-                    height=80,
-                ),
-                SavedDiagramElement(
-                    diagram_id=diagram.id, element_id=record.id, position_x=300, position_y=20
-                ),
-                SavedDiagramRelationship(diagram_id=diagram.id, relationship_id=rel.id),
-            ]
-        )
-        db.session.commit()
-
-        created = {"model": model.id, "diagram": diagram.id}
-        xml = service.export_to_xml(model.id)
-
-    yield ET.fromstring(xml), xml, created
-
-    with app.test_request_context("/"):
-        from flask import g
-
-        g.current_org_id = org
-        for sql in (
-            "DELETE FROM saved_diagram_relationships WHERE diagram_id=:d",
-            "DELETE FROM saved_diagram_elements WHERE diagram_id=:d",
-            "DELETE FROM saved_diagrams WHERE id=:d",
-        ):
-            db.session.execute(db.text(sql), {"d": created["diagram"]})
-        db.session.execute(
-            db.text("DELETE FROM archimate_relationships WHERE architecture_id=:a"),
-            {"a": created["model"]},
-        )
-        db.session.execute(
-            db.text("DELETE FROM archimate_elements WHERE architecture_id=:a"),
-            {"a": created["model"]},
-        )
-        db.session.execute(
-            db.text("DELETE FROM architecture_models WHERE id=:a"), {"a": created["model"]}
-        )
-        db.session.commit()
+    return ET.fromstring(xml), xml
 
 
 class TestOpenExchangeExport:
     def test_child_order_matches_the_schema(self, exported_model):
         """The schema fixes the sequence; right data in the wrong order is rejected."""
-        root, _, _ = exported_model
+        root, _ = exported_model
         assert [child.tag.replace(NS, "") for child in root] == [
             "name",
             "elements",
@@ -292,13 +263,13 @@ class TestOpenExchangeExport:
         ]
 
     def test_elements_and_relationships_present(self, exported_model):
-        root, _, _ = exported_model
+        root, _ = exported_model
         assert len(root.findall(f"{NS}elements/{NS}element")) == 2
         assert len(root.findall(f"{NS}relationships/{NS}relationship")) == 1
 
     def test_custom_properties_survive_the_export(self, exported_model):
         """Previously dropped entirely — this is most of the enterprise metadata."""
-        root, _, _ = exported_model
+        root, _ = exported_model
         declared = {
             n.text
             for n in root.findall(f"{NS}propertyDefinitions/{NS}propertyDefinition/{NS}name")
@@ -318,7 +289,7 @@ class TestOpenExchangeExport:
 
     def test_organizations_group_elements_by_layer(self, exported_model):
         """Without this an importing tool shows one flat folder."""
-        root, _, _ = exported_model
+        root, _ = exported_model
         labels = [x.text for x in root.findall(f"{NS}organizations/{NS}item/{NS}label")]
         assert "Application" in labels and "Business" in labels
 
@@ -331,7 +302,7 @@ class TestOpenExchangeExport:
 
     def test_views_carry_diagram_geometry(self, exported_model):
         """The whole point of OEF over CSV: layout round-trips."""
-        root, _, _ = exported_model
+        root, _ = exported_model
         nodes = root.findall(f"{NS}views/{NS}diagrams/{NS}view/{NS}node")
         assert len(nodes) == 2
 
@@ -344,7 +315,7 @@ class TestOpenExchangeExport:
 
     def test_view_references_resolve(self, exported_model):
         """A dangling ref makes the file unopenable, which is worse than omitting views."""
-        root, _, _ = exported_model
+        root, _ = exported_model
         element_ids = {e.get("identifier") for e in root.findall(f"{NS}elements/{NS}element")}
         rel_ids = {
             r.get("identifier") for r in root.findall(f"{NS}relationships/{NS}relationship")
@@ -364,7 +335,7 @@ class TestOpenExchangeExport:
             assert conn.get("target") in node_ids
 
     def test_declares_the_open_group_namespace(self, exported_model):
-        _, xml, _ = exported_model
+        _, xml = exported_model
         assert "http://www.opengroup.org/xsd/archimate/3.0/" in xml
 
     def test_export_of_an_empty_model_is_still_well_formed(self, app):
