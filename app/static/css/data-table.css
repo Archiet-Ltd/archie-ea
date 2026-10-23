@@ -481,8 +481,7 @@
   left: 0 !important;
   width: 100% !important;
   height: 100% !important;
-  background: rgba(0, 0, 0, 0.5) !important;
-  backdrop-filter: blur(4px);
+  background: rgb(15 23 42 / 0.5) !important;
 }
 
 .drawer-content {

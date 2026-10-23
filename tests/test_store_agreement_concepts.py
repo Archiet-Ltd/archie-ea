@@ -68,8 +68,6 @@ EXPECTED = {
     ],
     "application owners": [
         "app.models.application_owner.ApplicationOwner",
-        "app.models.enterprise_intelligence.ApplicationOwnership",
-        "app.models.application_portfolio.ApplicationComponent",
     ],
     # ArchitectureDecisionRecord dropped from this list by the decision-register
     # consolidation: every row is dual-write paired into ArchitectureDecision
@@ -357,7 +355,7 @@ def _seed(db_session, org, user, owners, costs, risks, packages, approvals):
         application = ApplicationComponent(
             name="App %s %s" % (i, uuid.uuid4().hex[:6]),
             organization_id=org.id,
-            business_owner="Owner %s" % i if i < owners else None)
+            legacy_business_owner="Owner %s" % i if i < owners else None)
         db_session.add(application)
         db_session.flush()
         if i < owners:
@@ -425,8 +423,6 @@ def test_two_organisations_never_change_each_others_counts(
     assert before["application owners"]["orm:ApplicationOwner(applications)"] == 2
     assert before["application owners"][
         "orm:ApplicationOwner(applications, primary)"] == 2
-    assert before["application owners"][
-        "orm:ApplicationComponent(owner text recorded)"] == 2
     assert before["applications with a recorded annual cost"][
         "orm:ApplicationCost(applications)"] == 1
     assert before["risks"]["orm:Risk"] == 3

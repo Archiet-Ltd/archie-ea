@@ -8,6 +8,7 @@ IMP-001: Add MIME type validation for file uploads
 """
 
 import logging
+import zipfile
 from typing import Optional, Set
 
 # Try to import python-magic (may not be installed in all environments)
@@ -39,6 +40,27 @@ REJECTED_MIME_TYPES = {
     'text/x-python',
     'text/x-shellscript',
 }
+
+
+XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+
+
+def is_xlsx_package(file) -> bool:
+    """True when the stream is a zip holding the parts every .xlsx must have.
+
+    Libraries that write spreadsheets differ in what a header sniffer reports
+    (often plain ``application/zip``), so the package structure is the check.
+    The stream position is restored afterwards.
+    """
+    try:
+        file.seek(0)
+        with zipfile.ZipFile(file) as archive:
+            names = set(archive.namelist())
+        return "[Content_Types].xml" in names and "xl/workbook.xml" in names
+    except (zipfile.BadZipFile, OSError, ValueError):
+        return False
+    finally:
+        file.seek(0)
 
 
 class InvalidFileTypeError(ValueError):
@@ -77,6 +99,14 @@ def validate_mime_type(file, filename: Optional[str] = None) -> str:
         >>> mime = validate_mime_type(file)
         >>> assert mime == 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
     """
+    is_xlsx_name = bool(filename) and filename.lower().endswith(".xlsx")
+    if is_xlsx_name:
+        # Decide by the file's structure, not by what the sniffer calls it.
+        if is_xlsx_package(file):
+            return XLSX_MIME
+        logger.warning("Rejected %s: not a valid .xlsx package", filename)
+        raise InvalidFileTypeError("not an Excel workbook", filename)
+
     if not MAGIC_AVAILABLE:
         logger.warning(
             "python-magic not installed. MIME type validation disabled. "

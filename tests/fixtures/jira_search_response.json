@@ -1,0 +1,56 @@
+{
+  "expand": "schema,names",
+  "startAt": 0,
+  "maxResults": 100,
+  "total": 3,
+  "issues": [
+    {
+      "id": "10001",
+      "key": "EA-1",
+      "fields": {
+        "summary": "Migrate payroll to the cloud platform",
+        "description": {"type": "doc", "version": 1, "content": [{"type": "paragraph", "content": [{"type": "text", "text": "Rich text body"}]}]},
+        "status": {"name": "In Progress"},
+        "priority": {"name": "High"},
+        "issuetype": {"name": "Epic"},
+        "assignee": {"displayName": "Ada Example"},
+        "reporter": {"displayName": "Bo Example"},
+        "created": "2026-09-01T10:00:00.000+00:00",
+        "updated": "2026-10-01T09:30:00.000+00:00",
+        "duedate": "2026-12-31"
+      }
+    },
+    {
+      "id": "10002",
+      "key": "EA-2",
+      "fields": {
+        "summary": "Retire legacy CRM",
+        "description": "Switch off the old customer system once data is moved.",
+        "status": {"name": "To Do"},
+        "priority": {"name": "Medium"},
+        "issuetype": {"name": "Story"},
+        "assignee": null,
+        "reporter": {"displayName": "Bo Example"},
+        "created": "2026-09-02T10:00:00.000+00:00",
+        "updated": "2026-09-02T10:00:00.000+00:00",
+        "duedate": null
+      }
+    },
+    {
+      "id": "10003",
+      "key": "EA-3",
+      "fields": {
+        "summary": "Retire legacy CRM",
+        "description": "A second ticket that happens to share a title with EA-2.",
+        "status": {"name": "To Do"},
+        "priority": {"name": "Low"},
+        "issuetype": {"name": "Task"},
+        "assignee": {"displayName": "Ada Example"},
+        "reporter": {"displayName": "Bo Example"},
+        "created": "2026-09-03T10:00:00.000+00:00",
+        "updated": "2026-09-03T10:00:00.000+00:00",
+        "duedate": null
+      }
+    }
+  ]
+}

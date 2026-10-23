@@ -29,6 +29,31 @@
             <h3 id="drawer-plain-terms-heading" class="text-sm font-semibold text-foreground">In plain terms</h3>
             <p class="mt-1 text-sm text-foreground" data-plain-terms x-text="drawer.plainTerms"></p>
         </section>
+
+        <!-- Provenance for recorded (explicit) rows -->
+        <section x-show="drawer.provenance" x-cloak aria-labelledby="drawer-provenance-heading" data-provenance-record>
+            <h3 id="drawer-provenance-heading" class="text-sm font-semibold text-foreground">Where this link came from</h3>
+            <div class="mt-2 space-y-2">
+                <p class="text-sm text-foreground" x-text="drawer.provenance.text"></p>
+                <template x-if="formatDate(drawer.provenance.recorded_at)">
+                    <p class="text-xs text-muted-foreground" data-provenance-date>Recorded <span x-text="formatDate(drawer.provenance.recorded_at)"></span></p>
+                </template>
+                <template x-if="!formatDate(drawer.provenance.recorded_at)">
+                    <p class="text-xs text-muted-foreground" data-provenance-date>Date not recorded</p>
+                </template>
+                <template x-if="drawer.provenance.relationship_id">
+                    <p class="text-sm">
+                        <a :href="'/architecture/relationships#relationship-' + drawer.provenance.relationship_id"
+                           class="font-medium text-primary hover:underline"
+                           data-relationship-link>
+                            Open relationship record
+                        </a>
+                    </p>
+                </template>
+            </div>
+        </section>
+
+        <!-- The links behind a worked-out connection -->
         <section x-show="drawer.why.state !== 'idle'" x-cloak aria-labelledby="drawer-why-heading" data-why-chain>
             <h3 id="drawer-why-heading" class="text-sm font-semibold text-foreground">The links behind this</h3>
             <div x-show="drawer.why.state === 'loading'" x-cloak class="mt-2">
@@ -52,7 +77,7 @@
                                     <span x-show="!link.targetHref">{{ provenance_badge('missing') }}</span>
                                 </p>
                                 <p class="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs text-muted-foreground">
-                                    <span>Drawn by</span>
+                                    <span x-show="!link.originNamesItself">Drawn by</span>
                                     <span x-show="link.drawnBy" class="text-foreground" x-text="link.drawnBy"></span>
                                     <span x-show="!link.drawnBy">{{ provenance_badge('missing') }}</span>
                                     <span aria-hidden="true">&middot;</span>

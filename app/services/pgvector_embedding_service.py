@@ -43,6 +43,7 @@ except Exception as e:
     SENTENCE_TRANSFORMERS_AVAILABLE = False
 
 from app import db
+from app.middleware.tenant_context import current_org_id
 from app.models.vector_embeddings import (
     ApplicationComponentEmbedding,
     BusinessCapabilityEmbedding,
@@ -350,7 +351,10 @@ class PgvectorEmbeddingService:
 
             results = (
                 self.session.query(ChatMessageEmbedding)
-                .filter(ChatMessageEmbedding.chat_session_id == chat_session_id)
+                .filter(
+                    ChatMessageEmbedding.chat_session_id == chat_session_id,
+                    ChatMessageEmbedding.in_org(current_org_id()),
+                )
                 .filter(
                     ChatMessageEmbedding.embedding.cosine_distance(query_embedding)
                     < (1 - threshold)
@@ -482,7 +486,7 @@ class PgvectorEmbeddingService:
                 "vendor_product_embeddings": VendorProductEmbedding.query.count(),
                 "capability_embeddings": BusinessCapabilityEmbedding.query.count(),
                 "process_embeddings": ProcessEmbedding.query.count(),
-                "chat_message_embeddings": ChatMessageEmbedding.query.count(),
+                "chat_message_embeddings": ChatMessageEmbedding.query.count(),  # tenant-scoping-ok: platform-wide embedding statistics
                 "solution_embeddings": SolutionEmbedding.query.count(),
                 "vendor_org_embeddings": VendorOrganizationEmbedding.query.count(),
                 "app_component_embeddings": ApplicationComponentEmbedding.query.count(),

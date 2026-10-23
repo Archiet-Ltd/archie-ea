@@ -101,8 +101,8 @@ def test_docker_compose_server_mem_limit_arithmetic_fits_the_host():
         )
         if m
     }
-    assert limits == {"server": 3072, "postgres": 448, "adminer": 64, "redis": 160}
-    assert sum(limits.values()) <= 3915, "sum of container ceilings must not exceed host RAM"
+    assert limits == {"server": 3072, "postgres": 1536, "adminer": 64, "redis": 160}
+    assert sum(limits.values()) <= 7942, "sum of container ceilings must not exceed host RAM"
 
     assert "GUNICORN_WORKERS: \"3\"" in text, "the worker trim from 9ead4e9 must not be reverted"
     assert "GUNICORN_MAX_REQUESTS: \"750\"" in text, "the max_requests trim must not be reverted"

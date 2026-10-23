@@ -169,7 +169,7 @@ def test_the_page_renders_its_own_template_for_a_signed_in_business_architect(
     assert "intelligence/value_streams_at_risk.html" in seen
     html = response.get_data(as_text=True)
     assert 'aria-label="Breadcrumb"' in html
-    assert '<h1 class="text-2xl font-bold text-foreground">Value streams at risk</h1>' in html
+    assert '<h1 class="text-3xl font-bold tracking-[-0.02em] text-foreground">Value streams at risk</h1>' in html
     assert 'x-data="valueStreamsAtRisk()"' in html
     assert "js/intelligence/value_streams_at_risk.js" in html
 

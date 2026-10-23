@@ -18,7 +18,7 @@
 
   {# ── Top band ────────────────────────────────────────────────────────── #}
   <div class="grid grid-cols-1 lg:grid-cols-4 gap-4 mb-6">
-    <div data-slot="card" class="rounded-xl border border-border bg-card shadow-sm p-6 flex items-center gap-5">
+    <div data-slot="card" class="rounded-lg border border-border bg-card p-6 flex items-center gap-5">
       {% set ring = band_class(overall.band) %}
       <div class="relative shrink-0" style="width:80px;height:80px"> {# inline-style-ok: fixed ring #}
         <svg viewBox="0 0 36 36" class="w-full h-full -rotate-90">
@@ -47,7 +47,7 @@
   {# ── Per-type breakdown ──────────────────────────────────────────────── #}
   <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
     {% for t in types %}
-    <div data-slot="card" class="rounded-xl border border-border bg-card shadow-sm p-6">
+    <div data-slot="card" class="rounded-lg border border-border bg-card p-6">
       <div class="flex items-center justify-between gap-3 mb-3">
         <h2 class="text-sm font-semibold text-foreground">{{ t.label }}</h2>
         <span class="text-sm font-bold tabular-nums {{ band_class(t.summary.band) }}">{{ t.summary.avg }}%</span>
@@ -67,14 +67,14 @@
   </div>
 
   {# ── Worst offenders — the actionable list ───────────────────────────── #}
-  <section data-slot="card" class="rounded-xl border border-border bg-card shadow-sm overflow-hidden">
+  <section data-slot="card" class="rounded-lg border border-border bg-card overflow-hidden">
     <header class="flex items-center gap-2 px-6 py-4 border-b border-border">
       <i data-lucide="list-checks" class="h-4 w-4 text-primary" aria-hidden="true"></i>
       <h2 class="text-sm font-semibold text-foreground">Fix these first — least-complete records</h2>
     </header>
     {% if worst %}
     <div class="overflow-x-auto">
-      <table class="w-full text-sm">
+      <table class="dense-table w-full text-sm">
         <thead>
           <tr class="text-left text-xs uppercase tracking-wide text-muted-foreground border-b border-border">
             <th class="px-6 py-2.5 font-medium">Record</th>

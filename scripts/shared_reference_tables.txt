@@ -1,0 +1,3 @@
+# Tables that are shared reference data on purpose, excluded from the protection requirement.
+# One table per line with a reason after the hash, e.g.  apqc_process  # shared catalogue, seeded only by commands
+# A line with no reason fails the unfenced-tables gate.

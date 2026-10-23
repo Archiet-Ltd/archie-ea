@@ -674,6 +674,6 @@ def get_analysis_types() -> List[Dict[str, str]]:
             "name": "Strategic Gap Analysis",
             "description": "Analyze maturity gaps and linked work packages",
             "icon": "📈",
-            "route": "dashboard.gap_analysis",
+            "route": "enterprise.gap_analysis",
         },
     ]

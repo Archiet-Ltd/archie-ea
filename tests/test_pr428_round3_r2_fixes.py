@@ -180,6 +180,9 @@ def test_r2_5_require_roles_and_role_required_literal_platform_admin_no_longer_b
     attacker, home_org, victim_org = _attacker_switched_into_victim_org(
         db_session, make_org, client, login_as
     )
+    # The column has no default any more: carry the literal persona explicitly.
+    attacker.enterprise_role = "platform_admin"
+    db_session.commit()
     assert attacker.enterprise_role == "platform_admin", (
         "fixture setup: this reproduction only means something if the "
         "attacker still carries the legacy default persona"

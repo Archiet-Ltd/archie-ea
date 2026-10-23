@@ -36,6 +36,9 @@
             targetName: target.name || null,
             targetHref: target.href || null,
             drawnBy: link.drawn_by || null,
+            // "Imported from <file>" and "Drawn by <person>" already say who; the
+            // drawer must not put a second "Drawn by" in front of them.
+            originNamesItself: /^(Imported from|Drawn by) /.test(link.drawn_by || ''),
             drawnAt: global.Intelligence.timeText(link.drawn_at)
         };
     }
@@ -51,6 +54,7 @@
                 staleLine: null,
                 detail: global.Intelligence.emptyDetail(),
                 why: emptyWhy(),
+                provenance: null,
                 forKey: null
             },
 
@@ -82,6 +86,7 @@
                     drawer.plainTerms = null;
                     drawer.staleLine = null;
                     drawer.detail = global.Intelligence.emptyDetail();
+                    drawer.provenance = null;
                     drawer.why = emptyWhy();
                     return;
                 }
@@ -94,7 +99,14 @@
                 drawer.plainTerms = row.plainTerms;
                 drawer.staleLine = row.staleLine;
                 drawer.detail = row.detail;
+                // For explicit (recorded) rows, pass provenance to the template.
+                drawer.provenance = row.detail && row.detail.provenance ? row.detail.provenance : null;
                 this.loadWhy(row);
+            },
+
+            // Format an ISO timestamp for display in the provenance section.
+            formatDate(iso) {
+                return global.Intelligence.timeText(iso);
             },
 
             /* A worked-out row is explained by the links it was worked out from.

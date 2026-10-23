@@ -47,7 +47,7 @@
     {% endif %}
     <form method="post" action="{{ url_for('data_governance.assign_steward', entity_id=entity.id) }}" class="flex items-center gap-2">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-      <select name="user_id" data-testid="steward-picker" class="rounded-md border border-border bg-background px-3 py-2 text-sm">
+      <select name="user_id" data-testid="steward-picker" class="h-9 rounded-md border border-border bg-background px-3 text-sm">
         <option value="">Select a person...</option>
         {% for u in org_users %}
         <option value="{{ u.id }}">{{ u.first_name or '' }} {{ u.last_name or '' }} ({{ u.email }})</option>
@@ -64,7 +64,7 @@
     </p>
     <form method="post" action="{{ url_for('data_governance.propose_classification', entity_id=entity.id) }}" class="flex items-center gap-2">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-      <select name="classification_label" data-testid="classification-picker" class="rounded-md border border-border bg-background px-3 py-2 text-sm">
+      <select name="classification_label" data-testid="classification-picker" class="h-9 rounded-md border border-border bg-background px-3 text-sm">
         <option value="">Propose a label...</option>
         <option value="public">Public</option>
         <option value="internal">Internal</option>

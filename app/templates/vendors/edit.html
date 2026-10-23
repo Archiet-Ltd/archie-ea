@@ -15,7 +15,7 @@
         ) }}
 
         <!-- Edit Form -->
-        <div class="bg-card rounded-lg border p-6">
+        <div class="bg-card rounded-lg border border-border p-6">
             <form method="POST" action="{{ request.path }}">
                 {{ form.hidden_tag() }}
                 
@@ -74,11 +74,11 @@
                 <!-- Submit Buttons -->
                 <div class="flex items-center justify-end space-x-4">
                     <a href="{{ url_for('application_mgmt.vendors_dashboard') }}"
-                       class="px-4 py-2 border border-input rounded-md shadow-sm text-sm font-medium text-muted-foreground bg-card hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-ring">
+                       class="px-4 py-2 border border-input rounded-md text-sm font-medium text-muted-foreground bg-card hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-ring">
                         Cancel
                     </a>
                     <button type="submit"
-                            class="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-primary-foreground bg-primary hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-ring" aria-label="Submit">
+                            class="px-4 py-2 border border-transparent rounded-md text-sm font-medium text-primary-foreground bg-primary hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-ring" aria-label="Submit">
                         Update Vendor
                     </button>
                 </div>

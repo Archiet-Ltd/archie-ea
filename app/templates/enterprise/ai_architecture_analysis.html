@@ -23,7 +23,7 @@
     ) }}
 
     {# ─ Onboarding Banner ─ #}
-    <div class="rounded-lg border border-primary/20 bg-primary/5 p-4">
+    <div class="rounded-md border border-primary/40 bg-primary/10 px-3 py-2">
         <div class="flex items-start gap-3">
             <i data-lucide="info" class="h-5 w-5 text-primary shrink-0 mt-0.5" aria-hidden="true"></i>
             <div>
@@ -33,53 +33,8 @@
         </div>
     </div>
 
-    {# ─ Top Priorities / Quick Actions ─ #}
-    {% set has_priorities = gaps_by_severity.critical > 0 or gaps_by_severity.high > 0 or apps_needing_review|length > 0 %}
-    {% if has_priorities %}
-    <div class="rounded-lg border bg-card shadow-sm border-warning/20">
-        <div class="border-b border-warning/20 bg-warning/5/50 p-4">
-            <h2 class="text-lg font-semibold flex items-center gap-2 text-warning-emphasis">
-                <i data-lucide="target" class="h-5 w-5" aria-hidden="true"></i>
-                Top Priorities
-            </h2>
-        </div>
-        <div class="p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-            {% if gaps_by_severity.critical > 0 or gaps_by_severity.high > 0 %}
-            <div class="flex items-center justify-between p-3 rounded-lg border bg-background">
-                <div class="flex items-center gap-3">
-                    <div class="p-2 bg-destructive/10 rounded-full">
-                        <i data-lucide="alert-triangle" class="h-4 w-4 text-destructive" aria-hidden="true"></i>
-                    </div>
-                    <div>
-                        <p class="font-medium">Critical & High Gaps</p>
-                        <p class="text-sm text-muted-foreground">{{ gaps_by_severity.critical + gaps_by_severity.high }} gaps require immediate attention</p>
-                    </div>
-                </div>
-                <a href="{{ url_for('enterprise.gap_analysis') }}" class="px-3 py-1.5 text-sm bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors whitespace-nowrap">
-                    Review Gaps
-                </a>
-            </div>
-            {% endif %}
-            
-            {% if apps_needing_review|length > 0 %}
-            <div class="flex items-center justify-between p-3 rounded-lg border bg-background">
-                <div class="flex items-center gap-3">
-                    <div class="p-2 bg-primary/10 rounded-full">
-                        <i data-lucide="clipboard-check" class="h-4 w-4 text-primary" aria-hidden="true"></i>
-                    </div>
-                    <div>
-                        <p class="font-medium">Lifecycle Reviews</p>
-                        <p class="text-sm text-muted-foreground">{{ apps_needing_review|length }} applications pending review</p>
-                    </div>
-                </div>
-                <a href="{{ url_for('unified_applications.application_list') }}?status=under_review" class="px-3 py-1.5 text-sm bg-secondary text-secondary-foreground rounded-md hover:bg-secondary/80 transition-colors whitespace-nowrap">
-                    View Applications
-                </a>
-            </div>
-            {% endif %}
-        </div>
-    </div>
-    {% endif %}
+    {# ─ Architecture priorities: the one shared prioritised action list ─ #}
+    {% include 'components/priority_actions.html' %}
 
     {# ─ Summary Metrics ─ #}
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -90,14 +45,14 @@
     </div>
 
     {# ─ Recent AI Recommendations ─ #}
-    <div class="rounded-lg border bg-card shadow-sm">
+    <div class="rounded-lg border border-border bg-card">
         <div class="border-b p-4 flex items-center justify-between">
             <h2 class="text-lg font-semibold flex items-center gap-2">
                 <i data-lucide="sparkles" class="h-5 w-5 text-primary" aria-hidden="true"></i>
                 AI Recommendations
                 <span class="relative group cursor-help ml-1">
                     <i data-lucide="help-circle" class="h-4 w-4 text-muted-foreground" aria-hidden="true"></i>
-                    <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 p-2 bg-popover text-popover-foreground text-xs rounded shadow-lg border hidden group-hover:block z-10">
+                    <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 p-2 bg-popover text-popover-foreground text-xs rounded border border-border hidden group-hover:block z-10">
                         Generated automatically by analyzing capability overlap, technological alignment, and architectural patterns in your portfolio.
                     </div>
                 </span>
@@ -141,10 +96,10 @@
                     We haven't generated any architectural recommendations for your portfolio. This typically requires more application mapping data.
                 </p>
                 <div class="flex items-center justify-center gap-3">
-                    <button type="button" id="startAnalysisEmpty" class="px-4 py-2 text-sm font-medium bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors inline-flex items-center gap-2" aria-label="Action">
+                    <button type="button" id="startAnalysisEmpty" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center" aria-label="Action">
                         <i data-lucide="play" class="w-4 h-4" aria-hidden="true"></i> Run Discovery Scan
                     </button>
-                    <a href="{{ url_for('unified_applications.application_list') }}" class="px-4 py-2 text-sm font-medium bg-secondary text-secondary-foreground rounded-lg hover:bg-secondary/80 transition-colors inline-flex items-center gap-2">
+                    <a href="{{ url_for('unified_applications.application_list') }}" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                         <i data-lucide="plus" class="w-4 h-4" aria-hidden="true"></i> Add Applications
                     </a>
                 </div>
@@ -154,14 +109,14 @@
     </div>
 
     {# ─ Open Gaps by Severity ─ #}
-    <div class="rounded-lg border bg-card shadow-sm">
+    <div class="rounded-lg border border-border bg-card">
         <div class="border-b p-4">
             <h2 class="text-lg font-semibold flex items-center gap-2">
                 <i data-lucide="flag" class="h-5 w-5 text-warning" aria-hidden="true"></i>
                 Architecture Gaps
                 <span class="relative group cursor-help ml-1">
                     <i data-lucide="help-circle" class="h-4 w-4 text-muted-foreground" aria-hidden="true"></i>
-                    <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 p-2 bg-popover text-popover-foreground text-xs rounded shadow-lg border hidden group-hover:block z-10">
+                    <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 p-2 bg-popover text-popover-foreground text-xs rounded border border-border hidden group-hover:block z-10">
                         Identified differences between the current baseline architecture and the target architecture.
                     </div>
                 </span>
@@ -206,14 +161,14 @@
     </div>
 
     {# ─ Applications Under Review ─ #}
-    <div class="rounded-lg border bg-card shadow-sm">
+    <div class="rounded-lg border border-border bg-card">
         <div class="border-b p-4">
             <h2 class="text-lg font-semibold flex items-center gap-2">
                 <i data-lucide="eye" class="h-5 w-5 text-primary" aria-hidden="true"></i>
                 Applications Under Review
                 <span class="relative group cursor-help ml-1">
                     <i data-lucide="help-circle" class="h-4 w-4 text-muted-foreground" aria-hidden="true"></i>
-                    <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 p-2 bg-popover text-popover-foreground text-xs rounded shadow-lg border hidden group-hover:block z-10">
+                    <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 p-2 bg-popover text-popover-foreground text-xs rounded border border-border hidden group-hover:block z-10">
                         Applications flagged by the portfolio manager or architecture board for lifecycle assessment or disposition planning.
                     </div>
                 </span>
@@ -258,8 +213,8 @@
     </div>
 
     {# ─ Analysis Trigger (Placeholder for Future Feature) ─ #}
-    <div class="rounded-lg border bg-card p-6 text-center">
-        <div class="rounded-lg bg-primary/10 p-3 inline-block mb-3">
+    <div class="rounded-lg border border-border bg-card p-6 text-center">
+        <div class="rounded-md bg-primary/10 px-3 py-2 inline-block mb-3">
             <i data-lucide="brain" class="w-8 h-8 text-primary" aria-hidden="true"></i>
         </div>
         <h3 class="text-lg font-semibold mb-2">On-Demand Analysis</h3>

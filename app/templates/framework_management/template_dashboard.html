@@ -426,23 +426,23 @@ function applyTemplate() {
     modal.id = 'apply-framework-template';
     modal.className = 'fixed inset-0 bg-foreground bg-opacity-50 flex items-center justify-center z-50';
     modal.innerHTML = `
-        <div class="bg-card rounded-xl shadow-xl p-6 max-w-md w-full mx-4 border">
+        <div class="bg-card rounded-lg p-6 max-w-md w-full mx-4 border border-border">
             <h3 class="text-lg font-semibold mb-4">Apply Template</h3>
             <p class="text-sm text-muted-foreground mb-4">This will create a new framework configuration based on the {{ template_name|tojson }} template.</p>
             <div class="space-y-4">
                 <div>
                     <label for="configName" class="block text-sm font-medium mb-1">Configuration Name</label>
-                    <input type="text" id="configName" class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" placeholder="Enter configuration name">
+                    <input type="text" id="configName" class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" placeholder="Enter configuration name">
                 </div>
                 <div>
                     <label for="orgName" class="block text-sm font-medium mb-1">Organization Name</label>
-                    <input type="text" id="orgName" class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" placeholder="Enter organization name">
+                    <input type="text" id="orgName" class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" placeholder="Enter organization name">
                 </div>
                 <div class="flex gap-2 pt-2">
-                    <button type="button" data-action="confirmApplyTemplate" class="inline-flex items-center justify-center h-10 px-4 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 text-sm font-medium" aria-label="Action">
+                    <button type="button" data-action="confirmApplyTemplate" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center" aria-label="Action">
                         Apply Template
                     </button>
-                    <button type="button" data-action="closeModal" class="inline-flex items-center justify-center h-10 px-4 rounded-lg border border-input bg-background hover:bg-accent text-sm font-medium" aria-label="Action">
+                    <button type="button" data-action="closeModal" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center" aria-label="Action">
                         Cancel
                     </button>
                 </div>
