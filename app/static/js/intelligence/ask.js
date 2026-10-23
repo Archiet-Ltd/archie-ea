@@ -424,3 +424,71 @@ function askSurface() {
     });
 }
 window.askSurface = askSurface;
+
+
+/* The plain-language question box at the top of the Ask page.
+ *
+ * A person types a business question, and the one ask path interprets it
+ * onto a catalogue entry and answers it. The answer's citations are shown
+ * as links to the record each rests on, so the person can open the record
+ * and see the fact for themselves. This is deliberately separate from the
+ * element-picker lenses below it: it drives POST /api/v1/intelligence/ask
+ * (the natural-language catalogue), not the per-element impact endpoints.
+ *
+ * Registered as a top-level window factory and referenced as
+ * x-data="askPlainQuestion()".
+ */
+function askPlainQuestion() {
+    var Platform = window.Platform;
+    return {
+        question: '',
+        state: 'idle', // idle | loading | ready | none | error
+        answerText: '',
+        entryTitle: '',
+        reason: '',
+        citations: [],
+
+        async submit() {
+            var asked = (this.question || '').trim();
+            if (!asked) {
+                return;
+            }
+            this.state = 'loading';
+            this.answerText = '';
+            this.entryTitle = '';
+            this.reason = '';
+            this.citations = [];
+            try {
+                var resp = await Platform.fetch.post(
+                    '/api/v1/intelligence/ask', { question: asked }, { silent: true }
+                );
+                var data = (resp && resp.data) || {};
+                var interpretation = data.interpretation || {};
+                if (!interpretation.entry_id) {
+                    // The question did not map to a known entry: show its plain
+                    // reason, never an invented answer.
+                    this.state = 'none';
+                    this.reason = data.reason || 'This question does not map to anything we can answer yet.';
+                    return;
+                }
+                this.entryTitle = interpretation.title || '';
+                this.answerText = data.answer || '';
+                this.reason = data.reason || '';
+                this.citations = Array.isArray(data.citations) ? data.citations : [];
+                this.state = 'ready';
+            } catch (err) {
+                this.state = 'error';
+            }
+            var self = this;
+            this.$nextTick(function () {
+                if (window.Intelligence && Intelligence.refreshIcons) {
+                    Intelligence.refreshIcons();
+                }
+                if (self.$refs.plainAnswerHeading) {
+                    self.$refs.plainAnswerHeading.focus();
+                }
+            });
+        }
+    };
+}
+window.askPlainQuestion = askPlainQuestion;

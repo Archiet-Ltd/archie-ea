@@ -41,6 +41,36 @@ def truth_class_for(source_table: Optional[str]) -> str:
     return TRUTH_CLASS_DERIVED
 
 
+def application_citation(application_id: int, name: str) -> Dict[str, Any]:
+    """A citation to an application record a person can open.
+
+    The target is the one tenant-scoped application record API
+    (``/api/v1/applications/<id>``); opening it shows the application's name,
+    owner and status, so the cited fact is checkable against the record.
+    """
+    return {
+        "type": "application",
+        "id": application_id,
+        "name": name,
+        "target": f"/api/v1/applications/{application_id}",
+    }
+
+
+def element_citation(element_id: int, name: str) -> Dict[str, Any]:
+    """A citation to an ArchiMate element record a person can open.
+
+    The target is the one tenant-scoped element record API
+    (``/api/v1/elements/<id>``), which shows the element's name, type and
+    layer — content the cited fact is checked against.
+    """
+    return {
+        "type": "element",
+        "id": element_id,
+        "name": name,
+        "target": f"/api/v1/elements/{element_id}",
+    }
+
+
 @dataclass
 class CatalogueEntry:
     """One named question. ``params`` names the parameters this entry
@@ -74,6 +104,7 @@ def _applications_without_owner(organization_id: int, **_: Any) -> Dict[str, Any
     )
 
     groups: Dict[str, List[Dict[str, Any]]] = {}
+    citations: List[Dict[str, Any]] = []
     for app in unowned:
         key = app.business_criticality or "not recorded"
         groups.setdefault(key, []).append(
@@ -84,6 +115,7 @@ def _applications_without_owner(organization_id: int, **_: Any) -> Dict[str, Any
                 "truth_class": truth_class_for("application_components"),
             }
         )
+        citations.append(application_citation(app.id, app.name))
 
     return {
         "answer": "applications with no recorded owner, by business criticality",
@@ -91,6 +123,7 @@ def _applications_without_owner(organization_id: int, **_: Any) -> Dict[str, Any
             {"group": group, "rows": rows} for group, rows in sorted(groups.items())
         ],
         "total": len(unowned),
+        "citations": citations,
         "reason": None if unowned else "every application in this organisation has a recorded owner",
     }
 
@@ -139,6 +172,7 @@ def _business_continuity_criticality(
                 owners_by_app.setdefault(row.application_id, []).append(name)
 
     rows = []
+    citations: List[Dict[str, Any]] = []
     for app in apps:
         owners = owners_by_app.get(app.id)
         rows.append(
@@ -152,12 +186,14 @@ def _business_continuity_criticality(
                 "truth_class": truth_class_for("application_components"),
             }
         )
+        citations.append(application_citation(app.id, app.name))
 
     return {
         "answer": f"systems at '{criticality}' criticality, their suppliers and owners",
         "criticality": criticality,
         "rows": rows,
         "total": len(rows),
+        "citations": citations,
         "reason": None if rows else f"no applications are recorded at '{criticality}' criticality",
     }
 
@@ -231,6 +267,8 @@ def _overlapping_contracts(organization_id: int, **_: Any) -> Dict[str, Any]:
     from app.models.business_capabilities import BusinessCapability
 
     result_groups = []
+    citations: List[Dict[str, Any]] = []
+    cited_app_ids: set = set()
     for bucket in overlapping.values():
         capability = BusinessCapability.query.filter_by(
             id=bucket["capability_id"], organization_id=organization_id,
@@ -253,12 +291,388 @@ def _overlapping_contracts(organization_id: int, **_: Any) -> Dict[str, Any]:
                 "nearest_end_date": min(end_dates) if end_dates else None,
             }
         )
+        # Each overlapping application is a record a person can open to see
+        # the duplicate for themselves.
+        for row in bucket["rows"]:
+            if row["application_id"] not in cited_app_ids:
+                cited_app_ids.add(row["application_id"])
+                citations.append(application_citation(row["application_id"], row["application_name"]))
 
     return {
         "answer": "applications sharing a capability, with their overlapping contracts",
         "groups": sorted(result_groups, key=lambda g: g["group"]),
         "total": len(result_groups),
+        "citations": citations,
         "reason": None if result_groups else "no capability is shared by more than one application with a contract",
+    }
+
+
+def _applications_and_owners(organization_id: int, **_: Any) -> Dict[str, Any]:
+    """"What do we run and who owns each one?" (UC-S1-05) — the application
+    inventory with each application's accountable owner and recorded annual
+    cost, read from the one owner store and the one cost field.
+
+    Owner is read through the same accountable-owner rule the owner store
+    defines (``application_owner``/``business_owner`` text, or an
+    ApplicationOwner row), never a second definition. Annual cost is the
+    application's recorded total cost of ownership; a missing cost reads as
+    "not recorded", never a fabricated zero.
+    """
+    from app.models.application_owner import ApplicationOwner
+    from app.models.application_portfolio import ApplicationComponent
+    from app.services.element_ownership_service import owner_label
+
+    apps = (
+        ApplicationComponent.query.filter(
+            ApplicationComponent.organization_id == organization_id,
+        )
+        .order_by(ApplicationComponent.name)
+        .all()
+    )
+
+    owners_by_app: Dict[int, List[str]] = {}
+    if apps:
+        owner_rows = (
+            db.session.query(ApplicationOwner)
+            .filter(
+                ApplicationOwner.organization_id == organization_id,
+                ApplicationOwner.application_id.in_([a.id for a in apps]),
+                ApplicationOwner.ownership_type.in_(("primary", "business")),
+            )
+            .all()
+        )
+        if owner_rows:
+            from app.models.user import User
+
+            owner_user_ids = {row.user_id for row in owner_rows if row.user_id is not None}
+            users_by_id = {
+                u.id: u
+                for u in User.query.filter(
+                    User.id.in_(owner_user_ids or {-1}),
+                    User.organization_id == organization_id,
+                ).all()
+            }
+            for row in owner_rows:
+                user = users_by_id.get(row.user_id)
+                if user is None:
+                    continue
+                owners_by_app.setdefault(row.application_id, []).append(
+                    owner_label(user.first_name, user.last_name, user.email)
+                )
+
+    rows = []
+    citations: List[Dict[str, Any]] = []
+    for app in apps:
+        owners = owners_by_app.get(app.id)
+        # The owner the user reads: the person record if there is one, else
+        # the owner text the application carries, else an honest "not recorded".
+        owner_text = owners[0] if owners else (app.application_owner or app.business_owner or None)
+        annual_cost = app.total_cost_of_ownership
+        rows.append(
+            {
+                "id": app.id,
+                "name": app.name,
+                "owner": owner_text or "not recorded",
+                "owner_reason": None if owner_text else "no accountable owner recorded for this application",
+                "annual_cost": annual_cost,
+                "annual_cost_reason": None if annual_cost is not None else "no annual cost recorded for this application",
+                "source_table": "application_components",
+                "truth_class": truth_class_for("application_components"),
+            }
+        )
+        citations.append(application_citation(app.id, app.name))
+
+    return {
+        "answer": "the applications we run, with each one's accountable owner and annual cost",
+        "rows": rows,
+        "total": len(rows),
+        "citations": citations,
+        "reason": None if rows else "no applications are recorded in this organisation",
+    }
+
+
+def _duplicate_tooling_by_capability(organization_id: int, **_: Any) -> Dict[str, Any]:
+    """"Are we paying for two tools that do the same thing?" (UC-S2-03) —
+    capabilities covered by more than one application, with each
+    application's annual cost, so a reader sees the duplicate spend.
+
+    Reads the one capability store (ApplicationCapabilityMapping ->
+    BusinessCapability) and the one application cost field; it does not
+    reimplement the overlap walk — it groups by capability the same way the
+    overlapping-contracts entry does, but over every application mapped to a
+    capability (not only those with a contract), since duplicate tooling is
+    the question even when neither tool has a contract recorded yet.
+    """
+    from app.models.application_capability import ApplicationCapabilityMapping
+    from app.models.application_portfolio import ApplicationComponent
+    from app.models.business_capabilities import BusinessCapability
+
+    mapping_rows = (
+        db.session.query(ApplicationCapabilityMapping, ApplicationComponent)
+        .join(
+            ApplicationComponent,
+            ApplicationComponent.id == ApplicationCapabilityMapping.application_component_id,
+        )
+        .filter(
+            ApplicationComponent.organization_id == organization_id,
+        )
+        .all()
+    )
+
+    apps_by_capability: Dict[int, Dict[int, ApplicationComponent]] = {}
+    for mapping, app in mapping_rows:
+        apps_by_capability.setdefault(mapping.business_capability_id, {})[app.id] = app
+
+    result_groups = []
+    citations: List[Dict[str, Any]] = []
+    cited_app_ids: set = set()
+    for capability_id, apps in apps_by_capability.items():
+        if len(apps) < 2:
+            continue  # one tool for a capability is not duplicate tooling
+        capability = BusinessCapability.query.filter_by(
+            id=capability_id, organization_id=organization_id,
+        ).first()
+        group_rows = []
+        costs = []
+        for app in sorted(apps.values(), key=lambda a: a.name or ""):
+            cost = app.total_cost_of_ownership
+            if cost is not None:
+                costs.append(float(cost))
+            group_rows.append(
+                {
+                    "application_id": app.id,
+                    "application_name": app.name,
+                    "annual_cost": cost,
+                    "annual_cost_reason": None if cost is not None else "no annual cost recorded",
+                    "source_table": "application_capabilities",
+                    "truth_class": truth_class_for("application_capabilities"),
+                }
+            )
+            if app.id not in cited_app_ids:
+                cited_app_ids.add(app.id)
+                citations.append(application_citation(app.id, app.name))
+        result_groups.append(
+            {
+                "group": capability.name if capability else "not recorded",
+                "rows": group_rows,
+                "combined_annual_cost": sum(costs) if costs else None,
+            }
+        )
+
+    return {
+        "answer": "capabilities covered by more than one application, with the annual cost of each",
+        "groups": sorted(result_groups, key=lambda g: g["group"]),
+        "total": len(result_groups),
+        "citations": citations,
+        "reason": None if result_groups else "no capability is covered by more than one application",
+    }
+
+
+def _github_sourced_records(organization_id: int, **_: Any) -> Dict[str, Any]:
+    """"What came from GitHub?" (UC-S2-04) — the elements a GitHub connector
+    wrote, read from the provenance the connector stamps on each record
+    (``source_kind`` is 'connector' and ``source_label`` names the GitHub
+    repository). Nothing here guesses provenance: a row is only listed when
+    the connector itself recorded it.
+    """
+    from app.models.archimate_core import ArchiMateElement
+
+    # The GitHub connector stamps ``source_kind='connector'`` and a
+    # ``source_label`` that starts "GitHub <repository>" (app/connectors/
+    # github.py stamp_origin); that label prefix is what tells a GitHub
+    # record apart from any other connector's.
+    elements = (
+        ArchiMateElement.query.filter(
+            ArchiMateElement.organization_id == organization_id,
+            ArchiMateElement.source_kind == "connector",
+            ArchiMateElement.source_label.ilike("GitHub %"),
+        )
+        .order_by(ArchiMateElement.name)
+        .all()
+    )
+
+    rows = []
+    citations: List[Dict[str, Any]] = []
+    for element in elements:
+        rows.append(
+            {
+                "id": element.id,
+                "name": element.name,
+                "type": element.type,
+                "origin": element.source_label,
+                "recorded_at": element.source_recorded_at.isoformat() if element.source_recorded_at else None,
+                "source_table": "archimate_elements",
+                "truth_class": TRUTH_CLASS_SYNCHRONISED,
+            }
+        )
+        citations.append(element_citation(element.id, element.name))
+
+    return {
+        "answer": "the records a GitHub connector brought into the model",
+        "rows": rows,
+        "total": len(rows),
+        "citations": citations,
+        "reason": None if rows else "no records in this organisation were brought in by a GitHub connector",
+    }
+
+
+def _resolve_service_element(organization_id: int, service: Optional[str]):
+    """The one ArchiMate element in *organization_id* a service name names,
+    or ``None``. Uses the one entity matcher (never a second name lookup);
+    an ambiguous or absent name resolves to nothing, so impact is never
+    computed for a guessed element."""
+    if not service or not service.strip():
+        return None
+    from app.models.archimate_core import ArchiMateElement
+    from app.modules.intelligence.services.matcher_service import MatcherService
+
+    result = MatcherService.match_by_name(service.strip(), org_id=organization_id)
+    if result.matched_element_id is None:
+        return None
+    return ArchiMateElement.query.filter_by(
+        id=result.matched_element_id, organization_id=organization_id,
+    ).first()
+
+
+def _single_points_of_failure(organization_id: int, limit: int = 10) -> Dict[str, Any]:
+    """The systems the most other things depend on, by how many
+    relationships point at them (their in-degree) in the one relationship
+    store. These are the single points of failure; each is a record to open."""
+    from app.models.archimate_core import ArchiMateElement, ArchiMateRelationship
+
+    # In-degree per target element, scoped to this organisation's relationships.
+    counts = (
+        db.session.query(
+            ArchiMateRelationship.target_id,
+            db.func.count(ArchiMateRelationship.id).label("in_degree"),
+        )
+        .filter(
+            ArchiMateRelationship.organization_id == organization_id,
+            ArchiMateRelationship.target_id.isnot(None),
+        )
+        .group_by(ArchiMateRelationship.target_id)
+        .having(db.func.count(ArchiMateRelationship.id) > 1)
+        .order_by(db.func.count(ArchiMateRelationship.id).desc(), ArchiMateRelationship.target_id)
+        .limit(limit)
+        .all()
+    )
+    if not counts:
+        return {
+            "answer": "the systems the most depends on",
+            "rows": [],
+            "total": 0,
+            "citations": [],
+            "reason": "nothing in this organisation has more than one thing depending on it yet",
+        }
+
+    target_ids = [target_id for target_id, _ in counts]
+    elements = {
+        e.id: e
+        for e in ArchiMateElement.query.filter(
+            ArchiMateElement.id.in_(target_ids),
+            ArchiMateElement.organization_id == organization_id,
+        ).all()
+    }
+
+    rows = []
+    citations: List[Dict[str, Any]] = []
+    for target_id, in_degree in counts:
+        element = elements.get(target_id)
+        if element is None:
+            continue
+        rows.append(
+            {
+                "id": element.id,
+                "name": element.name,
+                "depends_on_count": int(in_degree),
+                "source_table": "archimate_relationships",
+                "truth_class": truth_class_for("archimate_relationships"),
+            }
+        )
+        citations.append(element_citation(element.id, element.name))
+
+    return {
+        "answer": "the systems the most other things depend on — the single points of failure",
+        "rows": rows,
+        "total": len(rows),
+        "citations": citations,
+        "reason": None if rows else "nothing in this organisation has more than one thing depending on it yet",
+    }
+
+
+def _what_breaks_if_fails(organization_id: int, service: Optional[str] = None, **_: Any) -> Dict[str, Any]:
+    """"What breaks if this service fails?" (UC-S2-01) — the one impact
+    envelope, called for the named service. Impact is never recomputed here:
+    the named service is resolved to an element and the canonical impact walk
+    (IntelligenceQueryService.cross_layer_impact, through the answer envelope)
+    produces the rows and the citations.
+
+    With no service named, or a name that resolves to nothing, it returns a
+    plain reason rather than a guessed answer.
+    """
+    element = _resolve_service_element(organization_id, service)
+    if element is None:
+        if service:
+            # A service was named but matched nothing: say so plainly rather
+            # than trace a guessed element.
+            return {
+                "answer": "what breaks if a named service fails",
+                "rows": [],
+                "total": 0,
+                "citations": [],
+                "reason": "name the service you mean — it did not match one system in this organisation",
+            }
+        # No single service was named ("the single points of failure in our
+        # stack"): the systems the most other things depend on are the single
+        # points of failure. Count how many relationships point at each
+        # element (its in-degree) from the one relationship store; the most
+        # depended-on are the answer, each one a record to open.
+        return _single_points_of_failure(organization_id)
+
+    from app.modules.intelligence.services.answer_envelope import (
+        KIND_IMPACT,
+        build_envelope,
+        _compute,
+        normalise_params,
+    )
+
+    params = normalise_params(KIND_IMPACT, {"element_id": element.id, "direction": "downstream"})
+    envelope = build_envelope(KIND_IMPACT, params, _compute(KIND_IMPACT, params))
+
+    # The impact walk names each element in the envelope's element map
+    # (keyed by the element id as text), not on the row itself.
+    element_names = {
+        str(eid): meta.get("name") for eid, meta in (envelope.get("elements") or {}).items()
+    }
+
+    rows = []
+    for row in envelope["rows"]:
+        eid = row.get("element_id")
+        rows.append(
+            {
+                "id": eid,
+                "name": element_names.get(str(eid)),
+                "truth_class": row.get("truth_class"),
+                "source_table": "archimate_elements",
+            }
+        )
+    # The impact envelope already cites every relationship and element the
+    # answer rests on; name the service itself so the reader can open the
+    # system they asked about even when its blast radius is empty, then each
+    # reached element so the person can open what breaks.
+    citations: List[Dict[str, Any]] = [element_citation(element.id, element.name)]
+    for row in envelope["rows"]:
+        target = row.get("element_id")
+        if isinstance(target, int):
+            citations.append(element_citation(target, element_names.get(str(target)) or ""))
+
+    return {
+        "answer": f"what breaks if '{element.name}' fails",
+        "service": element.name,
+        "rows": rows,
+        "total": len(rows),
+        "citations": citations,
+        "reason": None if rows else f"nothing recorded depends on '{element.name}' yet",
     }
 
 
@@ -283,6 +697,34 @@ CATALOGUE: Dict[str, CatalogueEntry] = {
         description="Applications sharing a capability, with their contracts, combined value and nearest end date.",
         params=[],
         run=_overlapping_contracts,
+    ),
+    "applications_and_owners": CatalogueEntry(
+        id="applications_and_owners",
+        title="What do we run and who owns each one?",
+        description="The application inventory with each application's accountable owner and recorded annual cost.",
+        params=[],
+        run=_applications_and_owners,
+    ),
+    "duplicate_tooling_by_capability": CatalogueEntry(
+        id="duplicate_tooling_by_capability",
+        title="Are we paying for two tools that do the same thing?",
+        description="Capabilities covered by more than one application, with each application's annual cost.",
+        params=[],
+        run=_duplicate_tooling_by_capability,
+    ),
+    "github_sourced_records": CatalogueEntry(
+        id="github_sourced_records",
+        title="What came from GitHub?",
+        description="The records a GitHub connector brought into the model, by connector-stamped provenance.",
+        params=[],
+        run=_github_sourced_records,
+    ),
+    "what_breaks_if_fails": CatalogueEntry(
+        id="what_breaks_if_fails",
+        title="What breaks if a service fails?",
+        description="The blast radius of a named service's failure, from the one impact answer.",
+        params=["service"],
+        run=_what_breaks_if_fails,
     ),
 }
 
