@@ -195,6 +195,32 @@ def test_data_architecture_dashboard_counts_real_models(
         # The three model tiles each read a real, non-zero count.
         for label in ("Conceptual", "Logical", "Physical"):
             assert label in body, "%s model tile is missing" % label
+        # Each count is a real figure from the seeded data (2 of each model
+        # type), never a zero, a dash or a missing label.
+        for tile_title, expected_min in [
+            ("Conceptual Models", 2),
+            ("Logical Models", 2),
+            ("Physical Models", 2),
+            ("Data Lineage Flows", 1),
+        ]:
+            card = page.locator('div[data-slot="card"]').filter(
+                has_text=tile_title
+            )
+            assert card.count() >= 1, (
+                "No metrics card found for '%s'" % tile_title
+            )
+            value_text = card.locator(
+                'div[data-slot="card-title"]'
+            ).inner_text().strip()
+            assert value_text, (
+                "The '%s' tile has an empty value" % tile_title
+            )
+            count = int(value_text)
+            assert count >= expected_min, (
+                "Expected '%s' count >= %d, got %d" % (
+                    tile_title, expected_min, count
+                )
+            )
     finally:
         page.close()
 
@@ -248,7 +274,8 @@ def test_undeclared_copies_states_why_empty(demo_company, live_server, browser):
 
 def test_public_jira_github_page_has_content_and_steps(live_server, browser):
     """Signed out, the public Jira and GitHub use-case page carries its full
-    content: a heading, and the steps to connect what connects today."""
+    content: a heading, at least 600 words of body text, and the Jira and
+    GitHub connection steps named."""
     page = browser.new_page()
     try:
         page.goto(
@@ -259,17 +286,34 @@ def test_public_jira_github_page_has_content_and_steps(live_server, browser):
         heading = page.locator("h1").first.inner_text()
         assert heading.strip(), "the public Jira/GitHub page has no heading"
         body = page.inner_text("body")
+        # At least 600 words of real body text, not a content-less shell.
+        word_count = len(body.split())
+        assert word_count >= 600, (
+            "the Jira/GitHub page has only %d words; expected at least 600"
+            % word_count
+        )
         # What connects today and how, as the connectors page does.
         assert "ServiceNow" in body, "the page does not say what connects today"
         assert "Sync Now" in body, "the page does not give the connection steps"
         assert "Jira" in body, "the page does not mention Jira"
+        # Connection steps by name: the ServiceNow pull and Jira credential steps.
+        assert "OAuth2" in body, (
+            "the page does not name the ServiceNow connection step (OAuth2)"
+        )
+        assert "instance URL" in body, (
+            "the page does not name the Jira connection step (instance URL)"
+        )
+        assert "Test Connection" in body, (
+            "the page does not name the connection test step"
+        )
     finally:
         page.close()
 
 
 def test_public_business_model_canvas_page_has_content(live_server, browser):
     """Signed out, the public Business Model Canvas use-case page carries its
-    full content: a heading and real product detail."""
+    full content: a heading, at least 600 words of body text, and real product
+    detail."""
     page = browser.new_page()
     try:
         page.goto(
@@ -280,6 +324,12 @@ def test_public_business_model_canvas_page_has_content(live_server, browser):
         heading = page.locator("h1").first.inner_text()
         assert heading.strip(), "the public canvas page has no heading"
         body = page.inner_text("body")
+        # At least 600 words of real body text, not a content-less shell.
+        word_count = len(body.split())
+        assert word_count >= 600, (
+            "the Canvas page has only %d words; expected at least 600"
+            % word_count
+        )
         assert "Business Model Canvas" in body, (
             "the canvas page does not describe the Business Model Canvas"
         )
