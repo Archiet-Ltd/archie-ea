@@ -67,6 +67,16 @@ class Subscription(db.Model):  # migration-exempt
     # "month" or "year" — the billing interval of the price the customer
     # bought. NULL when unknown (free plan, or rows written before this).
     billing_interval = db.Column(db.String(10), nullable=True)
+    # Stripe's own subscription field, mirrored here (R1-B95 PR 2, TB-0193):
+    # "charge_automatically" (card on file, the hosted-checkout default) or
+    # "send_invoice" (net-terms collection, BillingService.start_invoice_
+    # billing). NULL means "charge_automatically" -- every row written
+    # before this column existed used a card, and every self-serve checkout
+    # still does.
+    collection_method = db.Column(db.String(20), nullable=True)
+    # Net-terms window in days for a send_invoice subscription (e.g. 30 for
+    # "net-30"). NULL when collection_method is not send_invoice.
+    days_until_due = db.Column(db.Integer, nullable=True)
     # Creation time of the newest provider event applied to this row, so an
     # older event delivered late cannot roll the plan back.
     last_event_at = db.Column(db.DateTime, nullable=True)

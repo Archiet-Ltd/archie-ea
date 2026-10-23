@@ -112,8 +112,15 @@ PLANS: Tuple[Plan, ...] = (
         key="enterprise",
         name="Enterprise",
         summary="Annual contract. Unlimited editors, SAML, audit export, supported self-hosting.",
+        # Not purchasable through the self-serve hosted checkout
+        # (create_checkout_session refuses it with "sold by annual
+        # contract") -- but it DOES have a price, used only by the
+        # platform-admin invoice-billing path (R1-B95 PR 2,
+        # BillingService.start_invoice_billing), which bypasses the
+        # self-serve purchasable gate deliberately, not by omission.
         purchasable=False,
         user_limit=None,
+        price_env={"year": "STRIPE_PRICE_ENTERPRISE_ANNUAL"},
         display_price_floor_annual=24000,
     ),
 )
