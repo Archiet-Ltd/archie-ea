@@ -9,15 +9,11 @@ removed from its list. Keep every key even when its list becomes empty.
 Remove a point when it shows any of these:
 - it names a metric, company, person or event that is not in the source records;
 - it claims more than the records support;
-- its citations do not point to a record id present in the source records (or
-  to "website" when a website profile is present);
+- its citations do not point to a record id present in the source records;
 - it is generic boilerplate that would read the same for any organisation.
 
 Source records:
 {records}
-
-Website profile:
-{website_profile}
 
 Proposed analysis to filter:
 {generated}

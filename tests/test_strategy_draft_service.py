@@ -59,26 +59,26 @@ class TestCritiqueFilter:
         }
         _stub_llm(monkeypatch, [json.dumps(boxes)])
 
-        out = engine._critique("swot", boxes, records, website_profile=None)
+        out = engine._critique("swot", boxes, records)
 
         strengths = out["strengths"]
         assert len(strengths) == 1
         assert strengths[0]["point"] == "Grounded in a real record"
         assert strengths[0]["citations"] == ["7"]
 
-    def test_website_citation_only_resolves_when_a_profile_is_present(self, monkeypatch):
+    def test_only_a_real_record_id_grounds_a_point(self, monkeypatch):
+        # There is no ungrounded source: a point that cites only a word that is
+        # not a record id in this organisation is dropped, so the footer never
+        # offers a citation with no page to land on.
         records = [{"id": "3", "kind": "Driver", "name": "Growth", "description": ""}]
-        boxes = {"opportunities": [{"point": "From the site", "citations": ["website"]}]}
+        boxes = {"opportunities": [
+            {"point": "From nowhere real", "citations": ["website"]},
+            {"point": "From the growth driver", "citations": ["3"]},
+        ]}
         _stub_llm(monkeypatch, [json.dumps(boxes)])
 
-        without = engine._critique("swot", boxes, records, website_profile=None)
-        assert without["opportunities"] == []
-
-        _stub_llm(monkeypatch, [json.dumps(boxes)])
-        with_profile = engine._critique(
-            "swot", boxes, records, website_profile="We sell widgets."
-        )
-        assert len(with_profile["opportunities"]) == 1
+        out = engine._critique("swot", boxes, records)
+        assert [p["point"] for p in out["opportunities"]] == ["From the growth driver"]
 
     def test_critique_falls_back_to_the_citation_filter_when_the_model_pass_is_unparseable(
         self, monkeypatch
@@ -92,7 +92,7 @@ class TestCritiqueFilter:
         }
         # The critique model returns junk; the hard citation filter still runs.
         _stub_llm(monkeypatch, ["not json at all"])
-        out = engine._critique("swot", boxes, records, website_profile=None)
+        out = engine._critique("swot", boxes, records)
         assert [p["point"] for p in out["threats"]] == ["Real"]
 
 
@@ -166,7 +166,55 @@ class TestDraftAndAccept:
             assert written.organization_id == org.id
             assert (written.acm_properties or {}).get("profile") == "swot_strength"
             assert (written.acm_properties or {}).get("citations") == [str(el.id)]
+            # The framework's assessment_type is set, so a report or filter
+            # keyed on it finds the accepted point.
+            assert (written.acm_properties or {}).get("assessment_type") == "swot"
             assert written.name == "Payroll system is a core asset"
+
+    def test_accept_is_idempotent_on_the_same_proposal(
+        self, app, db_session, make_org, tenant_ctx
+    ):
+        # A double-click or a retry of the same accept lands on one element,
+        # never two.
+        from app.models.archimate_core import ArchiMateElement
+
+        org = make_org("swot-idempotent")
+        el = _seed_element(db_session, org.id, "Payroll System")
+
+        with tenant_ctx(org.id):
+            first = engine.accept_point(
+                "swot", "strengths", "A core asset", [str(el.id)], org.id
+            )
+            db_session.flush()
+            second = engine.accept_point(
+                "swot", "strengths", "A core asset", [str(el.id)], org.id
+            )
+            db_session.flush()
+
+            assert first["element_id"] == second["element_id"]
+            count = ArchiMateElement.query.filter_by(
+                organization_id=org.id, type="Assessment"
+            ).count()
+            assert count == 1
+
+    def test_a_previously_accepted_point_is_not_a_citable_record(
+        self, app, db_session, make_org, tenant_ctx
+    ):
+        # An accepted strength is itself an Assessment element; it must not
+        # appear in the records a later draft may cite, so a draft cannot cite
+        # a past SWOT point as the evidence for a new one.
+        org = make_org("swot-no-circular")
+        el = _seed_element(db_session, org.id, "Payroll System")
+
+        with tenant_ctx(org.id):
+            saved = engine.accept_point(
+                "swot", "strengths", "A core asset", [str(el.id)], org.id
+            )
+            db_session.flush()
+
+            record_ids = {r["id"] for r in engine._gather_records(org.id)}
+            assert str(el.id) in record_ids
+            assert str(saved["element_id"]) not in record_ids
 
     def test_accept_refuses_a_point_with_no_resolvable_citation(
         self, app, db_session, make_org, tenant_ctx
