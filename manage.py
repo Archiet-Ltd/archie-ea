@@ -38,7 +38,7 @@ from flask_migrate import Migrate
 # Optional Redis/RQ imports
 try:
     from redis import Redis
-    from rq import Connection, Queue, Worker
+    from rq import Worker
 
     HAS_REDIS = True
 except ImportError:
@@ -725,24 +725,32 @@ def register_cli_commands(app):
         print("=" * 60)
 
     @app.cli.command()
-    def run_worker():
-        """Initializes a slim rq task queue."""
+    @click.option(
+        "--queue",
+        "-q",
+        "queues",
+        multiple=True,
+        help="Queue to listen on (interactive, agent, ingestion, compute); repeat for several. "
+        "Default: all four, interactive first.",
+    )
+    def run_worker(queues):
+        """Runs an rq worker on the named queues (all four unless --queue narrows them)."""
         if not HAS_REDIS:
             print("Error: redis and rq packages are required for background workers.")
             print("Install with: pip install redis rq")
             return
 
-        listen = ["default"]
-        conn = Redis(
-            host=app.config["RQ_DEFAULT_HOST"],
-            port=app.config["RQ_DEFAULT_PORT"],
-            db=0,
-            password=app.config["RQ_DEFAULT_PASSWORD"],
-        )
+        from app.services.job_queue_service import get_job_queue_service, resolve_worker_queues
 
-        with Connection(conn):
-            worker = Worker(map(Queue, listen))
-            worker.work()
+        try:
+            listen = resolve_worker_queues(queues)
+        except ValueError as exc:
+            raise click.UsageError(str(exc))
+
+        service = get_job_queue_service()
+        conn = service.rq_connection()
+        worker = Worker([service.get_queue(name) for name in listen], connection=conn)
+        worker.work()
 
     @app.cli.command()
     def format():

@@ -223,12 +223,8 @@ def init_extensions(app):
     except ImportError:
         pass
 
-    # Optional: Flask-RQ
-    try:
-        from flask_rq import RQ
-        RQ(app)
-    except ImportError:
-        pass
+    # Background queues are not an extension: the four named rq queues belong to
+    # app.services.job_queue_service and connect from the RQ_DEFAULT_* config.
 
     # Optional: Flask-Babel (S2-01 i18n — date/number/currency formatting)
     try:
