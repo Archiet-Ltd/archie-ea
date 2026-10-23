@@ -87,13 +87,42 @@ def _derivation_status():
         return None
 
 
+# The question lenses the Ask page draws. A deep link may name one so a
+# suggested question opens on the right lens; an unknown value is ignored and
+# the page opens on its default (impact), exactly as a bad element id is.
+ASK_QUESTION_KEYS = (
+    "impact",
+    "strategy",
+    "risk",
+    "portfolio",
+    "programme",
+    "data",
+    "compliance",
+    "accountability",
+)
+
+
 @intelligence_ui.route("/ask", methods=["GET"])
 @login_required
 def ask():
-    """Ask a plain business question about what depends on a chosen element."""
+    """Ask a plain business question about what depends on a chosen element.
+
+    ``element`` (optional) is the id of the element to answer about, and
+    ``question`` (optional) the lens to open, so a suggested question can hand
+    both straight across and the page answers without the person retyping the
+    name. A non-whole-number element and a question that is not one of the
+    lenses are ignored and the page opens on its picker, the same way Twin map
+    treats a bad element.
+    """
+    initial_element_id = request.args.get("element", type=int)
+    initial_question = request.args.get("question")
+    if initial_question not in ASK_QUESTION_KEYS:
+        initial_question = None
     workspace_is_empty = _workspace_is_empty()
     return render_template(
         "intelligence/ask.html",
+        initial_element_id=initial_element_id,
+        initial_question=initial_question,
         workspace_counts_available=workspace_is_empty is not None,
         workspace_is_empty=workspace_is_empty,
         derivation_status=_derivation_status(),

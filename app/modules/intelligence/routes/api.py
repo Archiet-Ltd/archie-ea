@@ -1104,4 +1104,28 @@ def ask_nl_question():
     return success_response({"question": question, "interpretation": interpretation, **result})
 
 
+@intelligence_api.route("/suggested-questions", methods=["GET"])
+@login_required
+def suggested_questions_for_organisation():  # reuse-ok: serialises the one suggested_questions generator, not a second one
+    """The three questions the Ask page and the dashboard checklist offer once
+    a model exists, written from the caller's own services and owners.
+
+    Serialises ``suggested_questions`` through ``success_response`` -- no
+    business logic here. Tenant-scoped by the one generator, so a second
+    organisation never sees the first one's names; no tenant context is 400.
+    """
+    organization_id = current_organization_id()
+    if organization_id is None:
+        return error_response(
+            "no tenant context for this request",
+            code="NO_TENANT_CONTEXT",
+            details={"reason": _NO_TENANT_CONTEXT_REASON},
+            status_code=400,
+        )
+
+    from app.modules.intelligence.services.suggested_questions import suggested_questions
+
+    return success_response(suggested_questions(organization_id))
+
+
 __all__ = ["intelligence_api"]
