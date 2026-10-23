@@ -389,3 +389,370 @@ class TestAskRouteBadCorrectionBodiesNeverCrash:
         assert data["interpretation"]["params"] == {"criticality": "Critical"}
         names = {row["name"] for row in data["rows"]}
         assert "LegitCorrection-critical" in names
+
+
+# ---------------------------------------------------------------------------
+# Helpers for the thirty-startup-question entries (UC-S1-05, S2-01, S2-03, S2-04)
+# ---------------------------------------------------------------------------
+
+
+def _make_app_with_cost(org_id, name, annual_cost=None, owner_user_id=None):
+    from app import db
+    from app.models.application_portfolio import ApplicationComponent
+    from app.models.application_owner import ApplicationOwner
+
+    app_row = ApplicationComponent(
+        name=name, organization_id=org_id, total_cost_of_ownership=annual_cost,
+    )
+    db.session.add(app_row)
+    db.session.flush()
+    if owner_user_id is not None:
+        db.session.add(ApplicationOwner(
+            application_id=app_row.id, user_id=owner_user_id,
+            organization_id=org_id, ownership_type="primary",
+        ))
+        db.session.flush()
+    return app_row
+
+
+def _map_capability(org_id, app_id, capability_id):
+    from app import db
+    from app.models.application_capability import ApplicationCapabilityMapping
+
+    db.session.add(ApplicationCapabilityMapping(
+        organization_id=org_id,
+        application_component_id=app_id,
+        business_capability_id=capability_id,
+        support_level="primary",
+        is_active=True,
+    ))
+    db.session.flush()
+
+
+def _make_capability(org_id, name):
+    from app import db
+    from app.models.business_capabilities import BusinessCapability
+
+    cap = BusinessCapability(name=name, organization_id=org_id)
+    db.session.add(cap)
+    db.session.flush()
+    return cap
+
+
+def _make_github_element(org_id, name, repository="acme/orders", commit="1a2b3c4d5e6f"):
+    """An ArchiMate element stamped as GitHub-connector-sourced, the way the
+    connector itself stamps provenance."""
+    from app import db
+    from app.connectors.github import stamp_origin
+    from app.models.archimate_core import ArchiMateElement
+
+    el = ArchiMateElement(
+        name=name, type="ApplicationComponent", layer="application",
+        organization_id=org_id,
+    )
+    db.session.add(el)
+    db.session.flush()
+    stamp_origin(el, repository=repository, commit=commit, file="go.mod")
+    db.session.flush()
+    return el
+
+
+def _make_manual_element(org_id, name):
+    from app import db
+    from app.models.archimate_core import ArchiMateElement
+
+    el = ArchiMateElement(
+        name=name, type="ApplicationComponent", layer="application",
+        organization_id=org_id, source_kind="manual",
+    )
+    db.session.add(el)
+    db.session.flush()
+    return el
+
+
+class TestEveryCitationHasAnOpenableTarget:
+    """The brief's bar: every answer carries at least one citation whose
+    target is a record a person can open. The target is checked for its
+    shape here; the journey proves it actually opens with content."""
+
+    def test_applications_without_owner_citations_point_at_the_application_record(
+        self, app, db_session, make_org
+    ):
+        from app.modules.intelligence.services.query_catalogue import run_entry
+
+        org = make_org("cite-noowner")
+        row = _make_app(org.id, "Unowned-with-cite", criticality="High")
+        result = run_entry("applications_without_owner", org.id)
+        assert result["citations"], "the answer carried no citation to open"
+        citation = next(c for c in result["citations"] if c["id"] == row.id)
+        assert citation["target"] == f"/api/v1/applications/{row.id}"
+        assert citation["type"] == "application"
+
+
+class TestApplicationsAndOwnersTwoOrgIsolation:
+    def test_inventory_lists_owner_and_annual_cost(self, app, db_session, make_org):
+        from app.models.user import User
+        from app.modules.intelligence.services.query_catalogue import run_entry
+
+        org = make_org("inv-a")
+        user = User(email="inv-owner@example.com", first_name="Pat", last_name="Owner", organization_id=org.id)
+        db_session.add(user)
+        db_session.flush()
+        _make_app_with_cost(org.id, "Inv-owned", annual_cost=42000, owner_user_id=user.id)
+
+        result = run_entry("applications_and_owners", org.id)
+        row = next(r for r in result["rows"] if r["name"] == "Inv-owned")
+        assert row["owner"] == "Pat Owner"
+        assert row["annual_cost"] == 42000
+        assert result["citations"]
+
+    def test_missing_owner_and_cost_read_as_not_recorded_not_fabricated(self, app, db_session, make_org):
+        from app.modules.intelligence.services.query_catalogue import run_entry
+
+        org = make_org("inv-missing")
+        _make_app_with_cost(org.id, "Inv-bare", annual_cost=None)
+
+        result = run_entry("applications_and_owners", org.id)
+        row = next(r for r in result["rows"] if r["name"] == "Inv-bare")
+        assert row["owner"] == "not recorded"
+        assert row["annual_cost"] is None
+        assert row["annual_cost_reason"] == "no annual cost recorded for this application"
+
+    def test_org_a_never_sees_org_b_inventory(self, app, db_session, make_org):
+        from app.modules.intelligence.services.query_catalogue import run_entry
+
+        org_a = make_org("inv-iso-a")
+        org_b = make_org("inv-iso-b")
+        _make_app_with_cost(org_a.id, "InvA-run", annual_cost=1000)
+        _make_app_with_cost(org_b.id, "InvB-run", annual_cost=2000)
+
+        result = run_entry("applications_and_owners", org_a.id)
+        names = {r["name"] for r in result["rows"]}
+        assert "InvA-run" in names
+        assert "InvB-run" not in names
+
+
+class TestDuplicateToolingByCapabilityTwoOrgIsolation:
+    def test_two_applications_on_one_capability_are_flagged_with_cost(self, app, db_session, make_org):
+        from app.modules.intelligence.services.query_catalogue import run_entry
+
+        org = make_org("dup-a")
+        cap = _make_capability(org.id, "Logging")
+        a = _make_app_with_cost(org.id, "Logger One", annual_cost=10000)
+        b = _make_app_with_cost(org.id, "Logger Two", annual_cost=15000)
+        _map_capability(org.id, a.id, cap.id)
+        _map_capability(org.id, b.id, cap.id)
+
+        result = run_entry("duplicate_tooling_by_capability", org.id)
+        assert result["total"] == 1
+        group = result["groups"][0]
+        assert group["group"] == "Logging"
+        assert group["combined_annual_cost"] == 25000
+        names = {r["application_name"] for r in group["rows"]}
+        assert names == {"Logger One", "Logger Two"}
+        assert len(result["citations"]) == 2
+
+    def test_single_application_on_a_capability_is_not_duplicate_tooling(self, app, db_session, make_org):
+        from app.modules.intelligence.services.query_catalogue import run_entry
+
+        org = make_org("dup-single")
+        cap = _make_capability(org.id, "Billing")
+        a = _make_app_with_cost(org.id, "Only Biller", annual_cost=5000)
+        _map_capability(org.id, a.id, cap.id)
+
+        result = run_entry("duplicate_tooling_by_capability", org.id)
+        assert result["total"] == 0
+        assert result["reason"] == "no capability is covered by more than one application"
+
+    def test_org_a_never_sees_org_b_duplicate_tooling(self, app, db_session, make_org):
+        from app.modules.intelligence.services.query_catalogue import run_entry
+
+        org_a = make_org("dup-iso-a")
+        org_b = make_org("dup-iso-b")
+        cap_a = _make_capability(org_a.id, "Monitoring")
+        a1 = _make_app_with_cost(org_a.id, "MonA-1", annual_cost=1)
+        a2 = _make_app_with_cost(org_a.id, "MonA-2", annual_cost=2)
+        _map_capability(org_a.id, a1.id, cap_a.id)
+        _map_capability(org_a.id, a2.id, cap_a.id)
+        cap_b = _make_capability(org_b.id, "Monitoring")
+        b1 = _make_app_with_cost(org_b.id, "MonB-1", annual_cost=3)
+        b2 = _make_app_with_cost(org_b.id, "MonB-2", annual_cost=4)
+        _map_capability(org_b.id, b1.id, cap_b.id)
+        _map_capability(org_b.id, b2.id, cap_b.id)
+
+        result = run_entry("duplicate_tooling_by_capability", org_a.id)
+        names = {r["application_name"] for g in result["groups"] for r in g["rows"]}
+        assert "MonA-1" in names and "MonA-2" in names
+        assert "MonB-1" not in names and "MonB-2" not in names
+
+
+class TestGithubSourcedRecordsTwoOrgIsolation:
+    def test_lists_only_github_connector_elements(self, app, db_session, make_org):
+        from app.modules.intelligence.services.query_catalogue import run_entry
+
+        org = make_org("gh-a")
+        gh = _make_github_element(org.id, "Orders Worker")
+        _make_manual_element(org.id, "Hand Drawn")
+
+        result = run_entry("github_sourced_records", org.id)
+        names = {r["name"] for r in result["rows"]}
+        assert "Orders Worker" in names
+        assert "Hand Drawn" not in names
+        citation = next(c for c in result["citations"] if c["id"] == gh.id)
+        assert citation["target"] == f"/api/v1/elements/{gh.id}"
+        assert citation["type"] == "element"
+
+    def test_no_github_records_reads_as_honest_reason_not_empty_dash(self, app, db_session, make_org):
+        from app.modules.intelligence.services.query_catalogue import run_entry
+
+        org = make_org("gh-none")
+        _make_manual_element(org.id, "Only Manual")
+
+        result = run_entry("github_sourced_records", org.id)
+        assert result["total"] == 0
+        assert result["reason"] == "no records in this organisation were brought in by a GitHub connector"
+
+    def test_org_a_never_sees_org_b_github_records(self, app, db_session, make_org):
+        from app.modules.intelligence.services.query_catalogue import run_entry
+
+        org_a = make_org("gh-iso-a")
+        org_b = make_org("gh-iso-b")
+        _make_github_element(org_a.id, "GhA Worker")
+        _make_github_element(org_b.id, "GhB Worker")
+
+        result = run_entry("github_sourced_records", org_a.id)
+        names = {r["name"] for r in result["rows"]}
+        assert "GhA Worker" in names
+        assert "GhB Worker" not in names
+
+
+class TestWhatBreaksIfFailsTwoOrgIsolation:
+    def _seed_chain(self, org_id):
+        """A service that serves a downstream element, so impact has rows."""
+        from app import db
+        from app.models.archimate_core import ArchiMateElement, ArchiMateRelationship
+
+        head = ArchiMateElement(
+            name="Billing Platform", type="ApplicationComponent", layer="application",
+            organization_id=org_id,
+        )
+        tail = ArchiMateElement(
+            name="Invoice Sender", type="ApplicationComponent", layer="application",
+            organization_id=org_id,
+        )
+        db.session.add_all([head, tail])
+        db.session.flush()
+        db.session.add(ArchiMateRelationship(
+            type="Serving", source_id=head.id, target_id=tail.id, organization_id=org_id,
+        ))
+        db.session.flush()
+        return head, tail
+
+    def test_named_service_returns_impact_rows_with_citations(
+        self, app, db_session, make_org, tenant_ctx
+    ):
+        from app.modules.intelligence.services.query_catalogue import run_entry
+
+        org = make_org("breaks-a")
+        head, tail = self._seed_chain(org.id)
+
+        # The impact walk reads the active organisation the way a signed-in
+        # request does, so run the entry inside that organisation's context.
+        with tenant_ctx(org.id):
+            result = run_entry("what_breaks_if_fails", org.id, service="Billing Platform")
+        assert result["service"] == "Billing Platform"
+        reached = {r["name"] for r in result["rows"]}
+        assert "Invoice Sender" in reached
+        # The service and every reached record are openable.
+        targets = {c["target"] for c in result["citations"]}
+        assert f"/api/v1/elements/{head.id}" in targets
+        assert f"/api/v1/elements/{tail.id}" in targets
+
+    def test_unresolved_service_returns_plain_reason_not_a_guess(self, app, db_session, make_org):
+        from app.modules.intelligence.services.query_catalogue import run_entry
+
+        org = make_org("breaks-unknown")
+        self._seed_chain(org.id)
+
+        result = run_entry("what_breaks_if_fails", org.id, service="A Service That Does Not Exist")
+        assert result["total"] == 0
+        assert result["citations"] == []
+        assert "did not match" in result["reason"]
+
+    def test_org_a_service_name_never_resolves_to_org_b_element(self, app, db_session, make_org):
+        from app.modules.intelligence.services.query_catalogue import run_entry
+
+        org_a = make_org("breaks-iso-a")
+        org_b = make_org("breaks-iso-b")
+        self._seed_chain(org_b.id)  # only org B has "Billing Platform"
+
+        result = run_entry("what_breaks_if_fails", org_a.id, service="Billing Platform")
+        assert result["total"] == 0
+        assert result["citations"] == []
+
+
+class TestEvaluationSetCoversAllThirtyStartupQuestions:
+    def test_evaluation_set_has_all_thirty_questions_mapped(self):
+        from app.modules.intelligence.services.nl_query_interpreter import evaluation_set
+
+        cases = evaluation_set()
+        answerable = [c for c in cases if c["expected_entry_id"] is not None]
+        assert len(answerable) == 30, "the thirty startup questions must each map to an entry"
+
+    def test_every_answerable_question_maps_to_a_real_entry(self):
+        from app.modules.intelligence.services.nl_query_interpreter import evaluation_set, interpret
+        from app.modules.intelligence.services.query_catalogue import CATALOGUE
+
+        for case in evaluation_set():
+            result = interpret(case["question"])
+            assert result["entry_id"] == case["expected_entry_id"], (
+                case["question"], result["entry_id"]
+            )
+            if case["expected_entry_id"] is not None:
+                assert case["expected_entry_id"] in CATALOGUE
+                assert result["method"] in ("keyword", "model")
+
+    def test_a_question_outside_the_catalogue_still_maps_to_none(self):
+        from app.modules.intelligence.services.nl_query_interpreter import interpret
+
+        result = interpret("what is the meaning of life")
+        assert result["entry_id"] is None
+        assert result["method"] == "none"
+
+
+class TestAskRouteAnswersTheNewEntries:
+    def test_ask_route_answers_inventory_question_with_citations(
+        self, app, db_session, make_org, client, login_as
+    ):
+        org = make_org("ask-inv")
+        _make_app_with_cost(org.id, "Ask-inv-app", annual_cost=1000)
+        user = _make_user(db_session, org)
+        login_as(client, user)
+
+        resp = client.post(
+            "/api/v1/intelligence/ask",
+            json={"question": "What applications do we run and who owns each one?"},
+        )
+        assert resp.status_code == 200, resp.get_data(as_text=True)
+        data = resp.get_json()["data"]
+        assert data["interpretation"]["entry_id"] == "applications_and_owners"
+        assert data["citations"]
+        assert any(r["name"] == "Ask-inv-app" for r in data["rows"])
+
+    def test_ask_route_answers_github_question_with_openable_citation(
+        self, app, db_session, make_org, client, login_as
+    ):
+        org = make_org("ask-gh")
+        gh = _make_github_element(org.id, "Ask-gh Worker")
+        user = _make_user(db_session, org)
+        login_as(client, user)
+
+        resp = client.post(
+            "/api/v1/intelligence/ask",
+            json={"question": "Which components were discovered from our GitHub repositories?"},
+        )
+        assert resp.status_code == 200, resp.get_data(as_text=True)
+        data = resp.get_json()["data"]
+        assert data["interpretation"]["entry_id"] == "github_sourced_records"
+        targets = {c["target"] for c in data["citations"]}
+        assert f"/api/v1/elements/{gh.id}" in targets

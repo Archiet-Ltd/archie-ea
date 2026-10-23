@@ -20,12 +20,69 @@ logger = logging.getLogger(__name__)
 # Deterministic fallback: ordered (keywords, entry_id, default_params).
 # Checked in order; the first match wins. This is also what runs the
 # committed evaluation set in CI, where no LLM provider is configured.
+#
+# The phrasings here cover the thirty plain-words questions a startup CTO
+# asks across the five use cases the ask page serves (what breaks, no owner,
+# paying twice, what we run and who owns it, what came from GitHub). The
+# more specific rules come first: "what came from GitHub" and "what we run"
+# are both checked before the broad "no owner" and "what breaks" rules so a
+# question that mentions both lands on the one it is really asking.
 _KEYWORD_RULES = [
+    # UC-S2-04: what came from the GitHub connector.
     (
-        ("no owner", "without owner", "without an owner", "no recorded owner", "unowned"),
+        (
+            "from github", "from our github", "github repositor", "github connector",
+            "github integration", "github commit", "github-sourced", "source is a github",
+            "discovered from", "cite a github", "into the inventory", "into the catalogue",
+        ),
+        "github_sourced_records",
+        {},
+    ),
+    # UC-S2-03: paying twice / duplicate tooling by capability.
+    (
+        (
+            "paying for two", "paying twice", "pay twice", "same thing",
+            "overlapping", "duplicate tool", "duplicate logging", "redundant",
+            "more than one paid", "covered by more than one", "cut by removing",
+            "duplicate subscription", "two tools",
+        ),
+        "duplicate_tooling_by_capability",
+        {},
+    ),
+    # UC-S2-02: nobody owns it. Checked before the inventory rule so a
+    # "missing an owner" question is never read as "list everything we run".
+    (
+        (
+            "no owner", "without owner", "without an owner", "no recorded owner",
+            "unowned", "nobody is responsible", "missing an accountable",
+            "no owner assigned", "unowned integration", "lack a named owner",
+            "no named owner", "without an accountable",
+        ),
         "applications_without_owner",
         {},
     ),
+    # UC-S1-05: what we run and who owns it (inventory + owner + cost).
+    (
+        (
+            "what applications do we run", "who owns each", "inventory of services",
+            "who owns the", "application portfolio", "own the most",
+            "every production system and its", "systems with their owners",
+            "run and who owns", "and its accountable team",
+        ),
+        "applications_and_owners",
+        {},
+    ),
+    # UC-S2-01: what breaks if X fails (impact).
+    (
+        (
+            "goes down", "what depends on", "break if", "breaks if", "breaks for",
+            "single point", "single points of failure", "unavailable", "is down",
+            "stops working", "fails, which", "if the", "what else stops",
+        ),
+        "what_breaks_if_fails",
+        {},
+    ),
+    # The original business-continuity phrasings still map to that entry.
     (
         (
             "stop the business", "stop trading", "stop us from trading",
@@ -102,16 +159,50 @@ def interpret(question: str) -> Dict[str, Any]:
 
 def evaluation_set() -> List[Dict[str, Any]]:
     """The committed set of plain-language questions and their correct
-    catalogue mapping, used by the ≥90% correctness test."""
+    catalogue mapping, used by the correctness test.
+
+    It holds the thirty startup-CTO questions across the five use cases the
+    ask page serves — one cited answer to each is the number behind the
+    sign-up-to-first-answer path — plus two questions outside the catalogue
+    that must still map to nothing rather than be answered with a guess.
+    """
     return [
-        {"question": "which applications have no owner?", "expected_entry_id": "applications_without_owner"},
-        {"question": "show me applications without an owner", "expected_entry_id": "applications_without_owner"},
-        {"question": "list unowned applications", "expected_entry_id": "applications_without_owner"},
-        {"question": "what systems have no recorded owner", "expected_entry_id": "applications_without_owner"},
-        {"question": "what would stop the business trading?", "expected_entry_id": "business_continuity_criticality"},
-        {"question": "what would stop us from trading", "expected_entry_id": "business_continuity_criticality"},
-        {"question": "show critical systems and their suppliers", "expected_entry_id": "business_continuity_criticality"},
-        {"question": "which systems are business continuity risks", "expected_entry_id": "business_continuity_criticality"},
+        # UC-S2-01 — what breaks if X fails (impact).
+        {"question": "If the billing platform goes down, what else stops working?", "expected_entry_id": "what_breaks_if_fails"},
+        {"question": "What depends on our primary database?", "expected_entry_id": "what_breaks_if_fails"},
+        {"question": "Which customer-facing services break if the auth service fails?", "expected_entry_id": "what_breaks_if_fails"},
+        {"question": "What are the single points of failure in our stack?", "expected_entry_id": "what_breaks_if_fails"},
+        {"question": "If the payment gateway is unavailable, which journeys are affected?", "expected_entry_id": "what_breaks_if_fails"},
+        {"question": "What breaks for customers if the email provider is down?", "expected_entry_id": "what_breaks_if_fails"},
+        # UC-S2-02 — nobody owns it.
+        {"question": "Which applications have no owner recorded?", "expected_entry_id": "applications_without_owner"},
+        {"question": "Are there any services nobody is responsible for?", "expected_entry_id": "applications_without_owner"},
+        {"question": "List the systems missing an accountable team.", "expected_entry_id": "applications_without_owner"},
+        {"question": "Which databases have no owner assigned?", "expected_entry_id": "applications_without_owner"},
+        {"question": "Do we have any unowned integrations?", "expected_entry_id": "applications_without_owner"},
+        {"question": "Which production components lack a named owner?", "expected_entry_id": "applications_without_owner"},
+        # UC-S2-03 — paying twice.
+        {"question": "Are we paying for two tools that do the same thing?", "expected_entry_id": "duplicate_tooling_by_capability"},
+        {"question": "Where do we have overlapping vendor subscriptions?", "expected_entry_id": "duplicate_tooling_by_capability"},
+        {"question": "Which capabilities are covered by more than one paid service?", "expected_entry_id": "duplicate_tooling_by_capability"},
+        {"question": "Do we have duplicate logging tools we pay for?", "expected_entry_id": "duplicate_tooling_by_capability"},
+        {"question": "Are there redundant monitoring subscriptions?", "expected_entry_id": "duplicate_tooling_by_capability"},
+        {"question": "Which spend could we cut by removing duplicate tooling?", "expected_entry_id": "duplicate_tooling_by_capability"},
+        # UC-S1-05 — what we run and who owns it.
+        {"question": "What applications do we run and who owns each one?", "expected_entry_id": "applications_and_owners"},
+        {"question": "Give me the inventory of services with their owners.", "expected_entry_id": "applications_and_owners"},
+        {"question": "Who owns the billing platform and what does it cost per year?", "expected_entry_id": "applications_and_owners"},
+        {"question": "List every production system and its accountable team.", "expected_entry_id": "applications_and_owners"},
+        {"question": "What is our full application portfolio right now?", "expected_entry_id": "applications_and_owners"},
+        {"question": "Which teams own the most systems?", "expected_entry_id": "applications_and_owners"},
+        # UC-S2-04 — what came from GitHub.
+        {"question": "Which components were discovered from our GitHub repositories?", "expected_entry_id": "github_sourced_records"},
+        {"question": "What did the GitHub connector import into the inventory?", "expected_entry_id": "github_sourced_records"},
+        {"question": "Show the services whose source is a GitHub repository.", "expected_entry_id": "github_sourced_records"},
+        {"question": "Which records cite a GitHub commit as their origin?", "expected_entry_id": "github_sourced_records"},
+        {"question": "What came into the catalogue from the GitHub integration?", "expected_entry_id": "github_sourced_records"},
+        {"question": "List the GitHub-sourced applications and their repositories.", "expected_entry_id": "github_sourced_records"},
+        # Outside the catalogue — must map to nothing, never a guessed answer.
         {"question": "what's the weather today", "expected_entry_id": None},
         {"question": "how many users do we have", "expected_entry_id": None},
     ]
