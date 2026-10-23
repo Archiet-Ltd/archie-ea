@@ -266,6 +266,8 @@ def test_enterprise_architect_my_work_membership():
         # Model history: as-of snapshot and changes between dates.
         "Model as of",
         "Changes",
+        # The model-health report, where findings are reviewed and dismissed.
+        "Model Health",
     ]
 
 
