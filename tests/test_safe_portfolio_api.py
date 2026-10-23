@@ -7,23 +7,6 @@ from app.models.user import User
 from app.services.element_profile_service import set_kind, set_wsjf_components
 
 
-def _login(client, user_id):
-    """Login a user in the test client session."""
-    from tests._session_test_helpers import mint_test_sid
-    _sid = mint_test_sid(user_id, app=client.application)
-    with client.session_transaction() as sess:
-        sess["_user_id"] = str(user_id)
-        sess["_fresh"] = True
-        if _sid:
-            sess["_sid"] = _sid
-
-    from flask import g, has_app_context
-    if not has_app_context():
-        return
-    for cached in ("_login_user", "_current_user", "current_org_id", "current_org"):
-        g.pop(cached, None)
-
-
 @pytest.fixture
 def test_user(db_session, make_org):
     """Create a test user with Architect role."""
@@ -68,9 +51,9 @@ def epic_element(db_session, make_org):
     return element
 
 
-def test_portfolio_index_loads(app, client, test_user, epic_element, tenant_ctx):
+def test_portfolio_index_loads(app, client, test_user, epic_element, tenant_ctx, login_as):
     """GET /safe/portfolio returns 200 with the kanban board."""
-    _login(client, test_user.id)
+    login_as(client, test_user)
     with tenant_ctx(epic_element.organization_id):
         response = client.get("/safe/portfolio/")
         assert response.status_code == 200
@@ -78,11 +61,11 @@ def test_portfolio_index_loads(app, client, test_user, epic_element, tenant_ctx)
         assert b"Test Epic" in response.data
 
 
-def test_portfolio_api_returns_json(app, client, test_user, epic_element, tenant_ctx):
-    """GET /safe/portfolio/api returns JSON with columns and epics."""
-    _login(client, test_user.id)
+def test_portfolio_api_returns_json(app, client, test_user, epic_element, tenant_ctx, login_as):
+    """GET /api/safe/portfolio returns JSON with columns and epics."""
+    login_as(client, test_user)
     with tenant_ctx(epic_element.organization_id):
-        response = client.get("/safe/portfolio/api")
+        response = client.get("/api/safe/portfolio")
         assert response.status_code == 200
         data = response.get_json()
 
@@ -101,7 +84,7 @@ def test_portfolio_api_returns_json(app, client, test_user, epic_element, tenant
         assert funnel_epics[0]["wsjf_score"] == 7.0  # (8+7+6)/3
 
 
-def test_portfolio_api_wsjf_ordering(app, client, test_user, db_session, make_org, tenant_ctx):
+def test_portfolio_api_wsjf_ordering(app, client, test_user, db_session, make_org, tenant_ctx, login_as):
     """Epics within a column are ordered by WSJF score descending."""
     org = make_org()
 
@@ -131,9 +114,9 @@ def test_portfolio_api_wsjf_ordering(app, client, test_user, db_session, make_or
         )
     db_session.commit()
 
-    _login(client, test_user.id)
+    login_as(client, test_user)
     with tenant_ctx(org.id):
-        response = client.get("/safe/portfolio/api")
+        response = client.get("/api/safe/portfolio")
         assert response.status_code == 200
         data = response.get_json()
 
@@ -149,12 +132,12 @@ def test_portfolio_api_wsjf_ordering(app, client, test_user, db_session, make_or
         assert funnel_epics[2]["wsjf_score"] == 2.0
 
 
-def test_portfolio_api_move_epic_to_new_state(app, client, test_user, epic_element, tenant_ctx, db_session):
-    """PATCH /safe/portfolio/api/<id> moves an epic to a new kanban state."""
-    _login(client, test_user.id)
+def test_portfolio_api_move_epic_to_new_state(app, client, test_user, epic_element, tenant_ctx, db_session, login_as):
+    """PATCH /api/safe/portfolio/<id> moves an epic to a new kanban state."""
+    login_as(client, test_user)
     with tenant_ctx(epic_element.organization_id):
         response = client.patch(
-            f"/safe/portfolio/api/{epic_element.id}",
+            f"/api/safe/portfolio/{epic_element.id}",
             json={"kanban_state": "Implementing"},
         )
         assert response.status_code == 200
@@ -166,18 +149,18 @@ def test_portfolio_api_move_epic_to_new_state(app, client, test_user, epic_eleme
 
         # Verify it persisted
         db_session.expire_all()
-        from app.services.element_profile_service import _read_property_value
+        from app.services.element_profile_service import get_kind_property
         db_session.refresh(epic_element)
-        kanban_state = _read_property_value(epic_element, "kanban_state")
+        kanban_state = get_kind_property(epic_element, "kanban_state")
         assert kanban_state == "Implementing"
 
 
-def test_portfolio_api_rejects_invalid_state(app, client, test_user, epic_element, tenant_ctx):
+def test_portfolio_api_rejects_invalid_state(app, client, test_user, epic_element, tenant_ctx, login_as):
     """PATCH with invalid kanban state returns 400."""
-    _login(client, test_user.id)
+    login_as(client, test_user)
     with tenant_ctx(epic_element.organization_id):
         response = client.patch(
-            f"/safe/portfolio/api/{epic_element.id}",
+            f"/api/safe/portfolio/{epic_element.id}",
             json={"kanban_state": "InvalidState"},
         )
         assert response.status_code == 400
@@ -186,7 +169,7 @@ def test_portfolio_api_rejects_invalid_state(app, client, test_user, epic_elemen
         assert "Invalid kanban state" in data["error"]
 
 
-def test_portfolio_api_rejects_non_epic(app, client, test_user, db_session, make_org, tenant_ctx):
+def test_portfolio_api_rejects_non_epic(app, client, test_user, db_session, make_org, tenant_ctx, login_as):
     """PATCH on a non-Epic work package returns 400."""
     org = make_org()
     # Create a work package that is NOT an Epic
@@ -198,10 +181,10 @@ def test_portfolio_api_rejects_non_epic(app, client, test_user, db_session, make
     db_session.add(element)
     db_session.commit()
 
-    _login(client, test_user.id)
+    login_as(client, test_user)
     with tenant_ctx(org.id):
         response = client.patch(
-            f"/safe/portfolio/api/{element.id}",
+            f"/api/safe/portfolio/{element.id}",
             json={"kanban_state": "Implementing"},
         )
         assert response.status_code == 400
@@ -210,7 +193,7 @@ def test_portfolio_api_rejects_non_epic(app, client, test_user, db_session, make
         assert "not an Epic" in data["error"]
 
 
-def test_portfolio_api_tenant_isolation(app, client, test_user, db_session, make_org, tenant_ctx):
+def test_portfolio_api_tenant_isolation(app, client, test_user, db_session, make_org, tenant_ctx, login_as):
     """An epic from org A is not visible to org B."""
     org_a = make_org()
     org_b = make_org()
@@ -227,30 +210,30 @@ def test_portfolio_api_tenant_isolation(app, client, test_user, db_session, make
     db_session.commit()
     element_id = element.id
 
-    _login(client, test_user.id)
+    login_as(client, test_user)
     # Switch to org B
     with tenant_ctx(org_b.id):
         # Try to access org A's epic
         response = client.patch(
-            f"/safe/portfolio/api/{element_id}",
+            f"/api/safe/portfolio/{element_id}",
             json={"kanban_state": "Implementing"},
         )
         assert response.status_code == 404
 
         # Verify org B sees empty board
-        response = client.get("/safe/portfolio/api")
+        response = client.get("/api/safe/portfolio")
         assert response.status_code == 200
         data = response.get_json()
         for state, epics in data["columns"].items():
             assert len(epics) == 0, f"Org B should see no epics in {state}"
 
 
-def test_portfolio_api_updates_wsjf_components(app, client, test_user, epic_element, tenant_ctx, db_session):
+def test_portfolio_api_updates_wsjf_components(app, client, test_user, epic_element, tenant_ctx, db_session, login_as):
     """PATCH can update WSJF components and returns new score."""
-    _login(client, test_user.id)
+    login_as(client, test_user)
     with tenant_ctx(epic_element.organization_id):
         response = client.patch(
-            f"/safe/portfolio/api/{epic_element.id}",
+            f"/api/safe/portfolio/{epic_element.id}",
             json={
                 "business_value": 10,
                 "time_criticality": 10,

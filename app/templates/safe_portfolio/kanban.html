@@ -107,7 +107,7 @@ function kanbanBoard() {
 
             this.moving = epic.id;
             try {
-                const updated = await Platform.fetch(`/safe/portfolio/api/${epic.id}`, {
+                const updated = await Platform.fetch(`/api/safe/portfolio/${epic.id}`, {
                     method: 'PATCH',
                     body: { kanban_state: newState }
                 });
