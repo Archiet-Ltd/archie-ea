@@ -80,7 +80,7 @@ class TestSchema:
         assert sorted(CANVAS_TEMPLATES) == [
             "ansoff_matrix", "bcg_matrix", "blue_ocean_strategy",
             "business_case", "business_model_canvas", "lean_canvas",
-            "pestle", "swot",
+            "mckinsey_7s", "pestle", "porters_five_forces", "swot", "vrio",
         ]
         assert {k: len(CANVAS_TEMPLATES[k]["zones"]) for k in CANVAS_TEMPLATES} == {
             "ansoff_matrix": 4,
@@ -89,8 +89,11 @@ class TestSchema:
             "business_case": 9,
             "business_model_canvas": 9,
             "lean_canvas": 9,
+            "mckinsey_7s": 7,
             "pestle": 6,
+            "porters_five_forces": 5,
             "swot": 4,
+            "vrio": 5,
         }
 
     def test_bmc_box_keys_equal_the_record_columns(self):
@@ -168,6 +171,8 @@ class TestSeedIdempotence:
         org = make_org("canvas-seed-idempotence")
 
         profile_type_count = len(CANVAS_PROFILE_OPTIONS_BY_TYPE)
+        template_count = len(CANVAS_TEMPLATES)
+
         template_count = len(CANVAS_TEMPLATES)
 
         template_count = len(CANVAS_TEMPLATES)

@@ -1518,6 +1518,72 @@ _BCG_ZONES = [
     ),
 ]
 
+# ── VRIO — a table of resources read across the four questions and the
+# competitive implication they add up to. Every box reads the organisation's
+# own Assessment elements: a resource recorded as an assessment of its own
+# value, scarcity, imitability and organisation, and the implication box
+# reading the resources judged a sustained advantage. One column per box in
+# the design's left-to-right table order. ───────────────────────────────────
+_VRIO_ZONES = [
+    _canvas_zone(
+        "valuable", "Valuable", 1, ["Assessment"], "vrio_valuable",
+        "type_profile", "strategy",
+    ),
+    _canvas_zone(
+        "rare", "Rare", 2, ["Assessment"], "vrio_rare",
+        "type_profile", "strategy",
+    ),
+    _canvas_zone(
+        "inimitable", "Inimitable", 3, ["Assessment"], "vrio_inimitable",
+        "type_profile", "strategy",
+    ),
+    _canvas_zone(
+        "organised", "Organised", 4, ["Assessment"], "vrio_organised",
+        "type_profile", "strategy",
+    ),
+    _canvas_zone(
+        "competitive_implication", "Competitive implication", 5, ["Assessment"],
+        "vrio_competitive_implication", "type_profile", "strategy",
+    ),
+]
+
+# ── McKinsey 7S — the seven interdependent elements, Shared values at the
+# centre, the three hard S and the four soft S each their own box. Shared
+# values is the organisation's core Driver; Strategy a Goal; the remaining
+# five are Assessment elements of the organisation itself. Order runs hard
+# first then soft, with Shared values central, matching the design's labelled
+# seven circles. ─────────────────────────────────────────────────────────────
+_SEVEN_S_ZONES = [
+    _canvas_zone(
+        "strategy", "Strategy", 1, ["Goal"], "seven_s_strategy",
+        "type_profile", "motivation",
+    ),
+    _canvas_zone(
+        "structure", "Structure", 2, ["Assessment"], "seven_s_structure",
+        "type_profile", "business",
+    ),
+    _canvas_zone(
+        "systems", "Systems", 3, ["Assessment"], "seven_s_systems",
+        "type_profile", "business",
+    ),
+    _canvas_zone(
+        "shared_values", "Shared values", 4, ["Driver"], "seven_s_shared_values",
+        "type_profile", "motivation",
+    ),
+    _canvas_zone(
+        "style", "Style", 5, ["Assessment"], "seven_s_style",
+        "type_profile", "business",
+    ),
+    _canvas_zone(
+        "staff", "Staff", 6, ["Assessment"], "seven_s_staff",
+        "type_profile", "business",
+    ),
+    _canvas_zone(
+        "skills", "Skills", 7, ["Assessment"], "seven_s_skills",
+        "type_profile", "strategy",
+    ),
+]
+
 # ── Ansoff growth matrix — existing and new products against existing and
 # new markets, one box per quadrant over the organisation's Products and
 # Business Services. ──────────────────────────────────────────────────────
@@ -1574,6 +1640,33 @@ _BLUE_OCEAN_ZONES = [
     ),
 ]
 
+# ── Porter's five forces — the central competitive rivalry box with the four
+# surrounding forces. Every force is the organisation's own Assessment of that
+# pressure. Rivalry is ordered first so it reads as the centre the design
+# places the other four around. ─────────────────────────────────────────────
+_PORTER_ZONES = [
+    _canvas_zone(
+        "competitive_rivalry", "Competitive rivalry", 1, ["Assessment"],
+        "porter_competitive_rivalry", "type_profile", "strategy",
+    ),
+    _canvas_zone(
+        "supplier_power", "Bargaining power of suppliers", 2, ["Assessment"],
+        "porter_supplier_power", "type_profile", "strategy",
+    ),
+    _canvas_zone(
+        "buyer_power", "Bargaining power of buyers", 3, ["Assessment"],
+        "porter_buyer_power", "type_profile", "strategy",
+    ),
+    _canvas_zone(
+        "threat_of_substitution", "Threat of substitutes", 4, ["Assessment"],
+        "porter_threat_of_substitution", "type_profile", "strategy",
+    ),
+    _canvas_zone(
+        "threat_of_new_entrants", "Threat of new entrants", 5, ["Assessment"],
+        "porter_threat_of_new_entrants", "type_profile", "strategy",
+    ),
+]
+
 CANVAS_TEMPLATES: Dict[str, dict] = {
     "swot": {
         "key": "swot",
@@ -1610,6 +1703,9 @@ CANVAS_TEMPLATES: Dict[str, dict] = {
         "projects": ["motivation", "strategy", "implementation_and_migration", "project"],
         "zones": _CASE_ZONES,
     },
+    # The strategy frameworks carry no per-record store: each box is a
+    # projection over the tenant's own elements by profile, so `record` is
+    # "elements" (projection only, no backing table).
     "bcg_matrix": {
         "key": "bcg_matrix",
         "name": "BCG matrix",
@@ -1630,6 +1726,27 @@ CANVAS_TEMPLATES: Dict[str, dict] = {
         "record": "elements",
         "projects": ["motivation", "strategy"],
         "zones": _BLUE_OCEAN_ZONES,
+    },
+    "vrio": {
+        "key": "vrio",
+        "name": "VRIO",
+        "record": "elements",
+        "projects": ["strategy", "motivation"],
+        "zones": _VRIO_ZONES,
+    },
+    "mckinsey_7s": {
+        "key": "mckinsey_7s",
+        "name": "McKinsey 7S",
+        "record": "elements",
+        "projects": ["motivation", "strategy", "organization"],
+        "zones": _SEVEN_S_ZONES,
+    },
+    "porters_five_forces": {
+        "key": "porters_five_forces",
+        "name": "Porter's five forces",
+        "record": "elements",
+        "projects": ["strategy", "motivation"],
+        "zones": _PORTER_ZONES,
     },
 }
 
@@ -1653,9 +1770,8 @@ def validate_canvas_templates(templates: Optional[Dict[str, dict]] = None) -> No
         assert tpl["key"] == tpl_key, f"{tpl_key}: key field does not match its dict key"
         # A canvas either backs a record (business_model_canvas, business_case)
         # or reads straight from the organisation's own elements: record None
-        # (SWOT, PESTLE) or "elements" (the frameworks that read profiled
-        # elements straight, e.g. BCG and Ansoff), both organisation-scoped
-        # rather than per-record.
+        # (SWOT, PESTLE) or "elements" (every framework that reads profiled
+        # elements straight), both organisation-scoped rather than per-record.
         assert tpl["record"] in ("business_model_canvas", "business_case", "elements", None), (
             f"{tpl_key}: unknown record {tpl['record']!r}"
         )
@@ -1725,7 +1841,7 @@ def validate_canvas_templates(templates: Optional[Dict[str, dict]] = None) -> No
 # derived from the zones above, because a type's full profile vocabulary
 # spans more than any one zone's own `profile` field.
 CANVAS_PROFILE_OPTIONS_BY_TYPE: Dict[str, List[str]] = {
-    "Driver": ["problem", "reason"],
+    "Driver": ["problem", "reason", "seven_s_shared_values"],
     "Assessment": [
         "existing_alternative", "current_state", "risk",
         # SWOT — one value per box of the 2x2.
@@ -1735,6 +1851,16 @@ CANVAS_PROFILE_OPTIONS_BY_TYPE: Dict[str, List[str]] = {
         "pestle_technological", "pestle_legal", "pestle_environmental",
         # Blue Ocean — competing factors plotted on the value curve.
         "competing_factor",
+        # VRIO — a resource read across the four questions and the implication.
+        "vrio_valuable", "vrio_rare", "vrio_inimitable", "vrio_organised",
+        "vrio_competitive_implication",
+        # McKinsey 7S — the five elements read as assessments of the firm.
+        "seven_s_structure", "seven_s_systems", "seven_s_style",
+        "seven_s_staff", "seven_s_skills",
+        # Porter's five forces — each force as an assessment of the pressure.
+        "porter_competitive_rivalry", "porter_supplier_power",
+        "porter_buyer_power", "porter_threat_of_substitution",
+        "porter_threat_of_new_entrants",
     ],
     "Stakeholder": ["customer_segment"],
     "Value": ["value_proposition"],
@@ -1753,5 +1879,7 @@ CANVAS_PROFILE_OPTIONS_BY_TYPE: Dict[str, List[str]] = {
     "Product": ["star", "question_mark", "cash_cow", "dog",
                 "market_penetration", "market_development",
                 "product_development", "diversification"],
-    "Goal": ["eliminate", "reduce", "raise", "create"],
+    # Blue Ocean's four-action grid (eliminate/reduce/raise/create) plus the
+    # McKinsey 7S Strategy box.
+    "Goal": ["eliminate", "reduce", "raise", "create", "seven_s_strategy"],
 }

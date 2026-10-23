@@ -1,0 +1,47 @@
+{% extends 'layouts/admin_base.html' %}
+{% from 'macros/page_shell.html' import page_shell %}
+{% from 'components/strategy_canvas_box.html' import strategy_box_body %}
+
+{% block title %}Porter's five forces{% endblock %}
+
+{% macro porter_force(zone, template_key, centre=False) %}
+<div class="rounded-lg border {{ 'border-2 border-primary/40' if centre else 'border-border' }} bg-card p-4"
+     data-testid="porter-force-{{ zone.box_key }}">
+  <h3 class="text-sm font-semibold text-foreground mb-2">{{ zone.label }}</h3>
+  {{ strategy_box_body(zone, template_key) }}
+</div>
+{% endmacro %}
+
+{% block content %}
+<div class="flex-1 overflow-auto" data-testid="strategy-canvas-porters_five_forces" data-template-key="{{ template_key }}">
+  <div class="p-6 space-y-6">
+    {{ page_shell(
+        title=template_name,
+        subtitle='Competitive rivalry at the centre, with the four forces around it',
+        breadcrumb=[('Strategy canvases', url_for('strategy_canvas.index')), (template_name, None)]
+    ) }}
+
+    {# The central rivalry box with the four forces placed around it: new
+       entrants above, suppliers left, buyers right, substitutes below. At
+       390px the five stack in that same cross order, rivalry in the middle, so
+       the centre-and-four shape reads at every width. #}
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4" data-testid="porter-grid">
+      <div class="hidden lg:block"></div>
+      <div>{{ porter_force(zones_by_key['threat_of_new_entrants'], template_key) }}</div>
+      <div class="hidden lg:block"></div>
+
+      <div>{{ porter_force(zones_by_key['supplier_power'], template_key) }}</div>
+      <div>{{ porter_force(zones_by_key['competitive_rivalry'], template_key, centre=True) }}</div>
+      <div>{{ porter_force(zones_by_key['buyer_power'], template_key) }}</div>
+
+      <div class="hidden lg:block"></div>
+      <div>{{ porter_force(zones_by_key['threat_of_substitution'], template_key) }}</div>
+      <div class="hidden lg:block"></div>
+    </div>
+
+    <div class="rounded-lg border border-border bg-card p-4" data-testid="canvas-unclassified" role="status">
+      <p class="text-sm text-muted-foreground">{{ unclassified }} not yet classified</p>
+    </div>
+  </div>
+</div>
+{% endblock %}
