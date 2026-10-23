@@ -1183,7 +1183,12 @@ def application_import():
         )
         return redirect(url_for("unified_applications.application_list"))
 
-    # Legacy DB-based idempotency check (kept for backward compatibility with import_token)
+    # Legacy DB-based idempotency check (kept for backward compatibility with import_token).
+    # Match only rows that represent a completed IMPORT, not an analysis of the same
+    # file: reviewing a spreadsheet writes an audit row with the same filename but no
+    # records_created, and matching that made the import right after a review believe
+    # the file was already imported and silently create nothing. A real import always
+    # records how many rows it created, so require that.
     import_token = request.form.get("import_token")
     if import_token:
         from datetime import datetime, timedelta
@@ -1193,6 +1198,7 @@ def application_import():
         recent_dup = ImportAuditLog.query.filter(
             ImportAuditLog.user_id == current_user.id,
             ImportAuditLog.filename == (file.filename or ""),
+            ImportAuditLog.duplicate_mode.isnot(None),
             ImportAuditLog.timestamp
             >= datetime.utcnow() - timedelta(seconds=idempotency_window),
         ).first()
@@ -2632,7 +2638,12 @@ def import_with_ai_review():
             }
         ), 200
 
-    # Legacy DB-based idempotency check (kept for backward compatibility with import_token)
+    # Legacy DB-based idempotency check (kept for backward compatibility with import_token).
+    # Match only rows that represent a completed IMPORT, not an analysis of the same
+    # file: reviewing a spreadsheet writes an audit row with the same filename but no
+    # records_created, and matching that made the import right after a review believe
+    # the file was already imported and silently create nothing. A real import always
+    # records how many rows it created, so require that.
     import_token = request.form.get("import_token")
     if import_token:
         from datetime import datetime, timedelta
@@ -2642,6 +2653,7 @@ def import_with_ai_review():
         recent_dup = ImportAuditLog.query.filter(
             ImportAuditLog.user_id == current_user.id,
             ImportAuditLog.filename == (file.filename or ""),
+            ImportAuditLog.duplicate_mode.isnot(None),
             ImportAuditLog.timestamp
             >= datetime.utcnow() - timedelta(seconds=idempotency_window),
         ).first()
