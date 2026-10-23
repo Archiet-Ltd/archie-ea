@@ -75,7 +75,7 @@ def test_every_sitemap_url_is_crawlable_and_tagged(app):
 
             canonical_match = _CANONICAL_RE.search(html)
             assert canonical_match is not None, f"{path}: no canonical link"
-            expected = _expected_canonical(path, pages_by_url)
+            expected = SITE_URL + path
             assert canonical_match.group(1) == expected, (
                 f"{path}: canonical is {canonical_match.group(1)!r}, "
                 f"expected {expected!r}"
