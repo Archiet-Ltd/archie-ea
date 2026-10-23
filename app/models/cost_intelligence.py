@@ -203,6 +203,10 @@ class ServiceLevelAgreement(db.Model):
     - Response and resolution times
     - Actual performance vs. targets
     - SLA violations and penalties
+
+    Maps the `service_level_agreements` table. No route or service currently
+    reads or writes this model — left in place (not deleted) per ADR 0008,
+    since a table with live schema is not code to remove on a hunch.
     """
 
     __tablename__ = "service_level_agreements"
@@ -315,6 +319,10 @@ class SLAViolation(db.Model):
     - Penalty calculation
     - Trend analysis
     - Vendor performance assessment
+
+    Maps the `sla_violations` table. No route or service currently reads or
+    writes this model — left in place (not deleted) per ADR 0008, since a
+    table with live schema is not code to remove on a hunch.
     """
 
     __tablename__ = "sla_violations"
