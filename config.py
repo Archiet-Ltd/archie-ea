@@ -477,6 +477,10 @@ class Config:
     # this flag is explicitly enabled and an LLM provider is configured.
     AI_PAGE_GUIDE_ENABLED = _env_bool("AI_PAGE_GUIDE_ENABLED", False)
 
+    # Server-side error aggregation into error_events; off only where a
+    # database round-trip per logged warning is pure cost.
+    ERROR_TRACKING_ENABLED = True
+
     # Architecture monitoring API is off by default; mounted only when this
     # flag is explicitly enabled.
     ARCHITECTURE_MONITORING_API_ENABLED = _env_bool("ARCHITECTURE_MONITORING_API_ENABLED", False)
@@ -586,6 +590,11 @@ class TestingConfig(Config):
     # on the operator's shell, not on the code.
     DEBUG = False
     WTF_CSRF_ENABLED = False
+
+    # Under NullPool (below) every db.engine.connect() the aggregation
+    # handler makes is a fresh TCP connection; off here, unchanged elsewhere.
+    ERROR_TRACKING_ENABLED = False
+
     # Flask-Mail records instead of sending under TESTING. A browser journey
     # that reads the real message from a local SMTP sink turns this off.
     MAIL_SUPPRESS_SEND = _env_bool("MAIL_SUPPRESS_SEND", True)

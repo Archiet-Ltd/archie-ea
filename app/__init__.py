@@ -103,7 +103,7 @@ def create_app(config=None):
     # 1e. Server-side error aggregation: dedupes WARNING+ log records into
     # error_events (see app/_bootstrap/error_tracking.py) so silent
     # degradation shows up at /admin/errors instead of only in stdout.
-    if not os.getenv("APP_FAST_INIT"):
+    if not os.getenv("APP_FAST_INIT") and app.config.get("ERROR_TRACKING_ENABLED", True):
         from app._bootstrap.error_tracking import init_error_tracking
         init_error_tracking(app)
 
