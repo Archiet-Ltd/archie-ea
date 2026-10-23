@@ -98,6 +98,12 @@
                             {% if stage.target_duration is not none or stage.current_duration is not none %}
                             <p class="text-xs text-muted-foreground mt-3">
                                 Duration: {{ stage.current_duration if stage.current_duration is not none else '—' }} / {{ stage.target_duration if stage.target_duration is not none else '—' }}
+                                {% if stage.duration_unit %}{{ stage.duration_unit }}{% endif %}
+                            </p>
+                            {% endif %}
+                            {% if stage.frequency_count is not none %}
+                            <p class="text-xs text-muted-foreground">
+                                Frequency: {{ stage.frequency_count }} {{ ('per ' ~ stage.frequency_period|replace('_', ' ')) if stage.frequency_period else '' }}
                             </p>
                             {% endif %}
                             <dl class="mt-3 space-y-2 text-xs">
@@ -161,6 +167,80 @@
                     cta_icon='plus'
                 ) }}
                 {% endif %}
+            </div>
+        </div>
+
+        <!-- Stage time analysis -->
+        <div class="rounded-xl border border-input bg-background">
+            <div class="px-5 py-4 border-b border-border flex items-center justify-between">
+                <h3 class="text-lg font-semibold text-foreground">Stage Time Analysis</h3>
+            </div>
+            <div class="p-5 space-y-4">
+                <div x-data="stageTimeAnalysis({ valueStreamId: {{ value_stream.id }} })" x-init="loadAnalysis()">
+                    <div x-show="loading" class="text-sm text-muted-foreground">Loading analysis...</div>
+                    <div x-show="error" x-cloak class="text-sm text-destructive-emphasis" x-text="error"></div>
+                    <template x-if="!loading && !error && e2eTime">
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div class="rounded-lg border border-border p-3">
+                                <p class="text-xs font-medium text-muted-foreground uppercase tracking-wide">End-to-End Time</p>
+                                <p class="text-lg font-semibold mt-1" x-text="e2eTime.total_label"></p>
+                                <p class="text-xs text-muted-foreground" x-text="'From ' + e2eTime.stages_used + ' of ' + e2eTime.stages_total + ' stages'"></p>
+                                <template x-if="e2eTime.stages_not_recorded && e2eTime.stages_not_recorded.length > 0">
+                                    <p class="text-xs text-warning-emphasis mt-1" x-text="'Not recorded: ' + e2eTime.stages_not_recorded.join(', ')"></p>
+                                </template>
+                            </div>
+                            <div class="rounded-lg border border-border p-3">
+                                <p class="text-xs font-medium text-muted-foreground uppercase tracking-wide">Slowest Stage</p>
+                                <template x-if="e2eTime.slowest_stage">
+                                    <div>
+                                        <p class="text-lg font-semibold mt-1" x-text="e2eTime.slowest_stage.name"></p>
+                                        <p class="text-xs text-muted-foreground" x-text="e2eTime.slowest_stage.duration"></p>
+                                        <template x-if="e2eTime.slowest_stage.capabilities && e2eTime.slowest_stage.capabilities.length > 0">
+                                            <div class="mt-1">
+                                                <p class="text-xs font-medium text-muted-foreground">Depends on:</p>
+                                                <ul class="text-xs text-foreground list-disc pl-4">
+                                                    <template x-for="cap in e2eTime.slowest_stage.capabilities" :key="cap.id">
+                                                        <li x-text="cap.name"></li>
+                                                    </template>
+                                                </ul>
+                                            </div>
+                                        </template>
+                                    </div>
+                                </template>
+                                <template x-if="!e2eTime.slowest_stage">
+                                    <p class="text-sm text-muted-foreground mt-1">No stages with recorded duration</p>
+                                </template>
+                            </div>
+                            <div class="rounded-lg border border-border p-3">
+                                <p class="text-xs font-medium text-muted-foreground uppercase tracking-wide">Downstream Impact</p>
+                                <p class="text-sm text-muted-foreground mt-1">Select a stage to see what depends on it.</p>
+                                <select x-model="selectedStage" @change="loadDownstream()"
+                                        class="mt-2 flex h-8 w-full rounded-md border border-input bg-transparent px-2 text-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+                                    <option value="">Select a stage...</option>
+                                    <template x-for="stage in stages" :key="stage.id">
+                                        <option x-text="stage.name" :value="stage.name"></option>
+                                    </template>
+                                </select>
+                                <template x-if="downstreamResult && downstreamResult.downstream_stages">
+                                    <div class="mt-2 space-y-1">
+                                        <p class="text-xs font-medium text-muted-foreground">Downstream stages:</p>
+                                        <template x-if="downstreamResult.downstream_stages.length === 0">
+                                            <p class="text-xs text-muted-foreground">None — this is the last stage.</p>
+                                        </template>
+                                        <template x-for="ds in downstreamResult.downstream_stages" :key="ds.stage_order">
+                                            <div class="text-xs">
+                                                <span class="font-medium text-foreground" x-text="ds.name"></span>
+                                                <template x-if="ds.capabilities && ds.capabilities.length > 0">
+                                                    <span class="text-muted-foreground" x-text="' (' + ds.capabilities.map(c => c.name).join(', ') + ')'"></span>
+                                                </template>
+                                            </div>
+                                        </template>
+                                    </div>
+                                </template>
+                            </div>
+                        </div>
+                    </template>
+                </div>
             </div>
         </div>
 
@@ -428,6 +508,46 @@
                        placeholder="Auto">
             </div>
         </div>
+        <div class="grid grid-cols-1 gap-4">
+            <div>
+                <label for="stage-target-duration" class="block text-sm font-medium text-muted-foreground mb-1">Target Duration</label>
+                <input type="number" id="stage-target-duration" name="target_duration" min="0"
+                       class="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                       placeholder="e.g. 2">
+            </div>
+            <div>
+                <label for="stage-duration-unit" class="block text-sm font-medium text-muted-foreground mb-1">Duration Unit</label>
+                <select id="stage-duration-unit" name="duration_unit"
+                        class="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+                    <option value="">Select unit...</option>
+                    <option value="minutes">Minutes</option>
+                    <option value="hours">Hours</option>
+                    <option value="days">Days</option>
+                    <option value="weeks">Weeks</option>
+                </select>
+            </div>
+        </div>
+        <div class="grid grid-cols-1 gap-4">
+            <div>
+                <label for="stage-frequency-count" class="block text-sm font-medium text-muted-foreground mb-1">Frequency Count</label>
+                <input type="number" id="stage-frequency-count" name="frequency_count" min="0"
+                       class="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                       placeholder="e.g. 10">
+            </div>
+            <div>
+                <label for="stage-frequency-period" class="block text-sm font-medium text-muted-foreground mb-1">Frequency Period</label>
+                <select id="stage-frequency-period" name="frequency_period"
+                        class="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+                    <option value="">Select period...</option>
+                    <option value="per_order">Per Order</option>
+                    <option value="per_day">Per Day</option>
+                    <option value="per_week">Per Week</option>
+                    <option value="per_month">Per Month</option>
+                    <option value="per_quarter">Per Quarter</option>
+                    <option value="per_year">Per Year</option>
+                </select>
+            </div>
+        </div>
         <div class="flex items-center gap-6">
             <label class="inline-flex items-center gap-2 text-sm text-foreground">
                 <input type="checkbox" name="customer_facing" class="rounded border-input text-primary focus-visible:ring-ring">
@@ -502,6 +622,44 @@
                 <label class="block text-sm font-medium text-muted-foreground mb-1">Order</label>
                 <input type="number" name="stage_order" min="1" x-model.number="stageEditForm.stage_order"
                        class="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" aria-label="Order">
+            </div>
+        </div>
+        <div class="grid grid-cols-1 gap-4">
+            <div>
+                <label class="block text-sm font-medium text-muted-foreground mb-1">Target Duration</label>
+                <input type="number" name="target_duration" min="0" x-model.number="stageEditForm.target_duration"
+                       class="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" aria-label="Target Duration">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-muted-foreground mb-1">Duration Unit</label>
+                <select name="duration_unit" x-model="stageEditForm.duration_unit"
+                        class="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" aria-label="Duration Unit">
+                    <option value="">Select unit...</option>
+                    <option value="minutes">Minutes</option>
+                    <option value="hours">Hours</option>
+                    <option value="days">Days</option>
+                    <option value="weeks">Weeks</option>
+                </select>
+            </div>
+        </div>
+        <div class="grid grid-cols-1 gap-4">
+            <div>
+                <label class="block text-sm font-medium text-muted-foreground mb-1">Frequency Count</label>
+                <input type="number" name="frequency_count" min="0" x-model.number="stageEditForm.frequency_count"
+                       class="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" aria-label="Frequency Count">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-muted-foreground mb-1">Frequency Period</label>
+                <select name="frequency_period" x-model="stageEditForm.frequency_period"
+                        class="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" aria-label="Frequency Period">
+                    <option value="">Select period...</option>
+                    <option value="per_order">Per Order</option>
+                    <option value="per_day">Per Day</option>
+                    <option value="per_week">Per Week</option>
+                    <option value="per_month">Per Month</option>
+                    <option value="per_quarter">Per Quarter</option>
+                    <option value="per_year">Per Year</option>
+                </select>
             </div>
         </div>
         <div class="flex items-center gap-6">
@@ -610,5 +768,53 @@
     {% endcall %}
 </div>
 
+<script>
+document.addEventListener('alpine:init', () => {
+    Alpine.data('stageTimeAnalysis', (config) => ({
+        valueStreamId: config.valueStreamId,
+        loading: false,
+        error: null,
+        e2eTime: null,
+        stages: [],
+        selectedStage: '',
+        downstreamResult: null,
+
+        loadAnalysis() {
+            this.loading = true;
+            this.error = null;
+            fetch('/value-streams/' + this.valueStreamId + '/api/analysis')
+                .then(r => r.json())
+                .then(data => {
+                    if (data.error) {
+                        this.error = data.error;
+                    } else {
+                        this.e2eTime = data;
+                        this.stages = data.citations ? data.citations.map(c => ({ id: c.stage, name: c.stage })) : [];
+                    }
+                    this.loading = false;
+                })
+                .catch(err => {
+                    this.error = 'Failed to load analysis';
+                    this.loading = false;
+                });
+        },
+
+        loadDownstream() {
+            if (!this.selectedStage) {
+                this.downstreamResult = null;
+                return;
+            }
+            fetch('/value-streams/' + this.valueStreamId + '/api/downstream?stage=' + encodeURIComponent(this.selectedStage))
+                .then(r => r.json())
+                .then(data => {
+                    this.downstreamResult = data;
+                })
+                .catch(() => {
+                    this.downstreamResult = { error: 'Failed to load downstream impact' };
+                });
+        },
+    }));
+});
+</script>
 <script src="{{ url_for('static', filename='js/value_stream/grid.js') }}"></script>
 {% endblock %}

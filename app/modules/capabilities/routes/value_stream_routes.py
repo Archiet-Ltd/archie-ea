@@ -297,6 +297,33 @@ def api_delete_mapping():
         return jsonify({"error": "An internal error occurred"}), 500
 
 
+@value_stream.route("/<int:value_stream_id>/api/analysis")
+@login_required
+def api_analysis(value_stream_id):
+    """Return end-to-end time analysis for a value stream."""
+    try:
+        result = vs_service.compute_end_to_end_time(value_stream_id)
+        return jsonify(result)
+    except Exception:
+        logger.error("Failed to compute analysis for value stream %s", value_stream_id, exc_info=True)
+        return jsonify({"error": "An internal error occurred"}), 500
+
+
+@value_stream.route("/<int:value_stream_id>/api/downstream")
+@login_required
+def api_downstream(value_stream_id):
+    """Return downstream impact for a given stage."""
+    stage_name = request.args.get("stage", "").strip()
+    if not stage_name:
+        return jsonify({"error": "stage parameter is required"}), 400
+    try:
+        result = vs_service.stages_downstream_of(value_stream_id, stage_name)
+        return jsonify(result)
+    except Exception:
+        logger.error("Failed to compute downstream impact for value stream %s", value_stream_id, exc_info=True)
+        return jsonify({"error": "An internal error occurred"}), 500
+
+
 # Import AI mapping-suggestion route — adds POST /api/<id>/ai-suggest-mappings
 # to this blueprint (side-effect import), matching the
 # app/modules/architecture/routes/arb_review_ai_routes.py pattern.

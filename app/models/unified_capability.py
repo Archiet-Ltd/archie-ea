@@ -843,6 +843,9 @@ class ValueStreamStage(TenantMixin, db.Model):
     # Performance metrics
     target_duration = Column(db.Integer)  # Target in hours/days
     current_duration = Column(db.Integer)  # Current in hours/days
+    duration_unit = Column(db.String(20))  # minutes, hours, days
+    frequency_count = Column(db.Integer)  # e.g., 1, 4
+    frequency_period = Column(db.String(30))  # per_order, per_month, per_quarter, per_year
     quality_gate = Column(db.Boolean, default=False)
 
     # What must be true for work to enter / leave this stage, who takes part in

@@ -232,6 +232,9 @@ def _stage_to_dict(stage: ValueStreamStage) -> Dict[str, Any]:
         "customer_facing": bool(stage.customer_facing),
         "target_duration": stage.target_duration,
         "current_duration": stage.current_duration,
+        "duration_unit": stage.duration_unit,
+        "frequency_count": stage.frequency_count,
+        "frequency_period": stage.frequency_period,
         "quality_gate": bool(stage.quality_gate),
         "entry_criteria": stage.entry_criteria,
         "exit_criteria": stage.exit_criteria,
@@ -290,6 +293,9 @@ def create_stage(value_stream_id: int, data: Dict[str, Any]) -> Optional[ValueSt
         customer_facing=bool(data.get("customer_facing")),
         target_duration=_to_int(data.get("target_duration")),
         current_duration=_to_int(data.get("current_duration")),
+        duration_unit=data.get("duration_unit") or None,
+        frequency_count=_to_int(data.get("frequency_count")),
+        frequency_period=data.get("frequency_period") or None,
         quality_gate=bool(data.get("quality_gate")),
         **{field: _clean_text(data.get(field)) for field in STAGE_TEXT_FIELDS},
     )
@@ -321,6 +327,12 @@ def update_stage(stage_id: int, data: Dict[str, Any]) -> Optional[ValueStreamSta
         stage.target_duration = _to_int(data.get("target_duration"))
     if "current_duration" in data:
         stage.current_duration = _to_int(data.get("current_duration"))
+    if "duration_unit" in data:
+        stage.duration_unit = data.get("duration_unit") or None
+    if "frequency_count" in data:
+        stage.frequency_count = _to_int(data.get("frequency_count"))
+    if "frequency_period" in data:
+        stage.frequency_period = data.get("frequency_period") or None
     for field in STAGE_TEXT_FIELDS:
         if field in data:
             setattr(stage, field, _clean_text(data.get(field)))
@@ -612,3 +624,173 @@ def _to_float(value, default=None):
         return float(value)
     except (TypeError, ValueError):
         return default
+
+
+# ---------------------------------------------------------------------------
+# Duration normalisation and answer helpers
+# ---------------------------------------------------------------------------
+
+# Minutes-per-unit for normalising durations to a common scale.
+_UNIT_TO_MINUTES = {
+    "minutes": 1,
+    "hours": 60,
+    "days": 24 * 60,
+    "weeks": 7 * 24 * 60,
+}
+
+
+def _duration_minutes(duration: Optional[int], unit: Optional[str]) -> Optional[int]:
+    """Normalise a (duration, unit) pair to minutes. Returns None when either is missing."""
+    if duration is None or unit not in _UNIT_TO_MINUTES:
+        return None
+    return duration * _UNIT_TO_MINUTES[unit]
+
+
+def _duration_label(duration: Optional[int], unit: Optional[str]) -> str:
+    """Render a duration with its unit, or 'not recorded'."""
+    if duration is None:
+        return "not recorded"
+    unit_label = unit or ""
+    return f"{duration} {unit_label}"
+
+
+def compute_end_to_end_time(value_stream_id: int) -> Dict[str, Any]:
+    """
+    Answer: how long does this value stream take end to end?
+
+    Returns a dict with:
+        total_minutes: sum of stage durations normalised to minutes, or None
+        stages_used: count of stages with a recorded duration
+        stages_total: total stages in the stream
+        stages_not_recorded: list of stage names with no duration
+        slowest_stage: name and duration of the stage with the longest duration
+        cited: list of citation dicts, one per stage
+    """
+    vs = get_value_stream(value_stream_id)
+    if not vs:
+        return {"error": "value stream not found"}
+
+    try:
+        stages = (
+            ValueStreamStage.query.filter(ValueStreamStage.value_stream_id == value_stream_id)
+            .order_by(ValueStreamStage.stage_order)
+            .all()
+        )
+    except Exception:
+        logger.error("Failed to load stages for e2e time %s", value_stream_id, exc_info=True)
+        return {"error": "failed to load stages"}
+
+    total_minutes = 0
+    stages_used = 0
+    stages_not_recorded = []
+    slowest = None
+    slowest_minutes = 0
+    citations = []
+
+    for s in stages:
+        mins = _duration_minutes(s.target_duration, s.duration_unit)
+        if mins is not None:
+            total_minutes += mins
+            stages_used += 1
+            if mins > slowest_minutes:
+                slowest_minutes = mins
+                slowest = s
+            citations.append({
+                "stage": s.name,
+                "duration": _duration_label(s.target_duration, s.duration_unit),
+                "source": "entered",
+            })
+        else:
+            stages_not_recorded.append(s.name)
+            citations.append({
+                "stage": s.name,
+                "duration": "not recorded",
+                "source": "entered",
+            })
+
+    # Find the slowest stage's capabilities
+    slowest_capabilities = []
+    if slowest:
+        try:
+            mappings = CapabilityValueStreamMapping.query.filter(
+                CapabilityValueStreamMapping.value_stream_stage_id == slowest.id
+            ).all()
+            cap_ids = [m.capability_id for m in mappings if m.capability_id]
+            if cap_ids:
+                caps = UnifiedCapability.query.filter(UnifiedCapability.id.in_(cap_ids)).all()
+                slowest_capabilities = [{"id": c.id, "name": c.name} for c in caps]
+        except Exception:
+            logger.warning("Failed to load capabilities for slowest stage", exc_info=True)
+
+    return {
+        "total_minutes": total_minutes if stages_used > 0 else None,
+        "total_label": f"{total_minutes} minutes" if stages_used > 0 else "not available",
+        "stages_used": stages_used,
+        "stages_total": len(stages),
+        "stages_not_recorded": stages_not_recorded,
+        "slowest_stage": {
+            "name": slowest.name if slowest else None,
+            "duration": _duration_label(slowest.target_duration, slowest.duration_unit) if slowest else None,
+            "capabilities": slowest_capabilities,
+        } if slowest else None,
+        "citations": citations,
+    }
+
+
+def stages_downstream_of(value_stream_id: int, stage_name: str) -> Dict[str, Any]:
+    """
+    Answer: what stops if this stage does not happen?
+
+    Returns downstream stages (by stage_order) and their capabilities.
+    """
+    vs = get_value_stream(value_stream_id)
+    if not vs:
+        return {"error": "value stream not found"}
+
+    try:
+        stages = (
+            ValueStreamStage.query.filter(ValueStreamStage.value_stream_id == value_stream_id)
+            .order_by(ValueStreamStage.stage_order)
+            .all()
+        )
+    except Exception:
+        logger.error("Failed to load stages for downstream impact %s", value_stream_id, exc_info=True)
+        return {"error": "failed to load stages"}
+
+    trigger_stage = None
+    for s in stages:
+        if s.name == stage_name:
+            trigger_stage = s
+            break
+
+    if not trigger_stage:
+        return {"error": f"stage '{stage_name}' not found"}
+
+    downstream = []
+    for s in stages:
+        if s.stage_order > trigger_stage.stage_order:
+            try:
+                mappings = CapabilityValueStreamMapping.query.filter(
+                    CapabilityValueStreamMapping.value_stream_stage_id == s.id
+                ).all()
+                cap_ids = [m.capability_id for m in mappings if m.capability_id]
+                capabilities = []
+                if cap_ids:
+                    caps = UnifiedCapability.query.filter(UnifiedCapability.id.in_(cap_ids)).all()
+                    capabilities = [{"id": c.id, "name": c.name} for c in caps]
+            except Exception:
+                capabilities = []
+            downstream.append({
+                "name": s.name,
+                "stage_order": s.stage_order,
+                "capabilities": capabilities,
+            })
+
+    return {
+        "trigger_stage": trigger_stage.name,
+        "downstream_stages": downstream,
+        "citations": [
+            {"stage": s.name, "relationship": "flow", "source": "stage_order"}
+            for s in stages if s.stage_order > trigger_stage.stage_order
+        ],
+    }
