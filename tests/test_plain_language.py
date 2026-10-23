@@ -202,19 +202,31 @@ def test_sidebar_shows_architecture_not_archimate_elements():
                     )
 
 
-def test_module_directory_shows_vendor_analysis():
-    """The More-tools entry formerly labelled 'Vendor ArchiMate Analysis' now
-    reads 'Vendor Analysis'."""
+def test_module_directory_shows_vendor_analysis_retired():
+    """The "Vendor Analysis" label has been retired from the More-tools
+    directory; the endpoint is now reachable via the Vendors group in the
+    sidebar (Vendor selection → /dashboard/vendor-analysis, Vendor mapping →
+    /vendor-archimate-analysis)."""
     from app.modules.modules_directory.routes import _MORE_TOOLS
 
-    for label, endpoint, _icon in _MORE_TOOLS:
-        if endpoint == "main.vendor_archimate_analysis":
-            assert label == "Vendor Analysis", (
-                f"Expected 'Vendor Analysis', got '{label}'"
-            )
-            break
-    else:
-        pytest.fail("main.vendor_archimate_analysis not found in _MORE_TOOLS")
+    # No entry should have the label "Vendor Analysis"
+    vendor_analysis_labels = [
+        label for label, endpoint, icon in _MORE_TOOLS
+        if label == "Vendor Analysis"
+    ]
+    assert not vendor_analysis_labels, (
+        "Vendor Analysis label must be retired from _MORE_TOOLS"
+    )
+
+    # The endpoint main.vendor_archimate_analysis should now be labelled "Vendor mapping"
+    vendor_mapping_links = [
+        (label, endpoint, icon)
+        for label, endpoint, icon in _MORE_TOOLS
+        if endpoint == "main.vendor_archimate_analysis" and label == "Vendor mapping"
+    ]
+    assert vendor_mapping_links, (
+        "Expected 'Vendor mapping' label for main.vendor_archimate_analysis in _MORE_TOOLS"
+    )
 
 
 # ---------------------------------------------------------------------------

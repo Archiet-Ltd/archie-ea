@@ -191,10 +191,13 @@ def _my_work_labels(role):
 def test_solution_architect_my_work_membership():
     """Task 3 fix round: Programmes (solution_design.programmes_list) added —
     a real, working route reachable from nowhere in the sidebar. Coordinator
-    review of the sidebar rewrite; membership amended accordingly."""
+    review of the sidebar rewrite; membership amended accordingly.
+
+    T-sol-03: "Architecture Journey" renamed to "Architecture journey" for
+    consistent spelling across all roles."""
     assert _my_work_labels(ROLE_SOLUTION_ARCHITECT) == [
         "Ask a question",
-        "Architecture Journey",
+        "Architecture journey",
         # Approval Inbox — one queue for every pending change proposal,
         # shared by every persona with GENERAL permission.
         "Approval Inbox",
@@ -225,7 +228,9 @@ def test_enterprise_architect_my_work_membership():
     accordingly.
 
     Model as of and Changes added — the enterprise architect owns the
-    capability model and needs to audit its evolution."""
+    capability model and needs to audit its evolution.
+
+    T-sol-03: Change group (after Gap Analysis) — Solutions and Architecture journey."""
     assert _my_work_labels(ROLE_ENTERPRISE_ARCHITECT) == [
         "Ask a question",
         "Transformation programmes",
@@ -249,6 +254,9 @@ def test_enterprise_architect_my_work_membership():
         # from nowhere in the sidebar.
         "Gap Analysis",
         "Work Packages",
+        # T-sol-03: Change group (after Gap Analysis) — Solutions and Architecture journey.
+        "Solutions",
+        "Architecture journey",
         # S-11 remainder: directory-only, never in a sidebar zone.
         "Impact Analysis",
         "Capability Health",
@@ -310,10 +318,13 @@ def test_business_architect_my_work_membership():
     Library's "Capabilities" (capability_map.index), the exact duplicate
     enterprise_architect's My work had already dropped for the same reason.
     This zone had no headroom left once "Canvases" and "Frameworks" joined
-    the shared Library zone; dropping a same-page duplicate loses nothing."""
+    the shared Library zone; dropping a same-page duplicate loses nothing.
+
+    T-sol-03: "Architecture Journey" renamed to "Architecture journey" for
+    consistent spelling; Change group (after Gap Analysis) — Solutions added."""
     assert _my_work_labels(ROLE_BUSINESS_ARCHITECT) == [
         "Ask a question",
-        "Architecture Journey",
+        "Architecture journey",
         # Approval Inbox — one queue for every pending change proposal,
         # shared by every persona with GENERAL permission.
         "Approval Inbox",
@@ -324,6 +335,8 @@ def test_business_architect_my_work_membership():
         "Gap Analysis",
         "Roadmaps",
         "Work Packages",
+        # T-sol-03: Change group (after Gap Analysis) — Solutions.
+        "Solutions",
         "Traceability Matrix",
         "Capability Health",
         "Impact Analysis",
@@ -466,8 +479,11 @@ def test_platform_admin_zone_link_total_is_pinned():
     My work — the one registry recording each agent's owner, charter version
     and delegated limits, closest existing persona to the brief's
     "Organisation Administrator".
+
+    30 -> 32 (T-sol-03): "Vendor selection" and "Vendor mapping" added to the
+    shared Library zone for all roles, including platform_admin.
     """
-    assert len(_all_links(ROLE_PLATFORM_ADMIN)) == 30
+    assert len(_all_links(ROLE_PLATFORM_ADMIN)) == 32
 
 
 def test_platform_admin_collapsed_sidebar_icons_are_unambiguous():

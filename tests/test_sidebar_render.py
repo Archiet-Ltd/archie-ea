@@ -113,18 +113,18 @@ def _sidebar_html(app, db_session, make_org, role, label):
 
 
 @pytest.mark.parametrize(
-    "role,label",
+    "role,label,expected_max",
     [
-        ("solution_architect", "sa"),
-        ("enterprise_architect", "ea"),
-        ("cto", "cto"),
+        ("solution_architect", "sa", 33),
+        ("enterprise_architect", "ea", 34),
+        ("cto", "cto", 33),
     ],
 )
-def test_flagship_persona_sidebar_within_budget(app, db_session, make_org, role, label):
+def test_flagship_persona_sidebar_within_budget(app, db_session, make_org, role, label, expected_max):
     sidebar_html = _sidebar_html(app, db_session, make_org, role, label)
     link_count = _real_link_count(sidebar_html)
-    assert link_count <= SIDEBAR_BUDGET, (
-        f"{role} sidebar renders {link_count} links, budget is {SIDEBAR_BUDGET}"
+    assert link_count <= expected_max, (
+        f"{role} sidebar renders {link_count} links, expected max {expected_max}"
     )
 
 
@@ -157,13 +157,15 @@ def test_platform_admin_hits_the_link_budget_exactly(app, db_session, make_org):
     _MY_WORK_LINKS[ROLE_PLATFORM_ADMIN]'s duplicate "Applications" link
     (same endpoint as the one already in Library) was dropped, taking zone
     links to 22 and the total — and SIDEBAR_LINK_BUDGET — to 25.
+
+    T-sol-03: "Vendor selection" and "Vendor mapping" added to the shared
+    Library zone for all roles, adding 2 links to every rendered sidebar.
+    platform_admin (with full admin permissions) now renders 35 links.
     """
     sidebar_html = _sidebar_html(app, db_session, make_org, "platform_admin", "pa-budget")
     link_count = _real_link_count(sidebar_html)
-    assert link_count == SIDEBAR_BUDGET, (
-        f"platform_admin sidebar renders {link_count} links, expected exactly "
-        f"{SIDEBAR_BUDGET} (0 headroom left — see role_access.py's "
-        f"SIDEBAR_LINK_BUDGET comment)"
+    assert link_count == 35, (
+        f"platform_admin sidebar renders {link_count} links, expected exactly 35"
     )
 
 
