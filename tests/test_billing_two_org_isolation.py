@@ -1,21 +1,29 @@
 """Two-organisation isolation for the admin billing family (blueprint ``billing``).
 
 The billing page at ``GET /admin/billing/`` renders the subscription, plan and
-seat limit of ``current_org()`` -- the caller's active organisation. The tenant
-boundary is the ``organization_id`` on ``subscriptions`` (``Subscription`` is a
-``TenantMixin`` model). This file proves the boundary by building TWO
-organisations, giving organisation A a distinctive paid plan, and asserting that
-organisation B's administrator, driving organisation B's own ``/admin/billing``
-route, never sees organisation A's plan, seats or billing details -- while
-organisation B still sees its own.
+seat limit of ``current_org()`` -- the caller's ACTIVE organisation, resolved
+from ``session[ACTIVE_ORG_SESSION_KEY]`` and NOT from
+``current_user.organization_id`` (see app/middleware/tenant_context.py).
 
-Follows tests/test_rationalization_benefits_aggregates_tenant.py: the shared
-db_session / make_org / login_as / client fixtures from tests/conftest.py, two
-real organisations with real ``User`` rows, never a hand-rolled app fixture.
+This file proves the boundary the way the app really crosses it: the signed-in
+administrator is a NATIVE member of organisation B and also an OrgRole member of
+organisation A, and is switched INTO organisation A through the real session
+switch (AccountService.switch_active_organization, the POST
+/account/switch-organization route). Once switched, the billing page must render
+organisation A's own named current plan (Enterprise), because ``current_org()``
+follows the switched session. A bug where ``current_org()`` read
+``user.organization_id`` instead of the switched session would render
+organisation B's Community plan, and these tests would FAIL -- which is the
+point. The assertions name the specific current-plan row (the
+``billing-current-plan`` testid value), never a bare substring that a nonce or a
+price could satisfy by accident.
+
+Follows tests/test_rationalization_benefits_aggregates_tenant.py and
+tests/smoke/test_multi_org_account_switching_journey.py: the shared db_session /
+make_org / login_as / client fixtures from tests/conftest.py, two real
+organisations with real ``User`` rows, and the production org-switch mechanism.
 This is the genuine two-organisation isolation test the ASVS register's
-admin-billing V4 row cites; the older tests/test_billing_access_control.py
-proves the administrator permission on an isolated Flask app and is not a
-two-organisation isolation test.
+admin-billing V4 row cites.
 """
 
 from __future__ import annotations
@@ -26,6 +34,29 @@ import uuid
 import pytest
 
 pytestmark = pytest.mark.usefixtures("db_session")
+
+
+def _switch_into(client, org_id):
+    """Switch the signed-in client INTO *org_id* via the real session switch.
+
+    Posts to /account/switch-organization exactly as the app's own UI does; the
+    route calls AccountService.switch_active_organization, which writes
+    session[ACTIVE_ORG_SESSION_KEY]. Returns the response so the caller can
+    assert the switch was accepted.
+    """
+    return client.post(
+        "/account/switch-organization",
+        data={"organization_id": str(org_id)},
+        follow_redirects=False,
+    )
+
+
+def _grant_membership(db_session, user, org_id, role="viewer"):
+    """Give *user* an OrgRole in *org_id* so they may switch into it."""
+    from app.models.org_role import OrgRole
+
+    OrgRole.set_role(org_id, user.id, role)
+    db_session.commit()
 
 
 # --------------------------------------------------------------------- #
@@ -127,37 +158,56 @@ def client(app):
 
 
 class TestBillingPageIsTwoOrgIsolated:
-    def test_org_b_billing_page_never_shows_org_a_enterprise_plan(
-        self, db_session, org_a_on_enterprise, admin_b, client, login_as
+    def test_billing_page_follows_the_switched_session_into_org_a(
+        self, db_session, org_a, org_b, org_a_on_enterprise, admin_b, client, login_as
     ):
-        """Organisation B's administrator, on organisation B's own
-        ``/admin/billing`` route, must see Community (its own plan), never
-        organisation A's Enterprise contract or its 97 purchased seats."""
+        """The administrator is a native member of organisation B and an OrgRole
+        member of organisation A. After switching INTO organisation A through the
+        real session switch, organisation B's own ``/admin/billing`` route must
+        render organisation A's named Enterprise plan -- because ``current_org()``
+        follows the switched session, not ``user.organization_id``.
+
+        DB-ONLY (CI): this request needs PostgreSQL; it cannot run in the
+        sandbox. A bug where ``current_org()`` read ``user.organization_id``
+        would render organisation B's Community plan and FAIL this assertion.
+        """
+        _grant_membership(db_session, admin_b, org_a.id)
+        login_as(client, admin_b)
+
+        switch = _switch_into(client, org_a.id)
+        assert switch.status_code in (302, 303), (
+            "the session switch into organisation A should be accepted"
+        )
+
+        resp = client.get("/admin/billing/")
+        assert resp.status_code == 200
+        body = resp.data.decode()
+
+        # Named-row assertion: the current-plan testid value must be the specific
+        # plan identity of the ACTIVE organisation (org_a's Enterprise), not a
+        # bare substring. If current_org() ignored the switch it would read
+        # org_b's Community plan and this would fail.
+        assert _current_plan(body) == "Enterprise", (
+            "current_org() did not follow the switched session into "
+            "organisation A: the billing page showed a current plan that is not "
+            "organisation A's named Enterprise plan."
+        )
+
+    def test_org_b_billing_page_without_switch_shows_its_own_community_plan(
+        self, db_session, org_a, org_b, org_a_on_enterprise, admin_b, client, login_as
+    ):
+        """No-regression control: with NO switch, organisation B's administrator
+        on organisation B's own ``/admin/billing`` route sees organisation B's
+        own Community plan, never organisation A's named Enterprise plan.
+
+        DB-ONLY (CI): needs PostgreSQL.
+        """
         login_as(client, admin_b)
         resp = client.get("/admin/billing/")
 
         assert resp.status_code == 200
         body = resp.data.decode()
-
         assert _current_plan(body) == "Community", (
             "TENANT LEAK: organisation B's billing page showed a current plan "
             "that is not its own Community plan."
-        )
-        assert "97" not in body, (
-            "TENANT LEAK: organisation B's billing page showed organisation A's "
-            "97 purchased seats."
-        )
-
-    def test_org_a_still_sees_its_own_enterprise_plan(
-        self, db_session, org_a_on_enterprise, admin_a, client, login_as
-    ):
-        """No-regression control: organisation A's own administrator still sees
-        the Enterprise plan it bought on its own ``/admin/billing`` route."""
-        login_as(client, admin_a)
-        resp = client.get("/admin/billing/")
-
-        assert resp.status_code == 200
-        body = resp.data.decode()
-        assert _current_plan(body) == "Enterprise", (
-            "organisation A's own Enterprise plan should still render for it."
         )
