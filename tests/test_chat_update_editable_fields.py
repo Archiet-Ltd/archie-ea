@@ -19,6 +19,7 @@ from tests.test_chat_matrix_write_gate import _user
 pytestmark = pytest.mark.usefixtures("db_session")
 
 D = "/ai-chat/data"
+_VENDOR_ACTORS: dict = {}  # architect id -> the platform admin who edits a vendor
 
 
 @pytest.fixture(autouse=True)
@@ -61,16 +62,26 @@ def _records(db_session, org):
             "vendor": vendor.id, "mapping": mapping.id, "org": org.id}
 
 
+def _platform_admin(db_session, org):
+    from tests.test_platform_admin_route_gates import _user as _gate_user
+
+    return _gate_user(db_session, org, platform=True)
+
+
 @pytest.fixture
 def world(db_session, make_org):
     a, b = make_org("ma-a"), make_org("ma-b")
     w = {
         "a": a, "b": b,
         "architect": _user(db_session, a, "architect", "architect"),
+        # A vendor row is shared by every organisation: only a platform admin
+        # edits it, so the vendor cases below act as one.
+        "platform_admin": _platform_admin(db_session, a),
         "recs_a": _records(db_session, a),
         "recs_b": _records(db_session, b),
     }
     db_session.commit()
+    _VENDOR_ACTORS[w["architect"].id] = w["platform_admin"]
     return w
 
 
@@ -91,6 +102,8 @@ def _row(db_session, kind, rid):
 
 
 def _send(client, login_as, user, kind, rid, body):
+    if kind == "vendor":
+        user = _VENDOR_ACTORS.get(user.id, user)
     login_as(client, user)
     urls = {
         "app": f"{D}/update-application/{rid}",

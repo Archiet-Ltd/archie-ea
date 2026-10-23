@@ -365,6 +365,29 @@ class AIDataInteractionService:
             logger.error(f"Error updating application: {e}")
             return {"success": False, "error": str(e), "operation": "update_application"}
 
+    def _vendor_edit_refusal(self, operation: str) -> Optional[Dict[str, Any]]:
+        """Refuse a create, edit or delete of a shared vendor row unless the
+        acting user is a platform administrator.
+
+        The acting user is the signed-in user, or the approver during an
+        approval replay. No acting user means refuse: nothing that edits a
+        vendor from here runs without a person.
+        """
+        from app.middleware.tenant_decorators import (
+            SHARED_VENDOR_REFUSAL, shared_vendor_edit_allowed,
+        )
+        from app.models.user import User
+
+        actor = User.query.get(self.user_id) if self.user_id else None
+        if actor is None or not shared_vendor_edit_allowed(actor):
+            return {
+                "success": False,
+                "error": SHARED_VENDOR_REFUSAL,
+                "forbidden": True,
+                "operation": operation,
+            }
+        return None
+
     def create_vendor(self, vendor_data: Dict[str, Any]) -> Dict[str, Any]:
         """
         Create a new vendor organization with validation.
@@ -375,6 +398,9 @@ class AIDataInteractionService:
         Returns:
             Operation result with success status and created vendor
         """
+        forbidden = self._vendor_edit_refusal("create_vendor")
+        if forbidden:
+            return forbidden
         try:
             # Basic validation
             if not vendor_data.get("name"):
@@ -434,6 +460,9 @@ class AIDataInteractionService:
         Returns:
             Operation result with success status and updated vendor
         """
+        forbidden = self._vendor_edit_refusal("update_vendor")
+        if forbidden:
+            return forbidden
         try:
             vendor = VendorOrganization.query.get(vendor_id)
             if not vendor:
@@ -462,6 +491,9 @@ class AIDataInteractionService:
                     setattr(vendor, field, value)
 
             vendor.updated_at = datetime.utcnow()
+            from app.middleware.tenant_decorators import record_vendor_editor
+
+            record_vendor_editor(vendor, self.user_id)
             db.session.commit()
 
             # Log operation
@@ -912,7 +944,10 @@ class AIDataInteractionService:
             return {"success": False, "error": str(e), "operation": "delete_application"}
 
     def delete_vendor(self, vendor_id: int) -> Dict[str, Any]:
-        """Hard-delete a vendor organization. Caller must verify admin privileges before invoking."""
+        """Hard-delete a vendor organization. Only a platform administrator may."""
+        forbidden = self._vendor_edit_refusal("delete_vendor")
+        if forbidden:
+            return forbidden
         try:
             vendor = VendorOrganization.query.get(vendor_id)
             if not vendor:

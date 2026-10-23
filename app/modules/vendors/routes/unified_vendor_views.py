@@ -27,7 +27,11 @@ from app.extensions import db
 from app.modules.vendors.services.vendor_onboarding_service import (
     VendorOnboardingService,
 )
-from app.middleware.tenant_decorators import platform_admin_required
+from app.middleware.tenant_decorators import (
+    platform_admin_required,
+    record_vendor_editor,
+    shared_vendor_edit_required,
+)
 
 
 def _get_vendor_list_context():
@@ -392,7 +396,7 @@ def vendor_detail(vendor_id):
 @login_required
 @require_roles("admin", "architect")
 @audit_log("vendor_edit")
-@platform_admin_required
+@shared_vendor_edit_required
 def edit_vendor(vendor_id):
     """Edit vendor organization - real implementation."""
     from app.modules.vendors.forms import CreateVendorForm
@@ -430,6 +434,7 @@ def edit_vendor(vendor_id):
             vendor.contract_end_date = form.contract_end_date.data
             vendor.contract_value_annual = form.contract_value_annual.data
             vendor.updated_at = datetime.utcnow()
+            record_vendor_editor(vendor)
 
             db.session.commit()
             flash(f'Vendor "{vendor.name}" updated successfully.', "success")
@@ -445,7 +450,7 @@ def edit_vendor(vendor_id):
 @login_required
 @require_roles("admin", "architect")
 @audit_log("vendor_activate")
-@platform_admin_required
+@shared_vendor_edit_required
 def activate_vendor(vendor_id):
     """Activate a vendor from catalog to contracted status."""
     try:
@@ -465,6 +470,8 @@ def activate_vendor(vendor_id):
             contract_end_date=end_date,
             contract_value=value,
         )
+        record_vendor_editor(vendor)
+        db.session.commit()
 
         flash(
             f"{vendor.name} activated successfully! Status: {vendor.contract_status}",
@@ -564,7 +571,7 @@ def vendor_deployment_portfolio(vendor_id):
 @login_required
 @require_roles("admin")
 @audit_log("vendor_delete")
-@platform_admin_required
+@shared_vendor_edit_required
 def delete_vendor(vendor_id):
     """Delete vendor - directly deletes and shows success message."""
     vendor = VendorOrganization.query.get_or_404(vendor_id)
@@ -591,7 +598,7 @@ def delete_vendor(vendor_id):
 @login_required
 @require_roles("admin")
 @audit_log("vendor_import")
-@platform_admin_required
+@shared_vendor_edit_required
 def import_vendors():
     """
     Bulk import vendors from CSV/Excel.
@@ -669,6 +676,7 @@ def import_vendors():
                         if value and hasattr(existing, key):
                             setattr(existing, key, value)
                     existing.updated_at = datetime.utcnow()
+                    record_vendor_editor(existing)
                     updated += 1
                 else:
                     # Create new

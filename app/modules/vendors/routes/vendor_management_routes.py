@@ -22,7 +22,11 @@ from app.decorators import audit_log, require_roles  # dead-code-ok
 from app.extensions import db
 from app.models.vendor_organization import VendorOrganization
 from app.utils.pagination import safe_int_arg
-from app.middleware.tenant_decorators import platform_admin_required
+from app.middleware.tenant_decorators import (
+    platform_admin_required,
+    record_vendor_editor,
+    shared_vendor_edit_required,
+)
 
 # Allowlist for vendor updates (security: prevent mass assignment)
 VENDOR_UPDATE_ALLOWLIST = ["name", "vendor_type", "country", "description", "website"]
@@ -145,7 +149,7 @@ def vendor_analytics():
 @login_required
 @require_roles("admin")
 @audit_log("vendor_import")
-@platform_admin_required
+@shared_vendor_edit_required
 def import_vendors():
     """
     Bulk import vendors from CSV/Excel (admin only).
@@ -285,6 +289,7 @@ def import_vendors():
                         if key in vendor_data and vendor_data[key]:
                             setattr(existing, key, vendor_data[key])
                     existing.updated_at = datetime.utcnow()
+                    record_vendor_editor(existing)
                     updated += 1
 
                     current_app.logger.info(
@@ -448,7 +453,7 @@ def api_get_vendor(vendor_id):
 @login_required
 @require_roles("admin", "architect")
 @audit_log("vendor_api_update")
-@platform_admin_required
+@shared_vendor_edit_required
 def api_update_vendor(vendor_id):
     """API: Update vendor (with allowlist protection)."""
     vendor = VendorOrganization.query.get_or_404(vendor_id)
@@ -460,6 +465,7 @@ def api_update_vendor(vendor_id):
             setattr(vendor, key, data[key])
 
     vendor.updated_at = datetime.utcnow()
+    record_vendor_editor(vendor)
     db.session.commit()
 
     return jsonify(
@@ -474,7 +480,7 @@ def api_update_vendor(vendor_id):
 @login_required
 @require_roles("admin")
 @audit_log("vendor_api_delete")
-@platform_admin_required
+@shared_vendor_edit_required
 def api_delete_vendor(vendor_id):
     """
     API: Delete vendor (admin only).

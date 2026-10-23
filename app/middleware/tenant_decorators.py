@@ -124,6 +124,54 @@ def platform_admin_required(f):
     return decorated
 
 
+SHARED_VENDOR_REFUSAL = (
+    "Vendor records are shared by every organisation. "
+    "Ask a platform administrator to change this vendor."
+)
+
+
+def shared_vendor_edit_allowed(user) -> bool:
+    """True when ``user`` may edit or delete a shared VendorOrganization row.
+
+    The one predicate for every vendor edit path (pages, APIs, chat and the
+    approval replay). It is ``is_platform_admin`` and nothing else.
+    """
+    return bool(user is not None and getattr(user, "is_authenticated", True)
+                and is_platform_admin(user))
+
+
+def shared_vendor_edit_required(f):
+    """Platform admin only, with the plain shared-vendor refusal.
+
+    Wraps ``is_platform_admin`` like ``platform_admin_required`` but answers
+    organisation users with the message that says why. Creating a vendor is
+    not gated by this; only editing, deleting and bulk-changing existing rows.
+    """
+    @wraps(f)
+    @login_required
+    def decorated(*args, **kwargs):
+        if not shared_vendor_edit_allowed(current_user):
+            if _wants_json():
+                return jsonify({"success": False, "error": SHARED_VENDOR_REFUSAL}), 403
+            from flask import render_template
+
+            return render_template("errors/403.html", message=SHARED_VENDOR_REFUSAL), 403
+        return f(*args, **kwargs)
+    return decorated
+
+
+def record_vendor_editor(vendor, user_id=None):
+    """Stamp VendorOrganization.last_manual_edit_by with the acting user's id.
+
+    Called on every successful gated edit. ``user_id`` is passed by the approval
+    replay (the approver); otherwise the signed-in user is used.
+    """
+    if user_id is None:
+        user_id = getattr(current_user, "id", None)
+    if user_id is not None:
+        vendor.last_manual_edit_by = str(user_id)
+
+
 def require_org_or_platform_admin(org_id):
     """Abort 403 unless the current user is this org's admin or a platform
     admin.

@@ -2856,11 +2856,11 @@ def auto_create_vendors():
     created_vendors = []
     errors = []
 
-    # Prefetch existing vendors to avoid N+1 query in loop
-    existing_vendors_list = VendorOrganization.query.all()
-    existing_vendors_by_name = {
-        v.name.lower(): v for v in existing_vendors_list if v.name
-    }
+    # Create-only: a vendor row is shared by every organisation, so an import
+    # adds a vendor only when no vendor of that name exists (the one name
+    # normaliser: case-insensitive, trimmed, whitespace collapsed) and never
+    # changes an existing row.
+    from app.utils.duplicate_guard import find_duplicate_by_name
 
     for vendor_name in vendor_names:
         if not vendor_name or not vendor_name.strip():
@@ -2868,11 +2868,7 @@ def auto_create_vendors():
 
         vendor_name = vendor_name.strip()
 
-        # Check if vendor already exists (case-insensitive)
-        # Use prefetched lookup instead of query to avoid N+1
-        existing = existing_vendors_by_name.get(vendor_name.lower())
-
-        if existing:
+        if find_duplicate_by_name(VendorOrganization, vendor_name) is not None:
             skipped_count += 1
             continue
 
@@ -2885,6 +2881,8 @@ def auto_create_vendors():
                 status="active",
                 evaluation_status="approved",
                 contract_status="catalog",
+                created_by_id=getattr(current_user, "id", None),
+                seeded_by="import",
             )
             db.session.add(new_vendor)
             db.session.flush()  # Get the ID

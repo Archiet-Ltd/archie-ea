@@ -26,7 +26,11 @@ import logging
 from app.utils.pagination import safe_int_arg
 from app.utils.route_guards import require_entity
 from app.models.vendor_analysis import OptionsAnalysis
-from app.middleware.tenant_decorators import platform_admin_required
+from app.middleware.tenant_decorators import (
+    platform_admin_required,
+    record_vendor_editor,
+    shared_vendor_edit_required,
+)
 logger = logging.getLogger(__name__)
 
 # Blueprint defined here (was in app/unified_vendors/__init__.py)
@@ -147,7 +151,7 @@ def list_vendors():
 
 @unified_vendors_api_bp.route("/bulk", methods=["DELETE"])
 @login_required
-@platform_admin_required
+@shared_vendor_edit_required
 def bulk_delete_vendors():
     """Bulk delete vendors by IDs."""
     data = request.get_json() or {}
@@ -334,7 +338,7 @@ def create_vendor():
 @require_roles("admin", "architect")
 @audit_log("vendor_update")
 @rate_limit(30, "1h")
-@platform_admin_required
+@shared_vendor_edit_required
 def update_vendor(vendor_id):
     """Update vendor organization with allowlist protection and audit logging. PROD-009"""
     from datetime import datetime
@@ -387,6 +391,7 @@ def update_vendor(vendor_id):
                 setattr(vendor, key, new_value)
 
     vendor.updated_at = datetime.utcnow()
+    record_vendor_editor(vendor)
     db.session.commit()
 
     # Audit logging
@@ -418,7 +423,7 @@ def update_vendor(vendor_id):
 @require_roles("admin")
 @audit_log("vendor_delete")
 @rate_limit(10, "1h")
-@platform_admin_required
+@shared_vendor_edit_required
 def delete_vendor(vendor_id):
     """Delete vendor organization."""
     vendor = VendorOrganization.query.get_or_404(vendor_id)
