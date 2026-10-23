@@ -285,6 +285,20 @@ def _is_connector_tool(schema: dict) -> bool:
     )
 
 
+def _title_from_name(name: str) -> str:
+    """Convert a tool name to a plain English title.
+
+    Split on underscores, drop empty words, join with single spaces, and
+    capitalise the first letter. A name with no words returns an empty
+    string, so no stray or trailing spaces can appear.
+    """
+    words = [word for word in name.split("_") if word]
+    if not words:
+        return ""
+    title = " ".join(words)
+    return title[0].upper() + title[1:]
+
+
 def connector_tools() -> list[dict]:
     """The tools the connector publishes, in its wire format, sorted by name.
 
@@ -295,16 +309,18 @@ def connector_tools() -> list[dict]:
     tools = []
     for schema in TOOL_SCHEMAS:
         if _is_connector_tool(schema):
+            title = schema.get("title") or _title_from_name(schema["name"])
             tools.append({
                 "name": schema["name"],
                 "description": schema["description"],
                 "inputSchema": schema["parameters"],
                 "annotations": {"readOnlyHint": True},
+                "title": title,
             })
     for alias, target in CONNECTOR_ALIASES.items():
         for tool in list(tools):
             if tool["name"] == target:
-                tools.append({**tool, "name": alias})
+                tools.append({**tool, "name": alias, "title": _title_from_name(alias)})
     return sorted(tools, key=lambda t: t["name"])
 
 
