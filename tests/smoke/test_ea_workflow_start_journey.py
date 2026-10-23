@@ -57,6 +57,23 @@ def test_arch_review_workflow_start_approve_persists(browser, live_server, seede
         expect(app_select).to_be_visible(timeout=PAGE_TIMEOUT)
         app_select.select_option(str(seeded['ids']['application']))
 
+        # The submit control must be the top-most element at its own centre: if
+        # the backdrop is laid over the panel it silently swallows the click and
+        # the workflow never starts, which is what a person experiences as a
+        # dead "Start Workflow" button.
+        topmost_is_start = page.evaluate(
+            """() => {
+                const btn = document.getElementById('startWorkflowBtn');
+                const r = btn.getBoundingClientRect();
+                const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+                return btn.contains(hit);
+            }"""
+        )
+        assert topmost_is_start, (
+            "the start-workflow backdrop is covering its own submit button, so the "
+            "click never reaches it"
+        )
+
         page.locator('#startWorkflowBtn').click()
 
         # The submit handler navigates to /ea-workflows/instance/<id> on success.
