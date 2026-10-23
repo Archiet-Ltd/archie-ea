@@ -726,7 +726,11 @@ def analyze_import_duplicates():
                         )
 
             if row_errors:
+                # A row with a bad cell is refused, not quietly imported with the
+                # bad value dropped: the person fixes the cell and uploads again.
                 validation_errors.append({"row": row_idx, "name": name, "errors": row_errors})
+                seen_names.setdefault(name_lower, row_idx)
+                continue
 
             # Check if duplicate in file
             if name_lower in seen_names:
@@ -751,6 +755,51 @@ def analyze_import_duplicates():
                 )
             else:
                 will_create.append({"row": row_idx, "name": name})
+
+        # The review a person reads: which rows arrive, and which are refused,
+        # each refusal naming the cell it is about and why in plain words. A row
+        # that arrives is one that will create or update an application; a
+        # refused row is one nothing silently drops — it is shown so the person
+        # can fix it and upload again. Each refusal carries the column it is
+        # about (the "cell": a header and the row number) so the person can go
+        # straight to it in their spreadsheet, never a bare row number.
+        accepted = [
+            {"row": item["row"], "name": item["name"], "outcome": "new"}
+            for item in will_create
+        ] + [
+            {"row": item["row"], "name": item["name"], "outcome": "update"}
+            for item in will_update
+        ]
+        refused = []
+        for item in no_name:
+            refused.append(
+                {
+                    "row": item["row"],
+                    "cell": f"{name_column} (row {item['row']})",
+                    "reason": "No application name in this row.",
+                }
+            )
+        for item in duplicates_in_file:
+            refused.append(
+                {
+                    "row": item["row"],
+                    "cell": f"{name_column} (row {item['row']})",
+                    "reason": (
+                        f"\u201c{item['name']}\u201d is already on row "
+                        f"{item['duplicate_of_row']} of this file."
+                    ),
+                }
+            )
+        for item in validation_errors:
+            for err in item["errors"]:
+                refused.append(
+                    {
+                        "row": item["row"],
+                        "cell": f"{err['header']} (row {item['row']})",
+                        "reason": f"{err['error']}: \u201c{err['value']}\u201d.",
+                    }
+                )
+        refused.sort(key=lambda r: (r["row"], r["cell"]))
 
         # Log successful analysis
         log_import_analysis(
@@ -777,6 +826,12 @@ def analyze_import_duplicates():
                     "duplicates_in_file": len(duplicates_in_file),
                     "no_name": len(no_name),
                     "validation_errors": len(validation_errors),
+                    # The review's own figures: how many rows arrive, how many
+                    # are refused, and each refusal's cell and reason.
+                    "accepted_count": len(accepted),
+                    "refused_count": len(refused),
+                    "accepted": accepted[:200],
+                    "refused": refused[:200],
                     "details": {
                         "create": will_create[:20],  # First 20 for preview
                         "update": will_update[:20],

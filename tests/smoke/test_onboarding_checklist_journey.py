@@ -69,8 +69,8 @@ def test_architect_adds_a_first_capability_from_the_checklist(browser, live_serv
         page.goto(live_server + "/dashboard/overview", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
         expect(page.locator('[data-testid="guided-setup"]')).to_be_visible(timeout=PAGE_TIMEOUT)
 
-        # The import step opens the import dialog on the applications list.
-        page.get_by_role("link", name="Import").first.click()
+        # The spreadsheet step opens the import dialog on the applications list.
+        page.get_by_role("link", name="Add from a spreadsheet").first.click()
         page.wait_for_url("**/applications/?import=1", timeout=PAGE_TIMEOUT)
         expect(page.locator("#application-import-modal")).to_be_visible(timeout=PAGE_TIMEOUT)
 

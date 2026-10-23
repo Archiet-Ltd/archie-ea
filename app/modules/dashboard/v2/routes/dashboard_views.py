@@ -632,7 +632,7 @@ def overview():
     guided_steps = []
     if dashboard_mode == "guided":
         from app.template_helpers import safe_url_for_with_fallback
-        from app.utils.role_access import can_edit_capabilities
+        from app.utils.role_access import can_edit_capabilities, is_admin
 
         # A blueprint that failed to register leaves its step pointing here
         # rather than raising BuildError and taking the dashboard down.
@@ -652,26 +652,53 @@ def overview():
                 "href": safe_url_for_with_fallback("unified_low_priority.capability_map_capabilities", FALLBACK_HREF),
                 "cta": "View capabilities",
             }
-        guided_steps = [
-            {
-                "title": "Import applications",
-                "description": (
-                    f"{applications_count} "
-                    f"{'application' if applications_count == 1 else 'applications'} "
-                    f"in the portfolio. Import more from a spreadsheet."
-                    if applications_count
-                    else f"Bring your application portfolio into {current_app.config['APP_NAME']}."
-                ),
-                "href": safe_url_for_with_fallback("unified_applications.application_list", FALLBACK_HREF, **{"import": 1}),
-                "cta": "Import",
-                "done": applications_count > 0,
-            },
+        # Bringing in the estate is one job offered two equal ways: add systems
+        # from a spreadsheet, or connect GitHub and let it read your
+        # repositories. Both bring applications into the one portfolio the count
+        # above reads, and an application found by both routes is shown once with
+        # both sources, so neither way is the "main" one. They sit together, in
+        # the same order, with the same weight. Connecting GitHub needs an
+        # administrator (the connect page is admin-only), so the step is shown
+        # only when the person signed in can actually reach it -- a dead link to
+        # a 403 is not an equal choice.
+        spreadsheet_step = {
+            "title": "Add your systems from a spreadsheet",
+            "description": (
+                f"{applications_count} "
+                f"{'application' if applications_count == 1 else 'applications'} "
+                f"in the portfolio. Add more from a spreadsheet of your systems, "
+                f"with their owner, vendor and cost."
+                if applications_count
+                else "Add the systems you run from a spreadsheet, with their "
+                "owner, vendor and cost. Every row is checked and anything "
+                "refused is shown with the reason and the cell."
+            ),
+            "href": safe_url_for_with_fallback("unified_applications.application_list", FALLBACK_HREF, **{"import": 1}),
+            "cta": "Add from a spreadsheet",
+            "done": applications_count > 0,
+        }
+        guided_steps = [spreadsheet_step]
+        if is_admin(current_user):
+            guided_steps.append(
+                {
+                    "title": "Connect GitHub",
+                    "description": (
+                        "Connect GitHub and it reads your repositories into a "
+                        "first model of your estate: applications, their parts and "
+                        "their owners. You review everything before anything lands."
+                    ),
+                    "href": safe_url_for_with_fallback("m365_connector.github_connect", FALLBACK_HREF),
+                    "cta": "Connect GitHub",
+                    "done": applications_count > 0,
+                }
+            )
+        guided_steps.append(
             {
                 "title": "Map capabilities",
                 "done": capability_mapping_count > 0,
                 **capability_step,
-            },
-        ]
+            }
+        )
         try:
             _can_invite = bool(current_user.is_admin())
         except Exception:
