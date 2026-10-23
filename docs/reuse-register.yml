@@ -218,11 +218,22 @@ entries:
     status: active
     canonical:
       path: app/services/archimate_backbone.py
-      symbols: [create_backbone_element, sync_archimate_element, ensure_archimate_element]
+      symbols: [create_backbone_element, sync_archimate_element, ensure_archimate_element, domain_model_for_element_type]
     reuse: >
       Create or find an element through archimate_backbone (create_backbone_element, sync_archimate_element) so
       the organisation, layer and provenance are set in one place. Do not construct ArchiMateElement(...) in a
       route or service, and do not add another ensure/create element helper.
+
+      For a generic "create any ArchiMate element from a (name, type, layer, description) tuple" call site --
+      the AI chat tools, not a typed form -- check domain_model_for_element_type(type) first. A type listed
+      there (ApplicationComponent today) has its own domain table, which is the one the matching product screen
+      reads (the Applications portfolio reads application_components directly, for example); construct that
+      domain row and call sync_archimate_element() on it instead of building a bare ArchiMateElement. A bare
+      element of a domain-backed type exists only in the architecture model and is invisible on the domain
+      screen -- found dogfooding entelim.org as a 26-vs-0 application count disagreement between the
+      Applications portfolio and the architecture store, caused by exactly this gap in
+      ai_chat/tools/executor.py::_tool_create_archimate_element and
+      ai_chat/services/workbench_kernel.py::create_archimate_element_from_chat.
     must_not_create:
       - id: element-helper
         regex: 'def\s+_?(ensure|create|get_or_create|make|upsert)_(archimate_|backbone_)?element\w*\s*\('
