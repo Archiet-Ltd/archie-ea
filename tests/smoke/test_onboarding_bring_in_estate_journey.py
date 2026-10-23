@@ -51,10 +51,17 @@ def _shoot(page, name):
     if not SHOTS:
         return
     os.makedirs(SHOTS, exist_ok=True)
-    for width, height in ((1440, 900), (390, 844)):
-        page.set_viewport_size({"width": width, "height": height})
-        page.wait_for_timeout(250)
-        page.screenshot(path=os.path.join(SHOTS, "%s-%d.png" % (name, width)), full_page=True)
+    for theme in ("light", "dark"):
+        page.evaluate(
+            "(t) => { const e = document.documentElement; t === 'dark' ? e.classList.add('dark') : e.classList.remove('dark'); }",
+            theme,
+        )
+        for width, height in ((1440, 900), (390, 844)):
+            page.set_viewport_size({"width": width, "height": height})
+            page.wait_for_timeout(250)
+            suffix = "" if theme == "light" else "-dark"
+            page.screenshot(path=os.path.join(SHOTS, "%s-%d%s.png" % (name, width, suffix)), full_page=True)
+    page.evaluate("() => document.documentElement.classList.remove('dark')")
     page.set_viewport_size({"width": 1440, "height": 900})
 
 
@@ -153,17 +160,37 @@ def test_bring_in_estate_end_to_end(browser, live_server, two_orgs):
 
         # 3. Import the accepted rows and confirm the three surfaces agree.
         page.on("dialog", lambda d: d.accept())
-        page.locator("#import-applications-btn").click()
-        # The import posts and the page reloads once it has landed.
-        page.wait_for_timeout(3000)
-        page.wait_for_load_state("domcontentloaded")
+        # Wait for the import POST itself to complete, so the create has landed
+        # before we read any surface (the page then reloads itself).
+        with page.expect_response(
+            lambda r: "/applications/import" in r.url and r.request.method == "POST",
+            timeout=PAGE_TIMEOUT,
+        ) as resp_info:
+            page.locator("#import-applications-btn").click()
+        assert resp_info.value.status in (200, 302), resp_info.value.status
 
         # The applications list holds the seventeen that arrived, and the list's
-        # own figure agrees with the count the review promised.
-        page.goto(live_server + "/applications/", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
-        page.wait_for_selector("[data-testid='applications-table']", timeout=PAGE_TIMEOUT)
-        list_count = _portfolio_count(live_server, page)
+        # own figure agrees with the count the review promised. Navigate fresh
+        # (the modal's own reload may still be in flight) and poll the list's own
+        # figure so the assertion does not race the reload.
+        def _goto_list():
+            for _attempt in range(4):
+                try:
+                    page.goto(live_server + "/applications/", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+                    return
+                except Exception:
+                    page.wait_for_timeout(1500)
+            page.goto(live_server + "/applications/", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+
+        list_count = 0
+        for _poll in range(10):
+            _goto_list()
+            list_count = _portfolio_count(live_server, page)
+            if list_count == 17:
+                break
+            page.wait_for_timeout(1500)
         assert list_count == 17, "the list holds %s applications, the review promised 17" % list_count
+        page.wait_for_selector("[data-testid='applications-table']", timeout=PAGE_TIMEOUT)
         for name in ("System 1 %s" % token, "System 17 %s" % token):
             expect(page.get_by_text(name).first).to_be_visible(timeout=PAGE_TIMEOUT)
         _shoot(page, "4-list")
