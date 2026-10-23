@@ -1,0 +1,10 @@
+{% from 'components/button.html' import button %}
+
+<!-- Raw navigate button -->
+<button onclick="window.location.href = '/applications/' + app_id">Go to App</button>
+
+<!-- Macro button with href -->
+{{ button('Create Application', href=url_for('applications.create'), variant='primary') }}
+
+<!-- Another macro button with href -->
+{{ button('View Details', href='/applications/123', variant='secondary') }}

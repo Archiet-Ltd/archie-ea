@@ -436,6 +436,25 @@ CI enforcement has silently rotted for days at a time (green reported locally
 while CI was actually red) without anyone noticing. A single `gh run list --limit 5`
 costs nothing and catches it.
 
+**What a journey must assert (21 Oct 2026, mandatory for every model).** Driving a
+browser is not enough on its own: on 21 Oct the risk register's "Touches" link passed
+its journey test and two reviews while every risk linked to itself and opened an
+empty impact page. The test checked that the line rendered, never where the link
+went. So every journey test and every review of a change a person can see must:
+- **start from the user's goal** ("a CTO sees what this risk would hit") and assert
+  the outcome that goal needs, not that an element exists or a page returned 200;
+- **follow every new or changed link and assert the landing page has content** for
+  the thing clicked; a link to an empty state, a 404 or a 403 for a role that was
+  shown the link is a failure;
+- **run in an organisation seeded with linked data** (risks linked to applications,
+  owners, costs, relationships), plus one deliberately empty case so the empty
+  state is tested too, saying why it is empty and offering the next step;
+- **reject self-reference and filler**: an item shown as its own answer, a bare dash
+  or zero with no explanation, or the same figure disagreeing between two screens;
+- **fail before the change and pass after**, shown in the pull request;
+- **be walked by someone other than the builder**, signed in, at 1440 and 390 wide,
+  light and dark, with screenshots and a note of what a person sees.
+
 **What this standard is not:** it is not satisfied by `scripts/verify.py` alone —
 the browser/smoke tier is deliberately excluded from that command (see
 Verification below) — and it is not satisfied by a curl check or an API-level
