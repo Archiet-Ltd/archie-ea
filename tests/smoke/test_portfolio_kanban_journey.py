@@ -14,7 +14,7 @@ import pathlib
 import pytest
 from playwright.sync_api import expect
 
-from .conftest import PAGE_TIMEOUT
+from .conftest import PAGE_TIMEOUT, PASSWORD
 from .test_archetype_journeys import _login
 
 pytestmark = [pytest.mark.smoke, pytest.mark.journey]
@@ -54,6 +54,72 @@ def _assert_empty_columns_name_the_next_step(page):
     assert "Move an epic here from Funnel when its business case is ready." in reviewing
     done = page.locator(".kanban-column[data-state='Done']").inner_text()
     assert "Move an epic here from Implementing" in done
+
+
+# Discovery stages tint blue (info token), execution stages tint green (success
+# token), Done is neutral — so a SAFe user reads the discovery / execution /
+# done bands at a glance.
+STAGE_GROUP = {
+    "Funnel": "discovery", "Reviewing": "discovery", "Analyzing": "discovery",
+    "Portfolio Backlog": "execution", "Implementing": "execution", "Done": "done",
+}
+# WIP limits the board shows on its column headers. Funnel and Done have none.
+WIP_LIMITS = {"Reviewing": 4, "Analyzing": 3, "Portfolio Backlog": 6, "Implementing": 5}
+
+
+def _assert_headers_are_colour_coded_by_stage(page):
+    """Every column header carries its stage band, and the three bands render
+    visibly different header backgrounds (criterion 6)."""
+    tints = {}
+    for state, group in STAGE_GROUP.items():
+        header = page.locator(f".kanban-column[data-state='{state}'] .kanban-column-header")
+        assert header.count() == 1, f"missing header for {state}"
+        assert header.get_attribute("data-stage-group") == group, (
+            f"{state} header is not banded as {group}"
+        )
+        tints[group] = header.evaluate("el => getComputedStyle(el).backgroundColor")
+    # Discovery, execution and done must not all share one background colour, or
+    # the banding is invisible to the person it is for.
+    assert len(set(tints.values())) >= 2, f"stage bands are not visually distinct: {tints}"
+
+
+def _assert_wip_limits_show_on_headers(page):
+    """Every limited column shows "count / limit" in its header; unlimited
+    columns (Funnel, Done) show no limit (criterion 5)."""
+    for state, limit in WIP_LIMITS.items():
+        header = page.locator(f".kanban-column[data-state='{state}'] .kanban-column-header").inner_text()
+        assert f"/ {limit}" in header, f"{state} header does not show its WIP limit: {header!r}"
+    for state in ("Funnel", "Done"):
+        header = page.locator(f".kanban-column[data-state='{state}'] .kanban-column-header").inner_text()
+        assert "/" not in header.replace("epics", ""), f"{state} should show no WIP limit: {header!r}"
+
+
+def _drag_card(page, card, to_state):
+    """Drive a native HTML5 drag-and-drop of a card onto a target column,
+    dispatching the dragstart/dragover/drop/dragend sequence the board listens
+    for with a shared DataTransfer so the payload survives. The board's
+    @dragover / @drop handlers sit on the .kanban-column element, so the drop
+    is dispatched there."""
+    target = page.locator(f".kanban-column[data-state='{to_state}']")
+    card.scroll_into_view_if_needed()
+    target.scroll_into_view_if_needed()
+    page.evaluate(
+        """([src, dst]) => {
+            const dt = new DataTransfer();
+            const fire = (el, type) => {
+                const ev = new DragEvent(type, { bubbles: true, cancelable: true, dataTransfer: dt });
+                Object.defineProperty(ev, 'dataTransfer', { value: dt });
+                el.dispatchEvent(ev);
+            };
+            fire(src, 'dragstart');
+            fire(dst, 'dragenter');
+            fire(dst, 'dragover');
+            fire(dst, 'drop');
+            fire(src, 'dragend');
+        }""",
+        [card.element_handle(), target.element_handle()],
+    )
+    page.wait_for_timeout(800)
 
 
 def _shoot(browser, live_server, email, width, height, scheme, name, scroll_to_end=False):
@@ -162,6 +228,28 @@ def test_portfolio_kanban_journey(browser, live_server, seeded, db_session):
         expect(page.get_by_role("heading", name="Legacy Migration Epic")).to_be_visible(timeout=PAGE_TIMEOUT)
         expect(page.get_by_role("heading", name="Platform Modernization Epic")).to_be_visible(timeout=PAGE_TIMEOUT)
 
+        # === Step 2a: colour-coded stage headers and WIP limits (criteria 5, 6) ===
+        _assert_headers_are_colour_coded_by_stage(page)
+        _assert_wip_limits_show_on_headers(page)
+
+        # === Step 2b: the highest-WSJF card in a column carries the Top WSJF accent ===
+        funnel = page.locator(".kanban-column[data-state='Funnel'] .kanban-card")
+        assert "Platform Modernization Epic" in funnel.first.inner_text()
+        assert "Top WSJF" in funnel.first.inner_text(), "highest-WSJF card is not accented"
+
+        # === Step 2c: shape, labels, empty columns and screenshots on the pristine
+        # board — before any move changes which columns are empty. The board keeps
+        # its six columns in one row and scrolls sideways at 390 (section 26). ===
+        email = seeded["emails"]["solution_architect"]
+        _assert_board_keeps_its_shape(page)
+        _assert_cards_use_words(page)
+        _assert_empty_columns_name_the_next_step(page)
+        for width, height in ((1440, 900), (390, 844)):
+            for scheme in ("light", "dark"):
+                _shoot(browser, live_server, email, width, height, scheme, f"kanban-{width}-{scheme}")
+        for scheme in ("light", "dark"):
+            _shoot(browser, live_server, email, 390, 844, scheme, f"kanban-390-{scheme}-scrolled", scroll_to_end=True)
+
         # === Step 3: Verify WSJF ordering in Funnel column (descending) ===
         # Platform Modernization (13.5) should be first, Customer Portal (7.67) second, Legacy Migration (2.8) third
         cards = page.locator(".kanban-column[data-state='Funnel'] .bg-card").all()
@@ -209,28 +297,139 @@ def test_portfolio_kanban_journey(browser, live_server, seeded, db_session):
         funnel_cards_after_reload = page.locator(".kanban-column[data-state='Funnel'] .bg-card").all()
         assert len(funnel_cards_after_reload) == 2, "Funnel should still have 2 epics after reload"
 
-        # === Step 7: Verify element detail page shows same state ===
-        # (This would require navigating to element detail - skipping for brevity)
+        # === Step 7: Drag an epic from Funnel to Reviewing (criterion 3) ===
+        # The architect drags, not selects: the card lands in Reviewing, the
+        # column counts update, and the move survives a reload.
+        platform_card = page.locator(".kanban-column[data-state='Funnel'] .kanban-card").filter(
+            has_text="Platform Modernization Epic")
+        expect(platform_card).to_be_visible(timeout=PAGE_TIMEOUT)
+        _drag_card(page, platform_card, "Reviewing")
+        reviewing_column = page.locator(".kanban-column[data-state='Reviewing']")
+        expect(reviewing_column.get_by_role("heading", name="Platform Modernization Epic")).to_be_visible(timeout=PAGE_TIMEOUT)
+        # It is the only card in Reviewing, and so carries the Top WSJF accent there.
+        assert "Top WSJF" in reviewing_column.locator(".kanban-card").first.inner_text()
+        # Funnel is down to one card (Legacy Migration; Customer Portal moved to Implementing above).
+        expect(page.locator(".kanban-column[data-state='Funnel'] .kanban-card")).to_have_count(1, timeout=PAGE_TIMEOUT)
 
-        # === Step 8: Test non-architect access - cannot move epics ===
-        # Note: viewer access control is tested in test_safe_portfolio_api.py unit tests.
-        # The smoke test focuses on the architect journey.
-
-        # === Step 9: Test org B isolation - empty board ===
-        # Note: org B isolation is tested in test_safe_portfolio_api.py unit tests
-        # The smoke test seeds epics into the shared org; org B would need a second
-        # organisation which the seeded fixture does not provide.
-
-        # === Step 7: Shape, labels and empty columns at both widths, both schemes ===
-        email = seeded["emails"]["solution_architect"]
-        _assert_board_keeps_its_shape(page)
-        _assert_cards_use_words(page)
-        _assert_empty_columns_name_the_next_step(page)
-        for width, height in ((1440, 900), (390, 844)):
-            for scheme in ("light", "dark"):
-                _shoot(browser, live_server, email, width, height, scheme, f"kanban-{width}-{scheme}")
-        for scheme in ("light", "dark"):
-            _shoot(browser, live_server, email, 390, 844, scheme, f"kanban-390-{scheme}-scrolled", scroll_to_end=True)
+        page.reload(timeout=PAGE_TIMEOUT)
+        expect(page.get_by_role("heading", name="Portfolio Kanban")).to_be_visible(timeout=PAGE_TIMEOUT)
+        reviewing_column = page.locator(".kanban-column[data-state='Reviewing']")
+        expect(reviewing_column.get_by_role("heading", name="Platform Modernization Epic")).to_be_visible(timeout=PAGE_TIMEOUT)
 
     finally:
         page.close()
+
+
+def _make_viewer(org_id):
+    """Add a read-only viewer to *org_id* and return their email. A viewer
+    holds the organisation's viewer role, so the permission matrix — not a role
+    name — refuses their write."""
+    from app import create_app, db
+    from app.models.user import User
+    from app.models.org_role import OrgRole
+
+    app = create_app("testing")
+    email = "smoke.safe-viewer.%s@example.com" % org_id
+    with app.app_context():
+        existing = User.query.filter_by(email=email).first()
+        if existing:
+            return email
+        user = User(
+            email=email, first_name="Smoke", last_name="Viewer",
+            organization_id=org_id, enterprise_role="Viewer", confirmed=True,
+        )
+        user.password = PASSWORD
+        db.session.add(user)
+        db.session.commit()
+        OrgRole.set_role(org_id, user.id, "viewer")
+        db.session.commit()
+    return email
+
+
+def test_portfolio_board_viewer_is_read_only(browser, live_server, seeded, db_session):
+    """A viewer sees the board but no way to move a card: no drag handles and no
+    "Move to" select (criterion 4)."""
+    org_id = seeded["ids"]["org"]
+    _seed_epics(org_id)
+    viewer_email = _make_viewer(org_id)
+
+    context = browser.new_context(viewport={"width": 1440, "height": 900})
+    try:
+        page = context.new_page()
+        _login(page, live_server, viewer_email)
+        page.goto(live_server + "/safe/portfolio", timeout=PAGE_TIMEOUT)
+        expect(page.get_by_role("heading", name="Portfolio Kanban")).to_be_visible(timeout=PAGE_TIMEOUT)
+        page.wait_for_load_state("networkidle")
+        # The epics are visible (read access), but no move control is shown.
+        expect(page.get_by_role("heading", name="Platform Modernization Epic").first).to_be_visible(timeout=PAGE_TIMEOUT)
+        # The "Move to" select is gated on canWrite (x-show), so for a viewer no
+        # select is visible — a hidden node may remain in the DOM, so the test
+        # asserts visibility, not DOM presence.
+        selects = page.locator(".kanban-card select")
+        for i in range(selects.count()):
+            assert not selects.nth(i).is_visible(), "viewer is shown a Move to select"
+        # The board's read-only-ness is also reported by the API it renders from.
+        import json
+        page.goto(live_server + "/api/safe/portfolio", timeout=PAGE_TIMEOUT)
+        api = json.loads(page.inner_text("body"))
+        assert api["can_write"] is False, "the board reports a viewer can write"
+    finally:
+        context.close()
+
+
+def test_portfolio_board_second_organisation_sees_only_its_own(browser, live_server, seeded, request):
+    """Two real organisations: a user in the second organisation sees that
+    organisation's epics and none of the first's (criterion 4)."""
+    from .conftest import _seed_standard_org
+
+    org_a = seeded["ids"]["org"]
+    _seed_epics(org_a)   # org A gets the three well-known epics
+
+    # A second, independently seeded organisation with one clearly-named epic.
+    # The AI protocol stub is session-wide (owned by `seeded`); this second
+    # organisation does not re-create it (passes None) so the shared stub's
+    # one-row teardown contract is undisturbed.
+    other = _seed_standard_org(request, None)
+    org_b = other["ids"]["org"]
+    assert org_b != org_a
+    _seed_named_epic(org_b, "Second Org Only Epic")
+
+    context = browser.new_context(viewport={"width": 1440, "height": 900})
+    try:
+        page = context.new_page()
+        _login(page, live_server, other["emails"]["solution_architect"])
+        page.goto(live_server + "/safe/portfolio", timeout=PAGE_TIMEOUT)
+        expect(page.get_by_role("heading", name="Portfolio Kanban")).to_be_visible(timeout=PAGE_TIMEOUT)
+        page.wait_for_load_state("networkidle")
+        board_text = page.locator(".kanban-board").inner_text()
+        assert "Second Org Only Epic" in board_text, "second org cannot see its own epic"
+        for first_org_epic in ("Customer Portal Epic", "Legacy Migration Epic", "Platform Modernization Epic"):
+            assert first_org_epic not in board_text, (
+                f"second org can see the first org's {first_org_epic!r} — tenant isolation is broken"
+            )
+    finally:
+        context.close()
+
+
+def _seed_named_epic(org_id, name):
+    """One SAFe Epic with a given name in *org_id*, via a connection the live
+    server process can see (mirrors _seed_epics)."""
+    from app import create_app, db
+    from app.models.archimate_core import ArchiMateElement
+    from app.services.element_profile_service import set_kind, set_wsjf_components
+
+    app = create_app("testing")
+    with app.app_context():
+        element = ArchiMateElement(
+            name=name, type="WorkPackage", organization_id=org_id,
+            description="Second-organisation isolation fixture.",
+        )
+        db.session.add(element)
+        db.session.flush()
+        set_kind(element, "Epic", framework_id="safe", source="test")
+        set_wsjf_components(
+            element, business_value=5, time_criticality=5,
+            risk_reduction=5, job_size=2, source="test",
+        )
+        db.session.commit()
+        return element.id
