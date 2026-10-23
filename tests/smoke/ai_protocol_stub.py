@@ -53,6 +53,72 @@ CASE_SEED = {
 }
 
 
+# The strategy drafting engine (app/services/strategy_draft_service.py) renders
+# its prompts from app/prompts/strategy/<key>.txt. These phrases are verbatim
+# in those files, so the real outbound request carries them with no product
+# change. The draft scenarios read the record ids the engine put in the prompt
+# ("- id <n> [kind] ...") and cite a real one per box, so the citation filter
+# keeps the points; the critique scenario echoes the proposed JSON back so the
+# engine's deterministic citation filter does the work.
+SWOT_DRAFT = {
+    'marker': 'Produce a SWOT analysis.',
+    'boxes': ('strengths', 'weaknesses', 'opportunities', 'threats'),
+    'stream': False,
+}
+PESTLE_DRAFT = {
+    'marker': 'Produce a PESTLE analysis',
+    'boxes': ('political', 'economic', 'social', 'technological', 'legal', 'environmental'),
+    'stream': False,
+}
+CRITIQUE = {
+    'marker': 'strict, hostile filter',
+    'stream': False,
+}
+
+
+def _record_ids_in_prompt(content):
+    """The record ids the engine listed in the prompt, in order."""
+    import re
+
+    return re.findall(r'^- id (\d+) ', content or '', flags=re.MULTILINE)
+
+
+def _strategy_draft_reply(scenario, content):
+    """One cited point per box, each citing a real record id from the prompt.
+
+    Deterministic and grounded: every point cites the first record id the
+    engine offered, so the engine's citation filter keeps it. If the prompt
+    carried no records, the boxes come back empty — the honest result.
+    """
+    ids = _record_ids_in_prompt(content)
+    boxes = {box: [] for box in scenario['boxes']}
+    if ids:
+        first = ids[0]
+        for index, box in enumerate(scenario['boxes']):
+            cite = ids[index % len(ids)]
+            boxes[box] = [{
+                'point': f'CI fixture {box} point grounded in record {first}',
+                'citations': [cite],
+            }]
+    return json.dumps(boxes)
+
+
+def _critique_reply(content):
+    """Echo the 'Proposed analysis to filter:' JSON block back unchanged."""
+    marker = 'Proposed analysis to filter:'
+    idx = content.find(marker)
+    if idx == -1:
+        return json.dumps({})
+    tail = content[idx + len(marker):].strip()
+    # The engine renders the proposed JSON as the last block; take from the
+    # first '{' to the last '}'.
+    start = tail.find('{')
+    end = tail.rfind('}')
+    if start == -1 or end == -1 or end < start:
+        return json.dumps({})
+    return tail[start:end + 1]
+
+
 class AIProtocolStub:
     """Loopback HTTP transport, strict scenarios and a metadata-only request ledger."""
 
@@ -119,10 +185,17 @@ class AIProtocolStub:
                     return
                 last = messages[-1]
                 content = last.get('content')
+                # The critique prompt also contains a SWOT/PESTLE marker inside
+                # the proposed JSON it echoes, so it is matched first and
+                # distinctly, and excluded from the draft matchers below.
+                is_critique = isinstance(content, str) and CRITIQUE['marker'] in content
                 matches = [(name, scenario) for name, scenario in [
                     ('chat', CHAT), ('guide', GUIDE),
                     ('programme_prefill', PROGRAMME_PREFILL), ('case_seed', CASE_SEED),
-                ] if isinstance(content, str) and scenario['marker'] in content]
+                    ('swot_draft', SWOT_DRAFT), ('pestle_draft', PESTLE_DRAFT),
+                ] if not is_critique and isinstance(content, str) and scenario['marker'] in content]
+                if is_critique:
+                    matches = [('critique', CRITIQUE)]
                 stream = body.get('stream', False)
                 if last.get('role') != 'user' or len(matches) != 1 or type(stream) is not bool:
                     self._reject(400, 'Unknown CI fixture scenario.', model=MODEL)
@@ -132,16 +205,23 @@ class AIProtocolStub:
                     self._reject(400, 'Scenario used the wrong transport.',
                                  scenario=name, model=MODEL, stream=stream)
                     return
+                # Scenarios with a dynamic reply built from the prompt.
+                dynamic_reply = None
+                if name in ('swot_draft', 'pestle_draft'):
+                    dynamic_reply = _strategy_draft_reply(scenario, content)
+                elif name == 'critique':
+                    dynamic_reply = _critique_reply(content)
                 self._record(200, scenario=name, model=MODEL, stream=stream)
+                reply_text = dynamic_reply if dynamic_reply is not None else scenario['reply']
                 base = {'id': 'chatcmpl-ci-' + name, 'created': 0, 'model': MODEL}
                 if not stream:
                     self._json(200, {**base, 'object': 'chat.completion', 'choices': [{
-                        'index': 0, 'message': {'role': 'assistant', 'content': scenario['reply']},
+                        'index': 0, 'message': {'role': 'assistant', 'content': reply_text},
                         'finish_reason': 'stop'}], 'usage': {
                             'prompt_tokens': 12, 'completion_tokens': 8, 'total_tokens': 20}})
                     return
                 chunks = []
-                text = scenario['reply']
+                text = reply_text
                 for start in range(0, len(text), 24):
                     chunks.append({**base, 'object': 'chat.completion.chunk', 'choices': [{
                         'index': 0, 'delta': {'content': text[start:start + 24]}, 'finish_reason': None}]})

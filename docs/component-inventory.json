@@ -448,6 +448,24 @@
   {
    "id": "app/modules/intelligence/templates/intelligence/answer.html::link::0",
    "kind": "link",
+   "label": "View file on GitHub",
+   "line": null,
+   "mutating": false,
+   "rendered_on": [
+    "/intelligence/answers/<address>"
+   ],
+   "rendered_on_count": 1,
+   "target": {
+    "href": "o.url"
+   },
+   "template": "app/modules/intelligence/templates/intelligence/answer.html",
+   "testid": null,
+   "type": null,
+   "via_macro": null
+  },
+  {
+   "id": "app/modules/intelligence/templates/intelligence/answer.html::link::1",
+   "kind": "link",
    "label": "answer.page_url",
    "line": null,
    "mutating": false,
@@ -574,7 +592,7 @@
    "id": "app/modules/intelligence/templates/intelligence/ask.html::table::0",
    "kind": "table",
    "label": "",
-   "line": 443,
+   "line": 452,
    "mutating": false,
    "rendered_on": [
     "/intelligence/ask"
@@ -8134,6 +8152,367 @@
    "via_macro": null
   },
   {
+   "id": "app/templates/admin/connectors/github.html::link::0",
+   "kind": "link",
+   "label": "Review what was found",
+   "line": null,
+   "mutating": false,
+   "rendered_on": [
+    "/admin/connectors/github"
+   ],
+   "rendered_on_count": 1,
+   "target": {
+    "href": "review_url"
+   },
+   "template": "app/templates/admin/connectors/github.html",
+   "testid": null,
+   "type": null,
+   "via_macro": null
+  },
+  {
+   "id": "app/templates/admin/connectors/github.html::button::0",
+   "kind": "button",
+   "label": "Connect and read my repositoriesSave and read again",
+   "line": null,
+   "mutating": true,
+   "rendered_on": [
+    "/admin/connectors/github"
+   ],
+   "rendered_on_count": 1,
+   "target": {
+    "button_type": "submit",
+    "form_method": "POST"
+   },
+   "template": "app/templates/admin/connectors/github.html",
+   "testid": null,
+   "type": "noop",
+   "via_macro": null
+  },
+  {
+   "id": "app/templates/admin/connectors/github.html::form::0",
+   "kind": "form",
+   "label": "",
+   "line": null,
+   "mutating": true,
+   "rendered_on": [
+    "/admin/connectors/github"
+   ],
+   "rendered_on_count": 1,
+   "target": {
+    "action": "url_for('m365_connector.github_connect_save')",
+    "endpoint": "m365_connector.github_connect_save",
+    "fields": [
+     "api_token",
+     "csrf_token",
+     "organization"
+    ],
+    "method": "POST"
+   },
+   "template": "app/templates/admin/connectors/github.html",
+   "testid": "github-connect-form",
+   "type": null,
+   "via_macro": null
+  },
+  {
+   "id": "app/templates/admin/connectors/github.html::testid::0",
+   "kind": "testid",
+   "label": "section",
+   "line": null,
+   "mutating": false,
+   "rendered_on": [
+    "/admin/connectors/github"
+   ],
+   "rendered_on_count": 1,
+   "target": {},
+   "template": "app/templates/admin/connectors/github.html",
+   "testid": "github-progress",
+   "type": null,
+   "via_macro": null
+  },
+  {
+   "id": "app/templates/admin/connectors/github_review.html::link::0",
+   "kind": "link",
+   "label": "approval inbox",
+   "line": null,
+   "mutating": false,
+   "rendered_on": [
+    "/admin/connectors/github/review"
+   ],
+   "rendered_on_count": 1,
+   "target": {
+    "endpoint": "unified_ai_chat.approval_inbox",
+    "href": "url_for('unified_ai_chat.approval_inbox')"
+   },
+   "template": "app/templates/admin/connectors/github_review.html",
+   "testid": null,
+   "type": null,
+   "via_macro": null
+  },
+  {
+   "id": "app/templates/admin/connectors/github_review.html::button::0",
+   "kind": "button",
+   "label": "Change",
+   "line": null,
+   "mutating": true,
+   "rendered_on": [
+    "/admin/connectors/github/review"
+   ],
+   "rendered_on_count": 1,
+   "target": {
+    "button_type": "submit",
+    "form_method": "POST"
+   },
+   "template": "app/templates/admin/connectors/github_review.html",
+   "testid": null,
+   "type": "noop",
+   "via_macro": null
+  },
+  {
+   "id": "app/templates/admin/connectors/github_review.html::button::1",
+   "kind": "button",
+   "label": "Skip",
+   "line": null,
+   "mutating": true,
+   "rendered_on": [
+    "/admin/connectors/github/review"
+   ],
+   "rendered_on_count": 1,
+   "target": {
+    "button_type": "submit",
+    "form_method": "POST"
+   },
+   "template": "app/templates/admin/connectors/github_review.html",
+   "testid": null,
+   "type": "noop",
+   "via_macro": null
+  },
+  {
+   "id": "app/templates/admin/connectors/github_review.html::button::2",
+   "kind": "button",
+   "label": "Approve all ({{ review.total }})",
+   "line": null,
+   "mutating": true,
+   "rendered_on": [
+    "/admin/connectors/github/review"
+   ],
+   "rendered_on_count": 1,
+   "target": {
+    "button_type": "submit",
+    "form_method": "POST"
+   },
+   "template": "app/templates/admin/connectors/github_review.html",
+   "testid": null,
+   "type": "noop",
+   "via_macro": null
+  },
+  {
+   "id": "app/templates/admin/connectors/github_review.html::button::3",
+   "kind": "button",
+   "label": "Skip",
+   "line": null,
+   "mutating": true,
+   "rendered_on": [
+    "/admin/connectors/github/review"
+   ],
+   "rendered_on_count": 1,
+   "target": {
+    "button_type": "submit",
+    "form_method": "POST"
+   },
+   "template": "app/templates/admin/connectors/github_review.html",
+   "testid": null,
+   "type": "noop",
+   "via_macro": null
+  },
+  {
+   "id": "app/templates/admin/connectors/github_review.html::form::0",
+   "kind": "form",
+   "label": "",
+   "line": null,
+   "mutating": true,
+   "rendered_on": [
+    "/admin/connectors/github/review"
+   ],
+   "rendered_on_count": 1,
+   "target": {
+    "action": "url_for('m365_connector.github_review_classify', approval_id=item.id)",
+    "endpoint": "m365_connector.github_review_classify",
+    "fields": [
+     "csrf_token"
+    ],
+    "method": "POST"
+   },
+   "template": "app/templates/admin/connectors/github_review.html",
+   "testid": null,
+   "type": null,
+   "via_macro": null
+  },
+  {
+   "id": "app/templates/admin/connectors/github_review.html::form::1",
+   "kind": "form",
+   "label": "",
+   "line": null,
+   "mutating": true,
+   "rendered_on": [
+    "/admin/connectors/github/review"
+   ],
+   "rendered_on_count": 1,
+   "target": {
+    "action": "url_for('m365_connector.github_review_skip', approval_id=item.id)",
+    "endpoint": "m365_connector.github_review_skip",
+    "fields": [
+     "csrf_token"
+    ],
+    "method": "POST"
+   },
+   "template": "app/templates/admin/connectors/github_review.html",
+   "testid": null,
+   "type": null,
+   "via_macro": null
+  },
+  {
+   "id": "app/templates/admin/connectors/github_review.html::form::2",
+   "kind": "form",
+   "label": "",
+   "line": null,
+   "mutating": true,
+   "rendered_on": [
+    "/admin/connectors/github/review"
+   ],
+   "rendered_on_count": 1,
+   "target": {
+    "action": "url_for('m365_connector.github_review_approve_all')",
+    "endpoint": "m365_connector.github_review_approve_all",
+    "fields": [
+     "csrf_token"
+    ],
+    "method": "POST"
+   },
+   "template": "app/templates/admin/connectors/github_review.html",
+   "testid": null,
+   "type": null,
+   "via_macro": null
+  },
+  {
+   "id": "app/templates/admin/connectors/github_review.html::form::3",
+   "kind": "form",
+   "label": "",
+   "line": null,
+   "mutating": true,
+   "rendered_on": [
+    "/admin/connectors/github/review"
+   ],
+   "rendered_on_count": 1,
+   "target": {
+    "action": "url_for('m365_connector.github_review_skip', approval_id=item.id)",
+    "endpoint": "m365_connector.github_review_skip",
+    "fields": [
+     "csrf_token"
+    ],
+    "method": "POST"
+   },
+   "template": "app/templates/admin/connectors/github_review.html",
+   "testid": null,
+   "type": null,
+   "via_macro": null
+  },
+  {
+   "id": "app/templates/admin/connectors/github_review.html::table::0",
+   "kind": "table",
+   "label": "",
+   "line": 74,
+   "mutating": false,
+   "rendered_on": [
+    "/admin/connectors/github/review"
+   ],
+   "rendered_on_count": 1,
+   "target": {},
+   "template": "app/templates/admin/connectors/github_review.html",
+   "testid": null,
+   "type": null,
+   "via_macro": "components/dense_table.html:dense_table"
+  },
+  {
+   "id": "app/templates/admin/connectors/github_review.html::table::1",
+   "kind": "table",
+   "label": "",
+   "line": 91,
+   "mutating": false,
+   "rendered_on": [
+    "/admin/connectors/github/review"
+   ],
+   "rendered_on_count": 1,
+   "target": {},
+   "template": "app/templates/admin/connectors/github_review.html",
+   "testid": null,
+   "type": null,
+   "via_macro": "components/dense_table.html:dense_table"
+  },
+  {
+   "id": "app/templates/admin/connectors/github_review.html::table::2",
+   "kind": "table",
+   "label": "",
+   "line": 109,
+   "mutating": false,
+   "rendered_on": [
+    "/admin/connectors/github/review"
+   ],
+   "rendered_on_count": 1,
+   "target": {},
+   "template": "app/templates/admin/connectors/github_review.html",
+   "testid": null,
+   "type": null,
+   "via_macro": "components/dense_table.html:dense_table"
+  },
+  {
+   "id": "app/templates/admin/connectors/github_review.html::table::3",
+   "kind": "table",
+   "label": "",
+   "line": 130,
+   "mutating": false,
+   "rendered_on": [
+    "/admin/connectors/github/review"
+   ],
+   "rendered_on_count": 1,
+   "target": {},
+   "template": "app/templates/admin/connectors/github_review.html",
+   "testid": null,
+   "type": null,
+   "via_macro": "components/dense_table.html:dense_table"
+  },
+  {
+   "id": "app/templates/admin/connectors/github_review.html::table::4",
+   "kind": "table",
+   "label": "",
+   "line": 147,
+   "mutating": false,
+   "rendered_on": [
+    "/admin/connectors/github/review"
+   ],
+   "rendered_on_count": 1,
+   "target": {},
+   "template": "app/templates/admin/connectors/github_review.html",
+   "testid": null,
+   "type": null,
+   "via_macro": "components/dense_table.html:dense_table"
+  },
+  {
+   "id": "app/templates/admin/connectors/github_review.html::testid::0",
+   "kind": "testid",
+   "label": "div",
+   "line": null,
+   "mutating": false,
+   "rendered_on": [
+    "/admin/connectors/github/review"
+   ],
+   "rendered_on_count": 1,
+   "target": {},
+   "template": "app/templates/admin/connectors/github_review.html",
+   "testid": "github-review-actions",
+   "type": null,
+   "via_macro": null
+  },
+  {
    "id": "app/templates/admin/connectors/index.html::link::0",
    "kind": "link",
    "label": "Review them in the approval inbox",
@@ -8153,6 +8532,25 @@
   },
   {
    "id": "app/templates/admin/connectors/index.html::link::1",
+   "kind": "link",
+   "label": "Connect GitHub",
+   "line": null,
+   "mutating": false,
+   "rendered_on": [
+    "/admin/connectors"
+   ],
+   "rendered_on_count": 1,
+   "target": {
+    "endpoint": "m365_connector.github_connect",
+    "href": "url_for('m365_connector.github_connect')"
+   },
+   "template": "app/templates/admin/connectors/index.html",
+   "testid": null,
+   "type": null,
+   "via_macro": null
+  },
+  {
+   "id": "app/templates/admin/connectors/index.html::link::2",
    "kind": "link",
    "label": "In approval queue",
    "line": null,
@@ -8311,6 +8709,22 @@
    "target": {},
    "template": "app/templates/admin/connectors/index.html",
    "testid": null,
+   "type": null,
+   "via_macro": null
+  },
+  {
+   "id": "app/templates/admin/connectors/index.html::testid::0",
+   "kind": "testid",
+   "label": "p",
+   "line": null,
+   "mutating": false,
+   "rendered_on": [
+    "/admin/connectors"
+   ],
+   "rendered_on_count": 1,
+   "target": {},
+   "template": "app/templates/admin/connectors/index.html",
+   "testid": "github-connect-link",
    "type": null,
    "via_macro": null
   },
@@ -19813,6 +20227,25 @@
   {
    "id": "app/templates/applications/list_simple.html::link::5",
    "kind": "link",
+   "label": "Not set: open to classify",
+   "line": null,
+   "mutating": false,
+   "rendered_on": [
+    "/applications/"
+   ],
+   "rendered_on_count": 1,
+   "target": {
+    "endpoint": "unified_applications.application_edit",
+    "href": "url_for('unified_applications.application_edit', id=app.id)"
+   },
+   "template": "app/templates/applications/list_simple.html",
+   "testid": "app-type-{{ app.id }}",
+   "type": null,
+   "via_macro": null
+  },
+  {
+   "id": "app/templates/applications/list_simple.html::link::6",
+   "kind": "link",
    "label": "View",
    "line": null,
    "mutating": false,
@@ -19830,7 +20263,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/applications/list_simple.html::link::6",
+   "id": "app/templates/applications/list_simple.html::link::7",
    "kind": "link",
    "label": "Fact sheet",
    "line": null,
@@ -19849,7 +20282,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/applications/list_simple.html::link::7",
+   "id": "app/templates/applications/list_simple.html::link::8",
    "kind": "link",
    "label": "Edit",
    "line": null,
@@ -19868,7 +20301,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/applications/list_simple.html::link::8",
+   "id": "app/templates/applications/list_simple.html::link::9",
    "kind": "link",
    "label": "",
    "line": null,
@@ -19887,7 +20320,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/applications/list_simple.html::link::9",
+   "id": "app/templates/applications/list_simple.html::link::10",
    "kind": "link",
    "label": "Fact sheet",
    "line": null,
@@ -19906,7 +20339,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/applications/list_simple.html::link::10",
+   "id": "app/templates/applications/list_simple.html::link::11",
    "kind": "link",
    "label": "Edit",
    "line": null,
@@ -20289,7 +20722,7 @@
   {
    "id": "app/templates/applications/list_simple.html::button::20",
    "kind": "button",
-   "label": "",
+   "label": "No capability mapped yet: map it",
    "line": null,
    "mutating": false,
    "rendered_on": [
@@ -20300,14 +20733,14 @@
     "button_type": "button"
    },
    "template": "app/templates/applications/list_simple.html",
-   "testid": null,
+   "testid": "app-capability-{{ app.id }}",
    "type": "inline-render",
    "via_macro": null
   },
   {
    "id": "app/templates/applications/list_simple.html::button::21",
    "kind": "button",
-   "label": "Map to Capabilities",
+   "label": "",
    "line": null,
    "mutating": false,
    "rendered_on": [
@@ -20325,7 +20758,7 @@
   {
    "id": "app/templates/applications/list_simple.html::button::22",
    "kind": "button",
-   "label": "Map to APQC",
+   "label": "Map to Capabilities",
    "line": null,
    "mutating": false,
    "rendered_on": [
@@ -20343,7 +20776,7 @@
   {
    "id": "app/templates/applications/list_simple.html::button::23",
    "kind": "button",
-   "label": "Map to Vendors",
+   "label": "Map to APQC",
    "line": null,
    "mutating": false,
    "rendered_on": [
@@ -20361,7 +20794,7 @@
   {
    "id": "app/templates/applications/list_simple.html::button::24",
    "kind": "button",
-   "label": "Map to ArchiMate",
+   "label": "Map to Vendors",
    "line": null,
    "mutating": false,
    "rendered_on": [
@@ -20378,6 +20811,24 @@
   },
   {
    "id": "app/templates/applications/list_simple.html::button::25",
+   "kind": "button",
+   "label": "Map to ArchiMate",
+   "line": null,
+   "mutating": false,
+   "rendered_on": [
+    "/applications/"
+   ],
+   "rendered_on_count": 1,
+   "target": {
+    "button_type": "button"
+   },
+   "template": "app/templates/applications/list_simple.html",
+   "testid": null,
+   "type": "inline-render",
+   "via_macro": null
+  },
+  {
+   "id": "app/templates/applications/list_simple.html::button::26",
    "kind": "button",
    "label": "",
    "line": null,
@@ -20396,7 +20847,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/applications/list_simple.html::button::26",
+   "id": "app/templates/applications/list_simple.html::button::27",
    "kind": "button",
    "label": "Clear Filters",
    "line": null,
@@ -20414,7 +20865,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/applications/list_simple.html::button::27",
+   "id": "app/templates/applications/list_simple.html::button::28",
    "kind": "button",
    "label": "Import Applications",
    "line": null,
@@ -20433,7 +20884,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/applications/list_simple.html::button::28",
+   "id": "app/templates/applications/list_simple.html::button::29",
    "kind": "button",
    "label": "Add Application",
    "line": null,
@@ -20452,7 +20903,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/applications/list_simple.html::button::29",
+   "id": "app/templates/applications/list_simple.html::button::30",
    "kind": "button",
    "label": "Map",
    "line": null,
@@ -20470,7 +20921,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/applications/list_simple.html::button::30",
+   "id": "app/templates/applications/list_simple.html::button::31",
    "kind": "button",
    "label": "Map to Capabilities",
    "line": null,
@@ -20488,7 +20939,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/applications/list_simple.html::button::31",
+   "id": "app/templates/applications/list_simple.html::button::32",
    "kind": "button",
    "label": "Map to APQC",
    "line": null,
@@ -20506,7 +20957,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/applications/list_simple.html::button::32",
+   "id": "app/templates/applications/list_simple.html::button::33",
    "kind": "button",
    "label": "Map to Vendors",
    "line": null,
@@ -20524,7 +20975,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/applications/list_simple.html::button::33",
+   "id": "app/templates/applications/list_simple.html::button::34",
    "kind": "button",
    "label": "Map to ArchiMate",
    "line": null,
@@ -20542,7 +20993,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/applications/list_simple.html::button::34",
+   "id": "app/templates/applications/list_simple.html::button::35",
    "kind": "button",
    "label": "",
    "line": null,
@@ -20561,7 +21012,25 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/applications/list_simple.html::button::35",
+   "id": "app/templates/applications/list_simple.html::button::36",
+   "kind": "button",
+   "label": "No capability mapped yet: map it",
+   "line": null,
+   "mutating": false,
+   "rendered_on": [
+    "/applications/"
+   ],
+   "rendered_on_count": 1,
+   "target": {
+    "button_type": "button"
+   },
+   "template": "app/templates/applications/list_simple.html",
+   "testid": null,
+   "type": "inline-render",
+   "via_macro": null
+  },
+  {
+   "id": "app/templates/applications/list_simple.html::button::37",
    "kind": "button",
    "label": "",
    "line": null,
@@ -20579,7 +21048,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/applications/list_simple.html::button::36",
+   "id": "app/templates/applications/list_simple.html::button::38",
    "kind": "button",
    "label": "",
    "line": null,
@@ -20597,7 +21066,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/applications/list_simple.html::button::37",
+   "id": "app/templates/applications/list_simple.html::button::39",
    "kind": "button",
    "label": "Close",
    "line": null,
@@ -20615,7 +21084,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/applications/list_simple.html::button::38",
+   "id": "app/templates/applications/list_simple.html::button::40",
    "kind": "button",
    "label": "Run AI Analysis",
    "line": null,
@@ -20633,7 +21102,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/applications/list_simple.html::button::39",
+   "id": "app/templates/applications/list_simple.html::button::41",
    "kind": "button",
    "label": "Accept & Save",
    "line": null,
@@ -20651,7 +21120,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/applications/list_simple.html::button::40",
+   "id": "app/templates/applications/list_simple.html::button::42",
    "kind": "button",
    "label": "",
    "line": null,
@@ -20670,7 +21139,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/applications/list_simple.html::button::41",
+   "id": "app/templates/applications/list_simple.html::button::43",
    "kind": "button",
    "label": "Cancel",
    "line": null,
@@ -20689,7 +21158,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/applications/list_simple.html::button::42",
+   "id": "app/templates/applications/list_simple.html::button::44",
    "kind": "button",
    "label": "Add Application",
    "line": null,
@@ -20775,7 +21244,7 @@
    "id": "app/templates/applications/list_simple.html::modal::0",
    "kind": "modal",
    "label": "AI Map Applications",
-   "line": 761,
+   "line": 767,
    "mutating": false,
    "rendered_on": [
     "/applications/"
@@ -20793,7 +21262,7 @@
    "id": "app/templates/applications/list_simple.html::modal::1",
    "kind": "modal",
    "label": "New Application",
-   "line": 835,
+   "line": 841,
    "mutating": false,
    "rendered_on": [
     "/applications/"
@@ -21130,7 +21599,7 @@
   {
    "id": "app/templates/applications/list_simple.html::testid::19",
    "kind": "testid",
-   "label": "div",
+   "label": "span",
    "line": null,
    "mutating": false,
    "rendered_on": [
@@ -21139,14 +21608,14 @@
    "rendered_on_count": 1,
    "target": {},
    "template": "app/templates/applications/list_simple.html",
-   "testid": "mobile-cards",
+   "testid": "app-type-{{ app.id }}",
    "type": null,
    "via_macro": null
   },
   {
    "id": "app/templates/applications/list_simple.html::testid::20",
    "kind": "testid",
-   "label": "div",
+   "label": "span",
    "line": null,
    "mutating": false,
    "rendered_on": [
@@ -21155,7 +21624,7 @@
    "rendered_on_count": 1,
    "target": {},
    "template": "app/templates/applications/list_simple.html",
-   "testid": "mobile-card-{{ app.id }}",
+   "testid": "app-type-{{ app.id }}",
    "type": null,
    "via_macro": null
   },
@@ -21171,7 +21640,7 @@
    "rendered_on_count": 1,
    "target": {},
    "template": "app/templates/applications/list_simple.html",
-   "testid": "pagination-footer",
+   "testid": "mobile-cards",
    "type": null,
    "via_macro": null
   },
@@ -21187,12 +21656,44 @@
    "rendered_on_count": 1,
    "target": {},
    "template": "app/templates/applications/list_simple.html",
-   "testid": "pagination-info",
+   "testid": "mobile-card-{{ app.id }}",
    "type": null,
    "via_macro": null
   },
   {
    "id": "app/templates/applications/list_simple.html::testid::23",
+   "kind": "testid",
+   "label": "div",
+   "line": null,
+   "mutating": false,
+   "rendered_on": [
+    "/applications/"
+   ],
+   "rendered_on_count": 1,
+   "target": {},
+   "template": "app/templates/applications/list_simple.html",
+   "testid": "pagination-footer",
+   "type": null,
+   "via_macro": null
+  },
+  {
+   "id": "app/templates/applications/list_simple.html::testid::24",
+   "kind": "testid",
+   "label": "div",
+   "line": null,
+   "mutating": false,
+   "rendered_on": [
+    "/applications/"
+   ],
+   "rendered_on_count": 1,
+   "target": {},
+   "template": "app/templates/applications/list_simple.html",
+   "testid": "pagination-info",
+   "type": null,
+   "via_macro": null
+  },
+  {
+   "id": "app/templates/applications/list_simple.html::testid::25",
    "kind": "testid",
    "label": "select",
    "line": null,
@@ -21208,7 +21709,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/applications/list_simple.html::testid::24",
+   "id": "app/templates/applications/list_simple.html::testid::26",
    "kind": "testid",
    "label": "span",
    "line": null,
@@ -21224,7 +21725,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/applications/list_simple.html::testid::25",
+   "id": "app/templates/applications/list_simple.html::testid::27",
    "kind": "testid",
    "label": "div",
    "line": null,
@@ -21240,7 +21741,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/applications/list_simple.html::testid::26",
+   "id": "app/templates/applications/list_simple.html::testid::28",
    "kind": "testid",
    "label": "div",
    "line": null,
@@ -21256,7 +21757,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/applications/list_simple.html::testid::27",
+   "id": "app/templates/applications/list_simple.html::testid::29",
    "kind": "testid",
    "label": "div",
    "line": null,
@@ -21272,7 +21773,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/applications/list_simple.html::testid::28",
+   "id": "app/templates/applications/list_simple.html::testid::30",
    "kind": "testid",
    "label": "div",
    "line": null,
@@ -33885,7 +34386,7 @@
   {
    "id": "app/templates/archimate_crud/dashboard.html::testid::2",
    "kind": "testid",
-   "label": "select",
+   "label": "div",
    "line": null,
    "mutating": false,
    "rendered_on": [
@@ -33898,7 +34399,7 @@
    "rendered_on_count": 5,
    "target": {},
    "template": "app/templates/archimate_crud/dashboard.html",
-   "testid": "detail-layer-select",
+   "testid": "kind-details-panel",
    "type": null,
    "via_macro": null
   },
@@ -33918,14 +34419,14 @@
    "rendered_on_count": 5,
    "target": {},
    "template": "app/templates/archimate_crud/dashboard.html",
-   "testid": "detail-type-select",
+   "testid": "detail-layer-select",
    "type": null,
    "via_macro": null
   },
   {
    "id": "app/templates/archimate_crud/dashboard.html::testid::4",
    "kind": "testid",
-   "label": "div",
+   "label": "select",
    "line": null,
    "mutating": false,
    "rendered_on": [
@@ -33938,7 +34439,7 @@
    "rendered_on_count": 5,
    "target": {},
    "template": "app/templates/archimate_crud/dashboard.html",
-   "testid": "ai-generate-modal",
+   "testid": "detail-type-select",
    "type": null,
    "via_macro": null
   },
@@ -33958,12 +34459,32 @@
    "rendered_on_count": 5,
    "target": {},
    "template": "app/templates/archimate_crud/dashboard.html",
-   "testid": "ai-generate-error",
+   "testid": "ai-generate-modal",
    "type": null,
    "via_macro": null
   },
   {
    "id": "app/templates/archimate_crud/dashboard.html::testid::6",
+   "kind": "testid",
+   "label": "div",
+   "line": null,
+   "mutating": false,
+   "rendered_on": [
+    "/architecture/",
+    "/architecture/<any(motivation, strategy, business, application, technology, physical, implementation):layer>/<element_type>",
+    "/architecture/<any(motivation, strategy, business, application, technology, physical, implementation):layer>/<element_type>/<int:element_id>/edit",
+    "/architecture/<any(motivation, strategy, business, application, technology, physical, implementation):layer>/<element_type>/new",
+    "/architecture/dashboard"
+   ],
+   "rendered_on_count": 5,
+   "target": {},
+   "template": "app/templates/archimate_crud/dashboard.html",
+   "testid": "ai-generate-error",
+   "type": null,
+   "via_macro": null
+  },
+  {
+   "id": "app/templates/archimate_crud/dashboard.html::testid::7",
    "kind": "testid",
    "label": "select",
    "line": null,
@@ -33983,7 +34504,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/archimate_crud/dashboard.html::testid::7",
+   "id": "app/templates/archimate_crud/dashboard.html::testid::8",
    "kind": "testid",
    "label": "textarea",
    "line": null,
@@ -34003,7 +34524,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/archimate_crud/dashboard.html::testid::8",
+   "id": "app/templates/archimate_crud/dashboard.html::testid::9",
    "kind": "testid",
    "label": "div",
    "line": null,
@@ -34023,7 +34544,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/archimate_crud/dashboard.html::testid::9",
+   "id": "app/templates/archimate_crud/dashboard.html::testid::10",
    "kind": "testid",
    "label": "div",
    "line": null,
@@ -35494,7 +36015,7 @@
   {
    "id": "app/templates/archimate_crud/partials/_repository_workspace.html::button::13",
    "kind": "button",
-   "label": "",
+   "label": "WSJF",
    "line": null,
    "mutating": false,
    "rendered_on": [
@@ -35538,7 +36059,7 @@
   {
    "id": "app/templates/archimate_crud/partials/_repository_workspace.html::button::15",
    "kind": "button",
-   "label": "Edit",
+   "label": "",
    "line": null,
    "mutating": false,
    "rendered_on": [
@@ -35560,6 +36081,28 @@
   {
    "id": "app/templates/archimate_crud/partials/_repository_workspace.html::button::16",
    "kind": "button",
+   "label": "Edit",
+   "line": null,
+   "mutating": false,
+   "rendered_on": [
+    "/architecture/",
+    "/architecture/<any(motivation, strategy, business, application, technology, physical, implementation):layer>/<element_type>",
+    "/architecture/<any(motivation, strategy, business, application, technology, physical, implementation):layer>/<element_type>/<int:element_id>/edit",
+    "/architecture/<any(motivation, strategy, business, application, technology, physical, implementation):layer>/<element_type>/new",
+    "/architecture/dashboard"
+   ],
+   "rendered_on_count": 5,
+   "target": {
+    "button_type": "button"
+   },
+   "template": "app/templates/archimate_crud/partials/_repository_workspace.html",
+   "testid": null,
+   "type": "inline-render",
+   "via_macro": null
+  },
+  {
+   "id": "app/templates/archimate_crud/partials/_repository_workspace.html::button::17",
+   "kind": "button",
    "label": "Delete",
    "line": null,
    "mutating": true,
@@ -35580,7 +36123,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/archimate_crud/partials/_repository_workspace.html::button::17",
+   "id": "app/templates/archimate_crud/partials/_repository_workspace.html::button::18",
    "kind": "button",
    "label": "Quick View",
    "line": null,
@@ -35602,7 +36145,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/archimate_crud/partials/_repository_workspace.html::button::18",
+   "id": "app/templates/archimate_crud/partials/_repository_workspace.html::button::19",
    "kind": "button",
    "label": "Edit",
    "line": null,
@@ -35624,7 +36167,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/archimate_crud/partials/_repository_workspace.html::button::19",
+   "id": "app/templates/archimate_crud/partials/_repository_workspace.html::button::20",
    "kind": "button",
    "label": "Delete",
    "line": null,
@@ -35646,7 +36189,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/archimate_crud/partials/_repository_workspace.html::button::20",
+   "id": "app/templates/archimate_crud/partials/_repository_workspace.html::button::21",
    "kind": "button",
    "label": "Previous",
    "line": null,
@@ -35668,7 +36211,7 @@
    "via_macro": null
   },
   {
-   "id": "app/templates/archimate_crud/partials/_repository_workspace.html::button::21",
+   "id": "app/templates/archimate_crud/partials/_repository_workspace.html::button::22",
    "kind": "button",
    "label": "Next",
    "line": null,
@@ -46865,7 +47408,7 @@
    "id": "app/templates/business_model/index.html::modal::0",
    "kind": "modal",
    "label": "New Business Model Canvas",
-   "line": 67,
+   "line": 68,
    "mutating": false,
    "rendered_on": [
     "/business-model/"
@@ -56613,7 +57156,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 450,
+   "rendered_on_count": 454,
    "target": {
     "endpoint": "account.manage",
     "href": "url_for('account.manage')"
@@ -56630,7 +57173,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 450,
+   "rendered_on_count": 454,
    "target": {
     "endpoint": "account.manage",
     "href": "url_for('account.manage')"
@@ -56647,7 +57190,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 450,
+   "rendered_on_count": 454,
    "target": {
     "endpoint": "team.team",
     "href": "url_for('team.team')"
@@ -56664,7 +57207,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 450,
+   "rendered_on_count": 454,
    "target": {
     "endpoint": "account.logout",
     "href": "url_for('account.logout')"
@@ -56681,7 +57224,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 450,
+   "rendered_on_count": 454,
    "target": {
     "button_type": "button"
    },
@@ -56697,7 +57240,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 450,
+   "rendered_on_count": 454,
    "target": {
     "button_type": "button"
    },
@@ -56713,7 +57256,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 450,
+   "rendered_on_count": 454,
    "target": {
     "button_type": "button"
    },
@@ -56729,7 +57272,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 450,
+   "rendered_on_count": 454,
    "target": {
     "button_type": "button"
    },
@@ -56745,7 +57288,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 450,
+   "rendered_on_count": 454,
    "target": {
     "button_type": "button"
    },
@@ -56761,7 +57304,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 450,
+   "rendered_on_count": 454,
    "target": {
     "button_type": "button"
    },
@@ -56777,7 +57320,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 450,
+   "rendered_on_count": 454,
    "target": {
     "button_type": "button"
    },
@@ -56793,7 +57336,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 450,
+   "rendered_on_count": 454,
    "target": {
     "button_type": "button"
    },
@@ -56809,7 +57352,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 450,
+   "rendered_on_count": 454,
    "target": {
     "button_type": "button"
    },
@@ -56825,7 +57368,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 450,
+   "rendered_on_count": 454,
    "target": {
     "button_type": "button"
    },
@@ -56841,7 +57384,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 450,
+   "rendered_on_count": 454,
    "target": {
     "modal_id": "search-modal"
    },
@@ -56857,7 +57400,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 450,
+   "rendered_on_count": 454,
    "target": {},
    "template": "app/templates/components/admin_header.html",
    "testid": "active-organization-chip",
@@ -56871,7 +57414,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 450,
+   "rendered_on_count": 454,
    "target": {
     "endpoint": "dashboard.overview",
     "href": "url_for('dashboard.overview')"
@@ -56888,7 +57431,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 450,
+   "rendered_on_count": 454,
    "target": {
     "endpoint": "modules_directory.index",
     "href": "url_for('modules_directory.index')"
@@ -56905,7 +57448,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 450,
+   "rendered_on_count": 454,
    "target": {
     "endpoint": "modules_directory.index",
     "href": "url_for('modules_directory.index')"
@@ -56922,7 +57465,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 450,
+   "rendered_on_count": 454,
    "target": {
     "endpoint": "account.logout",
     "href": "url_for('account.logout')"
@@ -56939,7 +57482,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 450,
+   "rendered_on_count": 454,
    "target": {
     "endpoint": "account.login",
     "href": "url_for('account.login')"
@@ -56956,7 +57499,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 450,
+   "rendered_on_count": 454,
    "target": {
     "button_type": "button"
    },
@@ -56972,7 +57515,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 450,
+   "rendered_on_count": 454,
    "target": {
     "button_type": "button"
    },
@@ -56988,7 +57531,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 450,
+   "rendered_on_count": 454,
    "target": {
     "button_type": "button"
    },
@@ -57004,7 +57547,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 450,
+   "rendered_on_count": 454,
    "target": {},
    "template": "app/templates/components/admin_sidebar.html",
    "testid": "sidebar",
@@ -57018,7 +57561,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 450,
+   "rendered_on_count": 454,
    "target": {},
    "template": "app/templates/components/admin_sidebar.html",
    "testid": "sidebar-search-results",
@@ -57032,11 +57575,13 @@
    "line": null,
    "mutating": false,
    "rendered_on": [
+    "/admin/connectors/github",
+    "/admin/connectors/github/review",
     "/arb/",
     "/arb/reviews/<int:id>",
     "/enterprise/analysis/ai-architecture"
    ],
-   "rendered_on_count": 3,
+   "rendered_on_count": 5,
    "target": {
     "href": "link_href"
    },
@@ -57052,11 +57597,13 @@
    "line": null,
    "mutating": false,
    "rendered_on": [
+    "/admin/connectors/github",
+    "/admin/connectors/github/review",
     "/arb/",
     "/arb/reviews/<int:id>",
     "/enterprise/analysis/ai-architecture"
    ],
-   "rendered_on_count": 3,
+   "rendered_on_count": 5,
    "target": {
     "button_type": "button"
    },
@@ -57072,11 +57619,13 @@
    "line": null,
    "mutating": false,
    "rendered_on": [
+    "/admin/connectors/github",
+    "/admin/connectors/github/review",
     "/arb/",
     "/arb/reviews/<int:id>",
     "/enterprise/analysis/ai-architecture"
    ],
-   "rendered_on_count": 3,
+   "rendered_on_count": 5,
    "target": {},
    "template": "app/templates/components/alert.html",
    "testid": "testid",
@@ -58149,7 +58698,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 19,
+   "rendered_on_count": 20,
    "target": {
     "href": "href"
    },
@@ -58165,7 +58714,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 19,
+   "rendered_on_count": 20,
    "target": {},
    "template": "app/templates/components/dense_table.html",
    "testid": null,
@@ -58179,7 +58728,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 19,
+   "rendered_on_count": 20,
    "target": {},
    "template": "app/templates/components/dense_table.html",
    "testid": "testid",
@@ -58509,7 +59058,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 450,
+   "rendered_on_count": 454,
    "target": {
     "button_type": "button"
    },
@@ -58525,7 +59074,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 450,
+   "rendered_on_count": 454,
    "target": {},
    "template": "app/templates/components/drawer.html",
    "testid": null,
@@ -60120,7 +60669,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 450,
+   "rendered_on_count": 454,
    "target": {
     "button_type": "button"
    },
@@ -60136,7 +60685,7 @@
    "line": null,
    "mutating": true,
    "rendered_on": null,
-   "rendered_on_count": 450,
+   "rendered_on_count": 454,
    "target": {
     "button_type": "submit",
     "form_method": "GET"
@@ -60153,7 +60702,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 450,
+   "rendered_on_count": 454,
    "target": {
     "method": "GET"
    },
@@ -60169,7 +60718,7 @@
    "line": 3,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 450,
+   "rendered_on_count": 454,
    "target": {
     "modal_id": "page-guide"
    },
@@ -60185,7 +60734,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 278,
+   "rendered_on_count": 282,
    "target": {
     "href": "crumb.href"
    },
@@ -60201,7 +60750,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 278,
+   "rendered_on_count": 282,
    "target": {
     "href": "action.href"
    },
@@ -60217,7 +60766,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 278,
+   "rendered_on_count": 282,
    "target": {
     "button_type": "button"
    },
@@ -62374,7 +62923,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 450,
+   "rendered_on_count": 454,
    "target": {
     "href": "href"
    },
@@ -62390,7 +62939,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 450,
+   "rendered_on_count": 454,
    "target": {
     "href": "href"
    },
@@ -62406,7 +62955,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 450,
+   "rendered_on_count": 454,
    "target": {
     "button_type": "button"
    },
@@ -62582,7 +63131,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 450,
+   "rendered_on_count": 454,
    "target": {
     "button_type": "button"
    },
@@ -62598,7 +63147,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 450,
+   "rendered_on_count": 454,
    "target": {
     "button_type": "button"
    },
@@ -76347,7 +76896,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 448,
+   "rendered_on_count": 452,
    "target": {
     "href": "#main-content"
    },
@@ -76363,7 +76912,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 448,
+   "rendered_on_count": 452,
    "target": {
     "href": "#sidebar-nav"
    },
@@ -76379,7 +76928,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 448,
+   "rendered_on_count": 452,
    "target": {
     "href": "#search-modal-trigger"
    },
@@ -76395,7 +76944,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 448,
+   "rendered_on_count": 452,
    "target": {
     "endpoint": "service_status.status_page",
     "href": "url_for('service_status.status_page')"
@@ -76412,7 +76961,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 448,
+   "rendered_on_count": 452,
    "target": {
     "button_type": "button"
    },
@@ -76428,7 +76977,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 448,
+   "rendered_on_count": 452,
    "target": {
     "button_type": "button"
    },
@@ -76444,7 +76993,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 448,
+   "rendered_on_count": 452,
    "target": {
     "button_type": "button"
    },
@@ -76460,7 +77009,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 448,
+   "rendered_on_count": 452,
    "target": {
     "button_type": "button"
    },
@@ -76476,7 +77025,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 448,
+   "rendered_on_count": 452,
    "target": {
     "button_type": "button",
     "handler": "dismissOnboarding(); window.location.href = (primaryCTA[selectedRole]?.href || '/dashboard/overview')"
@@ -76493,7 +77042,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 448,
+   "rendered_on_count": 452,
    "target": {
     "button_type": "button"
    },
@@ -76509,7 +77058,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 448,
+   "rendered_on_count": 452,
    "target": {
     "button_type": "button"
    },
@@ -76525,7 +77074,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 448,
+   "rendered_on_count": 452,
    "target": {
     "button_type": "button"
    },
@@ -76541,7 +77090,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 448,
+   "rendered_on_count": 452,
    "target": {
     "button_type": "button"
    },
@@ -76557,7 +77106,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 448,
+   "rendered_on_count": 452,
    "target": {
     "button_type": "button"
    },
@@ -76573,7 +77122,7 @@
    "line": null,
    "mutating": false,
    "rendered_on": null,
-   "rendered_on_count": 448,
+   "rendered_on_count": 452,
    "target": {},
    "template": "app/templates/layouts/admin_base.html",
    "testid": "app-footer",
@@ -99399,6 +99948,674 @@
    "via_macro": null
   },
   {
+   "id": "app/templates/strategy/_layout_circles.html::testid::0",
+   "kind": "testid",
+   "label": "div",
+   "line": null,
+   "mutating": false,
+   "rendered_on": [
+    "/strategy/<template_key>"
+   ],
+   "rendered_on_count": 1,
+   "target": {},
+   "template": "app/templates/strategy/_layout_circles.html",
+   "testid": "strategy-grid-{{ framework_key }}",
+   "type": null,
+   "via_macro": null
+  },
+  {
+   "id": "app/templates/strategy/_layout_columns.html::testid::0",
+   "kind": "testid",
+   "label": "div",
+   "line": null,
+   "mutating": false,
+   "rendered_on": [
+    "/strategy/<template_key>"
+   ],
+   "rendered_on_count": 1,
+   "target": {},
+   "template": "app/templates/strategy/_layout_columns.html",
+   "testid": "strategy-grid-{{ framework_key }}",
+   "type": null,
+   "via_macro": null
+  },
+  {
+   "id": "app/templates/strategy/_layout_curve.html::testid::0",
+   "kind": "testid",
+   "label": "div",
+   "line": null,
+   "mutating": false,
+   "rendered_on": [
+    "/strategy/<template_key>"
+   ],
+   "rendered_on_count": 1,
+   "target": {},
+   "template": "app/templates/strategy/_layout_curve.html",
+   "testid": "strategy-grid-{{ framework_key }}",
+   "type": null,
+   "via_macro": null
+  },
+  {
+   "id": "app/templates/strategy/_layout_curve.html::testid::1",
+   "kind": "testid",
+   "label": "section",
+   "line": null,
+   "mutating": false,
+   "rendered_on": [
+    "/strategy/<template_key>"
+   ],
+   "rendered_on_count": 1,
+   "target": {},
+   "template": "app/templates/strategy/_layout_curve.html",
+   "testid": "strategy-box-value_curve",
+   "type": null,
+   "via_macro": null
+  },
+  {
+   "id": "app/templates/strategy/_layout_curve.html::testid::2",
+   "kind": "testid",
+   "label": "canvas",
+   "line": null,
+   "mutating": false,
+   "rendered_on": [
+    "/strategy/<template_key>"
+   ],
+   "rendered_on_count": 1,
+   "target": {},
+   "template": "app/templates/strategy/_layout_curve.html",
+   "testid": "strategy-value-curve",
+   "type": null,
+   "via_macro": null
+  },
+  {
+   "id": "app/templates/strategy/_layout_curve.html::testid::3",
+   "kind": "testid",
+   "label": "p",
+   "line": null,
+   "mutating": false,
+   "rendered_on": [
+    "/strategy/<template_key>"
+   ],
+   "rendered_on_count": 1,
+   "target": {},
+   "template": "app/templates/strategy/_layout_curve.html",
+   "testid": "strategy-value-curve-empty",
+   "type": null,
+   "via_macro": null
+  },
+  {
+   "id": "app/templates/strategy/_layout_curve.html::testid::4",
+   "kind": "testid",
+   "label": "div",
+   "line": null,
+   "mutating": false,
+   "rendered_on": [
+    "/strategy/<template_key>"
+   ],
+   "rendered_on_count": 1,
+   "target": {},
+   "template": "app/templates/strategy/_layout_curve.html",
+   "testid": "strategy-four-actions",
+   "type": null,
+   "via_macro": null
+  },
+  {
+   "id": "app/templates/strategy/_layout_forces.html::testid::0",
+   "kind": "testid",
+   "label": "div",
+   "line": null,
+   "mutating": false,
+   "rendered_on": [
+    "/strategy/<template_key>"
+   ],
+   "rendered_on_count": 1,
+   "target": {},
+   "template": "app/templates/strategy/_layout_forces.html",
+   "testid": "strategy-grid-{{ framework_key }}",
+   "type": null,
+   "via_macro": null
+  },
+  {
+   "id": "app/templates/strategy/_layout_grid.html::testid::0",
+   "kind": "testid",
+   "label": "div",
+   "line": null,
+   "mutating": false,
+   "rendered_on": [
+    "/strategy/<template_key>"
+   ],
+   "rendered_on_count": 1,
+   "target": {},
+   "template": "app/templates/strategy/_layout_grid.html",
+   "testid": "strategy-grid-{{ framework_key }}",
+   "type": null,
+   "via_macro": null
+  },
+  {
+   "id": "app/templates/strategy/_layout_grid_2x2.html::testid::0",
+   "kind": "testid",
+   "label": "div",
+   "line": null,
+   "mutating": false,
+   "rendered_on": [
+    "/strategy/<template_key>"
+   ],
+   "rendered_on_count": 1,
+   "target": {},
+   "template": "app/templates/strategy/_layout_grid_2x2.html",
+   "testid": "strategy-grid-{{ framework_key }}",
+   "type": null,
+   "via_macro": null
+  },
+  {
+   "id": "app/templates/strategy/_layout_table.html::testid::0",
+   "kind": "testid",
+   "label": "div",
+   "line": null,
+   "mutating": false,
+   "rendered_on": [
+    "/strategy/<template_key>"
+   ],
+   "rendered_on_count": 1,
+   "target": {},
+   "template": "app/templates/strategy/_layout_table.html",
+   "testid": "strategy-grid-{{ framework_key }}",
+   "type": null,
+   "via_macro": null
+  },
+  {
+   "id": "app/templates/strategy/canvas.html::link::0",
+   "kind": "link",
+   "label": "item.name or item.point",
+   "line": null,
+   "mutating": false,
+   "rendered_on": [
+    "/strategy/<template_key>"
+   ],
+   "rendered_on_count": 1,
+   "target": {
+    "href": "item.detail_href"
+   },
+   "template": "app/templates/strategy/canvas.html",
+   "testid": "strategy-point-link",
+   "type": null,
+   "via_macro": null
+  },
+  {
+   "id": "app/templates/strategy/canvas.html::link::1",
+   "kind": "link",
+   "label": "citation.label",
+   "line": null,
+   "mutating": false,
+   "rendered_on": [
+    "/strategy/<template_key>"
+   ],
+   "rendered_on_count": 1,
+   "target": {
+    "href": "citation.href"
+   },
+   "template": "app/templates/strategy/canvas.html",
+   "testid": "strategy-citation-link",
+   "type": null,
+   "via_macro": null
+  },
+  {
+   "id": "app/templates/strategy/canvas.html::link::2",
+   "kind": "link",
+   "label": "",
+   "line": null,
+   "mutating": false,
+   "rendered_on": [
+    "/strategy/<template_key>"
+   ],
+   "rendered_on_count": 1,
+   "target": {},
+   "template": "app/templates/strategy/canvas.html",
+   "testid": "strategy-citation-link",
+   "type": null,
+   "via_macro": null
+  },
+  {
+   "id": "app/templates/strategy/canvas.html::button::0",
+   "kind": "button",
+   "label": "Accept",
+   "line": null,
+   "mutating": true,
+   "rendered_on": [
+    "/strategy/<template_key>"
+   ],
+   "rendered_on_count": 1,
+   "target": {
+    "button_type": "button"
+   },
+   "template": "app/templates/strategy/canvas.html",
+   "testid": "strategy-accept",
+   "type": "inline-render",
+   "via_macro": null
+  },
+  {
+   "id": "app/templates/strategy/canvas.html::button::1",
+   "kind": "button",
+   "label": "Reject",
+   "line": null,
+   "mutating": true,
+   "rendered_on": [
+    "/strategy/<template_key>"
+   ],
+   "rendered_on_count": 1,
+   "target": {
+    "button_type": "button"
+   },
+   "template": "app/templates/strategy/canvas.html",
+   "testid": "strategy-reject",
+   "type": "inline-render",
+   "via_macro": null
+  },
+  {
+   "id": "app/templates/strategy/canvas.html::button::2",
+   "kind": "button",
+   "label": "Draft from my model",
+   "line": null,
+   "mutating": false,
+   "rendered_on": [
+    "/strategy/<template_key>"
+   ],
+   "rendered_on_count": 1,
+   "target": {
+    "button_type": "button"
+   },
+   "template": "app/templates/strategy/canvas.html",
+   "testid": "strategy-draft-box-{{ zone.box_key }}",
+   "type": "inline-render",
+   "via_macro": null
+  },
+  {
+   "id": "app/templates/strategy/canvas.html::button::3",
+   "kind": "button",
+   "label": "Add",
+   "line": null,
+   "mutating": true,
+   "rendered_on": [
+    "/strategy/<template_key>"
+   ],
+   "rendered_on_count": 1,
+   "target": {
+    "button_type": "submit",
+    "form_method": "POST"
+   },
+   "template": "app/templates/strategy/canvas.html",
+   "testid": "strategy-add-submit-{{ zone.box_key }}",
+   "type": "noop",
+   "via_macro": null
+  },
+  {
+   "id": "app/templates/strategy/canvas.html::button::4",
+   "kind": "button",
+   "label": "Draft from my model",
+   "line": null,
+   "mutating": false,
+   "rendered_on": [
+    "/strategy/<template_key>"
+   ],
+   "rendered_on_count": 1,
+   "target": {
+    "button_type": "button"
+   },
+   "template": "app/templates/strategy/canvas.html",
+   "testid": "strategy-draft",
+   "type": "inline-render",
+   "via_macro": null
+  },
+  {
+   "id": "app/templates/strategy/canvas.html::form::0",
+   "kind": "form",
+   "label": "",
+   "line": null,
+   "mutating": true,
+   "rendered_on": [
+    "/strategy/<template_key>"
+   ],
+   "rendered_on_count": 1,
+   "target": {
+    "action": "url_for('strategy.add', template_key=framework_key)",
+    "endpoint": "strategy.add",
+    "fields": [
+     "box_key",
+     "element_type",
+     "name",
+     "offering_level",
+     "player"
+    ],
+    "method": "POST"
+   },
+   "template": "app/templates/strategy/canvas.html",
+   "testid": "strategy-add-form-{{ zone.box_key }}",
+   "type": null,
+   "via_macro": null
+  },
+  {
+   "id": "app/templates/strategy/canvas.html::testid::0",
+   "kind": "testid",
+   "label": "section",
+   "line": null,
+   "mutating": false,
+   "rendered_on": [
+    "/strategy/<template_key>"
+   ],
+   "rendered_on_count": 1,
+   "target": {},
+   "template": "app/templates/strategy/canvas.html",
+   "testid": "strategy-box-{{ zone.box_key }}",
+   "type": null,
+   "via_macro": null
+  },
+  {
+   "id": "app/templates/strategy/canvas.html::testid::1",
+   "kind": "testid",
+   "label": "span",
+   "line": null,
+   "mutating": false,
+   "rendered_on": [
+    "/strategy/<template_key>"
+   ],
+   "rendered_on_count": 1,
+   "target": {},
+   "template": "app/templates/strategy/canvas.html",
+   "testid": "strategy-box-count-{{ zone.box_key }}",
+   "type": null,
+   "via_macro": null
+  },
+  {
+   "id": "app/templates/strategy/canvas.html::testid::2",
+   "kind": "testid",
+   "label": "ul",
+   "line": null,
+   "mutating": false,
+   "rendered_on": [
+    "/strategy/<template_key>"
+   ],
+   "rendered_on_count": 1,
+   "target": {},
+   "template": "app/templates/strategy/canvas.html",
+   "testid": "strategy-filed-{{ zone.box_key }}",
+   "type": null,
+   "via_macro": null
+  },
+  {
+   "id": "app/templates/strategy/canvas.html::testid::3",
+   "kind": "testid",
+   "label": "li",
+   "line": null,
+   "mutating": false,
+   "rendered_on": [
+    "/strategy/<template_key>"
+   ],
+   "rendered_on_count": 1,
+   "target": {},
+   "template": "app/templates/strategy/canvas.html",
+   "testid": "strategy-point",
+   "type": null,
+   "via_macro": null
+  },
+  {
+   "id": "app/templates/strategy/canvas.html::testid::4",
+   "kind": "testid",
+   "label": "div",
+   "line": null,
+   "mutating": false,
+   "rendered_on": [
+    "/strategy/<template_key>"
+   ],
+   "rendered_on_count": 1,
+   "target": {},
+   "template": "app/templates/strategy/canvas.html",
+   "testid": "strategy-citations",
+   "type": null,
+   "via_macro": null
+  },
+  {
+   "id": "app/templates/strategy/canvas.html::testid::5",
+   "kind": "testid",
+   "label": "span",
+   "line": null,
+   "mutating": false,
+   "rendered_on": [
+    "/strategy/<template_key>"
+   ],
+   "rendered_on_count": 1,
+   "target": {},
+   "template": "app/templates/strategy/canvas.html",
+   "testid": "strategy-citation-text",
+   "type": null,
+   "via_macro": null
+  },
+  {
+   "id": "app/templates/strategy/canvas.html::testid::6",
+   "kind": "testid",
+   "label": "li",
+   "line": null,
+   "mutating": false,
+   "rendered_on": [
+    "/strategy/<template_key>"
+   ],
+   "rendered_on_count": 1,
+   "target": {},
+   "template": "app/templates/strategy/canvas.html",
+   "testid": "strategy-point",
+   "type": null,
+   "via_macro": null
+  },
+  {
+   "id": "app/templates/strategy/canvas.html::testid::7",
+   "kind": "testid",
+   "label": "div",
+   "line": null,
+   "mutating": false,
+   "rendered_on": [
+    "/strategy/<template_key>"
+   ],
+   "rendered_on_count": 1,
+   "target": {},
+   "template": "app/templates/strategy/canvas.html",
+   "testid": "strategy-citations",
+   "type": null,
+   "via_macro": null
+  },
+  {
+   "id": "app/templates/strategy/canvas.html::testid::8",
+   "kind": "testid",
+   "label": "span",
+   "line": null,
+   "mutating": false,
+   "rendered_on": [
+    "/strategy/<template_key>"
+   ],
+   "rendered_on_count": 1,
+   "target": {},
+   "template": "app/templates/strategy/canvas.html",
+   "testid": "strategy-citation-text",
+   "type": null,
+   "via_macro": null
+  },
+  {
+   "id": "app/templates/strategy/canvas.html::testid::9",
+   "kind": "testid",
+   "label": "ul",
+   "line": null,
+   "mutating": false,
+   "rendered_on": [
+    "/strategy/<template_key>"
+   ],
+   "rendered_on_count": 1,
+   "target": {},
+   "template": "app/templates/strategy/canvas.html",
+   "testid": "strategy-proposals-{{ zone.box_key }}",
+   "type": null,
+   "via_macro": null
+  },
+  {
+   "id": "app/templates/strategy/canvas.html::testid::10",
+   "kind": "testid",
+   "label": "li",
+   "line": null,
+   "mutating": false,
+   "rendered_on": [
+    "/strategy/<template_key>"
+   ],
+   "rendered_on_count": 1,
+   "target": {},
+   "template": "app/templates/strategy/canvas.html",
+   "testid": "strategy-proposal",
+   "type": null,
+   "via_macro": null
+  },
+  {
+   "id": "app/templates/strategy/canvas.html::testid::11",
+   "kind": "testid",
+   "label": "textarea",
+   "line": null,
+   "mutating": false,
+   "rendered_on": [
+    "/strategy/<template_key>"
+   ],
+   "rendered_on_count": 1,
+   "target": {},
+   "template": "app/templates/strategy/canvas.html",
+   "testid": "strategy-proposal-text",
+   "type": null,
+   "via_macro": null
+  },
+  {
+   "id": "app/templates/strategy/canvas.html::testid::12",
+   "kind": "testid",
+   "label": "span",
+   "line": null,
+   "mutating": false,
+   "rendered_on": [
+    "/strategy/<template_key>"
+   ],
+   "rendered_on_count": 1,
+   "target": {},
+   "template": "app/templates/strategy/canvas.html",
+   "testid": "strategy-proposal-citation",
+   "type": null,
+   "via_macro": null
+  },
+  {
+   "id": "app/templates/strategy/canvas.html::testid::13",
+   "kind": "testid",
+   "label": "p",
+   "line": null,
+   "mutating": false,
+   "rendered_on": [
+    "/strategy/<template_key>"
+   ],
+   "rendered_on_count": 1,
+   "target": {},
+   "template": "app/templates/strategy/canvas.html",
+   "testid": "strategy-proposal-error",
+   "type": null,
+   "via_macro": null
+  },
+  {
+   "id": "app/templates/strategy/canvas.html::testid::14",
+   "kind": "testid",
+   "label": "div",
+   "line": null,
+   "mutating": false,
+   "rendered_on": [
+    "/strategy/<template_key>"
+   ],
+   "rendered_on_count": 1,
+   "target": {},
+   "template": "app/templates/strategy/canvas.html",
+   "testid": "strategy-empty-{{ zone.box_key }}",
+   "type": null,
+   "via_macro": null
+  },
+  {
+   "id": "app/templates/strategy/canvas.html::testid::15",
+   "kind": "testid",
+   "label": "div",
+   "line": null,
+   "mutating": false,
+   "rendered_on": [
+    "/strategy/<template_key>"
+   ],
+   "rendered_on_count": 1,
+   "target": {},
+   "template": "app/templates/strategy/canvas.html",
+   "testid": "strategy-add-error",
+   "type": null,
+   "via_macro": null
+  },
+  {
+   "id": "app/templates/strategy/canvas.html::testid::16",
+   "kind": "testid",
+   "label": "span",
+   "line": null,
+   "mutating": false,
+   "rendered_on": [
+    "/strategy/<template_key>"
+   ],
+   "rendered_on_count": 1,
+   "target": {},
+   "template": "app/templates/strategy/canvas.html",
+   "testid": "strategy-draft-error",
+   "type": null,
+   "via_macro": null
+  },
+  {
+   "id": "app/templates/strategy/canvas.html::testid::17",
+   "kind": "testid",
+   "label": "span",
+   "line": null,
+   "mutating": false,
+   "rendered_on": [
+    "/strategy/<template_key>"
+   ],
+   "rendered_on_count": 1,
+   "target": {},
+   "template": "app/templates/strategy/canvas.html",
+   "testid": "strategy-unclassified",
+   "type": null,
+   "via_macro": null
+  },
+  {
+   "id": "app/templates/strategy/index.html::link::0",
+   "kind": "link",
+   "label": "Open {{ framework.name }}",
+   "line": null,
+   "mutating": false,
+   "rendered_on": [
+    "/strategy/"
+   ],
+   "rendered_on_count": 1,
+   "target": {
+    "href": "framework.href"
+   },
+   "template": "app/templates/strategy/index.html",
+   "testid": "strategy-open-{{ framework.key }}",
+   "type": null,
+   "via_macro": null
+  },
+  {
+   "id": "app/templates/strategy/index.html::testid::0",
+   "kind": "testid",
+   "label": "div",
+   "line": null,
+   "mutating": false,
+   "rendered_on": [
+    "/strategy/"
+   ],
+   "rendered_on_count": 1,
+   "target": {},
+   "template": "app/templates/strategy/index.html",
+   "testid": "strategy-framework-grid",
+   "type": null,
+   "via_macro": null
+  },
+  {
    "id": "app/templates/tech_radar/index.html::button::0",
    "kind": "button",
    "label": "Move",
@@ -101419,20 +102636,20 @@
   }
  ],
  "counts": {
-  "controls": 5538,
+  "controls": 5607,
   "controls_by_kind": {
-   "button": 3138,
-   "form": 248,
-   "link": 1012,
+   "button": 3151,
+   "form": 254,
+   "link": 1021,
    "modal": 193,
-   "table": 374,
-   "testid": 573
+   "table": 379,
+   "testid": 609
   },
-  "controls_mutating": 745,
-  "pages": 469,
-  "pages_without_parameters": 339,
-  "routes": 3784,
-  "templates": 689,
+  "controls_mutating": 759,
+  "pages": 473,
+  "pages_without_parameters": 342,
+  "routes": 3800,
+  "templates": 700,
   "templates_not_reached_by_a_route": 110
  },
  "routes": [
@@ -121983,6 +123200,63 @@
    ],
    "page": false,
    "rule": "/architecture/api/elements/<int:element_id>",
+   "template_unresolved": [],
+   "templates": [],
+   "templates_missing": []
+  },
+  {
+   "blueprint": "archimate_crud",
+   "closure": [],
+   "endpoint": "archimate_crud.api_element_profile",
+   "guards": [
+    "login_required"
+   ],
+   "has_parameters": true,
+   "id": "archimate_crud.api_element_profile /architecture/api/elements/<int:element_id>/profile",
+   "login_required": true,
+   "methods": [
+    "GET"
+   ],
+   "page": false,
+   "rule": "/architecture/api/elements/<int:element_id>/profile",
+   "template_unresolved": [],
+   "templates": [],
+   "templates_missing": []
+  },
+  {
+   "blueprint": "archimate_crud",
+   "closure": [],
+   "endpoint": "archimate_crud.api_element_set_kind",
+   "guards": [
+    "login_required"
+   ],
+   "has_parameters": true,
+   "id": "archimate_crud.api_element_set_kind /architecture/api/elements/<int:element_id>/profile",
+   "login_required": true,
+   "methods": [
+    "POST"
+   ],
+   "page": false,
+   "rule": "/architecture/api/elements/<int:element_id>/profile",
+   "template_unresolved": [],
+   "templates": [],
+   "templates_missing": []
+  },
+  {
+   "blueprint": "archimate_crud",
+   "closure": [],
+   "endpoint": "archimate_crud.api_element_set_wsjf",
+   "guards": [
+    "login_required"
+   ],
+   "has_parameters": true,
+   "id": "archimate_crud.api_element_set_wsjf /architecture/api/elements/<int:element_id>/profile/wsjf",
+   "login_required": true,
+   "methods": [
+    "POST"
+   ],
+   "page": false,
+   "rule": "/architecture/api/elements/<int:element_id>/profile/wsjf",
    "template_unresolved": [],
    "templates": [],
    "templates_missing": []
@@ -148879,6 +150153,203 @@
   {
    "blueprint": "m365_connector",
    "closure": [
+    "app/templates/admin/connectors/github.html",
+    "app/templates/components/_breadcrumb_root.html",
+    "app/templates/components/admin_header.html",
+    "app/templates/components/admin_sidebar.html",
+    "app/templates/components/alert.html",
+    "app/templates/components/drawer.html",
+    "app/templates/components/page_guide_drawer.html",
+    "app/templates/components/page_header.html",
+    "app/templates/components/sidebar_nav.html",
+    "app/templates/components/switch.html",
+    "app/templates/components/toast-container.html",
+    "app/templates/layouts/admin_base.html",
+    "app/templates/partials/_data_load_error.html",
+    "app/templates/partials/_head.html",
+    "app/templates/partials/_scripts_common.html"
+   ],
+   "endpoint": "m365_connector.github_connect",
+   "guards": [
+    "admin_required",
+    "login_required"
+   ],
+   "has_parameters": false,
+   "id": "m365_connector.github_connect /admin/connectors/github",
+   "login_required": true,
+   "methods": [
+    "GET"
+   ],
+   "page": true,
+   "rule": "/admin/connectors/github",
+   "template_unresolved": [],
+   "templates": [
+    "app/templates/admin/connectors/github.html"
+   ],
+   "templates_missing": []
+  },
+  {
+   "blueprint": "m365_connector",
+   "closure": [],
+   "endpoint": "m365_connector.github_connect_save",
+   "guards": [
+    "admin_required",
+    "login_required"
+   ],
+   "has_parameters": false,
+   "id": "m365_connector.github_connect_save /admin/connectors/github",
+   "login_required": true,
+   "methods": [
+    "POST"
+   ],
+   "page": false,
+   "rule": "/admin/connectors/github",
+   "template_unresolved": [],
+   "templates": [],
+   "templates_missing": []
+  },
+  {
+   "blueprint": "m365_connector",
+   "closure": [],
+   "endpoint": "m365_connector.github_resync",
+   "guards": [
+    "admin_required",
+    "login_required"
+   ],
+   "has_parameters": false,
+   "id": "m365_connector.github_resync /admin/connectors/github/sync",
+   "login_required": true,
+   "methods": [
+    "POST"
+   ],
+   "page": false,
+   "rule": "/admin/connectors/github/sync",
+   "template_unresolved": [],
+   "templates": [],
+   "templates_missing": []
+  },
+  {
+   "blueprint": "m365_connector",
+   "closure": [
+    "app/templates/admin/connectors/github_review.html",
+    "app/templates/components/_breadcrumb_root.html",
+    "app/templates/components/admin_header.html",
+    "app/templates/components/admin_sidebar.html",
+    "app/templates/components/alert.html",
+    "app/templates/components/dense_table.html",
+    "app/templates/components/drawer.html",
+    "app/templates/components/page_guide_drawer.html",
+    "app/templates/components/page_header.html",
+    "app/templates/components/sidebar_nav.html",
+    "app/templates/components/switch.html",
+    "app/templates/components/toast-container.html",
+    "app/templates/layouts/admin_base.html",
+    "app/templates/partials/_data_load_error.html",
+    "app/templates/partials/_head.html",
+    "app/templates/partials/_scripts_common.html"
+   ],
+   "endpoint": "m365_connector.github_review",
+   "guards": [
+    "admin_required",
+    "login_required"
+   ],
+   "has_parameters": false,
+   "id": "m365_connector.github_review /admin/connectors/github/review",
+   "login_required": true,
+   "methods": [
+    "GET"
+   ],
+   "page": true,
+   "rule": "/admin/connectors/github/review",
+   "template_unresolved": [],
+   "templates": [
+    "app/templates/admin/connectors/github_review.html"
+   ],
+   "templates_missing": []
+  },
+  {
+   "blueprint": "m365_connector",
+   "closure": [],
+   "endpoint": "m365_connector.github_review_approve_all",
+   "guards": [
+    "admin_required",
+    "login_required"
+   ],
+   "has_parameters": false,
+   "id": "m365_connector.github_review_approve_all /admin/connectors/github/review/approve-all",
+   "login_required": true,
+   "methods": [
+    "POST"
+   ],
+   "page": false,
+   "rule": "/admin/connectors/github/review/approve-all",
+   "template_unresolved": [],
+   "templates": [],
+   "templates_missing": []
+  },
+  {
+   "blueprint": "m365_connector",
+   "closure": [],
+   "endpoint": "m365_connector.github_review_classify",
+   "guards": [
+    "admin_required",
+    "login_required"
+   ],
+   "has_parameters": true,
+   "id": "m365_connector.github_review_classify /admin/connectors/github/review/<int:approval_id>/classify",
+   "login_required": true,
+   "methods": [
+    "POST"
+   ],
+   "page": false,
+   "rule": "/admin/connectors/github/review/<int:approval_id>/classify",
+   "template_unresolved": [],
+   "templates": [],
+   "templates_missing": []
+  },
+  {
+   "blueprint": "m365_connector",
+   "closure": [],
+   "endpoint": "m365_connector.github_review_skip",
+   "guards": [
+    "admin_required",
+    "login_required"
+   ],
+   "has_parameters": true,
+   "id": "m365_connector.github_review_skip /admin/connectors/github/review/<int:approval_id>/skip",
+   "login_required": true,
+   "methods": [
+    "POST"
+   ],
+   "page": false,
+   "rule": "/admin/connectors/github/review/<int:approval_id>/skip",
+   "template_unresolved": [],
+   "templates": [],
+   "templates_missing": []
+  },
+  {
+   "blueprint": "m365_connector",
+   "closure": [],
+   "endpoint": "m365_connector.github_status",
+   "guards": [
+    "admin_required",
+    "login_required"
+   ],
+   "has_parameters": false,
+   "id": "m365_connector.github_status /admin/connectors/github/status",
+   "login_required": true,
+   "methods": [
+    "GET"
+   ],
+   "page": false,
+   "rule": "/admin/connectors/github/status",
+   "template_unresolved": [],
+   "templates": [],
+   "templates_missing": []
+  },
+  {
+   "blueprint": "m365_connector",
+   "closure": [
     "app/templates/admin/connectors/jira.html",
     "app/templates/components/_breadcrumb_root.html",
     "app/templates/components/admin_header.html",
@@ -169796,6 +171267,146 @@
    "templates_missing": []
   },
   {
+   "blueprint": "strategy",
+   "closure": [],
+   "endpoint": "strategy.accept",
+   "guards": [
+    "login_required",
+    "require_roles"
+   ],
+   "has_parameters": true,
+   "id": "strategy.accept /strategy/<template_key>/accept",
+   "login_required": true,
+   "methods": [
+    "POST"
+   ],
+   "page": false,
+   "rule": "/strategy/<template_key>/accept",
+   "template_unresolved": [],
+   "templates": [],
+   "templates_missing": []
+  },
+  {
+   "blueprint": "strategy",
+   "closure": [],
+   "endpoint": "strategy.add",
+   "guards": [
+    "login_required",
+    "require_roles"
+   ],
+   "has_parameters": true,
+   "id": "strategy.add /strategy/<template_key>/add",
+   "login_required": true,
+   "methods": [
+    "POST"
+   ],
+   "page": false,
+   "rule": "/strategy/<template_key>/add",
+   "template_unresolved": [],
+   "templates": [],
+   "templates_missing": []
+  },
+  {
+   "blueprint": "strategy",
+   "closure": [
+    "app/templates/components/_breadcrumb_root.html",
+    "app/templates/components/admin_header.html",
+    "app/templates/components/admin_sidebar.html",
+    "app/templates/components/drawer.html",
+    "app/templates/components/page_guide_drawer.html",
+    "app/templates/components/page_header.html",
+    "app/templates/components/sidebar_nav.html",
+    "app/templates/components/switch.html",
+    "app/templates/components/toast-container.html",
+    "app/templates/layouts/admin_base.html",
+    "app/templates/partials/_data_load_error.html",
+    "app/templates/partials/_head.html",
+    "app/templates/partials/_scripts_common.html",
+    "app/templates/strategy/_layout_circles.html",
+    "app/templates/strategy/_layout_columns.html",
+    "app/templates/strategy/_layout_curve.html",
+    "app/templates/strategy/_layout_forces.html",
+    "app/templates/strategy/_layout_grid.html",
+    "app/templates/strategy/_layout_grid_2x2.html",
+    "app/templates/strategy/_layout_table.html",
+    "app/templates/strategy/canvas.html"
+   ],
+   "endpoint": "strategy.canvas",
+   "guards": [
+    "login_required"
+   ],
+   "has_parameters": true,
+   "id": "strategy.canvas /strategy/<template_key>",
+   "login_required": true,
+   "methods": [
+    "GET"
+   ],
+   "page": true,
+   "rule": "/strategy/<template_key>",
+   "template_unresolved": [],
+   "templates": [
+    "app/templates/strategy/canvas.html"
+   ],
+   "templates_missing": []
+  },
+  {
+   "blueprint": "strategy",
+   "closure": [],
+   "endpoint": "strategy.draft",
+   "guards": [
+    "login_required",
+    "require_roles"
+   ],
+   "has_parameters": true,
+   "id": "strategy.draft /strategy/<template_key>/draft",
+   "login_required": true,
+   "methods": [
+    "POST"
+   ],
+   "page": false,
+   "rule": "/strategy/<template_key>/draft",
+   "template_unresolved": [],
+   "templates": [],
+   "templates_missing": []
+  },
+  {
+   "blueprint": "strategy",
+   "closure": [
+    "app/templates/components/_breadcrumb_root.html",
+    "app/templates/components/admin_header.html",
+    "app/templates/components/admin_sidebar.html",
+    "app/templates/components/card.html",
+    "app/templates/components/drawer.html",
+    "app/templates/components/page_guide_drawer.html",
+    "app/templates/components/page_header.html",
+    "app/templates/components/sidebar_nav.html",
+    "app/templates/components/switch.html",
+    "app/templates/components/toast-container.html",
+    "app/templates/layouts/admin_base.html",
+    "app/templates/partials/_data_load_error.html",
+    "app/templates/partials/_head.html",
+    "app/templates/partials/_scripts_common.html",
+    "app/templates/strategy/index.html"
+   ],
+   "endpoint": "strategy.index",
+   "guards": [
+    "login_required"
+   ],
+   "has_parameters": false,
+   "id": "strategy.index /strategy/",
+   "login_required": true,
+   "methods": [
+    "GET"
+   ],
+   "page": true,
+   "rule": "/strategy/",
+   "template_unresolved": [],
+   "templates": [
+    "app/templates/strategy/index.html"
+   ],
+   "templates_missing": []
+  },
+  {
    "blueprint": "suggestions",
    "closure": [],
    "endpoint": "suggestions.accept_suggestion",
@@ -183730,6 +185341,35 @@
    "rendered_on_count": 1,
    "unresolved_refs": []
   },
+  "app/templates/admin/connectors/github.html": {
+   "extends": [
+    "app/templates/layouts/admin_base.html"
+   ],
+   "imports": [
+    "app/templates/components/alert.html",
+    "app/templates/components/page_header.html"
+   ],
+   "includes": [],
+   "name": "admin/connectors/github.html",
+   "parse_errors": [],
+   "rendered_on_count": 1,
+   "unresolved_refs": []
+  },
+  "app/templates/admin/connectors/github_review.html": {
+   "extends": [
+    "app/templates/layouts/admin_base.html"
+   ],
+   "imports": [
+    "app/templates/components/alert.html",
+    "app/templates/components/dense_table.html",
+    "app/templates/components/page_header.html"
+   ],
+   "includes": [],
+   "name": "admin/connectors/github_review.html",
+   "parse_errors": [],
+   "rendered_on_count": 1,
+   "unresolved_refs": []
+  },
   "app/templates/admin/connectors/index.html": {
    "extends": [
     "app/templates/layouts/admin_base.html"
@@ -186918,7 +188558,7 @@
    "includes": [],
    "name": "components/_breadcrumb_root.html",
    "parse_errors": [],
-   "rendered_on_count": 446,
+   "rendered_on_count": 450,
    "unresolved_refs": []
   },
   "app/templates/components/accessibility_helpers.html": {
@@ -186938,7 +188578,7 @@
    "includes": [],
    "name": "components/admin_header.html",
    "parse_errors": [],
-   "rendered_on_count": 450,
+   "rendered_on_count": 454,
    "unresolved_refs": []
   },
   "app/templates/components/admin_sidebar.html": {
@@ -186949,7 +188589,7 @@
    "includes": [],
    "name": "components/admin_sidebar.html",
    "parse_errors": [],
-   "rendered_on_count": 450,
+   "rendered_on_count": 454,
    "unresolved_refs": []
   },
   "app/templates/components/alert.html": {
@@ -186958,7 +188598,7 @@
    "includes": [],
    "name": "components/alert.html",
    "parse_errors": [],
-   "rendered_on_count": 3,
+   "rendered_on_count": 5,
    "unresolved_refs": []
   },
   "app/templates/components/answer_cascade.html": {
@@ -187101,7 +188741,7 @@
    "includes": [],
    "name": "components/card.html",
    "parse_errors": [],
-   "rendered_on_count": 67,
+   "rendered_on_count": 68,
    "unresolved_refs": []
   },
   "app/templates/components/checkbox.html": {
@@ -187146,7 +188786,7 @@
    "includes": [],
    "name": "components/dense_table.html",
    "parse_errors": [],
-   "rendered_on_count": 19,
+   "rendered_on_count": 20,
    "unresolved_refs": []
   },
   "app/templates/components/detail_meta.html": {
@@ -187182,7 +188822,7 @@
    "includes": [],
    "name": "components/drawer.html",
    "parse_errors": [],
-   "rendered_on_count": 450,
+   "rendered_on_count": 454,
    "unresolved_refs": []
   },
   "app/templates/components/dropdown_menu.html": {
@@ -187375,7 +189015,7 @@
    "includes": [],
    "name": "components/page_guide_drawer.html",
    "parse_errors": [],
-   "rendered_on_count": 450,
+   "rendered_on_count": 454,
    "unresolved_refs": []
   },
   "app/templates/components/page_header.html": {
@@ -187386,7 +189026,7 @@
    "includes": [],
    "name": "components/page_header.html",
    "parse_errors": [],
-   "rendered_on_count": 278,
+   "rendered_on_count": 282,
    "unresolved_refs": []
   },
   "app/templates/components/pagination_controls.html": {
@@ -187547,7 +189187,7 @@
    "includes": [],
    "name": "components/sidebar_nav.html",
    "parse_errors": [],
-   "rendered_on_count": 450,
+   "rendered_on_count": 454,
    "unresolved_refs": []
   },
   "app/templates/components/skeleton.html": {
@@ -187601,7 +189241,7 @@
    "includes": [],
    "name": "components/switch.html",
    "parse_errors": [],
-   "rendered_on_count": 450,
+   "rendered_on_count": 454,
    "unresolved_refs": []
   },
   "app/templates/components/table.html": {
@@ -187628,7 +189268,7 @@
    "includes": [],
    "name": "components/toast-container.html",
    "parse_errors": [],
-   "rendered_on_count": 467,
+   "rendered_on_count": 471,
    "unresolved_refs": []
   },
   "app/templates/components/traceability_panel.html": {
@@ -189197,7 +190837,7 @@
    ],
    "name": "layouts/admin_base.html",
    "parse_errors": [],
-   "rendered_on_count": 448,
+   "rendered_on_count": 452,
    "unresolved_refs": []
   },
   "app/templates/layouts/base.html": {
@@ -189534,7 +191174,7 @@
    "includes": [],
    "name": "partials/_data_load_error.html",
    "parse_errors": [],
-   "rendered_on_count": 448,
+   "rendered_on_count": 452,
    "unresolved_refs": []
   },
   "app/templates/partials/_filter_section.html": {
@@ -189570,7 +191210,7 @@
    "includes": [],
    "name": "partials/_head.html",
    "parse_errors": [],
-   "rendered_on_count": 467,
+   "rendered_on_count": 471,
    "unresolved_refs": []
   },
   "app/templates/partials/_head_common.html": {
@@ -189615,7 +191255,7 @@
    "includes": [],
    "name": "partials/_scripts_common.html",
    "parse_errors": [],
-   "rendered_on_count": 467,
+   "rendered_on_count": 471,
    "unresolved_refs": []
   },
   "app/templates/partials/_seo_meta.html": {
@@ -191170,6 +192810,104 @@
    "rendered_on_count": 1,
    "unresolved_refs": []
   },
+  "app/templates/strategy/_layout_circles.html": {
+   "extends": [],
+   "imports": [],
+   "includes": [],
+   "name": "strategy/_layout_circles.html",
+   "parse_errors": [],
+   "rendered_on_count": 1,
+   "unresolved_refs": []
+  },
+  "app/templates/strategy/_layout_columns.html": {
+   "extends": [],
+   "imports": [],
+   "includes": [],
+   "name": "strategy/_layout_columns.html",
+   "parse_errors": [],
+   "rendered_on_count": 1,
+   "unresolved_refs": []
+  },
+  "app/templates/strategy/_layout_curve.html": {
+   "extends": [],
+   "imports": [],
+   "includes": [],
+   "name": "strategy/_layout_curve.html",
+   "parse_errors": [],
+   "rendered_on_count": 1,
+   "unresolved_refs": []
+  },
+  "app/templates/strategy/_layout_forces.html": {
+   "extends": [],
+   "imports": [],
+   "includes": [],
+   "name": "strategy/_layout_forces.html",
+   "parse_errors": [],
+   "rendered_on_count": 1,
+   "unresolved_refs": []
+  },
+  "app/templates/strategy/_layout_grid.html": {
+   "extends": [],
+   "imports": [],
+   "includes": [],
+   "name": "strategy/_layout_grid.html",
+   "parse_errors": [],
+   "rendered_on_count": 1,
+   "unresolved_refs": []
+  },
+  "app/templates/strategy/_layout_grid_2x2.html": {
+   "extends": [],
+   "imports": [],
+   "includes": [],
+   "name": "strategy/_layout_grid_2x2.html",
+   "parse_errors": [],
+   "rendered_on_count": 1,
+   "unresolved_refs": []
+  },
+  "app/templates/strategy/_layout_table.html": {
+   "extends": [],
+   "imports": [],
+   "includes": [],
+   "name": "strategy/_layout_table.html",
+   "parse_errors": [],
+   "rendered_on_count": 1,
+   "unresolved_refs": []
+  },
+  "app/templates/strategy/canvas.html": {
+   "extends": [
+    "app/templates/layouts/admin_base.html"
+   ],
+   "imports": [
+    "app/templates/components/page_header.html"
+   ],
+   "includes": [
+    "app/templates/strategy/_layout_circles.html",
+    "app/templates/strategy/_layout_columns.html",
+    "app/templates/strategy/_layout_curve.html",
+    "app/templates/strategy/_layout_forces.html",
+    "app/templates/strategy/_layout_grid.html",
+    "app/templates/strategy/_layout_grid_2x2.html",
+    "app/templates/strategy/_layout_table.html"
+   ],
+   "name": "strategy/canvas.html",
+   "parse_errors": [],
+   "rendered_on_count": 1,
+   "unresolved_refs": []
+  },
+  "app/templates/strategy/index.html": {
+   "extends": [
+    "app/templates/layouts/admin_base.html"
+   ],
+   "imports": [
+    "app/templates/components/card.html",
+    "app/templates/components/page_header.html"
+   ],
+   "includes": [],
+   "name": "strategy/index.html",
+   "parse_errors": [],
+   "rendered_on_count": 1,
+   "unresolved_refs": []
+  },
   "app/templates/tech_radar/index.html": {
    "extends": [
     "app/templates/layouts/admin_base.html"
@@ -191467,5 +193205,5 @@
   "app/templates/solutions_strategic/partials/_issue_board.html",
   "app/templates/tools/gantt_demo.html"
  ],
- "templates_sha256": "f1747fcb21f0fbd57323a52949e8985dac09e690c295d2ef426a7189b1e98a5f"
+ "templates_sha256": "0a944ade9d53206d3551da7d251578fa95d7c33dab52fba3dddcc1f6b086e7ea"
 }

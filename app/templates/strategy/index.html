@@ -1,0 +1,43 @@
+{% extends 'layouts/admin_base.html' %}
+{% from 'components/page_header.html' import page_header %}
+{% import 'components/card.html' as card %}
+
+{% block title %}Strategy frameworks{% endblock %}
+
+{% block content %}
+<div class="flex-1 overflow-auto">
+  {{ page_header(
+      title='Strategy frameworks',
+      description='Open any framework in its recognisable shape, filled from your own model, each point cited to the record it came from.',
+      breadcrumbs=[
+          {'label': 'Home', 'href': url_for('main.index')},
+          {'label': 'Strategy frameworks'}
+      ]
+  ) }}
+
+  <div class="p-6">
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4" data-testid="strategy-framework-grid">
+      {% for framework in frameworks %}
+      {% call card.card() %}
+        {% call card.card_header() %}
+          {% call card.card_title(class='text-base flex items-center gap-2') %}
+            <i data-lucide="{{ framework.icon }}" class="h-4 w-4 text-muted-foreground" aria-hidden="true"></i>
+            {{ framework.name }}
+          {% endcall %}
+          {% call card.card_description() %}
+            {{ framework.purpose }}
+          {% endcall %}
+        {% endcall %}
+        {% call card.card_content() %}
+          <a href="{{ framework.href }}"
+             data-testid="strategy-open-{{ framework.key }}"
+             class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-medium transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring h-9 px-4">
+            Open {{ framework.name }}
+          </a>
+        {% endcall %}
+      {% endcall %}
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% endblock %}

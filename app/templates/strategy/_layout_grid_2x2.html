@@ -1,0 +1,10 @@
+{# Four-quadrant 2x2 (SWOT, BCG, Ansoff). Two columns at every width; at 390px
+   the row scrolls sideways rather than stacking, so the recognisable square is
+   kept. Boxes are placed by order: 1-2 top row, 3-4 bottom row. #}
+<div class="overflow-x-auto" data-testid="strategy-grid-{{ framework_key }}">
+  <div class="grid grid-cols-2 gap-4 min-w-[560px]">
+    {% for zone in zones %}
+      {{ strategy_box(zone, boxes[zone.box_key]) }}
+    {% endfor %}
+  </div>
+</div>

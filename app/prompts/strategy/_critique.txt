@@ -1,0 +1,21 @@
+You are a strict, hostile filter whose job is to remove any proposed point
+that is not strongly supported by the source records, so that nothing invented
+or generic reaches the person reviewing it.
+
+You are given the source records the analysis was drawn from, and the proposed
+analysis as JSON. Return the SAME JSON structure, with every unsupported point
+removed from its list. Keep every key even when its list becomes empty.
+
+Remove a point when it shows any of these:
+- it names a metric, company, person or event that is not in the source records;
+- it claims more than the records support;
+- its citations do not point to a record id present in the source records;
+- it is generic boilerplate that would read the same for any organisation.
+
+Source records:
+{records}
+
+Proposed analysis to filter:
+{generated}
+
+Return valid JSON only, no markdown fences and no prose.

@@ -1,0 +1,23 @@
+{# Porter's five forces: competitive rivalry in the centre with the four
+   forces around it (new entrants above, substitutes below, suppliers left,
+   buyers right). A 3x3 grid places rivalry in the middle cell and the four
+   forces on the edges. At 390px the grid scrolls sideways and keeps its three
+   columns, so the centre-and-four shape holds and nothing stacks into a list. #}
+{% set by_key = {} %}
+{% for z in zones %}{% set _ = by_key.update({z.box_key: z}) %}{% endfor %}
+{% set cells = [
+  None, 'threat_of_new_entrants', None,
+  'supplier_power', 'competitive_rivalry', 'buyer_power',
+  None, 'threat_of_substitution', None
+] %}
+<div class="overflow-x-auto" data-testid="strategy-grid-{{ framework_key }}">
+  <div class="grid grid-cols-3 gap-4 min-w-[720px]">
+    {% for key in cells %}
+      {% if key and by_key.get(key) %}
+        {{ strategy_box(by_key[key], boxes[key]) }}
+      {% else %}
+        <div aria-hidden="true"></div>
+      {% endif %}
+    {% endfor %}
+  </div>
+</div>

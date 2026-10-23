@@ -1,0 +1,11 @@
+{# VRIO as a table: one column per question across the four tests and the
+   competitive implication they add up to. At 390px the table scrolls
+   sideways and keeps its columns; it never stacks into one list. Each column
+   is one box, so a resource recorded under a question reads down that column. #}
+<div class="overflow-x-auto" data-testid="strategy-grid-{{ framework_key }}" role="table" aria-label="{{ framework_name }}">
+  <div class="grid grid-flow-col auto-cols-[minmax(220px,1fr)] gap-4 min-w-[1140px]">
+    {% for zone in zones %}
+      {{ strategy_box(zone, boxes[zone.box_key]) }}
+    {% endfor %}
+  </div>
+</div>

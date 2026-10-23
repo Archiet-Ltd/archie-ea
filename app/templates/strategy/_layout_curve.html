@@ -1,0 +1,39 @@
+{# Blue Ocean: the value curve (a line per player across the competing
+   factors, drawn with the shared Chart.js component) above the competing
+   factors box and the four-action grid (Eliminate, Reduce, Raise, Create).
+   The four-action grid keeps two columns at 390px and never stacks into one
+   list; the curve says so when no level is recorded rather than drawing an
+   empty axis. #}
+{% set by_key = {} %}
+{% for z in zones %}{% set _ = by_key.update({z.box_key: z}) %}{% endfor %}
+{% set curve_points = boxes.get('value_curve', []) %}
+{% set has_level = curve_points | selectattr('offering_level', 'ne', None) | list | length > 0 %}
+
+<div class="space-y-4" data-testid="strategy-grid-{{ framework_key }}">
+  {# The value curve. #}
+  <section class="rounded-lg border {{ LAYER_BORDER.get(by_key['value_curve'].colour, 'border-border') }} bg-card p-4"
+           data-testid="strategy-box-value_curve">
+    <h2 class="text-sm font-semibold text-foreground mb-3">{{ by_key['value_curve'].label }}</h2>
+    {% if has_level %}
+    <div class="relative h-64">
+      <canvas id="blue-ocean-value-curve" data-testid="strategy-value-curve"
+              aria-label="Value curve: offering level by competing factor"></canvas>
+    </div>
+    <script type="application/json" id="blue-ocean-value-curve-data">{{ curve_points | tojson }}</script>
+    {% else %}
+    <p class="text-sm text-muted-foreground" data-testid="strategy-value-curve-empty">
+      No offering level is recorded yet. Add a competing factor below with a 0-10 level for each player to draw the curve.
+    </p>
+    {% endif %}
+  </section>
+
+  {# Competing factors — the box a factor (with its player and level) is added to. #}
+  {{ strategy_box(by_key['competing_factors'], boxes['competing_factors']) }}
+
+  {# The four actions, two columns at every width (kept at 390px). #}
+  <div class="grid grid-cols-2 gap-4" data-testid="strategy-four-actions">
+    {% for key in ['eliminate', 'reduce', 'raise', 'create'] %}
+      {{ strategy_box(by_key[key], boxes[key]) }}
+    {% endfor %}
+  </div>
+</div>

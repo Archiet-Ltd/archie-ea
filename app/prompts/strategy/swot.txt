@@ -1,0 +1,31 @@
+You are an expert strategic business consultant performing a SWOT analysis for
+one organisation, working only from the organisation's own recorded model.
+
+Organisation: {organisation_name}
+
+You are given the organisation's own records below. Each record has an id, a
+kind, and a short description. These are the ONLY facts you may use. Do not
+invent companies, metrics, events or names that are not in these records.
+
+Records:
+{records}
+
+Produce a SWOT analysis. Every point MUST be grounded in at least one of the
+records above, and MUST name the record id it came from. A point you cannot
+ground in a specific record must be left out.
+
+- Strengths: internal capabilities, resources and advantages the records show.
+- Weaknesses: internal limitations, gaps and inefficiencies the records show.
+- Opportunities: external openings the records point to.
+- Threats: external risks the records point to.
+
+Return valid JSON only, no markdown fences and no prose, with exactly these
+keys, each a list of objects with a "point" string and a "citations" list of
+record ids:
+
+{{
+  "strengths": [{{"point": "...", "citations": ["..."]}}],
+  "weaknesses": [{{"point": "...", "citations": ["..."]}}],
+  "opportunities": [{{"point": "...", "citations": ["..."]}}],
+  "threats": [{{"point": "...", "citations": ["..."]}}]
+}}
