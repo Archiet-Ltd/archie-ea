@@ -697,6 +697,24 @@ def overview():
                 }
             )
 
+    # Once a model exists, offer three questions written from the
+    # organisation's own services, each linking to the Ask page, so the first
+    # thing a person does with a model is ask one and get a cited answer. Read
+    # at request time from the model elements; nothing is stored. Only when the
+    # workspace holds elements -- an empty workspace is a setup journey, and
+    # the guided steps above lead that instead.
+    ask_suggestions = None
+    if element_count > 0:
+        try:
+            from app.modules.intelligence.services.suggested_questions import (
+                suggested_questions,
+            )
+
+            suggestion_result = suggested_questions(g.current_org_id)
+            ask_suggestions = suggestion_result.get("questions") or None
+        except Exception as _sq_exc:  # noqa: BLE001 — the suggestions are advisory
+            logger.debug("suggested questions unavailable: %s", _sq_exc)
+
     # PROG-019: AI-governance alerts — cheap read of the latest EA briefing only
     # (never re-runs the expensive stewardship review on a dashboard load).
     governance_alerts = None
@@ -735,6 +753,7 @@ def overview():
         governance_alerts=governance_alerts,
         dashboard_mode=dashboard_mode,
         guided_steps=guided_steps,
+        ask_suggestions=ask_suggestions,
         capability_mapping_count=capability_mapping_count,
     )
 

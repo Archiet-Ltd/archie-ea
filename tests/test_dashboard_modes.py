@@ -507,3 +507,114 @@ def test_welcome_banner_dismiss_persists_server_side(app, db_session, make_org):
     assert second.status_code == 200
     second_html = second.get_data(as_text=True)
     assert 'data-testid="welcome-banner"' not in second_html
+
+
+def test_dashboard_offers_three_questions_once_a_model_exists(app, db_session, make_org):
+    """Once an organisation has a model with dependency links, the dashboard
+    offers three questions named after its own services, each linking to the
+    Ask page, so the first thing a person can do is ask one and get an answer.
+    """
+    from app.models.archimate_core import ArchiMateElement, ArchiMateRelationship
+
+    user, org = _make_user(db_session, make_org, "ask-step", enterprise_role="solution_architect", admin=False)
+
+    from flask import g
+
+    g.current_org_id = org.id
+
+    payments = ArchiMateElement(
+        name="Dash Payments Service", type="ApplicationComponent", layer="application",
+        organization_id=org.id,
+    )
+    billing = ArchiMateElement(
+        name="Dash Billing Api", type="ApplicationComponent", layer="application",
+        organization_id=org.id,
+    )
+    portal = ArchiMateElement(
+        name="Dash Customer Portal", type="ApplicationComponent", layer="application",
+        organization_id=org.id,
+    )
+    db_session.add_all([payments, billing, portal])
+    db_session.flush()
+    db_session.add_all([
+        ArchiMateRelationship(source_id=payments.id, target_id=billing.id, type="Serving", organization_id=org.id),
+        ArchiMateRelationship(source_id=payments.id, target_id=portal.id, type="Serving", organization_id=org.id),
+    ])
+    db_session.flush()
+
+    client = app.test_client()
+    _login(client, user.id)
+
+    resp = client.get("/dashboard/overview")
+    assert resp.status_code == 200, resp.get_data(as_text=True)[:2000]
+    html = resp.get_data(as_text=True)
+
+    # The section is present and names the organisation's own service.
+    assert 'data-testid="ask-suggestions"' in html
+    assert "What breaks if Dash Payments Service fails?" in html
+    # Each question links to the Ask page centred on a real element.
+    assert ("element=%s" % payments.id) in html
+    assert "/intelligence/ask?question=impact&amp;element=%s" % payments.id in html
+
+
+def test_dashboard_offers_no_questions_before_a_model_exists(app, db_session, make_org):
+    """An empty workspace is a setup journey, not a place to ask questions yet:
+    the three-questions section is absent until a model exists."""
+    user, _org = _make_user(db_session, make_org, "ask-step-empty")
+
+    client = app.test_client()
+    _login(client, user.id)
+
+    resp = client.get("/dashboard/overview")
+    assert resp.status_code == 200
+    html = resp.get_data(as_text=True)
+    assert 'data-testid="guided-setup"' in html
+    assert 'data-testid="ask-suggestions"' not in html
+
+
+def test_dashboard_never_shows_another_organisations_service_names(app, db_session, make_org):
+    """The questions on one organisation's dashboard never name another
+    organisation's services."""
+    from app.models.archimate_core import ArchiMateElement, ArchiMateRelationship
+
+    user_a, org_a = _make_user(db_session, make_org, "ask-iso-a", enterprise_role="solution_architect", admin=False)
+    _user_b, org_b = _make_user(db_session, make_org, "ask-iso-b", enterprise_role="solution_architect", admin=False)
+
+    from flask import g
+
+    g.current_org_id = org_b.id
+    b_svc = ArchiMateElement(
+        name="Hidden Bravo Service", type="ApplicationComponent", layer="application",
+        organization_id=org_b.id,
+    )
+    b_dep = ArchiMateElement(
+        name="Hidden Bravo Ledger", type="ApplicationComponent", layer="application",
+        organization_id=org_b.id,
+    )
+    db_session.add_all([b_svc, b_dep])
+    db_session.flush()
+    db_session.add(ArchiMateRelationship(source_id=b_svc.id, target_id=b_dep.id, type="Serving", organization_id=org_b.id))
+    db_session.flush()
+
+    g.current_org_id = org_a.id
+    a_svc = ArchiMateElement(
+        name="Alpha Only Service", type="ApplicationComponent", layer="application",
+        organization_id=org_a.id,
+    )
+    a_dep = ArchiMateElement(
+        name="Alpha Only Ledger", type="ApplicationComponent", layer="application",
+        organization_id=org_a.id,
+    )
+    db_session.add_all([a_svc, a_dep])
+    db_session.flush()
+    db_session.add(ArchiMateRelationship(source_id=a_svc.id, target_id=a_dep.id, type="Serving", organization_id=org_a.id))
+    db_session.flush()
+
+    client = app.test_client()
+    _login(client, user_a.id)
+
+    resp = client.get("/dashboard/overview")
+    assert resp.status_code == 200
+    html = resp.get_data(as_text=True)
+    assert "Alpha Only Service" in html
+    assert "Hidden Bravo" not in html

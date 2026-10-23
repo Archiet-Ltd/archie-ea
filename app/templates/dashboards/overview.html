@@ -138,6 +138,31 @@
         {% endfor %}
     </section>
 
+    {# The first thing to do with a model: ask one of three questions written
+       from this organisation's own services. Each opens the Ask page on that
+       service and answers straight away. Shown only when the generator found
+       real services to name; never an empty list of invented names. #}
+    {% if ask_suggestions %}
+    {% call section_card(title="Ask a question about your model") %}
+    <div class="space-y-3" data-testid="ask-suggestions">
+        <p class="text-sm text-muted-foreground max-w-[60ch]">
+            These are written from your own services. Pick one to see the answer, with its sources.
+        </p>
+        <ul class="space-y-2">
+            {% for question in ask_suggestions %}
+            <li>
+                <a href="{{ question.href }}"
+                   class="flex items-center justify-between gap-3 rounded-lg border border-border p-4 transition-colors hover:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                    <span class="min-w-0 text-sm font-medium text-foreground">{{ question.text }}</span>
+                    <i data-lucide="arrow-right" class="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true"></i>
+                </a>
+            </li>
+            {% endfor %}
+        </ul>
+    </div>
+    {% endcall %}
+    {% endif %}
+
     {# Lenses: a 32px segmented control on the tokens. Overview, CTO and CFO are
        the executive summaries; the six ArchiMate 3.2 layers each open their own
        panel below. #}
