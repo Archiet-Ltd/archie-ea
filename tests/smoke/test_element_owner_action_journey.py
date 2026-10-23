@@ -1,0 +1,206 @@
+"""Journey, in a browser: every page that can show an owner offers the same
+next step when there is none, and the external-identifiers help names only a
+connector the organisation can actually use today.
+
+A person opens a capability and an application that have no owner. Each says
+"No owner recorded" and offers "Assign owner". They take the step on the
+application page with its search picker; the owner they chose then shows by
+name on both the application page and that application's element page, which
+read the same owner record. An owner assigned in one organisation never shows
+in another. The external-identifiers help names GitHub only once a GitHub
+connector is live for the organisation, and otherwise names no connector and
+points at the Connectors page.
+"""
+
+import uuid
+
+import pytest
+
+from .conftest import PAGE_TIMEOUT
+from . import fresh_org
+
+pytestmark = [pytest.mark.smoke, pytest.mark.journey]
+
+ASSIGNER = "business_architect"
+OWNER = "application_manager"
+
+
+def _seed_elements(org_id):
+    """Create, through the ORM, a capability and an application with no owner."""
+    from app import create_app, db
+    from app.models.application_portfolio import ApplicationComponent
+    from app.models.business_capabilities import BusinessCapability
+
+    app = create_app("testing")
+    suffix = uuid.uuid4().hex[:6]
+    with app.app_context():
+        capability = BusinessCapability(
+            name="Owner action capability %s" % suffix,
+            organization_id=org_id,
+            level=1,
+            category="Operations",
+        )
+        component = ApplicationComponent(
+            name="Owner action application %s" % suffix,
+            organization_id=org_id,
+            lifecycle_status="operational",
+            description="Owner-action fixture.",
+        )
+        db.session.add_all([capability, component])
+        db.session.commit()
+        ids = {
+            "capability_id": capability.id,
+            "application_id": component.id,
+            "capability_name": capability.name,
+            "application_name": component.name,
+        }
+        db.session.remove()
+    return ids
+
+
+def _capability_url(base, ids):
+    return "%s/architecture/strategy/Capability/%d" % (base, ids["capability_id"])
+
+
+def _application_url(base, ids):
+    return "%s/applications/%d" % (base, ids["application_id"])
+
+
+def _application_element_url(base, ids):
+    return "%s/architecture/application/ApplicationComponent/%d" % (
+        base, ids["application_id"],
+    )
+
+
+def _owner_name(org):
+    """The name the picker shows for the other person in an organisation."""
+    from app import create_app, db
+    from app.models.user import User
+
+    app = create_app("testing")
+    with app.app_context():
+        user = db.session.get(User, org["user_ids"][OWNER])
+        name = user.full_name()
+        db.session.remove()
+    return name
+
+
+@pytest.fixture
+def two_orgs():
+    """Two isolated organisations, each with a person who can assign and a
+    person to be assigned as owner, plus an un-owned capability and
+    application in each."""
+    org_a = fresh_org.create_fresh_org(ASSIGNER, org_admin=True, extra_roles=(OWNER,))
+    org_b = fresh_org.create_fresh_org(ASSIGNER, org_admin=True, extra_roles=(OWNER,))
+    org_a["elements"] = _seed_elements(org_a["org_id"])
+    org_b["elements"] = _seed_elements(org_b["org_id"])
+    return org_a, org_b
+
+
+def test_assign_owner_action_shows_on_application_and_element_pages(page, live_server, two_orgs):
+    org_a, org_b = two_orgs
+    ids_a = org_a["elements"]
+    owner_name = _owner_name(org_a)
+    assert owner_name and owner_name != "—", "the person to assign has a shown name"
+
+    fresh_org.sign_in(page, live_server, org_a["emails"][ASSIGNER])
+
+    # The capability page states the gap and offers the step.
+    page.goto(_capability_url(live_server, ids_a), wait_until="networkidle",
+              timeout=PAGE_TIMEOUT)
+    owner_cell = page.locator("[data-testid='element-owner']")
+    assert "No owner recorded" in owner_cell.inner_text()
+    assert owner_cell.locator("a", has_text="Assign owner").count() == 1
+
+    # The application page states the same gap and offers the same step.
+    page.goto(_application_url(live_server, ids_a), wait_until="networkidle",
+              timeout=PAGE_TIMEOUT)
+    assert "No owner recorded" in page.inner_text("main")
+    assign = page.locator("[data-owner-picker] [data-owner-search]")
+    assert assign.count() == 1, "the application page has no owner picker"
+
+    # Take the step: search, pick the person, save. The POST records the owner.
+    # The search matches a name part against each name field, so search the
+    # distinctive surname rather than the full name (every person here shares
+    # the same forename).
+    assign.fill(owner_name.split()[-1])
+    result = page.locator(
+        "[data-owner-picker] [data-owner-results] button", has_text=owner_name
+    ).first
+    result.wait_for(timeout=PAGE_TIMEOUT)
+    result.click()
+    with page.expect_response(
+        lambda r: r.request.method == "POST" and "/owners" in r.url
+    ) as saved:
+        page.locator("[data-owner-picker] [data-owner-save]").click()
+    assert saved.value.status == 201
+
+    # The owner now shows by name on the application page.
+    page.goto(_application_url(live_server, ids_a), wait_until="networkidle",
+              timeout=PAGE_TIMEOUT)
+    assert owner_name in page.inner_text("main"), (
+        "the application page does not show the assigned owner by name"
+    )
+
+    # The same owner record shows by name on the application's element page.
+    page.goto(_application_element_url(live_server, ids_a), wait_until="networkidle",
+              timeout=PAGE_TIMEOUT)
+    assert owner_name in page.locator("[data-testid='element-owner']").inner_text(), (
+        "the element page does not show the assigned owner by name"
+    )
+
+    # Isolation: the other organisation never shows this owner.
+    page.goto(live_server + "/account/logout", wait_until="networkidle",
+              timeout=PAGE_TIMEOUT)
+    fresh_org.sign_in(page, live_server, org_b["emails"][ASSIGNER])
+    page.goto(_application_url(live_server, org_b["elements"]), wait_until="networkidle",
+              timeout=PAGE_TIMEOUT)
+    assert owner_name not in page.inner_text("main"), (
+        "an owner from the other organisation leaked onto this one's application page"
+    )
+    assert "No owner recorded" in page.inner_text("main")
+
+
+def _seed_github_connector(org_id):
+    """Record a live GitHub connector for the organisation."""
+    from app import create_app, db
+    from app.models.connector_config import ConnectorConfig, ConnectorStatus
+
+    app = create_app("testing")
+    with app.app_context():
+        db.session.add(ConnectorConfig(
+            organization_id=org_id,
+            connector_type="github",
+            name="GitHub",
+            config={},
+            status=ConnectorStatus.ACTIVE.value,
+        ))
+        db.session.commit()
+        db.session.remove()
+
+
+def test_external_identifiers_help_names_only_live_connectors(page, live_server, two_orgs):
+    org_a, org_b = two_orgs
+
+    fresh_org.sign_in(page, live_server, org_a["emails"][ASSIGNER])
+
+    # Deliberately empty: no external links and no live connector. The help
+    # names no connector and links to the Connectors page.
+    page.goto(_application_element_url(live_server, org_a["elements"]),
+              wait_until="networkidle", timeout=PAGE_TIMEOUT)
+    help_block = page.locator("[data-testid='external-identifiers']")
+    help_text = help_block.inner_text()
+    assert "GitHub" not in help_text, "named a connector that is not live"
+    assert "Jira" not in help_text, "named a connector that is not live"
+    assert help_block.locator("a", has_text="Connectors").count() == 1, (
+        "no link to the Connectors page when nothing is live"
+    )
+
+    # With a GitHub connector live for this organisation, the help names GitHub
+    # and never Jira.
+    _seed_github_connector(org_a["org_id"])
+    page.goto(_application_element_url(live_server, org_a["elements"]),
+              wait_until="networkidle", timeout=PAGE_TIMEOUT)
+    help_text = page.locator("[data-testid='external-identifiers']").inner_text()
+    assert "GitHub" in help_text, "did not name GitHub once it is live"
+    assert "Jira" not in help_text, "named Jira, which is not live"
