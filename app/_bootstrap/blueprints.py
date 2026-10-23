@@ -2362,13 +2362,14 @@ def _register_safe_portfolio(app):
 
     Routes:
     - GET   /safe/portfolio - Kanban board view
-    - GET   /safe/portfolio/api - JSON API
-    - PATCH /safe/portfolio/api/<id> - Move state / edit WSJF
+    - GET   /api/safe/portfolio - JSON API
+    - PATCH /api/safe/portfolio/<id> - Move state / edit WSJF
     """
     try:
-        from app.modules.safe_portfolio import safe_portfolio_bp
+        from app.modules.safe_portfolio import safe_portfolio_bp, safe_portfolio_api_bp
 
         app.register_blueprint(safe_portfolio_bp)
-        app.logger.info("[BLUEPRINT] SAFe Portfolio Kanban registered at /safe/portfolio")
+        app.register_blueprint(safe_portfolio_api_bp)
+        app.logger.info("[BLUEPRINT] SAFe Portfolio Kanban registered at /safe/portfolio and /api/safe/portfolio")
     except Exception as e:
         app.logger.warning(f"[BLUEPRINT] SAFe Portfolio Kanban registration failed: {e}")

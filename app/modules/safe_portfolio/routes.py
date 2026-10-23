@@ -9,12 +9,11 @@ from flask_login import current_user, login_required
 from app import db
 from app.middleware.tenant_context import current_org_id
 from app.models.archimate_core import ArchiMateElement
-from app.services.element_profile_service import read_profile, _read_property_value, _write_property
+from app.services.element_profile_service import read_profile, set_wsjf_component, get_kind_property, set_kind_property
 from app.services.wsjf_service import compute_wsjf_score
-
 from app.services.profiles.safe import KINDS
 
-from . import safe_portfolio_bp
+from . import safe_portfolio_bp, safe_portfolio_api_bp
 
 logger = logging.getLogger(__name__)
 
@@ -61,7 +60,7 @@ def _get_epics() -> List[Dict]:
             continue
 
         # Read kanban state from acm_properties
-        kanban_state = _read_property_value(element, "kanban_state") or "Funnel"
+        kanban_state = get_kind_property(element, "kanban_state") or "Funnel"
 
         # Get WSJF components
         props = profile.get("properties", {})
@@ -126,7 +125,7 @@ def index():
     )
 
 
-@safe_portfolio_bp.route("/api")
+@safe_portfolio_api_bp.route("")
 @login_required
 def api_list():
     """JSON API for portfolio epics."""
@@ -142,7 +141,7 @@ def api_list():
     )
 
 
-@safe_portfolio_bp.route("/api/<int:element_id>", methods=["PATCH"])
+@safe_portfolio_api_bp.route("/<int:element_id>", methods=["PATCH"])
 @login_required
 def api_update(element_id: int):
     """Update an epic's kanban state or WSJF components."""
@@ -176,11 +175,9 @@ def api_update(element_id: int):
         new_state = data["kanban_state"]
         if new_state not in KANBAN_STATES:
             return jsonify({"error": "Invalid kanban state"}), 400
-        _write_property(element, "kanban_state", new_state, source="user")
+        set_kind_property(element, "kanban_state", new_state, source="user")
 
     # Update WSJF components
-    from app.services.element_profile_service import set_wsjf_component
-
     if "business_value" in data:
         set_wsjf_component(element, "business_value", data["business_value"])
     if "time_criticality" in data:
@@ -194,7 +191,7 @@ def api_update(element_id: int):
 
     # Return updated profile
     updated_profile = read_profile(element)
-    kanban_state = _read_property_value(element, "kanban_state") or "Funnel"
+    kanban_state = get_kind_property(element, "kanban_state") or "Funnel"
 
     props = updated_profile.get("properties", {})
     bv = props.get("business_value", {}).get("value", 1) or 1

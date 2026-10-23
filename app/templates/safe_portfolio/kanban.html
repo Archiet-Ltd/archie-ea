@@ -37,7 +37,7 @@
 
                 <div class="space-y-3">
                     <template x-for="epic in columns['{{ state }}']" :key="epic.id">
-                        <div class="bg-card border border-border rounded-lg p-3 hover:shadow-sm transition-shadow">
+                        <div class="bg-card border border-border rounded-lg p-3 hover:bg-accent transition-colors">
                             <div class="flex items-start justify-between mb-2">
                                 <h3 class="text-sm font-medium text-foreground flex-1" x-text="epic.name"></h3>
                                 <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-primary/10 text-primary ml-2"
@@ -183,7 +183,7 @@ function kanbanBoard() {
             this.moving = epicId;
 
             try {
-                const response = await fetch(`/safe/portfolio/api/${epicId}`, {
+                const response = await fetch(`/api/safe/portfolio/${epicId}`, {
                     method: 'PATCH',
                     headers: {
                         'Content-Type': 'application/json',
