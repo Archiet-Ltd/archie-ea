@@ -111,12 +111,34 @@ def _seed_services_without_links(org_id, noun):
 
 
 def _shoot(page, name):
+    """Keep the screen at the two widths people use, in light and in dark, for
+    the person who reviews the walk. Screenshots only, no assertions."""
     if not SHOTS:
         return
     os.makedirs(SHOTS, exist_ok=True)
-    for width, height in ((1440, 900), (390, 844)):
-        page.set_viewport_size({"width": width, "height": height})
-        page.screenshot(path=os.path.join(SHOTS, "%s-%d.png" % (name, width)), full_page=True)
+    for mode in ("light", "dark"):
+        page.evaluate(
+            "(mode) => {"
+            " localStorage.setItem('theme', mode);"
+            " const root = document.documentElement;"
+            " if (mode === 'dark') { root.classList.add('dark'); } else { root.classList.remove('dark'); }"
+            " if (window.Alpine && Alpine.store && Alpine.store('theme')) {"
+            "   try { Alpine.store('theme').current = mode; } catch (e) {}"
+            " }"
+            "}",
+            mode,
+        )
+        page.wait_for_timeout(200)
+        for width, height in ((1440, 900), (390, 844)):
+            page.set_viewport_size({"width": width, "height": height})
+            page.screenshot(
+                path=os.path.join(SHOTS, "%s-%s-%d.png" % (name, mode, width)),
+                full_page=True,
+            )
+    page.evaluate(
+        "() => { localStorage.setItem('theme', 'light');"
+        " document.documentElement.classList.remove('dark'); }"
+    )
     page.set_viewport_size({"width": 1440, "height": 900})
 
 
@@ -151,6 +173,9 @@ def test_onboarding_first_question_journey(live_server, browser):
         _shoot(page, "1-dashboard-questions")
 
         # ── Clicking the first answers it: the dependents are named.
+        import time as _time
+
+        started = _time.monotonic()
         first.click()
         page.wait_for_url("**/intelligence/ask**", timeout=PAGE_TIMEOUT)
         page.wait_for_function(
@@ -160,6 +185,9 @@ def test_onboarding_first_question_journey(live_server, browser):
         expect(heading).to_contain_text("%s Payments Service" % noun, timeout=PAGE_TIMEOUT)
         rows = page.locator("[data-ask-row]")
         expect(rows.first).to_be_visible(timeout=PAGE_TIMEOUT)
+        # From the model being ready (the questions on the dashboard) to the
+        # answer on screen; the walk notes this against the 1:30 budget.
+        print("[walk] model ready to answer on screen: %.1fs" % (_time.monotonic() - started))
         for name in ("Billing Api", "Customer Portal"):
             expect(rows.filter(has_text="%s %s" % (noun, name)).first).to_be_visible()
         # The service never cites itself as its own dependent.
