@@ -1385,7 +1385,10 @@ def save_chat_session():
             return jsonify({"error": "No JSON data received"}), 400
 
         chat_service = get_chat_service()
-        result = chat_service.save_session(current_user.id, data)
+        session_name = data.get("session_name", "")
+        messages = data.get("messages", [])
+        context = data.get("context", {})
+        result = chat_service.save_session(session_name, messages, context)
 
         return jsonify(
             {
