@@ -131,7 +131,8 @@ def _bin_pack(weights: dict[str, int], total: int) -> dict[str, int]:
         fullest = max(range(total), key=lambda i: loads[i])
         donor = min((p for p, s in assignment.items() if s == fullest), key=lambda p: weights[p])
         assignment[donor] = empty
-        loads[fullest] -= weights[donor]; loads[empty] += weights[donor]
+        loads[fullest] -= weights[donor]
+        loads[empty] += weights[donor]
     return assignment
 
 
