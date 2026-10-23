@@ -192,6 +192,44 @@ def test_twin_map_hands_a_whole_number_element_to_the_page(
     assert 'data-initial-element="42"' in html
 
 
+def test_ask_hands_a_whole_number_element_and_question_to_the_page(
+    app, db_session, make_org, client, login_as
+):
+    """A link (the connect page's "ask here instead") opens Ask on a chosen
+    question for a chosen element, so it lands with the question filled."""
+    org = make_org("ui-ask-handoff")
+    user = _user(db_session, org.id)
+    login_as(client, user)
+    html = client.get("/intelligence/ask?element=42&question=impact").get_data(as_text=True)
+    assert 'data-initial-element="42"' in html
+    assert 'data-initial-question="impact"' in html
+
+
+@pytest.mark.parametrize("value", ["abc", "", "4 2", "1e3", "-"])
+def test_ask_ignores_an_element_that_is_not_a_whole_number(
+    app, db_session, make_org, client, login_as, value
+):
+    org = make_org("ui-ask-bad-element")
+    user = _user(db_session, org.id)
+    login_as(client, user)
+    response = client.get("/intelligence/ask", query_string={"element": value})
+    assert response.status_code == 200
+    assert "data-initial-element=" not in response.get_data(as_text=True)
+
+
+def test_ask_ignores_a_question_it_does_not_offer(
+    app, db_session, make_org, client, login_as
+):
+    org = make_org("ui-ask-bad-question")
+    user = _user(db_session, org.id)
+    login_as(client, user)
+    html = client.get(
+        "/intelligence/ask", query_string={"element": "42", "question": "nonsense"}
+    ).get_data(as_text=True)
+    assert 'data-initial-element="42"' in html
+    assert "data-initial-question=" not in html
+
+
 @pytest.mark.parametrize("value", ["abc", "", "4 2", "1e3", "-"])
 def test_twin_map_ignores_an_element_that_is_not_a_whole_number(
     app, db_session, make_org, client, login_as, value
