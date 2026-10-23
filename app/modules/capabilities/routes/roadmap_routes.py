@@ -1443,6 +1443,7 @@ def _derived_capability_name(capability_type, capability_id):
 @capability_map.route("/api/roadmap/work-packages", methods=["POST"])
 @login_required
 @rate_limit(30, "1m")
+@require_roles(*_LINK_WRITE_ROLES)
 @audit_log("roadmap_work_package_create_standalone")
 def api_roadmap_create_standalone_work_package():
     """
@@ -1588,6 +1589,7 @@ def api_roadmap_get_work_package(wp_id):
 @capability_map.route("/api/roadmap/work-packages/<int:wp_id>", methods=["PUT"])
 @login_required
 @rate_limit(30, "1m")
+@require_roles(*_LINK_WRITE_ROLES)
 @audit_log("roadmap_work_package_update")
 def api_roadmap_update_work_package(wp_id):
     """
@@ -1663,6 +1665,7 @@ def api_roadmap_update_work_package(wp_id):
 @capability_map.route("/api/roadmap/work-packages/<int:wp_id>", methods=["DELETE"])
 @login_required
 @rate_limit(30, "1m")
+@require_roles(*_LINK_WRITE_ROLES)
 @audit_log("roadmap_work_package_delete")
 def api_roadmap_delete_work_package(wp_id):
     """Delete a WorkPackage (and optionally its children)."""
@@ -1691,6 +1694,7 @@ def api_roadmap_delete_work_package(wp_id):
 @capability_map.route("/api/roadmap/work-packages/<int:wp_id>/children", methods=["POST"])
 @login_required
 @rate_limit(30, "1m")
+@require_roles(*_LINK_WRITE_ROLES)
 @audit_log("roadmap_child_work_package_create")
 def api_roadmap_create_child_work_package(wp_id):
     """
