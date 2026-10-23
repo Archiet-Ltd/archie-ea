@@ -528,19 +528,22 @@ def dashboard():
     )
     selected_key = initial_layer or "motivation"
     presentation_config = {
-        key: {**config, **LAYER_PRESENTATION[key], "key": key}
+        key: {
+            **config,
+            **LAYER_PRESENTATION[key],
+            "key": key,
+            # Kind options per layer come from the profile registry, never a
+            # hard-coded list; the front end renders the active layer's set.
+            "kind_options": _kind_options_for_layer(key),
+        }
         for key, config in LAYER_CONFIG.items()
     }
-    # Kind options from the profile registry, not hard-coded.
-    from app.services.profiles.safe import allowed_kinds_for_type
-    kind_options = allowed_kinds_for_type("WorkPackage")
     return render_template(
         "archimate_crud/dashboard.html",
         layer_config=presentation_config,
         selected_layer=presentation_config[selected_key],
         initial_layer=initial_layer,
         initial_element_type=initial_element_type,
-        kind_options=kind_options,
     )
 
 
@@ -658,16 +661,24 @@ def api_layer_counts():
 
 
 def _kind_options_for_layer(layer: str) -> list:
-    """Return the SAFe kind options for the layer's WorkPackage elements.
+    """The SAFe kind options for a layer, from the profile registry.
 
-    Kind options come from the profile registry, not a hard-coded list.
-    Only layers that contain WorkPackage elements have kind options.
+    The options are the union, in registry order, of the kinds each element
+    type in the layer may carry — a layer whose types carry no kinds (or an
+    unknown layer) has none. The registry is the single source of truth; the
+    list is never hard-coded here.
     """
     layer_types = LAYER_CONFIG.get(layer, {}).get("elements", [])
-    if "WorkPackage" not in layer_types:
-        return []
-    from app.services.profiles.safe import allowed_kinds_for_type
-    return allowed_kinds_for_type("WorkPackage")
+    from app.services.element_profile_service import allowed_kinds
+
+    options = []
+    seen = set()
+    for etype in layer_types:
+        for kind in allowed_kinds(etype, "safe"):
+            if kind not in seen:
+                seen.add(kind)
+                options.append(kind)
+    return options
 
 
 @archimate_crud.route("/api/layer/<layer>/elements")
@@ -700,7 +711,14 @@ def api_layer_elements(layer):
         query_types = layer_types
 
     all_elements = []
-    if source_filter != "architecture":  # skip dedicated tables when filtering to architecture-only
+    if source_filter != "architecture" and not kind_filter:
+        # When filtering by kind, the dedicated-table branch cannot contribute a
+        # match: an element's kind is the property the profile writer stores on
+        # archimate_elements.acm_properties (element_profile_service), and this
+        # branch only lists rows that have NO mirror (archimate_element_id IS
+        # NULL above) - so every row here trivially lacks a kind. Skipping the
+        # branch keeps the filter a single database predicate on the stored
+        # property instead of a Python pass that could never match.
         for etype in query_types:
             model_class = MODEL_REGISTRY.get(etype)
             if not model_class:
@@ -845,6 +863,23 @@ def api_layer_elements(layer):
                         ArchiMateElement.description.ilike(f"%{safe_s}%", escape="\\"),
                     )
                 )
+            if kind_filter:
+                # Filter on the property the profile writer stores
+                # (element_profile_service.KIND_PROPERTY on acm_properties): an
+                # object written as {"value": kind, ...} or a legacy plain
+                # string both match, so the database predicate agrees with
+                # read_profile. Runs inside the layer query, before pagination.
+                from app.services.element_profile_service import KIND_PROPERTY
+
+                properties = ArchiMateElement.acm_properties
+                ae_q = ae_q.filter(
+                    or_(
+                        db.func.json_extract_path_text(properties, KIND_PROPERTY, "value")
+                        == kind_filter,
+                        db.func.json_extract_path_text(properties, KIND_PROPERTY)
+                        == kind_filter,
+                    )
+                )
             ae_rows = ae_q.all()
             # Batch-fetch relationship counts for all new elements.
             new_ae_ids = [
@@ -931,32 +966,41 @@ def api_layer_elements(layer):
     if sort_by in ("name", "element_type", "description", "status"):
         all_elements.sort(key=lambda x: (x.get(sort_by) or "").lower(), reverse=reverse)
 
-    # Enrich ALL elements with their framework profile (kind, WSJF) — using
-    # the session identity map (elements were loaded by the architecture branch
-    # above), so no extra query is issued for already-loaded elements.
-    # Fixes PR 903: kind_filter was applied after pagination, so filtering
-    # by Epic only scanned the current page and returned wrong totals.
-    try:
-        from app.services.element_profile_service import read_profile
-        for el in all_elements:
-            if el.get("element_type") == "WorkPackage":
-                ae = db.session.get(ArchiMateElement, el["id"])
-                if ae is not None:
-                    profile = read_profile(ae)
-                    el["kind"] = profile.get("kind")
-                    el["wsjf_score"] = profile.get("wsjf_score")
-    except Exception as e:
-        current_app.logger.warning(f"Could not enrich profiles: {e}")
-
-    # Apply kind filter BEFORE pagination so totals reflect the filtered set.
-    if kind_filter:
-        all_elements = [el for el in all_elements if el.get("kind") == kind_filter]
-
     total = len(all_elements)
     pages = math.ceil(total / per_page) if per_page > 0 else 1
     start = (page - 1) * per_page
     end = start + per_page
     page_elements = all_elements[start:end]
+
+    # Enrich the page's elements with their framework profile (kind, WSJF).
+    # The ArchiMate rows were already loaded by the architecture branch above,
+    # so session.get is an identity-map hit and issues no query - and only
+    # mirror-backed elements can carry a profile, so the mirror-less dedicated
+    # rows are skipped rather than risk an unrelated row with the same id.
+    # Fixes PR 903: the kind filter ran after pagination, on the current page
+    # only, and total/pages were never recalculated; the filter itself now
+    # runs in the database query above on the property the writer stores.
+    try:
+        from app.services.element_profile_service import list_kinds, read_profile
+
+        kind_capable_types = {
+            etype
+            for kind in list_kinds("safe")
+            for etype in kind["allowed_types"]
+        }
+        for el in page_elements:
+            if el.get("element_type") not in kind_capable_types:
+                continue
+            if el.get("source") != "architecture":
+                continue  # mirror-less dedicated rows carry no profile to read
+            ae = db.session.get(ArchiMateElement, el["id"])
+            if ae is None:
+                continue
+            profile = read_profile(ae)
+            el["kind"] = profile.get("kind")
+            el["wsjf_score"] = profile.get("wsjf_score")
+    except Exception as e:
+        current_app.logger.warning(f"Could not enrich profiles: {e}")
 
     return jsonify(
         {
