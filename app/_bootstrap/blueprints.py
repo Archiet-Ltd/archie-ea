@@ -1659,6 +1659,15 @@ def _register_misc_blueprints(app, csrf):
     # to use _ff_solutions_strategic (actual success flag) instead of _use_solutions
     # (flag-is-set check that ignores v2 import failures).
 
+    # Integration review (SAFe 1b)
+    try:
+        from app.integrations.routes import integrations_bp
+
+        app.register_blueprint(integrations_bp)
+        app.logger.info("[BLUEPRINT] Integrations registered at /integrations")
+    except Exception as e:
+        app.logger.warning(f"[BLUEPRINT] Integrations not available: {e}")
+
 
 # ---------------------------------------------------------------------------
 # Monitoring — health_bp is registered unconditionally by _register_always_on_apis().

@@ -1,0 +1,144 @@
+{% extends "base.html" %}
+
+{% block title %}Integration Review - {{ system|title }}{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8 max-w-7xl">
+    <div class="mb-8">
+        <h1 class="text-3xl font-bold text-foreground mb-2">Integration Review</h1>
+        <p class="text-muted-foreground">Review and approve facts from {{ system|title }}</p>
+    </div>
+
+    {% if not facts_by_item %}
+    <div class="bg-card border border-border rounded-lg p-8 text-center">
+        <p class="text-muted-foreground">No pending facts to review for {{ system|title }}.</p>
+    </div>
+    {% else %}
+    <div class="space-y-6">
+        {% for external_id, item in facts_by_item.items() %}
+        <div class="bg-card border border-border rounded-lg p-6">
+            <div class="flex items-start justify-between mb-4">
+                <div>
+                    <h2 class="text-xl font-semibold text-foreground mb-1">
+                        {{ item.source_item_type|title }}: {{ external_id }}
+                    </h2>
+                    {% if item.source_url %}
+                    <a href="{{ item.source_url }}" target="_blank" rel="noopener noreferrer" class="text-sm text-primary hover:underline">
+                        View in {{ system|title }} →
+                    </a>
+                    {% endif %}
+                </div>
+                <div class="flex gap-2">
+                    <button
+                        type="button"
+                        onclick="approveFacts('{{ external_id }}')"
+                        class="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors"
+                    >
+                        Approve All
+                    </button>
+                    <button
+                        type="button"
+                        onclick="rejectFacts('{{ external_id }}')"
+                        class="px-4 py-2 bg-destructive text-destructive-foreground rounded-md hover:bg-destructive/90 transition-colors"
+                    >
+                        Reject All
+                    </button>
+                </div>
+            </div>
+
+            <div class="space-y-3" data-item-id="{{ external_id }}">
+                {% for fact in item.facts %}
+                <div class="border border-border rounded p-4 bg-background" data-fact-id="{{ fact.id }}">
+                    <div class="flex items-start justify-between mb-2">
+                        <div>
+                            <span class="inline-block px-2 py-1 bg-secondary text-secondary-foreground text-xs font-medium rounded">
+                                {{ fact.fact_type }}
+                            </span>
+                            <span class="ml-2 text-sm text-muted-foreground">{{ fact.path }}</span>
+                        </div>
+                    </div>
+                    <div class="text-sm text-foreground">
+                        {% set fact_data = fact.fact_data|from_json %}
+                        {% if fact.fact_type == 'element' %}
+                        <p class="font-medium">{{ fact_data.archimate_type }}: {{ fact_data.name }}</p>
+                        {% if fact_data.description %}
+                        <p class="text-muted-foreground mt-1">{{ fact_data.description }}</p>
+                        {% endif %}
+                        {% elif fact.fact_type == 'relationship' %}
+                        <p class="font-medium">{{ fact_data.type }}</p>
+                        <p class="text-muted-foreground mt-1">{{ fact_data.source_path }} → {{ fact_data.target_path }}</p>
+                        {% elif fact.fact_type == 'owner' %}
+                        <p class="font-medium">Owner: {{ fact_data.owner_name }}</p>
+                        <p class="text-muted-foreground mt-1">Type: {{ fact_data.ownership_type }} {% if fact_data.is_team %}(Team){% endif %}</p>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+</div>
+
+<script>
+    const factsByItem = {
+        {% for external_id, item in facts_by_item.items() %}
+        '{{ external_id }}': [{% for fact in item.facts %}{{ fact.id }}{% if not loop.last %}, {% endif %}{% endfor %}],
+        {% endfor %}
+    };
+
+    async function approveFacts(externalId) {
+        const factIds = factsByItem[externalId];
+        if (!factIds || factIds.length === 0) return;
+
+        try {
+            const response = await fetch('/integrations/approve', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ fact_ids: factIds }),
+            });
+
+            const result = await response.json();
+            if (result.success) {
+                window.location.reload();
+            } else {
+                alert('Error approving facts: ' + (result.errors || []).join(', '));
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            alert('Failed to approve facts');
+        }
+    }
+
+    async function rejectFacts(externalId) {
+        const factIds = factsByItem[externalId];
+        if (!factIds || factIds.length === 0) return;
+
+        const reason = prompt('Reason for rejection (optional):');
+        if (reason === null) return;
+
+        try {
+            const response = await fetch('/integrations/reject', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ fact_ids: factIds, reason }),
+            });
+
+            const result = await response.json();
+            if (result.success) {
+                window.location.reload();
+            } else {
+                alert('Error rejecting facts: ' + (result.errors || []).join(', '));
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            alert('Failed to reject facts');
+        }
+    }
+</script>
+{% endblock %}

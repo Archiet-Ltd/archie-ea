@@ -749,6 +749,19 @@ class AIChatApprovalService:
                     result = data_service.create_capability_mapping(payload)
                 elif approval.entity_type == "work_package":
                     result = data_service.create_work_package(payload)
+                elif approval.entity_type == "integration_fact":
+                    from app.integrations.fact_store import apply_fact
+                    from app.models.integration_fact import IntegrationFact
+
+                    fact_id = approval.entity_id
+                    fact = IntegrationFact.query.filter_by(
+                        id=fact_id,
+                        organization_id=approval.organization_id,
+                    ).first()
+                    if not fact:
+                        return {"success": False, "error": "Integration fact not found"}
+                    success = apply_fact(fact, commit=False)
+                    result = {"success": success}
                 else:
                     return {"success": False, "error": f"Unknown entity type: {approval.entity_type}"}
 
@@ -1027,6 +1040,17 @@ class AIChatApprovalService:
                 }
             if approval.entity_type == "connectors":
                 self._discard_staged_connector_credential(approval)
+            elif approval.entity_type == "integration_fact":
+                from app.integrations.fact_store import reject_fact
+                from app.models.integration_fact import IntegrationFact
+
+                fact_id = approval.entity_id
+                fact = IntegrationFact.query.filter_by(
+                    id=fact_id,
+                    organization_id=approval.organization_id,
+                ).first()
+                if fact:
+                    reject_fact(fact, reason=reason or "Rejected by user", commit=False)
             self._audit_nonblocking(
                 approval,
                 event="cancelled" if is_requester_cancellation else "rejected",
