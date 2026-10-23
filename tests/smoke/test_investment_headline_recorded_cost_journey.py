@@ -12,6 +12,8 @@ first-round head (the headline was placeholder arithmetic of a fixed figure per
 capability, unrelated to any recorded cost) and is green after.
 """
 
+import os
+import pathlib
 import uuid
 
 import pytest
@@ -22,7 +24,15 @@ from .fresh_org import create_fresh_org, sign_in
 
 pytestmark = [pytest.mark.smoke, pytest.mark.journey]
 
-SHOT_DIR = "/home/ubuntu/verify/seats/secinv01b/walk"
+
+def _shot_dir():
+    target = os.environ.get(
+        "SMOKE_SCREENSHOT_DIR",
+        str(pathlib.Path(__file__).resolve().parents[2] / "screenshots" / "investment-headline"),
+    )
+    path = pathlib.Path(target)
+    path.mkdir(parents=True, exist_ok=True)
+    return path
 
 INVESTMENT_PATH = "/architecture/investment-priorities"
 
@@ -131,13 +141,13 @@ def test_investment_headline_is_recorded_money_and_isolated(live_server, browser
     expect(row).to_contain_text("2 apps")
     expect(row).to_contain_text("Recorded")
     assert "No cost recorded" not in row.inner_text()
-    page_a.screenshot(path="%s/investment-org-a-1440.png" % SHOT_DIR, full_page=True)
+    page_a.screenshot(path=str(_shot_dir() / "investment-org-a-1440.png"), full_page=True)
 
     # Narrow view still shows the real headline.
     page_a.set_viewport_size({"width": 390, "height": 900})
     _open_investment(page_a, base)
     expect(_headline_card(page_a)).to_contain_text("£0.2M", timeout=PAGE_TIMEOUT)
-    page_a.screenshot(path="%s/investment-org-a-390.png" % SHOT_DIR, full_page=True)
+    page_a.screenshot(path=str(_shot_dir() / "investment-org-a-390.png"), full_page=True)
     ctx_a.close()
 
     # --- Org B: sees only its own recorded money ---
@@ -149,7 +159,7 @@ def test_investment_headline_is_recorded_money_and_isolated(live_server, browser
     card_b = _headline_card(page_b)
     expect(card_b).to_contain_text("£0.9M", timeout=PAGE_TIMEOUT)
     assert "£0.2M" not in card_b.inner_text()
-    page_b.screenshot(path="%s/investment-org-b-1440.png" % SHOT_DIR, full_page=True)
+    page_b.screenshot(path=str(_shot_dir() / "investment-org-b-1440.png"), full_page=True)
     ctx_b.close()
 
 
@@ -174,7 +184,7 @@ def test_investment_headline_empty_value_is_explained_and_links(live_server, bro
     expect(card).to_contain_text("Record an annual cost")
     # No fabricated figure anywhere on the headline.
     assert "M" not in card.locator("div[data-slot='card-title']").inner_text()
-    page.screenshot(path="%s/investment-empty-1440.png" % SHOT_DIR, full_page=True)
+    page.screenshot(path=str(_shot_dir() / "investment-empty-1440.png"), full_page=True)
 
     # The headline links to Applications; the link lands on a page with content.
     # With an explained empty value the whole card is a link to Applications,
@@ -188,5 +198,5 @@ def test_investment_headline_empty_value_is_explained_and_links(live_server, bro
     expect(body).not_to_contain_text("403")
     # The Applications page names its own subject — not an empty 200.
     expect(body).to_contain_text("Application", timeout=PAGE_TIMEOUT)
-    page.screenshot(path="%s/investment-empty-applications-landing.png" % SHOT_DIR, full_page=True)
+    page.screenshot(path=str(_shot_dir() / "investment-empty-applications-landing.png"), full_page=True)
     ctx.close()
