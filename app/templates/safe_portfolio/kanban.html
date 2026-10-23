@@ -1,0 +1,129 @@
+{% extends "layouts/admin_base.html" %}
+{% from 'macros/page_shell.html' import page_shell %}
+
+{% block title %}SAFe Portfolio Kanban{% endblock %}
+
+{% block content %}
+<div class="p-6 space-y-6">
+    {{ page_shell(
+        title='Portfolio Kanban',
+        subtitle='Epics organized by workflow state, ordered by WSJF priority',
+        breadcrumb=[('SAFe', None), ('Portfolio Kanban', None)]
+    ) }}
+
+    <div class="kanban-board"
+         x-data="kanbanBoard()">
+
+        <p class="text-xs text-muted-foreground mb-3">
+            Each card shows its WSJF score (Weighted Shortest Job First): Business Value, Time Criticality and Risk Reduction added together, divided by Job Size.
+            The board scrolls sideways when the columns do not fit.
+        </p>
+
+        <div class="overflow-x-auto pb-4"
+             data-kanban-scroll
+             role="region"
+             aria-label="Portfolio Kanban board, scrolls horizontally"
+             tabindex="0">
+            <div class="flex gap-4 min-w-max lg:min-w-0">
+                {% for state in kanban_states %}
+                <div class="kanban-column w-64 shrink-0 lg:w-auto lg:flex-1 lg:min-w-[10rem]" data-state="{{ state }}">
+                    <div class="bg-muted/30 border border-border rounded-lg p-3 mb-3">
+                        <h2 class="text-sm font-medium text-foreground">{{ state }}</h2>
+                        <span class="text-xs text-muted-foreground" x-text="`${columns['{{ state }}'].length} epic${columns['{{ state }}'].length !== 1 ? 's' : ''}`"></span>
+                    </div>
+
+                    <div class="space-y-3">
+                        <template x-for="epic in columns['{{ state }}']" :key="epic.id">
+                            <div class="bg-card border border-border rounded-lg p-3">
+                                <h3 class="text-sm font-medium text-foreground mb-1" x-text="epic.name"></h3>
+                                <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-primary mb-2"
+                                      x-text="`WSJF: ${epic.wsjf_score}`"></span>
+
+                                <p class="text-xs text-muted-foreground mb-3 line-clamp-2" x-text="epic.description" x-show="epic.description"></p>
+
+                                <dl class="text-xs space-y-1 mb-3">
+                                    <div class="flex justify-between gap-2">
+                                        <dt class="text-muted-foreground">Business Value</dt>
+                                        <dd class="text-foreground font-medium" x-text="epic.business_value"></dd>
+                                    </div>
+                                    <div class="flex justify-between gap-2">
+                                        <dt class="text-muted-foreground">Time Criticality</dt>
+                                        <dd class="text-foreground font-medium" x-text="epic.time_criticality"></dd>
+                                    </div>
+                                    <div class="flex justify-between gap-2">
+                                        <dt class="text-muted-foreground">Risk Reduction</dt>
+                                        <dd class="text-foreground font-medium" x-text="epic.risk_reduction"></dd>
+                                    </div>
+                                    <div class="flex justify-between gap-2">
+                                        <dt class="text-muted-foreground">Job Size</dt>
+                                        <dd class="text-foreground font-medium" x-text="epic.job_size"></dd>
+                                    </div>
+                                </dl>
+
+                                <div x-show="canWrite" class="border-t border-border pt-2">
+                                    <select
+                                        :id="`move-${epic.id}`"
+                                        :aria-label="`Move ${epic.name} to state`"
+                                        :value="epic.kanban_state"
+                                        @change="moveEpic(epic, $event.target)"
+                                        class="w-full text-xs border-input bg-background text-foreground rounded-md px-2 py-1.5 border focus:ring-2 focus:ring-ring focus:border-input"
+                                        :disabled="moving === epic.id">
+                                        <option value="">Move to...</option>
+                                        {% for target_state in kanban_states %}
+                                        <option value="{{ target_state }}" :selected="epic.kanban_state === '{{ target_state }}'">{{ target_state }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                            </div>
+                        </template>
+
+                        <div x-show="columns['{{ state }}'].length === 0"
+                             data-empty-state
+                             class="bg-muted/10 border border-dashed border-border rounded-lg p-3">
+                            {% set hint = empty_hints.get(state) %}
+                            <p class="text-xs text-muted-foreground">
+                                {% if hint %}{{ hint.why }} {{ hint.next_write if can_write else hint.next_read }}{% else %}No epics in {{ state }}.{% endif %}
+                            </p>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function kanbanBoard() {
+    return {
+        columns: {{ columns | tojson }},
+        canWrite: {{ can_write | tojson }},
+        moving: null,
+
+        async moveEpic(epic, selectEl) {
+            const newState = selectEl.value;
+            if (!newState || this.moving === epic.id) return;
+            if (newState === epic.kanban_state) { selectEl.value = newState; return; }
+
+            this.moving = epic.id;
+            try {
+                const updated = await Platform.fetch(`/api/safe/portfolio/${epic.id}`, {
+                    method: 'PATCH',
+                    body: { kanban_state: newState }
+                });
+
+                for (const state in this.columns) {
+                    this.columns[state] = this.columns[state].filter(e => e.id !== epic.id);
+                }
+                this.columns[newState].push({ ...epic, ...updated });
+                this.columns[newState].sort((a, b) => b.wsjf_score - a.wsjf_score);
+            } catch (error) {
+                selectEl.value = epic.kanban_state;
+            } finally {
+                this.moving = null;
+            }
+        }
+    };
+}
+</script>
+{% endblock %}
