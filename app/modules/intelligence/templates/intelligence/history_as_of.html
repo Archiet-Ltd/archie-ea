@@ -2,6 +2,7 @@
 {% from 'macros/page_shell.html' import page_shell %}
 {% from 'components/provenance.html' import provenance_badge %}
 {% from 'components/loading_state.html' import loading_inline %}
+{% from 'components/empty_state.html' import empty_state %}
 
 {% block title %}Model as of{% endblock %}
 
@@ -11,6 +12,7 @@
 
 {% block content %}
 {% set home_url = url_for('dashboard.overview') if 'dashboard.overview' in flask.current_app.view_functions else none %}
+{% set composer_url = url_for('archimate.composer_page') if 'archimate.composer_page' in flask.current_app.view_functions else none %}
 <div class="p-6 space-y-6" x-data="asOfPage()">
     {{ page_shell(
         title='Model as of',
@@ -54,7 +56,22 @@
 
     <template x-if="!loading && !error && elements.length === 0 && relationships.length === 0">
         <section class="rounded-lg border border-border bg-card p-6">
-            <p class="text-sm text-muted-foreground">No model elements or relationships recorded for this date.</p>
+            {% if composer_url %}
+            {{ empty_state(
+                icon='clock',
+                title='No model recorded for this date',
+                description='This page shows the architecture model exactly as it stood on a chosen date. Your workspace has no model yet, so there is nothing to rewind to. Add or import your first model elements, then come back here to see them as of any date.',
+                cta_text='Add model elements',
+                cta_href=composer_url,
+                cta_icon='pen-tool'
+            ) }}
+            {% else %}
+            {{ empty_state(
+                icon='clock',
+                title='No model recorded for this date',
+                description='This page shows the architecture model exactly as it stood on a chosen date. Your workspace has no model yet, so there is nothing to rewind to. Add or import your first model elements, then come back here to see them as of any date.'
+            ) }}
+            {% endif %}
         </section>
     </template>
 
