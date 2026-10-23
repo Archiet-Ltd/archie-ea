@@ -3,6 +3,15 @@
 # DATABASE_ADMIN_URL or DATABASE_DEPLOY_PASSWORD.
 set -eu
 
+# Test hook: when ZDD_TEST_SCHEMA_DELAY is set, sleep that many seconds before
+# running the schema steps. This lets the zero-downtime deploy test
+# (scripts/test_zero_downtime_deploy.sh) simulate a slow schema step and prove
+# the old server keeps answering throughout. Never set in production.
+if [ -n "${ZDD_TEST_SCHEMA_DELAY:-}" ]; then
+    echo "ZDD_TEST_SCHEMA_DELAY: sleeping ${ZDD_TEST_SCHEMA_DELAY}s (test hook only)"
+    sleep "${ZDD_TEST_SCHEMA_DELAY}"
+fi
+
 # Schema order: create missing tables, apply versioned revisions, then detect
 # drift. schema-upgrade is not suppressed: a revision that fails rolls back on
 # its own (PostgreSQL DDL is transactional) and the deploy must stop there
