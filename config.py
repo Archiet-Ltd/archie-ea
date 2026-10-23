@@ -593,11 +593,24 @@ class TestingConfig(Config):
     TRANSFORMATION_COMMAND_CAPABILITY_PREVIOUS_SECRETS = ""
 
     # credential_encryption.py raises RuntimeError when this is unset, by
-    # design (it must not silently store a credential in plaintext). Generated
-    # at import time rather than a literal, so nothing here reads as a real key.
+    # design (it must not silently store a credential in plaintext). Honour a
+    # key the environment provides, and only otherwise generate one at import
+    # time rather than reading a literal, so nothing here reads as a real key.
+    #
+    # The environment branch matters when the web server and the job worker run
+    # as separate processes (every deployment, and CI's browser journeys under
+    # gunicorn): a token one process encrypts can only be read by another when
+    # both import the same key. Without it every process generated its own, so
+    # the worker's decrypt failed with InvalidToken on a token the web process
+    # had just stored. ProductionConfig is unchanged and still requires its real
+    # keys from the environment.
     from cryptography.fernet import Fernet as _Fernet
-    CREDENTIAL_ENCRYPTION_KEY = _Fernet.generate_key().decode()
-    ORG_ENCRYPTION_MASTER_KEY = _Fernet.generate_key().decode()
+    CREDENTIAL_ENCRYPTION_KEY = (
+        os.environ.get("CREDENTIAL_ENCRYPTION_KEY") or _Fernet.generate_key().decode()
+    )
+    ORG_ENCRYPTION_MASTER_KEY = (
+        os.environ.get("ORG_ENCRYPTION_MASTER_KEY") or _Fernet.generate_key().decode()
+    )
 
     # Brute-force protection is a production control; under test it throttles the
     # suite instead of an attacker. /account/login is capped at 10 POSTs per

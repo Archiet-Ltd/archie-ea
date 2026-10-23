@@ -719,6 +719,15 @@ def _register_concrete_connectors():
     )
 
 
+# The one sentence a person reads when the saved token cannot be decrypted —
+# a wrong or rotated key, or corrupted ciphertext. Shown wherever an unreadable
+# credential surfaces to the connect page (``build_connector`` below, and the
+# job worker's error formatting), so the two never drift apart.
+CREDENTIAL_UNREADABLE_MESSAGE = (
+    "We could not read the saved token. Paste it again to reconnect."
+)
+
+
 class ConnectorWriteRefused(RuntimeError):
     """A connector write that is neither an approved approval proposal nor
     explicitly delegated by the organisation is refused, not queued
@@ -1432,9 +1441,7 @@ def build_connector(cfg: ConnectorConfig, org_id: int):
         merged_config = dict(base_config)
         merged_config.update(_credential_field_map(cfg.connector_type, org_id, base_config))
     except CredentialUnreadable:
-        raise ConnectorWriteRefused(
-            "We could not read the saved token. Paste it again to reconnect."
-        )
+        raise ConnectorWriteRefused(CREDENTIAL_UNREADABLE_MESSAGE)
 
     runtime_config = ConnectorConfig(
         id=cfg.id,
