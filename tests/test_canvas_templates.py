@@ -72,9 +72,19 @@ class TestSchema:
     def test_validate_canvas_templates_passes_on_the_real_templates(self):
         validate_canvas_templates()
 
-    def test_three_templates_with_the_srs_zone_counts(self):
-        assert sorted(CANVAS_TEMPLATES) == ["business_case", "business_model_canvas", "lean_canvas"]
-        assert [len(CANVAS_TEMPLATES[k]["zones"]) for k in sorted(CANVAS_TEMPLATES)] == [9, 9, 9]
+    def test_templates_with_the_srs_zone_counts(self):
+        assert sorted(CANVAS_TEMPLATES) == [
+            "business_case", "business_model_canvas", "lean_canvas",
+            "mckinsey_7s", "porters_five_forces", "vrio",
+        ]
+        assert {k: len(CANVAS_TEMPLATES[k]["zones"]) for k in sorted(CANVAS_TEMPLATES)} == {
+            "business_case": 9,
+            "business_model_canvas": 9,
+            "lean_canvas": 9,
+            "mckinsey_7s": 7,
+            "porters_five_forces": 5,
+            "vrio": 5,
+        }
 
     def test_bmc_box_keys_equal_the_record_columns(self):
         from app.models.business_model import CANVAS_BLOCKS
@@ -152,14 +162,16 @@ class TestSeedIdempotence:
 
         profile_type_count = len(CANVAS_PROFILE_OPTIONS_BY_TYPE)
 
+        template_count = len(CANVAS_TEMPLATES)
+
         first = seed_canvas_templates(org_id=org.id)
-        assert first == (3, 0, profile_type_count, 0)
+        assert first == (template_count, 0, profile_type_count, 0)
 
         second = seed_canvas_templates(org_id=org.id)
-        assert second == (0, 3, 0, profile_type_count)
+        assert second == (0, template_count, 0, profile_type_count)
 
         canvas_rows = ArchiMateViewpoint.query.filter_by(viewpoint_type="canvas").all()
-        assert len(canvas_rows) == 3
+        assert len(canvas_rows) == template_count
         assert {row.is_standard for row in canvas_rows} == {False}
 
         profile_rows = AcmPropertyTemplate.query.filter_by(property_key="profile").all()
@@ -177,7 +189,9 @@ class TestSeedIdempotence:
         org = make_org("canvas-seed-viewpoints")
 
         seed_viewpoints(org_id=org.id)
-        assert ArchiMateViewpoint.query.filter_by(viewpoint_type="canvas").count() == 3
+        assert ArchiMateViewpoint.query.filter_by(
+            viewpoint_type="canvas"
+        ).count() == len(CANVAS_TEMPLATES)
 
     def test_seed_property_templates_is_idempotent(self, app, db_session):
         from app.config.property_templates import PROPERTY_TEMPLATES
