@@ -1,0 +1,40 @@
+{% extends 'layouts/admin_base.html' %}
+{% from 'macros/page_shell.html' import page_shell, empty_state %}
+
+{% block title %}Downstream impact — {{ config.APP_NAME }}{% endblock %}
+
+{% block content %}
+<div class="flex-1 overflow-auto p-6">
+  {{ page_shell(
+      title='Downstream impact',
+      subtitle='Every consumer of this field, ranked by business criticality.',
+      breadcrumb=[('Home', url_for('main.index')), ('Data governance', url_for('data_governance.entities')), ('Impact', None)]
+  ) }}
+  {% if truncated %}
+  <p class="mb-4 rounded-md border border-warning/30 bg-warning/5 px-3 py-2 text-sm text-foreground" data-testid="impact-truncated">
+    Showing the first few consumers only — the impact continues beyond what is shown here.
+  </p>
+  {% endif %}
+  {% if consumers %}
+  <ol class="space-y-3" data-testid="impact-consumers">
+    {% for row in consumers %}
+    <li class="rounded-lg border border-border bg-card p-4" data-testid="impact-consumer-{{ row.element_id }}">
+      <div class="flex items-start justify-between gap-4">
+        <div class="min-w-0">
+          <p class="text-xs text-muted-foreground">Criticality: {{ row.criticality }}</p>
+          <h2 class="text-base font-semibold text-foreground truncate">{{ row.element_name }}</h2>
+        </div>
+        <p class="text-sm text-muted-foreground shrink-0">
+          Owner:
+          {% if row.owner %}<span class="font-medium text-foreground">{{ row.owner.user_name }}</span> ({{ row.owner.ownership_type_label }})
+          {% else %}not recorded{% endif %}
+        </p>
+      </div>
+    </li>
+    {% endfor %}
+  </ol>
+  {% else %}
+  {{ empty_state(icon='alert-triangle', headline='No downstream consumers', body='No data lineage edges leave this element yet.') }}
+  {% endif %}
+</div>
+{% endblock %}
