@@ -111,3 +111,56 @@ def test_a_pending_scan_older_than_fifty_newer_jobs_is_still_found(app, db_sessi
 
     assert _enqueue_model_health_scan_if_not_pending(org.id) is False
     assert Job.query.filter_by(task="model_health_scan").count() == 1
+
+
+def test_an_unreadable_credential_shows_the_plain_reconnect_sentence():
+    """A wrong or rotated key reaches the worker as CredentialUnreadable or as the
+    raw InvalidToken the key-unwrap raises before build_connector can catch it.
+    Both become the one sentence the connect page already shows, never a bare
+    'InvalidToken:' and never a key."""
+    from cryptography.fernet import InvalidToken
+
+    from app.modules.codegen.services.credential_encryption import CredentialUnreadable
+    from app.services.connector_framework import CREDENTIAL_UNREADABLE_MESSAGE
+    from app.services.job_queue_service import JobQueueService
+
+    assert JobQueueService._format_job_error(InvalidToken()) == CREDENTIAL_UNREADABLE_MESSAGE
+    assert (
+        JobQueueService._format_job_error(CredentialUnreadable("org 7 is unreadable"))
+        == CREDENTIAL_UNREADABLE_MESSAGE
+    )
+    # An ordinary failure is still reported with its type and message.
+    assert JobQueueService._format_job_error(ValueError("no connector")) == "ValueError: no connector"
+
+
+def test_a_failed_first_sync_on_an_invalid_token_sets_the_reconnect_sentence(
+        app, db_session, make_org, monkeypatch):
+    """When the GitHub first-sync job fails because the token cannot be decrypted,
+    the job's error is the plain reconnect sentence — what the connect page shows —
+    not the raw exception, and no key appears in it."""
+    from cryptography.fernet import InvalidToken
+
+    from app.connectors import github as gh
+    from app.services.connector_framework import CREDENTIAL_UNREADABLE_MESSAGE
+    from app.services.job_queue_service import get_job_queue_service
+
+    org = make_org("invalid-token")
+    service = get_job_queue_service()
+    service.app = app
+    job = service.create_job(
+        "GitHub: read repositories", gh.FIRST_SYNC_TASK,
+        payload={"connector_id": "github"}, organization_id=org.id)
+
+    # The decrypt path raises the raw InvalidToken that today reaches the worker
+    # from master.decrypt during key-unwrap, bypassing build_connector's catch.
+    def _raise_invalid_token(org_id, connector_id):
+        raise InvalidToken()
+
+    monkeypatch.setattr(gh, "run_first_sync", _raise_invalid_token)
+
+    service._process_job(job)
+
+    refreshed = service.get_job(job.id)
+    assert refreshed.status == "failed"
+    assert refreshed.error == CREDENTIAL_UNREADABLE_MESSAGE
+    assert "InvalidToken" not in (refreshed.error or "")

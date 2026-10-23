@@ -211,10 +211,32 @@ class JobQueueService:
 
         except Exception as e:
             # Mark as failed
-            error_msg = f"{type(e).__name__}: {str(e)}"
+            error_msg = self._format_job_error(e)
             self._reset_session(rollback=True)
             self.update_job_status(job.id, JobStatus.FAILED.value, error=error_msg)
-            logger.error(f"Job {job.id} failed: {error_msg}", exc_info=True)
+            logger.error(f"Job {job.id} failed: {type(e).__name__}", exc_info=True)
+
+    @staticmethod
+    def _format_job_error(exc: Exception) -> str:
+        """The failed job's message, as a person reads it on the connect page.
+
+        A credential that cannot be decrypted — a wrong or rotated key, or
+        corrupted ciphertext — reaches here either as ``CredentialUnreadable``
+        or as the raw ``InvalidToken`` the key-unwrap raises before
+        ``build_connector`` can catch it. Both say the same plain sentence the
+        connectors framework already shows, so the status line never reads a
+        bare ``InvalidToken:``. A key is never part of the message.
+        """
+        from cryptography.fernet import InvalidToken
+
+        from app.modules.codegen.services.credential_encryption import (
+            CredentialUnreadable,
+        )
+        from app.services.connector_framework import CREDENTIAL_UNREADABLE_MESSAGE
+
+        if isinstance(exc, (CredentialUnreadable, InvalidToken)):
+            return CREDENTIAL_UNREADABLE_MESSAGE
+        return f"{type(exc).__name__}: {str(exc)}"
 
     def _execute_task(self, task: str, payload: Dict[str, Any], job_id: int) -> Dict[str, Any]:
         """Execute a specific task type."""
