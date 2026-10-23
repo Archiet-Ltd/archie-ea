@@ -248,6 +248,45 @@ def get_user_role(user) -> str:
         return DEFAULT_ROLE
 
 
+def _is_org_administrator(user) -> bool:
+    """True when ``can()`` treats the person as an administrator of the active organisation.
+
+    Administrators hold every ability in the permission matrix; ``can`` answers
+    that first, so this asks the one authority rather than re-deriving it.
+    "access_any" on a solution is held by no one else without a persona.
+    """
+    try:
+        from app.core.auth.permissions import can
+
+        return bool(can(user, "access_any", "solution"))
+    except Exception:  # noqa: BLE001 - a nav gate must not be able to 500 a page
+        return False
+
+
+def get_effective_role(user) -> str:
+    """The role the cost-visibility check and the sidebar answer from.
+
+    A persona an administrator assigned (``enterprise_role``) is used as
+    stored. A person with no persona answers as an administrator when they
+    administer the active organisation (``can``), and otherwise as
+    ``DEFAULT_ROLE``. Having no persona grants nothing to anyone else.
+    """
+    if not user:
+        return DEFAULT_ROLE
+    try:
+        persona = getattr(user, "enterprise_role", None)
+    except Exception:  # noqa: BLE001
+        return DEFAULT_ROLE
+    if persona:
+        return persona
+    return ROLE_PLATFORM_ADMIN if _is_org_administrator(user) else DEFAULT_ROLE
+
+
+def can_see_costs(user) -> bool:
+    """The one cost-visibility rule: budget, cost, TCO and licence figures."""
+    return get_effective_role(user) in COST_VISIBILITY_ROLES
+
+
 def can_access_section(user, section: str) -> bool:
     """
     Check if user can access a navigation section.
@@ -259,7 +298,7 @@ def can_access_section(user, section: str) -> bool:
     Returns:
         True if user can access the section
     """
-    role = get_user_role(user)
+    role = get_effective_role(user)
     allowed_sections = ROLE_SECTION_ACCESS.get(role, set())
     return section in allowed_sections
 
@@ -274,7 +313,7 @@ def get_visible_sections(user) -> List[str]:
     Returns:
         List of section identifiers user can see
     """
-    role = get_user_role(user)
+    role = get_effective_role(user)
     allowed_sections = ROLE_SECTION_ACCESS.get(role, set())
     # Return in defined order
     return [s for s in NAVIGATION_SECTIONS if s in allowed_sections]
@@ -1088,7 +1127,7 @@ def get_sidebar_zones(user) -> List[Dict]:
     platform_admin_required — the one route where this default actually
     controls data access, not just link visibility.
     """
-    role = get_user_role(user)
+    role = get_effective_role(user)
     zones = SIDEBAR_ZONES.get(role, SIDEBAR_ZONES[DEFAULT_ROLE])
 
     # Permission-driven navigation (F-11, 2 Sep 2026 audit). Every admin-zone

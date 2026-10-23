@@ -28,6 +28,22 @@
 {%- else -%}No owner recorded{%- endif -%}
 {%- endmacro %}
 
+{# Where a connector read the links behind a row: repository, file and short commit, with the
+   address of that file at that commit. Links nobody's connector wrote say so. #}
+{% macro origins_text(relations) -%}
+{%- set ns = namespace(seen=[]) -%}
+{%- for relation in relations -%}{%- for o in (relation.origins or {}).values() if o.repository -%}
+{%- set key = [o.repository, o.file, o.commit] -%}
+{%- if key not in ns.seen -%}{%- set ns.seen = ns.seen + [key] -%}
+<span class="block" data-citation>
+    <span class="text-foreground">{{ o.repository }}{% if o.file %} · {{ o.file }}{% endif %}{% if o.commit %} @ {{ o.commit[:7] }}{% endif %}</span>
+    {% if o.url %}<a class="ml-2 underline hover:text-info" href="{{ o.url }}" target="_blank" rel="noopener noreferrer">View file on GitHub</a>{% endif %}
+</span>
+{%- endif -%}
+{%- endfor -%}{%- endfor -%}
+{%- if not ns.seen -%}<span class="text-muted-foreground" data-citation-missing>Source not recorded</span>{%- endif -%}
+{%- endmacro %}
+
 {% block content %}
 {% set home_url = url_for('dashboard.overview') if 'dashboard.overview' in flask.current_app.view_functions else none %}
 {% set kind = answer.question_kind %}
@@ -154,7 +170,8 @@
                         {% if kind == 'set_impact' %}<th scope="col" class="py-2 pr-4 font-medium">Reached from</th>{% endif %}
                         <th scope="col" class="py-2 pr-4 font-medium">Steps away</th>
                         <th scope="col" class="py-2 pr-4 font-medium">Owner</th>
-                        <th scope="col" class="py-2 font-medium">Basis</th>
+                        <th scope="col" class="py-2 pr-4 font-medium">Basis</th>
+                        <th scope="col" class="py-2 font-medium">Read from</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -168,7 +185,8 @@
                         {% endif %}
                         <td class="py-2 pr-4 text-foreground">{% if kind == 'set_impact' %}{{ row.depth }}{% else %}{{ row.relation.depth }}{% endif %}</td>
                         <td class="py-2 pr-4 text-foreground">{{ owner_text(row) }}</td>
-                        <td class="py-2">{{ basis_badge(row.truth_class) }}</td>
+                        <td class="py-2 pr-4">{{ basis_badge(row.truth_class) }}</td>
+                        <td class="py-2 text-xs">{{ origins_text(row.relations if kind == 'set_impact' else [row.relation]) }}</td>
                     </tr>
                     {% endfor %}
                 </tbody>

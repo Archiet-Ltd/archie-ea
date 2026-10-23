@@ -140,6 +140,34 @@ def test_the_committed_table_balances_the_shards_within_fifteen_percent_of_the_m
     assert max(loads) <= mean * 1.15, [round(ms / 60000, 1) for ms in loads]
 
 
+def test_the_committed_table_balances_within_1_3_with_head_start():
+    """Verify the head-start bin-pack keeps every shard within 1.3x of the mean.
+
+    The shard-0 connector-tests head start of 246s is designed exactly so the
+    longest-processing shard does not exceed 1.3x the mean when the table is
+    well-formed.
+    """
+    table = _table()
+    counts = {path: entry["tests"] for path, entry in table["files"].items()}
+    _assignment, loads = sharding.plan(counts, TOTAL, table)
+    mean = sum(loads) / TOTAL
+    assert max(loads) <= mean * 1.3, [round(ms / 60000, 1) for ms in loads]
+
+
+def test_shard_zero_receives_ordinary_files_with_committed_table():
+    """Shard 0 must receive at least one ordinary test file with the committed table.
+
+    The old 20_000 ms head start (treated as seconds = 20,000s) gave shard 0 such a
+    large lead that it received zero ordinary files. The corrected 246s head start
+    ensures shard 0 gets a fair share of ordinary work.
+    """
+    table = _table()
+    counts = {path: entry["tests"] for path, entry in table["files"].items()}
+    assignment, _loads = sharding.plan(counts, TOTAL, table)
+    shard_zero_files = [path for path, shard in assignment.items() if shard == 0]
+    assert shard_zero_files, "shard 0 received no ordinary test files"
+
+
 def test_the_committed_table_is_well_formed():
     table = _table()
     assert table["default_seconds_per_test"] > 0
