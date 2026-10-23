@@ -311,6 +311,7 @@ class TestBenefitLifecycle:
         with app.app_context():
             b = Benefit(name=f"Measure me {uuid.uuid4().hex[:6]}",
                         strategic_initiative_id=org_a["programme_id"], organization_id=org_a["org_id"],
+                        owner_id=org_a["user_id"], unit="GBP",
                         baseline_value=100, target_value=50, status="identified")
             db.session.add(b)
             db.session.commit()
@@ -323,9 +324,8 @@ class TestBenefitLifecycle:
             row = db.session.get(Benefit, bid)
             assert float(row.actual_value) == 75
             assert row.realisation_percentage == 50.0
-            assert row.status == "realising", "half-achieved must not claim realised"
-            db.session.delete(row)
-            db.session.commit()
+            assert row.status == "not_realised", "half-achieved must not claim realised"
+            # Measurement history is append-only, so the benefit is left in place.
 
     def test_status_becomes_realised_only_when_target_is_met(self, app, client, org_a):
         from app import db
@@ -334,6 +334,7 @@ class TestBenefitLifecycle:
         with app.app_context():
             b = Benefit(name=f"Full {uuid.uuid4().hex[:6]}",
                         strategic_initiative_id=org_a["programme_id"], organization_id=org_a["org_id"],
+                        owner_id=org_a["user_id"], unit="GBP",
                         baseline_value=100, target_value=50, status="identified")
             db.session.add(b)
             db.session.commit()
@@ -346,8 +347,7 @@ class TestBenefitLifecycle:
             row = db.session.get(Benefit, bid)
             assert row.realisation_percentage == 100.0
             assert row.status == "realised"
-            db.session.delete(row)
-            db.session.commit()
+            # Measurement history is append-only, so the benefit is left in place.
 
     def test_measurement_without_a_value_changes_nothing(self, app, client, org_a):
         from app import db
@@ -356,6 +356,7 @@ class TestBenefitLifecycle:
         with app.app_context():
             b = Benefit(name=f"Blank {uuid.uuid4().hex[:6]}",
                         strategic_initiative_id=org_a["programme_id"], organization_id=org_a["org_id"],
+                        owner_id=org_a["user_id"], unit="GBP",
                         baseline_value=100, target_value=50, status="identified")
             db.session.add(b)
             db.session.commit()

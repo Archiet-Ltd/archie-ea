@@ -277,25 +277,54 @@ def _create_programme_benefit(programme_id):
 @portfolio_bp.route("/benefits/<int:benefit_id>/measure", methods=["POST"])
 @login_required
 def benefit_measure(benefit_id):
-    """Record a measured actual — what turns a claim into evidence."""
-    from app.models.benefit import Benefit
+    """Record a measured actual — what turns a claim into evidence.
 
-    benefit = db.session.get(Benefit, benefit_id)
-    if benefit is None:
-        abort(404)
+    Goes through the room's outcome writer, the one place that appends the
+    measurement history and projects it onto the benefit.
+    """
+    import uuid
+    from datetime import timezone
+    from decimal import Decimal, InvalidOperation
 
-    actual = _decimal_or_none(request.form.get("actual_value"))
-    if actual is None:
+    from app.modules.transformation_room.domain import (
+        NotAuthorised,
+        NotFound,
+        TransformationError,
+    )
+    from app.modules.transformation_room.outcome_service import OutcomeMeasurementService
+    from app.modules.transformation_room.routes import actor_from_request
+
+    try:
+        actual = Decimal(str(request.form.get("actual_value") or "").strip())
+        if not actual.is_finite():
+            raise InvalidOperation
+    except InvalidOperation:
         flash("A measurement needs a value.", "error")
         return redirect(url_for("portfolio.index"))
 
-    benefit.actual_value = actual
-    benefit.actual_date = _date_or_none(request.form.get("actual_date")) or datetime.utcnow().date()
-    pct = benefit.realisation_percentage
-    # Only claim "realised" when the measurement supports it; otherwise the
-    # status would assert an outcome the numbers do not.
-    benefit.status = "realised" if (pct is not None and pct >= 100) else "realising"
-    db.session.commit()
+    now = datetime.now(timezone.utc)
+    observed_on = _date_or_none(request.form.get("actual_date"))
+    observed_at = now if observed_on is None else now.replace(
+        year=observed_on.year, month=observed_on.month, day=observed_on.day
+    )
+    try:
+        OutcomeMeasurementService.record(
+            actor=actor_from_request(),
+            benefit_id=benefit_id,
+            value=actual,
+            unavailable_reason=None,
+            observed_at=observed_at,
+            source_identity="portfolio:benefit-form",
+            source_version="1",
+            command_key=str(uuid.uuid4()),
+        )
+    except NotFound:
+        abort(404)
+    except NotAuthorised:
+        abort(403)
+    except (TransformationError, ValueError) as error:
+        flash(f"Measurement not recorded: {getattr(error, 'reason', error)}", "error")
+        return redirect(url_for("portfolio.index"))
     flash("Measurement recorded.", "success")
     return redirect(url_for("portfolio.index"))
 
