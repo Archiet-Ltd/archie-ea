@@ -196,10 +196,9 @@
                 <label for="architecture-kind" class="mb-1 block text-xs font-medium text-muted-foreground">Kind</label>
                 <select id="architecture-kind" x-model="kindFilter" @change="currentPage = 1; loadElements()" class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm">
                     <option value="">Any kind</option>
-                    <option value="Epic">Epic</option>
-                    <option value="Feature">Feature</option>
-                    <option value="Capability (SAFe)">Capability (SAFe)</option>
-                    <option value="Enabler">Enabler</option>
+                    {% for kind in kind_options %}
+                    <option value="{{ kind }}">{{ kind }}</option>
+                    {% endfor %}
                 </select>
             </div>
             {# No "Solution linkage" filter: the layer elements endpoint returns no
