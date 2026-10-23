@@ -33,12 +33,13 @@ def _overview_health_context():
 def test_overview_preserves_canonical_score_precision_and_missing_components(monkeypatch, score, components):
     from app.modules.dashboard.v2.services.executive_dashboard_service import ExecutiveDashboardService
     monkeypatch.setattr(ExecutiveDashboardService, "_get_health_score", lambda self: {
-        "composite_score": score, "components": components,
+        "composite_score": score,
+        "components": {key: {"key": key, "value": value} for key, value in components.items()},
         "unavailable_components": [key for key, value in components.items() if value is None],
     })
     context = _overview_health_context()
     assert context["health_score"] == score
-    assert context["health_components"] == {
+    assert {key: component["value"] for key, component in context["health_components"].items()} == {
         "phase_maturity": components["phase_maturity"], "risk_health": components["risk_posture"],
         "capability_coverage": components["capability_coverage"], "governance": components["governance"],
     }
@@ -83,7 +84,9 @@ def test_empty_portfolio_has_no_measured_health_components(monkeypatch):
                         lambda self: {"percentage": None})
     result = module.ExecutiveDashboardService()._get_health_score()
     assert result["composite_score"] is None
-    assert result["components"] == dict.fromkeys(["phase_maturity", "risk_posture", "capability_coverage", "governance"])
+    assert {key: component["value"] for key, component in result["components"].items()} == dict.fromkeys(
+        ["phase_maturity", "risk_posture", "capability_coverage", "governance"]
+    )
     assert result["unavailable_components"] == ["capability_coverage", "governance", "phase_maturity", "risk_posture"]
 
 

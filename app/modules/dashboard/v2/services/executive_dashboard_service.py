@@ -6,6 +6,7 @@ VendorOrganization, and ArchiMateElement models.
 """
 
 import logging
+from datetime import datetime
 
 from flask import g
 
@@ -137,7 +138,7 @@ class ExecutiveDashboardService:
             return {"counts": counts, "total": len(open_risks)}
         except Exception as exc:
             logger.warning("Executive dashboard: risk summary unavailable: %s", exc)
-            return {"counts": {"critical": 0, "high": 0, "medium": 0, "low": 0}, "total": 0}
+            return {"counts": None, "total": None}
 
     def _get_arb_pending(self):
         """Count ARB review items by status."""
@@ -255,173 +256,205 @@ class ExecutiveDashboardService:
 
         return stats
 
-    def _get_health_score(self):
-        """Compute a composite architecture health score (0-100).
+    # ------------------------------------------------------------------
+    # Health score: one perspective component per measure
+    # ------------------------------------------------------------------
 
-        Weighted average of:
-        - Phase maturity (40%): share of solutions with a recorded phase
-          that are in phase C or later
-        - Risk posture (30%): inverse of high/critical risk ratio
-        - Capability coverage (20%): % L1 capabilities with application mapping
-        - Governance (10%): ARB presence, timeliness and approval rate
+    @staticmethod
+    def _component(key, label, value, basis, source):
+        """The contract every perspective component returns.
 
-        A component is ``None`` when it could not be measured — the query failed,
-        or there is nothing to measure yet. It is deliberately not zero, and for
-        risk posture emphatically not 100: this method used to answer a database
-        failure with ``risk_posture = 100.0``, reporting a *perfect* enterprise
-        risk posture at exactly the moment it knew least. Per CLAUDE.md a value
-        the system does not have must reach the UI as ``None`` (rendered as an em
-        dash), because a plausible number is indistinguishable from a measured
-        one and the reader acts on it.
-
-        The composite is re-weighted over whichever components are available, and
-        is itself ``None`` when none of them are.
+        ``value`` is a number when measured and ``None`` when not measured; it
+        is never 0 or 100 standing in for "nothing to measure". ``basis`` is a
+        plain sentence on what was counted, ``source`` names the store it came
+        from, and ``as_of`` is the day the figure was read.
         """
-        scores = {}
+        return {
+            "key": key,
+            "label": label,
+            "value": value,
+            "basis": basis,
+            "source": source,
+            "as_of": datetime.utcnow().date().isoformat(),
+        }
 
-        # Phase maturity: share of solutions in phase C or later.
-        # Only recorded, valid phases supply a denominator. NULL/invalid phase
-        # does not mean Phase A, nor a measured failure to progress past Phase B.
-        # The Health Scorecard's average solution maturity reads the same
-        # solutions through the same phase summary.
+    def _phase_maturity_component(self):
+        """M23: share of phased solutions in phase C or later."""
+        label = "phase maturity"
+        source = "solution phases"
         try:
             from app.modules.dashboard.v2.services.solution_phase_measures import (
+                ADVANCED_PHASES,
                 recorded_phase_summary,
                 share_in_advanced_phases,
             )
 
-            scores["phase_maturity"] = share_in_advanced_phases(recorded_phase_summary())
+            summary = recorded_phase_summary()
+            value = share_in_advanced_phases(summary)
+            if value is None:
+                return self._component(
+                    "phase_maturity", label, None,
+                    "No solution has a recorded phase yet.", source,
+                )
+            counts = summary["counts"]
+            measured = sum(counts.values())
+            advanced = sum(counts[phase] for phase in ADVANCED_PHASES)
+            return self._component(
+                "phase_maturity", label, value,
+                f"{advanced} of {measured} solutions with a recorded phase are in phase C or later.",
+                source,
+            )
         except Exception:
             logger.exception("health score: phase maturity could not be measured")
-            scores["phase_maturity"] = None
+            return self._component(
+                "phase_maturity", label, None, "Solution phases could not be read.", source,
+            )
 
-        # Risk posture: fewer high/critical is better
-        try:
-            # Same system-of-record correction as _get_risk_summary below:
-            # SolutionRisk is a different, essentially unused table from the
-            # one the Risk Register and /api/risks actually read.
-            from app.models.risk import Risk, RiskStatus
+    def _risk_posture_component(self):
+        """Risk posture from the one risk summary; no second risk query.
 
-            open_risks = Risk.query.filter(Risk.status == RiskStatus.OPEN).all()
-            total_risks = len(open_risks)
-            if total_risks > 0:
-                severe = sum(1 for r in open_risks if r.risk_level in ("critical", "high"))
-                scores["risk_posture"] = round((1 - severe / total_risks) * 100, 1)
-            else:
-                # No open risks recorded is not the same as a clean risk posture.
-                # On a new or unpopulated tenant it means nobody has captured any
-                # risk yet, and scoring that 100 tells a CTO the opposite.
-                scores["risk_posture"] = None
-        except Exception:
-            logger.exception("health score: risk posture could not be measured")
-            scores["risk_posture"] = None
+        No open risk recorded is not a clean posture, and a failed read is not
+        either: both are not measured.
+        """
+        label = "risk posture"
+        source = "risk register"
+        risk = self._get_risk_summary()
+        counts, total = risk.get("counts"), risk.get("total")
+        if counts is None or total is None:
+            return self._component(
+                "risk_posture", label, None, "The risk register could not be read.", source,
+            )
+        if total == 0:
+            return self._component(
+                "risk_posture", label, None, "No open risk is recorded yet.", source,
+            )
+        severe = counts.get("critical", 0) + counts.get("high", 0)
+        return self._component(
+            "risk_posture", label, round((1 - severe / total) * 100, 1),
+            f"{total - severe} of {total} open risks are below high severity.", source,
+        )
 
-        # Capability coverage
+    def _capability_coverage_component(self):
+        """M24: L1 capabilities with at least one mapped application."""
+        label = "capability coverage"
+        source = "business capabilities"
         cap = self._get_capability_coverage()
-        scores["capability_coverage"] = cap["percentage"]
+        value = cap.get("percentage")
+        if value is None:
+            return self._component(
+                "capability_coverage", label, None,
+                "No top-level capability is recorded yet.", source,
+            )
+        return self._component(
+            "capability_coverage", label, value,
+            f"{cap['covered']} of {cap['total']} top-level capabilities have a mapped application.",
+            source,
+        )
 
-        # Governance: ARB throughput score
-        #
-        # Old formula: resolved/total punished platforms that actively used
-        # the ARB — a queue of pending items (which is healthy) scored 0%.
-        #
-        # New formula measures three things:
-        #   - Presence: ARB process is being used at all (50 pts baseline if any item exists)
-        #   - Timeliness: resolved items as % of items older than 30 days (pending > 30d = overdue)
-        #   - Approval rate: approved / resolved (healthy governance approves most things)
-        #
-        # An organisation with an active, up-to-date ARB queue scores near 100.
-        # An organisation with stale unresolved items scores lower.
-        # No ARB activity leaves no denominator to measure governance against.
+    def _governance_component(self):
+        """Review-board throughput: timeliness of open items and approval rate.
+
+        Not measured until at least one review item has been decided; there is
+        no invented default approval rate and no floor.
+        """
+        label = "governance"
+        source = "architecture review board"
         try:
-            from datetime import datetime, timedelta
+            from datetime import timedelta
+
             from app.models.architecture_review_board import ARBReviewItem
 
-            total_arb = db.session.query(db.func.count(ARBReviewItem.id)).scalar() or 0
-            if total_arb == 0:
-                scores["governance"] = None
-            else:
-                resolved = (
-                    db.session.query(db.func.count(ARBReviewItem.id))
-                    .filter(ARBReviewItem.status.in_(["approved", "rejected"]))
-                    .scalar()
-                ) or 0
-
-                cutoff = datetime.utcnow() - timedelta(days=30)
-                overdue = (
-                    db.session.query(db.func.count(ARBReviewItem.id))
-                    .filter(
-                        ARBReviewItem.status.notin_(["approved", "rejected"]),
-                        ARBReviewItem.created_at < cutoff,
-                    )
-                    .scalar()
-                ) or 0
-                pending = total_arb - resolved
-
-                # Timeliness: what fraction of pending items are NOT overdue?
-                timeliness = (1 - overdue / pending) if pending > 0 else 1.0
-
-                # Approval rate among resolved (low rejection rate is normal/healthy)
-                approved = (
-                    db.session.query(db.func.count(ARBReviewItem.id))
-                    .filter(ARBReviewItem.status == "approved")
-                    .scalar()
-                ) or 0
-                approval_rate = (approved / resolved) if resolved > 0 else 0.5
-
-                # Composite: presence (fixed 40) + timeliness (40) + approval_rate (20)
-                gov_score = 40 + round(timeliness * 40) + round(approval_rate * 20)
-                scores["governance"] = min(100.0, float(gov_score))
+            total = db.session.query(db.func.count(ARBReviewItem.id)).scalar() or 0
+            resolved = (
+                db.session.query(db.func.count(ARBReviewItem.id))
+                .filter(ARBReviewItem.status.in_(["approved", "rejected"]))
+                .scalar()
+            ) or 0
+            if total == 0:
+                return self._component(
+                    "governance", label, None, "No review item is recorded yet.", source,
+                )
+            if resolved == 0:
+                return self._component(
+                    "governance", label, None,
+                    "No review item has been decided yet.", source,
+                )
+            cutoff = datetime.utcnow() - timedelta(days=30)
+            overdue = (
+                db.session.query(db.func.count(ARBReviewItem.id))
+                .filter(
+                    ARBReviewItem.status.notin_(["approved", "rejected"]),
+                    ARBReviewItem.created_at < cutoff,
+                )
+                .scalar()
+            ) or 0
+            approved = (
+                db.session.query(db.func.count(ARBReviewItem.id))
+                .filter(ARBReviewItem.status == "approved")
+                .scalar()
+            ) or 0
+            pending = total - resolved
+            timeliness = (1 - overdue / pending) if pending > 0 else 1.0
+            approval_rate = approved / resolved
+            # Two parts, timeliness (2/3) and approval rate (1/3), scaled so a
+            # perfect record is 100 and there is no floor.
+            value = round((timeliness * 40 + approval_rate * 20) / 60 * 100, 1)
+            return self._component(
+                "governance", label, value,
+                f"{resolved} of {total} review items decided, {approved} approved, "
+                f"{overdue} open for more than 30 days.",
+                source,
+            )
         except Exception:
             logger.exception("health score: governance could not be measured")
-            scores["governance"] = None
+            return self._component(
+                "governance", label, None, "Review items could not be read.", source,
+            )
 
-        # Weighted composite over the components that could actually be measured,
-        # with the weights renormalised across them. Averaging a missing component
-        # in as zero would drag the headline score down for a reason the reader
-        # cannot see; treating the whole composite as unavailable when one part is
-        # missing would hide the three that are known.
-        weights = {
-            "phase_maturity": 0.4,
-            "risk_posture": 0.3,
-            "capability_coverage": 0.2,
-            "governance": 0.1,
+    # Nominal weights of the four components; the composite renormalises them
+    # over the components that were measured.
+    HEALTH_WEIGHTS = {
+        "phase_maturity": 0.4,
+        "risk_posture": 0.3,
+        "capability_coverage": 0.2,
+        "governance": 0.1,
+    }
+
+    def _get_health_score(self):
+        """Compute the composite architecture health score (0-100).
+
+        Four perspective components, each a dict ``{"key", "label", "value",
+        "basis", "source", "as_of"}`` whose ``value`` is a number or ``None``
+        for not measured (nothing to measure, or the read failed). It is never
+        0 or 100 standing in for a missing measure.
+
+        The composite is the weighted average of the measured components with
+        the nominal weights (phase maturity 40, risk posture 30, capability
+        coverage 20, governance 10) renormalised over them. It is ``None`` when
+        none are measured, and when the measured components carry less than 35%
+        of the nominal weight, so one lightly weighted component cannot stand
+        for the whole portfolio. ``left_out`` names, in plain words, the
+        components the composite did not use.
+        """
+        components = {
+            "phase_maturity": self._phase_maturity_component(),
+            "risk_posture": self._risk_posture_component(),
+            "capability_coverage": self._capability_coverage_component(),
+            "governance": self._governance_component(),
         }
-        available = {k: w for k, w in weights.items() if scores.get(k) is not None}
+        weights = self.HEALTH_WEIGHTS
+        available = {k: w for k, w in weights.items() if components[k]["value"] is not None}
         total_weight = sum(available.values())
-        # Renormalising over only the measured components is right when most
-        # of the score is measured - it stops one missing input from dragging
-        # the whole composite toward zero. It goes wrong at the other end: if
-        # only the *governance* component (nominal weight 0.1) is measurable,
-        # renormalising gives it 100% of the visible score, so one newly
-        # created, unresolved ARB item can single-handedly report "Health
-        # Score: 90" for a portfolio with zero solutions and zero measured
-        # capability coverage. Confirmed live 6 Sep 2026
-        # (Archie-E2E-Workflow-Test-Report.md E2E-M): "the score behaves as a
-        # near-constant unrelated to its inputs."
-        #
-        # The threshold is 0.35, not 0.5: phase_maturity alone (0.4) is an
-        # existing, deliberately-tested case
-        # (test_health_phase_denominator_uses_only_recorded_valid_phases)
-        # where a single substantial signal is trusted to stand for the
-        # composite on its own - a portfolio's ADM phase spread is not a
-        # throwaway metric the way one ARB item is. 0.35 sits strictly
-        # between governance/risk_posture/capability_coverage alone (0.1,
-        # 0.3, 0.2 - each still withheld) and phase_maturity alone (0.4 -
-        # still reported), so it draws the line at "was more than the
-        # single largest minor component measured", not at "was most of
-        # the score measured".
         composite = (
-            round(sum(scores[k] * w for k, w in available.items()) / total_weight, 1)
+            round(sum(components[k]["value"] * w for k, w in available.items()) / total_weight, 1)
             if total_weight >= 0.35
             else None
         )
-
         return {
             "composite_score": composite,
-            "components": scores,
-            # Names the components that could not be measured, so the UI can say
-            # which part of the score is missing rather than silently showing a
-            # number derived from less than it appears.
-            "unavailable_components": sorted(k for k in weights if scores.get(k) is None),
+            "components": components,
+            # Which parts could not be measured, as keys and as plain words, so
+            # a screen can say what the score was not weighted from.
+            "unavailable_components": sorted(k for k in weights if k not in available),
+            "left_out": [components[k]["label"] for k in weights if k not in available],
         }

@@ -54,7 +54,7 @@ def test_health_phase_denominator_uses_only_recorded_valid_phases(db_session, te
             solution.adm_phase = phase
         db.session.flush()
         result = ExecutiveDashboardService()._get_health_score()
-        assert result["components"]["phase_maturity"] == want
+        assert result["components"]["phase_maturity"]["value"] == want
         assert result["composite_score"] == want
         assert ("phase_maturity" in result["unavailable_components"]) == (want is None)
 
@@ -92,7 +92,7 @@ def test_imported_spellings_of_a_phase_count_as_that_phase(
         ).scalars().all()
         assert sorted(stored) == sorted(phases), "the values must reach the query as written"
 
-        assert ExecutiveDashboardService()._get_health_score()["components"]["phase_maturity"] == phase_maturity
+        assert ExecutiveDashboardService()._get_health_score()["components"]["phase_maturity"]["value"] == phase_maturity
         metrics = _assemble_health_scorecard_metrics()
         assert metrics["avg_maturity"] == avg_maturity
         assert metrics["total_solutions"] == len(phases)

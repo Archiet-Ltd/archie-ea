@@ -531,6 +531,8 @@ def overview():
         health = ExecutiveDashboardService()._get_health_score()
         components = health["components"]
         health_score = health["composite_score"]
+        # The component dicts as the service returns them (value, basis,
+        # source, as_of); the block shows the value and a dash for None.
         health_components = {
             "phase_maturity": components["phase_maturity"],
             "risk_health": components["risk_posture"],
@@ -1090,10 +1092,12 @@ def health_scorecard():
     metrics = _assemble_health_scorecard_metrics()
     health_score = None
     unavailable = None
+    health_components = []
     try:
         health = ExecutiveDashboardService()._get_health_score()
         health_score = health["composite_score"]
         unavailable = health["unavailable_components"]
+        health_components = list(health["components"].values())
     except Exception as exc:
         logger.warning("health_scorecard: health score unavailable: %s", exc)
         db.session.rollback()
@@ -1101,6 +1105,7 @@ def health_scorecard():
         "dashboards/health.html",
         health_score_text=format_health_score(health_score),
         health_basis=health_score_basis(health_score, unavailable),
+        health_components=health_components,
         **metrics,
     )
 
