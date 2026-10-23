@@ -24,9 +24,9 @@
             <div class="flex-1 min-w-[200px]">
                 <input type="text" name="search" value="{{ search or '' }}"
                        placeholder="Search contracts..."
-                       class="w-full px-3 py-2 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring" aria-label="Search contracts...">
+                       class="h-9 w-full px-3 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring" aria-label="Search contracts...">
             </div>
-            <select name="status" class="px-3 py-2 rounded-md border border-input bg-background text-sm" aria-label="Filter by Status">
+            <select name="status" class="h-9 px-3 rounded-md border border-input bg-background text-sm" aria-label="Filter by Status">
                 <option value="">All Statuses</option>
                 <option value="active" {{ 'selected' if status == 'active' }}>Active</option>
                 <option value="expired" {{ 'selected' if status == 'expired' }}>Expired</option>
@@ -43,7 +43,7 @@
     {% if contracts %}
     <div class="bg-card border border-border rounded-lg overflow-hidden">
         <div class="overflow-x-auto">
-        <table class="w-full border-collapse">
+        <table class="dense-table w-full border-collapse">
             <thead>
                 <tr class="bg-muted/40 border-b">
                     <th class="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Contract</th>

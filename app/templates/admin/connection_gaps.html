@@ -17,23 +17,23 @@
 
     <!-- Aggregate Stats Cards -->
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-6">
-        <div class="rounded-xl border bg-card p-4">
+        <div class="rounded-lg border border-border bg-card p-4">
             <div class="text-xs font-medium text-muted-foreground uppercase tracking-wider">Total Solutions</div>
             <div class="text-2xl font-semibold mt-1">{{ aggregate_stats.total }}</div>
         </div>
-        <div class="rounded-xl border bg-card p-4">
+        <div class="rounded-lg border border-border bg-card p-4">
             <div class="text-xs font-medium text-muted-foreground uppercase tracking-wider">Below 25% Complete</div>
             <div class="text-2xl font-semibold mt-1 text-destructive">{{ aggregate_stats.below_25 }}</div>
             {% if aggregate_stats.total > 0 %}
             <div class="text-xs text-muted-foreground mt-0.5">{{ (aggregate_stats.below_25 * 100 / aggregate_stats.total) | round | int }}% of portfolio</div>
             {% endif %}
         </div>
-        <div class="rounded-xl border bg-card p-4">
+        <div class="rounded-lg border border-border bg-card p-4">
             <div class="text-xs font-medium text-muted-foreground uppercase tracking-wider">No Phase A Data</div>
             <div class="text-2xl font-semibold mt-1 text-warning">{{ aggregate_stats.no_phase_a }}</div>
             <div class="text-xs text-muted-foreground mt-0.5">Missing drivers, goals, and constraints</div>
         </div>
-        <div class="rounded-xl border bg-card p-4">
+        <div class="rounded-lg border border-border bg-card p-4">
             <div class="text-xs font-medium text-muted-foreground uppercase tracking-wider">Avg Completeness</div>
             <div class="text-2xl font-semibold mt-1">{{ aggregate_stats.avg_score }}%</div>
             <div class="text-xs text-muted-foreground mt-0.5">Across all solutions</div>
@@ -42,7 +42,7 @@
 
     <!-- Most Common Missing Junctions -->
     {% if aggregate_stats.junction_gap_counts %}
-    <div class="rounded-xl border bg-card p-4 mt-4">
+    <div class="rounded-lg border border-border bg-card p-4 mt-4">
         <h3 class="text-sm font-medium text-foreground mb-3">Most Common Missing Junctions</h3>
         <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-2">
             {% for jk, label in junction_labels.items() %}
@@ -59,11 +59,11 @@
 
     <!-- Filters -->
     <form method="get" action="{{ url_for('admin.connection_gaps') }}" class="mt-6 rounded-xl border bg-card p-4">
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+        <div class="grid grid-cols-1 gap-3">
             <div>
-                <label for="domain" class="block text-xs font-medium text-muted-foreground mb-1">Business Domain</label>
+                <label for="domain" class="block text-sm font-medium text-muted-foreground mb-1">Business Domain</label>
                 <select id="domain" name="domain"
-                        class="w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm">
+                        class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm">
                     <option value="">All Domains</option>
                     {% for d in domain_options %}
                     <option value="{{ d }}" {{ 'selected' if domain_filter == d else '' }}>{{ d }}</option>
@@ -71,9 +71,9 @@
                 </select>
             </div>
             <div>
-                <label for="type" class="block text-xs font-medium text-muted-foreground mb-1">Solution Type</label>
+                <label for="type" class="block text-sm font-medium text-muted-foreground mb-1">Solution Type</label>
                 <select id="type" name="type"
-                        class="w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm">
+                        class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm">
                     <option value="">All Types</option>
                     {% for t in type_options %}
                     <option value="{{ t }}" {{ 'selected' if type_filter == t else '' }}>{{ t }}</option>
@@ -81,14 +81,14 @@
                 </select>
             </div>
             <div>
-                <label for="score_min" class="block text-xs font-medium text-muted-foreground mb-1">Min Score (%)</label>
+                <label for="score_min" class="block text-sm font-medium text-muted-foreground mb-1">Min Score (%)</label>
                 <input type="number" id="score_min" name="score_min" value="{{ score_min }}" min="0" max="100" placeholder="0"
-                       class="w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm">
+                       class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm">
             </div>
             <div>
-                <label for="score_max" class="block text-xs font-medium text-muted-foreground mb-1">Max Score (%)</label>
+                <label for="score_max" class="block text-sm font-medium text-muted-foreground mb-1">Max Score (%)</label>
                 <input type="number" id="score_max" name="score_max" value="{{ score_max }}" min="0" max="100" placeholder="100"
-                       class="w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm">
+                       class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm">
             </div>
             <div class="flex items-end">
                 <button type="submit"
@@ -99,11 +99,11 @@
         </div>
         <div class="flex items-center gap-3 mt-3">
             <a href="{{ url_for('admin.connection_gaps') }}"
-               class="inline-flex items-center justify-center rounded-md border border-input bg-background px-4 py-2 text-sm font-medium hover:bg-accent transition-colors">
+               class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
                 Clear
             </a>
             <a href="{{ url_for('admin.connection_gaps', domain=domain_filter, type=type_filter, score_min=score_min, score_max=score_max, export='csv') }}"
-               class="inline-flex items-center justify-center rounded-md border border-input bg-background px-4 py-2 text-sm font-medium hover:bg-accent transition-colors ml-auto">
+               class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center ml-auto">
                 <i data-lucide="download" class="h-4 w-4 mr-1.5"></i> Export CSV
             </a>
         </div>
@@ -118,9 +118,9 @@
     </div>
 
     <!-- Results table -->
-    <div class="rounded-xl border bg-card overflow-hidden">
+    <div class="rounded-lg border border-border bg-card overflow-hidden">
         <div class="overflow-x-auto">
-            <table class="w-full text-sm">
+            <table class="dense-table w-full text-sm">
                 <thead>
                     <tr class="border-b bg-muted/50">
                         <th class="px-4 py-3 text-left font-medium text-muted-foreground whitespace-nowrap">Solution</th>
@@ -159,7 +159,7 @@
                                 {{ sol.score }}%
                             </span>
                             {% elif sol.score < 75 %}
-                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-primary border border-primary/30">
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-info-emphasis border border-primary/30">
                                 {{ sol.score }}%
                             </span>
                             {% else %}
@@ -210,14 +210,14 @@
     <nav class="flex items-center justify-center gap-1 mt-6" aria-label="Connection gaps pagination">
         {% if page > 1 %}
         <a href="{{ url_for('admin.connection_gaps', page=page-1, domain=domain_filter, type=type_filter, score_min=score_min, score_max=score_max) }}"
-           class="inline-flex items-center justify-center rounded-md border border-input bg-background px-3 py-1.5 text-sm hover:bg-accent transition-colors">
+           class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
             Previous
         </a>
         {% endif %}
         <span class="px-3 py-1.5 text-sm text-muted-foreground">Page {{ page }} of {{ total_pages }}</span>
         {% if page < total_pages %}
         <a href="{{ url_for('admin.connection_gaps', page=page+1, domain=domain_filter, type=type_filter, score_min=score_min, score_max=score_max) }}"
-           class="inline-flex items-center justify-center rounded-md border border-input bg-background px-3 py-1.5 text-sm hover:bg-accent transition-colors">
+           class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
             Next
         </a>
         {% endif %}

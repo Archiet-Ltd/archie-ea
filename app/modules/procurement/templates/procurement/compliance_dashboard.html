@@ -122,7 +122,7 @@
         </h2>
         <div class="space-y-3">
             {% for license in violations %}
-            <div class="p-3 bg-destructive/10 rounded-lg"
+            <div class="px-3 py-2 bg-destructive/10 rounded-md"
                  x-data="{
                     open: false,
                     loading: false,
@@ -216,7 +216,7 @@
         </h2>
         <div class="space-y-3">
             {% for license in warnings %}
-            <div class="flex items-center justify-between p-3 bg-warning/10 rounded-lg">
+            <div class="flex items-center justify-between px-3 py-2 bg-warning/10 rounded-md">
                 <div>
                     <div class="font-medium">{{ license.product_name }}</div>
                     {# same bg-warning/10-lightens-the-token issue as the violations card above #}

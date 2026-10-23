@@ -7,6 +7,7 @@ Pure Python module: no DB, no LLM, no I/O.
 
 import re
 from dataclasses import dataclass
+from app.models.archimate_element_types import StandardTypeTable
 
 # ---------------------------------------------------------------------------
 # Element inference rules: regex pattern -> inferred element metadata
@@ -265,7 +266,7 @@ class InferenceRulesRegistry:
 
     def _layer_for_type(self, element_type: str) -> str:
         """Map element type to its ArchiMate layer."""
-        layer_map = {
+        layer_map = StandardTypeTable({
             "Stakeholder": "motivation", "Driver": "motivation", "Assessment": "motivation",
             "Goal": "motivation", "Outcome": "motivation", "Principle": "motivation",
             "Requirement": "motivation", "Constraint": "motivation",
@@ -281,5 +282,5 @@ class InferenceRulesRegistry:
             "Artifact": "technology", "CommunicationNetwork": "technology",
             "Gap": "implementation", "WorkPackage": "implementation",
             "Deliverable": "implementation", "Plateau": "implementation",
-        }
+        })
         return layer_map.get(element_type, "business")

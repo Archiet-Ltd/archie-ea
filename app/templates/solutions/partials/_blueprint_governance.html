@@ -11,7 +11,7 @@
     {# ════════════════════════════════════════════════════════════════════ #}
     {# 0. Setup Checklist (GOV-03)                                         #}
     {# ════════════════════════════════════════════════════════════════════ #}
-    <div class="rounded-xl border border-border bg-card shadow-sm p-4" x-data="setupChecklist({{ solution.id }})">
+    <div class="rounded-lg border border-border bg-card p-4" x-data="setupChecklist({{ solution.id }})">
         {# Collapsed by default: with Completeness and Next Actions carrying the
            page's live status, four always-open rail cards were noise. #}
         <div x-data="{ railOpen: false }">
@@ -111,7 +111,7 @@
     {# ════════════════════════════════════════════════════════════════════ #}
     {# 1. Blueprint Completeness Ring                                      #}
     {# ════════════════════════════════════════════════════════════════════ #}
-    <div class="rounded-xl border border-border bg-card shadow-sm p-4">
+    <div class="rounded-lg border border-border bg-card p-4">
         <h3 class="text-2xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">Completeness</h3>
 
         <div class="flex flex-col items-center">
@@ -154,7 +154,7 @@
     {# 2. TOGAF ADM Checklist                                              #}
     {# ════════════════════════════════════════════════════════════════════ #}
     {% if phase_checklist %}
-    <div class="rounded-xl border border-border bg-card shadow-sm p-4" x-data="{ railOpen: false }">
+    <div class="rounded-lg border border-border bg-card p-4" x-data="{ railOpen: false }">
         <button type="button" @click="railOpen = !railOpen" :aria-expanded="railOpen"
                 class="w-full flex items-center justify-between text-left">
             <h3 class="text-2xs font-semibold uppercase tracking-wider text-muted-foreground">ADM Phase Completion ({{ phase_checklist|length }} phases)</h3>
@@ -184,7 +184,7 @@
     {# ════════════════════════════════════════════════════════════════════ #}
     {# 3. Next Actions                                                     #}
     {# ════════════════════════════════════════════════════════════════════ #}
-    <div class="rounded-xl border border-border bg-card shadow-sm p-4">
+    <div class="rounded-lg border border-border bg-card p-4">
         <h3 class="text-2xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">Next Actions</h3>
 
         {% if next_actions %}
@@ -210,7 +210,7 @@
             {% endfor %}
         </div>
         {% else %}
-        <div class="rounded-lg border border-dashed border-success/30 bg-success/5 p-3 text-center">
+        <div class="rounded-md border border-dashed border-success/40 bg-success/10 px-3 py-2 text-center">
             <span class="text-xs text-success-emphasis font-medium">All sections at 80%+ — ready for governance review.</span>
         </div>
         {% endif %}
@@ -219,7 +219,7 @@
     {# ════════════════════════════════════════════════════════════════════ #}
     {# 4. Governance Status                                                #}
     {# ════════════════════════════════════════════════════════════════════ #}
-    <div class="rounded-xl border border-border bg-card shadow-sm p-4"
+    <div class="rounded-lg border border-border bg-card p-4"
          x-data="arbReadinessPanel({{ solution.id }})" x-init="load()">
         <h3 class="text-2xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">Governance Status</h3>
 
@@ -229,7 +229,7 @@
             {% if gov_status == 'approved' %}
             <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-success/10 text-success-emphasis border border-success/30">Approved</span>
             {% elif gov_status == 'arb_review' or gov_status == 'in_review' %}
-            <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-primary border border-primary/30">In ARB Review</span>
+            <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-info-emphasis border border-primary/30">In ARB Review</span>
             {% elif gov_status == 'rejected' %}
             <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-destructive/10 text-destructive-emphasis border border-destructive/30">Rejected</span>
             {% else %}
@@ -286,15 +286,15 @@
                     </div>
                 </div>
             </template>
-            <div x-show="loadError" x-cloak class="rounded-md border border-destructive/30 bg-destructive/5 p-3" role="alert">
+            <div x-show="loadError" x-cloak class="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2" role="alert">
                 <p class="text-xs font-medium text-destructive-emphasis">Readiness is unavailable</p>
                 <p class="mt-1 text-xs text-muted-foreground">No submission decision has been made. Try the check again.</p>
                 <button type="button" @click="load()" :disabled="loading"
-                        class="mt-2 inline-flex h-8 items-center justify-center rounded-md border border-input bg-background px-3 text-xs font-medium hover:bg-accent disabled:pointer-events-none disabled:opacity-50">Try readiness check again</button>
+                        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 mt-2 items-center justify-center">Try readiness check again</button>
             </div>
 
             <div x-show="submission.state === 'blocked'" x-cloak data-testid="arb-missing-evidence"
-                 class="rounded-md border border-warning/30 bg-warning/5 p-3" role="alert">
+                 class="rounded-md border border-warning/40 bg-warning/10 px-3 py-2" role="alert">
                 <p class="text-xs font-semibold text-warning-emphasis">Submission blocked by missing evidence</p>
                 <ul class="mt-2 space-y-2 border-l-2 border-warning/30 pl-3">
                     <template x-for="(item, index) in submission.missingEvidence" :key="item.code || item.name || index">
@@ -308,17 +308,17 @@
             </div>
 
             <div x-show="submission.state === 'unavailable' || submission.state === 'error'" x-cloak
-                 data-testid="arb-submission-error" class="rounded-md border border-destructive/30 bg-destructive/5 p-3" role="alert">
+                 data-testid="arb-submission-error" class="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2" role="alert">
                 <p class="text-xs font-semibold text-destructive-emphasis" x-text="submission.title"></p>
                 <p class="mt-1 text-xs text-muted-foreground" x-text="submission.message"></p>
             </div>
 
             <div x-show="submission.state === 'success' && submission.reviewItemId && submission.reviewNumber" x-cloak
-                 class="rounded-md border border-success/30 bg-success/5 p-3" role="status">
+                 class="rounded-md border border-success/40 bg-success/10 px-3 py-2" role="status">
                 <p class="text-xs font-semibold text-success-emphasis">Submitted to the Architecture Review Board</p>
                 <p class="mt-1 font-mono text-xs text-foreground" x-text="submission.reviewNumber"></p>
                 <a :href="'/arb/reviews/' + submission.reviewItemId"
-                   class="mt-2 inline-flex h-8 items-center justify-center rounded-md border border-input bg-background px-3 text-xs font-medium hover:bg-accent">Open canonical review</a>
+                   class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 mt-2 items-center justify-center">Open canonical review</a>
             </div>
         </div>
         <script>
@@ -411,7 +411,7 @@
             <label class="block text-xs text-muted-foreground">
                 Cost provenance <span class="font-normal">(required when estimated cost is non-zero)</span>
                 <select x-model="costSource" aria-label="Cost provenance"
-                        class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm text-foreground shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+                        class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
                     <option value="">Select when applicable</option>
                     <option value="manual_override">I confirm the estimate was manually reviewed</option>
                 </select>
@@ -432,7 +432,7 @@
                         <label class="block text-xs text-muted-foreground">
                             Evidence note
                             <input type="text" x-model.trim="directEvidence[item.key].evidence" :aria-label="item.label + ' evidence note'" placeholder="Record what was checked and where the evidence is held"
-                                   class="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+                                   class="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
                         </label>
                     </div>
                 </template>
@@ -483,7 +483,7 @@
     {# ════════════════════════════════════════════════════════════════════ #}
     {% set gov_status = solution.governance_status if solution.governance_status is defined else 'draft' %}
     {% if gov_status == 'arb_review' and arb_review_id is defined and arb_review_id %}
-    <div class="rounded-xl border border-primary/30 bg-primary/5 shadow-sm p-4"
+    <div class="rounded-md border border-primary/40 bg-primary/10 px-3 py-2"
          x-data="arbReviewPanel({{ solution.id }}, {{ arb_review_id }})">
         <h3 class="text-2xs font-semibold uppercase tracking-wider text-primary/80 mb-3">ARB Review</h3>
         <p class="text-xs text-muted-foreground mb-3">This blueprint is pending ARB approval. Review it and record your decision.</p>
@@ -564,7 +564,7 @@
     {# ════════════════════════════════════════════════════════════════════ #}
     {# 4c. AI Generation panel                                             #}
     {# ════════════════════════════════════════════════════════════════════ #}
-    <div class="rounded-xl border border-info/20 bg-info/5 shadow-sm p-4"
+    <div class="rounded-md border border-info/40 bg-info/10 px-3 py-2"
          x-data="{ aiGenerating: false, aiMsg: '', aiSuccess: false }">
         <h3 class="text-2xs font-semibold uppercase tracking-wider text-info-emphasis/80 mb-3">AI Generation</h3>
         <p class="text-xs text-muted-foreground mb-3 leading-relaxed">Generate a complete architecture draft across all TOGAF phases from the problem statement.</p>
@@ -594,7 +594,7 @@
     {# ════════════════════════════════════════════════════════════════════ #}
     {# 5. Export & Generate                                                #}
     {# ════════════════════════════════════════════════════════════════════ #}
-    <div class="rounded-xl border border-border bg-card shadow-sm p-4">
+    <div class="rounded-lg border border-border bg-card p-4">
         {# Export section #}
         <h3 class="text-2xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">Export</h3>
 
@@ -702,7 +702,7 @@
     {# ════════════════════════════════════════════════════════════════════ #}
     {# 5a. Integration Contracts (RUNTIME-02)                              #}
     {# ════════════════════════════════════════════════════════════════════ #}
-    <div id="setup-integration-contracts" class="rounded-xl border border-border bg-card shadow-sm" x-data="integrationContractsPanel({{ solution.id }})">
+    <div id="setup-integration-contracts" class="rounded-lg border border-border bg-card" x-data="integrationContractsPanel({{ solution.id }})">
         <button type="button" @click="expanded = !expanded"
                 class="w-full flex items-center justify-between p-4 text-left">
             <h3 class="text-2xs font-semibold uppercase tracking-wider text-muted-foreground">Integration Contracts</h3>
@@ -747,7 +747,7 @@
             </template>
 
             {# Add / Edit form #}
-            <div x-show="showForm" class="space-y-2 mb-3 rounded-lg border border-border p-3 bg-muted/20">
+            <div x-show="showForm" class="space-y-2 mb-3 rounded-md border border-border px-3 py-2 bg-muted/20">
                 <div>
                     <label class="text-xs text-muted-foreground block mb-0.5">Application</label>
                     <select x-model="form.application_id" class="w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm text-foreground focus:border-primary focus:ring-1 focus:ring-primary" aria-label="Application">
@@ -968,7 +968,7 @@
     {# ════════════════════════════════════════════════════════════════════ #}
     {# 5b-idp. Identity Provider (RUNTIME-03)                             #}
     {# ════════════════════════════════════════════════════════════════════ #}
-    <div id="setup-identity-provider" class="rounded-xl border border-border bg-card shadow-sm" x-data="identityProvider({{ solution.id }})">
+    <div id="setup-identity-provider" class="rounded-lg border border-border bg-card" x-data="identityProvider({{ solution.id }})">
         <button type="button" @click="expanded = !expanded"
                 class="w-full flex items-center justify-between p-4 text-left">
             <h3 class="text-2xs font-semibold uppercase tracking-wider text-muted-foreground">Identity Provider</h3>
@@ -1156,7 +1156,7 @@
     {# ════════════════════════════════════════════════════════════════════ #}
     {# 5c. Infrastructure & Deployment (RUNTIME-04/05)                     #}
     {# ════════════════════════════════════════════════════════════════════ #}
-    <div id="setup-infrastructure" class="rounded-xl border border-border bg-card shadow-sm" x-data="infrastructureConfig({{ solution.id }})">
+    <div id="setup-infrastructure" class="rounded-lg border border-border bg-card" x-data="infrastructureConfig({{ solution.id }})">
         <button type="button" @click="expanded = !expanded"
                 class="w-full flex items-center justify-between p-4 text-left">
             <h3 class="text-2xs font-semibold uppercase tracking-wider text-muted-foreground">Infrastructure</h3>
@@ -1495,7 +1495,7 @@
     {# ════════════════════════════════════════════════════════════════════ #}
     {# 5d. Cloud Cost Estimator                                            #}
     {# ════════════════════════════════════════════════════════════════════ #}
-    <div class="rounded-xl border border-border bg-card shadow-sm p-4" x-data="costEstimator({{ solution.id }})">
+    <div class="rounded-lg border border-border bg-card p-4" x-data="costEstimator({{ solution.id }})">
         <h3 class="text-2xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">Cloud Cost Estimate</h3>
 
         {# Estimate button #}
@@ -1603,7 +1603,7 @@
     {# ════════════════════════════════════════════════════════════════════ #}
     {# 5b. Compliance Monitor (CODEGEN-06)                                #}
     {# ════════════════════════════════════════════════════════════════════ #}
-    <div class="rounded-xl border border-border bg-card shadow-sm p-4" x-data="complianceMonitor({{ solution.id }})">
+    <div class="rounded-lg border border-border bg-card p-4" x-data="complianceMonitor({{ solution.id }})">
         <h3 class="text-2xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">Compliance Monitor</h3>
 
         {# Service URL input #}
