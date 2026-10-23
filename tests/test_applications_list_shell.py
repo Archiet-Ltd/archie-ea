@@ -141,12 +141,15 @@ def test_table_wrapper_has_overflow_x_auto(app, db_session, make_org):
 
 def test_am_column_header_has_truthful_label(app, db_session, make_org):
     """The AM column encodes a real field (ApplicationComponent.archimate_element_id)
-    — it must be labeled, not just a bare 'AM' header with unlabeled dots."""
+    — it must be labeled, not just a bare 'AM' header with unlabeled dots.
+    The header now reads the full word "ArchiMate" (the abbreviation told nobody what it
+    meant) and still carries a title and an accessible name; a bare 'AM' header fails."""
     html, _ = _get_list_html_with_app(app, db_session, make_org, "am-header")
-    header_idx = html.index(">AM<")
+    assert ">AM<" not in html, "the column header is the bare abbreviation again"
+    header_idx = html.index(">ArchiMate</th>")
     th_start = html.rindex("<th", 0, header_idx)
     th_open_tag = html[th_start : html.index(">", th_start)]
-    assert "title=" in th_open_tag or "aria-label=" in th_open_tag
+    assert "title=" in th_open_tag and "aria-label=" in th_open_tag
 
 
 def test_am_column_dots_have_aria_label(app, db_session, make_org):

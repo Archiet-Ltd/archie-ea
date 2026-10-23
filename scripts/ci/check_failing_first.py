@@ -29,6 +29,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import shutil
 import subprocess
 import sys
 import xml.etree.ElementTree as ET  # noqa: S405 - our own pytest output, not untrusted input
@@ -214,6 +215,14 @@ def cmd_prepare(args: argparse.Namespace) -> int:
     repo = Path(args.repo)
     plan = json.loads(Path(args.plan).read_text(encoding="utf-8"))
     dest = Path(args.dest)
+    # The runner wipes $RUNNER_TEMP between jobs but the checkout's worktree
+    # registration survives, so the next run fails with "a missing but already
+    # registered worktree" before any test runs. Prune stale entries and clear a
+    # left-over destination before adding, then add as before.
+    git(repo, "worktree", "prune", check=False)
+    if dest.is_dir():
+        git(repo, "worktree", "remove", "--force", str(dest), check=False)
+        shutil.rmtree(dest, ignore_errors=True)
     git(repo, "worktree", "add", "--detach", str(dest), plan["merge_base"])
     for path in plan["test_files"] + plan["support_files"]:
         blob = subprocess.run(  # noqa: S603 - fixed argv
@@ -233,6 +242,8 @@ def cmd_prepare(args: argparse.Namespace) -> int:
 # ---------------------------------------------------------------------------
 def cmd_run(args: argparse.Namespace) -> int:
     plan = json.loads(Path(args.plan).read_text(encoding="utf-8"))
+    repo = Path(args.repo)
+    dest = Path(args.dest)
     junit = Path(args.junit).resolve()
     junit.unlink(missing_ok=True)
     cmd = [
@@ -246,11 +257,17 @@ def cmd_run(args: argparse.Namespace) -> int:
         f"--junitxml={junit}",
         *plan["test_files"],
     ]
-    proc = subprocess.run(cmd, cwd=args.dest, env=_unmeasured_env(), check=False)  # noqa: S603 - fixed argv
-    print(
-        f"pytest exited {proc.returncode} (failures are expected and are what this check looks for)"
-    )
-    return 0
+    try:
+        proc = subprocess.run(cmd, cwd=args.dest, env=_unmeasured_env(), check=False)  # noqa: S603 - fixed argv
+        print(
+            f"pytest exited {proc.returncode} (failures are expected and are what this check looks for)"
+        )
+        return 0
+    finally:
+        # A normal run leaves no registration behind: remove the worktree the
+        # prepare step created and prune its administrative files.
+        git(repo, "worktree", "remove", "--force", str(dest), check=False)
+        git(repo, "worktree", "prune", check=False)
 
 
 def _unmeasured_env() -> dict[str, str]:
@@ -405,6 +422,7 @@ def build_parser() -> argparse.ArgumentParser:
     prep.set_defaults(func=cmd_prepare)
 
     run = sub.add_parser("run", help="run the changed tests against the base code")
+    run.add_argument("--repo", default=".", help="repository holding the worktree registrations")
     run.add_argument("--plan", default="failing-first-plan.json")
     run.add_argument("--dest", required=True)
     run.add_argument("--junit", default="failing-first.xml")

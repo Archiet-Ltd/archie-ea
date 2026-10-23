@@ -733,7 +733,9 @@ async function loadUnifiedApplications(targetId) {
         if (UnifiedMappingModal.context === 'apqc') {
             url = '/api/apqc/process/' + id + '/applications';
         } else if (UnifiedMappingModal.context === 'archimate') {
-            url = '/capability-map/api/capabilities/' + id + '/archimate-mappings';
+            // Canonical applications list reader: one endpoint for the
+            // organisation's applications, tenant-scoped by the middleware.
+            url = '/applications/api/list';
         } else if (UnifiedMappingModal.context === 'vendor') {
             url = '/api/vendors/' + id + '/applications';
         }

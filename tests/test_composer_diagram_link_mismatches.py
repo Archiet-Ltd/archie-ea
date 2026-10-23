@@ -325,7 +325,6 @@ def test_blueprint_js_uses_solution_id_param_not_solution():
 @pytest.mark.parametrize(
     "path,dead_needle",
     [
-        ("app/templates/architecture/elements.html", "?element=' + selectedElement.id"),
         ("app/templates/archimate/traceability_chain.html", "?element_id=' + editElement.id"),
         ("app/static/js/ai_chat/commands.js", "?process=${g.process_id}"),
     ],
@@ -341,6 +340,15 @@ def test_fix3_sites_no_longer_build_unread_params(path, dead_needle):
     src = Path(path).read_text(encoding="utf-8")
     assert dead_needle not in src, f"{path} still builds the unread param: {dead_needle!r}"
     assert "/archimate/composer" in src, f"{path} should still link to the composer generically"
+
+
+def test_elements_drawer_open_in_composer_carries_the_element():
+    """The Composer reads ?element=<id> (focus mode), so the elements drawer's
+    "Open in Composer" link opens the selected element's neighbourhood."""
+    from pathlib import Path
+
+    src = Path("app/templates/architecture/elements.html").read_text(encoding="utf-8")
+    assert "'/archimate/composer?element=' + selectedElement.id" in src
 
 
 def test_fix4_composer_url_helper_uses_create_diagram_not_elements_param():

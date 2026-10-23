@@ -24,6 +24,7 @@ logger = logging.getLogger(__name__)
 
 # ── Supported languages — sourced from STACK_REGISTRY (single source of truth) ──
 from app.modules.codegen.stack_registry import STACK_REGISTRY, SUPPORTED_LANGUAGES  # noqa: E402,F401 — re-exported to codegen_routes
+from app.models.archimate_element_types import StandardTypeTable, application_kind_types, is_application_kind
 
 
 
@@ -1366,7 +1367,7 @@ def _synthesize_uml_from_elements(solution_id):
                 "type": e.type,
             })
 
-        elif e.type == "ApplicationComponent":
+        elif is_application_kind(e.type):
             components.append({
                 "name": e.name,
                 "description": e.description or f"{e.name} service",
@@ -1698,7 +1699,7 @@ def _extract_element_context(element_name: str, element_type: str, brief_text: s
     name_tokens = set(re.sub(r"[^a-z0-9 ]", " ", element_name.lower()).split()) - _NOISE
 
     # Type-specific boosting tokens help match sentences about the right concern
-    _TYPE_BOOST = {
+    _TYPE_BOOST = StandardTypeTable({
         "DataObject":           {"data", "record", "store", "entity", "object", "field", "model"},
         "BusinessObject":       {"business", "domain", "entity", "object"},
         "ApplicationComponent": {"component", "service", "application", "system", "module"},
@@ -1713,7 +1714,7 @@ def _extract_element_context(element_name: str, element_type: str, brief_text: s
         "Node":                 {"server", "infrastructure", "node", "host", "deploy"},
         "TechnologyService":    {"technology", "platform", "infrastructure", "service"},
         "WorkPackage":          {"phase", "milestone", "delivery", "sprint", "wave", "workpackage"},
-    }
+    })
     query_tokens = name_tokens | _TYPE_BOOST.get(element_type, set())
     if not query_tokens:
         return ""
@@ -2960,7 +2961,7 @@ def _ensure_archimate_elements_from_journey(solution_id: int) -> int:
         ).all()
 
         if unconfirmed:
-            _TYPE_TO_LAYER = {
+            _TYPE_TO_LAYER = StandardTypeTable({
                 "ApplicationComponent": "application", "ApplicationService": "application",
                 "ApplicationFunction": "application", "ApplicationInterface": "application",
                 "DataObject": "application", "BusinessObject": "business",
@@ -2974,7 +2975,7 @@ def _ensure_archimate_elements_from_journey(solution_id: int) -> int:
                 "TechnologyService": "technology", "Artifact": "technology",
                 "WorkPackage": "implementation", "Deliverable": "implementation",
                 "Plateau": "implementation", "Gap": "implementation",
-            }
+            })
 
             for p in unconfirmed:
                 if not (p.archimate_type and p.name):
@@ -3056,7 +3057,10 @@ def _ensure_archimate_elements_from_journey(solution_id: int) -> int:
             if not cap_name:
                 continue
 
-            ae = ArchiMateElement.query.filter_by(name=cap_name, type="ApplicationComponent").first()
+            ae = ArchiMateElement.query.filter(
+                ArchiMateElement.name == cap_name,
+                ArchiMateElement.type.in_(application_kind_types()),
+            ).first()
             if not ae:
                 # Prefer brief-extracted context over generic fallback
                 _cap_ctx = (cap.description or "").strip()
@@ -3213,7 +3217,10 @@ def _ensure_archimate_elements_from_journey(solution_id: int) -> int:
                 t4_created = 0
                 for entity_name in matched:
                     pascal_name = "".join(w.capitalize() for w in entity_name.split("_"))
-                    ae = ArchiMateElement.query.filter_by(name=pascal_name, type="ApplicationComponent").first()
+                    ae = ArchiMateElement.query.filter(
+                        ArchiMateElement.name == pascal_name,
+                        ArchiMateElement.type.in_(application_kind_types()),
+                    ).first()
                     if not ae:
                         ae = ArchiMateElement(
                             name=pascal_name,

@@ -380,7 +380,7 @@ def test_backfill_migrates_text_owners(db_session, make_org):
 
     org = make_org("own-bftext")
     user = _make_user(db_session, org, "application_manager", "bftextuser")
-    app = _make_app(db_session, org, "Backfill Text", business_owner=f"{user.first_name} {user.last_name}")
+    app = _make_app(db_session, org, "Backfill Text", legacy_business_owner=f"{user.first_name} {user.last_name}")
 
     stats = backfill_owner_data(dry_run=False, organization_ids=[org.id])
     assert stats["text_owner_fields"] >= 1
@@ -404,8 +404,8 @@ def test_backfill_keeps_organisations_apart(db_session, make_org):
     org_b = make_org("own-bfb")
     user_a = _make_user(db_session, org_a, "application_manager", "bfusera")
     user_b = _make_user(db_session, org_b, "application_manager", "bfuserb")
-    _make_app(db_session, org_a, "OrgA App", business_owner=f"{user_a.first_name} {user_a.last_name}")
-    _make_app(db_session, org_b, "OrgB App", business_owner=f"{user_b.first_name} {user_b.last_name}")
+    _make_app(db_session, org_a, "OrgA App", legacy_business_owner=f"{user_a.first_name} {user_a.last_name}")
+    _make_app(db_session, org_b, "OrgB App", legacy_business_owner=f"{user_b.first_name} {user_b.last_name}")
 
     backfill_owner_data(dry_run=False, organization_ids=[org_a.id, org_b.id])
 
@@ -442,8 +442,8 @@ def test_backfill_does_not_crash_on_unresolved_name(db_session, make_org):
     org = make_org("own-unresolved")
     user = _make_user(db_session, org, "application_manager", "unresmgr")
     _make_app(db_session, org, "Unresolved Test",
-              business_owner=f"{user.first_name} {user.last_name}",
-              technical_owner="Nobody Known Here")
+              legacy_business_owner=f"{user.first_name} {user.last_name}",
+              legacy_technical_owner="Nobody Known Here")
 
     # Should not raise
     stats = backfill_owner_data(dry_run=False, organization_ids=[org.id])
@@ -466,7 +466,7 @@ def test_backfill_unresolved_name_goes_to_list_only(db_session, make_org):
     from app.models.application_owner import ApplicationOwner
 
     org = make_org("own-unres2")
-    _make_app(db_session, org, "No Match App", business_owner="Completely Unknown Person")
+    _make_app(db_session, org, "No Match App", legacy_business_owner="Completely Unknown Person")
 
     stats = backfill_owner_data(dry_run=False, organization_ids=[org.id])
     rows = ApplicationOwner.query.filter(
@@ -514,7 +514,7 @@ def test_backfill_is_idempotent(db_session, make_org):
 
     org = make_org("own-idem")
     user = _make_user(db_session, org, "application_manager", "idemmanager")
-    _make_app(db_session, org, "Idempotent App", business_owner=f"{user.first_name} {user.last_name}")
+    _make_app(db_session, org, "Idempotent App", legacy_business_owner=f"{user.first_name} {user.last_name}")
 
     _ = backfill_owner_data(dry_run=False, organization_ids=[org.id])
     rows1 = ApplicationOwner.query.filter(
@@ -528,7 +528,8 @@ def test_backfill_is_idempotent(db_session, make_org):
 
     assert len(rows1) == len(rows2), "second run should create no additional rows"
     assert stats2["text_owner_fields"] == 0  # all skipped
-    assert stats2["skipped_existing"] >= 1
+    # The resolved text was cleared by the first run, so there is nothing left to skip.
+    assert stats2["skipped_existing"] == 0
 
 
 # ── 6. Ownership coverage view ──────────────────────────────────────────────
@@ -1052,7 +1053,7 @@ def test_backfill_legacy_and_text_same_owner(db_session, make_org):
     org = make_org("own-merge1")
     user = _make_user(db_session, org, "application_manager", "mergemgr")
     app = _make_app(db_session, org, "Merge App",
-                    business_owner=f"{user.first_name} {user.last_name}")
+                    legacy_business_owner=f"{user.first_name} {user.last_name}")
 
     unit = OrganizationUnit(name="Test", organization_id=org.id)
     db_session.add(unit)
@@ -1093,7 +1094,7 @@ def test_backfill_ui_owner_then_text(db_session, make_org):
     org = make_org("own-merge2")
     user = _make_user(db_session, org, "application_manager", "mergemgr2")
     app = _make_app(db_session, org, "Merge UI App",
-                    business_owner=f"{user.first_name} {user.last_name}")
+                    legacy_business_owner=f"{user.first_name} {user.last_name}")
 
     # Pre-create the owner row as if it was added through the picker
     db_session.add(ApplicationOwner(

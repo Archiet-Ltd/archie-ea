@@ -19,7 +19,7 @@
 
     {# ── Score strip: actual vs target + per-module ─────────────────── #}
     <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mt-6">
-        <div class="border border-border rounded-xl bg-card p-4" data-testid="cc-actual">
+        <div class="border border-border rounded-lg bg-card p-4" data-testid="cc-actual">
             <p class="text-xs text-muted-foreground uppercase tracking-wider">Clean-Core Actual</p>
             {% if rollup.fit_gap.clean_core_score is not none %}
             <p class="text-2xl font-bold mt-1
@@ -27,7 +27,7 @@
                 {{ rollup.fit_gap.clean_core_score }}%</p>
             {% else %}<p class="text-lg text-muted-foreground mt-1">No data</p>{% endif %}
         </div>
-        <div class="border border-border rounded-xl bg-card p-4" data-testid="cc-target">
+        <div class="border border-border rounded-lg bg-card p-4" data-testid="cc-target">
             <p class="text-xs text-muted-foreground uppercase tracking-wider">Target</p>
             <div class="flex items-center gap-2 mt-1">
                 <input type="number" min="0" max="100" x-model="target" @change="saveTarget()"
@@ -36,7 +36,7 @@
                 <span class="text-lg font-bold text-muted-foreground">%</span>
             </div>
         </div>
-        <div class="border border-border rounded-xl bg-card p-4">
+        <div class="border border-border rounded-lg bg-card p-4">
             <p class="text-xs text-muted-foreground uppercase tracking-wider">Delta to Target</p>
             {% if rollup.fit_gap.clean_core_score is not none and rollup.fit_gap.clean_core_target %}
             {% set delta = rollup.fit_gap.clean_core_score - rollup.fit_gap.clean_core_target %}
@@ -44,7 +44,7 @@
                 {{ '%+d' % delta }}pp</p>
             {% else %}<p class="text-lg text-muted-foreground mt-1">Set a target</p>{% endif %}
         </div>
-        <div class="border border-border rounded-xl bg-card p-4">
+        <div class="border border-border rounded-lg bg-card p-4">
             <p class="text-xs text-muted-foreground uppercase tracking-wider">Entries</p>
             <p class="text-2xl font-bold text-foreground mt-1">{{ rollup.fit_gap.total }}</p>
             <p class="text-xs text-muted-foreground mt-0.5">{{ rollup.fit_gap.by_module | length }} module(s)</p>
@@ -68,7 +68,7 @@
     {% endif %}
 
     {# ── Bulk action bar ─────────────────────────────────────────────── #}
-    <div class="border border-border rounded-xl bg-card mt-6 overflow-hidden">
+    <div class="border border-border rounded-lg bg-card mt-6 overflow-hidden">
         <div class="px-5 py-3 border-b border-border flex flex-wrap items-center gap-3">
             <h2 class="text-sm font-semibold text-foreground">Register</h2>
             <span class="text-xs text-muted-foreground" x-text="selected.length + ' selected'"></span>
@@ -84,7 +84,7 @@
                 <input type="text" x-model="bulk.erp_module" placeholder="Module — keep"
                        class="h-8 w-32 rounded-md border border-input bg-background px-2 text-xs" aria-label="Bulk module">
                 <button type="button" @click="applyBulk()" :disabled="busy || !selected.length || (!bulk.fit_type && !bulk.status && !bulk.erp_module)"
-                        class="inline-flex items-center gap-2 px-3 py-1.5 text-xs font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50">
+                        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                     <span x-text="busy ? 'Applying…' : 'Apply to selected'"></span>
                 </button>
             </div>
@@ -94,7 +94,7 @@
              x-text="message"></div>
 
         {% if entries %}
-        <table class="min-w-full divide-y divide-border text-sm">
+        <table class="dense-table min-w-full divide-y divide-border text-sm">
             <thead class="bg-muted/30">
                 <tr>
                     <th class="px-4 py-2 w-8"><input type="checkbox" @change="toggleAll($event.target.checked)" aria-label="Select all entries"></th>

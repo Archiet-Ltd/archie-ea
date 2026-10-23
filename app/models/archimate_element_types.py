@@ -10,7 +10,7 @@ Reference: The Open Group ArchiMate 3.2 Specification
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import Dict, List, Optional, Set
+from typing import Dict, List, Optional, Set, Tuple
 
 from app.models.constants import ArchiMateLayer
 
@@ -391,6 +391,23 @@ class ArchiMateElementTypes:
     # =========================================================================
     APPLICATION_ELEMENTS = {
         # Active Structure Elements
+        # Entelim extension of ArchiMate 3.2 (ADR-0014): a specialisation of
+        # ApplicationComponent. Keeps every parent relationship rule (derived in the
+        # matrix module) and is exchanged as an ApplicationComponent.
+        "Application": ElementTypeDefinition(
+            name="Application",
+            layer="application",
+            aspect="active",
+            description=(
+                "A system, app, platform or product-level software offering that the "
+                "organisation lists, owns, costs and retires as one unit. It is "
+                "composed of application components."
+            ),
+            notation_symbol="Application component symbol, named <<Application>>",
+            # Keywords move from ApplicationComponent in the task that switches the type on.
+            example_keywords=[],
+            parent_type="ApplicationComponent",
+        ),
         "ApplicationComponent": ElementTypeDefinition(
             name="ApplicationComponent",
             layer="application",
@@ -1874,6 +1891,7 @@ PLAIN_LANGUAGE_NAMES: dict[str, str] = {
     "Representation": "Representation",
     "Product": "Product",
     # Application layer
+    "Application": "Application",
     "ApplicationComponent": "Application",
     "ApplicationCollaboration": "Application collaboration",
     "ApplicationInterface": "Application interface",
@@ -1964,6 +1982,71 @@ def plain_layer_name(layer: str | None) -> str:
     if pascal.lower() in PLAIN_LAYER_NAMES:
         return PLAIN_LAYER_NAMES[pascal.lower()]
     return layer
+
+
+# =============================================================================
+# Specialisations (ADR-0014)
+# =============================================================================
+# The only place a specialisation is resolved to its parent. Callers that mean
+# "the standard ArchiMate type" call base_type; callers that mean "an application
+# of either kind" call is_application_kind. Nothing else compares to a parent.
+
+SPECIALIZATIONS: Dict[str, str] = {"Application": "ApplicationComponent"}
+
+
+def base_type(element_type: Optional[str]) -> Optional[str]:
+    """The standard ArchiMate type of *element_type* (itself unless a specialisation)."""
+    return SPECIALIZATIONS.get(element_type, element_type)
+
+
+def is_application_kind(element_type: Optional[str]) -> bool:
+    """True for Application and for ApplicationComponent."""
+    return base_type(element_type) == "ApplicationComponent"
+
+
+def application_kind_types() -> Tuple[str, ...]:
+    """Every stored type for which ``is_application_kind`` is true.
+
+    For SQL ``IN`` filters, where a Python predicate cannot be used. Derived from
+    ``SPECIALIZATIONS``, so there is no second list.
+    """
+    parents = set(SPECIALIZATIONS.values())
+    return tuple(sorted(parents | {s for s, p in SPECIALIZATIONS.items() if p in parents}))
+
+
+# The element property that names a specialisation in an exchange file (ADR-0014 Decision 5).
+SPECIALIZATION_PROPERTY = "entelim:specialization"
+
+
+def exchange_type_for(element_type: Optional[str]) -> Tuple[Optional[str], Dict[str, str]]:
+    """``(xsi_type, extra_properties)`` to write for *element_type* in an exchange file.
+
+    A specialisation is written as its standard parent with a property that names it, so every
+    ArchiMate tool can open the file and Entelim reads the specialisation back. Any other type
+    passes through unchanged with no extra property. This is the one place that mapping lives.
+    """
+    parent = SPECIALIZATIONS.get(element_type) if element_type else None
+    if parent:
+        return parent, {SPECIALIZATION_PROPERTY: element_type}
+    return element_type, {}
+
+
+class StandardTypeTable(dict):
+    """A dict keyed by standard ArchiMate type, read through ``base_type``.
+
+    A table that maps a standard type to a layer, a label, a model or a rule is wrapped in this class
+    so an Application (a specialisation) finds its parent's entry on ``get``, ``[]`` and ``in``.
+    Writes, iteration and ``keys()`` are unchanged and still show only the standard keys.
+    """
+
+    def __getitem__(self, key):
+        return super().__getitem__(base_type(key) if isinstance(key, str) else key)
+
+    def get(self, key, default=None):
+        return super().get(base_type(key) if isinstance(key, str) else key, default)
+
+    def __contains__(self, key):
+        return super().__contains__(base_type(key) if isinstance(key, str) else key)
 
 
 # =============================================================================

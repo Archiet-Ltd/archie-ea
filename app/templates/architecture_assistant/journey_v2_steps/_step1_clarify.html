@@ -6,16 +6,16 @@
     </div>
 
     {# ── Start from Template ─────────────────────────────────── #}
-    <div x-show="!templateApplied && step1Phase === 'context'" x-cloak class="rounded-lg border-2 border-dashed border-primary/30 bg-primary/5 p-4">
+    <div x-show="!templateApplied && step1Phase === 'context'" x-cloak class="border rounded-md border-2 border-dashed border-primary/40 bg-primary/10 px-3 py-2">
         <div class="flex items-center gap-2 mb-3">
             <i data-lucide="layout-template" class="h-4 w-4 text-primary"></i>
             <span class="text-sm font-semibold text-foreground">Start from an Industry Template</span>
-            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-primary/10 text-primary border border-primary/20">NEW</span>
+            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-primary/10 text-info-emphasis border border-primary/20">NEW</span>
         </div>
         <p class="text-xs text-muted-foreground mb-3">Pre-built architectures with entities, state machines, roles, and compliance. Customize the 30% that makes your app unique.</p>
         <div x-show="!genomeTemplates" class="flex items-center gap-2">
             <button type="button" @click="loadGenomeTemplates()" :disabled="loadingTemplates"
-                    class="inline-flex items-center gap-1.5 rounded-md bg-primary text-primary-foreground px-3 py-1.5 text-xs font-medium hover:bg-primary/90 disabled:opacity-50">
+                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                 <svg x-show="loadingTemplates" x-cloak class="h-3 w-3 animate-spin" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>
                 <i x-show="!loadingTemplates" data-lucide="sparkles" class="h-3 w-3"></i>
                 Browse Templates
@@ -46,7 +46,7 @@
             <span x-text="templateApplyResult"></span>
         </div>
     </div>
-    <div x-show="templateApplied" x-cloak class="rounded-lg border border-success/30 bg-success/10 px-4 py-3 flex items-center gap-2">
+    <div x-show="templateApplied" x-cloak class="rounded-md border border-success/40 bg-success/10 px-4 py-2 flex items-center gap-2">
         <i data-lucide="check-circle-2" class="h-4 w-4 text-success"></i>
         <span class="text-sm text-success-emphasis font-medium" x-text="'Template applied: ' + (templateAppliedName || '') + ' — customize below'"></span>
     </div>
@@ -195,7 +195,7 @@
 
                 {# ── Landscape Discovery Panel ── #}
                 <div x-show="landscapeMatches || landscapeSearching" x-cloak
-                     class="mt-3 rounded-lg border border-primary/20 bg-primary/5 px-4 py-3 space-y-2.5">
+                     class="mt-3 rounded-md border border-primary/40 bg-primary/10 px-4 py-2 space-y-2.5">
                     <div class="flex items-center gap-2">
                         <i data-lucide="layers" class="w-3.5 h-3.5 text-primary shrink-0" aria-hidden="true"></i>
                         <span class="text-xs font-semibold text-primary">Your Enterprise Landscape</span>
@@ -263,7 +263,7 @@
                     <button type="button" @click="getClarifyingQuestions()"
                             x-show="clarifyPhase === 'input'"
                             :disabled="problemStatement.length < 20 || loading"
-                            class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors disabled:opacity-50">
+                            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                         <template x-if="!loading">
                             <span class="flex items-center gap-2">
                                 <i data-lucide="message-circle" class="w-4 h-4" aria-hidden="true"></i>
@@ -292,7 +292,7 @@
 
         {# ── LLM degradation warning ─────────────────────────── #}
         <div x-show="llmDegraded.step1" x-cloak
-             class="flex items-start gap-3 rounded-lg border border-warning/30 bg-warning/5 px-4 py-3">
+             class="flex items-start gap-3 rounded-md border border-warning/40 bg-warning/10 px-4 py-2">
             <svg class="w-4 h-4 text-warning flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
             </svg>
@@ -314,7 +314,7 @@
                     <div class="rounded-md border border-border bg-background p-4 space-y-2">
                         <div class="flex items-start justify-between gap-2">
                             <div class="flex items-start gap-2">
-                                <span class="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center text-xs font-bold text-primary flex-shrink-0 mt-0.5"
+                                <span class="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center text-xs font-bold text-info-emphasis flex-shrink-0 mt-0.5"
                                       x-text="idx + 1"></span>
                                 <p class="text-sm text-foreground" x-text="typeof q === 'string' ? q : (q.question || q.text || '')"></p>
                             </div>
@@ -343,7 +343,7 @@
                                     </div>
                                     <p x-show="pickerState[idx].searchError" x-cloak class="text-xs text-destructive-emphasis" x-text="pickerState[idx].searchError"></p>
                                     <div x-show="pickerState[idx].results.length > 0" x-cloak
-                                         class="border border-border rounded-md bg-background shadow-md max-h-40 overflow-y-auto">
+                                         class="border border-border rounded-md bg-background max-h-40 overflow-y-auto">
                                         <template x-for="(item, ri) in pickerState[idx].results" :key="ri">
                                             <button @click="addEntity(idx, item)" type="button"
                                                     class="w-full text-left px-3 py-2 text-sm hover:bg-accent transition-colors border-b border-border last:border-0">
@@ -354,7 +354,7 @@
                                     </div>
                                     <div x-show="pickerState[idx].selected.length > 0" class="flex flex-wrap gap-1.5">
                                         <template x-for="(sel, si) in pickerState[idx].selected" :key="si">
-                                            <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-primary border border-primary/30">
+                                            <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-info-emphasis border border-primary/30">
                                                 <span x-text="sel.name"></span>
                                                 <button @click="removeEntity(idx, sel.id)" type="button"
                                                         class="hover:text-destructive-emphasis transition-colors">&times;</button>
@@ -384,7 +384,7 @@
                 </button>
                 <button type="button" @click="submitClarifyAnswers()"
                         :disabled="loading"
-                        class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors disabled:opacity-50">
+                        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                     <template x-if="!loading">
                         <span class="flex items-center gap-2">
                             <i data-lucide="check" class="w-4 h-4" aria-hidden="true"></i>
@@ -624,7 +624,7 @@
                        class="w-full px-3 py-2 border border-border rounded-md bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring" aria-label="Applications in Scope">
                 {# Search results dropdown #}
                 <div x-show="appSearchResults.length > 0" x-cloak
-                     class="border border-border rounded-md max-h-40 overflow-y-auto bg-background shadow-md">
+                     class="border border-border rounded-md max-h-40 overflow-y-auto bg-background">
                     <template x-for="app in appSearchResults" :key="app.id">
                         <div @click="addScopeApp(app)"
                              class="px-3 py-2 hover:bg-muted cursor-pointer text-sm border-b border-border last:border-0">
@@ -636,7 +636,7 @@
                 {# Selected apps #}
                 <div class="flex flex-wrap gap-2 mt-2">
                     <template x-for="app in structuredIntake.in_scope_apps" :key="app.id">
-                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-primary border border-primary/30">
+                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-info-emphasis border border-primary/30">
                             <span x-text="app.name"></span>
                             <button @click="removeScopeApp(app.id)" type="button"
                                     class="ml-1 text-muted-foreground hover:text-destructive-emphasis">&times;</button>
@@ -652,7 +652,7 @@
                        placeholder="Search systems..."
                        class="w-full px-3 py-2 border border-border rounded-md bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring" aria-label="Systems to Integrate With">
                 <div x-show="integrationSearchResults.length > 0" x-cloak
-                     class="border border-border rounded-md max-h-40 overflow-y-auto bg-background shadow-md">
+                     class="border border-border rounded-md max-h-40 overflow-y-auto bg-background">
                     <template x-for="sys in integrationSearchResults" :key="sys.id">
                         <div @click="addIntegration(sys)"
                              class="px-3 py-2 hover:bg-muted cursor-pointer text-sm border-b border-border last:border-0">

@@ -19,7 +19,7 @@
   ) }}
 
   <!-- Progress -->
-  <div class="bg-card border rounded-lg p-6 mb-6">
+  <div class="bg-card border border-border rounded-lg p-6 mb-6">
     <div class="flex justify-between items-center mb-2">
       <span class="text-sm font-medium">Progress</span>
       <span class="text-sm text-muted-foreground" id="progress-text">Step 1 of 6</span>
@@ -30,7 +30,7 @@
   </div>
 
   <!-- Data Readiness Card — shows evidence completeness for the selected application -->
-  <div id="readiness-card" class="bg-card border rounded-lg p-6 mb-6 hidden" aria-live="polite">
+  <div id="readiness-card" class="bg-card border border-border rounded-lg p-6 mb-6 hidden" aria-live="polite">
     <div class="flex items-center justify-between mb-4">
       <h2 class="text-base font-semibold flex items-center gap-2">
         <i data-lucide="clipboard-check" class="h-5 w-5 text-primary" aria-hidden="true"></i>
@@ -40,7 +40,7 @@
     </div>
 
     <!-- Not-ready warning banner -->
-    <div id="readiness-warning" class="hidden mb-4 flex items-start gap-3 rounded-lg border border-warning/30 bg-warning/5 px-4 py-3">
+    <div id="readiness-warning" class="hidden mb-4 flex items-start gap-3 rounded-md border border-warning/40 bg-warning/10 px-4 py-2">
       <i data-lucide="alert-triangle" class="h-4 w-4 text-warning mt-0.5 shrink-0" aria-hidden="true"></i>
       <p class="text-sm text-warning-emphasis">
         <strong>Incomplete evidence</strong> — this application is missing required data. Rationalization
@@ -66,7 +66,7 @@
   </div>
 
   <!-- Application Selector -->
-  <div id="app-selector" class="bg-card border rounded-lg p-6 mb-6">
+  <div id="app-selector" class="bg-card border border-border rounded-lg p-6 mb-6">
     <label for="application-select" class="block text-sm font-medium mb-2">Select Application to Assess</label>
     <select id="application-select" class="w-full rounded-md border px-3 py-2">
       <option value="">Choose an application...</option>
@@ -87,15 +87,15 @@
   <form id="assessment-form" class="space-y-6">
     <!-- Step 1: Technical Health -->
     <div class="questionnaire-step" data-step="1">
-      <div class="bg-card border rounded-lg p-6">
+      <div class="bg-card border border-border rounded-lg p-6">
         <h2 class="text-xl font-semibold mb-4 flex items-center gap-2">
           <i data-lucide="cpu" class="h-5 w-5 text-primary" aria-hidden="true"></i>
           Technical Health Assessment
         </h2>
         <div class="space-y-6">
-          <div class="question-card border rounded-lg p-4 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md">
-            <label class="block font-medium mb-3">What is the current architecture pattern?</label>
-            <div class="grid grid-cols-2 gap-3">
+          <div class="question-card border rounded-lg p-4 transition-all duration-200 hover:-translate-y-0.5">
+            <label class="block text-sm font-medium text-muted-foreground mb-1">What is the current architecture pattern?</label>
+            <div class="grid grid-cols-1 gap-3">
               <label class="flex items-center gap-3 p-3 border rounded-md cursor-pointer hover:bg-accent">
                 <input type="radio" name="architecture_pattern" value="modern_microservices" class="w-4 h-4" aria-label="Architecture Pattern">
                 <div><div class="font-medium">Modern/Microservices</div><div class="text-xs text-muted-foreground">Cloud-native, scalable</div></div>
@@ -115,8 +115,8 @@
             </div>
           </div>
 
-          <div class="question-card border rounded-lg p-4 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md">
-            <label class="block font-medium mb-3">How would you rate the technical debt level?</label>
+          <div class="question-card border rounded-lg p-4 transition-all duration-200 hover:-translate-y-0.5">
+            <label class="block text-sm font-medium text-muted-foreground mb-1">How would you rate the technical debt level?</label>
             <div class="flex gap-2">
               <label class="flex-1 text-center p-3 border rounded-md cursor-pointer hover:bg-accent">
                 <input type="radio" name="technical_debt" value="low" class="hidden peer" aria-label="Technical Debt">
@@ -141,9 +141,9 @@
             </div>
           </div>
 
-          <div class="question-card border rounded-lg p-4 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md">
-            <label class="block font-medium mb-3">What is the deployment frequency?</label>
-            <select name="deployment_frequency" class="w-full rounded-md border px-3 py-2" aria-label="What is the deployment frequency?">
+          <div class="question-card border rounded-lg p-4 transition-all duration-200 hover:-translate-y-0.5">
+            <label class="block text-sm font-medium text-muted-foreground mb-1">What is the deployment frequency?</label>
+            <select name="deployment_frequency" class="h-9 w-full rounded-md border px-3 border-input" aria-label="What is the deployment frequency?">
               <option value="">Select...</option>
               <option value="multiple_daily">Multiple times per day (CI/CD)</option>
               <option value="daily">Daily</option>
@@ -159,14 +159,14 @@
 
     <!-- Step 2: Business Value -->
     <div class="questionnaire-step hidden" data-step="2">
-      <div class="bg-card border rounded-lg p-6">
+      <div class="bg-card border border-border rounded-lg p-6">
         <h2 class="text-xl font-semibold mb-4 flex items-center gap-2">
           <i data-lucide="briefcase" class="h-5 w-5 text-success" aria-hidden="true"></i>
           Business Value Assessment
         </h2>
         <div class="space-y-6">
-          <div class="question-card border rounded-lg p-4 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md">
-            <label class="block font-medium mb-3">Strategic Importance</label>
+          <div class="question-card border rounded-lg p-4 transition-all duration-200 hover:-translate-y-0.5">
+            <label class="block text-sm font-medium text-muted-foreground mb-1">Strategic Importance</label>
             <div class="flex gap-2">
               <label class="flex-1 text-center p-3 border rounded-md cursor-pointer hover:bg-accent">
                 <input type="radio" name="strategic_importance" value="critical" class="hidden peer" aria-label="Strategic Importance">
@@ -191,8 +191,8 @@
             </div>
           </div>
 
-          <div class="question-card border rounded-lg p-4 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md">
-            <label class="block font-medium mb-3">User Satisfaction (1-10)</label>
+          <div class="question-card border rounded-lg p-4 transition-all duration-200 hover:-translate-y-0.5">
+            <label class="block text-sm font-medium text-muted-foreground mb-1">User Satisfaction (1-10)</label>
             <input type="range" name="user_satisfaction" min="1" max="10" value="5" class="w-full mb-2" aria-label="User Satisfaction">
             <div class="flex justify-between text-xs text-muted-foreground">
               <span>Very Dissatisfied (1)</span>
@@ -201,8 +201,8 @@
             </div>
           </div>
 
-          <div class="question-card border rounded-lg p-4 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md">
-            <label class="block font-medium mb-3">Business Process Coverage</label>
+          <div class="question-card border rounded-lg p-4 transition-all duration-200 hover:-translate-y-0.5">
+            <label class="block text-sm font-medium text-muted-foreground mb-1">Business Process Coverage</label>
             <div class="flex gap-2">
               <label class="flex-1 text-center p-3 border rounded-md cursor-pointer hover:bg-accent">
                 <input type="radio" name="process_coverage" value="comprehensive" class="hidden peer" aria-label="Process Coverage">
@@ -227,15 +227,15 @@
 
     <!-- Step 3: Cost Efficiency -->
     <div class="questionnaire-step hidden" data-step="3">
-      <div class="bg-card border rounded-lg p-6">
+      <div class="bg-card border border-border rounded-lg p-6">
         <h2 class="text-xl font-semibold mb-4 flex items-center gap-2">
           <i data-lucide="dollar-sign" class="h-5 w-5 text-warning" aria-hidden="true"></i>
           Cost Efficiency Assessment
         </h2>
         <div class="space-y-6">
-          <div class="question-card border rounded-lg p-4 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md">
-            <label class="block font-medium mb-3">Annual Operating Cost Tier</label>
-            <div class="grid grid-cols-2 gap-3">
+          <div class="question-card border rounded-lg p-4 transition-all duration-200 hover:-translate-y-0.5">
+            <label class="block text-sm font-medium text-muted-foreground mb-1">Annual Operating Cost Tier</label>
+            <div class="grid grid-cols-1 gap-3">
               <label class="flex items-center gap-3 p-3 border rounded-md cursor-pointer hover:bg-accent">
                 <input type="radio" name="cost_tier" value="very_low" class="w-4 h-4" aria-label="Cost Tier">
                 <div><div class="font-medium">Very Low</div><div class="text-xs text-muted-foreground">&lt; $50K/year</div></div>
@@ -255,9 +255,9 @@
             </div>
           </div>
 
-          <div class="question-card border rounded-lg p-4 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md">
-            <label class="block font-medium mb-3">License Optimization Opportunity</label>
-            <select name="license_optimization" class="w-full rounded-md border px-3 py-2" aria-label="License Optimization Opportunity">
+          <div class="question-card border rounded-lg p-4 transition-all duration-200 hover:-translate-y-0.5">
+            <label class="block text-sm font-medium text-muted-foreground mb-1">License Optimization Opportunity</label>
+            <select name="license_optimization" class="h-9 w-full rounded-md border px-3 border-input" aria-label="License Optimization Opportunity">
               <option value="">Select...</option>
               <option value="high">High - Significant unused licenses</option>
               <option value="medium">Medium - Some optimization possible</option>
@@ -271,14 +271,14 @@
 
     <!-- Step 4: Vendor Risk -->
     <div class="questionnaire-step hidden" data-step="4">
-      <div class="bg-card border rounded-lg p-6">
+      <div class="bg-card border border-border rounded-lg p-6">
         <h2 class="text-xl font-semibold mb-4 flex items-center gap-2">
           <i data-lucide="shield" class="h-5 w-5 text-destructive" aria-hidden="true"></i>
           Vendor Risk Assessment
         </h2>
         <div class="space-y-6">
-          <div class="question-card border rounded-lg p-4 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md">
-            <label class="block font-medium mb-3">Vendor Financial Health</label>
+          <div class="question-card border rounded-lg p-4 transition-all duration-200 hover:-translate-y-0.5">
+            <label class="block text-sm font-medium text-muted-foreground mb-1">Vendor Financial Health</label>
             <div class="flex gap-2">
               <label class="flex-1 text-center p-3 border rounded-md cursor-pointer hover:bg-accent">
                 <input type="radio" name="vendor_health" value="strong" class="hidden peer" aria-label="Vendor Health">
@@ -303,9 +303,9 @@
             </div>
           </div>
 
-          <div class="question-card border rounded-lg p-4 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md">
-            <label class="block font-medium mb-3">Contract Status</label>
-            <select name="contract_status" class="w-full rounded-md border px-3 py-2" aria-label="Contract Status">
+          <div class="question-card border rounded-lg p-4 transition-all duration-200 hover:-translate-y-0.5">
+            <label class="block text-sm font-medium text-muted-foreground mb-1">Contract Status</label>
+            <select name="contract_status" class="h-9 w-full rounded-md border px-3 border-input" aria-label="Contract Status">
               <option value="">Select...</option>
               <option value="long_term">Long-term contract (3+ years)</option>
               <option value="medium_term">Medium-term (1-3 years)</option>
@@ -320,14 +320,14 @@
 
     <!-- Step 5: Dependencies & Duplication -->
     <div class="questionnaire-step hidden" data-step="5">
-      <div class="bg-card border rounded-lg p-6">
+      <div class="bg-card border border-border rounded-lg p-6">
         <h2 class="text-xl font-semibold mb-4 flex items-center gap-2">
           <i data-lucide="git-branch" class="h-5 w-5 text-primary" aria-hidden="true"></i>
           Dependencies &amp; Duplication
         </h2>
         <div class="space-y-6">
-          <div class="question-card border rounded-lg p-4 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md">
-            <label class="block font-medium mb-3">Are there duplicate/similar applications?</label>
+          <div class="question-card border rounded-lg p-4 transition-all duration-200 hover:-translate-y-0.5">
+            <label class="block text-sm font-medium text-muted-foreground mb-1">Are there duplicate/similar applications?</label>
             <div class="flex gap-4">
               <label class="flex items-center gap-2">
                 <input type="radio" name="has_duplicates" value="yes" class="w-4 h-4" aria-label="Has Duplicates">
@@ -344,9 +344,9 @@
             </div>
           </div>
 
-          <div class="question-card border rounded-lg p-4 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md">
-            <label class="block font-medium mb-3">Integration Complexity</label>
-            <select name="integration_complexity" class="w-full rounded-md border px-3 py-2" aria-label="Integration Complexity">
+          <div class="question-card border rounded-lg p-4 transition-all duration-200 hover:-translate-y-0.5">
+            <label class="block text-sm font-medium text-muted-foreground mb-1">Integration Complexity</label>
+            <select name="integration_complexity" class="h-9 w-full rounded-md border px-3 border-input" aria-label="Integration Complexity">
               <option value="">Select...</option>
               <option value="high">High - Many critical integrations</option>
               <option value="medium">Medium - Some integrations</option>
@@ -355,9 +355,9 @@
             </select>
           </div>
 
-          <div class="question-card border rounded-lg p-4 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md">
-            <label class="block font-medium mb-3">Data Migration Complexity</label>
-            <select name="data_migration_complexity" class="w-full rounded-md border px-3 py-2" aria-label="Data Migration Complexity">
+          <div class="question-card border rounded-lg p-4 transition-all duration-200 hover:-translate-y-0.5">
+            <label class="block text-sm font-medium text-muted-foreground mb-1">Data Migration Complexity</label>
+            <select name="data_migration_complexity" class="h-9 w-full rounded-md border px-3 border-input" aria-label="Data Migration Complexity">
               <option value="">Select...</option>
               <option value="simple">Simple - Standard data formats</option>
               <option value="moderate">Moderate - Some transformation needed</option>
@@ -371,7 +371,7 @@
 
     <!-- Step 6: Review & Submit -->
     <div class="questionnaire-step hidden" data-step="6">
-      <div class="bg-card border rounded-lg p-6">
+      <div class="bg-card border border-border rounded-lg p-6">
         <h2 class="text-xl font-semibold mb-4 flex items-center gap-2">
           <i data-lucide="check-circle" class="h-5 w-5 text-success" aria-hidden="true"></i>
           Review &amp; Submit
@@ -379,7 +379,7 @@
         <div id="review-summary" class="space-y-4">
           <p class="text-muted-foreground">Review your answers before submitting.</p>
         </div>
-        <div class="mt-6 p-4 bg-warning/5 border border-warning/20 rounded-lg">
+        <div class="mt-6 px-3 py-2 bg-warning/10 border border-warning/40 rounded-md">
           <p class="text-sm text-warning-emphasis">
             <i data-lucide="alert-triangle" class="h-4 w-4 inline mr-1" aria-hidden="true"></i>
             This assessment will update the application's rationalization score using the TIME framework.

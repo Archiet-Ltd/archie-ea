@@ -84,9 +84,11 @@ def _fence_response_text(payload: dict) -> None:
         elif isinstance(value, dict):
             _fence_response_text(value)
         elif isinstance(value, list):
-            for item in value:
+            for index, item in enumerate(value):
                 if isinstance(item, dict):
                     _fence_response_text(item)
+                elif isinstance(item, str) and key not in _FENCE_SAFE_KEYS:
+                    value[index] = neutralize_fence_lookalikes(item)
 
 
 def _fence_keys(item: Any, keys: tuple[str, ...]) -> None:
@@ -114,6 +116,39 @@ def _intelligence(lens: str) -> Callable[[dict], dict]:
 
     handler.__name__ = f"ask_{lens}"
     return handler
+
+
+def _impact_answer(args: dict) -> dict:
+    """``ask_impact`` returns the envelope the canonical answer service stores:
+    rows, truth class, confidence, citations and freshness, at a permanent
+    address. The organisation is the caller's, taken from the token or session
+    by the middleware; it is not an argument. The only write is the answer
+    service's own immutable answer record."""
+    from flask_login import current_user
+
+    from .executor import ToolCall, ToolExecutor
+
+    return ToolExecutor(user_id=current_user.id).execute(
+        ToolCall(
+            id="mcp-ask-impact",
+            name="answer",
+            arguments={"question": "impact", "element_id": args["element_id"]},
+        ),
+        propagate_errors=True,
+    )
+
+
+# Tools whose result is the answer service's envelope. It names records and
+# carries free text (element names, reasons, messages), so on the connector it
+# is fenced like every route tool's payload. Chat does not go through here.
+ANSWER_ENVELOPE_TOOLS = frozenset({"answer", "ask_impact"})
+
+
+def fence_connector_result(tool_name: str, result: Any) -> Any:
+    """Neutralise fence look-alikes in an answer-envelope tool's result."""
+    if tool_name in ANSWER_ENVELOPE_TOOLS and isinstance(result, dict):
+        _fence_response_text(result)
+    return result
 
 
 def _search_elements(args: dict) -> dict:
@@ -195,7 +230,7 @@ def _get_canvas(args: dict) -> dict:
 
 
 ROUTE_READ_HANDLERS: dict[str, Callable[[dict], dict]] = {
-    "ask_impact": _intelligence("impact"),
+    "ask_impact": _impact_answer,
     "ask_strategy": _intelligence("strategy"),
     "ask_portfolio": _intelligence("portfolio"),
     "ask_programme": _intelligence("programme"),

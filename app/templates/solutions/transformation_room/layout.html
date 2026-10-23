@@ -49,7 +49,7 @@
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <input type="hidden" name="expected_revision" value="{{ room.workstream.revision }}">
           <input type="hidden" name="command_key" value="{{ room.command_key }}">
-          <button type="submit" class="inline-flex items-center h-8 px-3 rounded-md bg-primary text-primary-foreground text-xs font-medium hover:bg-primary/90">Advance now</button>
+          <button type="submit" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">Advance now</button>
         </form>
         {% endif %}
         {% else %}{{ room.header.next_action or '—' }}{% endif %}
@@ -73,7 +73,7 @@
 
   <div class="mt-6">
     {% if room.stage_view and room.stage_view.resource_states.stage and room.stage_view.resource_states.stage.state == 'failed' %}
-    <div class="mb-6 rounded-md border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive-emphasis" role="alert" data-resource-state="failed">{{ room.stage_view.resource_states.stage.reason }}</div>
+    <div class="mb-6 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive-emphasis" role="alert" data-resource-state="failed">{{ room.stage_view.resource_states.stage.reason }}</div>
     {% elif room.stage_view and room.stage_view.resource_states.stage and room.stage_view.resource_states.stage.state == 'loading' %}
     <div class="mb-6 rounded-md border border-border bg-muted p-4 text-sm text-muted-foreground" role="status" aria-live="polite" data-resource-state="loading">{{ room.stage_view.resource_states.stage.reason }}</div>
     {% endif %}

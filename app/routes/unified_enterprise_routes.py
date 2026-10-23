@@ -32,7 +32,7 @@ from flask import (
 )
 from flask_login import current_user, login_required  # dead-code-ok
 from app.middleware.tenant_context import current_org_id
-from sqlalchemy import or_  # dead-code-ok
+from sqlalchemy import case, or_  # dead-code-ok
 from sqlalchemy.exc import SQLAlchemyError
 
 from .. import db
@@ -63,6 +63,7 @@ from ..models.implementation_migration import WorkPackage  # dead-code-ok
 from app.services import work_package_service
 from app.utils.pagination import safe_int_arg
 from app.utils.tenant import current_organization_id
+from app.models.archimate_element_types import application_kind_types
 
 logger = logging.getLogger(__name__)
 
@@ -295,8 +296,9 @@ def api_solutions():
 def software_architecture_dashboard():
     """Software Architecture Dashboard"""
     try:
-        component_count = ArchiMateElement.query.filter_by(
-            type="ApplicationComponent", layer="Application"
+        component_count = ArchiMateElement.query.filter(
+            ArchiMateElement.type.in_(application_kind_types()),
+            ArchiMateElement.layer == "Application",
         ).count()
         service_count = ArchiMateElement.query.filter_by(
             type="ApplicationService", layer="Application"
@@ -879,6 +881,8 @@ def plateaus():
 _GAP_SORT_COLUMNS = {
     "name": Gap.name,
     "gap_type": Gap.gap_type,
+    # critical sorts above high, not alphabetically; an unrecorded severity ranks below low
+    "severity": case({"low": 1, "medium": 2, "high": 3, "critical": 4}, value=Gap.severity, else_=0),
     "priority": Gap.priority,
     "resolution_status": Gap.resolution_status,
     "impact": Gap.impact,
@@ -978,8 +982,11 @@ def ai_architecture_analysis():
         total_recommendations = AIRecommendation.query.count()
         total_gaps = count_gaps(current_org_id())
 
+        from app.services.priority_action_service import limit_for, prioritised_actions
+
         return render_template(
             "enterprise/ai_architecture_analysis.html",
+            priority_actions=prioritised_actions(current_org_id(), limit=limit_for(request.args)),
             ai_recommendations=ai_recommendations,
             gaps_by_severity=gaps_by_severity,
             apps_needing_review=apps_needing_review,
