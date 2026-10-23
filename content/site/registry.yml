@@ -1,0 +1,264 @@
+# entelim.org public site registry: the ONE list behind the navbar, its menus,
+# the footer, the roles hub and the sitemap of links. Nothing else holds a link
+# list. Read by app/services/site_registry.py (site_registry()).
+#
+# Labels and one-line descriptions are the ones that passed product-manager and
+# product-designer review (public-site/menu-item-descriptions-v2, pm-decision-
+# live-menu-v2, solutions-menu-v2 and its reviews). Do not reword here.
+#
+# Item fields
+#   label       1 to 5 words, shown as written
+#   blurb       one line, 80 characters or fewer (checked by the registry tests)
+#   icon        a Lucide name from design/patterns.json public_icons (closed list)
+#   href        a page that answers 200 with content today. When the item's own
+#               page does not exist yet, href is the existing page that shows it
+#               and own_page names the URL the content writer will build.
+#   own_page    the URL of the item's own page, when it is not built yet
+#   shown_when  "live_page": render only while href is a live (non-held) page
+#   capability  the capability id in the capability model
+
+version: 1
+
+# Top level, left to right. Sign in, Talk to us and Start free sit on the right.
+nav:
+  - {id: product, label: Product, kind: menu}
+  - {id: solutions, label: Solutions, kind: menu}
+  - {id: roles, label: Roles, kind: menu}
+  - {id: compare, label: Compare, kind: menu}
+  - {id: pricing, label: Pricing, kind: link, href: /pricing}
+  - {id: resources, label: Resources, kind: menu}
+
+actions:
+  - {id: sign-in, label: Sign in, endpoint: account.login, variant: ghost}
+  - {id: talk-to-us, label: Talk to us, href: /contact, variant: outline}
+  - {id: start-free, label: Start free, endpoint: account.register, variant: primary}
+
+product:
+  all_link: {label: All features, href: /features}
+  groups:
+    - id: ask-anything
+      label: Ask anything
+      items:
+        - {label: AI chat, icon: message-square, href: /modules/ai-chat, capability: CAP-13.11,
+           blurb: "Ask questions about your model in plain words and read the answer in chat."}
+        - {label: Twin map, icon: network, href: /modules/digital-twin, capability: CAP-13.02,
+           blurb: "Pick a system and see the applications and services that depend on it."}
+        - {label: Connect your AI assistant, icon: plug, href: /connectors/ai-assistants, capability: CAP-15.07,
+           blurb: "Connect an AI assistant you already use to your organisation's model."}
+    - id: map-your-business
+      label: Map your business
+      items:
+        - {label: Business capability map, icon: map, href: "/features#strategy-management",
+           own_page: /modules/capability-map, blurb: ""}
+        - {label: Value streams, icon: route, href: /use-cases/value-streams-at-risk,
+           own_page: /modules/value-streams, capability: CAP-01.04,
+           blurb: "Draw value streams with their stages and map each stage to capabilities."}
+        - {label: Business model canvas, icon: layout-dashboard, href: /modules/business-model-canvas, capability: CAP-01.05,
+           blurb: "Create a business model canvas and export it."}
+    - id: know-what-you-run
+      label: Know what you run
+      items:
+        - {label: Application inventory, icon: list-checks, href: /modules/applications, capability: CAP-02.01,
+           blurb: "Keep a list of your applications and record the details of each."}
+        - {label: Architecture model, icon: boxes, href: /modules/architecture-model, capability: CAP-03.01,
+           blurb: "Import an ArchiMate file and browse the elements and links it brings in."}
+        - {label: Diagrams, icon: workflow, href: /modules/diagrams, capability: CAP-03.02,
+           blurb: "Draw architecture diagrams from the elements in your model."}
+        - {label: Org chart, icon: users, href: /modules/org-chart, capability: CAP-12.01,
+           blurb: "See your organisation's units and roles as a chart."}
+        - {label: Risk register, icon: shield-check, href: /modules/risk-register, capability: CAP-06.01,
+           blurb: "Record risks to your systems and review them together."}
+    - id: what-it-costs
+      label: What it costs
+      items:
+        - {label: Rationalisation scoring, icon: scale, href: /modules/rationalization, capability: CAP-02.03,
+           blurb: "Score each application and rank the results."}
+        - {label: Contracts and licences, icon: file-text, href: /modules/procurement, capability: CAP-11.02,
+           blurb: "Record vendor contracts and software licences in registers."}
+        - {label: Business case, icon: gauge, href: /modules/business-case, capability: CAP-05.02,
+           blurb: "Work out an investment's net present value from its costs and benefits."}
+    - id: what-you-are-changing
+      label: What you are changing
+      items:
+        - {label: Roadmaps, icon: target, href: /modules/roadmaps, capability: CAP-04.01,
+           blurb: "Record programmes and place them on a roadmap."}
+        - {label: Portfolio, icon: layers, href: /modules/portfolio, capability: CAP-02.06,
+           blurb: "Register initiatives and see them together in a portfolio."}
+    - id: approvals
+      label: Approvals
+      items:
+        - {label: Architecture review board, icon: building-2, href: /modules/arb, capability: CAP-07.03,
+           blurb: "Submit a change for board review and track it from submission to decision."}
+        - {label: AI approval queue, icon: check, href: "/features#agentic-automation",
+           own_page: /modules/ai-approval-queue, capability: CAP-15.03,
+           blurb: "Review changes an AI assistant proposes, then approve or reject each."}
+  # Menu columns: groups that share a column (by id), in reading order.
+  columns:
+    - [ask-anything, map-your-business]
+    - [know-what-you-run]
+    - [what-it-costs, what-you-are-changing]
+    - [approvals]
+  coming_soon:
+    label: Coming soon
+    all_link: {label: Everything coming soon, href: "/features#coming-soon", blurb: On the features page}
+    items:
+      - {label: Build your model from your tools, icon: git-branch, href: /modules/build-your-model-from-your-tools, capability: CAP-17.08,
+         blurb: "Coming soon: start your model from the tools you already use."}
+      - {label: Scenarios, icon: git-compare, href: /modules/scenario-modelling, capability: CAP-14.01,
+         blurb: "Coming soon: compare what-if plans side by side before you commit."}
+      - {label: Every answer shows its sources, icon: search, href: /modules/answer-sources, capability: CAP-13.04,
+         blurb: "Coming soon: see the records behind each figure in an answer."}
+
+solutions:
+  label: Solutions
+  items:
+    - {label: Application rationalisation, icon: scale, href: /use-cases/duplicate-software-spend,
+       own_page: /solutions/application-rationalisation,
+       blurb: "Find overlapping applications and decide which to keep, consolidate or retire."}
+    - {label: IT investment business cases, icon: gauge, href: /use-cases/business-case-for-the-cio,
+       own_page: /solutions/it-investment-business-cases,
+       blurb: "Build the case for each IT investment and keep contracts and licences on record."}
+    - {label: Technology risk, icon: shield-check, href: /use-cases/what-breaks-and-who-gets-called,
+       own_page: /solutions/technology-risk,
+       blurb: "See what a failure would reach and record the risks tied to it."}
+    - {label: Transformation planning, icon: target, href: /use-cases/target-state-roadmap,
+       own_page: /solutions/transformation-planning,
+       blurb: "Plan the path from today's estate to the target and track it as a portfolio."}
+    - {label: Enterprise architecture modelling, icon: boxes, href: "/features#architecture-management",
+       own_page: /features/architecture,
+       blurb: "Model applications, architecture and organisation, and draw from them."}
+    - {label: Architecture governance, icon: building-2, href: /use-cases/architecture-review-board,
+       own_page: /solutions/architecture-governance,
+       blurb: "Review architecture changes, record the decision and its conditions."}
+  coming_soon:
+    label: Coming soon
+    items:
+      - {label: Scenarios, icon: git-compare, href: /modules/scenario-modelling,
+         blurb: "Coming soon: compare what-if plans side by side before you commit."}
+      - {label: Software and tool discovery, icon: search, href: /modules/software-and-tool-discovery,
+         blurb: "Coming soon: discover the software and tools you actually pay for and use."}
+
+# Role families, in menu order. A role with a page links to it; a role without
+# one links to its place on the /roles hub, which lists all of them.
+roles:
+  label: Roles
+  all_link: {label: All 46 roles, href: /roles}
+  shown_per_family: 6
+  families:
+    - id: executives
+      label: Executives
+      roles:
+        - {label: Chief Executive Officer}
+        - {label: Chief Information Officer, href: /roles/cto-and-cio}
+        - {label: Chief Technology Officer, href: /roles/cto-and-cio}
+        - {label: Chief Financial Officer}
+        - {label: Chief Information Security Officer}
+        - {label: Chief Data Officer}
+        - {label: Chief Strategy Officer}
+        - {label: Chief Operating Officer}
+        - {label: Business Unit Leader}
+    - id: startups-and-scale-ups
+      label: Startups and scale-ups
+      roles:
+        - {label: Startup Founder}
+        - {label: Business Owner}
+        - {label: Scale-up CTO}
+    - id: architecture
+      label: Architecture
+      roles:
+        - {label: Enterprise Architect, href: /roles/enterprise-architects}
+        - {label: Solution Architect, href: /roles/solution-architects}
+        - {label: Business Architect}
+        - {label: Technology Architect}
+        - {label: Security Architect}
+        - {label: Data Architect}
+        - {label: AI Architect}
+        - {label: Application Architect}
+        - {label: Integration Architect}
+        - {label: Architecture Review Board Member}
+    - id: portfolio-programmes-and-product
+      label: Portfolio, programmes and product
+      roles:
+        - {label: Portfolio Manager, href: /roles/it-portfolio-managers}
+        - {label: Programme Manager}
+        - {label: Project Manager}
+        - {label: PMO Lead}
+        - {label: Transformation Lead}
+        - {label: Product Manager}
+        - {label: Product Analyst}
+        - {label: Business Analyst}
+    - id: it-operations
+      label: IT operations
+      roles:
+        - {label: Application Manager}
+        - {label: Operations Manager}
+        - {label: IT Service Owner}
+        - {label: Platform Engineer}
+    - id: risk-compliance-and-data
+      label: Risk, compliance and data
+      roles:
+        - {label: Risk Manager}
+        - {label: Compliance Officer}
+        - {label: Data Protection Officer}
+        - {label: Auditor}
+        - {label: Regulator Liaison}
+        - {label: Data Steward}
+    - id: finance-sourcing-and-people
+      label: Finance, sourcing and people
+      roles:
+        - {label: Finance Business Partner}
+        - {label: Procurement Manager}
+        - {label: Vendor Manager}
+        - {label: Workforce Planner}
+        - {label: Sustainability Lead}
+    - id: consultancies
+      label: Consultancies
+      roles:
+        - {label: Consulting Partner}
+
+compare:
+  label: Compare Entelim with
+  all_link: {label: All comparisons, href: /vs}
+  items:
+    - {label: LeanIX, href: /vs/leanix}
+    - {label: Ardoq, href: /vs/ardoq}
+    - {label: ServiceNow APM, href: /vs/servicenow-apm}
+    - {label: Bizzdesign HOPEX, href: /vs/bizzdesign-hopex}
+    - {label: Sparx Enterprise Architect, href: /vs/sparx-enterprise-architect}
+    - {label: Archi, href: /vs/archi}
+    - {label: Avolution ABACUS, href: /vs/avolution-abacus}
+    - {label: BOC ADOIT, href: /vs/boc-adoit}
+    - {label: Orbus iServer, href: /vs/orbus-iserver}
+
+resources:
+  groups:
+    - id: learn
+      label: Learn
+      items:
+        - {label: Docs, href: /docs, shown_when: live_page}
+        - {label: Security, href: /security}
+        - {label: Connectors, href: /connectors, shown_when: live_page}
+        - {label: How Archiet runs on Entelim, href: /how-archiet-runs-on-entelim, shown_when: live_page}
+    - id: services
+      label: Services
+      items:
+        - {label: Architecture health check, href: /architecture-health-check}
+        - {label: Team plan with onboarding, href: /team-annual-onboarding}
+    - id: company
+      label: Company
+      items:
+        - {label: About, href: /about}
+        - {label: Contact, href: /contact}
+
+pricing:
+  label: Pricing
+  items:
+    - {label: Plans, href: /pricing}
+    - {label: Talk to us, href: /contact}
+
+# Legal pages come from app/services/legal_pages.py (Terms and Privacy always,
+# the rest once approved and switched on). Licence points at the terms page.
+legal:
+  label: Legal
+  extra_items:
+    - {label: Licence, href: /terms}

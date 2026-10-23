@@ -809,7 +809,10 @@ def build_jsonld(page: PublicPage) -> str:
         ld = _jsonld_faq(page, site_url)
     elif family == "vision":
         ld = _jsonld_software_app(page, site_url)
-    elif family == "module":
+    elif family == "module" and page.cta != "waiting_list":
+        # A module still on the waiting list is a plain page: no
+        # SoftwareApplication or offer is emitted for a capability that
+        # cannot be used yet.
         ld = _jsonld_software_app(page, site_url)
     elif family == "function-per-segment":
         ld = _jsonld_webpage(page, site_url)
@@ -1650,8 +1653,12 @@ def build_landing(page: PublicPage) -> Landing | None:
 
     if page.cta == "waiting_list":
         primary_action = ("Tell us you need this", "#feature-interest")
+        # A page for something not built yet never points at pricing: its
+        # second action is a conversation, not a plan.
+        secondary_action = ("Talk to us", "/contact")
     else:
         primary_action = ("Start free", url_for("account.register"))
+        secondary_action = ("See pricing", "/pricing")
 
     return Landing(
         title=page.title,
@@ -1662,4 +1669,5 @@ def build_landing(page: PublicPage) -> Landing | None:
         breadcrumb=parent,
         segment_label=segment_label,
         primary_action=primary_action,
+        secondary_action=secondary_action,
     )
