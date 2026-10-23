@@ -52,15 +52,29 @@ class InvestmentPrioritizationService:
         Returns:
             Dict with prioritized investment recommendations
         """
+        from app.middleware.tenant_context import current_org_id
+        from app.models.application_portfolio import ApplicationComponent
+
         # Get all unified capabilities
         capabilities = UnifiedCapability.query.all()
 
-        # Batch-load all capability mappings to avoid N+1 queries
+        # Batch-load all capability mappings scoped to this organization
+        # UnifiedApplicationCapabilityMapping has no organization_id, so scope through
+        # ApplicationComponent (TenantMixin, automatically filtered by current_org_id)
         mappings_by_cap = {}
         try:
-            all_mappings = UnifiedApplicationCapabilityMapping.query.all()
-            for m in all_mappings:
-                mappings_by_cap.setdefault(m.unified_capability_id, []).append(m)
+            org_id = current_org_id()
+            if org_id is not None:
+                all_mappings = (
+                    UnifiedApplicationCapabilityMapping.query
+                    .join(
+                        ApplicationComponent,
+                        UnifiedApplicationCapabilityMapping.application_component_id == ApplicationComponent.id
+                    )
+                    .all()
+                )
+                for m in all_mappings:
+                    mappings_by_cap.setdefault(m.unified_capability_id, []).append(m)
         except Exception:
             logger.debug("Could not batch-load capability mappings", exc_info=True)
 
