@@ -397,7 +397,7 @@
                 Type<i data-lucide="chevron-up" class="h-3 w-3" x-show="sort === 'type' && dir === 'asc'" x-cloak aria-hidden="true"></i><i data-lucide="chevron-down" class="h-3 w-3" x-show="sort === 'type' && dir === 'desc'" x-cloak aria-hidden="true"></i>
               </button>
             </th>
-            <th scope="col" class="h-10 px-2 align-middle text-left w-10" title="ArchiMate: whether this application has a linked ArchiMate element" aria-label="ArchiMate link status">AM</th>
+            <th scope="col" class="h-10 px-2 align-middle text-left min-w-[110px]" title="ArchiMate: whether this application has a linked ArchiMate element" aria-label="ArchiMate link status">ArchiMate</th>
             <th scope="col" class="h-10 px-2 align-middle text-left min-w-[160px]">
               <button type="button" @click="sortBy('lifecycle_status')" data-testid="th-sort-lifecycle-status"
                 class="inline-flex items-center gap-1 hover:text-foreground transition-colors" aria-label="Sort by Lifecycle Status">
@@ -432,15 +432,19 @@
             <td class="px-2 align-middle">
               <p class="font-medium text-sm text-foreground truncate max-w-[220px]" title="{{ app.name | e }}{% if app.description %} — {{ app.description[:120] | e }}{% endif %}">{{ app.name }}</p>
             </td>
-            <td class="px-2 align-middle"><span class="text-sm text-muted-foreground">{{ app.component_type or '—' }}</span></td>
+            <td class="px-2 align-middle">
+              {% if app.component_type %}<span class="text-sm text-muted-foreground" data-testid="app-type-{{ app.id }}">{{ app.component_type[:1] | upper }}{{ app.component_type[1:] }}</span>
+              {% elif can('edit', 'application') %}<a href="{{ url_for('unified_applications.application_edit', id=app.id) }}" class="text-xs text-muted-foreground underline hover:text-info" data-testid="app-type-{{ app.id }}">Not set: open to classify</a>
+              {% else %}<span class="text-xs text-muted-foreground" data-testid="app-type-{{ app.id }}">Not set</span>{% endif %}
+            </td>
             <td class="px-2 align-middle text-center">
               {% if app.archimate_element_id %}
               {# role="img" makes the aria-label legal: a bare span is a generic
                  element, and aria-label on it is an aria-prohibited-attr
                  violation (serious). #}
-              <span role="img" class="inline-block h-2.5 w-2.5 rounded-full bg-primary" title="ArchiMate linked" aria-label="Linked to an ArchiMate element"></span>
+              <span class="inline-flex items-center gap-1.5 text-xs text-muted-foreground"><span role="img" class="inline-block h-2.5 w-2.5 rounded-full bg-primary" title="ArchiMate linked" aria-label="Linked to an ArchiMate element"></span>Linked</span>
               {% else %}
-              <span class="inline-block h-2.5 w-2.5 rounded-full bg-muted-foreground/30" title="No ArchiMate link" role="img" aria-label="Not linked to an ArchiMate element"></span>
+              <span class="inline-flex items-center gap-1.5 text-xs text-muted-foreground"><span class="inline-block h-2.5 w-2.5 rounded-full bg-muted-foreground/30" title="No ArchiMate link" role="img" aria-label="Not linked to an ArchiMate element"></span>Not linked</span>
               {% endif %}
             </td>
             <td class="px-2 align-middle">
@@ -465,7 +469,8 @@
             <td class="px-2 align-middle">
               {% if pc and pc.business_capability %}
               <span class="text-xs text-muted-foreground truncate max-w-[150px] block" title="{{ pc.business_capability.name | e }}">{{ pc.business_capability.name }}</span>
-              {% else %}<span class="text-xs text-muted-foreground">Not mapped</span>{% endif %}
+              {% elif can('edit', 'application') %}<button type="button" class="text-xs text-muted-foreground underline hover:text-info" data-testid="app-capability-{{ app.id }}" @click='openMappingForApp({{ app.id }}, {{ app.name | tojson }}, "capability")'>No capability mapped yet: map it</button>
+              {% else %}<span class="text-xs text-muted-foreground">No capability mapped yet</span>{% endif %}
             </td>
             <td class="px-2 align-middle text-right">
               <div class="flex justify-end gap-1 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
@@ -689,7 +694,8 @@
               <p class="text-xs text-muted-foreground mb-0.5">Capability</p>
               {% if pc and pc.business_capability %}
               <p class="text-sm text-muted-foreground truncate">{{ pc.business_capability.name }}</p>
-              {% else %}<p class="text-sm text-muted-foreground">Not mapped</p>{% endif %}
+              {% elif can('edit', 'application') %}<button type="button" class="text-sm text-muted-foreground underline hover:text-info" @click='openMappingForApp({{ app.id }}, {{ app.name | tojson }}, "capability")'>No capability mapped yet: map it</button>
+              {% else %}<p class="text-sm text-muted-foreground">No capability mapped yet</p>{% endif %}
             </div>
           </div>
         </div>
