@@ -19,7 +19,7 @@
         :class="onTrackPct == null ? 'bg-muted text-muted-foreground' : onTrackPct >= 70 ? 'bg-success/10 text-success-emphasis' : onTrackPct >= 40 ? 'bg-warning/10 text-warning-emphasis' : 'bg-destructive/10 text-destructive-emphasis'"
         x-text="onTrackPct == null ? '—' : onTrackPct + '%'"
       ></span>
-      <span class="text-xs text-muted-foreground/60" x-text="'Total epics: ' + totalEpics"></span>
+      <span class="text-xs text-muted-foreground" x-text="'Total epics: ' + totalEpics"></span>
     </div>
   {% endmacro %}
   {{ page_shell(title='Product Roadmap', breadcrumb=[('Home', '/'), ('Product Roadmap', none)], subtitle='Epics across Now · Next · Later horizons', actions_caller=_ps_actions) }}
@@ -38,15 +38,15 @@
     >
       <div class="border px-4 py-2 bg-primary/10 border-b border-primary/40 rounded-t-xl flex items-center gap-2">
         <span class="w-2.5 h-2.5 rounded-full bg-primary"></span>
-        <h2 class="text-sm font-bold text-primary/90 uppercase tracking-wide">Now</h2>
+        <h2 class="text-sm font-bold text-primary uppercase tracking-wide">Now</h2>
         <span class="ml-auto text-xs text-primary" x-text="horizons.now.epics.length + ' epics'"></span>
       </div>
       <!-- Sprint badges -->
       <div class="px-4 py-2 flex flex-wrap gap-1 border-b border-primary/10">
         <template x-for="sp in horizons.now.sprints" :key="sp.id">
-          <span class="text-xs bg-primary/10 text-info-emphasis px-2 py-0.5 rounded" x-text="sp.name"></span>
+          <span class="text-xs bg-info/10 text-info-emphasis px-2 py-0.5 rounded" x-text="sp.name"></span>
         </template>
-        <span x-show="horizons.now.sprints.length === 0" x-cloak class="text-xs text-muted-foreground/60 italic">No sprints assigned</span>
+        <span x-show="horizons.now.sprints.length === 0" x-cloak class="text-xs text-muted-foreground italic">No sprints assigned</span>
       </div>
       <!-- Epic cards -->
       <div class="p-3 flex-1 space-y-2 min-h-24">
@@ -69,10 +69,10 @@
                 :style="'width:' + epic.pct_done + '%'"
               ></div>
             </div>
-            <p class="text-xs text-right text-muted-foreground/60 mt-0.5" x-text="epic.pct_done + '% done'"></p>
+            <p class="text-xs text-right text-muted-foreground mt-0.5" x-text="epic.pct_done + '% done'"></p>
           </div>
         </template>
-        <p x-show="horizons.now.epics.length === 0" x-cloak class="text-xs text-center text-muted-foreground/60 italic py-4">
+        <p x-show="horizons.now.epics.length === 0" x-cloak class="text-xs text-center text-muted-foreground italic py-4">
           No epics &mdash; drag one here
         </p>
       </div>
@@ -93,7 +93,7 @@
         <template x-for="sp in horizons.next.sprints" :key="sp.id">
           <span class="text-xs bg-muted text-muted-foreground px-2 py-0.5 rounded" x-text="sp.name"></span>
         </template>
-        <span x-show="horizons.next.sprints.length === 0" x-cloak class="text-xs text-muted-foreground/60 italic">No sprints assigned</span>
+        <span x-show="horizons.next.sprints.length === 0" x-cloak class="text-xs text-muted-foreground italic">No sprints assigned</span>
       </div>
       <div class="p-3 flex-1 space-y-2 min-h-24">
         <template x-for="epic in horizons.next.epics" :key="epic.id">
@@ -115,10 +115,10 @@
                 :style="'width:' + epic.pct_done + '%'"
               ></div>
             </div>
-            <p class="text-xs text-right text-muted-foreground/60 mt-0.5" x-text="epic.pct_done + '% done'"></p>
+            <p class="text-xs text-right text-muted-foreground mt-0.5" x-text="epic.pct_done + '% done'"></p>
           </div>
         </template>
-        <p x-show="horizons.next.epics.length === 0" x-cloak class="text-xs text-center text-muted-foreground/60 italic py-4">
+        <p x-show="horizons.next.epics.length === 0" x-cloak class="text-xs text-center text-muted-foreground italic py-4">
           No epics &mdash; drag one here
         </p>
       </div>
@@ -131,7 +131,7 @@
       @drop="dropEpic($event, 'later')"
     >
       <div class="px-4 py-3 bg-muted/30 border-b border-border rounded-t-xl flex items-center gap-2">
-        <span class="w-2.5 h-2.5 rounded-full bg-muted/70"></span>
+        <span class="w-2.5 h-2.5 rounded-full bg-muted-foreground"></span>
         <h2 class="text-sm font-bold text-foreground uppercase tracking-wide">Later</h2>
         <span class="ml-auto text-xs text-muted-foreground" x-text="horizons.later.epics.length + ' epics'"></span>
       </div>
@@ -139,7 +139,7 @@
         <template x-for="sp in horizons.later.sprints" :key="sp.id">
           <span class="text-xs bg-muted text-muted-foreground px-2 py-0.5 rounded" x-text="sp.name"></span>
         </template>
-        <span x-show="horizons.later.sprints.length === 0" x-cloak class="text-xs text-muted-foreground/60 italic">No sprints assigned</span>
+        <span x-show="horizons.later.sprints.length === 0" x-cloak class="text-xs text-muted-foreground italic">No sprints assigned</span>
       </div>
       <div class="p-3 flex-1 space-y-2 min-h-24">
         <template x-for="epic in horizons.later.epics" :key="epic.id">
@@ -156,14 +156,14 @@
             </div>
             <div class="w-full bg-muted rounded-full h-1.5">
               <div
-                class="h-1.5 rounded-full bg-muted/70 transition-all"
+                class="h-1.5 rounded-full bg-muted-foreground transition-all"
                 :style="'width:' + epic.pct_done + '%'"
               ></div>
             </div>
-            <p class="text-xs text-right text-muted-foreground/60 mt-0.5" x-text="epic.pct_done + '% done'"></p>
+            <p class="text-xs text-right text-muted-foreground mt-0.5" x-text="epic.pct_done + '% done'"></p>
           </div>
         </template>
-        <p x-show="horizons.later.epics.length === 0" x-cloak class="text-xs text-center text-muted-foreground/60 italic py-4">
+        <p x-show="horizons.later.epics.length === 0" x-cloak class="text-xs text-center text-muted-foreground italic py-4">
           No epics &mdash; drag one here
         </p>
       </div>
@@ -178,7 +178,7 @@
   >
     <div class="px-4 py-3 border-b border-border flex items-center gap-2">
       <h2 class="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Unscheduled</h2>
-      <span class="ml-auto text-xs text-muted-foreground/60" x-text="unscheduled.length + ' epics'"></span>
+      <span class="ml-auto text-xs text-muted-foreground" x-text="unscheduled.length + ' epics'"></span>
     </div>
     <div class="p-3 flex flex-wrap gap-2">
       <template x-for="epic in unscheduled" :key="epic.id">
@@ -189,7 +189,7 @@
           x-text="epic.title"
         ></div>
       </template>
-      <p x-show="unscheduled.length === 0" x-cloak class="text-xs text-muted-foreground/60 italic py-2">All epics are scheduled</p>
+      <p x-show="unscheduled.length === 0" x-cloak class="text-xs text-muted-foreground italic py-2">All epics are scheduled</p>
     </div>
   </div>
 
@@ -205,16 +205,16 @@
               <template x-for="sp in group" :key="sp.id">
                 <div
                   class="px-3 py-2 rounded-lg text-xs text-center min-w-28"
-                  :class="sp.status === 'active' ? 'bg-primary/10 border border-primary/30 text-primary/90 font-semibold' : 'bg-muted border border-border text-muted-foreground'"
+                  :class="sp.status === 'active' ? 'bg-primary/10 border border-primary/30 text-primary font-semibold' : 'bg-muted border border-border text-muted-foreground'"
                 >
                   <p class="font-medium" x-text="sp.name"></p>
-                  <p class="text-muted-foreground/60 mt-0.5" x-text="sp.start_date ? sp.start_date + ' \u2192 ' + (sp.end_date || '?') : 'No dates'"></p>
+                  <p class="text-muted-foreground mt-0.5" x-text="sp.start_date ? sp.start_date + ' \u2192 ' + (sp.end_date || '?') : 'No dates'"></p>
                 </div>
               </template>
             </div>
           </div>
         </template>
-        <p x-show="allSprints().length === 0" x-cloak class="text-xs text-muted-foreground/60 italic">No sprints found</p>
+        <p x-show="allSprints().length === 0" x-cloak class="text-xs text-muted-foreground italic">No sprints found</p>
       </div>
     </div>
   </div>

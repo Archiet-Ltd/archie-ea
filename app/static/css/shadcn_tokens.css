@@ -5,6 +5,28 @@
    token (white text on it in light, navy in dark); --info is the accent-as-text
    token (links, active nav), lighter in dark so it reads on slate-900. */
 @layer base {
+  /* Native controls (select lists, date pickers, scrollbars) follow the theme. Without this a <select> with no
+     background class painted light grey (239,239,239) under near-white text in dark mode. */
+  :root { color-scheme: light; }
+  .dark { color-scheme: dark; }
+  /* Every native select, text input and textarea reads the surface and foreground tokens, so a control with no
+     background class is the page colour in both themes (it was the browser's pale grey under light text in dark).
+     Layered, so any bg-*/text-* utility on the control still wins. */
+  select,
+  textarea,
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="file"]):not([type="button"]):not([type="submit"]):not([type="reset"]):not([type="image"]):not([type="hidden"]) {
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
+  }
+  select option,
+  select optgroup {
+    background-color: hsl(var(--popover));
+    color: hsl(var(--popover-foreground));
+  }
+  input::placeholder,
+  textarea::placeholder {
+    color: hsl(var(--muted-foreground));
+  }
   :root {
     --background: 0 0% 100%;
     --foreground: 222.2 47.4% 11.2%;
@@ -17,7 +39,7 @@
     --secondary: 210 40% 96.1%;
     --secondary-foreground: 215.3 25% 26.7%;
     --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 45%; /* 4.51:1 on bg-muted (46.9% was 4.34, a WCAG AA fail on every bg-muted chip) */
+    --muted-foreground: 215.4 16.3% 42%; /* 4.9:1 on a bg-primary/10 tint, 5.5:1 on bg-muted (45% was 4.41 on the tint) */
     --accent: 210 40% 96.1%;
     --accent-foreground: 222.2 47.4% 11.2%;
     --destructive: 0 84.2% 60.2%;
@@ -30,7 +52,8 @@
     --success: 142.1 76.2% 36.3%;
     --success-foreground: 0 0% 100%;
     --success-emphasis: 142.1 76.2% 28%;  /* 4.63 on bg-success/10; base is 2.95 */
-    --warning: 37.7 92.1% 50.2%;
+    /* Fill and indicator: 4.1:1 on white, 3.8:1 on slate-100 (50.2% lightness was 2.15:1), black text on it 5.1:1 */
+    --warning: 32 95% 38%;
     --warning-foreground: 0 0% 0%;
     /* 5.62 on bg-warning/10. --warning-foreground is pure black in BOTH themes,
        which is 19.43 here but 1.19 in dark mode, where bg-warning/10 composites
@@ -60,7 +83,7 @@
        relationship as --info / --info-emphasis. */
     --layer-motivation-emphasis: 263 70% 40%;
     --layer-strategy-emphasis: 38 92% 28%;
-    --layer-business-emphasis: 160 84% 26%;
+    --layer-business-emphasis: 160 84% 23%;
     --layer-application-emphasis: 221 83% 42%;
     --layer-technology-emphasis: 142 71% 26%;
     --layer-implementation-emphasis: 199 89% 30%;
@@ -82,8 +105,9 @@
     --muted-foreground: 215 20.2% 65.1%;
     --accent: 217.2 32.6% 17.5%;
     --accent-foreground: 210 40% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
+    /* Fill AND indicator: a dot or bar in this red must reach 3:1 on the slate-800 card (was 1.5:1) with white text on it at 4.5:1 */
+    --destructive: 0 74% 52%;
+    --destructive-foreground: 0 0% 100%;
     --destructive-emphasis: 0 91% 71%;
     --success: 142.1 70.6% 45.3%;
     --success-foreground: 0 0% 0%;
@@ -111,7 +135,7 @@
     --layer-technology: 142 71% 55%;
     --layer-implementation: 199 89% 58%;
     --layer-risk: 0 84% 65%;
-    --layer-motivation-emphasis: 263 70% 75%;
+    --layer-motivation-emphasis: 263 70% 80%;
     --layer-strategy-emphasis: 38 92% 68%;
     --layer-business-emphasis: 160 84% 62%;
     --layer-application-emphasis: 221 83% 74%;

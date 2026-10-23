@@ -58,7 +58,7 @@
                     <p class="text-xs text-muted-foreground">Choose the organisation you are currently working in.</p>
                 </div>
                 {% if active_organization_name %}
-                <span class="inline-flex items-center rounded-md border border-primary/20 bg-primary/10 px-2.5 py-1 text-xs font-medium text-info-emphasis"
+                <span class="inline-flex items-center rounded-md border border-info/20 bg-info/10 px-2.5 py-1 text-xs font-medium text-info-emphasis"
                       data-testid="active-organization-badge">
                     Active: {{ active_organization_name }}
                 </span>
@@ -84,7 +84,7 @@
                             </span>
                         </span>
                         {% if active_organization and org.id == active_organization.id %}
-                        <span class="rounded-md bg-success/10 px-2 py-1 text-xs font-medium text-success">Current</span>
+                        <span class="rounded-md bg-success/10 px-2 py-1 text-xs font-medium text-success-emphasis">Current</span>
                         {% endif %}
                     </label>
                     {% endfor %}
@@ -138,7 +138,7 @@
                                 {% for ev in recent_auth_events %}
                                     <li class="flex items-center justify-between gap-3">
                                         <span class="font-mono text-xs">{{ ev.created_at.strftime('%d %b %H:%M') if ev.created_at else '—' }}</span>
-                                        <span class="text-xs {% if ev.action == 'login_failed' %}text-destructive{% else %}text-muted-foreground{% endif %}">{{ ev.action|replace('_', ' ') }}</span>
+                                        <span class="text-xs {% if ev.action == 'login_failed' %}text-destructive-emphasis{% else %}text-muted-foreground{% endif %}">{{ ev.action|replace('_', ' ') }}</span>
                                         <span class="font-mono text-xs text-muted-foreground">{{ ev.ip_address or '—' }}</span>
                                     </li>
                                 {% endfor %}
@@ -188,11 +188,11 @@
                                             const inp = document.getElementById('pref_{{ pref_key }}');
                                             if (inp) inp.checked = !checked;
                                             btn.classList.toggle('bg-primary', !checked);
-                                            btn.classList.toggle('bg-muted', checked);
+                                            btn.classList.toggle('bg-muted-foreground', checked);
                                             btn.querySelector('span').classList.toggle('translate-x-5', !checked);
                                             btn.querySelector('span').classList.toggle('translate-x-0', checked);
                                         "
-                                        class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 {{ 'bg-primary' if is_enabled else 'bg-muted' }}">
+                                        class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 {{ 'bg-primary' if is_enabled else 'bg-muted-foreground' }}">
                                     <span class="inline-block h-4 w-4 transform rounded-full bg-background transition-transform {{ 'translate-x-5' if is_enabled else 'translate-x-0' }} ml-0.5"></span>
                                 </button>
                                 <input type="checkbox"
@@ -243,11 +243,11 @@
                                         const inp = document.getElementById('pref_show_archimate');
                                         if (inp) inp.checked = !checked;
                                         btn.classList.toggle('bg-primary', !checked);
-                                        btn.classList.toggle('bg-muted', checked);
+                                        btn.classList.toggle('bg-muted-foreground', checked);
                                         btn.querySelector('span').classList.toggle('translate-x-5', !checked);
                                         btn.querySelector('span').classList.toggle('translate-x-0', checked);
                                     "
-                                    class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 {{ 'bg-primary' if show_archimate else 'bg-muted' }}">
+                                    class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 {{ 'bg-primary' if show_archimate else 'bg-muted-foreground' }}">
                                 <span class="inline-block h-4 w-4 transform rounded-full bg-background transition-transform {{ 'translate-x-5' if show_archimate else 'translate-x-0' }} ml-0.5"></span>
                             </button>
                             <input type="checkbox"
