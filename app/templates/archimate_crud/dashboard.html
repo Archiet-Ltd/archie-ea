@@ -125,6 +125,37 @@
                         <p class="text-muted-foreground" x-text="(detailData && detailData.description) || '—'"></p>
                     </div>
                 </div>
+                <!-- Kind and details panel -->
+                <div x-cloak x-show="detailData && detailData.profile && detailData.profile.kind"
+                     class="border-t border-border pt-3 mt-3" data-testid="kind-details-panel">
+                    <h3 class="text-sm font-semibold mb-2">Kind and details</h3>
+                    <div class="grid grid-cols-2 gap-3 text-sm">
+                        <div>
+                            <p class="text-xs text-muted-foreground">Kind</p>
+                            <p class="font-medium" x-text="detailData.profile.kind"></p>
+                        </div>
+                        <div>
+                            <p class="text-xs text-muted-foreground">Framework</p>
+                            <p class="font-medium" x-text="detailData.profile.framework_label || detailData.profile.framework_id"></p>
+                        </div>
+                        <div>
+                            <p class="text-xs text-muted-foreground">WSJF Score</p>
+                            <p class="font-medium tabular-nums" x-text="detailData.profile.wsjf_score"></p>
+                        </div>
+                    </div>
+                    <div class="mt-2" x-cloak x-show="detailData.profile.properties">
+                        <p class="text-xs font-semibold text-muted-foreground mb-1">WSJF Components</p>
+                        <div class="grid grid-cols-2 gap-2 text-xs">
+                            <template x-for="(entry, key) in detailData.profile.properties" :key="key">
+                                <div>
+                                    <p class="text-muted-foreground" x-text="key.replace('_', ' ').replace(/^(.)/, function(c){return c.toUpperCase()})"></p>
+                                    <p class="font-medium tabular-nums" x-text="entry ? entry.value : '—'"></p>
+                                    <p x-cloak x-show="entry && entry.set_by" class="text-muted-foreground" x-text="'by ' + entry.set_by + ' at ' + (entry.set_at ? entry.set_at.substring(0, 10) : '')"></p>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+                </div>
                 <div class="flex gap-2">
                     <button type="button" data-testid="detail-edit-btn" @click="startDetailEdit()"
                             class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center" aria-label="Edit element">

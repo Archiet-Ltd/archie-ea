@@ -6,15 +6,11 @@
 
 {% block content %}
 <div class="space-y-6">
-    {# A-02: this directory is scoped to the current organisation (deliberately —
-       see the tenant-scoping-ok note in admin_routes.py::registered_users). State
-       that scope explicitly so "2 users" here and "22 users" summed across
-       /admin/organizations read as the same number viewed at two scopes, not a
-       drift or a leak. #}
+    {# Scoped to the current organisation: the count is the number of rows listed. #}
     {{ page_header(
         title='Registered Users',
         description='View and manage users registered to ' ~ (current_org.name if current_org else 'this organization')
-            ~ ' (' ~ users|length ~ ' of ' ~ platform_total_users ~ ' users platform-wide — see Organizations for the full breakdown).',
+            ~ ' (' ~ users|length ~ ' ' ~ ('user' if users|length == 1 else 'users') ~ ').',
         breadcrumbs=[
             {'label': 'Admin', 'href': url_for('admin.index')},
             {'label': 'Registered Users'}

@@ -46,7 +46,9 @@ class APIResponse:
         error: str = None,
         rate_limit_remaining: int = None,
         rate_limit_reset: datetime = None,
+        status_code: int = None,
     ):
+        self.status_code = status_code
         self.success = success
         self.data = data
         self.error = error
@@ -144,6 +146,14 @@ class BaseAPIClient(ABC):
         """Setup authentication headers. Override in subclasses."""
         if self.api_key:
             self.session.headers.update({"Authorization": f"Bearer {self.api_key}"})
+
+    def _scrub(self, text: str) -> str:
+        """Remove anything secret from text about to be logged or returned.
+
+        The base client has nothing to hide; a client that sends a credential
+        overrides this so the credential cannot leave through an error message.
+        """
+        return text
 
     def _check_rate_limit(self):
         """Check and enforce rate limiting."""
@@ -283,6 +293,7 @@ class BaseAPIClient(ABC):
         # Rate limiting
         self._check_rate_limit()
 
+        failed_status = None
         try:
             # Prepare request
             request_kwargs = {
@@ -316,6 +327,7 @@ class BaseAPIClient(ABC):
 
             # Handle response
             if response.status_code == 429:
+                failed_status = 429
                 # Rate limited
                 reset_time = response.headers.get("Retry-After")
                 if reset_time:
@@ -330,12 +342,15 @@ class BaseAPIClient(ABC):
                 raise RateLimitError("API rate limit exceeded")
 
             elif response.status_code == 401:
+                failed_status = 401
                 raise AuthenticationError("API authentication failed")
 
             elif response.status_code >= 400:
+                failed_status = response.status_code
                 error_msg = f"API request failed: {response.status_code} {response.reason}"
                 if response.text:
-                    error_msg += f" - {response.text[:200]}"
+                    # Scrub before cutting: a secret split by the cut would survive it.
+                    error_msg += f" - {self._scrub(response.text)[:200]}"
                 raise APIClientError(error_msg)
 
             # Parse response
@@ -359,14 +374,14 @@ class BaseAPIClient(ABC):
             return api_response
 
         except requests.RequestException as e:
-            error_msg = f"Request failed: {e}"
+            error_msg = self._scrub(f"Request failed: {e}")
             logger.error(error_msg)
             return APIResponse(success=False, error=error_msg)
 
         except (RateLimitError, AuthenticationError, APIClientError) as e:
-            error_msg = str(e)
+            error_msg = self._scrub(str(e))
             logger.error(error_msg)
-            return APIResponse(success=False, error=error_msg)
+            return APIResponse(success=False, error=error_msg, status_code=failed_status)
 
     def get(
         self, endpoint: str, params: Dict = None, headers: Dict = None, use_cache: bool = True

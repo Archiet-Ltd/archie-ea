@@ -192,6 +192,16 @@
                     <option value="">Any state</option><option value="yes">Connected</option><option value="no">Orphaned</option>
                 </select>
             </div>
+            <div>
+                <label for="architecture-kind" class="mb-1 block text-xs font-medium text-muted-foreground">Kind</label>
+                <select id="architecture-kind" x-model="kindFilter" @change="currentPage = 1; loadElements()" class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm">
+                    <option value="">Any kind</option>
+                    <option value="Epic">Epic</option>
+                    <option value="Feature">Feature</option>
+                    <option value="Capability (SAFe)">Capability (SAFe)</option>
+                    <option value="Enabler">Enabler</option>
+                </select>
+            </div>
             {# No "Solution linkage" filter: the layer elements endpoint returns no
                solution references, so the control could only ever yield an empty
                result the user would read as "nothing is linked". #}
@@ -259,13 +269,16 @@
                     <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">Source</th>
                     <th class="min-w-[230px] px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">Documentation</th>
                     <th class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide text-muted-foreground">Relationships</th>
+                    <th class="min-w-[100px] px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide text-muted-foreground" :aria-sort="sortBy === 'wsjf_score' ? (sortOrder === 'asc' ? 'ascending' : 'descending') : 'none'">
+                        <button type="button" @click="toggleSort('wsjf_score')" class="inline-flex h-8 items-center gap-1 rounded-md px-1 hover:text-foreground disabled:pointer-events-none disabled:opacity-50" aria-label="Sort by WSJF score">WSJF<i data-lucide="arrow-up-down" class="h-3 w-3" aria-hidden="true"></i></button>
+                    </th>
                     <th class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground">Actions</th>
                 </tr>
             </thead>
             <template x-for="group in elementGroups" :key="'group-' + group.type">
                 <tbody class="divide-y divide-border">
                     <tr x-cloak x-show="groupByType" class="bg-muted/20">
-                        <td :colspan="bulkMode ? 7 : 6" class="px-4 py-2">
+                        <td :colspan="bulkMode ? 8 : 7" class="px-4 py-2">
                             <button type="button" @click="toggleTypeGroup(group.type)" class="inline-flex h-8 items-center gap-2 rounded-md px-1 text-sm font-semibold hover:text-primary disabled:pointer-events-none disabled:opacity-50" :aria-label="(collapsedTypes[group.type] ? 'Expand ' : 'Collapse ') + formatTypeName(group.type) + ' group'">
                                 <i :data-lucide="collapsedTypes[group.type] ? 'chevron-right' : 'chevron-down'" class="h-4 w-4 text-muted-foreground" aria-hidden="true"></i>
                                 <span x-text="formatTypeName(group.type)"></span><span class="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground" x-text="group.count"></span>
@@ -280,6 +293,7 @@
                             <td class="px-4 py-3" data-field="element-source"><span class="text-sm capitalize text-muted-foreground" x-text="el.source || '—'"></span></td>
                             <td class="px-4 py-3" data-field="element-documentation"><p class="max-w-[300px] truncate text-sm text-muted-foreground" :title="el.description || ''" x-text="el.description ? truncate(el.description, 100) : 'No description'"></p></td>
                             <td class="px-4 py-3 text-center" data-field="element-relationships"><span class="text-sm tabular-nums text-muted-foreground" x-text="el.rel_count === null || el.rel_count === undefined ? '—' : el.rel_count"></span></td>
+                            <td class="px-4 py-3 text-center" data-field="element-wsjf"><span class="text-sm tabular-nums text-muted-foreground" x-text="el.wsjf_score !== undefined && el.wsjf_score !== null ? el.wsjf_score : '—'"></span></td>
                             <td class="px-4 py-3" data-field="element-actions">
                                 <div class="flex items-center justify-end gap-1">
                                     <a :href="detailUrl(el)" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-8 px-2.5 items-center" :aria-label="'Open full detail for ' + el.name">View</a>

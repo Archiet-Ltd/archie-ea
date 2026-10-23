@@ -9,7 +9,7 @@ import logging
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
 
-from .base_client import APIResponse, BaseAPIClient
+from .base_client import APIClientError, APIResponse, BaseAPIClient
 
 logger = logging.getLogger(__name__)
 
@@ -26,19 +26,47 @@ class GitHubAPIClient(BaseAPIClient):
     - Technology stack analysis
     """
 
-    def __init__(self, api_token: Optional[str] = None):
+    def __init__(
+        self,
+        api_token: Optional[str] = None,
+        *,
+        base_url: Optional[str] = None,
+        rate_limit_per_minute: Optional[int] = None,
+    ):
         """
         Initialize GitHub API client.
 
         Args:
             api_token: GitHub personal access token (optional, increases rate limits)
+            base_url: API address; GitHub Enterprise Server's ``https://host/api/v3``.
+                The caller checks it (``validate_connector_url``) before passing it.
+            rate_limit_per_minute: request budget; defaults to 30 with a token, 10 without
         """
         super().__init__(
-            base_url="https://api.github.com",
+            base_url=base_url or "https://api.github.com",
             api_key=api_token,
-            rate_limit_per_minute=30 if api_token else 10,  # Higher limit with token
+            rate_limit_per_minute=rate_limit_per_minute or (30 if api_token else 10),
             cache_ttl_seconds=1800,  # 30 minute cache for repo data
         )
+
+    def _create_session(self):
+        """The base session, plus: a redirect is refused, never followed (a followed
+        redirect would carry the token to wherever the answer points)."""
+        session = super()._create_session()
+
+        def refuse_redirect(response, *args, **kwargs):
+            if response.status_code in (301, 302, 303, 307, 308):
+                raise APIClientError("GitHub answered with a redirect, which is not followed")
+            return response
+
+        session.hooks["response"].append(refuse_redirect)
+        return session
+
+    def _scrub(self, text: str) -> str:
+        """The token never leaves in a log line or an error message."""
+        if self.api_key and isinstance(text, str):
+            return text.replace(self.api_key, "***")
+        return text
 
     def _setup_authentication(self):
         """Setup GitHub API authentication."""
