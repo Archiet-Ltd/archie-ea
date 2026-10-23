@@ -2458,7 +2458,7 @@ function _dispositionBadgeHtml(disposition) {
     case 'replatform':  cls = 'bg-violet-500/10 text-violet-600 border border-violet-500/30'; break; // token-migration-ok
     case 'rehost':      cls = 'bg-sky-500/10 text-sky-600 border border-sky-500/30'; break;      // token-migration-ok
     case 'refactor':    cls = 'bg-amber-500/10 text-amber-600 border border-amber-500/30'; break; // token-migration-ok
-    case 'retain':      cls = 'bg-blue-500/10 text-blue-600 border border-blue-500/30'; break;   // token-migration-ok
+    case 'retain':      cls = 'bg-info/10 text-info-emphasis border border-info/30'; break;   // token-migration-ok
     default:            cls = 'bg-muted/50 text-muted-foreground border border-border';
   }
   return '<span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium ' + cls + '">' +
@@ -2786,7 +2786,7 @@ function renderDecisionDossier(data, containerId) {
     replatform: 'bg-violet-500/10 text-violet-600 border border-violet-500/30', // token-migration-ok
     rehost: 'bg-sky-500/10 text-sky-600 border border-sky-500/30', // token-migration-ok
     refactor: 'bg-amber-500/10 text-amber-600 border border-amber-500/30', // token-migration-ok
-    retain: 'bg-blue-500/10 text-blue-600 border border-blue-500/30', // token-migration-ok
+    retain: 'bg-info/10 text-info-emphasis border border-info/30', // token-migration-ok
   };
   let confMap = {
     high: 'bg-emerald-500/10 text-emerald-600 border border-emerald-500/30', // token-migration-ok
@@ -2971,7 +2971,7 @@ function executiveSummary() {
       const classes = {
         'approved':        'bg-emerald-500/10 text-emerald-600 border border-emerald-500/30',
         'rejected':        'bg-red-500/10 text-red-600 border border-red-500/30', // token-migration-ok
-        'under_review':    'bg-blue-500/10 text-blue-600 border border-blue-500/30', // token-migration-ok
+        'under_review':    'bg-info/10 text-info-emphasis border border-info/30', // token-migration-ok
         'pending':         'bg-muted text-muted-foreground border border-border',
         'needs_more_info': 'bg-amber-500/10 text-amber-600 border border-amber-500/30', // token-migration-ok
         'escalated':       'bg-purple-500/10 text-purple-600 border border-purple-500/30' // token-migration-ok
