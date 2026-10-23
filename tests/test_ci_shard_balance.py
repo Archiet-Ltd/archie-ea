@@ -320,3 +320,51 @@ def test_the_updater_builds_the_browser_table_from_the_main_browser_shard_files(
     table = json.loads(out.read_text(encoding="utf-8"))
     assert table["files"] == {"tests/smoke/test_archetype_journeys.py": {"seconds": 20.0, "tests": 2}}
     assert "browser" in table["comment"]
+
+
+def _matrix_nodeids():
+    """One heavy file of many parametrised functions beside ordinary files."""
+    heavy = "tests/smoke/test_heavy_matrix.py"
+    nodeids = [f"{heavy}::test_route_{f}[{role}]" for f in range(12) for role in ("cto", "pm", "ea", "sa")]
+    nodeids += [f"tests/smoke/test_light_{n}.py::test_x" for n in range(4)]
+    return heavy, nodeids
+
+
+def test_a_named_heavy_file_is_placed_one_test_function_at_a_time(monkeypatch):
+    heavy, nodeids = _matrix_nodeids()
+    table = {"default_seconds_per_test": 5.0, "files": {}}
+    path = Path(os.environ.get("TMPDIR", "/tmp")) / f"shard-table-{os.getpid()}.json"
+    path.write_text(json.dumps(table), encoding="utf-8")
+    monkeypatch.setenv("CI_SHARD_SPLIT_FILES", f"{heavy}, tests/smoke/not_collected.py")
+    try:
+        homes_by_function, seen, sizes = {}, [], []
+        for index in range(3):
+            kept, _ = _run_hook(monkeypatch, nodeids, index, total=3, table_path=path)
+            sizes.append(len(kept))
+            seen += kept
+            for nodeid in kept:
+                if nodeid.startswith(heavy):
+                    homes_by_function.setdefault(nodeid.split("[")[0], set()).add(index)
+    finally:
+        path.unlink()
+    assert sorted(seen) == sorted(nodeids) and len(seen) == len(set(seen))
+    assert all(len(shards) == 1 for shards in homes_by_function.values()), "a function's parametrisations were split"
+    assert len({next(iter(s)) for s in homes_by_function.values()}) == 3, "the heavy file stayed in one shard"
+    assert max(sizes) <= len(nodeids) // 2, sizes
+
+
+def test_an_unnamed_heavy_file_still_stays_in_one_shard(monkeypatch):
+    heavy, nodeids = _matrix_nodeids()
+    monkeypatch.delenv("CI_SHARD_SPLIT_FILES", raising=False)
+    homes = set()
+    for index in range(3):
+        kept, _ = _run_hook(monkeypatch, nodeids, index, total=3)
+        if any(n.startswith(heavy) for n in kept):
+            homes.add(index)
+    assert len(homes) == 1
+
+
+def test_a_split_function_takes_its_files_recorded_rate():
+    table = {"default_seconds_per_test": 0.5, "files": {"tests/smoke/test_m.py": {"seconds": 40.0, "tests": 10}}}
+    weights = sharding.file_weights({"tests/smoke/test_m.py::test_a": 3}, table)
+    assert weights["tests/smoke/test_m.py::test_a"] == 12000

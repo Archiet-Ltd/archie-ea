@@ -27,6 +27,13 @@ module- or class-scoped state with another test in its own file is never
 split across two database sessions. It does not protect against state
 shared ACROSS files; ci.yml records what was checked for that.
 
+The one exception is a file named in CI_SHARD_SPLIT_FILES: it is placed one
+test function at a time (every parametrisation of a function stays together),
+because a single file heavier than a whole shard's share cannot be balanced
+otherwise. Each shard then builds that file's module-scoped fixtures for
+itself, so name only a file whose functions do not depend on one another's
+side effects.
+
 Controlled by environment variables, read once at collection time:
 
     CI_SHARD_TOTAL       total number of shards (absent, "0" or "1": no-op --
@@ -36,6 +43,8 @@ Controlled by environment variables, read once at collection time:
     CI_SHARD_DURATIONS   optional path of the duration table (default:
                          tests/shard_durations.json next to this repository's
                          scripts/ directory)
+    CI_SHARD_SPLIT_FILES optional comma-separated test files placed one test
+                         function at a time instead of as a whole file
 
     CI_SHARD_INDEX=0 CI_SHARD_TOTAL=8 pytest --collect-only -q \\
         -p scripts.ci.test_sharding --ignore=tests/smoke
@@ -72,6 +81,21 @@ def _file_of(item) -> str:
     return item.nodeid.split("::", 1)[0]
 
 
+def split_files() -> frozenset[str]:
+    """Files placed one test function at a time (CI_SHARD_SPLIT_FILES)."""
+    raw = os.environ.get("CI_SHARD_SPLIT_FILES", "")
+    return frozenset(part.strip() for part in raw.split(",") if part.strip())
+
+
+def _unit_of(item, split: frozenset[str]) -> str:
+    """The unit the planner places: the file, or for a split file the test
+    function (its node id without the parametrisation)."""
+    path = _file_of(item)
+    if path in split:
+        return item.nodeid.split("[", 1)[0]
+    return path
+
+
 def load_table(path=None) -> dict:
     """The committed duration table, or {} when it is absent or unreadable."""
     path = Path(path or os.environ.get("CI_SHARD_DURATIONS") or DEFAULT_TABLE)
@@ -97,12 +121,13 @@ def default_seconds_per_test(table: dict) -> float:
 
 def file_weights(file_counts: dict[str, int], table: dict) -> dict[str, int]:
     """Weight (milliseconds) of each collected file: recorded seconds per test
-    times today's test count, or the table's median rate for an unknown file."""
+    times today's test count, or the table's median rate for an unknown file.
+    A test function of a split file ("path::name") takes its file's rate."""
     fallback = default_seconds_per_test(table)
     known = table.get("files", {})
     weights: dict[str, int] = {}
     for path, count in file_counts.items():
-        entry = known.get(path)
+        entry = known.get(path.split("::", 1)[0])
         if isinstance(entry, dict) and entry.get("tests") and entry.get("seconds") is not None:
             rate = entry["seconds"] / entry["tests"]
         else:
@@ -163,15 +188,16 @@ def pytest_collection_modifyitems(config, items):  # noqa: ARG001 - pytest hook
     if not (0 <= index < total):
         raise ValueError(f"CI_SHARD_INDEX={index} out of range for CI_SHARD_TOTAL={total}")
 
-    file_counts: dict[str, int] = defaultdict(int)
+    split = split_files()
+    unit_counts: dict[str, int] = defaultdict(int)
     for item in items:
-        file_counts[_file_of(item)] += 1
-    assignment, _loads = plan(dict(file_counts), total)
+        unit_counts[_unit_of(item, split)] += 1
+    assignment, _loads = plan(dict(unit_counts), total)
 
     kept = []
     deselected = []
     for item in items:
-        if assignment[_file_of(item)] == index:
+        if assignment[_unit_of(item, split)] == index:
             kept.append(item)
         else:
             deselected.append(item)
