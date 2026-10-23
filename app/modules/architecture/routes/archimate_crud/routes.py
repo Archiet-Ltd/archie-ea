@@ -1326,11 +1326,26 @@ def detail_element(layer, element_type, element_id):
         abort(404)
     model_class = MODEL_REGISTRY.get(element_type)
 
-    # filter_by always emits SQL, so the tenant filter applies even when the row
-    # is already in the session identity map (Query.get would skip it).
+    # The element list links a mirrored element by its ArchiMate element id (the
+    # id every row, relationship and quick view uses), while a dedicated table
+    # (work_packages, gaps, ...) keeps its own primary-key sequence. The two
+    # sequences overlap, so looking the dedicated table up by the incoming id
+    # first could open a DIFFERENT element that merely shares that number — the
+    # work package list opened a neighbour's detail page this way. Resolve the
+    # dedicated row by the key that matches what was linked: first the mirror
+    # (archimate_element_id == id), then the dedicated primary key for callers
+    # that link by it (the gap register, capability links), then the native
+    # ArchiMate element. filter_by always emits SQL, so the tenant filter
+    # applies even when the row is already in the session identity map
+    # (Query.get would skip it).
     element = None
     if model_class:
-        element = model_class.query.filter_by(id=element_id).first()
+        if hasattr(model_class, "archimate_element_id"):
+            element = model_class.query.filter_by(
+                archimate_element_id=element_id
+            ).first()
+        if element is None:
+            element = model_class.query.filter_by(id=element_id).first()
 
     # Fall back to archimate_elements table (native ArchiMate elements)
     if element is None:
