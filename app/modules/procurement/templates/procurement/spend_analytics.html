@@ -4,6 +4,21 @@
 {% block title %}Spend Analytics{% endblock %}
 
 {% block content %}
+{# Amounts are shown in the currency they were recorded in. The reporting-currency
+   figure is a separate, labelled column; a dash there means a rate is missing
+   and the note beneath names it. #}
+{% macro amounts(by_currency) -%}
+{%- if by_currency -%}
+{%- for code, value in by_currency.items() -%}<span class="block whitespace-nowrap">{{ '{:,.2f}'.format(value) }} {{ code }}</span>{%- endfor -%}
+{%- else -%}—{%- endif -%}
+{%- endmacro %}
+{% macro in_reporting(value, code) -%}
+{{ ('{:,.2f}'.format(value) ~ ' ' ~ code) if value is not none else '—' }}
+{%- endmacro %}
+{% macro rate_notes(pairs, code) -%}
+{%- for currency, on in pairs -%}<div class="text-xs text-muted-foreground" data-testid="missing-rate">No {{ currency }} to {{ code }} rate on file for {{ on.strftime('%-d %b %Y') if on else 'this date' }}</div>{%- endfor -%}
+{%- endmacro %}
+{% set reporting = summary.reporting_currency %}
 <div class="p-6 space-y-6">
     {{ page_header(
         title='Spend Analytics',
@@ -32,9 +47,11 @@
                 </div>
                 <div class="text-sm text-muted-foreground">Total Contract Value</div>
             </div>
-            <div class="text-3xl font-bold">{{ summary.total_value|format_currency(show_code=True) if summary.total_value is not none else '—' }}</div>
-            {% if summary.contracts_without_value %}
-            <p class="mt-1 text-sm text-muted-foreground">excludes {{ summary.contracts_without_value }} contract{{ '' if summary.contracts_without_value == 1 else 's' }} without a contract value</p>
+            <div class="text-3xl font-bold">{{ in_reporting(summary.total_contract_value.converted, reporting) }}</div>
+            <div class="mt-1 text-sm text-muted-foreground">{{ amounts(summary.total_contract_value.by_currency) }}</div>
+            {{ rate_notes(summary.total_contract_value.missing_rates, reporting) }}
+            {% if summary.total_contract_value.contracts_without_contract_value %}
+            <p class="mt-1 text-sm text-muted-foreground">excludes {{ summary.total_contract_value.contracts_without_contract_value }} contract{{ '' if summary.total_contract_value.contracts_without_contract_value == 1 else 's' }} without a contract value</p>
             {% endif %}
         </div>
         <div class="bg-card border border-border rounded-lg p-6">
@@ -44,9 +61,11 @@
                 </div>
                 <div class="text-sm text-muted-foreground">Annual Recurring Cost</div>
             </div>
-            <div class="text-3xl font-bold">{{ summary.total_annual_cost|format_currency(show_code=True) if summary.total_annual_cost is not none else '—' }}</div>
-            {% if summary.contracts_without_annual_cost %}
-            <p class="mt-1 text-sm text-muted-foreground">excludes {{ summary.contracts_without_annual_cost }} contract{{ '' if summary.contracts_without_annual_cost == 1 else 's' }} without an annual cost</p>
+            <div class="text-3xl font-bold" data-testid="spend-total-converted">{{ in_reporting(summary.total.converted, reporting) }}</div>
+            <div class="mt-1 text-sm text-muted-foreground">{{ amounts(summary.total.by_currency) }}</div>
+            {{ rate_notes(summary.total.missing_rates, reporting) }}
+            {% if summary.total.contracts_without_annual_cost %}
+            <p class="mt-1 text-sm text-muted-foreground">excludes {{ summary.total.contracts_without_annual_cost }} contract{{ '' if summary.total.contracts_without_annual_cost == 1 else 's' }} without an annual cost</p>
             {% endif %}
         </div>
     </div>
@@ -107,62 +126,105 @@
         </div>
     </div>
 
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <!-- Spend by Contract Type -->
-        <div class="bg-card border border-border rounded-lg p-6">
-            <h2 class="text-lg font-semibold mb-4">Spend by Contract Type</h2>
-            {% if summary.by_type %}
-            <div class="space-y-4">
-                {% for type, data in summary.by_type.items() %}
-                <div class="flex items-center justify-between">
-                    <div class="flex items-center gap-3">
-                        <div class="w-3 h-3 rounded-full bg-primary"></div>
-                        <span class="capitalize">{{ type.replace('_', ' ') }}</span>
-                        <span class="text-sm text-muted-foreground">({{ data.count }} contracts)</span>
-                    </div>
-                    <span class="font-medium">{% if data.annual_cost is not none %}{{ data.annual_cost|format_currency }}/yr{% else %}—{% endif %}</span>
+    {% if summary.by_type %}
+    <!-- Spend by Contract Type -->
+    <div class="bg-card border border-border rounded-lg p-6">
+        <h2 class="text-lg font-semibold mb-4">Spend by Contract Type</h2>
+        <div class="space-y-4">
+            {% for type, data in summary.by_type.items() %}
+            <div class="flex items-start justify-between gap-4">
+                <div class="flex items-center gap-3">
+                    <div class="w-3 h-3 rounded-full bg-primary"></div>
+                    <span class="capitalize">{{ type.replace('_', ' ') }}</span>
+                    <span class="text-sm text-muted-foreground">({{ data.count }} contracts)</span>
                 </div>
-                {% endfor %}
-            </div>
-            {% else %}
-            <p class="text-muted-foreground">No contract type data available</p>
-            {% endif %}
-        </div>
-
-        <!-- Top Vendors by Spend -->
-        <div class="bg-card border border-border rounded-lg p-6">
-            <h2 class="text-lg font-semibold mb-4">Top Vendors by Annual Spend</h2>
-            {% if summary.top_vendors %}
-            <div class="space-y-4">
-                {% for vendor_name, data in summary.top_vendors %}
-                <div>
-                    <div class="flex items-center justify-between mb-1">
-                        <span class="font-medium">{{ vendor_name }}</span>
-                        <span class="text-sm">{% if data.annual_cost is not none %}{{ data.annual_cost|format_currency }}/yr{% else %}—{% endif %}</span>
-                    </div>
-                    {% if data.annual_cost is not none %}
-                    <div class="flex items-center gap-2">
-                        <div class="flex-1 h-2 bg-muted rounded-full overflow-hidden">
-                            {% set pct = (data.annual_cost / summary.total_annual_cost * 100) if (summary.total_annual_cost or 0) > 0 else 0 %}
-                            <div class="h-full bg-primary rounded-full" style="width: {{ pct }}%"></div>
-                        </div>
-                        <span class="text-xs text-muted-foreground w-12 text-right">{{ "{:.1f}".format(pct) }}%</span>
-                    </div>
-                    {% endif %}
+                <div class="text-right">
+                    <span class="font-medium">{% if data.converted is not none %}{{ in_reporting(data.converted, reporting) }}/yr{% else %}—{% endif %}</span>
+                    <div class="text-xs text-muted-foreground">{{ amounts(data.by_currency) }}</div>
+                    {{ rate_notes(data.missing_rates, reporting) }}
                 </div>
-                {% endfor %}
             </div>
-            {% else %}
-            <p class="text-muted-foreground">No vendor spend data available</p>
-            {% endif %}
+            {% endfor %}
         </div>
     </div>
+    {% endif %}
 
-    {% if summary.total_contracts == 0 %}
+    {% if summary.by_vendor %}
+    <!-- Spend by Vendor -->
+    <div class="bg-card border border-border rounded-lg overflow-hidden">
+        <h2 class="text-lg font-semibold p-6 pb-4">Spend by vendor</h2>
+        <div class="overflow-x-auto">
+        <table class="w-full border-collapse" data-testid="spend-by-vendor">
+            <thead>
+                <tr class="bg-muted/40 border-b">
+                    <th scope="col" class="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Vendor</th>
+                    <th scope="col" class="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Contracts</th>
+                    <th scope="col" class="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Annual cost as recorded</th>
+                    <th scope="col" class="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">In {{ reporting }}</th>
+                    <th scope="col" class="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Applications covered</th>
+                    <th scope="col" class="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Nearest end date</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y">
+                {% for row in summary.by_vendor %}
+                <tr class="hover:bg-muted/30 transition-colors">
+                    <td class="px-4 py-3 font-medium">{{ row.vendor_name }}</td>
+                    <td class="px-4 py-3 text-sm">
+                        {{ row.contract_count }}
+                        {% if row.contracts_without_annual_cost %}<div class="text-xs text-muted-foreground">{{ row.contracts_without_annual_cost }} without an annual cost</div>{% endif %}
+                    </td>
+                    <td class="px-4 py-3 text-sm">{{ amounts(row.by_currency) }}</td>
+                    <td class="px-4 py-3 text-sm">{{ in_reporting(row.converted, reporting) }}{{ rate_notes(row.missing_rates, reporting) }}</td>
+                    <td class="px-4 py-3 text-sm">{{ row.covered_application_count if row.covered_application_count is not none else '—' }}</td>
+                    <td class="px-4 py-3 text-sm">{{ row.nearest_end_date.strftime('%-d %b %Y') if row.nearest_end_date else '—' }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        </div>
+    </div>
+    {% endif %}
+
+    {% if summary.by_contract %}
+    <!-- Spend by Contract -->
+    <div class="bg-card border border-border rounded-lg overflow-hidden">
+        <h2 class="text-lg font-semibold p-6 pb-4">Spend by contract</h2>
+        <div class="overflow-x-auto">
+        <table class="w-full border-collapse" data-testid="spend-by-contract">
+            <thead>
+                <tr class="bg-muted/40 border-b">
+                    <th scope="col" class="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Contract</th>
+                    <th scope="col" class="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Vendor</th>
+                    <th scope="col" class="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Annual cost as recorded</th>
+                    <th scope="col" class="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">In {{ reporting }}</th>
+                    <th scope="col" class="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Ends</th>
+                    <th scope="col" class="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Applications covered</th>
+                    <th scope="col" class="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Basis</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y">
+                {% for row in summary.by_contract %}
+                <tr class="hover:bg-muted/30 transition-colors" data-source-table="{{ row.source_table }}" data-truth-class="{{ row.truth_class }}">
+                    <td class="px-4 py-3 font-medium">{{ row.contract_name }}</td>
+                    <td class="px-4 py-3 text-sm">{{ row.vendor_name or '—' }}</td>
+                    <td class="px-4 py-3 text-sm">{% if row.annual_cost is not none %}{{ amounts({row.currency: row.annual_cost}) }}{% else %}—{% endif %}</td>
+                    <td class="px-4 py-3 text-sm">{{ in_reporting(row.converted, reporting) }}{{ rate_notes(row.missing_rates, reporting) }}</td>
+                    <td class="px-4 py-3 text-sm">{{ row.end_date.strftime('%-d %b %Y') if row.end_date else '—' }}</td>
+                    <td class="px-4 py-3 text-sm">{% if row.applications %}{{ row.applications|join(', ') }}{% else %}—{% endif %}</td>
+                    <td class="px-4 py-3 text-sm text-muted-foreground">{{ row.truth_class|capitalize }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        </div>
+    </div>
+    {% endif %}
+
+    {% if not summary.total.by_currency %}
     {{ empty_state(
         icon='pie-chart',
-        title='No spend data available',
-        description='Spend analytics will appear once vendor contracts are added to the system.',
+        title='No active contracts with a stated annual cost',
+        description='Spend appears here by vendor and by contract once an active contract has an annual cost.',
         cta_text='View Contracts',
         cta_href=url_for('procurement.contracts_list'),
         cta_icon='arrow-right'

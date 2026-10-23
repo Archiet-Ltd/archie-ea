@@ -305,12 +305,18 @@ class ConvertedTotal:
         return self.amount is None
 
 
-def convert_total(facts: Iterable, reporting_currency: str) -> ConvertedTotal:
+def convert_total(facts: Iterable, reporting_currency: str,
+                  rate_cache: Optional[dict] = None) -> ConvertedTotal:
     """Sum cost facts in ``reporting_currency`` at each fact's period rate.
 
     A fact in another currency is converted at the rate in effect at the end of
     its period. If any fact has no rate the whole total is missing (``amount``
     None) and ``missing`` names each pair; no partial sum is ever returned.
+
+    ``rate_cache`` is an optional dict the caller owns for the span of one
+    request: a (currency, reporting currency, date) lookup already made is
+    reused instead of queried again, a missing rate included. It changes how
+    often the rate table is read, never the answer.
     """
     reporting = reporting_currency.upper()
     total = Decimal(0)
@@ -319,7 +325,13 @@ def convert_total(facts: Iterable, reporting_currency: str) -> ConvertedTotal:
     for fact in facts:
         count += 1
         as_of = fact.period_end or fact.period_start
-        rate = get_exchange_rate(fact.currency, reporting, as_of)
+        key = (fact.currency, reporting, as_of)
+        if rate_cache is not None and key in rate_cache:
+            rate = rate_cache[key]
+        else:
+            rate = get_exchange_rate(fact.currency, reporting, as_of)
+            if rate_cache is not None:
+                rate_cache[key] = rate
         if rate is None:
             pair = (fact.currency, as_of)
             if pair not in missing:
