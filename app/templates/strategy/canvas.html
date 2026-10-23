@@ -201,7 +201,7 @@
       <span x-show="draftError" x-cloak data-testid="strategy-draft-error"
             class="text-sm text-destructive-emphasis" x-text="draftError"></span>
       {% endif %}
-      {% if unclassified and layout in ('grid_2x2',) %}
+      {% if show_unclassified %}
       <span class="text-sm text-muted-foreground" data-testid="strategy-unclassified">{{ unclassified }} not yet classified</span>
       {% endif %}
     </div>

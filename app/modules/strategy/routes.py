@@ -136,6 +136,16 @@ def canvas(template_key):
     draftable = engine.is_strategy_framework(template_key)
     layout = tpl.get("layout", "grid")
 
+    # The "not yet classified" count is meaningful only for the frameworks a
+    # person classifies an existing element INTO (BCG and Ansoff, over the
+    # organisation's Products and Business Services). For SWOT, PESTLE and the
+    # other assessment frameworks every box is authored directly, so there is
+    # no backlog of unclassified elements to report.
+    show_unclassified = tpl.get("record") == "elements" and layout == "grid_2x2"
+    unclassified = (
+        engine.unclassified_count(template_key, org_id) if (org_id and show_unclassified) else 0
+    )
+
     # Per-zone empty-reason wording, said in the box.
     empty_reasons = {z["box_key"]: _empty_reason_text(z) for z in zones}
 
@@ -148,7 +158,8 @@ def canvas(template_key):
         boxes=boxes,
         draftable=draftable,
         empty_reasons=empty_reasons,
-        unclassified=engine.unclassified_count(template_key, org_id) if org_id else 0,
+        show_unclassified=show_unclassified,
+        unclassified=unclassified,
     )
 
 
