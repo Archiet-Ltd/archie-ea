@@ -58,7 +58,7 @@
                     <p class="text-xs text-muted-foreground">Choose the organisation you are currently working in.</p>
                 </div>
                 {% if active_organization_name %}
-                <span class="inline-flex items-center rounded-md border border-primary/20 bg-primary/10 px-2.5 py-1 text-xs font-medium text-info-emphasis"
+                <span class="inline-flex items-center rounded-md border border-info/20 bg-info/10 px-2.5 py-1 text-xs font-medium text-info-emphasis"
                       data-testid="active-organization-badge">
                     Active: {{ active_organization_name }}
                 </span>
@@ -84,7 +84,7 @@
                             </span>
                         </span>
                         {% if active_organization and org.id == active_organization.id %}
-                        <span class="rounded-md bg-success/10 px-2 py-1 text-xs font-medium text-success">Current</span>
+                        <span class="rounded-md bg-success/10 px-2 py-1 text-xs font-medium text-success-emphasis">Current</span>
                         {% endif %}
                     </label>
                     {% endfor %}
@@ -138,7 +138,7 @@
                                 {% for ev in recent_auth_events %}
                                     <li class="flex items-center justify-between gap-3">
                                         <span class="font-mono text-xs">{{ ev.created_at.strftime('%d %b %H:%M') if ev.created_at else '—' }}</span>
-                                        <span class="text-xs {% if ev.action == 'login_failed' %}text-destructive{% else %}text-muted-foreground{% endif %}">{{ ev.action|replace('_', ' ') }}</span>
+                                        <span class="text-xs {% if ev.action == 'login_failed' %}text-destructive-emphasis{% else %}text-muted-foreground{% endif %}">{{ ev.action|replace('_', ' ') }}</span>
                                         <span class="font-mono text-xs text-muted-foreground">{{ ev.ip_address or '—' }}</span>
                                     </li>
                                 {% endfor %}
