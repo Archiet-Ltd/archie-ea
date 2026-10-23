@@ -279,7 +279,12 @@ class RelationshipSuggestion(db.Model):  # migration-exempt — uses db.create_a
 
 # ArchiMate 3.2 relationship validity matrix
 # Key: (relationship_type, source_layer, target_layer) → bool
-# Layers: business, application, technology, motivation, strategy, implementation, physical
+# Layers: business, application, technology, motivation, strategy,
+# implementation_migration, physical. "implementation_migration" matches
+# ArchiMateLayer.IMPLEMENTATION (app/models/constants.py), the single
+# authority for the layer string -- see _ELEMENT_TYPE_LAYER below. Four
+# association entries deliberately stay on the old bare "implementation"
+# spelling -- see the comment immediately above them.
 #
 # This layer-triple matrix is coarser than the element-type-keyed one in
 # app/config/archimate_relationship_matrix.py (via RelationshipValidator),
@@ -298,7 +303,7 @@ VALID_RELATIONSHIPS = {
     ("composition", "motivation", "motivation"): True,
     ("composition", "strategy", "strategy"): True,
     ("composition", "physical", "physical"): True,
-    ("composition", "implementation", "implementation"): True,  # Deliverable → WorkPackage
+    ("composition", "implementation_migration", "implementation_migration"): True,  # Deliverable → WorkPackage
     # Aggregation — within same layer only
     ("aggregation", "business", "business"): True,
     ("aggregation", "application", "application"): True,
@@ -317,12 +322,12 @@ VALID_RELATIONSHIPS = {
     ("realization", "technology", "application"): True,
     ("realization", "technology", "technology"): True,
     ("realization", "application", "application"): True,
-    ("realization", "implementation", "motivation"): True,
+    ("realization", "implementation_migration", "motivation"): True,
     ("realization", "motivation", "motivation"): True,  # Goal → Outcome
     ("realization", "motivation", "strategy"): True,   # Goal → Capability
     ("realization", "strategy", "motivation"): True,   # CourseOfAction → Goal
     ("realization", "strategy", "business"): True,     # Capability → BusinessProcess/Service
-    ("realization", "implementation", "implementation"): True,  # WorkPackage → Gap
+    ("realization", "implementation_migration", "implementation_migration"): True,  # WorkPackage → Gap
     # Serving — cross-layer allowed
     ("serving", "application", "business"): True,
     ("serving", "application", "application"): True,
@@ -355,17 +360,29 @@ VALID_RELATIONSHIPS = {
     ("association", "motivation", "strategy"): True,   # Requirement → Capability
     ("association", "strategy", "strategy"): True,      # ValueStream ↔ Capability (uses), stage adjacency
     ("association", "strategy", "motivation"): True,    # Capability ↔ Goal/Outcome
-    ("association", "implementation", "implementation"): True,  # WorkPackage → Plateau
+    ("association", "implementation_migration", "implementation_migration"): True,  # WorkPackage → Plateau
     ("association", "business", "application"): True,
     ("association", "application", "business"): True,
     ("association", "application", "technology"): True,
     ("association", "technology", "application"): True,
     ("association", "business", "motivation"): True,
     ("association", "motivation", "business"): True,
-    ("association", "strategy", "implementation"): True,  # ArchiMate 3.2 §5.2.4: option ↔ plan item
-    ("association", "implementation", "strategy"): True,  # ArchiMate 3.2 §5.2.4: plan item ↔ option
-    ("association", "motivation", "implementation"): True,  # ArchiMate 3.2 §5.2.4: outcome ↔ work package
-    ("association", "implementation", "motivation"): True,  # ArchiMate 3.2 §5.2.4: work package ↔ outcome
+    # ArchiMate 3.2 §5.2.4 also permits an association for option ↔ plan
+    # item (strategy ↔ implementation_migration) and outcome ↔ work package
+    # (motivation ↔ implementation_migration). Deliberately NOT added here:
+    # orphan_layer is always canonicalized to "implementation_migration"
+    # before any VALID_RELATIONSHIPS lookup (ArchiMateLayer.canonical,
+    # called by _orphan_link_choice and _link_orphan_elements), and that
+    # function's type-priority loop checks association before realization
+    # -- adding these would make it pick Association over the Realization
+    # entries above for every implementation_migration/motivation orphan,
+    # which tests/test_archimate_orphan_link_layers.py's
+    # test_orphan_on_implementation_migration_links_to_motivation_by_realization
+    # pins against. This coarse table is non-authoritative for direct
+    # validation anyway (see the big comment above VALID_RELATIONSHIPS);
+    # the precise, element-type-keyed matrix in
+    # app/config/archimate_relationship_matrix.py is where that ArchiMate
+    # 3.2 §5.2.4 pairing belongs if it is ever needed for real validation.
     ("association", "business", "strategy"): True,  # ArchiMate 3.2 §5.2.4: key partner ↔ resource/capability
     ("association", "strategy", "business"): True,  # ArchiMate 3.2 §5.2.4: resource/capability ↔ key partner
     # Specialization — within same layer
@@ -376,7 +393,12 @@ VALID_RELATIONSHIPS = {
     ("specialization", "strategy", "strategy"): True,
 }
 
-# Layer classification for element types
+# Layer classification for element types. Canonical layer string per type:
+# app/models/archimate_element_types.py's ArchiMateElementTypes is the single
+# authority (ElementTypeDefinition.layer) -- this dict must agree with it. Its
+# values are exactly the seven names in app.models.constants.ArchiMateLayer.ALL,
+# and VALID_RELATIONSHIPS above is keyed in that same vocabulary. Pinned by
+# tests/test_archimate_layer_taxonomy.py.
 _ELEMENT_TYPE_LAYER = {
     "business_actor": "business", "business_role": "business",
     "business_collaboration": "business", "business_interface": "business",
@@ -401,8 +423,9 @@ _ELEMENT_TYPE_LAYER = {
     "meaning": "motivation", "value": "motivation",
     "resource": "strategy", "capability": "strategy", "course_of_action": "strategy",
     "value_stream": "strategy",
-    "work_package": "implementation", "deliverable": "implementation",
-    "implementation_event": "implementation", "plateau": "implementation", "gap": "implementation",
+    "work_package": "implementation_migration", "deliverable": "implementation_migration",
+    "implementation_event": "implementation_migration", "plateau": "implementation_migration",
+    "gap": "implementation_migration",
     "equipment": "physical", "facility": "physical",
     "distribution_network": "physical", "material": "physical",
 }
@@ -419,9 +442,12 @@ def validate_relationship(rel_type, source_type, target_type):
     Returns:
         Tuple of (is_valid: bool, message: str)
     """
-    source_layer = _ELEMENT_TYPE_LAYER.get((source_type or "").lower(), "unknown")
-    target_layer = _ELEMENT_TYPE_LAYER.get((target_type or "").lower(), "unknown")
+    source_type_norm = (source_type or "").lower()
+    target_type_norm = (target_type or "").lower()
     rel = (rel_type or "").lower()
+
+    source_layer = _ELEMENT_TYPE_LAYER.get(source_type_norm, "unknown")
+    target_layer = _ELEMENT_TYPE_LAYER.get(target_type_norm, "unknown")
 
     if source_layer == "unknown" or target_layer == "unknown":
         return True, "Element type not in registry; validation skipped"

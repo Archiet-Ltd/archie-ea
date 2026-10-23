@@ -1855,7 +1855,7 @@ class ArchiMateElementTypes:
         if layer == "motivation":
             valid_relationships.append("influence")  # Motivation elements use influence
 
-        if layer in {ArchiMateLayer.IMPLEMENTATION, "implementation_migration"}:
+        if layer == ArchiMateLayer.IMPLEMENTATION:
             valid_relationships.extend(["realization", "triggering"])
 
         # Remove duplicates and return sorted list

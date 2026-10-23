@@ -43,8 +43,16 @@ type genuinely out of scope. Say why, and who models it instead.
     python scripts/check_ai_layer_coverage.py --count
 
 Proven-against: `_tool_create_driver` renamed in the executor -- the count rises
-by one naming `driver`, and returns when restored. Pinned red-and-green on a
-synthetic tree by tests/test_gates_actually_fail.py.
+by one naming `driver`, and returns when restored. Pinned by
+tests/test_archimate_layer_taxonomy.py, which parses the real tree and asserts
+58 element types across the seven ArchiMateLayer names with their per-layer
+counts. It is not one of tests/test_gates_actually_fail.py's synthetic-tree
+CASES, and cannot be: that harness plants a defect and asserts the bad count
+is higher than the good one (`bad_count > 0`, `bad_count > good_count`), which
+fits a gate whose failure mode is reporting MORE problems than it should. This
+gate's failure mode is the opposite -- a defect in the anchor pattern below
+makes `_element_types` find nothing at all and the count silently drops to
+zero, which the synthetic-tree harness cannot express.
 """
 from __future__ import annotations
 
@@ -75,7 +83,7 @@ def _element_types(root: str) -> dict:
             source = fh.read()
     except (OSError, UnicodeDecodeError):
         return {}
-    start = source.find("_ELEMENT_TYPE_LAYER")
+    start = source.find("_ELEMENT_TYPE_LAYER = {")
     if start < 0:
         return {}
     end = source.find("\n}", start)

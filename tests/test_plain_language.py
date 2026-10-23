@@ -126,8 +126,8 @@ def test_plain_layer_names():
     assert plain_layer_name("technology") == "Technology"
     assert plain_layer_name("implementation") == "Projects and change"
     assert plain_layer_name("implementation_migration") == "Projects and change"
-    assert ArchiMateLayer.IMPLEMENTATION == "implementation"
-    assert ArchiMateLayer.normalize("Implementation & Migration") == "implementation"
+    assert ArchiMateLayer.IMPLEMENTATION == "implementation_migration"
+    assert ArchiMateLayer.normalize("Implementation & Migration") == "implementation_migration"
     assert plain_layer_name(None) == "\u2014"
 
 
