@@ -1881,7 +1881,7 @@ def build_gates(baseline: dict) -> list[Gate]:
         Gate("write-route-gates",
              "No write route guarded only by require_roles or login_required (matrix require_permission required)",
              "ratchet",
-             lambda: gate_write_route_gates(baseline.get("write_route_gates", 1997)),
+             lambda: gate_write_route_gates(baseline.get("write_route_gates", 1971)),
              remediation="add @require_permission(action, object_type) from app.core.auth.decorators",
              tags=["static"]),
         Gate("raw-fetch-sites",
