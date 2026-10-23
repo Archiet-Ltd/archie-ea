@@ -1,7 +1,7 @@
 # API Contract Subset — auto-generated
 # Source: api-model-v1.yaml
 # SHA256: f34b68f30dd7d8e52334a523eae0af7f025f379232f3280754811be6a74204fc
-# Body-SHA256: 5cdc00221071f6f0861a8b7e8e375e92110fc2895a527607536e7aaf6c0a5e79
+# Body-SHA256: a4487ff93859f41bbbca65f19a7e4328fc5f1bd0e47eeb0986fe662977d3b345
 # Do not edit by hand.
 openapi: 3.1.0
 info:
@@ -49,7 +49,169 @@ security:
 tags:
 - name: Model
   description: Model operations
+- name: Strategy
+  description: Strategy operations
 paths:
+  /capabilities:
+    get:
+      operationId: listCapabilities
+      summary: List Capability records
+      tags:
+      - Strategy
+      parameters:
+      - $ref: '#/components/parameters/Filter'
+      - $ref: '#/components/parameters/Q'
+      - $ref: '#/components/parameters/Sort'
+      - $ref: '#/components/parameters/Fields'
+      - $ref: '#/components/parameters/Include'
+      - $ref: '#/components/parameters/AsOf'
+      - $ref: '#/components/parameters/ValidAt'
+      - $ref: '#/components/parameters/IncludeRetired'
+      - $ref: '#/components/parameters/Scenario'
+      - $ref: '#/components/parameters/ScopeParam'
+      - $ref: '#/components/parameters/Limit'
+      - $ref: '#/components/parameters/Cursor'
+      responses:
+        '200':
+          description: Success.
+          headers:
+            RateLimit:
+              $ref: '#/components/headers/RateLimit'
+            RateLimit-Policy:
+              $ref: '#/components/headers/RateLimitPolicy'
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+            Link:
+              $ref: '#/components/headers/Link'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CapabilityPage'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+      security:
+      - entelimOAuth:
+        - model:read
+      x-rate-limit-tier: read
+      x-idempotency:
+        required: false
+        note: Safe and idempotent by method.
+      x-pagination:
+        style: cursor
+        limit_default: 50
+        limit_max: 200
+        order: stable, by the sort key then id
+      x-personas:
+      - PER-011
+      - PER-009
+      - PER-007
+      - PER-019
+      - PER-043
+      - PER-004
+      - PER-040
+      - PER-001
+      x-use-case-ids:
+      - UC-004
+      - UC-014
+      - UC-019
+      - UC-020
+      - UC-024
+      - UC-030
+      x-use-cases:
+      - See what breaks if a core platform fails, with owner and health on every row
+      - Consolidate duplicate capability records into the one system of record
+      - Maintain the capability map from the single capability store
+      x-entity-id: ENT-0001
+      x-entity: Capability
+      x-archimate: Capability
+  /capabilities/{id}:
+    get:
+      operationId: getCapability
+      summary: Get a Capability
+      tags:
+      - Strategy
+      parameters:
+      - $ref: '#/components/parameters/Id'
+      - $ref: '#/components/parameters/Fields'
+      - $ref: '#/components/parameters/Include'
+      - $ref: '#/components/parameters/AsOf'
+      - $ref: '#/components/parameters/ValidAt'
+      - $ref: '#/components/parameters/Scenario'
+      - $ref: '#/components/parameters/IfNoneMatch'
+      responses:
+        '200':
+          description: Success.
+          headers:
+            RateLimit:
+              $ref: '#/components/headers/RateLimit'
+            RateLimit-Policy:
+              $ref: '#/components/headers/RateLimitPolicy'
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+            ETag:
+              $ref: '#/components/headers/ETag'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Capability'
+        '304':
+          description: Not modified since the ETag given in If-None-Match.
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        '410':
+          $ref: '#/components/responses/Gone'
+      security:
+      - entelimOAuth:
+        - model:read
+      x-rate-limit-tier: read
+      x-idempotency:
+        required: false
+        note: Safe and idempotent by method.
+      x-personas:
+      - PER-011
+      - PER-009
+      - PER-007
+      - PER-019
+      - PER-043
+      - PER-004
+      - PER-040
+      - PER-001
+      x-use-case-ids:
+      - UC-004
+      - UC-014
+      - UC-019
+      - UC-020
+      - UC-024
+      - UC-030
+      x-use-cases:
+      - See what breaks if a core platform fails, with owner and health on every row
+      - Consolidate duplicate capability records into the one system of record
+      - Maintain the capability map from the single capability store
+      x-entity-id: ENT-0001
+      x-entity: Capability
+      x-archimate: Capability
   /elements:
     get:
       operationId: listElements
@@ -125,13 +287,188 @@ paths:
       - entelimOAuth:
         - model:read
       x-rate-limit-tier: read
+  /value-streams:
+    get:
+      operationId: listValueStreams
+      summary: List Value Stream records
+      tags:
+      - Strategy
+      parameters:
+      - $ref: '#/components/parameters/Filter'
+      - $ref: '#/components/parameters/Q'
+      - $ref: '#/components/parameters/Sort'
+      - $ref: '#/components/parameters/Fields'
+      - $ref: '#/components/parameters/Include'
+      - $ref: '#/components/parameters/AsOf'
+      - $ref: '#/components/parameters/ValidAt'
+      - $ref: '#/components/parameters/IncludeRetired'
+      - $ref: '#/components/parameters/Scenario'
+      - $ref: '#/components/parameters/ScopeParam'
+      - $ref: '#/components/parameters/Limit'
+      - $ref: '#/components/parameters/Cursor'
+      responses:
+        '200':
+          description: Success.
+          headers:
+            RateLimit:
+              $ref: '#/components/headers/RateLimit'
+            RateLimit-Policy:
+              $ref: '#/components/headers/RateLimitPolicy'
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+            Link:
+              $ref: '#/components/headers/Link'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValueStreamPage'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+      security:
+      - entelimOAuth:
+        - model:read
+      x-rate-limit-tier: read
+      x-idempotency:
+        required: false
+        note: Safe and idempotent by method.
+      x-pagination:
+        style: cursor
+        limit_default: 50
+        limit_max: 200
+        order: stable, by the sort key then id
+      x-personas:
+      - PER-011
+      - PER-008
+      - PER-031
+      - PER-024
+      - PER-043
+      - PER-004
+      - PER-009
+      - PER-041
+      x-use-case-ids:
+      - UC-012
+      - UC-041
+      - UC-059
+      - UC-060
+      - UC-078
+      - UC-079
+      x-use-cases:
+      - Tell a business owner which systems would stop the business trading if they
+        failed
+      - State the business impact of a live major incident
+      - Assign owners to capabilities and find capabilities with none
+      x-entity-id: ENT-0002
+      x-entity: Value Stream
+      x-archimate: Value Stream
+  /value-streams/{id}:
+    get:
+      operationId: getValueStream
+      summary: Get a Value Stream
+      tags:
+      - Strategy
+      parameters:
+      - $ref: '#/components/parameters/Id'
+      - $ref: '#/components/parameters/Fields'
+      - $ref: '#/components/parameters/Include'
+      - $ref: '#/components/parameters/AsOf'
+      - $ref: '#/components/parameters/ValidAt'
+      - $ref: '#/components/parameters/Scenario'
+      - $ref: '#/components/parameters/IfNoneMatch'
+      responses:
+        '200':
+          description: Success.
+          headers:
+            RateLimit:
+              $ref: '#/components/headers/RateLimit'
+            RateLimit-Policy:
+              $ref: '#/components/headers/RateLimitPolicy'
+            Request-Id:
+              $ref: '#/components/headers/RequestId'
+            ETag:
+              $ref: '#/components/headers/ETag'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValueStream'
+        '304':
+          description: Not modified since the ETag given in If-None-Match.
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        '410':
+          $ref: '#/components/responses/Gone'
+      security:
+      - entelimOAuth:
+        - model:read
+      x-rate-limit-tier: read
+      x-idempotency:
+        required: false
+        note: Safe and idempotent by method.
+      x-personas:
+      - PER-011
+      - PER-008
+      - PER-031
+      - PER-024
+      - PER-043
+      - PER-004
+      - PER-009
+      - PER-041
+      x-use-case-ids:
+      - UC-012
+      - UC-041
+      - UC-059
+      - UC-060
+      - UC-078
+      - UC-079
+      x-use-cases:
+      - Tell a business owner which systems would stop the business trading if they
+        failed
+      - State the business impact of a live major incident
+      - Assign owners to capabilities and find capabilities with none
+      x-entity-id: ENT-0002
+      x-entity: Value Stream
+      x-archimate: Value Stream
 components:
   headers:
+    ETag:
+      description: Strong entity tag of the returned version.
+      schema:
+        type: string
+    Link:
+      description: 'RFC 8288 links: next, prev, first.'
+      schema:
+        type: string
     RateLimit:
       description: Remaining quota for the current window (IETF RateLimit header fields).
       schema:
         type: string
       example: '"read";r=1180;t=42'
+    RateLimitPolicy:
+      description: Quota policy that applies to this operation.
+      schema:
+        type: string
+      example: '"read";q=1200;w=60'
     RequestId:
       description: Identifier of this request, also carried in problem details and
         the audit trail.
@@ -149,6 +486,38 @@ components:
       example: Bearer resource_metadata="https://entelim.org/.well-known/oauth-protected-resource",
         error="invalid_token"
   parameters:
+    AsOf:
+      name: asOf
+      in: query
+      description: 'Read the state as recorded at this instant (bitemporal: valid
+        and recorded time). Defaults to now.'
+      schema:
+        type: string
+        format: date-time
+    Cursor:
+      name: cursor
+      in: query
+      description: Opaque cursor from page.next_cursor or page.prev_cursor.
+      schema:
+        type: string
+        maxLength: 1000
+    Fields:
+      name: fields
+      in: query
+      description: 'Sparse fieldset: comma-separated fields to return.'
+      schema:
+        type: string
+        maxLength: 1000
+    Filter:
+      name: filter
+      in: query
+      style: deepObject
+      explode: true
+      description: 'Field filters, e.g. filter[lifecycle]=live&filter[updated_at][gte]=2026-01-01.
+        Operators: eq, ne, in, nin, gt, gte, lt, lte, contains, exists.'
+      schema:
+        type: object
+        additionalProperties: true
     Id:
       name: id
       in: path
@@ -156,10 +525,101 @@ components:
       description: Resource identifier.
       schema:
         $ref: '#/components/schemas/Id'
+    IfNoneMatch:
+      name: If-None-Match
+      in: header
+      description: Return 304 when the ETag still matches.
+      schema:
+        type: string
+    Include:
+      name: include
+      in: query
+      description: Comma-separated reference fields to expand inline, one level deep.
+      schema:
+        type: string
+        maxLength: 500
+    IncludeRetired:
+      name: includeRetired
+      in: query
+      description: Include retired records.
+      schema:
+        type: boolean
+        default: false
+    Limit:
+      name: limit
+      in: query
+      description: Page size, 1 to 200.
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 200
+        default: 50
+    Q:
+      name: q
+      in: query
+      description: Free-text search within the collection.
+      schema:
+        type: string
+        maxLength: 500
+    Scenario:
+      name: scenario
+      in: query
+      description: Read through a scenario's hypothetical changes instead of the baseline
+        model.
+      schema:
+        $ref: '#/components/schemas/Id'
+    ScopeParam:
+      name: scope
+      in: query
+      description: 'For hybrid and reference entities: tenant rows, shared reference
+        rows, or both.'
+      schema:
+        type: string
+        enum:
+        - tenant
+        - shared
+        - all
+        default: all
+    Sort:
+      name: sort
+      in: query
+      description: Comma-separated fields; prefix with - for descending.
+      schema:
+        type: string
+        maxLength: 200
+      example: -updated_at,name
+    ValidAt:
+      name: validAt
+      in: query
+      description: Read the state that was true in the world at this instant, as currently
+        known.
+      schema:
+        type: string
+        format: date-time
   responses:
+    BadRequest:
+      description: 'The request is malformed: bad syntax, bad parameter or unknown
+        filter field.'
+      headers:
+        Request-Id:
+          $ref: '#/components/headers/RequestId'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
     Forbidden:
       description: The token lacks the scope, or the principal's role lacks the permission,
         for this operation.
+      headers:
+        Request-Id:
+          $ref: '#/components/headers/RequestId'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    Gone:
+      description: The resource was retired into another; the problem's retired_into
+        field names it.
       headers:
         Request-Id:
           $ref: '#/components/headers/RequestId'
@@ -183,6 +643,18 @@ components:
       headers:
         Request-Id:
           $ref: '#/components/headers/RequestId'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    ServiceUnavailable:
+      description: A dependency is unavailable (model provider, connector, search
+        index). The problem names which; partial answers are never returned as complete.
+      headers:
+        Request-Id:
+          $ref: '#/components/headers/RequestId'
+        Retry-After:
+          $ref: '#/components/headers/RetryAfter'
       content:
         application/problem+json:
           schema:
@@ -213,6 +685,73 @@ components:
           schema:
             $ref: '#/components/schemas/Problem'
   schemas:
+    Capability:
+      description: 'Capability: A business capability at level 0 to 3 of the capability
+        map, the anchor most questions are asked against.'
+      allOf:
+      - $ref: '#/components/schemas/EntityBase'
+      - $ref: '#/components/schemas/CapabilityAttributes'
+      - type: object
+        properties:
+          lifecycle_state:
+            type: string
+            enum:
+            - draft
+            - proposed
+            - approved
+            - superseded
+            - rejected
+            readOnly: true
+            description: States of lifecycle set LC-DESIGN.
+        additionalProperties: false
+      x-entity-id: ENT-0001
+      x-ontology-class: ONT-0003 Capability
+      x-archimate: Capability
+      x-scope: hybrid
+      x-identity-key: tenant_id + normalised name + parent_capability_id
+      x-lifecycle-set: LC-DESIGN
+      unevaluatedProperties: false
+    CapabilityAttributes:
+      type: object
+      properties:
+        level:
+          type: integer
+        parent_capability_id:
+          $ref: '#/components/schemas/EntityRef'
+          x-target-entity: Capability
+        reference_entry_id:
+          $ref: '#/components/schemas/EntityRef'
+          x-target-entity: ReferenceModelEntry
+        maturity_current:
+          type: integer
+        maturity_target:
+          type: integer
+        strategic_importance:
+          type: string
+          enum:
+          - core
+          - differentiating
+          - supporting
+          - commodity
+        heat:
+          type: string
+          enum:
+          - low
+          - medium
+          - high
+      description: Attributes specific to Capability (ENT-0001).
+    CapabilityPage:
+      type: object
+      required:
+      - data
+      - page
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Capability'
+        page:
+          $ref: '#/components/schemas/PageInfo'
     ElementDetail:
       allOf:
       - $ref: '#/components/schemas/ElementSummary'
@@ -723,6 +1262,33 @@ components:
       format: uuid
       description: UUID v7 (time-ordered) surrogate id. Never reused; stable across
         renames and re-imports.
+    PageInfo:
+      type: object
+      properties:
+        next_cursor:
+          type:
+          - string
+          - 'null'
+        prev_cursor:
+          type:
+          - string
+          - 'null'
+        limit:
+          type: integer
+        total_estimate:
+          type:
+          - integer
+          - 'null'
+          description: Estimated count when cheap to compute; null otherwise, never
+            zero as a stand-in.
+        as_of:
+          type: string
+          format: date-time
+      additionalProperties: false
+      required:
+      - next_cursor
+      - limit
+      - as_of
     Problem:
       description: 'Problem: An underlying cause of incidents.'
       allOf:
@@ -812,3 +1378,53 @@ components:
       - recorded_at
       description: Where a fact came from. Every record, relationship and answer row
         carries one.
+    ValueStream:
+      description: 'Value Stream: An end-to-end value stream delivering a result to
+        a triggering stakeholder.'
+      allOf:
+      - $ref: '#/components/schemas/EntityBase'
+      - $ref: '#/components/schemas/ValueStreamAttributes'
+      - type: object
+        properties:
+          lifecycle_state:
+            type: string
+            enum:
+            - draft
+            - proposed
+            - approved
+            - superseded
+            - rejected
+            readOnly: true
+            description: States of lifecycle set LC-DESIGN.
+        additionalProperties: false
+      x-entity-id: ENT-0002
+      x-ontology-class: ONT-0004 Value Stream
+      x-archimate: Value Stream
+      x-scope: tenant
+      x-identity-key: tenant_id + normalised name
+      x-lifecycle-set: LC-DESIGN
+      unevaluatedProperties: false
+    ValueStreamAttributes:
+      type: object
+      properties:
+        triggering_stakeholder_id:
+          $ref: '#/components/schemas/EntityRef'
+          x-target-entity: Stakeholder
+        value_proposition:
+          type: string
+          maxLength: 50000
+        customer_facing:
+          type: boolean
+      description: Attributes specific to Value Stream (ENT-0002).
+    ValueStreamPage:
+      type: object
+      required:
+      - data
+      - page
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/ValueStream'
+        page:
+          $ref: '#/components/schemas/PageInfo'
