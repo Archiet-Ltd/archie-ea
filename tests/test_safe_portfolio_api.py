@@ -281,13 +281,13 @@ def viewer_user(db_session, epic_element):
     return user
 
 
-def test_portfolio_viewer_cannot_move_epic(app, client, viewer_user, epic_element, tenant_ctx, db_session):
+def test_portfolio_viewer_cannot_move_epic(app, client, viewer_user, epic_element, tenant_ctx, db_session, login_as):
     """The permission matrix, not a role list, refuses a viewer's write."""
-    _login(client, viewer_user.id)
+    login_as(client, viewer_user.id)
     with tenant_ctx(epic_element.organization_id):
-        assert client.get("/safe/portfolio/api").get_json()["can_write"] is False
+        assert client.get("/api/safe/portfolio").get_json()["can_write"] is False
         response = client.patch(
-            f"/safe/portfolio/api/{epic_element.id}",
+            f"/api/safe/portfolio/{epic_element.id}",
             json={"kanban_state": "Implementing"},
         )
         assert response.status_code == 403
@@ -297,9 +297,9 @@ def test_portfolio_viewer_cannot_move_epic(app, client, viewer_user, epic_elemen
         assert _read_property_value(epic_element, "kanban_state") in (None, "Funnel")
 
 
-def test_portfolio_empty_columns_name_the_next_step(app, client, test_user, viewer_user, epic_element, tenant_ctx):
+def test_portfolio_empty_columns_name_the_next_step(app, client, test_user, viewer_user, epic_element, tenant_ctx, login_as):
     """An empty column says why it is empty and what to do next, for each role."""
-    _login(client, test_user.id)
+    login_as(client, test_user.id)
     with tenant_ctx(epic_element.organization_id):
         html = client.get("/safe/portfolio/").get_data(as_text=True)
         assert "No epics are being reviewed. Move an epic here from Funnel when its business case is ready." in html
@@ -308,7 +308,7 @@ def test_portfolio_empty_columns_name_the_next_step(app, client, test_user, view
         assert "Risk Reduction" in html and "Job Size" in html
         assert "BV:" not in html and "TC:" not in html
 
-    _login(client, viewer_user.id)
+    login_as(client, viewer_user.id)
     with tenant_ctx(epic_element.organization_id):
         html = client.get("/safe/portfolio/").get_data(as_text=True)
         assert "Someone with edit access moves an epic here from Funnel when its business case is ready." in html
