@@ -93,7 +93,8 @@ def _headline_card(page):
 
 
 def test_investment_headline_is_recorded_money_and_isolated(live_server, browser):
-    cap = _shared_capability(uuid.uuid4().hex[:6], "Payments %s" % uuid.uuid4().hex[:4])
+    cap_name = "Settlements %s" % uuid.uuid4().hex[:8]
+    cap = _shared_capability(uuid.uuid4().hex[:6], cap_name)
 
     # Org A records 180,000 + 20,000 = 200,000 -> headline £0.2M.
     # Org B records 900,000 -> headline £0.9M. Neither sees the other's money.
@@ -119,6 +120,17 @@ def test_investment_headline_is_recorded_money_and_isolated(live_server, browser
     # Not the first-round fabricated headline: org A's two apps total 200,000,
     # so £0.9M (org B's money) must never show here.
     assert "£0.9M" not in card_a.inner_text()
+
+    # Headline and matrix agree on the same screen: filter the matrix to this
+    # organisation's capability and assert its row shows the two covered
+    # applications and a recorded figure (not 0 apps, not an invented number).
+    search = page_a.get_by_placeholder("Search capabilities...")
+    search.fill(cap_name)
+    row = page_a.locator("tbody tr", has_text=cap_name).first
+    expect(row).to_be_visible(timeout=PAGE_TIMEOUT)
+    expect(row).to_contain_text("2 apps")
+    expect(row).to_contain_text("Recorded")
+    assert "No cost recorded" not in row.inner_text()
     page_a.screenshot(path="%s/investment-org-a-1440.png" % SHOT_DIR, full_page=True)
 
     # Narrow view still shows the real headline.
