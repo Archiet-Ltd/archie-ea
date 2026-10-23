@@ -135,3 +135,28 @@ def capability_mapping_in_caller_org(mapping_id) -> Optional[object]:
     return fenced_capability_mappings_query().filter(
         CapabilityProcessMapping.id == mapping_id
     ).first()
+
+
+def archimate_element_owned_by_caller(element_id) -> bool:
+    """Whether ``element_id`` belongs to the caller's organisation.
+
+    ArchiMateElement carries TenantMixin, so its organization_id is the
+    authoritative tenant scope. Returns False for missing, foreign, or
+    no-ambient-org cases -- fail closed rather than guess.
+    """
+    if not element_id:
+        return False
+    org_id = current_org_id()
+    if org_id is None:
+        return False
+    from app.models.archimate_core import ArchiMateElement
+
+    return (
+        db.session.execute(
+            db.select(ArchiMateElement).where(
+                ArchiMateElement.id == element_id,
+                ArchiMateElement.organization_id == org_id,
+            )
+        ).scalar_one_or_none()
+        is not None
+    )

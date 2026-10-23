@@ -132,3 +132,146 @@ def test_saving_mappings_skips_another_organisations_capability(
         text("select count(*) from capability_archimate_classifications where capability_id = :c"),
         {"c": cap_a_id}).scalar()
     assert count == 1 and _exists(db_session, mapping_id)
+
+
+def _element(db_session, org, name="Element"):
+    from app.models.archimate_core import ArchiMateElement
+    element = ArchiMateElement(name=name, type="BusinessFunction", layer="business", organization_id=org.id)
+    db_session.add(element)
+    db_session.flush()
+    return element
+
+
+def _capability(db_session, org, name="Cap"):
+    from app.models.business_capabilities import BusinessCapability
+    cap = BusinessCapability(name=name, organization_id=org.id)
+    db_session.add(cap)
+    db_session.flush()
+    return cap
+
+
+def test_saving_mapping_skips_another_organisations_element(
+        app, db_session, make_org, client, login_as):
+    """Org B tries to save a mapping pointing at Org A's element -- skipped, nothing written."""
+    org_a, org_b = make_org("cm-elem-a"), make_org("cm-elem-b")
+    cap_b = _capability(db_session, org_b, "Cap B")
+    elem_a = _element(db_session, org_a, "Element A")
+    user_b = _user(db_session, org_b, "b")
+    db_session.commit()
+    cap_b_id, elem_a_id, user_b_id = cap_b.id, elem_a.id, user_b.id
+    db_session.expunge_all()
+
+    from app.models.user import User
+
+    login_as(client, db_session.get(User, user_b_id))
+    response = client.post("/capability-map/api/save-archimate-mappings", json={"mappings": [{
+        "capability_id": cap_b_id, "archimate_element_id": elem_a_id, "archimate_layer": "business"}]})
+
+    assert response.status_code == 200, response.get_data(as_text=True)
+    data = response.get_json()
+    assert data["total"] == 0
+    assert data["skipped"]["element_not_owned"] == 1
+    count = db_session.execute(
+        text("select count(*) from capability_archimate_classifications where capability_id = :c"),
+        {"c": cap_b_id}).scalar()
+    assert count == 0
+
+
+def test_saving_mapping_to_own_element_is_written(
+        app, db_session, make_org, client, login_as):
+    """Org A saves a mapping to its own element -- written successfully."""
+    org_a = make_org("cm-own-elem")
+    cap_a = _capability(db_session, org_a, "Cap A")
+    elem_a = _element(db_session, org_a, "Element A")
+    user_a = _user(db_session, org_a, "a")
+    db_session.commit()
+    cap_a_id, elem_a_id, user_a_id = cap_a.id, elem_a.id, user_a.id
+    db_session.expunge_all()
+
+    from app.models.user import User
+
+    login_as(client, db_session.get(User, user_a_id))
+    response = client.post("/capability-map/api/save-archimate-mappings", json={"mappings": [{
+        "capability_id": cap_a_id, "archimate_element_id": elem_a_id, "archimate_layer": "business"}]})
+
+    assert response.status_code == 200, response.get_data(as_text=True)
+    data = response.get_json()
+    assert data["total"] == 1
+    assert data["created"] == 1
+    assert data["skipped"]["element_not_owned"] == 0
+    count = db_session.execute(
+        text("select count(*) from capability_archimate_classifications where capability_id = :c"),
+        {"c": cap_a_id}).scalar()
+    assert count == 1
+
+
+def test_switched_user_skips_another_organisations_element(
+        app, db_session, make_org, client, login_as):
+    """User switched into Org B tries to save mapping to Org A's element -- skipped."""
+    from app.models.org_role import OrgRole
+
+    org_a, org_b = make_org("cm-home-elem"), make_org("cm-second-elem")
+    cap_a = _capability(db_session, org_a, "Cap A")
+    elem_a = _element(db_session, org_a, "Element A")
+    user = _user(db_session, org_a, "multi")
+    OrgRole.set_role(org_b.id, user.id, "architect", granted_by_id=user.id)
+    db_session.commit()
+    cap_a_id, elem_a_id, user_id, org_b_id = cap_a.id, elem_a.id, user.id, org_b.id
+    db_session.expunge_all()
+
+    from app.models.user import User
+
+    login_as(client, db_session.get(User, user_id))
+    switched = client.post("/account/switch-organization",
+                           data={"organization_id": str(org_b_id)}, follow_redirects=False)
+    assert switched.status_code == 302
+    response = client.post("/capability-map/api/save-archimate-mappings", json={"mappings": [{
+        "capability_id": cap_a_id, "archimate_element_id": elem_a_id, "archimate_layer": "business"}]})
+
+    assert response.status_code == 200, response.get_data(as_text=True)
+    data = response.get_json()
+    assert data["total"] == 0
+    # Both capability and element belong to org_a, so both should be skipped
+    # when current org is org_b. The first check (capability) catches it.
+    assert data["skipped"]["capability_not_owned"] == 1
+    assert data["skipped"]["element_not_owned"] == 0
+    count = db_session.execute(
+        text("select count(*) from capability_archimate_classifications where capability_id = :c"),
+        {"c": cap_a_id}).scalar()
+    assert count == 0
+
+
+def test_switched_user_skips_another_organisations_element_with_own_capability(
+        app, db_session, make_org, client, login_as):
+    """User switched into Org B tries to save mapping with Org B's capability but Org A's element -- skipped."""
+    from app.models.org_role import OrgRole
+
+    org_a, org_b = make_org("cm-home-elem2"), make_org("cm-second-elem2")
+    cap_b = _capability(db_session, org_b, "Cap B")
+    elem_a = _element(db_session, org_a, "Element A")
+    user = _user(db_session, org_a, "multi2")
+    OrgRole.set_role(org_b.id, user.id, "architect", granted_by_id=user.id)
+    db_session.commit()
+    cap_b_id, elem_a_id, user_id, org_b_id = cap_b.id, elem_a.id, user.id, org_b.id
+    db_session.expunge_all()
+
+    from app.models.user import User
+
+    login_as(client, db_session.get(User, user_id))
+    switched = client.post("/account/switch-organization",
+                           data={"organization_id": str(org_b_id)}, follow_redirects=False)
+    assert switched.status_code == 302
+    response = client.post("/capability-map/api/save-archimate-mappings", json={"mappings": [{
+        "capability_id": cap_b_id, "archimate_element_id": elem_a_id, "archimate_layer": "business"}]})
+
+    assert response.status_code == 200, response.get_data(as_text=True)
+    data = response.get_json()
+    assert data["total"] == 0
+    # Capability belongs to org_b (current org), element belongs to org_a
+    # Element check should catch it
+    assert data["skipped"]["capability_not_owned"] == 0
+    assert data["skipped"]["element_not_owned"] == 1
+    count = db_session.execute(
+        text("select count(*) from capability_archimate_classifications where capability_id = :c"),
+        {"c": cap_b_id}).scalar()
+    assert count == 0
