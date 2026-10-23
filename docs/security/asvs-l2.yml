@@ -36,6 +36,11 @@
 #             path/to/test.py::Class::test_name) OR a control description that
 #             names a real FILE path (a bare directory does not resolve; a bare
 #             word never resolves)
+#   symbol    for a control-description row, the code identifier, setting name or
+#             configuration directive that must be present in the cited control
+#             file (e.g. SESSION_COOKIE_SECURE, SecurityMiddleware, ssl_protocols).
+#             The gate verifies the symbol text is actually in that file, so a
+#             control that is removed from the file it cites fails the register.
 #   status    pass (evidence resolves and exercises the requirement) or fail
 #             (open gap, names a real follow-up brief by id)
 #
@@ -55,24 +60,28 @@ rows:
     family: account
     applies: true
     status: pass
+    symbol: reset_password
     evidence:
-      - password change and credential recovery are handled by the account auth blueprint in app/auth/__init__.py
+      - password change and credential recovery are handled in app/modules/account/routes/account_routes.py
   - id: V3.2.1
     family: account
     applies: true
     status: pass
+    symbol: SESSION_COOKIE_SECURE
     evidence:
-      - the session identifier is minted server-side by Flask-Login on sign-in, configured in config.py
+      - the session cookie is minted server-side by Flask-Login and configured in config.py
   - id: V3.3.1
     family: account
     applies: true
     status: pass
+    symbol: SESSION_COOKIE_HTTPONLY
     evidence:
       - the session cookie is signed, HttpOnly and cleared on sign-out, configured in config.py
   - id: V3.4.1
     family: account
     applies: true
     status: pass
+    symbol: SESSION_COOKIE_SAMESITE
     evidence:
       - SESSION_COOKIE_HTTPONLY, SESSION_COOKIE_SAMESITE and SESSION_COOKIE_SECURE are set in config.py
   - id: V4.1.1
@@ -98,12 +107,14 @@ rows:
     family: account
     applies: true
     status: pass
+    symbol: SecurityMiddleware
     evidence:
       - CSRF protection on every state-changing form is enforced by app/security/middleware.py
   - id: V7.1.1
     family: account
     applies: true
     status: pass
+    symbol: AuditLogger
     evidence:
       - credentials and tokens are kept out of the logs by the audit logging in app/security/audit.py
   - id: V8.2.1
@@ -116,6 +127,7 @@ rows:
     family: account
     applies: true
     status: pass
+    symbol: ssl_protocols
     evidence:
       - TLS terminates at the load balancer, whose TLS listener, protocols and HSTS are configured in ./nginx.conf
   - id: V13.1.1
@@ -143,12 +155,14 @@ rows:
     family: m365_connector
     applies: true
     status: pass
+    symbol: SecurityMiddleware
     evidence:
       - connector configuration forms are CSRF-protected by app/security/middleware.py
   - id: V7.1.1
     family: m365_connector
     applies: true
     status: pass
+    symbol: Fernet
     evidence:
       - connector secrets are encrypted at rest and never logged, handled in app/security/data_protection.py
   - id: V8.1.1
@@ -161,6 +175,7 @@ rows:
     family: m365_connector
     applies: true
     status: pass
+    symbol: login.microsoftonline
     evidence:
       - outbound connector calls use the HTTPS Microsoft Graph and token endpoints defined in app/services/m365_service.py
   - id: V13.1.1
@@ -188,12 +203,14 @@ rows:
     family: intelligence_api
     applies: true
     status: pass
+    symbol: SecurityMiddleware
     evidence:
       - request bodies to the intelligence API are validated and CSRF-exempt endpoints are gated in app/security/middleware.py
   - id: V9.1.1
     family: intelligence_api
     applies: true
     status: pass
+    symbol: ssl_protocols
     evidence:
       - TLS terminates at the load balancer whose HTTPS listener is configured in ./nginx.conf
   - id: V13.1.1
@@ -219,8 +236,9 @@ rows:
     family: intelligence_ui
     applies: true
     status: pass
+    symbol: SecurityMiddleware
     evidence:
-      - rendered answers are HTML-escaped by the Jinja2 autoescaping configured in app/security/middleware.py
+      - rendered answers are HTML-escaped and response headers are set in app/security/middleware.py
   - id: V13.1.1
     family: intelligence_ui
     applies: false
@@ -258,12 +276,14 @@ rows:
     family: unified_applications
     applies: true
     status: pass
+    symbol: UploadSecurityService
     evidence:
       - uploaded application spreadsheets are validated and sanitised by app/security/upload_security.py
   - id: V9.1.1
     family: unified_applications
     applies: true
     status: pass
+    symbol: ssl_protocols
     evidence:
       - TLS terminates at the load balancer whose HTTPS listener is configured in ./nginx.conf
   - id: V13.1.1
@@ -289,6 +309,7 @@ rows:
     family: my_applications
     applies: true
     status: pass
+    symbol: ContentValidator
     evidence:
       - input to the my-applications routes is validated and uploads are sanitised by app/security/content_validator.py
 
@@ -298,7 +319,7 @@ rows:
     applies: true
     status: pass
     evidence:
-      - tests/test_billing_two_org_isolation.py::TestBillingPageIsTwoOrgIsolated::test_org_b_billing_page_never_shows_org_a_enterprise_plan
+      - tests/test_billing_two_org_isolation.py::TestBillingPageIsTwoOrgIsolated::test_billing_page_follows_the_switched_session_into_org_a
   - id: V4.1.3
     family: billing
     applies: true
@@ -310,23 +331,26 @@ rows:
     applies: true
     status: pass
     evidence:
-      - tests/test_billing_two_org_isolation.py::TestBillingPageIsTwoOrgIsolated::test_org_b_billing_page_never_shows_org_a_enterprise_plan
+      - tests/test_billing_two_org_isolation.py::TestBillingPageIsTwoOrgIsolated::test_billing_page_follows_the_switched_session_into_org_a
   - id: V5.1.1
     family: billing
     applies: true
     status: pass
+    symbol: SecurityMiddleware
     evidence:
       - billing state-changing posts are CSRF-protected by app/security/middleware.py
   - id: V8.1.1
     family: billing
     applies: true
     status: pass
+    symbol: organization_id
     evidence:
       - plan and invoice records are scoped to the organisation in app/services/billing_plans.py
   - id: V9.1.1
     family: billing
     applies: true
     status: pass
+    symbol: ssl_protocols
     evidence:
       - TLS terminates at the load balancer whose HTTPS listener is configured in ./nginx.conf
 
@@ -336,14 +360,14 @@ rows:
     applies: true
     status: pass
     evidence:
-      - tests/test_team_two_org_isolation.py::TestTeamPageIsTwoOrgIsolated::test_org_b_team_page_never_lists_org_a_member
+      - tests/test_team_two_org_isolation.py::TestTeamPageIsTwoOrgIsolated::test_team_page_follows_the_switched_session_into_org_a
       - tests/test_admin_users_own_org_count.py::test_users_page_counts_only_own_organisation
   - id: V4.1.3
     family: team
     applies: true
     status: pass
     evidence:
-      - tests/test_team_two_org_isolation.py::TestTeamPageIsTwoOrgIsolated::test_org_b_team_page_never_lists_org_a_member
+      - tests/test_team_two_org_isolation.py::TestTeamPageIsTwoOrgIsolated::test_team_page_follows_the_switched_session_into_org_a
   - id: V4.2.1
     family: team
     applies: true
@@ -354,12 +378,14 @@ rows:
     family: team
     applies: true
     status: pass
+    symbol: issue_link
     evidence:
-      - invitations mint a single-use credential-setup link handled by app/auth/__init__.py
+      - invitations mint a single-use credential-setup link handled by app/models/pending_invitation.py
   - id: V5.1.1
     family: team
     applies: true
     status: pass
+    symbol: SecurityMiddleware
     evidence:
       - the invite and role forms are CSRF-protected by app/security/middleware.py
 
@@ -381,12 +407,14 @@ rows:
     family: dashboard
     applies: true
     status: pass
+    symbol: SecurityMiddleware
     evidence:
-      - dashboard values are HTML-escaped by the Jinja2 autoescaping configured in app/security/middleware.py
+      - dashboard values are HTML-escaped and response headers are set in app/security/middleware.py
   - id: V9.1.1
     family: dashboard
     applies: true
     status: pass
+    symbol: ssl_protocols
     evidence:
       - TLS terminates at the load balancer whose HTTPS listener is configured in ./nginx.conf
   - id: V4.1.1
@@ -401,42 +429,49 @@ rows:
     family: platform
     applies: true
     status: pass
+    symbol: FROM
     evidence:
       - the build and its pinned dependencies are recorded in ./Dockerfile
   - id: V14.2.1
     family: platform
     applies: true
     status: pass
+    symbol: SECRET_KEY
     evidence:
       - runtime configuration is read from the environment, recorded in ./.env.example
   - id: V14.4.1
     family: platform
     applies: true
     status: pass
+    symbol: X-Content-Type-Options
     evidence:
       - response security headers and content types are set for every response in app/security/middleware.py
   - id: V7.1.1
     family: platform
     applies: true
     status: pass
+    symbol: AuditLogger
     evidence:
       - error telemetry is cross-tenant by design and gated to platform admins, recorded in app/security/audit.py
   - id: V7.4.1
     family: platform
     applies: true
     status: pass
+    symbol: SecurityEnforcement
     evidence:
       - users receive generic error pages while details stay in the server log, handled in app/security/middleware.py
   - id: V8.3.1
     family: platform
     applies: true
     status: pass
+    symbol: Fernet
     evidence:
       - sensitive values are encrypted at rest and only read inside an authenticated tenant context in app/security/data_protection.py
   - id: V9.1.2
     family: platform
     applies: true
     status: pass
+    symbol: ssl_protocols
     evidence:
       - only TLS 1.2 and 1.3 with strong ciphers are accepted at the load balancer, configured in ./nginx.conf
 
