@@ -12,6 +12,7 @@ from typing import Any
 from flask import g, has_request_context
 
 from app import db
+from app.core.auth.permissions import can as _matrix_can
 from app.models.arb_submission_evidence import (
     ARBSubmissionEvidenceSnapshot,
     WorkbenchArtifactEvidence,
@@ -346,7 +347,7 @@ class ARBSubmissionService:
         if (
             actor.is_org_admin
             or actor.is_platform_admin
-            or actor.enterprise_role == "platform_admin"
+            or _matrix_can(actor, "access_any", "solution")
         ):
             return True
         email = (actor.email or "").strip().lower()

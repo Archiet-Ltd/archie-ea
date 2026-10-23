@@ -122,17 +122,17 @@ def _row_key(row):
 # --------------------------------------------------------------------------- #
 
 
-def test_answer_is_registered_once_and_only_on_the_chat_surface():
+def test_answer_is_registered_once_on_the_chat_and_connector_surfaces():
     schemas = [s for s in TOOL_SCHEMAS if s["name"] == "answer"]
     assert len(schemas) == 1
     schema = schemas[0]
-    assert schema["surfaces"] == ["chat"]
+    assert schema["surfaces"] == ["chat", "mcp"]
     assert schema["risk_class"] == "read" and schema["mutates"] is False
     assert TOOL_SCHEMA_BY_NAME["answer"] is schema
 
     from app.modules.ai_chat.tools.route_read_tools import connector_tools
 
-    assert "answer" not in {t["name"] for t in connector_tools()}
+    assert "answer" in {t["name"] for t in connector_tools()}
 
     offered = {
         t["name"]

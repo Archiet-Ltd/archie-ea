@@ -1,17 +1,10 @@
-"""Collection rules and shared fixtures for the connector tests.
-
-The shared fixtures (app, client, db_session, login_as, make_org, tenant_ctx)
-come from app/modules/conftest.py, which imports them from tests/conftest.py.
-
-These tests need the connector switched on (MCP_ENABLED and PUBLIC_BASE_URL are
-read when the app is created), which the ordinary suite run leaves off. A
-dedicated CI step runs them with the switch on; in an ordinary run only the
-switched-off test is collected, and with the switch on it is left out.
+"""Shared fixtures for the connector (MCP/OAuth) tests: two organisations, bearer tokens per
+organisation, and an identity-clear helper to switch users between requests.
+Test selection is handled by scripts/ci/mcp_selection.py (loaded through pytest.ini).
 """
 
 from __future__ import annotations
 
-import os
 import uuid
 
 import pytest
@@ -19,13 +12,6 @@ import pytest
 from app.models.organization import Organization
 from app.models.user import User
 from app.modules.oauth_provider.models import OAuthClient, OAuthToken, _new_client_id, hash_secret
-
-# These tests need the connector switched on (MCP_ENABLED and PUBLIC_BASE_URL are
-# read when the app is created), which the ordinary suite run leaves off. A
-# dedicated CI step runs them with the switch on; in an ordinary run only the
-# switched-off test is collected, and with the switch on it is left out.
-_ENABLED = os.environ.get("MCP_ENABLED", "").strip().lower() in ("1", "true", "yes")
-collect_ignore_glob = ["test_mcp_flag.py"] if _ENABLED else ["test_[!m]*.py", "test_mcp_[!f]*.py"]
 
 
 @pytest.fixture

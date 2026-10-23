@@ -61,7 +61,7 @@
             </div>
 
             {# Users #}
-            <div class="rounded-xl border border-border/50 bg-card p-5 flex items-center gap-4">
+            <div class="rounded-lg border border-border/50 bg-card p-5 flex items-center gap-4">
                 <div class="p-2.5 rounded-lg bg-primary/10">
                     <i data-lucide="users" class="w-5 h-5 text-primary" aria-hidden="true"></i>
                 </div>
@@ -76,7 +76,7 @@
             </div>
 
             {# Feature Flags #}
-            <div class="rounded-xl border border-border/50 bg-card p-5 flex items-center gap-4">
+            <div class="rounded-lg border border-border/50 bg-card p-5 flex items-center gap-4">
                 <div class="p-2.5 rounded-lg bg-info/10">
                     <i data-lucide="toggle-left" class="w-5 h-5 text-info" aria-hidden="true"></i>
                 </div>
@@ -109,7 +109,7 @@
                 </div>
                 <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     <a href="{{ url_for('admin.registered_users') }}" class="block group">
-                        <div class="rounded-xl border border-border/50 bg-card hover:bg-accent/5 hover:border-primary/30 transition-all p-5 flex items-start gap-4">
+                        <div class="rounded-lg border border-border/50 bg-card hover:bg-accent/5 hover:border-primary/30 transition-all p-5 flex items-start gap-4">
                             <div class="p-2.5 rounded-lg bg-primary/10 group-hover:bg-primary/15 transition-colors">
                                 <i data-lucide="users" class="w-5 h-5 text-primary" aria-hidden="true"></i>
                             </div>
@@ -120,7 +120,7 @@
                         </div>
                     </a>
                     <a href="{{ url_for('admin.new_user') }}" class="block group">
-                        <div class="rounded-xl border border-border/50 bg-card hover:bg-accent/5 hover:border-primary/30 transition-all p-5 flex items-start gap-4">
+                        <div class="rounded-lg border border-border/50 bg-card hover:bg-accent/5 hover:border-primary/30 transition-all p-5 flex items-start gap-4">
                             <div class="p-2.5 rounded-lg bg-primary/10 group-hover:bg-primary/15 transition-colors">
                                 <i data-lucide="user-plus" class="w-5 h-5 text-primary" aria-hidden="true"></i>
                             </div>
@@ -131,7 +131,7 @@
                         </div>
                     </a>
                     <a href="{{ url_for('admin.invite_user') }}" class="block group">
-                        <div class="rounded-xl border border-border/50 bg-card hover:bg-accent/5 hover:border-primary/30 transition-all p-5 flex items-start gap-4">
+                        <div class="rounded-lg border border-border/50 bg-card hover:bg-accent/5 hover:border-primary/30 transition-all p-5 flex items-start gap-4">
                             <div class="p-2.5 rounded-lg bg-primary/10 group-hover:bg-primary/15 transition-colors">
                                 <i data-lucide="mail" class="w-5 h-5 text-primary" aria-hidden="true"></i>
                             </div>
@@ -156,7 +156,7 @@
                        predicate the route enforces rather than for every admin. #}
                     {% if current_user.is_platform_admin %}
                     <a href="{{ url_for('admin.feature_flags') }}" class="block group">
-                        <div class="rounded-xl border border-border/50 bg-card hover:bg-accent/5 hover:border-primary/30 transition-all p-5 flex items-start gap-4">
+                        <div class="rounded-lg border border-border/50 bg-card hover:bg-accent/5 hover:border-primary/30 transition-all p-5 flex items-start gap-4">
                             <div class="p-2.5 rounded-lg bg-info/10 group-hover:bg-info/15 transition-colors">
                                 <i data-lucide="toggle-left" class="w-5 h-5 text-info" aria-hidden="true"></i>
                             </div>
@@ -171,7 +171,7 @@
                        @org_admin_required. Same rule: render on the guard's own predicate. #}
                     {% if current_user.is_org_admin %}
                     <a href="{{ url_for('admin.api_settings') }}" class="block group">
-                        <div class="rounded-xl border border-border/50 bg-card hover:bg-accent/5 hover:border-primary/30 transition-all p-5 flex items-start gap-4">
+                        <div class="rounded-lg border border-border/50 bg-card hover:bg-accent/5 hover:border-primary/30 transition-all p-5 flex items-start gap-4">
                             <div class="p-2.5 rounded-lg bg-warning/10 group-hover:bg-warning/15 transition-colors">
                                 <i data-lucide="key" class="w-5 h-5 text-warning" aria-hidden="true"></i>
                             </div>
@@ -190,7 +190,7 @@
                        doesn't get a tile that only leads to a 403. #}
                     {% if current_user.is_platform_admin %}
                     <a href="{{ url_for('admin.abacus_settings') }}" class="block group">
-                        <div class="rounded-xl border border-border/50 bg-card hover:bg-accent/5 hover:border-primary/30 transition-all p-5 flex items-start gap-4">
+                        <div class="rounded-lg border border-border/50 bg-card hover:bg-accent/5 hover:border-primary/30 transition-all p-5 flex items-start gap-4">
                             <div class="p-2.5 rounded-lg bg-info/10 group-hover:bg-info/15 transition-colors">
                                 <i data-lucide="database" class="w-5 h-5 text-info" aria-hidden="true"></i>
                             </div>
@@ -201,7 +201,7 @@
                         </div>
                     </a>
                     <a href="{{ url_for('admin.jira_settings') }}" class="block group">
-                        <div class="rounded-xl border border-border/50 bg-card hover:bg-accent/5 hover:border-primary/30 transition-all p-5 flex items-start gap-4">
+                        <div class="rounded-lg border border-border/50 bg-card hover:bg-accent/5 hover:border-primary/30 transition-all p-5 flex items-start gap-4">
                             <div class="p-2.5 rounded-lg bg-info/10 group-hover:bg-info/15 transition-colors">
                                 <i data-lucide="git-merge" class="w-5 h-5 text-primary" aria-hidden="true"></i>
                             </div>
@@ -213,7 +213,7 @@
                     </a>
                     {% endif %}
                     <a href="{{ url_for('admin.slack_integration') }}" class="block group">
-                        <div class="rounded-xl border border-border/50 bg-card hover:bg-accent/5 hover:border-primary/30 transition-all p-5 flex items-start gap-4">
+                        <div class="rounded-lg border border-border/50 bg-card hover:bg-accent/5 hover:border-primary/30 transition-all p-5 flex items-start gap-4">
                             <div class="p-2.5 rounded-lg bg-info/10 group-hover:bg-info/15 transition-colors">
                                 <i data-lucide="message-square" class="w-5 h-5 text-info" aria-hidden="true"></i>
                             </div>
@@ -224,7 +224,7 @@
                         </div>
                     </a>
                     <a href="{{ url_for('admin.teams_meetings_integration') }}" class="block group">
-                        <div class="rounded-xl border border-border/50 bg-card hover:bg-accent/5 hover:border-primary/30 transition-all p-5 flex items-start gap-4">
+                        <div class="rounded-lg border border-border/50 bg-card hover:bg-accent/5 hover:border-primary/30 transition-all p-5 flex items-start gap-4">
                             <div class="p-2.5 rounded-lg bg-info/10 group-hover:bg-info/15 transition-colors">
                                 <i data-lucide="video" class="w-5 h-5 text-info" aria-hidden="true"></i>
                             </div>
@@ -235,7 +235,7 @@
                         </div>
                     </a>
                     <a href="{{ url_for('admin.seed_management') }}" class="block group">
-                        <div class="rounded-xl border border-border/50 bg-card hover:bg-accent/5 hover:border-primary/30 transition-all p-5 flex items-start gap-4">
+                        <div class="rounded-lg border border-border/50 bg-card hover:bg-accent/5 hover:border-primary/30 transition-all p-5 flex items-start gap-4">
                             <div class="p-2.5 rounded-lg bg-success/10 group-hover:bg-success/15 transition-colors">
                                 <i data-lucide="sprout" class="w-5 h-5 text-success" aria-hidden="true"></i>
                             </div>
@@ -264,7 +264,7 @@
                 </div>
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <a href="{{ url_for('main.framework_management.dashboard') }}" class="block group">
-                        <div class="rounded-xl border border-border/50 bg-card hover:bg-accent/5 hover:border-primary/30 transition-all p-5 flex items-start gap-4">
+                        <div class="rounded-lg border border-border/50 bg-card hover:bg-accent/5 hover:border-primary/30 transition-all p-5 flex items-start gap-4">
                             <div class="p-2.5 rounded-lg bg-info/10 group-hover:bg-info/15 transition-colors">
                                 <i data-lucide="package" class="w-5 h-5 text-info" aria-hidden="true"></i>
                             </div>
@@ -275,7 +275,7 @@
                         </div>
                     </a>
                     <a href="{{ url_for('framework_config_ui.framework_config_dashboard') }}" class="block group">
-                        <div class="rounded-xl border border-border/50 bg-card hover:bg-accent/5 hover:border-primary/30 transition-all p-5 flex items-start gap-4">
+                        <div class="rounded-lg border border-border/50 bg-card hover:bg-accent/5 hover:border-primary/30 transition-all p-5 flex items-start gap-4">
                             <div class="p-2.5 rounded-lg bg-info/10 group-hover:bg-info/15 transition-colors">
                                 <i data-lucide="settings-2" class="w-5 h-5 text-info" aria-hidden="true"></i>
                             </div>
@@ -286,7 +286,7 @@
                         </div>
                     </a>
                     <a href="{{ url_for('batch_import_view.dashboard') }}" class="block group">
-                        <div class="rounded-xl border border-border/50 bg-card hover:bg-accent/5 hover:border-primary/30 transition-all p-5 flex items-start gap-4">
+                        <div class="rounded-lg border border-border/50 bg-card hover:bg-accent/5 hover:border-primary/30 transition-all p-5 flex items-start gap-4">
                             <div class="p-2.5 rounded-lg bg-warning/10 group-hover:bg-warning/15 transition-colors">
                                 <i data-lucide="upload" class="w-5 h-5 text-warning" aria-hidden="true"></i>
                             </div>
@@ -297,7 +297,7 @@
                         </div>
                     </a>
                     <a href="{{ url_for('dashboard_pages.import_history') }}" class="block group">
-                        <div class="rounded-xl border border-border/50 bg-card hover:bg-accent/5 hover:border-primary/30 transition-all p-5 flex items-start gap-4">
+                        <div class="rounded-lg border border-border/50 bg-card hover:bg-accent/5 hover:border-primary/30 transition-all p-5 flex items-start gap-4">
                             <div class="p-2.5 rounded-lg bg-warning/10 group-hover:bg-warning/15 transition-colors">
                                 <i data-lucide="history" class="w-5 h-5 text-warning" aria-hidden="true"></i>
                             </div>
@@ -318,7 +318,7 @@
                     <div class="flex-1 h-px bg-border/50"></div>
                     <a href="{{ url_for('admin.registered_users') }}" class="text-xs font-medium text-primary hover:text-primary/80 transition-colors">Manage →</a>
                 </div>
-                <div class="rounded-xl border border-border/50 bg-card overflow-hidden">
+                <div class="rounded-lg border border-border/50 bg-card overflow-hidden">
                     <div class="divide-y divide-border/50">
                         {% for user in recent_users %}
                         <div class="flex items-center justify-between px-5 py-3 hover:bg-accent/30 transition-colors">
@@ -353,7 +353,7 @@
         {# RIGHT: API Key Status #}
         <div class="space-y-6">
             {% if api_keys %}
-            <div class="rounded-xl border border-border/50 bg-card overflow-hidden">
+            <div class="rounded-lg border border-border/50 bg-card overflow-hidden">
                 <div class="px-5 py-4 border-b border-border/50">
                     <div class="flex items-center justify-between">
                         <div class="flex items-center gap-3">

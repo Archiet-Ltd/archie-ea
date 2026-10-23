@@ -42,7 +42,7 @@
                     id="{{ search_id }}"
                     placeholder="{{ search_placeholder }}"
                     value="{{ search_value }}"
-                    class="flex h-10 w-full rounded-md border border-input bg-background pl-9 pr-3 py-2 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    class="flex h-9 w-full rounded-md border border-input bg-background pl-9 pr-3 py-2 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 />
             </div>
         </div>
@@ -53,7 +53,7 @@
             <label for="{{ filter.id }}" class="block text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wider">{{ filter.label }}</label>
             <select
                 id="{{ filter.id }}"
-                class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
                 <option value="">All {{ filter.label.lower() ~ 'es' if filter.label.lower().endswith('s') else filter.label.lower() ~ 's' }}</option>
                 {% for opt in filter.options %}
@@ -69,7 +69,7 @@
             <label for="{{ sort_id }}" class="block text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wider">Sort By</label>
             <select
                 id="{{ sort_id }}"
-                class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
                 {% for opt in sort_options %}
                 <option value="{{ opt.value }}" {{ 'selected' if sort_value == opt.value else '' }}>{{ opt.label }}</option>

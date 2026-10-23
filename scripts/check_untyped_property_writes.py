@@ -53,6 +53,7 @@ ALLOWED_SUFFIXES = {
     os.path.join("app", "modules", "solutions_strategic", "v2", "services", "solution_composer_service.py"),
     os.path.join("app", "modules", "solutions_strategic", "v2", "routes", "journey_v2_routes.py"),
     os.path.join("app", "implementation_planning", "routes.py"),
+    os.path.join("app", "services", "element_profile_service.py"),
 }
 
 

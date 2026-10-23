@@ -54,7 +54,7 @@
     <!-- Matrix -->
     <div x-show="!loading && capabilities.length > 0 && stakeholders.length > 0" x-cloak class="rounded-lg border border-border bg-card">
       <div class="overflow-x-auto">
-        <table class="min-w-full text-sm" data-testid="raci-matrix-table">
+        <table class="dense-table min-w-full text-sm" data-testid="raci-matrix-table">
           <thead>
             <tr class="border-b border-border bg-muted/40">
               <th scope="col" class="sticky left-0 bg-muted/40 px-4 py-2.5 text-left font-medium text-muted-foreground whitespace-nowrap">Stakeholder</th>
@@ -110,7 +110,7 @@
     <label for="raci-stakeholder-search" class="block text-sm font-medium mb-1">Search</label>
     <input id="raci-stakeholder-search" type="text" x-model="searchQuery" @input.debounce.300ms="runSearch()"
       placeholder="Search by name or email..."
-      class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+      class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
   </div>
   <div class="max-h-64 overflow-y-auto rounded-md border border-border divide-y divide-border" x-show="searchResults.length > 0" x-cloak>
     <template x-for="result in searchResults" :key="result.type + ':' + result.id">
@@ -136,7 +136,7 @@
   </button>
   <div class="flex justify-end gap-3 pt-2 border-t border-border">
     <button type="button" data-modal-close="org-raci-add-stakeholder"
-      class="inline-flex items-center justify-center rounded-md text-sm font-medium bg-secondary text-secondary-foreground hover:bg-secondary/80 h-9 px-4 py-2">
+      class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
       Close
     </button>
   </div>

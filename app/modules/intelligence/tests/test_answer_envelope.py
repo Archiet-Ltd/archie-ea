@@ -108,8 +108,9 @@ def test_asking_stores_the_answer_and_returns_the_envelope(app, db_session, make
     assert data["summary"]["total"] == 2
     assert data["freshness"]["computed_at"] == data["computed_at"]
     assert data["freshness"]["derivation_state"] in ("current", "not_computed", "stale", "partial")
-    assert {"type": "relationship", "id": rels[0].id} in data["citations"]
-    assert {"type": "relationship", "id": rels[2].id} in data["citations"]
+    cited = {(c["type"], c["id"]) for c in data["citations"]}
+    assert ("relationship", rels[0].id) in cited
+    assert ("relationship", rels[2].id) in cited
     assert _count(db_session, org.id) == 1
 
 
@@ -163,6 +164,24 @@ def test_the_stored_page_renders_the_snapshot(app, db_session, make_org, client,
     assert "Recorded by people" in html
 
 
+def _shows_element_label(html, label):
+    """Whether the page shows ``label`` as text. Every page carries a random
+    content-security-policy nonce (base64), which contains any two-character label
+    by chance about one render in fifteen, so nonces are removed first and the label
+    must stand alone as a word."""
+    import re
+
+    without_nonces = re.sub(r'nonce="[^"]*"', "", html)
+    return re.search(rf"(?<![\w-]){re.escape(label)}(?![\w-])", without_nonces) is not None
+
+
+def test_a_random_nonce_that_contains_the_label_is_not_a_leak():
+    page = '<script nonce="JF0-HeDCP6ZeHeFWOZdqLoB0X2KILkH7fYpcS1E4-Fg">x</script><p>Not found</p>'
+    assert not _shows_element_label(page, "S1")
+    assert _shows_element_label(page + "<li>S1</li>", "S1")
+    assert not _shows_element_label("<li>OnlyS1</li>", "S1")
+
+
 def test_an_address_from_another_organisation_is_not_found_exactly_like_an_unissued_one(
     app, db_session, make_org, client, login_as
 ):
@@ -186,7 +205,7 @@ def test_an_address_from_another_organisation_is_not_found_exactly_like_an_uniss
     assert foreign_api.status_code == never_issued_api.status_code == malformed_api.status_code == 404
     assert _same_body(foreign_api) == _same_body(never_issued_api) == _same_body(malformed_api)
     assert foreign_page.status_code == never_issued_page.status_code == 404
-    assert "S1" not in foreign_page.get_data(as_text=True)
+    assert not _shows_element_label(foreign_page.get_data(as_text=True), "S1")
 
     # The owner can still open it: the rows exist and only the caller changed.
     login_as(client, user_a)

@@ -22,27 +22,53 @@ one cause: ``POST /architecture/decisions/new`` returned a bare 500 and
 persisted nothing, and ``POST /arb/sessions/create`` returned 500 so no ARB
 session could ever be scheduled.
 
+The first fix (superseded by this one)
+---------------------------------------
+A first fix kept the ORM-query shape but read the existing values with raw SQL
+(``not`` subject to ``do_orm_execute``) and took the maximum suffix across the
+whole table. That closed the ORM-filtering hole, but it did not close the
+underlying problem: the application connects to production as ``archie_runtime``,
+which is ``NOBYPASSRLS`` -- row-level security genuinely applies to that
+connection, with or without the ORM listener. A raw ``SELECT ... FROM
+architecture_decisions`` run through that role sees only the session
+organisation's rows just as surely as the ORM query did, because the database
+itself is filtering them, not SQLAlchemy. A second organisation's first ADR
+still computed ``AD-001`` and still collided -- the same defect, moved one
+layer down, caught before it reached production.
+
 The fix
 -------
-Allocate against the whole table. The uniqueness domain and the allocation
-domain must be the same domain; making them agree is the only fix that does not
-require dropping a unique index (which ``reconcile-schema`` cannot do -- see
-ADR 0002).
+Stop reading the target table at all. ``next_reference`` allocates from
+``reference_number_counters`` (see ``app/models/reference_number_counter.py``),
+one row per ``(table, column, prefix)`` family, with a single atomic
+``INSERT ... ON CONFLICT ... DO UPDATE ... RETURNING`` statement: Postgres
+serialises concurrent callers on that row's unique index, so two callers in the
+same family can never be handed the same number, whichever organisation they
+run under and however many of them run at once.
 
-``next_reference`` reads the existing values with **raw SQL**, which is not
-subject to ``do_orm_execute``, and it takes the maximum suffix rather than the
-last row by id, so a manually inserted or out-of-order row cannot make it hand
-back a value that is already taken.
+This table carries no ``organization_id`` and is not row-level-secured --
+deliberately: the families counted here (``AD-``, ``ARB-<year>-``, and friends)
+are already required to be unique *across every organisation* by the target
+column's own unique index, so a tenant-scoped counter would be exactly the bug
+this module exists to remove, not a safer version of it. See that model's
+docstring.
 
-This deliberately means references are globally sequential rather than
-per-tenant sequential: tenant B's first ADR may be ``AD-047``. That leaks
-nothing beyond a monotonic counter, and it is the behaviour the unique index
-already demanded.
+A literal ``CREATE SEQUENCE`` per family was considered and rejected: the ARB
+families embed the current year in the prefix (``ARB-2026-001``, resetting to
+``...-001`` every January) and a plain sequence has no key, so either the
+reset behaviour would quietly break, or a deploy-time step would need to
+provision a new sequence every year. The counter table is keyed by the whole
+prefix string, so a new year (or any new family) is handled by the first
+``INSERT ... ON CONFLICT`` that names it -- no schema change required, ever.
+
+``next_reference`` still takes ``table``/``column`` (not just ``prefix``) even
+though it no longer reads the named table, so that two different columns which
+happen to share a prefix text (``architecture_review_boards.board_number`` and
+``arb_review_items.review_number`` both use ``ARB-<year>-``) keep independent
+counters, the same way the old table-scan was always scoped per table.
 """
 
 from __future__ import annotations
-
-import re
 
 from app import db
 
@@ -53,28 +79,26 @@ def next_reference(table: str, column: str, prefix: str, width: int = 3) -> str:
     """Return the next unused ``<prefix><n>`` reference for ``table.column``.
 
     Args:
-        table: physical table name (not the model).
-        column: the UNIQUE reference column.
+        table: physical table name the reference is ultimately stored on (used
+            only to key the counter; this function never reads that table).
+        column: the UNIQUE reference column (used only to key the counter).
         prefix: everything before the numeric suffix, including the separator
             (e.g. ``"AD-"`` or ``"ARB-2026-"``).
         width: zero-padding of the numeric suffix.
 
-    The scan is table-wide on purpose; see the module docstring.
+    Allocation is one atomic UPSERT against ``reference_number_counters``; see
+    the module docstring for why that replaces the previous table-wide scan.
     """
-    # tenancy-ok: allocation must span every tenant because the unique index does.
-    rows = db.session.execute(
+    next_value = db.session.execute(
         db.text(
-            f"SELECT {column} AS ref FROM {table} "  # nosec B608 - identifiers are literals at every call site
-            f"WHERE {column} LIKE :pattern"
+            "INSERT INTO reference_number_counters "
+            "(table_name, column_name, prefix, last_value) "
+            "VALUES (:table_name, :column_name, :prefix, 1) "
+            "ON CONFLICT (table_name, column_name, prefix) DO UPDATE SET "
+            "last_value = reference_number_counters.last_value + 1, "
+            "updated_at = clock_timestamp() "
+            "RETURNING last_value"
         ),
-        {"pattern": f"{prefix}%"},
-    ).fetchall()
-
-    highest = 0
-    suffix = re.compile(r"^" + re.escape(prefix) + r"(\d+)$")
-    for row in rows:
-        match = suffix.match(row.ref or "")
-        if match:
-            highest = max(highest, int(match.group(1)))
-
-    return f"{prefix}{highest + 1:0{width}d}"
+        {"table_name": table, "column_name": column, "prefix": prefix},
+    ).scalar_one()
+    return f"{prefix}{next_value:0{width}d}"

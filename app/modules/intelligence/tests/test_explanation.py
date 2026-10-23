@@ -18,7 +18,7 @@ from app.modules.intelligence.tests.test_api_routes import (
 )
 
 
-def _relationship(db_session, org_id, source, target, type_="Serving", created_by=None, created_at=None):
+def _relationship(db_session, org_id, source, target, type_="Serving", created_by=None, created_at=None, **provenance):
     from app.models import ArchiMateRelationship
 
     row = ArchiMateRelationship(
@@ -28,6 +28,7 @@ def _relationship(db_session, org_id, source, target, type_="Serving", created_b
         organization_id=org_id,
         created_by_id=getattr(created_by, "id", created_by),
         created_at=created_at,
+        **provenance,
     )
     db_session.add(row)
     db_session.flush()
@@ -338,3 +339,39 @@ def test_every_absence_code_an_explanation_carries_is_in_the_one_vocabulary():
 
     literals = set(re.findall(r'"([a-z]+(?:_[a-z]+)*_not_[a-z_]+)"', source))
     assert literals <= REASON_CODES, literals - REASON_CODES
+
+
+def test_the_explanation_names_where_an_imported_and_a_drawn_link_came_from(
+    app, db_session, make_org, client, login_as
+):
+    import datetime as dt
+
+    w = _two_organisations(db_session, make_org)
+    org_id = w["org_a"].id
+    imported = _relationship(
+        db_session, org_id, w["gateway"], w["portal"],
+        source_kind="import", source_ref="batch-1", source_label="archiet-model-v1.oef.xml",
+        source_recorded_at=dt.datetime(2026, 10, 1, 9, 0),
+    )
+    drawn = _relationship(
+        db_session, org_id, w["mainframe"], w["gateway"], created_by=w["ada"],
+        source_kind="manual", source_ref=str(w["ada"].id), source_label="Ada Lovelace",
+        source_recorded_at=dt.datetime(2026, 10, 2, 9, 0),
+    )
+    row = _insert_derived_row(
+        db_session, org_id, w["mainframe"], w["portal"],
+        chain=[drawn.id, imported.id],
+        chain_element_ids=[w["mainframe"].id, w["gateway"].id, w["portal"].id],
+        depth=2, derived_type="Serving", rule_id="table:Serving:Serving",
+    )
+    db_session.commit()
+    row_id = row.id
+
+    login_as(client, w["ada"])
+    resp = client.get(f"/api/v1/intelligence/derived/{row_id}")
+    assert resp.status_code == 200, resp.get_data(as_text=True)
+    second, first = resp.get_json()["data"]["explanation"]["links"]
+    assert second["drawn_by"] == "Drawn by Ada Lovelace" and second["drawn_by_reason"] is None
+    assert second["drawn_at"].startswith("2026-10-02T09:00")
+    assert first["drawn_by"] == "Imported from archiet-model-v1.oef.xml" and first["drawn_by_reason"] is None
+    assert first["drawn_at"].startswith("2026-10-01T09:00")
