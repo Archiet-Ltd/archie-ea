@@ -1104,10 +1104,14 @@ TOOL_SCHEMAS = [
         "mutates": True,
         "record_types_written": [],
         "description": (
-            "Check configured infrastructure endpoints for reachability. "
-            "Probes: Abacus API connector, LLM API endpoints, integration pattern URLs. "
-            "Returns up/down status per endpoint, latency, and a delta summary of what's "
-            "modelled in Entelim vs what's actually reachable. "
+            "Run a one-off reachability check against configured infrastructure endpoints "
+            "(not continuous or scheduled polling). "
+            "Probes: Abacus API connector, LLM API endpoints, integration pattern URLs — sends "
+            "a HEAD request to each and reports up/down status, latency, and a delta summary of "
+            "what's modelled in Entelim vs what's actually reachable right now. Does not call "
+            "cloud hyperscaler APIs (Azure/AWS). "
+            "USE when the user asks about connectivity, 'is X reachable?', infrastructure health, "
+            "or wants to know if configured integrations are live. "
             "REQUIRES USER CONFIRMATION — outbound network connections, including "
             "model-supplied URLs."
         ),
