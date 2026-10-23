@@ -261,24 +261,15 @@ def test_ai_context_general_refuses_inconsistent_portfolio_summary(org_client, t
 
 
 def test_admin_users_directory_states_its_scope(org_client):
-    """A-02: /admin/users must not present an org-scoped count as if global.
-
-    The directory is deliberately org-scoped (tenant-isolation fix), so "2
-    users" here vs. "22" summed across /admin/organizations is not a leak —
-    but the page used to say only "Registered Users" with no scope
-    indicator. It must now name the organization and show the platform-wide
-    total for reconciliation.
-    """
+    """A-02 / DG-126: /admin/users names its organisation and counts only that
+    organisation's users; it never shows a platform-wide total."""
     org, client, user = org_client
 
     resp = client.get("/admin/users")
     assert resp.status_code == 200, resp.get_data(as_text=True)
     html = resp.get_data(as_text=True)
     assert org.name in html, "page must name the organization it is scoped to"
-    assert "platform-wide" in html or "platform wide" in html, (
-        "page must state the platform-wide total for reconciliation against "
-        "/admin/organizations"
-    )
+    assert "platform-wide" not in html and "platform wide" not in html
 
 
 # ---------------------------------------------------------------------------

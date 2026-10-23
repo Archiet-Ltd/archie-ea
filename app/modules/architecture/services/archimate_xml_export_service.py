@@ -21,6 +21,7 @@ from app.models import (
     ArchiMateViewpoint,
     ArchitectureModel,
 )
+from app.models.archimate_element_types import SPECIALIZATION_PROPERTY, exchange_type_for
 
 # ---------------------------------------------------------------------------
 # OEF namespace constants
@@ -155,11 +156,31 @@ OEF_RELATIONSHIP_TYPE_MAP: Dict[str, str] = {
 
 
 def _elem_oef_type(raw_type: Optional[str]) -> str:
-    """Resolve an element's OEF xsi:type from its stored type string."""
-    if not raw_type:
+    """Resolve an element's OEF xsi:type from its stored type string.
+
+    A specialisation (an Application) is written as its standard parent; the property that
+    names it is added by ``_exchange_properties`` (ADR-0014 Decision 5).
+    """
+    exchange_type, _ = exchange_type_for(raw_type)
+    if not exchange_type:
         return "ApplicationComponent"
-    key = raw_type.lower().replace("-", "_").replace(" ", "_")
-    return OEF_ELEMENT_TYPE_MAP.get(key, raw_type)
+    key = exchange_type.lower().replace("-", "_").replace(" ", "_")
+    return OEF_ELEMENT_TYPE_MAP.get(key, exchange_type)
+
+
+def _exchange_properties(elem, *sources) -> Dict[str, str]:
+    """An element's properties as written to a file: stored ones, then the exchange mapping's.
+
+    The specialisation property is never copied from storage, because the stored type already
+    records it; it is written only when the type is a specialisation.
+    """
+    merged: Dict[str, str] = {}
+    for source in sources:
+        merged.update(_coerce_properties(source))
+    for key in [k for k in merged if k.strip().lower() == SPECIALIZATION_PROPERTY]:
+        del merged[key]
+    merged.update(exchange_type_for(getattr(elem, "type", None))[1])
+    return merged
 
 
 def _rel_oef_type(raw_type: Optional[str]) -> str:
@@ -227,9 +248,9 @@ def export_to_xml(model_id: Optional[int] = None) -> str:
     prop_defs: Dict[str, str] = {}   # key -> propertyDefinition identifier
     elem_props: Dict[int, Dict[str, str]] = {}
     for elem in elements:
-        merged: Dict[str, str] = {}
-        for source in (getattr(elem, "properties", None), getattr(elem, "custom_properties", None)):
-            merged.update(_coerce_properties(source))
+        merged = _exchange_properties(
+            elem, getattr(elem, "properties", None), getattr(elem, "custom_properties", None)
+        )
         if merged:
             elem_props[elem.id] = merged
             for key in merged:
@@ -583,13 +604,14 @@ class ArchiMateXMLExportService:
 
     def _add_element_to_xml(self, parent: ET.Element, element: ArchiMateElement):
         """Add an ArchiMate element to XML."""
+        exchange_type, extra = exchange_type_for(element.type)
         elem = ET.SubElement(
             parent,
             "element",
             {
                 "id": str(element.id),
                 "name": element.name or "",
-                "type": element.type or "",
+                "type": exchange_type or "",
                 "layer": element.layer or "",
             },
         )
@@ -598,9 +620,16 @@ class ArchiMateXMLExportService:
             ET.SubElement(elem, "documentation").text = element.description
 
         # Add properties if they exist
+        props_el = None
         if hasattr(element, "properties") and element.properties:
-            ET.SubElement(elem, "properties")
+            props_el = ET.SubElement(elem, "properties")
             # Parse and add properties (would need to handle JSON properties)
+        if extra:
+            # The specialisation travels as a property (ADR-0014 Decision 5).
+            if props_el is None:
+                props_el = ET.SubElement(elem, "properties")
+            for key, value in extra.items():
+                ET.SubElement(props_el, "property", {"key": key, "value": value})
 
     def _add_relationship_to_xml(self, parent: ET.Element, relationship: ArchiMateRelationship):
         """Add an ArchiMate relationship to XML."""

@@ -1,0 +1,8 @@
+{% extends "inv_layout.html" %}
+{% block body %}
+{% include "inv_partial.html" %}
+<form method="get" action="{{ url_for('fx.search') }}"><input name="q"><button type="submit">Search</button></form>
+<form method="post" action="/change"><button type="submit">Delete it</button></form>
+<a href="/plain">Plain <b>link</b> text</a>
+<div data-testid="kpi-card">0</div>
+{% endblock %}

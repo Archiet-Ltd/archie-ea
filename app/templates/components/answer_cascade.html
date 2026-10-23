@@ -33,7 +33,7 @@
 <section id="{{ id }}" class="cascade" data-cascade
          x-data="{ tip: null, selected: null, shared: false, saved: false,
                    continues(i, list) { var d = list[i].depth || 0; for (var j = i + 1; j < list.length; j++) { var dj = list[j].depth || 0; if (dj < d) { return false; } if (dj === d) { return true; } } return false; } }">
-    <p class="question-line mb-6 max-w-[640px]" x-text="{{ question }}"></p>
+    <p class="question-line mb-6 max-w-[640px] px-4" x-text="{{ question }}"></p>
     <ol class="relative space-y-2 py-6" role="list">
         {% if root %}
         {# Root node: the element the question was asked about. #}
