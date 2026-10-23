@@ -102,7 +102,7 @@ def test_each_row_shows_its_owner_and_vendor(browser, live_server, linked_world)
 
 
 def test_opening_first_and_last_rows_shows_the_same_facts_the_row_showed(browser, live_server, linked_world):
-    noun, mine = linked_world["noun"], linked_world["mine"]
+    _, mine = linked_world["noun"], linked_world["mine"]
     context, page = _signed_in(browser, live_server, linked_world)
     try:
         _list(page, live_server)
