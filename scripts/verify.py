@@ -1322,6 +1322,24 @@ def gate_reuse_register() -> Result:
                   detail, count, 0)
 
 
+def gate_marketing_copy() -> Result:
+    """Roadmap language and generic filler on public pages (scripts/check_marketing_copy.py).
+
+    Static. Hard-fail guardrails over content/pages and the public templates, ratcheted per
+    file against scripts/marketing_copy_baseline.json (which only falls). Absolute-claim words
+    are listed for review (`--claims`) and never fail the build.
+    """
+    proc = _run([sys.executable, "scripts/check_marketing_copy.py"])
+    try:
+        count = int(proc.stdout.strip().splitlines()[-1])
+    except (ValueError, IndexError):
+        return Result("marketing-copy", FAIL,
+                      f"could not parse: {proc.stdout!r} {proc.stderr[:300]}")
+    detail = proc.stdout[-1800:] if count or proc.returncode else ""
+    return Result("marketing-copy", PASS if count == 0 and proc.returncode == 0 else FAIL,
+                  detail, count, 0)
+
+
 def gate_sidebar_links(baseline: int) -> Result:
     """Persona sidebar link-count budget (shell-overhaul Wave 1, Task 3).
 
@@ -1918,6 +1936,11 @@ def build_gates(baseline: dict) -> list[Gate]:
              remediation="reuse the implementation named in docs/reuse-register.yml "
                          "(python scripts/check_reuse_register.py --entries), or add a "
                          "known_exceptions entry with a reason",
+             tags=["static", "process"]),
+        Gate("marketing-copy", "no roadmap language or generic filler on a public page beyond the baseline",
+             "ratchet", gate_marketing_copy,
+             remediation="describe what the product does today (python scripts/check_marketing_copy.py "
+                         "names the file and line), or mark the line `copy-ok: <reason>`",
              tags=["static", "process"]),
         Gate("llm-boundary", "codegen emitters make no direct LLM calls (deterministic boundary)",
              "ratchet", lambda: gate_llm_boundary(baseline.get("llm_boundary", 0)),

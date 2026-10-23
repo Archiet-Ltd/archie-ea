@@ -1,0 +1,29 @@
+{
+ "_comment": "Hard-fail marketing-copy hits that already existed, per guardrail and file. Written by scripts/check_marketing_copy.py --update-baseline, which refuses to raise a count or add a file. Lowering is routine.",
+ "guardrails": {
+  "roadmap-language": {
+   "app/templates/main/index.html": 12,
+   "app/templates/public/pricing.html": 4,
+   "content/pages/dogfood/how-archiet-runs-on-entelim.md": 1,
+   "content/pages/function-per-segment/uc-s2-03-duplicate-spend.md": 2,
+   "content/pages/function-per-segment/uc-s2-04-connect-your-tools.md": 4,
+   "content/pages/function-per-segment/uc-s2-10-what-i-own.md": 5,
+   "content/pages/function-per-segment/uc-s3-09-programme-tracking.md": 3,
+   "content/pages/function-per-segment/uc-s3-12-who-do-we-need.md": 1,
+   "content/pages/function-per-segment/uc-s3-13-target-state-roadmap.md": 11,
+   "content/pages/modules/applications.md": 1,
+   "content/pages/modules/digital-twin.md": 1,
+   "content/pages/modules/gap-analysis.md": 1,
+   "content/pages/modules/projects.md": 1,
+   "content/pages/modules/rationalization.md": 1,
+   "content/pages/modules/roadmaps.md": 1,
+   "content/pages/roles/cto-and-cio.md": 4,
+   "content/pages/roles/enterprise-architects.md": 4,
+   "content/pages/roles/it-portfolio-managers.md": 2,
+   "content/pages/roles/solution-architects.md": 4,
+   "content/pages/site/about.md": 8,
+   "content/pages/site/architecture-health-check.md": 1,
+   "content/pages/site/features.md": 41
+  }
+ }
+}
