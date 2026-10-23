@@ -31,6 +31,28 @@ import yaml
 # Each entry is the first path segment (without leading /).
 PUBLISHED_GROUPS = ["elements"]
 
+# The operations published in this subset, by operationId. When non-empty it
+# takes precedence over PUBLISHED_GROUPS: only the listed operations are kept,
+# and only on paths that carry at least one of them. A slice publishes exactly
+# the operations it builds, never a whole group whose other operations
+# (writes, later slices) nobody built yet.
+PUBLISHED_OPERATIONS = [
+    "listElements",
+    "getElement",
+    "listCapabilities",
+    "getCapability",
+    "listValueStreams",
+    "getValueStream",
+    "listDrivers",
+    "getDriver",
+    "listGoals",
+    "getGoal",
+    "listBusinessActors",
+    "getBusinessActor",
+    "listBusinessProcesses",
+    "getBusinessProcess",
+]
+
 
 def _to_plain(obj: Any) -> Any:
     """Recursively convert OrderedDict to plain dict for clean YAML output."""
@@ -103,15 +125,19 @@ def _gather_referenced_components(
     (schemas, responses, parameters, etc.), each being an OrderedDict of
     name -> resolved component.
     """
-    # Collect all $refs from the operations and path-level items
+    # Collect all $refs from the kept operations and from genuinely
+    # path-level items (parameters, summary, description). Refs that live
+    # only on unbuilt operations of a published path must not be pulled in:
+    # the subset must be a fixed point of its own output.
     all_refs: set[str] = set()
     for _path, _method, operation in operations:
         _collect_refs(operation, all_refs)
 
-    # Also collect refs from path-level items (parameters, etc.)
     for path_key in subset_path_keys:
         path_item = source_paths.get(path_key, {})
-        _collect_refs(path_item, all_refs)
+        for key in ("parameters", "summary", "description"):
+            if key in path_item:
+                _collect_refs(path_item[key], all_refs)
 
     # Resolve refs and gather referenced component names
     # Track names per category in sets; the traversal order (set iteration)
@@ -178,26 +204,39 @@ def generate_subset(source_path: Path) -> dict:
     source_components = source.get("components", {}) or {}
     source_paths = source.get("paths", {}) or {}
 
-    # Filter paths by published groups
+    # Filter paths by published groups, or by published operation ids when
+    # PUBLISHED_OPERATIONS is set (then it takes precedence over groups).
     subset_paths: dict[str, dict] = OrderedDict()
     operations: list[tuple[str, str, dict]] = []
 
     for path_key in sorted(source_paths.keys()):
-        group = _first_path_segment(path_key)
-        if group in PUBLISHED_GROUPS:
-            path_item = source_paths[path_key]
-            subset_paths[path_key] = OrderedDict()
+        path_item = source_paths[path_key]
+        kept: list[tuple[str, dict]] = []
 
-            # Copy path-level items (parameters, summary, description)
-            for key in ("parameters", "summary", "description"):
-                if key in path_item:
-                    subset_paths[path_key][key] = path_item[key]
+        for method in ("get", "post", "put", "patch", "delete", "head", "options"):
+            if method not in path_item:
+                continue
+            operation = path_item[method]
+            if PUBLISHED_OPERATIONS:
+                if operation.get("operationId") not in PUBLISHED_OPERATIONS:
+                    continue
+            elif _first_path_segment(path_key) not in PUBLISHED_GROUPS:
+                continue
+            kept.append((method, operation))
 
-            for method in ("get", "post", "put", "patch", "delete", "head", "options"):
-                if method in path_item:
-                    operation = path_item[method]
-                    subset_paths[path_key][method] = operation
-                    operations.append((path_key, method, operation))
+        if not kept:
+            continue
+
+        subset_paths[path_key] = OrderedDict()
+
+        # Copy path-level items (parameters, summary, description)
+        for key in ("parameters", "summary", "description"):
+            if key in path_item:
+                subset_paths[path_key][key] = path_item[key]
+
+        for method, operation in kept:
+            subset_paths[path_key][method] = operation
+            operations.append((path_key, method, operation))
 
     # Gather referenced components
     subset_components = _gather_referenced_components(
