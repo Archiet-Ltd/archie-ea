@@ -1,0 +1,28 @@
+{
+  "_note": "Live module, role and use-case pages known to have no real screenshot. The list may only shrink: capture the screenshot, then delete the entry. A new live page missing a screenshot is not allowed on this list without a reviewed reason.",
+  "urls": [
+    "/modules/diagrams",
+    "/modules/digital-twin",
+    "/modules/industry-apqc",
+    "/modules/org-chart",
+    "/modules/rationalization",
+    "/modules/roadmaps",
+    "/use-cases/architecture-map-for-due-diligence",
+    "/use-cases/architecture-review-board",
+    "/use-cases/business-case-for-the-cio",
+    "/use-cases/business-model-canvas-on-one-page",
+    "/use-cases/contract-renewals",
+    "/use-cases/duplicate-software-spend",
+    "/use-cases/import-archimate-model",
+    "/use-cases/import-from-jira-and-github",
+    "/use-cases/programme-tracking",
+    "/use-cases/risk-and-control-gaps",
+    "/use-cases/risk-blast-radius",
+    "/use-cases/single-point-of-failure",
+    "/use-cases/target-state-roadmap",
+    "/use-cases/value-streams-at-risk",
+    "/use-cases/what-breaks-and-who-gets-called",
+    "/use-cases/what-happens-if-a-supplier-fails",
+    "/use-cases/what-i-own"
+  ]
+}
