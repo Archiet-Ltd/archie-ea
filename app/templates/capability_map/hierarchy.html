@@ -44,7 +44,7 @@
                         :class="levelFilter === lvl ? getLevelBadgeClassActive(lvl) : 'bg-muted text-muted-foreground hover:text-foreground'">
                     <span class="inline-block w-2 h-2 rounded-full" :class="getLevelDotColor(lvl)"></span>
                     <span x-text="'L' + lvl"></span>
-                    <span class="text-xs opacity-70" x-text="'(' + countByLevel(lvl) + ')'"></span>
+                    <span class="text-xs" x-text="'(' + countByLevel(lvl) + ')'"></span>
                 </button>
             </template>
         </div>
@@ -218,25 +218,29 @@ function hierarchyView() {
         },
 
         getLevelBadgeClass(level) {
+            // Coloured text on the token's own 10% tint: the -emphasis variants,
+            // which are darker in light mode and lighter in dark, read at WCAG AA
+            // where the base layer hue (chosen for fill distinctness) does not.
             const classes = {
-                // design-tokens-ok: 5-level hierarchy depth legend, level 1 is already primary
-                1: 'bg-primary/10 text-primary border border-primary/30',
-                2: 'bg-sky-500/10 text-sky-700 border border-sky-500/30', // design-tokens-ok
-                3: 'bg-amber-500/10 text-amber-700 border border-amber-500/30', // design-tokens-ok
-                4: 'bg-violet-500/10 text-violet-700 border border-violet-500/30', // design-tokens-ok
-                5: 'bg-rose-500/10 text-rose-700 border border-rose-500/30' // design-tokens-ok
+                1: 'bg-primary/10 text-info-emphasis border border-primary/30',
+                2: 'bg-layer-implementation/10 text-layer-implementation-emphasis border border-layer-implementation/30',
+                3: 'bg-layer-strategy/10 text-layer-strategy-emphasis border border-layer-strategy/30',
+                4: 'bg-layer-motivation/10 text-layer-motivation-emphasis border border-layer-motivation/30',
+                5: 'bg-layer-risk/10 text-layer-risk-emphasis border border-layer-risk/30'
             };
             return classes[level] || 'bg-muted text-foreground border border-border';
         },
 
         getLevelBadgeClassActive(level) {
+            // A solid-fill active state: the layer token behind near-white label
+            // text. The -emphasis fills carry enough contrast for that label in
+            // both themes.
             const classes = {
-                // design-tokens-ok: 5-level hierarchy depth legend, level 1 is already primary
                 1: 'bg-primary text-primary-foreground',
-                2: 'bg-sky-600 text-primary-foreground', // design-tokens-ok
-                3: 'bg-amber-600 text-primary-foreground', // design-tokens-ok
-                4: 'bg-violet-600 text-primary-foreground', // design-tokens-ok
-                5: 'bg-rose-600 text-primary-foreground' // design-tokens-ok
+                2: 'bg-layer-implementation-emphasis text-background',
+                3: 'bg-layer-strategy-emphasis text-background',
+                4: 'bg-layer-motivation-emphasis text-background',
+                5: 'bg-layer-risk-emphasis text-background'
             };
             return classes[level] || 'bg-primary text-primary-foreground';
         },
@@ -494,7 +498,7 @@ function hierarchyView() {
 
         getTypeColor(type) {
             const colorMap = {
-                'core': 'bg-primary/10 text-primary/90',
+                'core': 'bg-info/10 text-info-emphasis',
                 'supporting': 'bg-muted text-foreground',
                 'differentiating': 'bg-success/10 text-success-emphasis'
             };
