@@ -16,6 +16,10 @@ from typing import Any
 
 import requests
 
+from app.modules.intelligence.services.operational_source import (
+    OperationalRecordDraft,
+    OperationalSourceAdapter,
+)
 from app.utils.ssrf_guard import build_checked_url
 
 logger = logging.getLogger(__name__)
@@ -157,6 +161,31 @@ class ServiceNowConnectorService:
         except Exception as exc:
             logger.error("ServiceNow pull_cmdb_inventory failed for org %s: %s", org_id, exc)
             raise
+
+    def pull_operational_records(self, org_id: int, since: datetime | None = None) -> dict[str, Any]:
+        """Pull incidents, problems and changes into the organisation's operational records.
+
+        Runs the ServiceNow adapter through the one ingest path and returns its
+        report (fetched, created, updated, and every unmatched record). Returns
+        {} when the organisation has no enabled ServiceNow connector.
+        """
+        from app.extensions import db
+        from app.modules.intelligence.services.operational_source import (
+            ingest_operational_records,
+        )
+
+        config = self._get_config(org_id, "servicenow")
+        if config is None or not config.enabled:
+            return {}
+        report = ingest_operational_records(
+            ServiceNowOperationalAdapter(self, config), org_id, since
+        )
+        db.session.commit()
+        logger.info(
+            "ServiceNow operational pull for org %s: fetched=%s created=%s updated=%s unmatched=%s",
+            org_id, report.fetched, report.created, report.updated, len(report.unmatched),
+        )
+        return report.to_dict()
 
     def push_arb_decision(self, solution_id: int, arb_decision_id: int) -> dict[str, Any]:
         """
@@ -345,3 +374,95 @@ class ServiceNowConnectorService:
             )
         except Exception:
             return ""
+
+
+# ----------------------------------------------------------------------
+# Operational source adapter
+# ----------------------------------------------------------------------
+
+_OPERATIONAL_TABLES = {"incident": "incident", "problem": "problem", "change": "change_request"}
+_OPERATIONAL_FIELDS = (
+    "sys_id,number,short_description,state,severity,priority,cmdb_ci,"
+    "opened_at,resolved_at,closed_at,sys_updated_on"
+)
+_PAGE_SIZE = 1000
+_MAX_PAGES = 50
+
+
+def _sn_time(value) -> datetime | None:
+    """ServiceNow UTC 'YYYY-MM-DD HH:MM:SS'; empty means not set."""
+    if not value:
+        return None
+    return datetime.strptime(str(value), "%Y-%m-%d %H:%M:%S")
+
+
+def _sn_ref(value) -> str | None:
+    """A reference field is either a bare sys_id or {'link':..., 'value': sys_id}."""
+    if isinstance(value, dict):
+        value = value.get("value")
+    return str(value).strip() or None if value else None
+
+
+class ServiceNowOperationalAdapter(OperationalSourceAdapter):
+    """ServiceNow incidents, problems and changes as an operational source adapter.
+
+    Reuses the service's token cache, outbound-URL guard and configuration.
+    """
+
+    source_system = "servicenow"
+
+    def __init__(self, service: ServiceNowConnectorService, config) -> None:
+        self._service = service
+        self._config = config
+
+    def fetch_since(self, org_id: int, since: datetime | None):
+        service, config = self._service, self._config
+        token = service._get_token(config, org_id)
+        for kind, table in _OPERATIONAL_TABLES.items():
+            url = build_checked_url(_instance_base(config), f"/api/now/table/{table}")
+            offset = 0
+            for _page in range(_MAX_PAGES):
+                params = {
+                    "sysparm_fields": _OPERATIONAL_FIELDS,
+                    "sysparm_limit": str(_PAGE_SIZE),
+                    "sysparm_offset": str(offset),
+                    "sysparm_query": "ORDERBYsys_updated_on"
+                    if since is None
+                    else f"sys_updated_on>={since:%Y-%m-%d %H:%M:%S}^ORDERBYsys_updated_on",
+                }
+                headers = {"Authorization": f"Bearer {token}", "Accept": "application/json"}
+                resp = requests.get(url, headers=headers, params=params, timeout=10, allow_redirects=False)
+                if resp.status_code == 401:
+                    service._token = None
+                    token = service._get_token(config, org_id)
+                    headers["Authorization"] = f"Bearer {token}"
+                    resp = requests.get(url, headers=headers, params=params, timeout=10, allow_redirects=False)
+                resp.raise_for_status()
+                rows = resp.json().get("result", [])
+                for row in rows:
+                    yield {**row, "_kind": kind}
+                if len(rows) < _PAGE_SIZE:
+                    break
+                offset += _PAGE_SIZE
+            else:
+                raise RuntimeError(
+                    f"ServiceNow {table} returned more than {_MAX_PAGES * _PAGE_SIZE} rows; "
+                    "narrow the sync window"
+                )
+
+    def map_record(self, raw: dict[str, Any]):
+        severity = raw.get("severity") or raw.get("priority") or None
+        return OperationalRecordDraft(
+            kind=raw["_kind"],
+            external_id=_sn_ref(raw.get("sys_id")) or "",
+            item_external_id=_sn_ref(raw.get("cmdb_ci")),
+            reference=raw.get("number") or None,
+            title=(raw.get("short_description") or None),
+            state=(str(raw["state"]) if raw.get("state") not in (None, "") else None),
+            severity=(str(severity) if severity else None),
+            opened_at=_sn_time(raw.get("opened_at")),
+            resolved_at=_sn_time(raw.get("resolved_at")),
+            closed_at=_sn_time(raw.get("closed_at")),
+            source_updated_at=_sn_time(raw.get("sys_updated_on")),
+        )
+
