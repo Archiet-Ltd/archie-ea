@@ -604,6 +604,112 @@ jobs:
           # nothing to combine.
           include-hidden-files: true
 
+  # Decides whether the pool-of-one run below is needed. Kept apart from the
+  # `changes` job so that job's contract (every job it gates runs when it cannot
+  # answer) is untouched. Not a required check (see EXCLUDED_CHECKS in
+  # scripts/deploy_workflow.py).
+  pool-of-one-gate:
+    name: Pool-of-one run needed (tenant context)
+    if: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && (github.event.action != 'labeled' || github.event.label.name == 'pool-of-one')) }}
+    runs-on: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && vars.CI_LIGHT_RUNNER && fromJSON(vars.CI_LIGHT_RUNNER) || 'ubuntu-latest' }}
+    outputs:
+      run: ${{ steps.decide.outputs.run }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - name: Decide
+        # The run starts on a manual dispatch, on a pull request that carries the
+        # pool-of-one label, and on one that touches the code that carries the
+        # tenant context to the database.
+        id: decide
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          HAS_LABEL: ${{ contains(github.event.pull_request.labels.*.name, 'pool-of-one') }}
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          run=false
+          if [ "$EVENT_NAME" = "workflow_dispatch" ] || [ "$HAS_LABEL" = "true" ]; then
+            run=true
+          elif git diff --name-only "origin/${BASE_REF:-main}...HEAD" | grep -qxE 'app/middleware/tenant_isolation\.py|app/middleware/tenant_context\.py|app/jobs/tenant_safe_job\.py|config\.py'; then
+            run=true
+          fi
+          echo "run=$run" | tee -a "$GITHUB_OUTPUT"
+
+  # Mirrors tests-shard's setup steps (unsharded); fold both into a composite action when this job is next touched.
+  # The whole database suite once on a pool of one connection with the tenant-context
+  # self-check on (ADR 0013, requirement 15). Not a required check: it does not run on
+  # a push to main (see EXCLUDED_CHECKS in scripts/deploy_workflow.py).
+  tests-pool-of-one:
+    name: Tests on a pool of one connection (tenant context)
+    needs: [pool-of-one-gate]
+    if: ${{ !cancelled() && needs.pool-of-one-gate.outputs.run == 'true' }}
+    runs-on: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && (vars.CI_SHARD_RUNNER || fromJSON('["self-hosted","ibm-vsi"]')) || 'ubuntu-latest' }}
+    timeout-minutes: 480
+    services:
+      postgres:
+        image: mirror.gcr.io/library/postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: archie_test
+        ports: ["5432"]
+        options: >-
+          --health-cmd pg_isready --health-interval 10s
+          --health-timeout 5s --health-retries 5
+          --tmpfs /var/lib/postgresql/data:rw,size=2g
+    env:
+      FLASK_CONFIG: testing
+      SECRET_KEY: ci-only-not-secret
+      CI_QUARANTINE_MODE: exclude
+      # One pooled connection (two overflow connections for the paths that hold a
+      # second connection by design) and the tenant-context self-check.
+      ARCHIE_TEST_POOL: one
+      ARCHIE_TENANT_GUC_SELFCHECK: "1"
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+      - name: Create an isolated virtual environment for this job's dependencies
+        run: |
+          python -m venv --clear .venv
+          echo "$PWD/.venv/bin" >> "$GITHUB_PATH"
+      - name: Resolve the postgres service's mapped port
+        run: |
+          echo "TEST_DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:${{ job.services.postgres.ports['5432'] }}/archie_test" >> "$GITHUB_ENV"
+          echo "DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:${{ job.services.postgres.ports['5432'] }}/archie_test" >> "$GITHUB_ENV"
+      - name: Install deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt || pip install --no-cache-dir -r requirements.txt
+          if [ -f requirements-test.txt ]; then pip install -r requirements-test.txt; fi
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install browsers for rendered UI regression tests
+        run: |
+          for attempt in $(seq 1 10); do
+            if flock /tmp/archie-ci-browser-install.lock                 python -m playwright install --with-deps chromium firefox webkit; then
+              exit 0
+            fi
+            echo "Browser install attempt $attempt failed; retrying in 60 seconds."
+            sleep 60
+          done
+          exit 1
+      - name: Create schema
+        run: |
+          python -c "import psycopg2" 2>/dev/null || pip install psycopg2-binary
+          flask --app manage init-db
+          flask --app manage schema-upgrade
+          flask --app manage reconcile-schema
+          flask --app manage apply-unified-capability-provenance-migration
+      - name: Run the whole suite on a pool of one connection
+        # tests/conftest.py records each backend process id at checkout and fails
+        # the run when no connection was ever reused.
+        run: |
+          pytest -q --maxfail=20 --ignore=tests/smoke -o xfail_strict=true             -p scripts.ci.quarantine
+
   # ---------------------------------------------------------------------------
   # Fast lane. An ordinary pull-request push (no `full-ci` label) runs the cheap
   # gates above plus this job: the test files the pull request changes and the

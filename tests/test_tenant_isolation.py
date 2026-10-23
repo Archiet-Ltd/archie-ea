@@ -425,14 +425,15 @@ def test_database_tenant_setting_clears_at_transaction_boundary(app):
     from sqlalchemy import text
 
     from app import db
-    from app.middleware.tenant_isolation import set_database_tenant_context
+    from app.middleware.tenant_isolation import bind_tenant, set_database_tenant_context
 
     with db.engine.connect() as connection:
         transaction = connection.begin()
-        set_database_tenant_context(connection, 777001)
-        assert connection.execute(
-            text("SELECT current_setting('archie.organization_id', true)")
-        ).scalar_one() == "777001"
+        with bind_tenant(777001):
+            set_database_tenant_context(connection, 777001)
+            assert connection.execute(
+                text("SELECT current_setting('archie.organization_id', true)")
+            ).scalar_one() == "777001"
         transaction.rollback()
 
         with connection.begin():

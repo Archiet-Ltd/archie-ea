@@ -104,3 +104,34 @@ def test_a_foreign_organisations_row_is_still_invisible(app, db_session, make_or
         db.session.rollback()
     assert "OwnRow" in names
     assert "ForeignRow" not in names
+
+
+def test_the_tenant_engine_hooks_register_once_per_process(app):
+    """ADR 0013: the engine-level hook sits on the ``Engine`` class, so repeated
+    app creation must not stack it: with it installed five more times, the first
+    statement of a transaction still writes the tenant context exactly once."""
+    from sqlalchemy import create_engine, text
+    from sqlalchemy.pool import QueuePool
+
+    from app.middleware import tenant_isolation as ti
+    from tests._tenant_cursors import recording_cursor_class
+
+    ti._default_mode = "enforce"
+    for _ in range(5):
+        ti.install_tenant_filter(app)
+    statements = []
+    url = app.config["SQLALCHEMY_DATABASE_URI"]
+    engine = create_engine(
+        url,
+        poolclass=QueuePool,
+        pool_size=1,
+        connect_args={"cursor_factory": recording_cursor_class(url, statements)},
+    )
+    try:
+        with ti.bind_tenant(7), engine.connect() as connection:
+            connection.execute(text("SELECT 1"))
+            connection.execute(text("SELECT 2"))
+    finally:
+        engine.dispose()
+    writes = [s for s in statements if "set_config('archie.organization_id', %s" in s]
+    assert len(writes) == 1, writes

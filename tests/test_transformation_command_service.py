@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from datetime import timedelta
 
 import pytest
-from flask import current_app
+from flask import current_app, g
 from sqlalchemy import select, text
 from sqlalchemy import event
 from sqlalchemy.exc import DBAPIError
@@ -28,6 +28,7 @@ from app.models.transformation_execution import (
 )
 from app.models.transformation_db_guards import ensure_transformation_db_guards
 from app.models.user import User
+from app.middleware.tenant_isolation import TenantBindingConflict
 from app.modules.transformation_room.command_service import (
     CommandService,
     NATURAL_KEY_CONTENDER_REASON,
@@ -2003,4 +2004,58 @@ def test_supplied_receipt_id_is_still_tenant_and_actor_scoped(command_fixture):
             authorizer=_allow_command,
             handler=_mutation(command_fixture),
         )
+    assert _counts(command_fixture) == (0, 0, 0)
+
+
+def test_command_succeeds_with_no_ambient_org_writes_actor_organisation(
+    command_fixture,
+):
+    """A command run under an app context with no g.current_org_id succeeds and
+    the result row carries the actor's organisation."""
+    g.pop("current_org_id", None)
+    result = _execute(command_fixture)
+    assert result.created is True
+    row = _receipt(command_fixture)
+    assert row.organization_id == command_fixture.organization_id
+
+
+def test_command_refused_when_actor_org_differs_from_ambient_org(app, command_fixture):
+    """An actor naming organisation B while g.current_org_id is organisation A
+    is refused with TenantBindingConflict before any claim is written."""
+    suffix = uuid.uuid4().hex[:12]
+    with app.app_context():
+        org_b = Organization(
+            name=f"Command Org B {suffix}", slug=f"command-org-b-{suffix}"
+        )
+        db.session.add(org_b)
+        db.session.flush()
+        org_b_id = org_b.id
+        db.session.commit()
+
+    g.current_org_id = command_fixture.organization_id
+    actor_b = ActorContext(
+        user_id=command_fixture.user_id,
+        organization_id=org_b_id,
+        roles=command_fixture.actor.roles,
+        request_id=f"request-actor-b-{suffix}",
+    )
+    try:
+        with pytest.raises(TenantBindingConflict):
+            CommandService.execute(
+                actor=actor_b,
+                operation="programme.create",
+                idempotency_key="conflict-org",
+                payload={"name": command_fixture.domain_name, "scope": {"b": 2, "a": 1}},
+                natural_key="programme-intake:conflict-org",
+                authorizer=_allow_command,
+                handler=_mutation(command_fixture),
+            )
+    finally:
+        g.pop("current_org_id", None)
+        with db.engine.begin() as connection:
+            connection.exec_driver_sql("SET LOCAL session_replication_role = replica")
+            connection.execute(
+                text("DELETE FROM organizations WHERE id = :organization_id"),
+                {"organization_id": org_b_id},
+            )
     assert _counts(command_fixture) == (0, 0, 0)

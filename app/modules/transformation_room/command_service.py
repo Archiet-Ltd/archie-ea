@@ -21,7 +21,7 @@ from sqlalchemy.sql.dml import Delete, Insert, Update
 from sqlalchemy.orm import Session
 
 from app import db
-from app.middleware.tenant_isolation import set_database_tenant_context
+from app.middleware.tenant_isolation import bind_tenant, set_database_tenant_context
 from app.models.transformation_execution import (
     CommandMaterialisation,
     CommandIdempotencyRecord,
@@ -355,34 +355,10 @@ class CommandService:
         handler: Callable[[Session, CommandClaim], DomainMutationResult],
         natural_key_resolver: OperationNaturalKeyResolver | None = None,
     ) -> CommandResult:
-        authorizer = cls._require_authorizer(authorizer)
-        digest = canonical_request_digest(payload)
-        claim_or_result = cls.claim_or_reconcile(
-            actor=actor,
-            operation=operation,
-            idempotency_key=idempotency_key,
-            request_digest=digest,
-            natural_key=natural_key,
-            authorizer=authorizer,
-        )
-        if isinstance(claim_or_result, CommandResult):
-            return claim_or_result
-        try:
-            return cls._execute_claim(
-                actor=actor,
-                operation=operation,
-                claim=claim_or_result,
-                handler=handler,
-                natural_key_resolver=natural_key_resolver,
-                authorizer=None,
-            )
-        except _NaturalKeyContenderConflict:
-            # A concurrent command can materialise the same natural key while
-            # this handler is waiting on its domain lock.  The failed envelope
-            # transaction has rolled back at this point, so ask the atomic
-            # claim procedure to attach this receipt to the winner.  That path
-            # re-runs authorization before exposing the immutable result.
-            reconciled = cls.claim_or_reconcile(
+        with bind_tenant(actor.organization_id):
+            authorizer = cls._require_authorizer(authorizer)
+            digest = canonical_request_digest(payload)
+            claim_or_result = cls.claim_or_reconcile(
                 actor=actor,
                 operation=operation,
                 idempotency_key=idempotency_key,
@@ -390,51 +366,76 @@ class CommandService:
                 natural_key=natural_key,
                 authorizer=authorizer,
             )
-            if isinstance(reconciled, CommandResult):
-                return reconciled
-            raise CommandConflict("natural_key_contender_reconciliation_incomplete")
-        except KnownPreCommitTransient as error:
-            cls.mark_retryable(
-                actor=actor,
-                claim=claim_or_result,
-                error_class=type(error).__name__,
-            )
-            raise
-        except DBAPIError as error:
-            sqlstate = (
-                getattr(error.orig, "sqlstate", None)
-                or getattr(error.orig, "pgcode", None)
-                or getattr(getattr(error.orig, "diag", None), "sqlstate", None)
-            )
-            if sqlstate in {"40P01", "40001"}:
+            if isinstance(claim_or_result, CommandResult):
+                return claim_or_result
+            try:
+                return cls._execute_claim(
+                    actor=actor,
+                    operation=operation,
+                    claim=claim_or_result,
+                    handler=handler,
+                    natural_key_resolver=natural_key_resolver,
+                    authorizer=None,
+                )
+            except _NaturalKeyContenderConflict:
+                # A concurrent command can materialise the same natural key while
+                # this handler is waiting on its domain lock.  The failed envelope
+                # transaction has rolled back at this point, so ask the atomic
+                # claim procedure to attach this receipt to the winner.  That path
+                # re-runs authorization before exposing the immutable result.
+                reconciled = cls.claim_or_reconcile(
+                    actor=actor,
+                    operation=operation,
+                    idempotency_key=idempotency_key,
+                    request_digest=digest,
+                    natural_key=natural_key,
+                    authorizer=authorizer,
+                )
+                if isinstance(reconciled, CommandResult):
+                    return reconciled
+                raise CommandConflict("natural_key_contender_reconciliation_incomplete")
+            except KnownPreCommitTransient as error:
                 cls.mark_retryable(
                     actor=actor,
                     claim=claim_or_result,
-                    error_class=f"PostgreSQLTransient:{sqlstate}",
+                    error_class=type(error).__name__,
                 )
-                raise KnownPreCommitTransient(
-                    "database_transaction_retry", sqlstate=sqlstate
-                ) from error
-            raise
-        except StaleClaim:
-            raise
-        except TransformationError as error:
-            cls.mark_non_retryable(
-                actor=actor,
-                claim=claim_or_result,
-                error_class=type(error).__name__,
-                terminal_reason=(
-                    NATURAL_KEY_CONTENDER_REASON
-                    if isinstance(error, _NaturalKeyContenderConflict)
-                    else error.reason
-                ),
-            )
-            raise
-        except Exception:
-            # The database outcome can be uncertain (for example a connection
-            # loss while COMMIT is acknowledged). Leave the receipt claim for
-            # result/natural-key reconciliation; never manufacture failure.
-            raise
+                raise
+            except DBAPIError as error:
+                sqlstate = (
+                    getattr(error.orig, "sqlstate", None)
+                    or getattr(error.orig, "pgcode", None)
+                    or getattr(getattr(error.orig, "diag", None), "sqlstate", None)
+                )
+                if sqlstate in {"40P01", "40001"}:
+                    cls.mark_retryable(
+                        actor=actor,
+                        claim=claim_or_result,
+                        error_class=f"PostgreSQLTransient:{sqlstate}",
+                    )
+                    raise KnownPreCommitTransient(
+                        "database_transaction_retry", sqlstate=sqlstate
+                    ) from error
+                raise
+            except StaleClaim:
+                raise
+            except TransformationError as error:
+                cls.mark_non_retryable(
+                    actor=actor,
+                    claim=claim_or_result,
+                    error_class=type(error).__name__,
+                    terminal_reason=(
+                        NATURAL_KEY_CONTENDER_REASON
+                        if isinstance(error, _NaturalKeyContenderConflict)
+                        else error.reason
+                    ),
+                )
+                raise
+            except Exception:
+                # The database outcome can be uncertain (for example a connection
+                # loss while COMMIT is acknowledged). Leave the receipt claim for
+                # result/natural-key reconciliation; never manufacture failure.
+                raise
 
     @classmethod
     def execute_claim(
@@ -447,15 +448,16 @@ class CommandService:
         handler: Callable[[Session, CommandClaim], DomainMutationResult],
         natural_key_resolver: OperationNaturalKeyResolver | None = None,
     ) -> CommandResult:
-        authorizer = cls._require_authorizer(authorizer)
-        return cls._execute_claim(
-            actor=actor,
-            operation=operation,
-            claim=claim,
-            authorizer=authorizer,
-            handler=handler,
-            natural_key_resolver=natural_key_resolver,
-        )
+        with bind_tenant(actor.organization_id):
+            authorizer = cls._require_authorizer(authorizer)
+            return cls._execute_claim(
+                actor=actor,
+                operation=operation,
+                claim=claim,
+                authorizer=authorizer,
+                handler=handler,
+                natural_key_resolver=natural_key_resolver,
+            )
 
     @classmethod
     def _execute_claim(
@@ -469,66 +471,67 @@ class CommandService:
         natural_key_resolver: OperationNaturalKeyResolver | None = None,
     ) -> CommandResult:
         command_result = None
-        with _FencedSession(db.engine, expire_on_commit=False) as session, session.begin():
-            session.configure_fence(actor, claim)
-            cls._scope_session(session, actor)
-            if authorizer is not None:
-                authorizer(session, actor, operation, claim.natural_key)
-            # This preflight is intentionally non-locking. A handler may run for
-            # minutes; heartbeat/reclaim must remain able to advance the lease.
-            # The result/outbox/finalisation boundary takes the row lock below.
-            cls.assert_fence(session, actor=actor, claim=claim, lock=False)
-            mutation = cls.resolve_materialisation(
-                session,
-                actor=actor,
-                operation=operation,
-                claim=claim,
-            )
-            recovered_from_materialisation = mutation is not None
-            if mutation is None and natural_key_resolver is not None:
-                mutation = natural_key_resolver(
-                    session, actor, claim.natural_key, claim
+        with bind_tenant(actor.organization_id):
+            with _FencedSession(db.engine, expire_on_commit=False) as session, session.begin():
+                session.configure_fence(actor, claim)
+                cls._scope_session(session, actor)
+                if authorizer is not None:
+                    authorizer(session, actor, operation, claim.natural_key)
+                # This preflight is intentionally non-locking. A handler may run for
+                # minutes; heartbeat/reclaim must remain able to advance the lease.
+                # The result/outbox/finalisation boundary takes the row lock below.
+                cls.assert_fence(session, actor=actor, claim=claim, lock=False)
+                mutation = cls.resolve_materialisation(
+                    session,
+                    actor=actor,
+                    operation=operation,
+                    claim=claim,
                 )
-            reconciled = mutation is not None
-            if mutation is None:
-                mutation = handler(session, claim)
-            if not isinstance(mutation, DomainMutationResult):
-                source = "natural-key resolver" if reconciled else "command handler"
-                raise TypeError(f"{source} must return DomainMutationResult")
-            mutation = cls.canonicalize_outbox_events(
-                actor=actor,
-                operation=operation,
-                claim=claim,
-                mutation=mutation,
-                preserve_event_ids=recovered_from_materialisation,
-            )
-            session._ensure_locked_fence()
-            result_was_present = cls._find_result(
-                session,
-                organization_id=actor.organization_id,
-                actor_id=actor.user_id,
-                operation=operation,
-                natural_key=claim.natural_key,
-            )
-            result = cls.persist_command_envelope(
-                session,
-                actor=actor,
-                operation=operation,
-                claim=claim,
-                mutation=mutation,
-            )
-            created = result_was_present is None
-            cls.finalise_succeeded(
-                session,
-                actor=actor,
-                claim=claim,
-                result_id=result.id,
-            )
-            command_result = cls.to_command_result(
-                result,
-                created=created and not reconciled,
-                idempotent=reconciled,
-            )
+                recovered_from_materialisation = mutation is not None
+                if mutation is None and natural_key_resolver is not None:
+                    mutation = natural_key_resolver(
+                        session, actor, claim.natural_key, claim
+                    )
+                reconciled = mutation is not None
+                if mutation is None:
+                    mutation = handler(session, claim)
+                if not isinstance(mutation, DomainMutationResult):
+                    source = "natural-key resolver" if reconciled else "command handler"
+                    raise TypeError(f"{source} must return DomainMutationResult")
+                mutation = cls.canonicalize_outbox_events(
+                    actor=actor,
+                    operation=operation,
+                    claim=claim,
+                    mutation=mutation,
+                    preserve_event_ids=recovered_from_materialisation,
+                )
+                session._ensure_locked_fence()
+                result_was_present = cls._find_result(
+                    session,
+                    organization_id=actor.organization_id,
+                    actor_id=actor.user_id,
+                    operation=operation,
+                    natural_key=claim.natural_key,
+                )
+                result = cls.persist_command_envelope(
+                    session,
+                    actor=actor,
+                    operation=operation,
+                    claim=claim,
+                    mutation=mutation,
+                )
+                created = result_was_present is None
+                cls.finalise_succeeded(
+                    session,
+                    actor=actor,
+                    claim=claim,
+                    result_id=result.id,
+                )
+                command_result = cls.to_command_result(
+                    result,
+                    created=created and not reconciled,
+                    idempotent=reconciled,
+                )
         return command_result
 
     @classmethod
@@ -602,60 +605,61 @@ class CommandService:
         mutation: DomainMutationResult,
     ) -> OperationResult:
         """Persist an exact result/materialisation/outbox through the signed fence."""
-        request_document = canonical_request_document(
-            {
-                "object_ids": copy.deepcopy(dict(mutation.object_ids)),
-                "response": copy.deepcopy(dict(mutation.response)),
-                "outbox_events": copy.deepcopy(list(mutation.outbox_events)),
-            }
-        )
-        schema = session.scalar(text("SELECT current_schema()"))
-        quoted_schema = session.bind.dialect.identifier_preparer.quote(schema)
-        try:
-            result_id = session.scalar(
-                text(
-                    f"SELECT {quoted_schema}.archie_persist_command_envelope("
-                    "CAST(:capability_document AS text), "
-                    "CAST(:capability AS text), CAST(:request_document AS text))"
-                ),
+        with bind_tenant(actor.organization_id):
+            request_document = canonical_request_document(
                 {
-                    "capability_document": claim.capability_document,
-                    "capability": claim.capability_mac,
-                    "request_document": request_document,
-                },
+                    "object_ids": copy.deepcopy(dict(mutation.object_ids)),
+                    "response": copy.deepcopy(dict(mutation.response)),
+                    "outbox_events": copy.deepcopy(list(mutation.outbox_events)),
+                }
             )
-        except DBAPIError as error:
-            message = str(error.orig).lower()
-            if NATURAL_KEY_CONTENDER_REASON in message:
-                raise _NaturalKeyContenderConflict(
-                    NATURAL_KEY_CONTENDER_REASON
-                ) from error
-            if "outbox" in message and "mismatch" in message:
-                raise CommandConflict(
-                    "operation_outbox_materialisation_mismatch"
-                ) from error
-            if (
-                "materialisation mismatch" in message
-                or "materialisation identity mismatch" in message
-            ):
-                raise CommandConflict(
-                    "operation_result_materialisation_mismatch"
-                ) from error
-            raise
-        result = session.scalar(
-            select(OperationResult).where(
-                OperationResult.id == result_id,
-                OperationResult.organization_id == actor.organization_id,
-                OperationResult.actor_id == actor.user_id,
-                OperationResult.operation == operation,
-                OperationResult.natural_key == claim.natural_key,
-                OperationResult.request_digest == claim.request_digest,
-                OperationResult.receipt_id == claim.receipt_id,
+            schema = session.scalar(text("SELECT current_schema()"))
+            quoted_schema = session.bind.dialect.identifier_preparer.quote(schema)
+            try:
+                result_id = session.scalar(
+                    text(
+                        f"SELECT {quoted_schema}.archie_persist_command_envelope("
+                        "CAST(:capability_document AS text), "
+                        "CAST(:capability AS text), CAST(:request_document AS text))"
+                    ),
+                    {
+                        "capability_document": claim.capability_document,
+                        "capability": claim.capability_mac,
+                        "request_document": request_document,
+                    },
+                )
+            except DBAPIError as error:
+                message = str(error.orig).lower()
+                if NATURAL_KEY_CONTENDER_REASON in message:
+                    raise _NaturalKeyContenderConflict(
+                        NATURAL_KEY_CONTENDER_REASON
+                    ) from error
+                if "outbox" in message and "mismatch" in message:
+                    raise CommandConflict(
+                        "operation_outbox_materialisation_mismatch"
+                    ) from error
+                if (
+                    "materialisation mismatch" in message
+                    or "materialisation identity mismatch" in message
+                ):
+                    raise CommandConflict(
+                        "operation_result_materialisation_mismatch"
+                    ) from error
+                raise
+            result = session.scalar(
+                select(OperationResult).where(
+                    OperationResult.id == result_id,
+                    OperationResult.organization_id == actor.organization_id,
+                    OperationResult.actor_id == actor.user_id,
+                    OperationResult.operation == operation,
+                    OperationResult.natural_key == claim.natural_key,
+                    OperationResult.request_digest == claim.request_digest,
+                    OperationResult.receipt_id == claim.receipt_id,
+                )
             )
-        )
-        if result is None:
-            raise CommandConflict("operation_result_missing_after_persist")
-        return result
+            if result is None:
+                raise CommandConflict("operation_result_missing_after_persist")
+            return result
 
     @classmethod
     def resolve_materialisation(
@@ -667,25 +671,26 @@ class CommandService:
         claim: CommandClaim,
     ) -> DomainMutationResult | None:
         """Strictly recover only the exact actor/operation/payload materialisation."""
-        row = session.scalar(
-            select(CommandMaterialisation).where(
-                CommandMaterialisation.organization_id == actor.organization_id,
-                CommandMaterialisation.operation == operation,
-                CommandMaterialisation.natural_key == claim.natural_key,
+        with bind_tenant(actor.organization_id):
+            row = session.scalar(
+                select(CommandMaterialisation).where(
+                    CommandMaterialisation.organization_id == actor.organization_id,
+                    CommandMaterialisation.operation == operation,
+                    CommandMaterialisation.natural_key == claim.natural_key,
+                )
             )
-        )
-        if row is None:
-            return None
-        if row.actor_id != actor.user_id:
-            raise CommandConflict("natural_key_owned_by_another_actor")
-        if row.request_digest != claim.request_digest:
-            raise CommandConflict("natural_key_payload_conflict")
-        events = tuple(copy.deepcopy(row.outbox_events or ()))
-        return DomainMutationResult(
-            object_ids=copy.deepcopy(dict(row.object_ids)),
-            response=copy.deepcopy(dict(row.response_json)),
-            outbox_events=events,
-        )
+            if row is None:
+                return None
+            if row.actor_id != actor.user_id:
+                raise CommandConflict("natural_key_owned_by_another_actor")
+            if row.request_digest != claim.request_digest:
+                raise CommandConflict("natural_key_payload_conflict")
+            events = tuple(copy.deepcopy(row.outbox_events or ()))
+            return DomainMutationResult(
+                object_ids=copy.deepcopy(dict(row.object_ids)),
+                response=copy.deepcopy(dict(row.response_json)),
+                outbox_events=events,
+            )
 
     @classmethod
     def repair_reconciled_envelope(
@@ -736,103 +741,104 @@ class CommandService:
         authorizer: OperationAuthorizer,
     ) -> CommandClaim | CommandResult:
         """Commit a first/reclaimed claim independently, reconciling effects first."""
-        authorizer = cls._require_authorizer(authorizer)
-        if not operation or not idempotency_key or not natural_key:
-            raise ValueError("operation, idempotency_key and natural_key are required")
-        if len(request_digest) != 64:
-            raise ValueError("request_digest must be a SHA-256 hexadecimal digest")
+        with bind_tenant(actor.organization_id):
+            authorizer = cls._require_authorizer(authorizer)
+            if not operation or not idempotency_key or not natural_key:
+                raise ValueError("operation, idempotency_key and natural_key are required")
+            if len(request_digest) != 64:
+                raise ValueError("request_digest must be a SHA-256 hexadecimal digest")
 
-        token = cls._new_claim_token()
-        lease_milliseconds = max(10, math.ceil(cls._lease_seconds() * 1000.0))
-        challenge = cls._issue_claim_challenge(actor)
-        claim_document, claim_capability = cls._signed_capability(
-            {
-                "schema_version": "transformation-command-claim-r1",
-                "organization_id": actor.organization_id,
-                "actor_id": actor.user_id,
-                "operation": operation,
-                "idempotency_key": idempotency_key,
-                "request_digest": request_digest,
-                "natural_key": natural_key,
-                "claim_token": token,
-                "claimant_request_id": actor.request_id,
-                "claim_nonce": challenge["claim_nonce"],
-                "claim_issued_at_ms": challenge["claim_issued_at_ms"],
-                "claim_expires_at_ms": challenge["claim_expires_at_ms"],
-                "contender_reason": NATURAL_KEY_CONTENDER_REASON,
-                "lease_milliseconds": lease_milliseconds,
-            }
-        )
-        conflict: tuple[str, dict[str, Any]] | None = None
-        outcome: CommandClaim | CommandResult | None = None
-        with Session(db.engine, expire_on_commit=False) as session, session.begin():
-            cls._scope_session(session, actor)
-            # Authorization is mandatory and precedes both receipt creation and
-            # immutable-result reconciliation. Resolvers never carry hidden auth.
-            authorizer(session, actor, operation, natural_key)
-            schema = session.scalar(text("SELECT current_schema()"))
-            quoted_schema = session.bind.dialect.identifier_preparer.quote(schema)
-            row = session.execute(
-                text(
-                    f"SELECT * FROM {quoted_schema}.archie_claim_transformation_command("  # nosec B608 -- current schema is dialect-quoted; function name is literal; values are bound
-                    "CAST(:document AS text), CAST(:capability AS text))"
-                ),
-                {"document": claim_document, "capability": claim_capability},
-            ).mappings().one()
-            if row["claim_outcome"] == "reconciled":
-                cls.repair_reconciled_envelope(
-                    session,
-                    claim_document=claim_document,
-                    claim_capability=claim_capability,
-                    operation_result_id=row["operation_result_id"],
-                )
-                result = session.scalar(
-                    select(OperationResult).where(
-                        OperationResult.id == row["operation_result_id"],
-                        OperationResult.organization_id == actor.organization_id,
-                        OperationResult.actor_id == actor.user_id,
-                        OperationResult.operation == operation,
-                        OperationResult.natural_key == natural_key,
+            token = cls._new_claim_token()
+            lease_milliseconds = max(10, math.ceil(cls._lease_seconds() * 1000.0))
+            challenge = cls._issue_claim_challenge(actor)
+            claim_document, claim_capability = cls._signed_capability(
+                {
+                    "schema_version": "transformation-command-claim-r1",
+                    "organization_id": actor.organization_id,
+                    "actor_id": actor.user_id,
+                    "operation": operation,
+                    "idempotency_key": idempotency_key,
+                    "request_digest": request_digest,
+                    "natural_key": natural_key,
+                    "claim_token": token,
+                    "claimant_request_id": actor.request_id,
+                    "claim_nonce": challenge["claim_nonce"],
+                    "claim_issued_at_ms": challenge["claim_issued_at_ms"],
+                    "claim_expires_at_ms": challenge["claim_expires_at_ms"],
+                    "contender_reason": NATURAL_KEY_CONTENDER_REASON,
+                    "lease_milliseconds": lease_milliseconds,
+                }
+            )
+            conflict: tuple[str, dict[str, Any]] | None = None
+            outcome: CommandClaim | CommandResult | None = None
+            with Session(db.engine, expire_on_commit=False) as session, session.begin():
+                cls._scope_session(session, actor)
+                # Authorization is mandatory and precedes both receipt creation and
+                # immutable-result reconciliation. Resolvers never carry hidden auth.
+                authorizer(session, actor, operation, natural_key)
+                schema = session.scalar(text("SELECT current_schema()"))
+                quoted_schema = session.bind.dialect.identifier_preparer.quote(schema)
+                row = session.execute(
+                    text(
+                        f"SELECT * FROM {quoted_schema}.archie_claim_transformation_command("  # nosec B608 -- current schema is dialect-quoted; function name is literal; values are bound
+                        "CAST(:document AS text), CAST(:capability AS text))"
+                    ),
+                    {"document": claim_document, "capability": claim_capability},
+                ).mappings().one()
+                if row["claim_outcome"] == "reconciled":
+                    cls.repair_reconciled_envelope(
+                        session,
+                        claim_document=claim_document,
+                        claim_capability=claim_capability,
+                        operation_result_id=row["operation_result_id"],
                     )
-                )
-                if result is None:
-                    raise CommandConflict("operation_result_missing_after_reconcile")
-                outcome = cls.to_command_result(
-                    result, created=False, idempotent=True
-                )
-            elif row["claim_outcome"] == "conflict":
-                details = {"receipt_id": row["command_receipt_id"]}
-                if row["conflict_error_class"] is not None:
-                    details["error_class"] = row["conflict_error_class"]
-                if row["retry_after_seconds"] is not None:
-                    details["generation"] = row["command_generation"]
-                    details["retry_after_seconds"] = row["retry_after_seconds"]
-                if row["operation_result_id"] is not None:
-                    details["operation_result_id"] = row["operation_result_id"]
-                conflict = (row["conflict_reason"], details)
-            elif row["claim_outcome"] != "claimed":
-                raise RuntimeError("command claim function returned an unknown outcome")
-            else:
-                capability_document, capability_mac = cls._execution_capability(
-                    actor=actor,
-                    operation=operation,
-                    idempotency_key=idempotency_key,
-                    request_digest=request_digest,
-                    natural_key=natural_key,
-                    receipt_id=row["command_receipt_id"],
-                    generation=row["command_generation"],
-                    claim_token=row["command_claim_token"],
-                    claimant_request_id=actor.request_id,
-                )
-                outcome = CommandClaim(
-                    receipt_id=row["command_receipt_id"],
-                    generation=row["command_generation"],
-                    claim_token=row["command_claim_token"],
-                    request_digest=request_digest,
-                    natural_key=natural_key,
-                    capability_document=capability_document,
-                    capability_mac=capability_mac,
-                )
+                    result = session.scalar(
+                        select(OperationResult).where(
+                            OperationResult.id == row["operation_result_id"],
+                            OperationResult.organization_id == actor.organization_id,
+                            OperationResult.actor_id == actor.user_id,
+                            OperationResult.operation == operation,
+                            OperationResult.natural_key == natural_key,
+                        )
+                    )
+                    if result is None:
+                        raise CommandConflict("operation_result_missing_after_reconcile")
+                    outcome = cls.to_command_result(
+                        result, created=False, idempotent=True
+                    )
+                elif row["claim_outcome"] == "conflict":
+                    details = {"receipt_id": row["command_receipt_id"]}
+                    if row["conflict_error_class"] is not None:
+                        details["error_class"] = row["conflict_error_class"]
+                    if row["retry_after_seconds"] is not None:
+                        details["generation"] = row["command_generation"]
+                        details["retry_after_seconds"] = row["retry_after_seconds"]
+                    if row["operation_result_id"] is not None:
+                        details["operation_result_id"] = row["operation_result_id"]
+                    conflict = (row["conflict_reason"], details)
+                elif row["claim_outcome"] != "claimed":
+                    raise RuntimeError("command claim function returned an unknown outcome")
+                else:
+                    capability_document, capability_mac = cls._execution_capability(
+                        actor=actor,
+                        operation=operation,
+                        idempotency_key=idempotency_key,
+                        request_digest=request_digest,
+                        natural_key=natural_key,
+                        receipt_id=row["command_receipt_id"],
+                        generation=row["command_generation"],
+                        claim_token=row["command_claim_token"],
+                        claimant_request_id=actor.request_id,
+                    )
+                    outcome = CommandClaim(
+                        receipt_id=row["command_receipt_id"],
+                        generation=row["command_generation"],
+                        claim_token=row["command_claim_token"],
+                        request_digest=request_digest,
+                        natural_key=natural_key,
+                        capability_document=capability_document,
+                        capability_mac=capability_mac,
+                    )
         if conflict is not None:
             raise CommandConflict(conflict[0], **conflict[1])
         if outcome is None:
@@ -866,28 +872,29 @@ class CommandService:
         claim: CommandClaim,
         lock: bool = True,
     ) -> CommandIdempotencyRecord:
-        statement = select(CommandIdempotencyRecord).where(
-                CommandIdempotencyRecord.id == claim.receipt_id,
-                CommandIdempotencyRecord.organization_id
-                == actor.organization_id,
-                CommandIdempotencyRecord.actor_id == actor.user_id,
-                CommandIdempotencyRecord.request_digest == claim.request_digest,
-                CommandIdempotencyRecord.natural_key == claim.natural_key,
-            )
-        if lock:
-            statement = statement.with_for_update()
-        receipt = session.execute(statement).scalar_one_or_none()
-        now = cls._database_now(session)
-        if (
-            receipt is None
-            or receipt.status != "in_progress"
-            or receipt.lease_generation != claim.generation
-            or not secrets.compare_digest(receipt.claim_token, claim.claim_token)
-            or receipt.lease_expires_at is None
-            or receipt.lease_expires_at <= now
-        ):
-            raise StaleClaim("stale_or_expired_claim", receipt_id=claim.receipt_id)
-        return receipt
+        with bind_tenant(actor.organization_id):
+            statement = select(CommandIdempotencyRecord).where(
+                    CommandIdempotencyRecord.id == claim.receipt_id,
+                    CommandIdempotencyRecord.organization_id
+                    == actor.organization_id,
+                    CommandIdempotencyRecord.actor_id == actor.user_id,
+                    CommandIdempotencyRecord.request_digest == claim.request_digest,
+                    CommandIdempotencyRecord.natural_key == claim.natural_key,
+                )
+            if lock:
+                statement = statement.with_for_update()
+            receipt = session.execute(statement).scalar_one_or_none()
+            now = cls._database_now(session)
+            if (
+                receipt is None
+                or receipt.status != "in_progress"
+                or receipt.lease_generation != claim.generation
+                or not secrets.compare_digest(receipt.claim_token, claim.claim_token)
+                or receipt.lease_expires_at is None
+                or receipt.lease_expires_at <= now
+            ):
+                raise StaleClaim("stale_or_expired_claim", receipt_id=claim.receipt_id)
+            return receipt
 
     @classmethod
     def finalise_succeeded(
@@ -931,12 +938,13 @@ class CommandService:
         claim: CommandClaim,
         error_class: str,
     ) -> bool:
-        return cls._mark_failure(
-            actor=actor,
-            claim=claim,
-            status="retryable_failure",
-            error_class=error_class,
-        )
+        with bind_tenant(actor.organization_id):
+            return cls._mark_failure(
+                actor=actor,
+                claim=claim,
+                status="retryable_failure",
+                error_class=error_class,
+            )
 
     @classmethod
     def mark_non_retryable(
@@ -947,13 +955,14 @@ class CommandService:
         error_class: str,
         terminal_reason: str | None = None,
     ) -> bool:
-        return cls._mark_failure(
-            actor=actor,
-            claim=claim,
-            status="failed_non_retryable",
-            error_class=error_class,
-            terminal_reason=terminal_reason or error_class,
-        )
+        with bind_tenant(actor.organization_id):
+            return cls._mark_failure(
+                actor=actor,
+                claim=claim,
+                status="failed_non_retryable",
+                error_class=error_class,
+                terminal_reason=terminal_reason or error_class,
+            )
 
     @classmethod
     def _mark_failure(
@@ -1047,33 +1056,34 @@ class CommandService:
     def heartbeat(
         cls, *, actor: ActorContext, claim: CommandClaim
     ) -> CommandClaim:
-        with Session(db.engine, expire_on_commit=False) as session, session.begin():
-            cls._scope_session(session, actor)
-            receipt = session.execute(
-                select(CommandIdempotencyRecord)
-                .where(
-                    CommandIdempotencyRecord.id == claim.receipt_id,
-                    CommandIdempotencyRecord.organization_id
-                    == actor.organization_id,
-                    CommandIdempotencyRecord.actor_id == actor.user_id,
-                    CommandIdempotencyRecord.request_digest == claim.request_digest,
-                    CommandIdempotencyRecord.natural_key == claim.natural_key,
-                )
-                .with_for_update()
-            ).scalar_one_or_none()
-            now = cls._database_now(session)
-            if (
-                receipt is None
-                or receipt.status != "in_progress"
-                or receipt.lease_generation != claim.generation
-                or not secrets.compare_digest(receipt.claim_token, claim.claim_token)
-                or receipt.lease_expires_at is None
-                or receipt.lease_expires_at <= now
-            ):
-                raise StaleClaim("stale_or_expired_claim", receipt_id=claim.receipt_id)
-            receipt.lease_expires_at = now + timedelta(seconds=cls._lease_seconds())
-            session.flush()
-            return cls.claim_from_record(receipt)
+        with bind_tenant(actor.organization_id):
+            with Session(db.engine, expire_on_commit=False) as session, session.begin():
+                cls._scope_session(session, actor)
+                receipt = session.execute(
+                    select(CommandIdempotencyRecord)
+                    .where(
+                        CommandIdempotencyRecord.id == claim.receipt_id,
+                        CommandIdempotencyRecord.organization_id
+                        == actor.organization_id,
+                        CommandIdempotencyRecord.actor_id == actor.user_id,
+                        CommandIdempotencyRecord.request_digest == claim.request_digest,
+                        CommandIdempotencyRecord.natural_key == claim.natural_key,
+                    )
+                    .with_for_update()
+                ).scalar_one_or_none()
+                now = cls._database_now(session)
+                if (
+                    receipt is None
+                    or receipt.status != "in_progress"
+                    or receipt.lease_generation != claim.generation
+                    or not secrets.compare_digest(receipt.claim_token, claim.claim_token)
+                    or receipt.lease_expires_at is None
+                    or receipt.lease_expires_at <= now
+                ):
+                    raise StaleClaim("stale_or_expired_claim", receipt_id=claim.receipt_id)
+                receipt.lease_expires_at = now + timedelta(seconds=cls._lease_seconds())
+                session.flush()
+                return cls.claim_from_record(receipt)
 
     @staticmethod
     def to_command_result(

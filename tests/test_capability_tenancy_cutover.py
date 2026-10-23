@@ -22,6 +22,7 @@ from app.commands.cutover_capability_tenancy import (
     install_cutover_constraints,
     run_cutover,
 )
+from app.middleware.tenant_isolation import bind_tenant
 
 
 pytestmark = pytest.mark.usefixtures("db_session")
@@ -546,25 +547,23 @@ def test_database_guard_enforces_tenant_context_for_bulk_update_and_delete(
             "(163, 'Tenant B', 'GUARD-B', 1, 1, 'tenant', 92)"
         )
     )
-    connection.execute(
-        text("SELECT set_config('archie.organization_id', '91', true)")
-    )
 
-    for statement in (
-        "UPDATE unified_capabilities SET organization_id = 92 WHERE id = 162",
-        "UPDATE unified_capabilities SET name = 'cross-tenant' WHERE id = 163",
-        "DELETE FROM unified_capabilities WHERE id = 161",
-        "DELETE FROM unified_capabilities WHERE id = 163",
-    ):
-        nested = connection.begin_nested()
-        with pytest.raises(Exception, match="tenant|reference"):
-            connection.execute(text(statement))
-        nested.rollback()
+    with bind_tenant(91):
+        for statement in (
+            "UPDATE unified_capabilities SET organization_id = 92 WHERE id = 162",
+            "UPDATE unified_capabilities SET name = 'cross-tenant' WHERE id = 163",
+            "DELETE FROM unified_capabilities WHERE id = 161",
+            "DELETE FROM unified_capabilities WHERE id = 163",
+        ):
+            nested = connection.begin_nested()
+            with pytest.raises(Exception, match="tenant|reference"):
+                connection.execute(text(statement))
+            nested.rollback()
 
-    connection.execute(text("DELETE FROM unified_capabilities WHERE id = 162"))
-    assert connection.execute(
-        text("SELECT count(*) FROM unified_capabilities WHERE id = 162")
-    ).scalar_one() == 0
+        connection.execute(text("DELETE FROM unified_capabilities WHERE id = 162"))
+        assert connection.execute(
+            text("SELECT count(*) FROM unified_capabilities WHERE id = 162")
+        ).scalar_one() == 0
 
 
 def test_final_constraint_rejects_null_or_invalid_scope_ownership(capability_schema):

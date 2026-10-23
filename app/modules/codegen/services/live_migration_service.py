@@ -163,7 +163,8 @@ class LiveMigrationService:
 
         # 3. Execute migration on the deployed solution's database
         try:
-            engine = sa.create_engine(db_url)
+            # A customer's own database, not the product's: the tenant-context hook leaves it alone.
+            engine = sa.create_engine(db_url).execution_options(archie_foreign_database=True)
             with engine.connect() as conn:
                 conn.execute(sa.text(migration_sql))
                 # Backfill if a default was provided
