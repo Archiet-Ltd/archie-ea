@@ -54,6 +54,7 @@ from app import db
 from app.models import User
 from app.utils.tenant_sql import org_scope
 from app.models.vector_embeddings import ChatMessageEmbedding
+from app.middleware.tenant_context import current_org_id
 
 # Import AI Chat Extension Services
 from app.services.ai_chat_extensions import (
@@ -1508,7 +1509,18 @@ class MultiDomainChatService:
                 }
         return None
 
-    def _refuse_chat_write(self, action_name: str, message: str = ""):
+    def _acting_user_id(self):
+        """The user a chat write is made as; None (fails closed) when unknown."""
+        user_id = self.user_id
+        if user_id is None:
+            # Some callers build the service without a user; the signed-in
+            # person is still the one writing.
+            from flask_login import current_user
+
+            user_id = getattr(current_user, "id", None) if current_user else None
+        return user_id
+
+    def _refuse_chat_write(self, action_name: str, message: str = "", via: str = "chat_nl"):
         """Write-permission gate for the chat paths that write directly.
 
         Returns None when the acting user may write; otherwise the refusal
@@ -1516,15 +1528,8 @@ class MultiDomainChatService:
         """
         from app.modules.ai_chat.tools.executor import refuse_unless_can_write
 
-        user_id = self.user_id
-        if user_id is None:
-            # Some callers build the service without a user; the signed-in
-            # person is still the one writing. No user at all fails closed.
-            from flask_login import current_user
-
-            user_id = getattr(current_user, "id", None) if current_user else None
         refused = refuse_unless_can_write(
-            user_id, action_name, {"message": message or ""}, via="chat_nl"
+            self._acting_user_id(), action_name, {"message": message or ""}, via=via
         )
         if refused is None:
             return None
@@ -2438,7 +2443,8 @@ class MultiDomainChatService:
 
             messages = (
                 ChatMessageEmbedding.query.filter(
-                    ChatMessageEmbedding.chat_session_id == session_id
+                    ChatMessageEmbedding.chat_session_id == session_id,
+                    ChatMessageEmbedding.in_org(current_org_id()),
                 )
                 .order_by(ChatMessageEmbedding.created_at.asc())
                 .all()
@@ -2481,8 +2487,9 @@ class MultiDomainChatService:
 
         try:
             embeddings_cleared = ChatMessageEmbedding.query.filter(
-                ChatMessageEmbedding.chat_session_id == session_id
-            ).delete()
+                ChatMessageEmbedding.chat_session_id == session_id,
+                ChatMessageEmbedding.in_org(current_org_id()),
+            ).delete(synchronize_session=False)
             db.session.commit()
             self.logger.info(
                 f"Cleared {embeddings_cleared} chat messages for session {session_id}"
@@ -2593,7 +2600,10 @@ class MultiDomainChatService:
                     sql_func.count(ChatMessageEmbedding.id).label("msg_count"),
                     sql_func.min(ChatMessageEmbedding.created_at).label("created"),
                 )
-                .filter(ChatMessageEmbedding.chat_session_id.like(f"{saved_prefix}%"))
+                .filter(
+                    ChatMessageEmbedding.chat_session_id.like(f"{saved_prefix}%"),
+                    ChatMessageEmbedding.in_org(current_org_id()),
+                )
                 .group_by(ChatMessageEmbedding.chat_session_id)
                 .all()
             )
@@ -2607,7 +2617,8 @@ class MultiDomainChatService:
                 # Get session name from the first message's metadata
                 first_msg = (
                     ChatMessageEmbedding.query.filter(
-                        ChatMessageEmbedding.chat_session_id == full_session_id
+                        ChatMessageEmbedding.chat_session_id == full_session_id,
+                        ChatMessageEmbedding.in_org(current_org_id()),
                     )
                     .order_by(ChatMessageEmbedding.created_at.asc())
                     .first()
@@ -2655,7 +2666,8 @@ class MultiDomainChatService:
 
             messages = (
                 ChatMessageEmbedding.query.filter(
-                    ChatMessageEmbedding.chat_session_id == full_session_id
+                    ChatMessageEmbedding.chat_session_id == full_session_id,
+                    ChatMessageEmbedding.in_org(current_org_id()),
                 )
                 .order_by(ChatMessageEmbedding.created_at.asc())
                 .all()
@@ -2881,6 +2893,14 @@ class MultiDomainChatService:
         Returns:
             Created action definition
         """
+        from app.modules.ai_chat.tools.executor import refuse_unless_can_write
+
+        refused = refuse_unless_can_write(
+            user_id, f"create_automated_action:{action_type}", parameters,
+            via="automated_action",
+        )
+        if refused is not None:
+            return refused
         try:
             if action_type == "bulk_update":
                 return self.automated_actions.create_bulk_update_action(
@@ -6746,6 +6766,15 @@ Instructions:
             if not explicit_record and not implicit_decision:
                 return
 
+            # Nobody typed a command here: this is a side effect of an ordinary
+            # answer, so a user without write access just does not get a record.
+            # Skipped silently (no refusal row) so every Viewer question that
+            # happens to say "should" does not fill the audit log.
+            from app.modules.ai_chat.tools.executor import user_can_write
+
+            if not user_can_write(self._acting_user_id()):
+                return
+
             from app.models.architecture_decision import ArchitectureDecision
 
             # Extract decision title from message
@@ -8610,6 +8639,9 @@ End with: "Type **'next'** to complete the design workflow."
         try:
             from app.modules.ai_chat.services.workbench_kernel import WorkbenchKernel, GreenfieldWorkflow
 
+            refusal = self._refuse_chat_write("start-greenfield-workflow", message, via="workbench_command")
+            if refusal:
+                return refusal
             kernel = WorkbenchKernel(user_id=self.user_id)
             workflow = GreenfieldWorkflow(kernel, user_id=self.user_id)
             return workflow.start(message, context)
@@ -8621,6 +8653,10 @@ End with: "Type **'next'** to complete the design workflow."
         """Start a new brownfield workbench workflow (AIC-314)."""
         try:
             from app.modules.ai_chat.services.workbench_kernel import WorkbenchKernel, BrownfieldWorkflow
+
+            refusal = self._refuse_chat_write("start-brownfield-workflow", message, via="workbench_command")
+            if refusal:
+                return refusal
 
             # Extract domain from message
             domain = message
@@ -8644,6 +8680,9 @@ End with: "Type **'next'** to complete the design workflow."
                 WorkbenchKernel, GreenfieldWorkflow, BrownfieldWorkflow,
             )
 
+            refusal = self._refuse_chat_write("advance-workbench-workflow", message, via="workbench_command")
+            if refusal:
+                return refusal
             kernel = WorkbenchKernel(user_id=self.user_id)
             workspace_type = wf.get("workspace_type", "greenfield")
 
@@ -8689,6 +8728,9 @@ End with: "Type **'next'** to complete the design workflow."
                 return self._handle_archimate_create_element(msg_lower, kernel, workspace_id, solution_id)
 
             if "generate viewpoint" in msg_lower or msg_lower.startswith("/generate-viewpoint"):
+                refusal = self._refuse_chat_write("generate-viewpoint", message, via="workbench_command")
+                if refusal:
+                    return refusal
                 if workspace_id:
                     authoring = ArchiMateChatAuthoring(kernel, user_id=self.user_id)
                     result = authoring.generate_viewpoint(workspace_id, solution_id=solution_id)
@@ -8697,6 +8739,9 @@ End with: "Type **'next'** to complete the design workflow."
 
             # AIC-316: SAD / Governance commands
             if "generate sad" in msg_lower or msg_lower.startswith("/generate-sad"):
+                refusal = self._refuse_chat_write("generate-sad", message, via="workbench_command")
+                if refusal:
+                    return refusal
                 if workspace_id:
                     gen = SADGovernanceGenerator(kernel, user_id=self.user_id)
                     result = gen.generate_sad_sections(workspace_id, solution_id)
@@ -8704,6 +8749,9 @@ End with: "Type **'next'** to complete the design workflow."
                 return None
 
             if "generate governance" in msg_lower or "governance pack" in msg_lower:
+                refusal = self._refuse_chat_write("generate-governance-pack", message, via="workbench_command")
+                if refusal:
+                    return refusal
                 if workspace_id:
                     gen = SADGovernanceGenerator(kernel, user_id=self.user_id)
                     result = gen.generate_governance_pack(workspace_id, solution_id)
@@ -8715,6 +8763,9 @@ End with: "Type **'next'** to complete the design workflow."
 
             # AIC-317: Delivery planning commands
             if "generate work packages" in msg_lower or "create work packages" in msg_lower:
+                refusal = self._refuse_chat_write("generate-work-packages", message, via="workbench_command")
+                if refusal:
+                    return refusal
                 if workspace_id:
                     planner = DeliveryPlanningService(kernel, user_id=self.user_id)
                     result = planner.generate_work_packages(workspace_id, solution_id)
@@ -8722,6 +8773,9 @@ End with: "Type **'next'** to complete the design workflow."
                 return None
 
             if "generate roadmap" in msg_lower or "generate plateaus" in msg_lower:
+                refusal = self._refuse_chat_write("generate-roadmap", message, via="workbench_command")
+                if refusal:
+                    return refusal
                 if workspace_id:
                     planner = DeliveryPlanningService(kernel, user_id=self.user_id)
                     planner.generate_work_packages(workspace_id, solution_id)
@@ -8742,6 +8796,9 @@ End with: "Type **'next'** to complete the design workflow."
             if msg_lower.startswith("confirm "):
                 artifact_key = msg_lower.replace("confirm ", "").strip().replace(" ", "_")
                 if workspace_id and artifact_key:
+                    refusal = self._refuse_chat_write("confirm-artifact", message, via="workbench_command")
+                    if refusal:
+                        return refusal
                     from app.modules.ai_chat.services.workbench_kernel import ArtifactState
                     kernel.set_artifact_state(workspace_id, artifact_key, ArtifactState.CONFIRMED.value)
                     return {
@@ -8760,6 +8817,10 @@ End with: "Type **'next'** to complete the design workflow."
     ) -> Optional[Dict]:
         """Parse and create an ArchiMate element from a chat command."""
         from app.modules.ai_chat.services.workbench_kernel import ArchiMateChatAuthoring
+
+        refusal = self._refuse_chat_write("create-element", msg, via="workbench_command")
+        if refusal:
+            return refusal
 
         # Parse: /create-element ApplicationComponent "CRM System" Application
         # Or: create archimate element ApplicationComponent named CRM System
@@ -8791,6 +8852,10 @@ End with: "Type **'next'** to complete the design workflow."
     def _handle_record_decision(self, message: str, kernel, workspace_id: int) -> Optional[Dict]:
         """Record an architecture decision from chat."""
         from app.modules.ai_chat.services.workbench_kernel import SADGovernanceGenerator
+
+        refusal = self._refuse_chat_write("record-decision", message, via="workbench_command")
+        if refusal:
+            return refusal
 
         # Extract decision text after the command
         text = message

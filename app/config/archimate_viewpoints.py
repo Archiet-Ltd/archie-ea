@@ -14,6 +14,8 @@ import re
 from dataclasses import dataclass
 from typing import Dict, List, Optional
 
+from app.models.archimate_element_types import SPECIALIZATIONS
+
 
 @dataclass
 class ViewpointDefinition:
@@ -893,6 +895,19 @@ VIEWPOINTS: Dict[str, ViewpointDefinition] = {
         layer="composite",
     ),
 }
+
+# A specialisation (ADR-0014) is allowed wherever its parent is allowed, so the Application joins every
+# viewpoint that lists ApplicationComponent. Done once here, so callers that test membership or build an
+# SQL IN list from `allowed_elements` need no change of their own.
+for _viewpoint in VIEWPOINTS.values():
+    _viewpoint.allowed_elements = [
+        *_viewpoint.allowed_elements,
+        *(
+            child
+            for child, parent in SPECIALIZATIONS.items()
+            if parent in _viewpoint.allowed_elements and child not in _viewpoint.allowed_elements
+        ),
+    ]
 
 
 # =============================================================================

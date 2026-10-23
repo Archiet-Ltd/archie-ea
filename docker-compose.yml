@@ -106,12 +106,11 @@ services:
     # the droplet showed server at 1.425GiB/2.539GiB (56%) while the HOST had
     # ~1.8GB available and a 4GB swap file barely touched (170MB used) — so
     # this was never a "buy a bigger droplet" question. Arithmetic for the new
-    # ceiling, all in MB against the droplet's 3915MB total RAM:
-    #   server 3072 + postgres 448 + adminer 64 + redis 160 = 3744
-    #   3915 - 3744 = 171MB headroom for the OS, PLUS the 4GB swap file as a
-    #   second cushion behind that. Re-derive by re-summing the mem_limit
-    #   lines below against `free -m` on the droplet if any service's limit
-    #   changes.
+    # ceiling, all in MB against the current host's 7942MB total RAM, no swap:
+    #   server 3072 + postgres 1536 + adminer 64 + redis 160 = 4832
+    #   7942 - 4832 = 3110MB headroom for the OS and page cache, no swap.
+    #   Re-derive by re-summing the mem_limit lines below against `free -m`
+    #   on the host if any service's limit changes.
     # Do NOT run `docker compose exec server flask ...` against production —
     # it boots a second full Flask app (~800MB) inside THIS SAME cgroup, on
     # top of gunicorn's steady-state footprint, and is what actually killed
@@ -231,8 +230,8 @@ services:
       options:
         max-size: "20m"
         max-file: "5"
-    mem_limit: 448m
-    memswap_limit: 448m   # == mem_limit: no swap allowance
+    mem_limit: 1536m
+    memswap_limit: 1536m   # == mem_limit: no swap allowance
     environment:
       POSTGRES_USER: postgres
       # Sourced from .env, which is gitignored. It must NOT be hardcoded here:

@@ -35,24 +35,24 @@
 
     {% macro _ps_actions() %}
             <a href="{{ url_for('architect_ui.impact_analysis', element_id=element.id) }}"
-               class="inline-flex items-center justify-center rounded-md text-sm font-medium border border-input bg-background hover:bg-accent hover:text-accent-foreground h-9 px-3 py-2">
+               class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
                 <i data-lucide="zap" class="h-4 w-4 mr-1.5" aria-hidden="true"></i>Impact
             </a>
             <a href="{{ url_for('archimate.element_impact_graph_page', element_id=element.id) }}"
-               class="inline-flex items-center justify-center rounded-md text-sm font-medium border border-input bg-background hover:bg-accent hover:text-accent-foreground h-9 px-3 py-2">
+               class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
                 <i data-lucide="git-fork" class="h-4 w-4 mr-1.5" aria-hidden="true"></i>Impact graph
             </a>
             <a href="{{ url_for('archimate_crud.update_element', layer=layer, element_type=element_type, element_id=element.id) }}"
-               class="inline-flex items-center justify-center rounded-md text-sm font-medium border border-input bg-background hover:bg-accent hover:text-accent-foreground h-9 px-3 py-2">
+               class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
                 <i data-lucide="pencil" class="h-4 w-4 mr-1.5" aria-hidden="true"></i>Edit
             </a>
             <button type="button" @click="deleteElement()"
-                    class="inline-flex items-center justify-center rounded-md text-sm font-medium bg-destructive text-destructive-foreground hover:bg-destructive/90 h-9 px-3 py-2"
+                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-destructive text-destructive-foreground text-sm font-semibold transition-colors hover:bg-destructive/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center"
                     aria-label="Delete element">
                 <i data-lucide="trash-2" class="h-4 w-4 mr-1.5" aria-hidden="true"></i>Delete
             </button>
             <button type="button" @click="downloadDiagram()"
-                    class="inline-flex items-center justify-center rounded-md text-xs font-medium bg-primary/10 text-primary border border-primary/30 hover:bg-primary/20 h-9 px-3 py-2"
+                    class="inline-flex items-center justify-center rounded-md text-xs font-medium bg-primary/10 text-info-emphasis border border-primary/30 hover:bg-primary/20 h-9 px-3 py-2"
                     aria-label="Export ArchiMate diagram as SVG">
                 <svg class="w-3 h-3 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
                 Export Diagram
@@ -305,7 +305,7 @@
                 </div>
                 <p x-show="errorMsg" x-cloak class="text-sm text-destructive-emphasis" x-text="errorMsg"></p>
                 <button type="button" @click="createRelationship()" :disabled="!selectedTarget || !relType || saving"
-                        class="inline-flex items-center h-9 px-4 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 disabled:opacity-50">
+                        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                     <span x-text="saving ? 'Saving…' : 'Create relationship'"></span>
                 </button>
             </div>

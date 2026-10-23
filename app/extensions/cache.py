@@ -267,3 +267,23 @@ def invalidate_cache(pattern: str):
     deleted = cache_manager.delete_pattern(pattern)
     current_app.logger.info(f"Invalidated {deleted} cache keys matching: {pattern}")
     return deleted
+
+
+def org_scoped_cache_key(key: str) -> Optional[str]:
+    """Prefix ``key`` with the active organisation, or return None when there is none.
+
+    A cache hit runs no query, so row-level security and the ORM tenant filter
+    cannot protect it: the organisation has to be part of the key. Outside a
+    request, or with no active organisation, nothing may be cached, so callers
+    skip the cache when this returns None.
+    """
+    from flask import has_request_context
+
+    from app.middleware.tenant_context import current_org_id
+
+    if not has_request_context():
+        return None
+    org_id = current_org_id()
+    if org_id is None:
+        return None
+    return f"org{org_id}:{key}"

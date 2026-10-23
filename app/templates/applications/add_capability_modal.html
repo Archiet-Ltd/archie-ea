@@ -1,4 +1,5 @@
 {% from 'macros/shadcn_compat.html' import shadcn_select %}
+{% from 'components/form_field.html' import form_group, form_footer %}
 {% from 'components/modal_form.html' import modal_form %}
 
 {% call modal_form(
@@ -15,7 +16,7 @@
 <div class="space-y-4">
     <div>
         <label for="cap-select" class="block text-sm font-medium mb-1.5">Capability <span class="text-destructive-emphasis">*</span></label>
-        {% call shadcn_select('capability_id', bare=true, id='cap-select', class='h-9 w-full', attrs='required') %}
+{% call shadcn_select('capability_id', bare=true, id='cap-select', class='h-9 w-full', attrs='required') %}
             <option value="">Select a capability...</option>
             {% for opt in capability_form_config.capability_options %}
             <option value="{{ opt.id }}"{% if opt.disabled %} disabled{% endif %}>{{ opt.label }}</option>
@@ -25,7 +26,7 @@
 
     <div>
         <label for="cap-support" class="block text-sm font-medium mb-1.5">Support Level</label>
-        {% call shadcn_select('support_level', bare=true, id='cap-support', class='h-9 w-full') %}
+{% call shadcn_select('support_level', bare=true, id='cap-support', class='h-9 w-full') %}
             <option value="">Select...</option>
             {% for val, label in capability_form_config.support_levels %}
             <option value="{{ val }}">{{ label }}</option>
@@ -34,14 +35,13 @@
     </div>
 
     <div class="grid grid-cols-2 gap-4">
-        <div>
-            <label for="cap-coverage" class="block text-sm font-medium mb-1.5">Coverage %</label>
+        {% call form_group(id='cap-coverage', label='Coverage %') %}
             <input type="number" id="cap-coverage" name="coverage_percentage" min="0" max="100" placeholder="0-100"
-                   class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
-        </div>
+                   class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+        {% endcall %}
         <div>
             <label for="cap-maturity" class="block text-sm font-medium mb-1.5">Maturity Level</label>
-            {% call shadcn_select('maturity_level', bare=true, id='cap-maturity', class='h-9 w-full') %}
+{% call shadcn_select('maturity_level', bare=true, id='cap-maturity', class='h-9 w-full') %}
                 <option value="">Select...</option>
                 {% for val, label in capability_form_config.maturity_levels %}
                 <option value="{{ val }}">{{ label }}</option>
@@ -56,10 +56,9 @@
         <label for="cap-strategic" class="text-sm font-medium">Strategic capability</label>
     </div>
 
-    <div>
-        <label for="cap-notes" class="block text-sm font-medium mb-1.5">Notes</label>
+    {% call form_group(id='cap-notes', label='Notes') %}
         <textarea id="cap-notes" name="notes" rows="2" placeholder="Optional notes about this mapping..."
-                  class="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"></textarea>
-    </div>
+                  class="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"></textarea>
+    {% endcall %}
 </div>
 {% endcall %}

@@ -1,7 +1,7 @@
 """Regression tests: a bearer token's granted scope is enforced on every
 tools/call, not just computed and stored at issue time.
 
-None of the ten registered tools write anything today, and every issued
+None of the registered tools write anything today, and every issued
 token defaults to "mcp:read", so this was not yet exploitable — but nothing
 on the tools/call path checked scope at all, which would become a real hole
 the moment any "mcp:propose" (write) tool ships. These tests construct an

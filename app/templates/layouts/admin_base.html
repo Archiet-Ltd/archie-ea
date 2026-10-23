@@ -152,7 +152,7 @@
              x-transition:leave="transition-opacity ease-in duration-150"
              x-transition:leave-start="opacity-100"
              x-transition:leave-end="opacity-0"
-             class="fixed inset-0 z-40 bg-black/50 lg:hidden" aria-hidden="true"
+             class="fixed inset-0 z-40 lg:hidden bg-overlay/50" aria-hidden="true"
              x-cloak></div>
 
         <!-- Sidebar -->
@@ -339,10 +339,10 @@
             }
         }"
         x-show="showOnboarding" x-cloak
-        class="fixed inset-0 z-[200] flex items-start sm:items-center justify-center bg-black/60 p-4 overflow-y-auto"
+        class="fixed inset-0 z-[200] flex items-start sm:items-center justify-center p-4 overflow-y-auto bg-overlay/50"
         @keydown.escape.window="completeOnboarding()"
         @keydown.enter.prevent>
-        <div class="bg-card rounded-2xl border border-border w-full max-w-lg max-h-[calc(100dvh-2rem)] overflow-y-auto"
+        <div class="bg-card rounded-lg border border-border w-full max-w-lg max-h-[calc(100dvh-2rem)] overflow-y-auto"
              @click.away="completeOnboarding()">
             {# Step 1: Welcome + Role Selection #}
             <div x-show="step === 1" class="p-8 space-y-6">
@@ -473,7 +473,7 @@
              @keydown.escape.window="exit()">
             <div class="flex items-center justify-between border-b border-border px-4 py-3">
                 <span class="text-sm font-semibold text-foreground">Guided Walkthrough</span>
-                <button type="button" @click="exit()" class="rounded p-1 text-muted-foreground hover:bg-accent transition-colors" aria-label="Close guide">
+                <button type="button" @click="exit()" class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Close guide">
                     <i data-lucide="x" class="h-4 w-4" aria-hidden="true"></i>
                 </button>
             </div>
@@ -498,14 +498,12 @@
     </div>
 
     <!-- Global Loading Indicator -->
+    {# No x-transition: the bar flips on and off with every request, often inside
+       one transition duration. Alpine rejects the superseded transition promise
+       with {isFromCancelledTransition}, and Firefox reports that rejection as an
+       uncaught page error before 05-error.js can see it. A 4px bar needs no fade. #}
     <div x-data
          x-show="$store.loading.active" x-cloak
-         x-transition:enter="transition ease-out duration-200"
-         x-transition:enter-start="opacity-0"
-         x-transition:enter-end="opacity-100"
-         x-transition:leave="transition ease-in duration-150"
-         x-transition:leave-start="opacity-100"
-         x-transition:leave-end="opacity-0"
          class="fixed top-0 left-0 right-0 z-50 h-1 bg-primary/20"
          x-cloak>
         <div class="h-full bg-primary animate-pulse"></div>

@@ -28,7 +28,7 @@
   </div>
 
   {# Error state #}
-  <div x-show="error && !loading" x-cloak class="rounded-md border border-destructive/30 bg-destructive/5 p-4">
+  <div x-show="error && !loading" x-cloak class="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2">
     <p class="text-sm text-destructive-emphasis" x-text="error"></p>
   </div>
 
@@ -71,7 +71,7 @@
 
   {# Heatmap table #}
   <div x-show="!loading && !error && (data.domains || []).length > 0" x-cloak class="overflow-x-auto">
-    <table class="w-full text-sm border-collapse">
+    <table class="dense-table w-full text-sm border-collapse">
       <thead>
         <tr class="border-b border-border">
           <th class="text-left py-2 px-3 font-semibold text-foreground">Domain</th>
@@ -154,11 +154,11 @@
 
   {# Domain detail panel #}
   <div x-show="selectedDomain" x-cloak
-       class="rounded-lg border border-border bg-card p-5 shadow-sm">
+       class="rounded-lg border border-border bg-card p-5">
     <div class="flex items-center justify-between mb-4">
       <h2 class="text-lg font-semibold text-foreground" x-text="selectedDomain?.name"></h2>
       <button type="button" @click="selectedDomain = null"
-              class="rounded-sm p-1 text-muted-foreground hover:text-foreground transition-colors"
+              class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               aria-label="Close detail panel">
         <i data-lucide="x" class="h-4 w-4"></i>
       </button>

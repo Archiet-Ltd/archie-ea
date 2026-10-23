@@ -111,6 +111,7 @@ from app.models.technology_layer import (
 from app.models.unified_capability import ValueStream
 import logging
 from app.utils.pagination import safe_int_arg
+from app.models.archimate_element_types import StandardTypeTable
 
 logger = logging.getLogger(__name__)
 
@@ -120,7 +121,7 @@ logger = logging.getLogger(__name__)
 write_role_required = require_roles("admin", "architect")
 
 # Model registry mapping element types to model classes
-MODEL_REGISTRY = {
+MODEL_REGISTRY = StandardTypeTable({
     # Motivation Layer
     "Stakeholder": Stakeholder,
     "Driver": Driver,
@@ -186,7 +187,7 @@ MODEL_REGISTRY = {
     "ImplementationEvent": ImplementationEvent,
     "Plateau": Plateau,
     "Gap": Gap,
-}
+})
 
 # Layer configuration
 # Accepted stored spellings per layer key. ArchiMate 3.2 names two layers with
@@ -703,6 +704,7 @@ def api_layer_elements(layer):
     search = request.args.get("search", "").strip()
     type_filter = request.args.get("element_type", "").strip()
     source_filter = request.args.get("source", "").strip()  # "portfolio", "architecture", or ""
+    kind_filter = request.args.get("kind", "").strip()  # "Epic", "Feature", etc.
     page = safe_int_arg('page', 1, minimum=1)
     per_page = safe_int_arg('per_page', 25, minimum=1, maximum=500)
     sort_by = request.args.get("sort_by", "name")
@@ -917,6 +919,25 @@ def api_layer_elements(layer):
     end = start + per_page
     page_elements = all_elements[start:end]
 
+    # Enrich WorkPackage elements with their framework profile (kind, WSJF).
+    try:
+        from app.services.element_profile_service import read_profile
+        for el in page_elements:
+            if el.get("element_type") == "WorkPackage":
+                ae = db.session.get(ArchiMateElement, el["id"])
+                if ae is not None:
+                    profile = read_profile(ae)
+                    el["kind"] = profile.get("kind")
+                    el["wsjf_score"] = profile.get("wsjf_score")
+    except Exception as e:
+        current_app.logger.warning(f"Could not enrich profiles: {e}")
+
+    # Apply kind filter after enrichment.
+    if kind_filter:
+        page_elements = [el for el in page_elements if el.get("kind") == kind_filter]
+        total = len(all_elements)
+        pages = math.ceil(total / per_page) if per_page > 0 else 1
+
     return jsonify(
         {
             "elements": page_elements,
@@ -1056,6 +1077,22 @@ def _selected_layer_for(layer):
     return presentation_config[selected_key]
 
 
+# Element types whose model declares a NOT NULL foreign key with no default
+# that this generic create form never collects anywhere else (not in the
+# name/description fields set unconditionally above, not in any
+# field_configs.py entry): BusinessFunction.capability_id is required by the
+# model (app/models/business_capabilities.py) but has no field here, so every
+# submission reached db.session.commit() and failed the database's own NOT
+# NULL constraint instead of a validated request. Checked explicitly in
+# create_element() below, before any insert is attempted, the same way every
+# other required-field check in this codebase already works (compare
+# _add_archimate_element's "name" check a few hundred lines up, and
+# create_process_link's "process_id" check in business_layer_routes.py).
+REQUIRED_RELATIONSHIP_FIELDS = {
+    "BusinessFunction": ("capability_id", "Capability"),
+}
+
+
 @archimate_crud.route(f"/{_LAYER_URL_PATTERN}/<element_type>/new", methods=["GET", "POST"])
 @login_required
 @write_role_required
@@ -1070,6 +1107,43 @@ def create_element(layer, element_type):
     if request.method == "POST":
         try:
             data = request.get_json() if request.is_json else request.form.to_dict()
+
+            # Required-relationship validation: reject before any insert is
+            # attempted, rather than let the model's own NOT NULL constraint
+            # catch it at commit time (see REQUIRED_RELATIONSHIP_FIELDS above).
+            required_field = REQUIRED_RELATIONSHIP_FIELDS.get(element_type)
+            relationship_field_value = None
+            if required_field:
+                field_name, field_label = required_field
+                raw_value = data.get(field_name)
+                try:
+                    relationship_field_value = (
+                        int(raw_value) if raw_value not in (None, "") else None
+                    )
+                except (TypeError, ValueError):
+                    relationship_field_value = None
+
+                if relationship_field_value is None:
+                    error_message = f"{field_label} is required"
+                    if request.is_json:
+                        return (
+                            jsonify({"success": False, "error": error_message}),
+                            400,
+                        )
+                    flash(error_message, "error")
+                    return (
+                        render_template(
+                            "archimate_crud/dashboard.html",
+                            layer=layer,
+                            element_type=element_type,
+                            layer_config=LAYER_CONFIG,
+                            selected_layer=_selected_layer_for(layer),
+                            field_config=get_element_config(element_type),
+                            form_data=create_empty_form_data(element_type),
+                            element_field_configs=ELEMENT_FIELD_CONFIGS,
+                        ),
+                        400,
+                    )
 
             # Create model instance
             element = model_class()
@@ -1091,6 +1165,13 @@ def create_element(layer, element_type):
 
             # Set layer-specific fields based on model
             _set_model_fields(element, data, model_class, element_type)
+
+            # Apply the validated required relationship field (e.g.
+            # BusinessFunction.capability_id) — not part of the legacy
+            # field_mappings table or a field_configs.py entry, so
+            # _set_model_fields above never touches it.
+            if required_field and relationship_field_value is not None:
+                setattr(element, required_field[0], relationship_field_value)
 
             # Auto-create ArchiMateElement if not provided
             if not element.archimate_element_id:
@@ -1701,7 +1782,8 @@ def element_relationships(layer, element_type, element_id):
 def api_element_detail(element_id):
     """ARC-006: Return full detail JSON for a single ArchiMate element.
 
-    Returns element fields, outgoing/incoming relationships, and solution linkages.
+    Returns element fields, outgoing/incoming relationships, solution linkages,
+    and the element's framework profile (kind, WSJF score).
     """
     # filter_by always emits SQL, so the tenant filter applies even when the row
     # is already in the session identity map (Query.get would skip it).
@@ -1746,6 +1828,14 @@ def api_element_detail(element_id):
     except Exception as e:
         current_app.logger.warning(f"Could not load solution linkages for element {element_id}: {e}")
 
+    # Read the element's framework profile (kind, WSJF).
+    profile = {}
+    try:
+        from app.services.element_profile_service import read_profile
+        profile = read_profile(element)
+    except Exception as e:
+        current_app.logger.warning(f"Could not read profile for element {element_id}: {e}")
+
     return jsonify({
         "id": element.id,
         "name": element.name,
@@ -1756,6 +1846,7 @@ def api_element_detail(element_id):
         "outgoing": outgoing,
         "incoming": incoming,
         "solutions": solutions,
+        "profile": profile,
     })
 
 
@@ -2647,3 +2738,86 @@ def api_health_scorecard_repair():
         current_app.logger.error("Health repair error: %s", e, exc_info=True)
         db.session.rollback()
         return jsonify({"error": "Repair failed", "detail": str(e)}), 500
+
+
+# ── Element profile routes (kind, WSJF) ─────────────────────────────────────
+
+
+@archimate_crud.route("/api/elements/<int:element_id>/profile", methods=["GET"])
+@login_required
+def api_element_profile(element_id):
+    """Read the element's framework profile (kind, WSJF score, properties)."""
+    element = ArchiMateElement.query.filter_by(id=element_id).first_or_404()
+    try:
+        from app.services.element_profile_service import read_profile
+        profile = read_profile(element)
+        return jsonify(profile)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@archimate_crud.route("/api/elements/<int:element_id>/profile", methods=["POST"])
+@login_required
+def api_element_set_kind(element_id):
+    """Set the framework kind on an element.
+
+    Only Architect and above (not Viewer) may edit.
+    """
+    from flask_login import current_user
+
+    # Check enterprise_role: Viewer cannot edit.
+    enterprise_role = getattr(current_user, "enterprise_role", "").lower()
+    if enterprise_role == "viewer":
+        return jsonify({"error": "Viewer cannot edit element kind."}), 403
+
+    element = ArchiMateElement.query.filter_by(id=element_id).first_or_404()
+    data = request.get_json() or {}
+    kind = data.get("kind")
+    framework_id = data.get("framework_id", "safe")
+
+    try:
+        from app.services.element_profile_service import set_kind, read_profile
+        if kind is None:
+            set_kind(element, None, framework_id)
+        else:
+            set_kind(element, kind, framework_id)
+        db.session.commit()
+        return jsonify(read_profile(element))
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": str(e)}), 500
+
+
+@archimate_crud.route("/api/elements/<int:element_id>/profile/wsjf", methods=["POST"])
+@login_required
+def api_element_set_wsjf(element_id):
+    """Set WSJF components on an element.
+
+    Only Architect and above (not Viewer) may edit.
+    """
+    from flask_login import current_user
+
+    # Check enterprise_role: Viewer cannot edit.
+    enterprise_role = getattr(current_user, "enterprise_role", "").lower()
+    if enterprise_role == "viewer":
+        return jsonify({"error": "Viewer cannot edit WSJF components."}), 403
+
+    element = ArchiMateElement.query.filter_by(id=element_id).first_or_404()
+    data = request.get_json() or {}
+
+    try:
+        from app.services.element_profile_service import set_wsjf_components
+        result = set_wsjf_components(
+            element,
+            business_value=data.get("business_value", 1),
+            time_criticality=data.get("time_criticality", 1),
+            risk_reduction=data.get("risk_reduction", 1),
+            job_size=data.get("job_size", 1),
+        )
+        db.session.commit()
+        return jsonify(result)
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": str(e)}), 500

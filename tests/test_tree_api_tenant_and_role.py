@@ -1,0 +1,803 @@
+"""Generic tree API: write-role gate and tenant isolation.
+
+Two holes closed together:
+
+* ``/capability-map/api/trees/<key>`` create, edit and delete required only a
+  signed-in user, so a read-only Viewer could change any of 21 hierarchies.
+* Seven of the backing models (tasks, portfolio initiatives, system boundaries,
+  compliance requirements, vendor capability and process hierarchies, required
+  capabilities) had no organisation column, so one organisation could read,
+  rename and delete another's rows. Two catalogues (APQC, product taxonomy) are
+  shared by every organisation and are now writable by a platform administrator
+  only, and shared reference-model capabilities are read-only to tenants.
+
+Uses the shared ``db_session`` / ``make_org`` / ``login_as`` fixtures.
+"""
+
+from __future__ import annotations
+
+import uuid
+
+import pytest
+
+pytestmark = pytest.mark.usefixtures("db_session")
+
+BASE = "/capability-map/api/trees"
+
+# Trees whose model was unscoped before this change.
+NEWLY_SCOPED = [
+    "compliance",
+    "portfolio_initiative",
+    "system_boundary",
+    "task",
+    "vendor_capability",
+    "vendor_process",
+    "required_capability",
+]
+PLATFORM = ["apqc", "product_taxonomy"]
+HYBRID = ["capability", "reference_capability"]
+
+
+def _registry():
+    from app.services.tree_service import TREE_REGISTRY
+
+    return TREE_REGISTRY
+
+
+def _model(key):
+    from app.services.tree_service import _import_model
+
+    return _import_model(_registry()[key]["model"])
+
+
+def _int_pk(key):
+    """The node routes take ``<int:node_id>``; a model keyed by UUID (Task) is
+    never reachable by id through them, only through the tree listing."""
+    import sqlalchemy as sa
+
+    (column,) = _model(key).__table__.primary_key.columns
+    return isinstance(column.type, sa.Integer)
+
+
+def _tenant_keys():
+    return sorted(k for k in _registry() if k not in PLATFORM + HYBRID)
+
+
+def _make_user(db_session, org_id, label, role_name):
+    from app.models.user import Permission, Role, User
+
+    user = User(
+        email=f"{label.lower()}-{uuid.uuid4().hex[:8]}@example.com",
+        first_name=label,
+        last_name="Tester",
+        organization_id=org_id,
+        confirmed=True,
+        enterprise_role="solution_architect",
+    )
+    db_session.add(user)
+    db_session.flush()
+    role = Role.query.filter_by(name=role_name).first()
+    if role is None:
+        perms = {"Viewer": 0, "Administrator": Permission.ADMINISTER}.get(
+            role_name, Permission.GENERAL
+        )
+        role = Role(name=role_name, permissions=perms, index="main", default=False)
+        db_session.add(role)
+        db_session.flush()
+    user.role = role
+    db_session.flush()
+    return user
+
+
+@pytest.fixture
+def org_a(make_org):
+    return make_org("tree-a")
+
+
+@pytest.fixture
+def org_b(make_org):
+    return make_org("tree-b")
+
+
+@pytest.fixture
+def architect_a(db_session, org_a):
+    return _make_user(db_session, org_a.id, "ArchitectA", "Architect")
+
+
+@pytest.fixture
+def architect_b(db_session, org_b):
+    return _make_user(db_session, org_b.id, "ArchitectB", "Architect")
+
+
+@pytest.fixture
+def viewer_a(db_session, org_a):
+    return _make_user(db_session, org_a.id, "ViewerA", "Viewer")
+
+
+# --------------------------------------------------------------------- #
+# Structure: every tree is accounted for, and none is silently unscoped. #
+# --------------------------------------------------------------------- #
+
+
+def test_all_21_trees_are_classified_exactly_once():
+    from app.services.tree_service import HYBRID_TREES, PLATFORM_TREES
+
+    assert len(_registry()) == 21
+    assert set(PLATFORM_TREES) == set(PLATFORM)
+    assert set(HYBRID_TREES) == set(HYBRID)
+    assert not set(PLATFORM_TREES) & set(HYBRID_TREES)
+    assert set(PLATFORM) | set(HYBRID) <= set(_registry())
+
+
+@pytest.mark.parametrize("key", _tenant_keys())
+def test_every_tenant_tree_model_is_a_tenant_mixin(key):
+    from app.models.mixins import TenantMixin
+
+    assert issubclass(_model(key), TenantMixin), key
+    assert "organization_id" in _model(key).__table__.columns
+
+
+@pytest.mark.parametrize("key", NEWLY_SCOPED)
+def test_newly_scoped_models_carry_a_required_organisation(key):
+    column = _model(key).__table__.columns["organization_id"]
+    if key == "required_capability":
+        # Fenced by 20261018_vendor_analysis_rls, a different migration from
+        # a different PR -- it was never given the nullable=True override
+        # the other six models below needed; it still declares TenantMixin's
+        # plain nullable=False.
+        assert column.nullable is False
+    else:
+        # 20261018_tree_models_org_id leaves organization_id NULL on a row
+        # with no derivable organisation, an ADD-only migration's shape
+        # TenantMixin's own default (nullable=False) would otherwise
+        # contradict. These six models override it the same way PR 742's
+        # own typed-table models do (app/models/implementation_migration.py
+        # and the rest of that PR's six).
+        assert column.nullable is True
+    assert column.foreign_keys
+
+
+@pytest.mark.parametrize("key", HYBRID)
+def test_hybrid_models_keep_their_own_nullable_mechanism(key):
+    from app.models.mixins import TenantMixin
+
+    model = _model(key)
+    assert not issubclass(model, TenantMixin)
+    assert model.__table__.columns["organization_id"].nullable is True
+
+
+def test_a_tenant_tree_whose_model_lost_its_mixin_refuses_writes(monkeypatch):
+    from app.services import tree_service
+
+    class Bare:  # no TenantMixin
+        pass
+
+    assert tree_service._write_gate("task", Bare).startswith(tree_service.FORBIDDEN)
+    assert tree_service._write_gate("task", _model("task")) is None
+
+
+# --------------------------------------------------------------------- #
+# Hole 1: a Viewer is refused every write on every tree.                 #
+# --------------------------------------------------------------------- #
+
+
+@pytest.mark.parametrize("key", sorted(_registry()))
+class TestViewerRefusedWrites:
+    def test_create_refused(self, client, login_as, viewer_a, key):
+        login_as(client, viewer_a)
+        resp = client.post(f"{BASE}/{key}", json={"name": "viewer probe"})
+        assert resp.status_code == 403
+
+    def test_update_refused(self, client, login_as, viewer_a, key):
+        login_as(client, viewer_a)
+        resp = client.patch(f"{BASE}/{key}/1", json={"name": "viewer probe"})
+        assert resp.status_code == 403
+
+    def test_delete_refused(self, client, login_as, viewer_a, key):
+        login_as(client, viewer_a)
+        assert client.delete(f"{BASE}/{key}/1").status_code == 403
+
+
+@pytest.mark.parametrize("key", sorted(_registry()))
+def test_viewer_reads_remain_open(client, login_as, viewer_a, key):
+    login_as(client, viewer_a)
+    assert client.get(f"{BASE}/{key}").status_code == 200
+
+
+def test_viewer_write_leaves_no_row(client, login_as, db_session, viewer_a):
+    login_as(client, viewer_a)
+    client.post(f"{BASE}/task", json={"name": "viewer-made task"})
+    from flask import g
+
+    g.current_org_id = viewer_a.organization_id
+    assert _model("task").query.filter_by(title="viewer-made task").count() == 0
+
+
+# --------------------------------------------------------------------- #
+# Hole 2: a user of organisation B cannot reach organisation A's node.   #
+# --------------------------------------------------------------------- #
+
+
+def _seed(db_session, key, user, name):
+    """Insert one node owned by ``user``'s organisation, with whatever parents the
+    model requires. Several models cannot be created through the tree API at all
+    (the API sets only the tree fields, not their mandatory foreign keys)."""
+    from flask import g
+
+    org_id = user.organization_id
+    g.current_org_id = org_id  # listeners that insert linked rows read the context
+    model = _model(key)
+    name_field = _registry()[key]["name_field"]
+    kwargs = {name_field: name, "organization_id": org_id}
+
+    if key == "compliance":
+        kwargs.update(description="isolation probe", requirement_type="regulatory")
+    elif key == "system_boundary":
+        from app.models.archimate_core import ArchiMateElement
+
+        element = ArchiMateElement(
+            name=name, type="Grouping", layer="application", organization_id=org_id
+        )
+        db_session.add(element)
+        db_session.flush()
+        kwargs.update(system_name=name, archimate_element_id=element.id)
+    elif key == "task":
+        from app.models.project_models import Project
+
+        project = Project(name=f"P {name}", code=f"P{uuid.uuid4().hex[:8]}", organization_id=org_id)
+        db_session.add(project)
+        db_session.flush()
+        kwargs.update(project_id=project.id)
+    elif key in ("vendor_capability", "vendor_process", "vendor_component", "vendor_service"):
+        from app.models.vendor_stack_template import VendorStackTemplate
+
+        template = VendorStackTemplate(
+            vendor_name=f"Probe {uuid.uuid4().hex[:8]}", name=f"T {uuid.uuid4().hex[:8]}", organization_id=org_id
+        )
+        db_session.add(template)
+        db_session.flush()
+        kwargs.update(template_id=template.id)
+        if key == "vendor_capability":
+            kwargs.update(level=1)
+    elif key == "required_capability":
+        from app.models.business_capabilities import BusinessCapability
+        from app.models.vendor_analysis import OptionsAnalysis
+
+        capability = BusinessCapability(name=f"BC {name}", organization_id=org_id)
+        db_session.add(capability)
+        db_session.flush()
+        analysis = OptionsAnalysis(
+            name=f"A {name}",
+            capability_id=capability.id,
+            created_by_id=user.id,
+            organization_id=org_id,
+        )
+        db_session.add(analysis)
+        db_session.flush()
+        kwargs.update(analysis_id=analysis.id, importance="high")
+    elif key in ("work_package", "solution", "goal", "requirement", "business_process",
+                 "archimate", "business_actor", "organization_unit", "portfolio_initiative"):
+        if "description" in _registry()[key]["fields"]:
+            kwargs.update(description="isolation probe")
+        if key == "archimate":
+            kwargs.update(type="BusinessActor", layer="Business")
+        if key == "requirement":
+            kwargs.update(requirement_type="functional")
+
+    row = model(**kwargs)
+    db_session.add(row)
+    db_session.commit()
+    return row.id
+
+
+def _count_for_org(key, org_id, node_id):
+    from flask import g
+
+    g.current_org_id = org_id
+    return _model(key).query.filter_by(id=node_id).count()
+
+
+@pytest.mark.parametrize("key", _tenant_keys())
+class TestCrossOrganisationRefused:
+    def test_owner_creates_and_reads_own_node(
+        self, client, login_as, db_session, architect_a, key
+    ):
+        node_id = _seed(db_session, key, architect_a, f"A-only {key}")
+        login_as(client, architect_a)
+        if _int_pk(key):
+            assert client.get(f"{BASE}/{key}/{node_id}").status_code == 200
+        names = _flatten(client.get(f"{BASE}/{key}").get_json())
+        assert f"A-only {key}" in names
+
+    def test_node_refused(self, client, login_as, db_session, architect_a, architect_b, key):
+        if not _int_pk(key):
+            pytest.skip("node routes take an integer id; this model is keyed by UUID")
+        node_id = _seed(db_session, key, architect_a, f"A-only {key}")
+        login_as(client, architect_b)
+        resp = client.get(f"{BASE}/{key}/{node_id}")
+        assert resp.status_code == 404
+        assert b"A-only" not in resp.data
+
+    def test_tree_does_not_show_other_organisation(
+        self, client, login_as, db_session, architect_a, architect_b, key
+    ):
+        _seed(db_session, key, architect_a, f"A-only {key}")
+        login_as(client, architect_b)
+        names = _flatten(client.get(f"{BASE}/{key}").get_json())
+        assert f"A-only {key}" not in names
+
+    def test_edit_refused_and_row_unchanged(
+        self, client, login_as, db_session, org_a, architect_a, architect_b, key
+    ):
+        if not _int_pk(key):
+            pytest.skip("node routes take an integer id; this model is keyed by UUID")
+        node_id = _seed(db_session, key, architect_a, f"A-only {key}")
+        login_as(client, architect_b)
+        resp = client.patch(f"{BASE}/{key}/{node_id}", json={"name": "renamed by B"})
+        assert resp.status_code == 404
+        db_session.expire_all()
+        name_field = _registry()[key]["name_field"]
+        from flask import g
+
+        g.current_org_id = org_a.id
+        assert getattr(_model(key).query.get(node_id), name_field) == f"A-only {key}"
+
+    def test_delete_refused_and_row_survives(
+        self, client, login_as, db_session, org_a, architect_a, architect_b, key
+    ):
+        if not _int_pk(key):
+            pytest.skip("node routes take an integer id; this model is keyed by UUID")
+        node_id = _seed(db_session, key, architect_a, f"A-only {key}")
+        login_as(client, architect_b)
+        assert client.delete(f"{BASE}/{key}/{node_id}").status_code == 404
+        db_session.expire_all()
+        assert _count_for_org(key, org_a.id, node_id) == 1
+
+    def test_cannot_parent_under_other_organisation(
+        self, client, login_as, db_session, org_a, architect_a, architect_b, key
+    ):
+        if not _int_pk(key):
+            pytest.skip("node routes take an integer id; this model is keyed by UUID")
+        a_id = _seed(db_session, key, architect_a, f"A-only {key}")
+        login_as(client, architect_b)
+        resp = client.post(f"{BASE}/{key}", json={"name": "B child", "parent_id": a_id})
+        assert resp.status_code == 400
+        b_id = _seed(db_session, key, architect_b, "B root")
+        resp = client.patch(f"{BASE}/{key}/{b_id}", json={"parent_id": a_id})
+        assert resp.status_code == 400
+
+
+# Tenant trees with a genuine self-referential parent, reachable by an
+# integer node route (task is UUID-keyed and excluded the same way the
+# class above excludes it).
+_REPARENTING_TENANT_KEYS = [
+    "portfolio_initiative", "system_boundary", "compliance", "vendor_capability", "vendor_process",
+]
+
+
+@pytest.mark.parametrize("key", _REPARENTING_TENANT_KEYS)
+def test_delete_refuses_a_node_whose_child_belongs_to_another_organisation(
+    client, login_as, db_session, org_a, org_b, architect_a, architect_b, key
+):
+    """The same guard TestReferenceCapabilityTree proves for the hybrid tree
+    must hold for a plain tenant tree too: a child in another organisation
+    is never loaded at all (TenantMixin's own session filter sees to that),
+    so without this guard it is silently never reparented and the real
+    foreign key it still carries blocks the delete.
+
+    That real foreign key is a referential conflict, not an authorization
+    refusal -- this caller never even saw the other organisation's child --
+    so the response is a generic 409 with no database text in it, never the
+    403 an explicit tenancy refusal elsewhere in this module uses, and never
+    an unhandled 500 with the database's own exception message attached.
+    """
+    from flask import g
+
+    parent_id = _seed(db_session, key, architect_a, f"A parent {key}")
+    child_id = _seed(db_session, key, architect_b, f"B child {key}")
+    parent_fk = _registry()[key]["parent_fk"]
+    Model = _model(key)
+
+    g.current_org_id = org_b.id
+    child = Model.query.get(child_id)
+    setattr(child, parent_fk, parent_id)
+    db_session.commit()
+
+    login_as(client, architect_a)
+    resp = client.delete(f"{BASE}/{key}/{parent_id}")
+    assert resp.status_code == 409, resp.get_json()
+
+    error_text = resp.get_json().get("error", "")
+    assert "Key (" not in error_text
+    assert "DETAIL" not in error_text
+    assert "constraint" not in error_text.lower()
+    assert Model.__tablename__ not in error_text
+    assert str(parent_id) not in error_text
+    assert str(child_id) not in error_text
+
+    db_session.expire_all()
+    g.current_org_id = org_a.id
+    assert Model.query.get(parent_id) is not None
+    g.current_org_id = org_b.id
+    assert getattr(Model.query.get(child_id), parent_fk) == parent_id
+
+
+def _flatten(tree):
+    names = []
+    for node in tree.get("children", []):
+        names.append(node["name"])
+        names.extend(_flatten(node))
+    return names
+
+
+# --------------------------------------------------------------------- #
+# Platform catalogues: readable by all, writable by a platform admin only #
+# --------------------------------------------------------------------- #
+
+
+@pytest.mark.parametrize("key", PLATFORM)
+class TestPlatformCatalogues:
+    def test_organisation_architect_refused(self, client, login_as, architect_a, key):
+        login_as(client, architect_a)
+        assert client.post(f"{BASE}/{key}", json={"name": "probe"}).status_code == 403
+        assert client.patch(f"{BASE}/{key}/1", json={"name": "probe"}).status_code == 403
+        assert client.delete(f"{BASE}/{key}/1").status_code == 403
+
+    def test_organisation_architect_cannot_alter_an_existing_row(
+        self, client, login_as, db_session, architect_a, key
+    ):
+        model = _model(key)
+        name_field = _registry()[key]["name_field"]
+        kwargs = {name_field: f"shared {uuid.uuid4().hex[:8]}"}
+        if key == "apqc":
+            kwargs["process_code"] = f"T{uuid.uuid4().hex[:8]}"
+        row = model(**kwargs)
+        db_session.add(row)
+        db_session.commit()
+        original = getattr(row, name_field)
+        login_as(client, architect_a)
+        assert client.patch(f"{BASE}/{key}/{row.id}", json={"name": "hijacked"}).status_code == 403
+        assert client.delete(f"{BASE}/{key}/{row.id}").status_code == 403
+        db_session.expire_all()
+        assert getattr(model.query.get(row.id), name_field) == original
+
+    def test_reads_stay_open(self, client, login_as, architect_a, key):
+        login_as(client, architect_a)
+        assert client.get(f"{BASE}/{key}").status_code == 200
+
+
+# --------------------------------------------------------------------- #
+# Hybrid trees: shared rows are read-only to tenants, own rows editable. #
+# --------------------------------------------------------------------- #
+
+
+@pytest.fixture
+def reference_model(db_session):
+    from app.models.reference_models import ReferenceModel
+
+    model = ReferenceModel(name=f"RM {uuid.uuid4().hex[:8]}", code=f"RM{uuid.uuid4().hex[:8]}")
+    db_session.add(model)
+    db_session.flush()
+    return model
+
+
+def _shared_reference_capability(db_session, reference_model):
+    from app.models.reference_models import ReferenceModelCapability
+
+    row = ReferenceModelCapability(
+        reference_model_id=reference_model.id, name="Shared reference", organization_id=None
+    )
+    db_session.add(row)
+    db_session.commit()
+    return row
+
+
+def _owned_reference_capability(db_session, reference_model, org_id, name):
+    from app.models.reference_models import ReferenceModelCapability
+
+    row = ReferenceModelCapability(
+        reference_model_id=reference_model.id, name=name, organization_id=org_id
+    )
+    db_session.add(row)
+    db_session.commit()
+    return row
+
+
+class TestReferenceCapabilityTree:
+    def test_tenant_reads_shared_rows(
+        self, client, login_as, db_session, reference_model, architect_a
+    ):
+        shared = _shared_reference_capability(db_session, reference_model)
+        login_as(client, architect_a)
+        assert client.get(f"{BASE}/reference_capability/{shared.id}").status_code == 200
+        assert "Shared reference" in _flatten(client.get(f"{BASE}/reference_capability").get_json())
+
+    def test_tenant_cannot_edit_or_delete_shared_row(
+        self, client, login_as, db_session, reference_model, architect_a
+    ):
+        shared = _shared_reference_capability(db_session, reference_model)
+        login_as(client, architect_a)
+        resp = client.patch(
+            f"{BASE}/reference_capability/{shared.id}", json={"name": "hijacked"}
+        )
+        assert resp.status_code == 403
+        assert client.delete(f"{BASE}/reference_capability/{shared.id}").status_code == 403
+        db_session.expire_all()
+        from app.models.reference_models import ReferenceModelCapability
+
+        assert db_session.get(ReferenceModelCapability, shared.id).name == "Shared reference"
+
+    def test_other_organisation_cannot_see_or_change_owned_row(
+        self, client, login_as, db_session, reference_model, org_a, architect_b
+    ):
+        owned = _owned_reference_capability(db_session, reference_model, org_a.id, "A-only ref")
+        login_as(client, architect_b)
+        assert client.get(f"{BASE}/reference_capability/{owned.id}").status_code == 404
+        assert "A-only ref" not in _flatten(
+            client.get(f"{BASE}/reference_capability").get_json()
+        )
+        assert (
+            client.patch(
+                f"{BASE}/reference_capability/{owned.id}", json={"name": "renamed by B"}
+            ).status_code
+            == 404
+        )
+        assert client.delete(f"{BASE}/reference_capability/{owned.id}").status_code == 404
+        db_session.expire_all()
+        from app.models.reference_models import ReferenceModelCapability
+
+        assert db_session.get(ReferenceModelCapability, owned.id).name == "A-only ref"
+
+    def test_owner_can_edit_and_delete_own_row(
+        self, client, login_as, db_session, reference_model, org_a, architect_a
+    ):
+        owned = _owned_reference_capability(db_session, reference_model, org_a.id, "A-only ref")
+        login_as(client, architect_a)
+        resp = client.patch(
+            f"{BASE}/reference_capability/{owned.id}", json={"name": "renamed by A"}
+        )
+        assert resp.status_code == 200
+        assert client.delete(f"{BASE}/reference_capability/{owned.id}").status_code == 200
+
+    def test_delete_does_not_reparent_another_organisations_child(
+        self, client, login_as, db_session, reference_model, org_a, org_b, architect_a
+    ):
+        """delete_node reparents a deleted node's children to its own parent.
+        That reparenting query used no tenancy filter at all, so deleting a
+        node org_a legitimately owns could silently rewrite -- or, through
+        this model's own cascade="all, delete-orphan" relationship, silently
+        delete -- another organisation's private child row, one org_a
+        cannot even see through this API. A node with a child outside the
+        caller's organisation must refuse the whole delete instead of
+        reparenting what it can see and destroying or mutating what it
+        cannot.
+
+        This refusal is an explicit, genuine tenancy check (``delete_node``
+        counts the child before any write is attempted), not a database
+        exception -- it stays 403, and its message was always a static
+        string with nothing of the database's own in it; asserted here too
+        so a future change cannot quietly start interpolating one.
+        """
+        from app.models.reference_models import ReferenceModelCapability
+
+        parent = _owned_reference_capability(db_session, reference_model, org_a.id, "A parent")
+        own_child = _owned_reference_capability(db_session, reference_model, org_a.id, "A child")
+        own_child.parent_capability_id = parent.id
+        other_org_child = _owned_reference_capability(db_session, reference_model, org_b.id, "B child")
+        other_org_child.parent_capability_id = parent.id
+        db_session.commit()
+
+        login_as(client, architect_a)
+        resp = client.delete(f"{BASE}/reference_capability/{parent.id}")
+        assert resp.status_code == 403
+
+        error_text = resp.get_json().get("error", "")
+        assert "Key (" not in error_text
+        assert "DETAIL" not in error_text
+        assert "constraint" not in error_text.lower()
+        assert ReferenceModelCapability.__tablename__ not in error_text
+        assert str(parent.id) not in error_text
+        assert str(other_org_child.id) not in error_text
+
+        db_session.expire_all()
+        assert db_session.get(ReferenceModelCapability, parent.id) is not None
+        assert db_session.get(ReferenceModelCapability, own_child.id).parent_capability_id == parent.id
+        assert db_session.get(ReferenceModelCapability, other_org_child.id).parent_capability_id == parent.id
+
+    def test_delete_refuses_a_shared_child_instead_of_reparenting_it(
+        self, client, login_as, db_session, reference_model, org_a, architect_a
+    ):
+        """A shared row (organization_id IS NULL) is visible to every
+        organisation but owned by none -- _visible() includes it for reads,
+        but nobody's write may touch it. Reparenting it anyway would be a
+        tenant silently rewriting (or, through cascade="all, delete-orphan",
+        silently deleting) the platform's own shared catalogue row; refuse
+        the whole delete the same way a foreign organisation's child does.
+        """
+        from app.models.reference_models import ReferenceModelCapability
+
+        parent = _owned_reference_capability(db_session, reference_model, org_a.id, "A parent")
+        own_child = _owned_reference_capability(db_session, reference_model, org_a.id, "A child")
+        own_child.parent_capability_id = parent.id
+        shared_child = _shared_reference_capability(db_session, reference_model)
+        shared_child.parent_capability_id = parent.id
+        db_session.commit()
+
+        login_as(client, architect_a)
+        resp = client.delete(f"{BASE}/reference_capability/{parent.id}")
+        assert resp.status_code == 403
+
+        db_session.expire_all()
+        assert db_session.get(ReferenceModelCapability, parent.id) is not None
+        assert db_session.get(ReferenceModelCapability, own_child.id).parent_capability_id == parent.id
+        assert db_session.get(ReferenceModelCapability, shared_child.id).parent_capability_id == parent.id
+
+    def test_delete_with_only_owned_children_still_reparents_them(
+        self, client, login_as, db_session, reference_model, org_a, architect_a
+    ):
+        """The refusals above must not block the ordinary case: a child the
+        caller actually owns still gets reparented and the delete still
+        succeeds when there is no foreign or shared child in the way."""
+        from app.models.reference_models import ReferenceModelCapability
+
+        parent = _owned_reference_capability(db_session, reference_model, org_a.id, "A parent")
+        own_child = _owned_reference_capability(db_session, reference_model, org_a.id, "A child")
+        own_child.parent_capability_id = parent.id
+        db_session.commit()
+
+        login_as(client, architect_a)
+        assert client.delete(f"{BASE}/reference_capability/{parent.id}").status_code == 200
+
+        db_session.expire_all()
+        assert db_session.get(ReferenceModelCapability, parent.id) is None
+        assert db_session.get(ReferenceModelCapability, own_child.id).parent_capability_id is None
+
+
+class TestUnifiedCapabilityTree:
+    """UnifiedCapability keeps its own session listeners; they are correct."""
+
+    def _make(self, db_session, org_id, name):
+        from app.models.unified_capability import UnifiedCapability
+
+        row = UnifiedCapability(name=name, organization_id=org_id)
+        db_session.add(row)
+        db_session.commit()
+        return row
+
+    def test_shared_row_is_readable_but_not_writable_by_a_tenant(
+        self, client, login_as, db_session, architect_a
+    ):
+        shared = self._make(db_session, None, "Shared capability")
+        login_as(client, architect_a)
+        assert client.get(f"{BASE}/capability/{shared.id}").status_code == 200
+        assert (
+            client.patch(f"{BASE}/capability/{shared.id}", json={"name": "hijacked"}).status_code
+            == 403
+        )
+        assert client.delete(f"{BASE}/capability/{shared.id}").status_code == 403
+        db_session.expire_all()
+        from app.models.unified_capability import UnifiedCapability
+
+        assert db_session.get(UnifiedCapability, shared.id).name == "Shared capability"
+
+    def test_other_organisation_row_is_invisible_and_untouchable(
+        self, client, login_as, db_session, org_a, architect_b
+    ):
+        owned = self._make(db_session, org_a.id, "A-only capability")
+        login_as(client, architect_b)
+        assert client.get(f"{BASE}/capability/{owned.id}").status_code == 404
+        assert (
+            client.patch(f"{BASE}/capability/{owned.id}", json={"name": "renamed"}).status_code
+            == 404
+        )
+        assert client.delete(f"{BASE}/capability/{owned.id}").status_code == 404
+        assert "A-only capability" not in _flatten(client.get(f"{BASE}/capability").get_json())
+
+    def test_owner_can_edit_own_row(self, client, login_as, db_session, org_a, architect_a):
+        owned = self._make(db_session, org_a.id, "A-only capability")
+        login_as(client, architect_a)
+        assert (
+            client.patch(f"{BASE}/capability/{owned.id}", json={"name": "renamed"}).status_code
+            == 200
+        )
+
+
+# Trees whose rows can be created from the tree fields alone.
+API_CREATABLE = ["business_process", "goal", "organization_unit", "portfolio_initiative"]
+
+
+@pytest.mark.parametrize("key", API_CREATABLE)
+def test_architect_can_still_create_edit_and_delete(client, login_as, architect_a, key):
+    login_as(client, architect_a)
+    resp = client.post(f"{BASE}/{key}", json={"name": "architect-made", "description": "x"})
+    assert resp.status_code == 201, resp.get_data(as_text=True)
+    node_id = resp.get_json()["id"]
+    resp = client.patch(f"{BASE}/{key}/{node_id}", json={"name": "architect-renamed"})
+    assert resp.status_code == 200
+    assert resp.get_json()["name"] == "architect-renamed"
+    assert client.delete(f"{BASE}/{key}/{node_id}").status_code == 200
+    assert client.get(f"{BASE}/{key}/{node_id}").status_code == 404
+
+
+@pytest.mark.parametrize("key", API_CREATABLE)
+def test_created_node_belongs_to_the_callers_organisation(
+    client, login_as, db_session, org_a, architect_a, key
+):
+    login_as(client, architect_a)
+    node_id = client.post(f"{BASE}/{key}", json={"name": "stamped", "description": "x"}).get_json()["id"]
+    from flask import g
+
+    g.current_org_id = org_a.id
+    assert _model(key).query.get(node_id).organization_id == org_a.id
+
+
+# --------------------------------------------------------------------- #
+# A refused write never echoes the database's own exception text, and is  #
+# classified by its real cause rather than blanket-mapped to FORBIDDEN.   #
+# --------------------------------------------------------------------- #
+
+
+class _FakeDiag:
+    def __init__(self, sqlstate):
+        self.sqlstate = sqlstate
+
+
+class _FakeOrig(Exception):
+    """Stands in for psycopg2's own exception, which exposes the Postgres
+    SQLSTATE as ``.sqlstate``/``.pgcode``/``.diag.sqlstate`` depending on
+    version -- the same three-way fallback already used in
+    app/modules/transformation_room/command_service.py."""
+
+    def __init__(self, sqlstate, detail):
+        super().__init__(detail)
+        self.pgcode = sqlstate
+        self.diag = _FakeDiag(sqlstate)
+
+
+class _FakeIntegrityError(Exception):
+    def __init__(self, sqlstate, detail):
+        super().__init__(detail)
+        self.orig = _FakeOrig(sqlstate, detail)
+
+
+_LEAKY_DETAIL = (
+    'Key (id)=(42) is still referenced from table "widgets".\n'
+    "DETAIL:  constraint widgets_parent_id_fkey"
+)
+
+
+@pytest.mark.parametrize(
+    "sqlstate,expected_prefix",
+    [
+        ("23503", "Conflict"),  # foreign_key_violation
+        ("23505", "Conflict"),  # unique_violation
+        ("23502", "Invalid"),  # not_null_violation
+        ("23514", "Invalid"),  # check_violation
+        ("99999", "Conflict"),  # unrecognised -- generic conflict, never FORBIDDEN
+    ],
+)
+def test_integrity_error_is_classified_and_never_echoes_the_exception(
+    sqlstate, expected_prefix
+):
+    from app.services.tree_service import FORBIDDEN, _integrity_error_message
+
+    message = _integrity_error_message(_FakeIntegrityError(sqlstate, _LEAKY_DETAIL))
+
+    assert message.startswith(expected_prefix)
+    assert not message.startswith(FORBIDDEN)
+    assert "Key (" not in message
+    assert "DETAIL" not in message
+    assert "widgets" not in message
+    assert "42" not in message
+
+
+def test_integrity_error_status_mapping_matches_classification():
+    """_error_status (tree_routes.py) must map CONFLICT/INVALID the same way
+    delete_node/create_node/update_node produce them."""
+    from app.modules.capabilities.routes.tree_routes import _error_status
+    from app.services.tree_service import _integrity_error_message
+
+    assert _error_status(_integrity_error_message(_FakeIntegrityError("23503", _LEAKY_DETAIL))) == 409
+    assert _error_status(_integrity_error_message(_FakeIntegrityError("23505", _LEAKY_DETAIL))) == 409
+    assert _error_status(_integrity_error_message(_FakeIntegrityError("23502", _LEAKY_DETAIL))) == 400
+    assert _error_status(_integrity_error_message(_FakeIntegrityError("23514", _LEAKY_DETAIL))) == 400

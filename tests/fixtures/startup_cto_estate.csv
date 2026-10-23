@@ -1,0 +1,11 @@
+Name,Description,Application Status,Category,Business Criticality,App Business Owner,Package Vendor,Total Run Cost (Auto),Depends On
+Monelytics,Billing and payments service,Production,Application,High,Chidi Okeke,Stripe,48000,Archiet API; Stripe Billing
+Archiet API,Core API,Production,Service,Critical,Ada Obi,AWS,120000,Postgres; Redis Cache
+Postgres,Primary database,Production,Platform,Critical,Ada Obi,AWS,36000,
+Redis Cache,Session and rate-limit cache,Production,Platform,Medium,Ada Obi,AWS,9000,
+Web App,Customer web app,Production,Application,High,Chidi Okeke,Vercel,24000,Archiet API
+Stripe Billing,Card payments,Production,Service,High,Chidi Okeke,Stripe,18000,
+Slack,Team chat,Production,Platform,Low,,Slack,6000,
+GitHub,Source control,Production,Platform,Medium,,GitHub,,
+Auth Service,Sign-in and sessions,Production,Service,Critical,Ada Obi,Auth0,15000,Postgres
+Analytics Dashboard,Product analytics,Production,Application,Medium,Chidi Okeke,Metabase,,Postgres

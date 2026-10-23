@@ -13,12 +13,12 @@
 {% block content %}
 <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8" x-data="reviewQueue()">
     {% macro _ps_actions() %}
-<a href="/capability-map/" class="inline-flex items-center px-3 py-2 text-sm rounded-md border border-input bg-background hover:bg-accent">Back to Capabilities</a>
+<a href="/capability-map/" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">Back to Capabilities</a>
     {% endmacro %}
     {{ page_shell(title='Relationship Review Queue', subtitle='Review AI-suggested ArchiMate relationships. Accept to add to the enterprise graph, reject to discard.', actions_caller=_ps_actions) }}
     <div class="flex items-center gap-3 mb-4 p-3 rounded-lg border border-input bg-card">
-        <button type="button" @click="bulkAccept(0.8)" :disabled="processing" class="inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50">Accept all &gt; 80%</button>
-        <button type="button" @click="bulkAccept(0.6)" :disabled="processing" class="inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-md bg-secondary text-secondary-foreground hover:bg-secondary/80 disabled:opacity-50">Accept all &gt; 60%</button>
+        <button type="button" @click="bulkAccept(0.8)" :disabled="processing" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">Accept all &gt; 80%</button>
+        <button type="button" @click="bulkAccept(0.6)" :disabled="processing" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">Accept all &gt; 60%</button>
         <span class="text-xs text-muted-foreground ml-auto" x-text="loadError ? '— pending suggestions' : suggestions.length + ' pending suggestions'"></span>
         <select x-model="sortBy" @change="loadSuggestions()" class="h-8 px-2 text-xs rounded-md border border-input bg-background" aria-label="Sort By">
             <option value="confidence">Sort: Confidence</option>
@@ -31,7 +31,7 @@
         <div class="text-center py-12 border-2 border-dashed border-destructive/30 rounded-xl bg-destructive/10">
             <div class="text-lg font-medium text-destructive-emphasis mb-2">Could not load the review queue</div>
             <p class="text-sm text-muted-foreground" x-text="loadError"></p>
-            <button type="button" @click="loadSuggestions()" class="mt-3 inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-md bg-secondary text-secondary-foreground hover:bg-secondary/80">Try again</button>
+            <button type="button" @click="loadSuggestions()" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 mt-3 items-center">Try again</button>
         </div>
     </template>
     <template x-if="!loading && !loadError && suggestions.length === 0">
@@ -64,7 +64,7 @@
                 </div>
                 <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-muted text-muted-foreground shrink-0" x-text="s.source_method"></span>
                 <div class="flex items-center gap-1 shrink-0">
-                    <button type="button" @click="acceptSuggestion(s.id)" :disabled="processing" class="inline-flex items-center justify-center h-7 w-7 rounded-md bg-primary/10 text-primary hover:bg-primary/20 disabled:opacity-50" title="Accept">
+                    <button type="button" @click="acceptSuggestion(s.id)" :disabled="processing" class="inline-flex items-center justify-center h-7 w-7 rounded-md bg-primary/10 text-info-emphasis hover:bg-primary/20 disabled:opacity-50" title="Accept">
                         <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
                     </button>
                     <button type="button" @click="rejectSuggestion(s.id)" :disabled="processing" class="inline-flex items-center justify-center h-7 w-7 rounded-md bg-destructive/10 text-destructive-emphasis hover:bg-destructive/20 disabled:opacity-50" title="Reject">
@@ -74,7 +74,7 @@
             </div>
         </template>
     </div>
-    <div x-show="statusMessage" x-cloak class="fixed bottom-4 right-4 px-4 py-2 rounded-lg text-sm font-medium shadow-lg" :class="statusError ? 'bg-destructive text-destructive-foreground' : 'bg-primary text-primary-foreground'" x-text="statusMessage" x-transition></div>
+    <div x-show="statusMessage" x-cloak class="fixed bottom-4 right-4 px-4 py-2 rounded-lg text-sm font-medium" :class="statusError ? 'bg-destructive text-destructive-foreground' : 'bg-primary text-primary-foreground'" x-text="statusMessage" x-transition></div>
 </div>
 {% endblock %}
 {% block scripts %}

@@ -28,6 +28,7 @@ from app.modules.intelligence.services.derived_facts import list_derived_facts
 from app.modules.intelligence.services.latency_probe import record_query_latency
 from app.modules.intelligence.services.plain_terms import plain_terms_sentence
 from app.modules.intelligence.services.reason_codes import validate_reason_code
+from app.models.archimate_element_types import is_application_kind
 
 VALID_DIRECTIONS = {"downstream", "upstream", "both"}
 
@@ -306,7 +307,7 @@ def _resolve_application_owners_batch(
     element_type_ids: Dict[str, List[int]] = {}
     for eid in distinct_ids:
         el_type = (elements.get(str(eid)) or {}).get("type")
-        if el_type == "ApplicationComponent":
+        if is_application_kind(el_type):
             app_component_ids.append(eid)
         elif el_type and el_type.lower() in ApplicationOwner.ELEMENT_TYPES:
             element_type_ids.setdefault(el_type.lower(), []).append(eid)
@@ -385,6 +386,26 @@ def _resolve_application_owners_batch(
             {"name": display_by_id[o.id]["user_name"], "role": display_by_id[o.id]["ownership_type_label"]}
             for o in owners
         ]
+
+    # The one owner store holds people only. A repository's code owner (a team or a handle) is
+    # not a person in the organisation, so approval records it as a fact on the element with its
+    # source; the answer shows that fact, labelled as such, where no person is recorded.
+    missing = [eid for eid in distinct_ids if not results[eid]]
+    if missing:
+        from app.models.archimate_core import ArchiMateElement
+
+        for eid, props in db.session.execute(
+            db.select(ArchiMateElement.id, ArchiMateElement.acm_properties)
+            .where(ArchiMateElement.id.in_(missing))
+            .where(ArchiMateElement.organization_id == org_id)
+        ).all():
+            props = props or {}
+            owners = (props.get("github_code_owners") or {}).get("value")
+            shown = ", ".join(owners) if owners else (props.get("github_owning_team") or {}).get("value")
+            if shown:
+                results[eid] = [
+                    {"name": f"{shown} (from GitHub code owners; assign an owner)", "role": "GitHub code owner"}
+                ]
 
     return results
 
@@ -491,7 +512,51 @@ def _attach_plain_terms(rows: List[Dict[str, Any]], elements: Dict[str, Dict[str
         )
 
 
+ORIGIN_NOT_RECORDED = "origin not recorded"
+RECORDED_CONFIDENCE = "recorded"
+
+
+def _row_origin(rel) -> Dict[str, Any]:
+    """The origin a relationship row recorded, read from the row the walk
+    already loaded (no query). A person's name is filled in afterwards, in one
+    batch, by ``_attach_origins`` when only their id was recorded. A row with no
+    recorded origin says so; none is ever invented.
+    """
+    kind = (getattr(rel, "source_kind", None) or "").strip() or None
+    label = (getattr(rel, "source_label", None) or "").strip() or None
+    text = None
+    if kind == "import" and label:
+        text = f"Imported from {label}"
+    elif kind == "manual" and label:
+        text = f"Drawn by {label}"
+    elif kind in ("connector", "derived") and label:
+        text = label
+    created = getattr(rel, "created_at", None)
+    recorded = getattr(rel, "source_recorded_at", None) or created
+    person_ids: List[int] = []
+    if kind == "manual" and not label:
+        # The drawing path stores the drawer's id in source_ref; older rows
+        # carry created_by_id instead.
+        for candidate in (getattr(rel, "source_ref", None), getattr(rel, "created_by_id", None)):
+            try:
+                person_ids.append(int(candidate))
+            except (TypeError, ValueError):
+                continue
+    return {
+        "basis": "explicit",
+        "kind": kind,
+        "label": label,
+        "text": text or ORIGIN_NOT_RECORDED,
+        "recorded_at": recorded.isoformat() if recorded else None,
+        # Internal: resolved to a name in one batch, then dropped.
+        "_person_ids": person_ids,
+        "_created_at": created.isoformat() if created else None,
+    }
+
+
 def _explicit_row(rel, depth: int, chain: List[int], chain_elements: List[int], element_id: int) -> Dict[str, Any]:
+    origin = _row_origin(rel)
+    origin["relationship_id"] = rel.id
     return {
         "element_id": element_id,
         "_endpoints": (rel.source_id, rel.target_id),
@@ -502,9 +567,13 @@ def _explicit_row(rel, depth: int, chain: List[int], chain_elements: List[int], 
             "rule_id": None,
             "chain": chain,
             "chain_elements": chain_elements,
-            "confidence": None,
-            "provenance": "explicit",
-            "computed_at": None,
+            # A recorded row is a drawn or imported fact, not a computed one.
+            "confidence": RECORDED_CONFIDENCE,
+            # Same keys as a worked-out row: the provenance names the
+            # relationship record the row rests on (the last link of ``chain``)
+            # and where and when that record came from.
+            "provenance": origin,
+            "computed_at": origin["recorded_at"],
             "stale": False,
             # Derived-fact-only fields; an explicit row has no derived fact,
             # so all three are null.
@@ -513,6 +582,45 @@ def _explicit_row(rel, depth: int, chain: List[int], chain_elements: List[int], 
             "plain_terms": None,
         },
     }
+
+
+def _attach_origins(rows: List[Dict[str, Any]], org_id: int) -> None:
+    """Name the person behind every hand-drawn row that recorded only an id,
+    in ONE tenant-fenced select for the whole page, then drop the internal
+    key. A person outside the organisation is never named."""
+    pending = [
+        row["relation"]["provenance"]
+        for row in rows
+        if row["relation"]["kind"] == "explicit" and isinstance(row["relation"].get("provenance"), dict)
+    ]
+    ids = {pid for o in pending for pid in o.get("_person_ids") or []}
+    names: Dict[int, str] = {}
+    if ids:
+        from app.models.user import User
+
+        for user in db.session.execute(
+            db.select(User).where(User.id.in_(ids)).where(User.organization_id == org_id)
+        ).scalars():
+            first = (user.first_name or "").strip()
+            last = (user.last_name or "").strip()
+            full = f"{first} {last}".strip() or user.username or user.email
+            if full:
+                names[user.id] = full
+    for row in rows:
+        relation = row["relation"]
+        origin = relation.get("provenance")
+        if relation["kind"] != "explicit" or not isinstance(origin, dict):
+            continue
+        person_ids = origin.pop("_person_ids", None) or []
+        created_at = origin.pop("_created_at", None)
+        name = next((names[pid] for pid in person_ids if pid in names), None)
+        if name:
+            origin["label"] = name
+            origin["text"] = f"Drawn by {name}"
+        elif origin["text"] == ORIGIN_NOT_RECORDED:
+            # No origin: only the creation date is a recorded date.
+            origin["recorded_at"] = created_at
+            relation["computed_at"] = created_at
 
 
 def _walk_explicit(root_id: int, max_depth: int, direction: str) -> List[Dict[str, Any]]:
@@ -569,6 +677,64 @@ def _walk_explicit(root_id: int, max_depth: int, direction: str) -> List[Dict[st
         frontier = next_frontier
 
     return rows
+
+
+def _attach_connector_origins(rows: List[Dict[str, Any]], org_id: Optional[int]) -> None:
+    """Say where each connector-written link of an explicit chain came from.
+
+    A link a connector wrote carries its origin (``source_kind`` ``connector``):
+    the repository, the commit it was read at and the file that shows it. Rows
+    whose chain holds such a link gain ``relation["origins"]``, keyed by the
+    relationship id as text; a chain of drawn or imported links gains nothing,
+    so those rows keep exactly the shape they had. One batched select, fenced
+    to the organisation; nothing but the origin's own fields is read.
+    """
+    import json
+
+    from app.connectors.github import file_url as github_file_url
+    from app.models import ArchiMateRelationship
+
+    ids = sorted({rid for row in rows for rid in row["relation"]["chain"]})
+    if not ids or org_id is None:
+        return
+    found = db.session.execute(
+        db.select(
+            ArchiMateRelationship.id,
+            ArchiMateRelationship.source_ref,
+            ArchiMateRelationship.source_label,
+            ArchiMateRelationship.source_recorded_at,
+        ).where(
+            ArchiMateRelationship.id.in_(ids),
+            ArchiMateRelationship.organization_id == org_id,
+            ArchiMateRelationship.source_kind == "connector",
+        )
+    ).all()
+    origins: Dict[str, Dict[str, Any]] = {}
+    for rel_id, ref, label, recorded_at in found:
+        try:
+            body = json.loads(ref or "{}")
+        except ValueError:
+            body = {}
+        if not isinstance(body, dict):
+            body = {}
+        origins[str(rel_id)] = {
+            "system": body.get("system"),
+            "repository": body.get("repository"),
+            "commit": body.get("commit"),
+            "file": body.get("file"),
+            "detail": body.get("detail"),
+            "label": label,
+            "recorded_at": recorded_at.isoformat() if recorded_at else None,
+            "url": github_file_url(body.get("repository"), body.get("commit"), body.get("file"))
+            if body.get("system") == "github"
+            else None,
+        }
+    if not origins:
+        return
+    for row in rows:
+        mine = {str(r): origins[str(r)] for r in row["relation"]["chain"] if str(r) in origins}
+        if mine:
+            row["relation"]["origins"] = mine
 
 
 def _filter_explicit_by_layer(rows: List[Dict[str, Any]], layer: str) -> List[Dict[str, Any]]:
@@ -906,6 +1072,7 @@ class IntelligenceQueryService:
                         derived_rows = [_derived_row(fact, element_id) for fact in matching]
 
                     rows = explicit_rows + derived_rows
+                    _attach_connector_origins(explicit_rows, org_id)
 
                     # Resolve every element id the result set can name in ONE
                     # batched select, INSIDE the latency scope so
@@ -999,6 +1166,11 @@ class IntelligenceQueryService:
                 if slice_start + page_size < total:
                     next_cursor = slice_start + page_size
                 rows = page
+
+            # Origins for the page's rows only: one batched select for the
+            # people behind hand-drawn rows, whatever the page size.
+            if org_id is not None and rows:
+                _attach_origins(rows, org_id)
 
             # Owner resolution for the page's rows only (moved after
             # pagination so the 2,400-row walk resolves owners for 50 rows, not
@@ -1881,7 +2053,7 @@ class IntelligenceQueryService:
         component = None
         if getattr(element, "application_component_id", None):
             component = db.session.get(ApplicationComponent, element.application_component_id)
-        if component is None and (element.type or "") == "ApplicationComponent":
+        if component is None and is_application_kind(element.type):
             component = ApplicationComponent.query.filter_by(archimate_element_id=element.id).first()
 
         if component is None:

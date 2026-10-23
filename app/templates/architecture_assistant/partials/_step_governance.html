@@ -7,7 +7,7 @@
     <template x-for="(cp, idx) in governanceCheckpoints" :key="idx">
       <div class="flex items-center gap-4 p-3 rounded-lg border border-border bg-card">
         <div class="w-16 text-center">
-          <span class="inline-flex items-center justify-center w-8 h-8 rounded-full bg-primary/10 text-primary font-semibold text-sm" x-text="cp.phase"></span>
+          <span class="inline-flex items-center justify-center w-8 h-8 rounded-full bg-primary/10 text-info-emphasis font-semibold text-sm" x-text="cp.phase"></span>
         </div>
         <div class="flex-1">
           <div class="text-sm font-medium text-foreground" x-text="phaseLabel(cp.phase)"></div>

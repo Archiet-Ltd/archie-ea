@@ -8,7 +8,7 @@
     <form method="post" action="{{ url_for('genome_roadmap.generate') }}">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <button type="submit"
-                class="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors">
+                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
             <i data-lucide="calendar-range" class="w-4 h-4"></i>
             Generate roadmap
         </button>
@@ -20,7 +20,7 @@
         actions_caller=_ps_actions) }}
 
     {% if error %}
-    <div class="p-4 border border-destructive/50 bg-destructive/10 rounded-lg text-sm text-destructive">
+    <div class="px-3 py-2 border border-destructive/50 bg-destructive/10 rounded-md text-sm text-destructive">
         {{ error }}
     </div>
     {% endif %}

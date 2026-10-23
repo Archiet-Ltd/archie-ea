@@ -24,7 +24,7 @@ from app.modules.architecture.services.cto_scorecard_service import (
 
 
 def _vendor_product(db_session, *, months_to_eol=None, end_of_life_date=None):
-    vendor = VendorOrganization(name=f"Vendor {uuid.uuid4().hex[:6]}")
+    vendor = VendorOrganization(name=f"Vendor {uuid.uuid4().hex}")
     db_session.add(vendor)
     db_session.flush()
     eol = end_of_life_date
@@ -301,7 +301,7 @@ class TestEndOfSupportExposureSingleSourceOfTruth:
         db_session.flush()
 
         for i in range(200):
-            vendor = VendorOrganization(name=f"QVendor {uuid.uuid4().hex[:6]}")
+            vendor = VendorOrganization(name=f"QVendor {uuid.uuid4().hex}")
             db_session.add(vendor)
             db_session.flush()
             product = VendorProduct(

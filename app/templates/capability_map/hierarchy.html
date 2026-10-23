@@ -30,7 +30,7 @@
     {% with active_view = 'hierarchy' %}{% include 'capability_map/_view_switcher.html' %}{% endwith %}
 
     <!-- Level Filter -->
-    <div class="bg-card rounded-lg shadow border p-4">
+    <div class="bg-card rounded-lg border border-border p-4">
         <div class="flex items-center flex-wrap gap-3">
             <span class="text-sm font-medium text-foreground mr-2">Filter by Level:</span>
             <button type="button" @click="levelFilter = 0"
@@ -65,7 +65,7 @@
         every capability has 0 mapped apps" (a real, all-zero dict). This
         gate is server-side and Jinja-rendered (not Alpine x-show) so both
         states are directly testable without executing JS. #}
-    <div class="bg-card rounded-lg shadow border px-4 py-2 flex items-center gap-4 text-sm">
+    <div class="bg-card rounded-lg border border-border px-4 py-2 flex items-center gap-4 text-sm">
         <span class="font-medium text-foreground">{{ total_capabilities|dash }} capabilities</span>
         <span class="text-muted-foreground">|</span>
         {% if has_coverage_data %}
@@ -90,7 +90,7 @@
     {% endif %}
 
     <!-- Hierarchy Tree -->
-    <div class="bg-card rounded-lg shadow border">
+    <div class="bg-card rounded-lg border border-border">
         <div class="p-6">
             <div class="space-y-4" x-ref="treeContainer" x-html="renderTree(catalog.children, 1)" x-effect="$nextTick(() => { if (typeof lucide !== 'undefined') lucide.createIcons({ attrs: { class: ['lucide-icon'] } }); })">
             </div>
@@ -99,7 +99,7 @@
 
     <!-- Statistics Sidebar -->
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div class="bg-card rounded-lg shadow border p-6">
+        <div class="bg-card rounded-lg border border-border p-6">
             <h3 class="text-lg font-medium text-foreground mb-4">Domain Distribution</h3> <!-- frontend-quality-ok: h3 in stats card, pre-existing content -->
             <div class="space-y-3">
                 <template x-for="domain in getDomainStats()" :key="domain.name">
@@ -114,7 +114,7 @@
             </div>
         </div>
 
-        <div class="bg-card rounded-lg shadow border p-6">
+        <div class="bg-card rounded-lg border border-border p-6">
             <h3 class="text-lg font-medium text-foreground mb-4">Capability Types</h3> <!-- frontend-quality-ok: h3 in stats card, pre-existing content -->
             <div class="space-y-3">
                 <template x-for="type in getTypeStats()" :key="type.name">
@@ -128,7 +128,7 @@
             </div>
         </div>
 
-        <div class="bg-card rounded-lg shadow border p-6">
+        <div class="bg-card rounded-lg border border-border p-6">
             <h3 class="text-lg font-medium text-foreground mb-4">Level Distribution</h3> <!-- frontend-quality-ok: h3 in stats card -->
             <div class="space-y-3">
                 <template x-for="lvl in getLevelStats()" :key="lvl.level">
