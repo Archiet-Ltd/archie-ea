@@ -5,6 +5,7 @@ page_role: "Fixed-price, one-time engagement page for the architecture health ch
 cta: inquiry
 offer: architecture_health_check
 offer_summary: "I'd like to schedule an architecture health check."
+inquiry_button: "Talk to us"
 inquiry_consent_text: "Used to follow up about pricing and scheduling for the architecture health check you requested."
 description: "A fixed-price enterprise architecture assessment: $4,500, a written report within two weeks of kickoff, run on your own application data. Request yours below."
 ---
@@ -15,7 +16,7 @@ The architecture health check is a fixed-price enterprise architecture assessmen
 
 ## Who it is for
 
-Buy the health check when someone is about to ask you a question about your systems and you cannot answer it from a list.
+Request the health check when someone is about to ask you a question about your systems and you cannot answer it from a list.
 
 - **A CIO or head of architecture** before a budget round, an audit, an acquisition or a decision about which tools to keep.
 - **A scale-up CTO** before a funding round, when an investor will ask what you run and what depends on what.
@@ -61,7 +62,7 @@ Your side is gathering the files and answering questions about what they mean. E
 
 The price is fixed. It covers the scoping call, the import, the analysis, the written report and the read-out call. It does not include a subscription: if you want to keep using Entelim after the report, the model stays in your workspace, and you can work on the free Community plan (one organisation, up to three people) or choose a plan on the [pricing page](/pricing). You can also export the model as ArchiMate Open Exchange, or self-host the open-source edition under AGPL-3.0.
 
-To buy, request the health check below and we will set up the scoping call.
+To go ahead, talk to us using the form below and we will set up the scoping call.
 
 ## Where the analysis comes from
 

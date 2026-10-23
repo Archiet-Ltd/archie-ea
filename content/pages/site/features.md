@@ -8,7 +8,7 @@ source: docs/eim-category-positioning-v1.md section 2; docs/artifacts/feature-st
 # The eighteen capabilities of Enterprise Intelligence Management
 
 Enterprise Intelligence Management is the company brain: one living, explainable model of your
-enterprise, turned into answers, insights, recommendations and simulations. Entelim delivers it
+enterprise, turned into answers and insights. Entelim delivers it
 through eighteen capabilities, grouped into five questions every enterprise asks: set direction,
 know what you run, stay in control, get answers before you need them, and connect and trust.
 
@@ -242,14 +242,6 @@ Delivered today by: [Digital Twin](/modules/digital-twin),
 <figcaption class="mt-2 text-sm text-muted-foreground">The AI assistant answering a question from the organisation's own architecture model.</figcaption>
 </figure>
 
-<h3 id="simulation-and-scenario-planning">Simulation and Scenario Planning</h3>
-
-Branch the model, change it, and see what happens to cost, risk, resilience and capacity before you
-commit money.
-
-Scenario branches with every assumption visible arrive in Q3 2027, with portfolio and roadmap
-optimisation in Q4 2027. Until then, the impact question shows exactly what one failure would break.
-
 <h3 id="agentic-automation">Agentic Automation</h3>
 
 Let governed agents and your own AI assistants read the model, propose changes and, within limits you
@@ -293,7 +285,7 @@ Enterprise sign-in, access control, proven tenant isolation, audit and billing, 
 passes the checks your security team runs first.
 
 **Today:** single sign-on through SAML or OpenID Connect, every record scoped to your organisation, a
-verifiable audit log, and plans you can buy, change and cancel yourself.
+verifiable audit log, and plans you can change and cancel yourself.
 
 For certifications and what we do and do not claim today, see [Security](/security).
 

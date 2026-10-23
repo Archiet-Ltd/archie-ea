@@ -47,27 +47,21 @@ def test_each_plan_card_holds_its_price_and_its_buy_button(browser, live_server)
         context.close()
 
 
-def test_toggle_switches_prices_and_the_live_buy_link(browser, live_server):
+def test_toggle_switches_prices(browser, live_server):
     context, page = _open(browser, live_server)
     try:
         startup = page.get_by_test_id("plan-card-startup")
         shown = startup.locator(".pp-price > span:visible")
         expect(shown).to_have_count(1)
         expect(shown).to_have_text("$490/year")
-        expect(startup.get_by_test_id("buy-startup")).to_have_attribute("href", __import__("re").compile("interval%3Dyear"))
         page.get_by_text("Monthly", exact=True).click()
         expect(shown).to_have_count(1)
         expect(shown).to_have_text("$49/month")
-        expect(startup.get_by_test_id("buy-startup")).to_be_hidden()
-        expect(startup.get_by_test_id("buy-startup-monthly")).to_be_visible()
-        expect(startup.get_by_test_id("buy-startup-monthly")).to_have_attribute(
-            "href", __import__("re").compile("interval%3Dmonth"))
         team = page.get_by_test_id("plan-card-team")
         expect(team.locator(".pp-price > span:visible")).to_have_text("$29/editor/month")
-        # The visible buy button still leads to that plan's registration.
-        startup.get_by_test_id("buy-startup-monthly").click()
-        page.wait_for_url(lambda url: "/account/register" in url and "plan=startup" in url
-                          and "interval=month" in url, timeout=PAGE_TIMEOUT)
+        # The plan button leads to the contact form.
+        startup.get_by_test_id("buy-startup").click()
+        page.wait_for_url(lambda url: url.rstrip("/").endswith("/contact"), timeout=PAGE_TIMEOUT)
     finally:
         context.close()
 

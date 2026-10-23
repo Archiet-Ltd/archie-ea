@@ -24,7 +24,7 @@ management gave every company one record of its customers. Enterprise resource p
 record of its operations and finances. Enterprise Intelligence Management gives it one record of the
 enterprise itself: a company brain holding strategy, business, applications, data, technology,
 people, money, risk, suppliers, operations and AI, kept current from the systems that master each
-fact, and turned into answers, insights, recommendations and simulations for every person who runs
+fact, and turned into answers and insights for every person who runs
 the business, and for the machines that work for them.
 
 **It is a capability, not a department.** A startup is an enterprise. So is a 200-person family
@@ -35,7 +35,7 @@ it.
 
 **Entelim defines the category.** Entelim is built around eighteen capabilities that together make
 up Enterprise Intelligence Management, from strategy and portfolio management through risk,
-compliance, data, AI and vendor management to the intelligence, simulation and automation that
+compliance, data, AI and vendor management to the intelligence and automation that
 reason over all of them. Every answer Entelim gives cites the records it came from and shows how
 confident it is. When it does not know something, it says so. When its AI assistant proposes a
 change, nothing changes until a person approves it.
