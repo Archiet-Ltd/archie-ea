@@ -1,0 +1,24 @@
+{% extends 'layouts/admin_base.html' %}
+{% from 'macros/page_shell.html' import page_shell %}
+{% from 'components/empty_state.html' import empty_state %}
+
+{% block title %}Canvas not found{% endblock %}
+
+{% block content %}
+<div class="flex-1 overflow-auto">
+  <div class="p-6 space-y-6">
+    {{ page_shell(
+        title='Strategy canvases',
+        breadcrumb=[('Strategy canvases', url_for('strategy_canvas.index')), ('Not found', None)]
+    ) }}
+    {{ empty_state(
+        icon='search-x',
+        title='Canvas not found',
+        description='Strategy canvas "' ~ template_key ~ '" does not exist.',
+        cta_text='Back to strategy canvases',
+        cta_href=url_for('strategy_canvas.index'),
+        cta_icon='arrow-left'
+    ) }}
+  </div>
+</div>
+{% endblock %}

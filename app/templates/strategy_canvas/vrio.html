@@ -1,0 +1,47 @@
+{% extends 'layouts/admin_base.html' %}
+{% from 'macros/page_shell.html' import page_shell %}
+{% from 'components/strategy_canvas_box.html' import strategy_box_body %}
+
+{% block title %}VRIO{% endblock %}
+
+{% block content %}
+<div class="flex-1 overflow-auto" data-testid="strategy-canvas-vrio" data-template-key="{{ template_key }}">
+  <div class="p-6 space-y-6">
+    {{ page_shell(
+        title=template_name,
+        subtitle='Your resources read across Valuable, Rare, Inimitable and Organised, and the competitive implication they add up to',
+        breadcrumb=[('Strategy canvases', url_for('strategy_canvas.index')), (template_name, None)]
+    ) }}
+
+    {# VRIO as a table: one column per question, plus the competitive
+       implication column. Each resource recorded against a question appears in
+       that column's cell. Below 640px the table scrolls inside its own box, so
+       the four-questions-and-implication shape is kept at 390px. #}
+    <div class="rounded-lg border border-border overflow-x-auto" data-testid="vrio-table-wrap">
+      <table class="w-full min-w-[600px] border-collapse text-left">
+        <thead>
+          <tr class="bg-muted">
+            {% for zone in zones %}
+            <th scope="col" class="p-3 text-xs font-medium text-muted-foreground uppercase tracking-wide border-b border-border align-top"
+                data-testid="vrio-col-{{ zone.box_key }}">{{ zone.label }}</th>
+            {% endfor %}
+          </tr>
+        </thead>
+        <tbody>
+          <tr class="align-top">
+            {% for zone in zones %}
+            <td class="p-3 border-b border-border bg-card" data-testid="vrio-cell-{{ zone.box_key }}">
+              {{ strategy_box_body(zone, template_key) }}
+            </td>
+            {% endfor %}
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="rounded-lg border border-border bg-card p-4" data-testid="canvas-unclassified" role="status">
+      <p class="text-sm text-muted-foreground">{{ unclassified }} not yet classified</p>
+    </div>
+  </div>
+</div>
+{% endblock %}
