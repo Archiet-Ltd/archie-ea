@@ -42,8 +42,8 @@ class AIChatLinkService:
                     r"coverage.*gaps?",
                     r"capability.*gaps?",
                 ],
-                "url": "/auto-dashboard/business-capability",
-                "title": "Business Capability Dashboard",
+                "url": "/capability-map/",
+                "title": "Business Capability Map",
                 "description": "Comprehensive business capability analysis",
             },
             # Application Management
@@ -55,7 +55,7 @@ class AIChatLinkService:
                     r"application.*inventory",
                     r"list.*applications?",
                 ],
-                "url": "/auto-dashboard/",
+                "url": "/applications/",
                 "title": "Application Registry",
                 "description": "Complete application portfolio and registry",
             },
@@ -107,7 +107,7 @@ class AIChatLinkService:
                     r"business.*architecture",
                     r"capability.*framework",
                 ],
-                "url": "/auto-dashboard/business-capability",
+                "url": "/capability-map/",
                 "title": "Business Capabilities",
                 "description": "Business capability model and framework",
             },
@@ -128,8 +128,8 @@ class AIChatLinkService:
 
         # Domain-specific default links
         self.domain_defaults = {
-            "gap_analysis": "/auto-dashboard/business-capability",
-            "business_capability": "/auto-dashboard/business-capability",
+            "gap_analysis": "/capability-map/",
+            "business_capability": "/capability-map/",
             "technology": "/dashboard/operations",
             "architecture": "/dashboard/architecture",
             "vendor_analysis": "/applications/vendors",
@@ -276,16 +276,16 @@ class AIChatLinkService:
                     "icon": "🔍",
                 },
                 {
-                    "url": urljoin(self.base_url, "/auto-dashboard/business-capability"),
-                    "title": "Business Capability Dashboard",
+                    "url": urljoin(self.base_url, "/capability-map/"),
+                    "title": "Business Capability Map",
                     "description": "Comprehensive business capability analysis",
                     "icon": "📊",
                 },
             ],
             "business_capability": [
                 {
-                    "url": urljoin(self.base_url, "/auto-dashboard/business-capability"),
-                    "title": "Business Capability Dashboard",
+                    "url": urljoin(self.base_url, "/capability-map/"),
+                    "title": "Business Capability Map",
                     "description": "Business capability overview",
                     "icon": "🏢",
                 },
@@ -304,7 +304,7 @@ class AIChatLinkService:
                     "icon": "💻",
                 },
                 {
-                    "url": urljoin(self.base_url, "/auto-dashboard/"),
+                    "url": urljoin(self.base_url, "/applications/"),
                     "title": "Application Registry",
                     "description": "Complete application inventory",
                     "icon": "📋",

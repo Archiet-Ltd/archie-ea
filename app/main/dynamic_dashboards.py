@@ -7,6 +7,7 @@ dashboards for ANY SQLAlchemy model without requiring manual route creation.
 from datetime import datetime
 
 from flask import Blueprint, abort, current_app, render_template, url_for  # dead-code-ok
+from flask_login import current_user
 
 from app.models.application_layer import (
     ApplicationEvent,
@@ -28,6 +29,22 @@ from flask_login import login_required
 
 # Create blueprint
 dynamic_dashboards = Blueprint("dynamic_dashboards", __name__, url_prefix="/auto-dashboard")
+
+
+@dynamic_dashboards.before_request
+def _platform_admin_only():
+    """Platform tooling, not a customer feature: every route here is platform-admin only.
+
+    Customers browse element types through the Element Catalog. One guard on the
+    blueprint covers every current and future route, so a new route cannot be
+    added ungated.
+    """
+    from app.middleware.tenant_decorators import is_platform_admin
+
+    if not current_user.is_authenticated:
+        return current_app.login_manager.unauthorized()
+    if not is_platform_admin(current_user):
+        abort(403)
 
 # Model registry - ONLY working models to avoid conflicts
 MODEL_REGISTRY = {

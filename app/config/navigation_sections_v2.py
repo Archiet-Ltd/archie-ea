@@ -509,13 +509,6 @@ TOOLS_UTILITIES_SECTION = NavigationSectionV2(
     storage_key="tools",
     items=[
         NavigationItemV2(
-            label="Model Registry",
-            icon="package-2",
-            endpoint="dynamic_dashboards.model_registry_index",
-            url_fallback="/auto-dashboard/",
-            order=1,
-        ),
-        NavigationItemV2(
             label="Users",
             icon="users",
             endpoint="admin.registered_users",

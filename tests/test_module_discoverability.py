@@ -60,6 +60,9 @@ _INFRA_RULES = {
     "/use-cases",  # the public use-case index (app/main/views.py::public_use_cases_index)
     "/roles",  # the public role hub (app/main/views.py::public_roles_index)
     "/connectors",  # the public connector hub (app/main/views.py::public_connectors_index)
+    # Platform-admin-only tooling, deliberately linked from no persona's navigation: the
+    # customer-facing job is the Element Catalog (tests/test_auto_dashboard_platform_admin_only.py).
+    "/auto-dashboard/",
 }
 
 _SINGLE_SEGMENT = re.compile(r"^/[^/]+/?$")
