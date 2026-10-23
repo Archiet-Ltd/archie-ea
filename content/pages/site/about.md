@@ -17,15 +17,14 @@ and rarely trusted.
 **This isn't a search problem, and it isn't a chatbot problem.** Searching your documents faster
 doesn't fix knowledge that was never written down in a structured, checkable form, and a chatbot
 repeats the same gaps with more confidence. What's missing is a company brain: a living, explainable
-model of how the enterprise actually works, kept current and queryable by the people who run it.
+model of how the enterprise actually works, recorded once and queryable by the people who run it.
 
 **Enterprise Intelligence Management is the capability that builds it.** Customer relationship
 management gave every company one record of its customers. Enterprise resource planning gave it one
 record of its operations and finances. Enterprise Intelligence Management gives it one record of the
 enterprise itself: a company brain holding strategy, business, applications, data, technology,
-people, money, risk, suppliers, operations and AI, kept current from the systems that master each
-fact, and turned into answers, insights, recommendations and simulations for every person who runs
-the business, and for the machines that work for them.
+people, money, risk, suppliers, operations and AI, held in one model your team keeps up to date as the business changes, and turned into cited answers for every person who runs the
+business.
 
 **It is a capability, not a department.** A startup is an enterprise. So is a 200-person family
 business, a scale-up preparing for its first audit and a multinational with ten thousand
@@ -35,8 +34,8 @@ it.
 
 **Entelim defines the category.** Entelim is built around eighteen capabilities that together make
 up Enterprise Intelligence Management, from strategy and portfolio management through risk,
-compliance, data, AI and vendor management to the intelligence, simulation and automation that
-reason over all of them. Every answer Entelim gives cites the records it came from and shows how
+compliance, data, AI and vendor management to the intelligence that
+reasons over all of them. Every answer Entelim gives cites the records it came from and shows how
 confident it is. When it does not know something, it says so. When its AI assistant proposes a
 change, nothing changes until a person approves it.
 
@@ -50,13 +49,12 @@ AI assistants are becoming the way people ask questions about their company, and
 rarely the model anymore. It's that the company's own knowledge was never written down in a
 structured, checkable form. This isn't a problem a better search box or a chattier assistant fixes:
 it needs a living, explainable model of how the enterprise actually works, with every answer traced
-back to the record it came from. Enterprise Intelligence Management gives every assistant one
-governed, time-aware, cited model of the enterprise to stand on, the same way a CRM is the source a
-sales assistant should read about customers. That positions Entelim as the company brain other AI
-tools plug into, rather than another AI feature bolted onto an architecture tool. Read access for
-external AI assistants, through the open Model Context Protocol, opens in Q1 2027. Today, Entelim's
-own assistant already works this way: every action passes one permission check and every change
-waits for approval. See [Agentic Automation](/features#agentic-automation) among the eighteen
+back to the record it came from. Enterprise Intelligence Management gives people and
+Entelim's own assistant one governed, time-aware, cited model of the enterprise to stand on, the same
+way a CRM is the source a sales assistant should read about customers. That positions Entelim as the
+company brain, rather than another AI feature bolted onto an architecture tool. Entelim's
+own assistant already works this way: every change it attempts passes one permission check and every change
+the assistant proposes waits for approval. See [Agentic Automation](/features#agentic-automation) among the eighteen
 capabilities.
 
 ## What we believe
@@ -69,21 +67,18 @@ capabilities.
   a change, nothing happens until a person approves it.
 - **One engine per question.** The same question gets the same answer everywhere it is asked: in a
   screen, in the API or through an AI assistant.
-- **Open by contract.** Every connector and every assistant acts through the same governed interface,
-  logged and revocable, not a side door.
+- **No side door.** Every change Entelim's own assistant attempts is checked against the permissions
+  of the person it acts for.
 - **Portable and sovereign.** Your model is yours. It is built on the open ArchiMate 3.2 standard,
   and the whole platform is open source, so you are never locked into a proprietary format or a
   single vendor.
 
-## Where Entelim is today, and where it goes
+## Where Entelim is today
 
-Entelim's company brain grows in five stages. Today it is **modelled**: import an existing
-architecture model and ask cited questions about it. **Synchronised** (Q1 2027) connects it to the
-systems you already use and opens read access for your own AI assistants. **Operational** (Q2 2027)
-brings in operations and finance. **Predictive** (Q3 2027) adds forecasting and the first scenarios.
-**Self-maintaining** (Q1 2028) lets it keep itself current within limits you set. See
-[all eighteen capabilities](/features) for what each one delivers today and what quarter adds to it
-next.
+Today Entelim is a modelled company brain: import an existing architecture model and ask cited
+questions about it. Every change Entelim's own assistant attempts passes one permission check, and every
+change the assistant proposes waits in an approval queue until a person approves it. See
+[all eighteen capabilities](/features) for what each one covers.
 
 ## Open source, so nobody's locked in
 
@@ -95,7 +90,7 @@ locked into a proprietary format.
 
 ## How we run our own company on it
 
-Archiet Ltd, the company behind Entelim, runs its own operating model in Entelim: roadmap and
+Archiet Ltd, the company behind Entelim, runs its own operating model in Entelim: transition plans and
 stop/go decisions trace back to the same twin the product sells, not a spreadsheet kept alongside
 it. See [how Archiet runs on Entelim](/how-archiet-runs-on-entelim).
 

@@ -83,8 +83,8 @@ touches, built from the model rather than redrawn for the meeting.
 ## Works with
 
 An imported Archi or Open Exchange model puts everything on one model from day one. From there,
-[connect an AI assistant](/connectors/ai-assistants) to carry these same questions into a conversation
-you are already having, read-only and scoped to your own data, and pull configuration items from
+use [Entelim's own AI assistant](/connectors/ai-assistants) to carry these same questions into a
+conversation, answered from your own model, and pull configuration items from
 ServiceNow's CMDB into the application inventory.
 
 ## Limits

@@ -8,7 +8,7 @@ source: docs/eim-category-positioning-v1.md section 2; docs/artifacts/feature-st
 # The eighteen capabilities of Enterprise Intelligence Management
 
 Enterprise Intelligence Management is the company brain: one living, explainable model of your
-enterprise, turned into answers, insights, recommendations and simulations. Entelim delivers it
+enterprise, turned into cited answers. Entelim delivers it
 through eighteen capabilities, grouped into five questions every enterprise asks: set direction,
 know what you run, stay in control, get answers before you need them, and connect and trust.
 
@@ -24,8 +24,6 @@ the strategy is actually being carried out.
 **Today:** map your value streams stage by stage to the capabilities behind them, see which value
 streams are at risk, lay out drivers and goals in a motivation model, and capture the business model
 on one canvas.
-
-Tracing capability ownership and goals to what realises them lands in Q4 2026, and objectives and key results with measured results follow in Q2 2027.
 
 Delivered today by: [Business Model Canvas](/modules/business-model-canvas),
 [Value Streams at Risk](/use-cases/value-streams-at-risk).
@@ -45,8 +43,6 @@ owner, a health picture and a disposition you can defend with data.
 **Today:** keep your application inventory with its interfaces and dependencies, place technology on
 a radar, score applications for rationalisation and work from one consolidation list.
 
-Every application will carry a named owner, and every impact answer will show owners and health, from Q4 2026.
-
 Delivered today by: [Applications](/modules/applications), [Portfolio](/modules/portfolio),
 [Rationalization](/modules/rationalization), [What I Own](/use-cases/what-i-own).
 
@@ -59,13 +55,11 @@ Delivered today by: [Applications](/modules/applications), [Portfolio](/modules/
 
 <h3 id="transformation-management">Transformation Management</h3>
 
-Plan change from where you are to where you want to be, through gaps, roadmaps, programmes and work
+Plan change from where you are to where you want to be, through gaps, transition plans, programmes and work
 packages, and prove the outcome when it lands.
 
-**Today:** record gaps, roadmaps, programmes and work packages in the same model as the estate they
+**Today:** record gaps, transition plans, programmes and work packages in the same model as the estate they
 change, and ask what any programme touches.
-
-Stage evidence and gate conformance arrive in Q1 2027, and benefits tracked to measured outcomes follow in Q2 2027.
 
 Delivered today by: [Roadmaps](/modules/roadmaps), [Programme Tracking](/use-cases/programme-tracking).
 
@@ -76,8 +70,6 @@ capabilities and outcomes it pays for.
 
 **Today:** build a business case with net present value against the applications and capabilities it
 affects.
-
-Next comes one home for every cost, totalled in your reporting currency, in Q2 2027, with financial what-if and budget-constrained portfolio optimisation to follow later in 2027.
 
 Delivered today by: [Business Case](/modules/business-case).
 
@@ -101,8 +93,6 @@ design solutions against your standards, and keep the model healthy.
 it in the composer, browse every view in the diagram library, see it all on the twin map, and record
 architecture decisions.
 
-Re-importing a model will keep identities through renames from Q4 2026, with model health findings and design-to-delivery traceability following through 2027.
-
 Delivered today by: [Architecture Model](/modules/architecture-model),
 [Diagrams and Composer](/modules/diagrams), [Industry Reference Frameworks](/modules/industry-apqc).
 
@@ -121,8 +111,6 @@ looks after it.
 **Today:** keep an enterprise data model, trace lineage, assign stewards and declare the system of
 record for each master data domain.
 
-Lineage across every hop, with sensitivity carried forward to every consumer, arrives in Q1 2027, and data quality rules and trends follow in Q2 2027.
-
 <h3 id="people-and-organisation-management">People and Organisation Management</h3>
 
 Connect people, teams, roles and skills to the capabilities and systems they own and run, so every
@@ -130,18 +118,12 @@ question has a name attached.
 
 **Today:** keep your organisation chart with roles and responsibilities, and map your stakeholders.
 
-Ownership will reach across the whole model from Q4 2026, and skills and capacity planning join it from Q3 2027.
-
 Delivered today by: [Org Chart and RACI](/modules/org-chart).
 
 <h3 id="operations-and-service-management">Operations and Service Management</h3>
 
-Bring the live state of the business into the model (services, incidents, changes, service levels
-and telemetry) so the company brain reflects what is happening now, not what was drawn last quarter.
-
-This is where the company brain goes live. Service mapping and reconciliation with your configuration records
-start in Q1 2027, and incidents, changes, telemetry and service levels on the model arrive in
-Q2 2027.
+Keep the services the business runs on in the model, so the company brain reflects how the business
+operates. Today the model holds what your team records in it.
 
 ## Stay in control
 
@@ -153,8 +135,6 @@ Hold one risk register, see risk that travels through dependencies rather than o
 on an element, and measure exposure against your appetite.
 
 **Today:** keep the risk register and ask which risks sit on the path to any element.
-
-Risk will propagate through every dependency from Q1 2027, with appetite, key risk indicators and scenario-based resilience tests following through 2027.
 
 Delivered today by: [Risk Register](/modules/risk-register).
 
@@ -173,8 +153,6 @@ complete evidence without a scramble.
 **Today:** run an architecture review board from submission to decision, record conditions and
 waivers, define governance gates, monitor policy, handle data subject requests and query, export and
 verify the audit log.
-
-A control library with evidence that proves each control operates arrives in Q1 2027.
 
 Delivered today by: [Architecture Review Board](/modules/arb),
 [Compliance Frameworks](/modules/compliance-frameworks).
@@ -195,8 +173,6 @@ the last day to cancel.
 **Today:** keep vendors, contracts, licences, renewals and spend in one procurement workspace tied to
 the applications they serve.
 
-Renewal alerts that show the last day to cancel arrive in Q1 2027, followed by licence usage that is measured rather than typed in Q2 2027.
-
 Delivered today by: [Vendors](/modules/vendors), [Procurement](/modules/procurement).
 
 <figure class="public-figure mt-10">
@@ -208,14 +184,10 @@ Delivered today by: [Vendors](/modules/vendors), [Procurement](/modules/procurem
 
 <h3 id="ai-management">AI Management</h3>
 
-Inventory, classify, evaluate and govern every AI system in the enterprise, including Entelim's own,
-and manage what AI costs you.
+Govern the AI in your enterprise, starting with Entelim's own assistant.
 
-**Today:** Entelim governs its own AI the way you will govern yours: every action its assistant takes
-passes one permission check, writes wait for approval, and its agents are listed in a register you
-can read.
-
-Your own AI system register, with a proposed EU AI Act risk class for each system, opens in Q1 2027, and AI usage and cost by provider follow in Q2 2027.
+**Today:** Entelim governs its own assistant: every change it attempts passes one permission check, the
+changes it proposes wait for approval, and its agents are listed in a register you can read.
 
 ## Get answers before you need them
 
@@ -224,13 +196,10 @@ Your own AI system register, with a proposed EU AI Act risk class for each syste
 <h3 id="enterprise-intelligence">Enterprise Intelligence</h3>
 
 Ask the model a question and get an answer that cites its sources, explains itself and shows what it
-does not know. Then let the platform raise what matters before you ask.
-
+does not know. 
 **Today:** pick any element and ask four questions: what breaks if it fails, which strategy it
 serves, which programmes touch it and which risks reach it. Every row shows its source and how it was
 derived, and you can see the model as it stood on any past date.
-
-Organisation-wide questions with cited, shareable answers arrive in Q4 2026, and the platform will start raising insights without being asked in Q1 2027, with forecasts and recommendations tracked to outcomes following through 2027.
 
 Delivered today by: [Digital Twin](/modules/digital-twin),
 [What breaks if this fails, and who gets called](/use-cases/what-breaks-and-who-gets-called).
@@ -244,21 +213,17 @@ Delivered today by: [Digital Twin](/modules/digital-twin),
 
 <h3 id="simulation-and-scenario-planning">Simulation and Scenario Planning</h3>
 
-Branch the model, change it, and see what happens to cost, risk, resilience and capacity before you
-commit money.
+Understand what a failure would affect before it happens, and before you commit money.
 
-Scenario branches with every assumption visible arrive in Q3 2027, with portfolio and roadmap
-optimisation in Q4 2027. Until then, the impact question shows exactly what one failure would break.
+Today, the impact question shows exactly what one failure would break.
 
 <h3 id="agentic-automation">Agentic Automation</h3>
 
-Let governed agents and your own AI assistants read the model, propose changes and, within limits you
-delegate, act on it, with one permission check, one approval queue and a full audit trail.
+Let Entelim's own assistant read the model and propose changes, with one permission check on every
+change it attempts and one approval queue for the changes it proposes.
 
-**Today:** the in-product assistant works through the same permission check and approval inbox every
-agent will use.
-
-Your own AI assistants will be able to read the model securely from Q1 2027, with multi-step agent workflows following in 2027.
+**Today:** the in-product assistant checks permission on every change it attempts, and the changes it
+proposes wait in the approval inbox until a person approves them.
 
 Delivered today by: [AI Chat](/modules/ai-chat).
 
@@ -273,17 +238,14 @@ work.
 
 **Today:** diagrams and the audit trail export now.
 
-Answers you can save, share, subscribe to and export arrive in Q4 2026, with comments and reviews following in 2027.
-
 <h3 id="integration-and-interoperability">Integration and Interoperability</h3>
 
 Open the model to the rest of your stack through a secure API, events and connectors, with every
 incoming change matched by identifier and approved before it lands.
 
-**Today:** import ArchiMate Open Exchange, Archi and spreadsheet files, and send signed event
-notifications to Slack, Microsoft Teams or any webhook.
-
-A token-secured public API with developer kits arrives in Q4 2026, and connectors that write through one approval queue, starting with ServiceNow and your identity provider, follow in Q1 2027.
+**Today:** import ArchiMate Open Exchange, Archi and spreadsheet files, and deliver webhook calls to
+Slack, Microsoft Teams or any endpoint for events you publish yourself, signed when a signing secret is
+configured on the subscription.
 
 Delivered today by: [Architecture Model](/modules/architecture-model) (file import).
 
@@ -299,5 +261,4 @@ For certifications and what we do and do not claim today, see [Security](/securi
 
 ---
 
-Every capability above is in the product today or has a quarter on the published roadmap. See [how
-it's priced](/pricing) or [try it](/account/register).
+See [how it's priced](/pricing) or [try it](/account/register).
