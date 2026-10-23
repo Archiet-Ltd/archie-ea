@@ -307,3 +307,16 @@ def test_the_head_start_is_capped_at_a_fraction_of_one_even_share():
     assert sharding.head_start_ms(weights, 3) == 30_000
     big = {f"tests/test_{n}.py": 600_000 for n in range(30)}
     assert sharding.head_start_ms(big, 8) == sharding.SHARD_0_CONNECTOR_HEAD_START_SECONDS * 1000
+
+
+def test_the_updater_builds_the_browser_table_from_the_main_browser_shard_files(tmp_path):
+    junit_dir = tmp_path / "run"
+    junit_dir.mkdir()
+    journey = "tests.smoke.test_archetype_journeys"
+    _junit(junit_dir / "chromium-main-0.xml", [(journey, "t1", 12.5), (journey, "t2", 7.5)])
+    _junit(junit_dir / "backend-tests-0.xml", [("tests.test_ci_shard_balance", "t", 99)])
+    out = tmp_path / "browser.json"
+    assert updater.main(["--suite", "browser", "--junit-dir", str(junit_dir), "--output", str(out)]) == 0
+    table = json.loads(out.read_text(encoding="utf-8"))
+    assert table["files"] == {"tests/smoke/test_archetype_journeys.py": {"seconds": 20.0, "tests": 2}}
+    assert "browser" in table["comment"]

@@ -10,6 +10,11 @@ the table has drifted:
     python scripts/ci/update_shard_durations.py --run 38441287981 --run 38439758466
     python scripts/ci/update_shard_durations.py --junit-dir path/with/xml/files
 
+The browser journeys shard the same way with their own table; build it from the
+chromium-main-N.xml files of the three main browser shards:
+
+    python scripts/ci/update_shard_durations.py --suite browser --junit-dir path/with/xml/files
+
 --run and --latest download the tests-shard-N artifacts with the GitHub CLI
 (`gh`, authenticated, --repo). With several runs the per-file median is taken,
 so one run on a busy runner does not skew the table. Add --predict to print
@@ -32,6 +37,32 @@ REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 TABLE_PATH = REPO_ROOT / "tests" / "shard_durations.json"
 DEFAULT_REPO = "Archiet-Ltd/archie-ea"
 SHARDS = 8
+
+# Each sharded suite: its committed table, the junit files its shards upload,
+# its shard count and the comment written into the table.
+SUITES = {
+    "backend": {
+        "table": TABLE_PATH,
+        "pattern": "backend-tests-*.xml",
+        "artifacts": "tests-shard-*",
+        "shards": SHARDS,
+        "comment": (
+            "Per-file run time of the backend tests, used by scripts/ci/test_sharding.py to "
+            "balance the eight pytest shards. Regenerate with scripts/ci/update_shard_durations.py."
+        ),
+    },
+    "browser": {
+        "table": REPO_ROOT / "tests" / "smoke" / "shard_durations.json",
+        "pattern": "chromium-main-*.xml",
+        "artifacts": "smoke-junit-main-*",
+        "shards": 3,
+        "comment": (
+            "Per-file run time of the main browser journeys, used by scripts/ci/test_sharding.py to "
+            "balance the three main browser shards. Regenerate with "
+            "scripts/ci/update_shard_durations.py --suite browser."
+        ),
+    },
+}
 
 
 def class_to_file(classname: str, repo_root: Path, cache: dict) -> str | None:
@@ -77,14 +108,11 @@ def merge_runs(runs: list[dict[str, dict]]) -> dict[str, dict]:
     return merged
 
 
-def build_table(runs: list[dict[str, dict]], run_ids: list[str]) -> dict:
+def build_table(runs: list[dict[str, dict]], run_ids: list[str], comment: str | None = None) -> dict:
     files = merge_runs(runs)
     rates = [e["seconds"] / e["tests"] for e in files.values() if e["tests"]]
     return {
-        "comment": (
-            "Per-file run time of the backend tests, used by scripts/ci/test_sharding.py to "
-            "balance the eight pytest shards. Regenerate with scripts/ci/update_shard_durations.py."
-        ),
+        "comment": comment or SUITES["backend"]["comment"],
         "generated_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%MZ"),
         "source_runs": run_ids,
         "default_seconds_per_test": round(statistics.median(rates), 3) if rates else 1.0,
@@ -119,15 +147,15 @@ def _gh(*args: str) -> str:
     return subprocess.run(["gh", *args], check=True, capture_output=True, text=True).stdout
 
 
-def download_run(run_id: str, repo: str, dest: Path) -> list[Path]:
+def download_run(run_id: str, repo: str, dest: Path, suite: dict = SUITES["backend"]) -> list[Path]:
     target = dest / str(run_id)
     target.mkdir(parents=True, exist_ok=True)
-    _gh("run", "download", str(run_id), "-R", repo, "-p", "tests-shard-*", "-D", str(target))
-    return sorted(target.rglob("backend-tests-*.xml"))
+    _gh("run", "download", str(run_id), "-R", repo, "-p", suite["artifacts"], "-D", str(target))
+    return sorted(target.rglob(suite["pattern"]))
 
 
-def latest_run_ids(count: int, repo: str, branch: str) -> list[str]:
-    """Newest completed CI runs on the branch that still hold all eight shard artifacts."""
+def latest_run_ids(count: int, repo: str, branch: str, suite: dict = SUITES["backend"]) -> list[str]:
+    """Newest completed CI runs on the branch that still hold every shard's artifact."""
     listing = json.loads(_gh(
         "run", "list", "-R", repo, "--workflow", "CI", "--branch", branch, "--limit", "40",
         "--json", "databaseId,status"))
@@ -139,9 +167,9 @@ def latest_run_ids(count: int, repo: str, branch: str) -> list[str]:
             "api", f"repos/{repo}/actions/runs/{row['databaseId']}/artifacts?per_page=100"))
         shard_artifacts = [
             a for a in names.get("artifacts", [])
-            if a["name"].startswith("tests-shard-") and not a["expired"]
+            if a["name"].startswith(suite["artifacts"].rstrip("*")) and not a["expired"]
         ]
-        if len(shard_artifacts) >= SHARDS:
+        if len(shard_artifacts) >= suite["shards"]:
             found.append(str(row["databaseId"]))
         if len(found) == count:
             break
@@ -154,23 +182,26 @@ def main(argv=None) -> int:
     parser.add_argument("--latest", type=int, default=0, help="use the N newest completed runs on --branch")
     parser.add_argument("--branch", default="main")
     parser.add_argument("--junit-dir", action="append", default=[], type=Path,
-                        help="directory holding backend-tests-*.xml (repeatable; one run each)")
+                        help="directory holding the suite's junit files (repeatable; one run each)")
+    parser.add_argument("--suite", choices=sorted(SUITES), default="backend")
     parser.add_argument("--repo", default=DEFAULT_REPO)
-    parser.add_argument("--output", type=Path, default=TABLE_PATH)
+    parser.add_argument("--output", type=Path, default=None)
     parser.add_argument("--predict", action="store_true", help="print predicted shard minutes, do not write")
     args = parser.parse_args(argv)
+    suite = SUITES[args.suite]
+    output = args.output or suite["table"]
 
     run_ids = list(args.run)
     if args.latest:
-        run_ids += latest_run_ids(args.latest, args.repo, args.branch)
+        run_ids += latest_run_ids(args.latest, args.repo, args.branch, suite)
     runs: list[dict[str, dict]] = []
     with tempfile.TemporaryDirectory() as tmp:
         for run_id in run_ids:
-            xmls = download_run(run_id, args.repo, Path(tmp))
+            xmls = download_run(run_id, args.repo, Path(tmp), suite)
             if xmls:
                 runs.append(read_junit(xmls))
         for directory in args.junit_dir:
-            xmls = sorted(directory.rglob("backend-tests-*.xml"))
+            xmls = sorted(directory.rglob(suite["pattern"]))
             if xmls:
                 runs.append(read_junit(xmls))
                 run_ids.append(str(directory))
@@ -178,13 +209,13 @@ def main(argv=None) -> int:
         print("no junit data found", file=sys.stderr)
         return 2
 
-    table = build_table(runs, run_ids)
+    table = build_table(runs, run_ids, suite["comment"])
     print(f"{len(table['files'])} test files, {len(runs)} run(s)")
-    print(format_prediction(predict(table)))
+    print(format_prediction(predict(table, suite["shards"])))
     if args.predict:
         return 0
-    args.output.write_text(json.dumps(table, indent=1) + "\n", encoding="utf-8")
-    print(f"wrote {args.output}")
+    output.write_text(json.dumps(table, indent=1) + "\n", encoding="utf-8")
+    print(f"wrote {output}")
     return 0
 
 
