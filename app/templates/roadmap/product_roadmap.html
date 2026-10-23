@@ -25,18 +25,18 @@
   {{ page_shell(title='Product Roadmap', breadcrumb=[('Home', '/'), ('Product Roadmap', none)], subtitle='Epics across Now · Next · Later horizons', actions_caller=_ps_actions) }}
 
   <!-- Error banner -->
-  <div x-show="error" x-cloak class="mb-4 p-3 bg-destructive/5 border border-destructive/20 rounded text-destructive-emphasis text-sm" x-text="error"></div>
+  <div x-show="error" x-cloak class="mb-4 px-3 py-2 bg-destructive/10 border border-destructive/40 rounded text-destructive-emphasis text-sm" x-text="error"></div>
 
   <!-- 3-column kanban + unscheduled -->
   <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
 
     <!-- NOW -->
     <div
-      class="bg-background border-2 border-primary/30 rounded-xl shadow-sm flex flex-col"
+      class="bg-background border-2 border-primary/30 rounded-xl flex flex-col"
       @dragover.prevent
       @drop="dropEpic($event, 'now')"
     >
-      <div class="px-4 py-3 bg-primary/5 border-b border-primary/20 rounded-t-xl flex items-center gap-2">
+      <div class="border px-4 py-2 bg-primary/10 border-b border-primary/40 rounded-t-xl flex items-center gap-2">
         <span class="w-2.5 h-2.5 rounded-full bg-primary"></span>
         <h2 class="text-sm font-bold text-primary/90 uppercase tracking-wide">Now</h2>
         <span class="ml-auto text-xs text-primary" x-text="horizons.now.epics.length + ' epics'"></span>
@@ -44,7 +44,7 @@
       <!-- Sprint badges -->
       <div class="px-4 py-2 flex flex-wrap gap-1 border-b border-primary/10">
         <template x-for="sp in horizons.now.sprints" :key="sp.id">
-          <span class="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded" x-text="sp.name"></span>
+          <span class="text-xs bg-primary/10 text-info-emphasis px-2 py-0.5 rounded" x-text="sp.name"></span>
         </template>
         <span x-show="horizons.now.sprints.length === 0" x-cloak class="text-xs text-muted-foreground/60 italic">No sprints assigned</span>
       </div>
@@ -52,7 +52,7 @@
       <div class="p-3 flex-1 space-y-2 min-h-24">
         <template x-for="epic in horizons.now.epics" :key="epic.id">
           <div
-            class="p-3 bg-primary/5 border border-primary/20 rounded-lg cursor-grab active:cursor-grabbing"
+            class="px-3 py-2 bg-primary/10 border border-primary/40 rounded-md cursor-grab active:cursor-grabbing"
             draggable="true"
             @dragstart="dragStart($event, epic)"
           >
@@ -80,11 +80,11 @@
 
     <!-- NEXT -->
     <div
-      class="bg-background border-2 border-primary/20 rounded-xl shadow-sm flex flex-col"
+      class="bg-background border-2 border-primary/20 rounded-xl flex flex-col"
       @dragover.prevent
       @drop="dropEpic($event, 'next')"
     >
-      <div class="px-4 py-3 bg-primary/5 border-b border-primary/10 rounded-t-xl flex items-center gap-2">
+      <div class="border px-4 py-2 bg-primary/10 border-b border-primary/10 rounded-t-xl flex items-center gap-2">
         <span class="w-2.5 h-2.5 rounded-full bg-primary/70"></span>
         <h2 class="text-sm font-bold text-foreground uppercase tracking-wide">Next</h2>
         <span class="ml-auto text-xs text-muted-foreground" x-text="horizons.next.epics.length + ' epics'"></span>
@@ -126,7 +126,7 @@
 
     <!-- LATER -->
     <div
-      class="bg-card border-2 border-border rounded-xl shadow-sm flex flex-col"
+      class="bg-card border border-border rounded-lg flex flex-col"
       @dragover.prevent
       @drop="dropEpic($event, 'later')"
     >
@@ -172,7 +172,7 @@
 
   <!-- Unscheduled -->
   <div
-    class="bg-background border border-dashed border-border rounded-xl shadow-sm mb-8"
+    class="bg-background border border-dashed border-border rounded-xl mb-8"
     @dragover.prevent
     @drop="dropEpic($event, '')"
   >
@@ -194,7 +194,7 @@
   </div>
 
   <!-- Sprint timeline strip -->
-  <div class="bg-card border border-border rounded-xl shadow-sm p-4">
+  <div class="bg-card border border-border rounded-lg p-4">
     <h2 class="text-sm font-semibold text-foreground mb-3">Sprint Timeline</h2>
     <div class="overflow-x-auto">
       <div class="flex gap-2 min-w-max">

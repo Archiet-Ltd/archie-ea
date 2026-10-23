@@ -472,3 +472,5 @@ workflow_templates
 oauth_authorization_codes
 oauth_clients
 oauth_tokens
+# reference_number_counters: global allocation counters, no tenant data, runtime role insert/update only
+reference_number_counters

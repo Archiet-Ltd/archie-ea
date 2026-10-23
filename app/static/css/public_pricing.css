@@ -11,7 +11,11 @@
 .pricing-page .pp-section--first { margin-top: 3rem; }
 @media (min-width: 768px) { .pricing-page .pp-section { margin-top: 6rem; } .pricing-page .pp-section--first { margin-top: 3rem; } }
 
-/* Lead paragraphs: first reads as normal text, the rest as supporting detail. */
+/* Lead paragraphs: first reads as normal text, the rest as supporting detail.
+   The heading and its intro share one left edge — override the public-page-content
+   centring (.public-page-content > * { margin-inline: auto }) so the heading does
+   not float away from its text. */
+.pricing-page .pp-lead > * { margin-inline: 0; }
 .pricing-page .pp-lead p { margin: 0 0 1rem; color: var(--pp-muted); }
 .pricing-page .pp-lead p:first-of-type { color: var(--pp-fg); }
 .pricing-page h2 { font-size: 1.5rem; line-height: 1.25; font-weight: 600; margin: 0 0 1rem; }

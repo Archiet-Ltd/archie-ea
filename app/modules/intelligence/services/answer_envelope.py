@@ -263,11 +263,13 @@ def _row_truth_class(kind: str, row: Dict[str, Any]) -> str:
 
 
 def _citations(kind: str, rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-    cited: Dict[Tuple[str, int], None] = {}
+    cited: Dict[Tuple[str, int], Optional[Dict[str, Any]]] = {}
 
-    def cite(source: str, ident: Any) -> None:
+    origins: Dict[Tuple[str, int], Dict[str, Any]] = {}
+
+    def cite(kind_of: str, ident: Any, connector_source: Optional[Dict[str, Any]] = None) -> None:
         if isinstance(ident, int):
-            cited.setdefault((source, ident), None)
+            cited.setdefault((kind_of, ident), connector_source)
 
     for row in rows:
         if kind == KIND_RISK_PROPAGATION:
@@ -279,10 +281,31 @@ def _citations(kind: str, rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
                 cite("compliance_control", control.get("control_id"))
             continue
         for relation in _relations_of(kind, row):
+            connector_sources = relation.get("origins") or {}
             for relationship_id in relation.get("chain") or []:
-                cite("relationship", relationship_id)
+                # A link a connector wrote cites the repository and commit it was read at.
+                cite("relationship", relationship_id, connector_sources.get(str(relationship_id)))
             cite("derived_relationship", relation.get("derived_id"))
-    return [{"type": t, "id": i} for (t, i) in sorted(cited)][:MAX_CITATIONS]
+            # The relationship a recorded row rests on carries its origin and
+            # date, so the citation says where the fact came from.
+            origin = relation.get("provenance")
+            if relation.get("kind") == "explicit" and isinstance(origin, dict):
+                record_id = origin.get("relationship_id")
+                if isinstance(record_id, int):
+                    origins[("relationship", record_id)] = {
+                        "origin": origin.get("text"),
+                        "recorded_at": origin.get("recorded_at"),
+                        "confidence": relation.get("confidence"),
+                    }
+    out = []
+    for t, i in sorted(cited):
+        citation: Dict[str, Any] = {"type": t, "id": i}
+        citation.update(origins.get((t, i), {}))
+        if cited[(t, i)]:
+            # Where a connector read the link (repository, file, commit, read time).
+            citation["source"] = cited[(t, i)]
+        out.append(citation)
+    return out[:MAX_CITATIONS]
 
 
 def build_envelope(

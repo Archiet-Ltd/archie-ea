@@ -17,7 +17,7 @@ __all__ = ["FeatureFlag", "FeatureState", "FeatureType"]
 
 
 # In-memory cache for feature flags (TTL: 60 seconds)
-_feature_cache: Dict[str, tuple] = {}  # key -> (is_active, timestamp)
+_feature_cache: Dict[str, tuple] = {}  # key -> (is_active, timestamp)  # cache-tenancy-ok: the feature_flags table has no organisation column and its key is unique, so there is one answer per key for every organisation
 _CACHE_TTL = 60  # seconds
 
 # Cache metrics tracking

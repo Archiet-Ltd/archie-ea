@@ -364,3 +364,338 @@ def test_relationship_with_no_id_or_key_still_renders_and_is_stable_across_updat
     assert out["found2"] is True
     assert out["sameCell"] is True
     assert out["countAfterFirst"] == out["countAfterSecond"]
+
+
+# ---------------------------------------------------------------------------
+# Default-style golden output
+#
+# GOLDEN was captured from the engine as it stood on main before any
+# connectionStyle / rowAlign work (set COMPOSER_CAPTURE_GOLDEN=1 to re-capture,
+# which is only ever done deliberately). A caller that passes neither new option
+# must get this output exactly: graph JSON and the paper's SVG, with JointJS's
+# generated ids replaced by their order of first appearance.
+# ---------------------------------------------------------------------------
+import json
+import os
+
+GOLDEN = pathlib.Path(__file__).resolve().parent.parent / "composer_renderer" / "golden_default_style.json"
+
+_SERIALISE = r"""
+(() => {
+  const map = {};
+  let n = 0;
+  const norm = (s) => s.replace(
+    /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|\bj_\d+\b|\bv-\d+\b/g,
+    (m) => (map[m] = map[m] || ('ID' + (++n))));
+  const graph = JSON.stringify(R.graph.toJSON(), null, 1);
+  const svg = R.paper.svg.outerHTML.replace(/></g, '>\n<');
+  const both = norm(graph + '\n=====SVG=====\n' + svg).split('\n=====SVG=====\n');
+  return {graph: both[0], svg: both[1]};
+})()
+"""
+
+
+def _default_style_snapshot(page):
+    page.evaluate(SETUP)
+    out = {}
+    page.evaluate("() => { mk({}); R.loadElements(EL, REL); }")
+    page.evaluate("() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)))")
+    out["no_options"] = page.evaluate(_SERIALISE)
+    page.evaluate("""() => { mk({layout:'bands', bands:BANDS, nodeStyle:'compact', tokens:true});
+        R.loadElements(EL, REL); R.setCentre('c'); R.setSelected('a'); R.setHighlightedEdges(new Set(['k2'])); }""")
+    page.evaluate("() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)))")
+    out["bands_compact_tokens_provenance"] = page.evaluate(_SERIALISE)
+    return out
+
+
+def test_default_style_output_matches_main_golden(page):
+    got = _default_style_snapshot(page)
+    if os.environ.get("COMPOSER_CAPTURE_GOLDEN") == "1":
+        GOLDEN.write_text(json.dumps(got, indent=1, sort_keys=True) + "\n", encoding="utf-8")
+    want = json.loads(GOLDEN.read_text(encoding="utf-8"))
+    for case in ("no_options", "bands_compact_tokens_provenance"):
+        assert got[case]["graph"] == want[case]["graph"], case + ": graph JSON differs from the golden"
+        assert got[case]["svg"] == want[case]["svg"], case + ": SVG differs from the golden"
+
+
+# ---------------------------------------------------------------------------
+# Plain connection style (connectionStyle:'plain') and centred rows (rowAlign:'centre')
+# ---------------------------------------------------------------------------
+HEX = r"#[0-9a-fA-F]{3,8}\b|rgb\("
+
+STYLE_SETUP = """
+(() => {
+  window.BANDS = %s;
+  window.SEL = [
+    {id:'c', name:'Centre', type:'BusinessProcess', layer:'business', depth:0},
+    {id:'a', name:'Ledger app', type:'ApplicationComponent', layer:'application', depth:1},
+    {id:'b', name:'Billing app', type:'ApplicationComponent', layer:'application', depth:1},
+    {id:'d', name:'Goal', type:'Goal', layer:'strategy', depth:1},
+    {id:'e', name:'Notes', type:'Node', layer:'technology', depth:1},
+  ];
+  window.SREL = [
+    {id:'s1', key:'s1', source_id:'c', target_id:'a', type:'realization', provenance:'explicit', kind:'explicit'},
+    {id:'s2', key:'s2', source_id:'c', target_id:'b', type:'flow', provenance:'explicit', kind:'explicit'},
+    {id:'s3', key:'s3', source_id:'a', target_id:'d', provenance:'explicit', kind:'explicit'},
+    {id:'s4', key:'s4', source_id:'b', target_id:'e', type:'serving', provenance:'derivation', kind:'derived'},
+  ];
+  window.resolved = (name) => 'hsl(' + getComputedStyle(document.getElementById('host')).getPropertyValue(name).trim() + ')';
+  window.inspect = (R) => R.graph.getLinks().map(l => {
+    const labels = (l.labels() || []).map(x => x.attrs.text.text);
+    const tm = l.attr('line/targetMarker'), sm = l.attr('line/sourceMarker');
+    return {key: l.get('edgeKey'), labels, dash: l.attr('line/strokeDasharray'), stroke: l.attr('line/stroke'),
+            width: l.attr('line/strokeWidth'), arrow: !!(tm && tm.d), arrowFill: tm && tm.fill, source: !!(sm && sm.d),
+            attrs: JSON.stringify([l.attributes.attrs, l.attributes.labels]),
+            dom: document.querySelector('[model-id="' + l.id + '"]').outerHTML};
+  });
+})();
+""" % __import__("json").dumps(BANDS)
+
+
+def test_plain_style_switches_label_dash_arrow_and_colour(page):
+    import re
+    page.evaluate(STYLE_SETUP)
+    out = page.evaluate("""() => {
+      const host = document.getElementById('host');
+      const make = (o) => { host.innerHTML = ''; const r = ComposerRenderer.create(host, Object.assign({mode:'view', height:300, layout:'bands', bands:BANDS}, o)); r.loadElements(SEL, SREL); return r; };
+      const plain = make({connectionStyle:'plain'});
+      const before = inspect(plain);
+      plain.setHighlightedEdges(['s1']);
+      const hi = inspect(plain);
+      const plainRouters = plain.graph.getLinks().map(l => [l.get('router').name, l.get('connector').name]);
+      const def = make({});
+      return {before, hi, plainRouters, def: inspect(def), muted: resolved('--muted-foreground'), primary: resolved('--ring'), card: resolved('--card'), fg: resolved('--foreground'), mfg: resolved('--muted-foreground'),
+              chrome: (() => { const nodes = plain.graph.getElements(); return nodes.map(n => JSON.stringify(n.attributes.attrs)); })(),
+              defRouters: def.graph.getLinks().map(l => [l.get('router').name, l.get('connector').name])};
+    }""")
+    by = {i["key"]: i for i in out["before"]}
+    for key, info in by.items():
+        assert info["arrow"] is True, key
+        assert info["source"] is False, key
+        assert not re.search(HEX, info["attrs"]), (key, "hex or rgb in link attributes")
+        assert not re.search(HEX, info["dom"]), (key, "hex or rgb in rendered link")
+        assert info["stroke"] == out["muted"], key
+        assert info["arrowFill"] == out["muted"], key
+        assert info["width"] == 1, key
+    # no relationship word on any link; the worked-out one has exactly its badge
+    assert by["s1"]["labels"] == [] and by["s2"]["labels"] == [] and by["s3"]["labels"] == []
+    assert by["s4"]["labels"] == ["Worked out"]
+    # solid when recorded, whatever the type; dashed 5,5 when worked out
+    assert by["s1"]["dash"] == "" and by["s2"]["dash"] == "" and by["s3"]["dash"] == ""
+    assert by["s4"]["dash"] == "5,5"
+    # highlighted links take the ring token and widen
+    hi = {i["key"]: i for i in out["hi"]}
+    assert hi["s1"]["stroke"] == out["primary"] and hi["s1"]["arrowFill"] == out["primary"]
+    assert hi["s1"]["width"] == 2.5
+    assert hi["s2"]["stroke"] == out["muted"]
+    assert out["plainRouters"] == [["normal", "smooth"]] * 4
+    # the same page, default style: today's values, so the switch is per renderer instance
+    d = {i["key"]: i for i in out["def"]}
+    assert d["s1"]["labels"] == ["Realization"] and d["s1"]["dash"] == "8,4"
+    assert d["s2"]["labels"] == ["Flow"] and d["s2"]["dash"] == "10,4"
+    assert d["s3"]["labels"] == ["Association"] and d["s3"]["arrow"] is False
+    assert d["s4"]["labels"][0] == "Serving" and d["s4"]["dash"] == "4,4"
+    assert re.search(HEX, d["s1"]["attrs"])
+    # node cards and band zones of the plain style: tokens only, no shadow, no literal colour
+    for blob in out["chrome"]:
+        assert not re.search(HEX, blob), blob[:200]
+        assert "shadow" not in blob.lower() and "filter" not in blob.lower()
+    assert any(out["card"] in blob for blob in out["chrome"])
+    assert any('"fontSize":14' in blob and out["fg"] in blob for blob in out["chrome"])
+    assert any('"fontSize":10' in blob and out["mfg"] in blob for blob in out["chrome"])
+    assert out["defRouters"] == [["manhattan", "rounded"]] * 4
+
+
+ROUTE_SETUP = """
+(() => {
+  window.RBANDS = %s;
+  const mkEl = (id, layer, depth, name) => ({id, name: name || ('Node ' + id), type: layer === 'strategy' ? 'Goal' : (layer === 'business' ? 'BusinessProcess' : (layer === 'application' ? 'ApplicationComponent' : 'Node')), layer, depth});
+  window.REL_EL = [
+    mkEl('g1','strategy',1,'Grow revenue'), mkEl('g2','strategy',1,'Cut cost'),
+    mkEl('b0','business',0,'Order process'), mkEl('b1','business',1), mkEl('b2','business',1), mkEl('b3','business',2), mkEl('b4','business',2),
+    mkEl('a1','application',1), mkEl('a2','application',1), mkEl('a3','application',2,'Application component with a rather long name'), mkEl('a4','application',2), mkEl('a5','application',3),
+    mkEl('t1','technology',1), mkEl('t2','technology',2), mkEl('t3','technology',3),
+  ];
+  const R_ = (id, s, t, type, prov) => ({id, key: id, source_id: s, target_id: t, type, provenance: prov || 'explicit', kind: prov === 'derivation' ? 'derived' : 'explicit'});
+  window.REL_REL = [
+    R_('e1','b0','g1','influence'), R_('e2','b0','g2','influence','derivation'),
+    R_('e3','b0','a1','serving'), R_('e4','b0','a5','serving','derivation'), R_('e5','b0','t3','realization','derivation'),
+    R_('e6','a1','b3','serving'), R_('e7','a2','t1','realization'), R_('e8','a4','t2','flow','derivation'),
+    R_('e9','b1','b4','triggering'), R_('e10','b1','b2','association'),
+    R_('e11','a1','a5','flow'), R_('e12','t1','g1','influence','derivation'),
+    R_('e13','b0','a1','flow','derivation'),
+    R_('e14','a3','b0','serving'), R_('e15','g1','a4','realization'),
+  ];
+  window.mkRoute = (extra, width) => {
+    const host = document.getElementById('host');
+    host.innerHTML = '';
+    window.R = ComposerRenderer.create(host, Object.assign({mode:'view', layout:'bands', bands:RBANDS, nodeStyle:'compact', tokens:true, connectionStyle:'plain'}, extra || {}));
+    host.style.width = (width || 640) + 'px';
+    R.loadElements(REL_EL, REL_REL);
+    return true;
+  };
+  window.measure = () => {
+    const nodes = R.graph.getElements().filter(c => c.get('elementId')).map(c => ({id: c.id, key: c.get('elementId'), b: c.getBBox()}));
+    const zones = R.graph.getElements().filter(c => c.get('isLayerZone')).map(c => c.getBBox());
+    const size = R.paper.getComputedSize();
+    const inBox = (p, b, inset) => p.x > b.x + inset && p.x < b.x + b.width - inset && p.y > b.y + inset && p.y < b.y + b.height - inset;
+    const borderDist = (p, b) => {
+      const dx = Math.max(b.x - p.x, 0, p.x - (b.x + b.width)), dy = Math.max(b.y - p.y, 0, p.y - (b.y + b.height));
+      if (dx > 0 || dy > 0) return Math.hypot(dx, dy);
+      return Math.min(p.x - b.x, b.x + b.width - p.x, p.y - b.y, b.y + b.height - p.y);
+    };
+    return R.graph.getLinks().map(l => {
+      const view = R.paper.findViewByModel(l);
+      const path = view.getConnection();
+      const total = path.length();
+      const N = 400, pts = [];
+      for (let i = 0; i <= N; i++) { const p = path.pointAtLength(total * i / N); pts.push({x: p.x, y: p.y}); }
+      const s = nodes.find(n => n.id === l.source().id), t = nodes.find(n => n.id === l.target().id);
+      const others = nodes.filter(n => n !== s && n !== t);
+      const insideNode = pts.filter(p => others.some(n => inBox(p, n.b, 2))).length;
+      const outside = pts.filter(p => p.x < 0 || p.x > size.width || p.y < 0 || p.y > size.height).length;
+      /* longest run lying within 3px of a band zone's top or bottom edge */
+      let longest = 0, run = 0, last = null;
+      const edges = [];
+      zones.forEach(z => { edges.push({y: z.y, x0: z.x, x1: z.x + z.width}); edges.push({y: z.y + z.height, x0: z.x, x1: z.x + z.width}); });
+      pts.forEach(p => {
+        const near = edges.some(e => Math.abs(p.y - e.y) <= 3 && p.x >= e.x0 && p.x <= e.x1);
+        if (near) { run = last && last.near ? run + Math.hypot(p.x - last.x, p.y - last.y) : 0; longest = Math.max(longest, run); }
+        else run = 0;
+        last = {x: p.x, y: p.y, near};
+      });
+      const end = pts[pts.length - 1], start = pts[0];
+      let clearance = Infinity;
+      pts.forEach(p => others.forEach(n => { clearance = Math.min(clearance, inBox(p, n.b, -0.01) ? -1 : borderDist(p, n.b)); }));
+      const mid = path.pointAtLength(total / 2);
+      return {key: l.get('edgeKey'), from: s.key, to: t.key, insideNode, outside, longestEdgeRun: longest,
+              endBorder: borderDist(end, t.b), endInterior: inBox(end, t.b, 1),
+              startBorder: borderDist(start, s.b), startInterior: inBox(start, s.b, 1),
+              minClearance: clearance === Infinity ? null : clearance,
+              mid: {x: mid.x, y: mid.y},
+              points: pts.filter((p, i) => i %% 20 === 0)};
+    });
+  };
+})();
+""" % __import__("json").dumps(BANDS)
+
+
+def _assert_routes(rows, label, count=15):
+    assert len(rows) == count, label
+    for r in rows:
+        where = "%s %s %s->%s" % (label, r["key"], r["from"], r["to"])
+        assert r["insideNode"] == 0, where + " crosses a node"
+        assert r["outside"] == 0, where + " leaves the drawing"
+        assert r["longestEdgeRun"] <= 24, where + " runs along a band edge: %s" % r["longestEdgeRun"]
+        assert r["endBorder"] <= 2 and not r["endInterior"], where + " does not end on the target border"
+        assert r["startBorder"] <= 2 and not r["startInterior"], where + " does not start on the source border"
+
+
+def test_plain_routes_avoid_nodes_stay_inside_and_end_on_a_border(page):
+    page.evaluate(ROUTE_SETUP)
+    page.evaluate("() => mkRoute()")
+    assert page.evaluate("() => new Set(R.graph.getElements().filter(c => c.get('band') === 'business').map(c => c.position().y)).size") == 2
+    _assert_routes(page.evaluate("() => measure()"), "initial")
+    # narrower drawing: rows wrap differently, every route is recomputed
+    page.evaluate("() => { document.getElementById('host').style.width = '420px'; R.resize(); }")
+    _assert_routes(page.evaluate("() => measure()"), "narrower")
+    # an update that adds a node and two connections
+    page.evaluate("""() => { R.update({elements: REL_EL.concat([{id:'x1', name:'Late arrival', type:'Node', layer:'technology', depth:1}]),
+        relationships: REL_REL.concat([{id:'e16', key:'e16', source_id:'x1', target_id:'b0', type:'serving', provenance:'explicit', kind:'explicit'},
+                                       {id:'e17', key:'e17', source_id:'g2', target_id:'x1', type:'influence', provenance:'derivation', kind:'derived'}])}); }""")
+    _assert_routes(page.evaluate("() => measure()"), "after update", 17)
+
+
+def test_plain_style_also_works_without_bands(page):
+    page.evaluate(ROUTE_SETUP)
+    page.evaluate("() => mkRoute({layout: undefined, bands: undefined, nodeStyle: undefined, height: 900}, 1100)")
+    rows = page.evaluate("() => measure()")
+    assert len(rows) == 15
+    for r in rows:
+        assert r["insideNode"] == 0, r["key"]
+        assert r["outside"] == 0, r["key"]
+        assert r["endBorder"] <= 2 and not r["endInterior"], r["key"]
+
+
+def test_a_recorded_and_a_worked_out_connection_between_one_pair_both_stay_visible(page):
+    import math
+    page.evaluate(ROUTE_SETUP)
+    page.evaluate("() => mkRoute()")
+    rows = {r["key"]: r for r in page.evaluate("() => measure()")}
+    # e3 (recorded) and e13 (worked out) join b0 and a1 in different rows
+    d = math.hypot(rows["e3"]["mid"]["x"] - rows["e13"]["mid"]["x"], rows["e3"]["mid"]["y"] - rows["e13"]["mid"]["y"])
+    assert d >= 10, d
+    # both keys are on the drawing, one link each
+    keys = page.evaluate("() => Array.from(document.querySelectorAll('.joint-link')).map(e => e.getAttribute('data-edge')).sort()")
+    assert "e3" in keys and "e13" in keys and len(keys) == len(set(keys))
+    # a pair on one row
+    page.evaluate("""() => { R.update({elements: REL_EL, relationships: REL_REL.concat([
+        {id:'p1', key:'p1', source_id:'b1', target_id:'b2', type:'serving', provenance:'derivation', kind:'derived'}])}); }""")
+    rows = {r["key"]: r for r in page.evaluate("() => measure()")}
+    d = math.hypot(rows["e10"]["mid"]["x"] - rows["p1"]["mid"]["x"], rows["e10"]["mid"]["y"] - rows["p1"]["mid"]["y"])
+    assert d >= 10, d
+
+
+def test_centred_rows_have_equal_margins(page):
+    page.evaluate(ROUTE_SETUP)
+    for width in (640, 420, 900):
+        margins = page.evaluate("""(w) => {
+          mkRoute({connectionStyle: undefined, rowAlign: 'centre'}, w);
+          const zones = {};
+          R.graph.getElements().filter(c => c.get('isLayerZone')).forEach(z => { zones[z.get('zoneLayer')] = z.getBBox(); });
+          const rows = {};
+          R.graph.getElements().filter(c => c.get('elementId')).forEach(c => {
+            const k = c.get('band') + '@' + c.position().y; const b = c.getBBox();
+            const r = rows[k] = rows[k] || {band: c.get('band'), l: Infinity, r: -Infinity};
+            r.l = Math.min(r.l, b.x); r.r = Math.max(r.r, b.x + b.width);
+          });
+          return Object.values(rows).map(r => ({left: r.l - zones[r.band].x, right: zones[r.band].x + zones[r.band].width - r.r}));
+        }""", width)
+        assert margins
+        for m in margins:
+            assert abs(m["left"] - m["right"]) <= 1, (width, m)
+        # real positions still come back from getNodeBounds
+        bounds = page.evaluate("() => R.getNodeBounds()")
+        assert len(bounds) == 15 and all(b["x"] >= 0 for b in bounds)
+    # without the option, rows are left-aligned exactly as before
+    left = page.evaluate("""() => { mkRoute({connectionStyle: undefined}, 640);
+        return Math.min.apply(null, R.graph.getElements().filter(c => c.get('elementId')).map(c => c.position().x)); }""")
+    assert left == 12
+
+
+def test_plain_layout_gaps_are_at_least_sixteen_pixels(page):
+    page.evaluate(ROUTE_SETUP)
+    gaps = page.evaluate("""() => {
+      mkRoute({}, 900);
+      const nodes = R.graph.getElements().filter(c => c.get('elementId')).map(c => c.getBBox());
+      let col = Infinity, row = Infinity;
+      nodes.forEach(a => nodes.forEach(b => {
+        if (a === b) return;
+        if (Math.abs(a.y - b.y) < 1 && b.x > a.x) col = Math.min(col, b.x - (a.x + a.width));
+        if (Math.abs(a.x - b.x) < 1 && b.y > a.y) row = Math.min(row, b.y - (a.y + a.height));
+      }));
+      return {col, row};
+    }""")
+    assert gaps["col"] >= 16 and gaps["row"] >= 16, gaps
+
+
+def test_arrivals_on_one_node_side_stay_apart_and_chip_and_ring_are_drawn_from_tokens(page):
+    page.evaluate(ROUTE_SETUP)
+    page.evaluate("() => mkRoute()")
+    rows = {r["key"]: r for r in page.evaluate("() => measure()")}
+    # e1 (recorded) and e12 (worked out) both arrive on the bottom of g1
+    a, b = rows["e1"]["points"][-1], rows["e12"]["points"][-1]
+    assert abs(a["x"] - b["x"]) >= 12, (a, b)
+    chips = page.evaluate("""() => {
+      const out = [];
+      R.graph.getLinks().forEach(l => { (l.labels() || []).forEach(x => out.push([x.attrs.chip.fill, x.attrs.chip.stroke, x.attrs.chip.strokeDasharray])); });
+      return {chips: out, card: resolved('--card'), border: resolved('--border')};
+    }""".replace("resolved(", "((n) => 'hsl(' + getComputedStyle(document.getElementById('host')).getPropertyValue(n).trim() + ')')("))
+    assert chips["chips"]
+    for fill, stroke, dash in chips["chips"]:
+        assert fill == chips["card"] and stroke == chips["border"] and not dash
+    ring = page.evaluate("""() => { R.setCentre('b0'); const n = R.graph.getElements().find(c => c.get('elementId') === 'b0');
+        return [n.attr('ring/display'), n.attr('ring/rx'), n.attr('ring/strokeWidth'), n.attr('ring/fill')]; }""")
+    assert ring == ["block", 9, 2, "none"]
+    off = page.evaluate("""() => { R.setCentre(null); return R.graph.getElements().filter(c => c.get('elementId')).every(n => n.attr('ring/display') === 'none'); }""")
+    assert off is True

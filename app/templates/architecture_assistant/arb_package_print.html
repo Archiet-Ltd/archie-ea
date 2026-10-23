@@ -54,7 +54,7 @@
 
 {% if package.domains %}
 <h2>Domain Coverage</h2>
-<table>
+<table class="dense-table">
   <thead>
     <tr><th>Domain</th><th>Status</th><th>Elements</th><th>Property Coverage</th><th>NFRs</th><th>Waivers</th></tr>
   </thead>
@@ -101,7 +101,7 @@
 
 {% if package.summary and package.summary.layer_counts %}
 <h2>ArchiMate Layer Coverage</h2>
-<table>
+<table class="dense-table">
   <thead><tr>{% for layer in ['motivation','strategy','business','application','technology','implementation'] %}<th>{{ layer|capitalize }}</th>{% endfor %}</tr></thead>
   <tbody>
   <tr>
@@ -117,7 +117,7 @@
 <h2>Element Inventory</h2>
 {% for domain_code, elements in package.elements_by_domain.items() %}
 <h3>{{ domain_code }}</h3>
-<table>
+<table class="dense-table">
   <thead><tr><th>Name</th><th>Type</th><th>Layer</th><th>Build/Buy</th><th>Deployment</th><th>Availability</th></tr></thead>
   <tbody>
   {# actionable-rows-ok: a printed ARB pack, rendered standalone for PDF; a link on paper is not a control. Each element listed here is opened from the solution's architecture page in the app. #}
@@ -138,7 +138,7 @@
 
 {% if package.nfrs %}
 <h2>Non-Functional Requirements</h2>
-<table>
+<table class="dense-table">
   <thead><tr><th>Type</th><th>Target</th><th>Priority</th><th>Domain</th></tr></thead>
   <tbody>
   {# actionable-rows-ok: a printed ARB pack, rendered standalone for PDF; a link on paper is not a control. NFRs are edited on the solution's requirements page in the app. #}

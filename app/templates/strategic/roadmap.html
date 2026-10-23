@@ -28,8 +28,8 @@
         {% call card.card_content(class='p-4') %}
             <form method="get" action="{{ request.path }}" class="flex flex-wrap gap-4 items-end">
                 <div class="flex-1 min-w-[200px]">
-                    <label for="year" class="block text-sm font-medium text-foreground mb-1">Year</label>
-                    <select name="year" id="year" class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                    <label for="year" class="block text-sm font-medium text-muted-foreground mb-1">Year</label>
+                    <select name="year" id="year" class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                         <option value="">All Years</option>
                         {% for y in range(2024, 2030) %}
                         <option value="{{ y }}" {% if year == y %}selected{% endif %}>{{ y }}</option>
@@ -37,8 +37,8 @@
                     </select>
                 </div>
                 <div class="flex-1 min-w-[200px]">
-                    <label for="quarter" class="block text-sm font-medium text-foreground mb-1">Quarter</label>
-                    <select name="quarter" id="quarter" class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                    <label for="quarter" class="block text-sm font-medium text-muted-foreground mb-1">Quarter</label>
+                    <select name="quarter" id="quarter" class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                         <option value="">All Quarters</option>
                         <option value="Q1" {% if quarter == 'Q1' %}selected{% endif %}>Q1</option>
                         <option value="Q2" {% if quarter == 'Q2' %}selected{% endif %}>Q2</option>
@@ -47,13 +47,13 @@
                     </select>
                 </div>
                 <div>
-                    <button type="submit" class="inline-flex items-center justify-center rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2 transition-colors" aria-label="Apply roadmap filters">
+                    <button type="submit" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center" aria-label="Apply roadmap filters">
                         Apply Filters
                     </button>
                 </div>
                 {% if year or quarter %}
                 <div>
-                    <a href="{{ url_for('unified_low_priority.strategic_roadmap') }}" class="inline-flex items-center justify-center rounded-md text-sm font-medium border border-input bg-background hover:bg-accent hover:text-accent-foreground h-10 px-4 py-2 transition-colors">
+                    <a href="{{ url_for('unified_low_priority.strategic_roadmap') }}" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
                         Clear Filters
                     </a>
                 </div>
@@ -67,7 +67,7 @@
     <div class="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-4 gap-6">
         {% for lane in ['business', 'application', 'technology', 'infrastructure'] %}
         {% set lane_items = roadmap_by_lane.get(lane, []) %}
-        <div data-slot="card" class="rounded-xl border bg-card shadow-sm overflow-hidden">
+        <div data-slot="card" class="rounded-lg border border-border bg-card overflow-hidden">
             <div class="bg-muted/50 px-4 py-3 border-b">
                 <div class="flex items-center justify-between">
                     <h3 class="font-semibold text-foreground capitalize">{{ lane }}</h3>
@@ -78,7 +78,7 @@
             <div class="p-4 space-y-3 min-h-[200px]">
                 {% if lane_items %}
                     {% for item in lane_items %}
-                    <div class="rounded-lg border bg-card shadow-sm p-4 hover:bg-muted/30 transition-colors">
+                    <div class="rounded-lg border border-border bg-card p-4 hover:bg-muted/30 transition-colors">
                         <div class="font-medium text-foreground text-sm mb-2">
                             {{ item.title | default('Untitled') }}
                         </div>
@@ -136,7 +136,7 @@
     {# ── Fallback: Flat List View ────────────────────────────────────────── #}
     <div class="space-y-3">
         {% for item in roadmap_items %}
-        <div data-slot="card" class="rounded-xl border bg-card shadow-sm p-4 hover:bg-muted/30 transition-colors">
+        <div data-slot="card" class="rounded-lg border border-border bg-card p-4 hover:bg-muted/30 transition-colors">
             <div class="flex justify-between items-start">
                 <div>
                     <div class="font-medium text-foreground">{{ item.title | default('Untitled') }}</div>

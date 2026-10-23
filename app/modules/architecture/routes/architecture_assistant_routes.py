@@ -29,6 +29,7 @@ from flask import Blueprint, Response, current_app, jsonify, render_template, re
 from flask_login import current_user, login_required
 
 from app.decorators import require_roles
+from app.extensions.cache import org_scoped_cache_key
 from app.models.archimate_motivation import (
     MotivationAssessment,
     MotivationConstraint,
@@ -138,14 +139,22 @@ def _populate_junction_tables_from_options(solution, solution_options_result):
     logger.info("ENH-018: Junction tables populated for solution_id=%s", solution.id)
 
 
-def _get_cached(key, query_fn, ttl=300):
+def _get_cached(key, query_fn, ttl=300, scoped=True):
     """Return cached data if fresh, otherwise call query_fn and cache result.
 
     Args:
         key: Cache key string.
         query_fn: Callable that returns the data to cache.
         ttl: Time-to-live in seconds (default 5 minutes).
+        scoped: True (default) for data read from organisation-owned tables: the
+            entry is keyed by the active organisation and nothing is cached when
+            there is none. Pass False only for reference data identical for
+            every organisation.
     """
+    if scoped:
+        key = org_scoped_cache_key(key)
+        if key is None:
+            return query_fn()
     entry = _catalog_cache.get(key)
     now = _time.time()
     if entry and now - entry["ts"] < ttl:
@@ -3352,7 +3361,7 @@ def motivation_elements_typeahead():
         items = [{"id": r.id, "name": r.name, "type": r.type, "layer": r.layer} for r in rows]
         return {"elements": items, "results": items}
 
-    results = _get_cached(cache_key, _run_query, ttl=300)
+    results = _get_cached(cache_key, _run_query, ttl=300, scoped=True)
     return jsonify(results)
 
 
@@ -3391,7 +3400,7 @@ def archimate_element_types():
             ],
         }
 
-    types_by_layer = _get_cached("archimate_element_types", _build_types, ttl=600)
+    types_by_layer = _get_cached("archimate_element_types", _build_types, ttl=600, scoped=False)
     return jsonify({"types_by_layer": types_by_layer})
 
 
@@ -4496,10 +4505,12 @@ def paginated_capabilities():
     per_page = min(200, max(1, safe_int_arg('per_page', 50, minimum=1, maximum=500)))
     search = request.args.get("search", "").strip()
 
-    cache_key = f"aa_capabilities:p{page}:pp{per_page}:s{search}"
+    # Keyed by organisation (None when there is no organisation: then nothing is
+    # read from or written to the cache).
+    cache_key = org_scoped_cache_key(f"aa_capabilities:p{page}:pp{per_page}:s{search}")
     # Read-only cache check (the result is computed and stored below). Calling
     # _get_cached with query_fn=None would invoke None() on a miss.
-    entry = _catalog_cache.get(cache_key)
+    entry = _catalog_cache.get(cache_key) if cache_key else None
     if entry and _time.time() - entry["ts"] < 120:
         return jsonify(entry["data"])
 
@@ -4529,7 +4540,8 @@ def paginated_capabilities():
     }
 
     # Store in cache
-    _catalog_cache[cache_key] = {"data": result, "ts": _time.time()}
+    if cache_key:
+        _catalog_cache[cache_key] = {"data": result, "ts": _time.time()}
 
     return jsonify(result)
 

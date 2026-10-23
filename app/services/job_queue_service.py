@@ -222,6 +222,8 @@ class JobQueueService:
             return self._execute_abacus_sync(payload, job_id)
         elif task == "model_health_scan":
             return self._execute_model_health_scan(payload, job_id)
+        elif task == "github_first_sync":
+            return self._execute_github_first_sync(payload, job_id)
         else:
             raise ValueError(f"Unknown task type: {task}")
 
@@ -251,6 +253,18 @@ class JobQueueService:
             return loop.run_until_complete(sync_service.async_run_incremental_sync())
         else:
             raise ValueError(f"Unknown sync type: {sync_type}")
+
+    def _execute_github_first_sync(self, payload: Dict[str, Any], job_id: int) -> Dict[str, Any]:
+        """Read one organisation's GitHub repositories into proposals (the connect page's first sync
+        and its re-sync). The job carries the organisation and the connector id; never a credential."""
+        org_id = payload.get("organization_id")
+        connector_id = payload.get("connector_id")
+        if org_id is None or not connector_id:
+            raise ValueError("github_first_sync job requires organization_id and connector_id in payload")
+
+        from app.connectors.github import run_first_sync
+
+        return run_first_sync(org_id, connector_id)
 
     def _execute_model_health_scan(self, payload: Dict[str, Any], job_id: int) -> Dict[str, Any]:
         """Execute a model-health drift scan for one organisation."""

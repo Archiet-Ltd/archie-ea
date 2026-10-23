@@ -210,6 +210,14 @@ class TestCrossTenantIsolation:
 
         # Org A's token gets 404 for org B's element — same as REST
         for tool_name in self.LENS_TOOLS:
+            if tool_name == "ask_impact":
+                # Answered by the stored-answer service: not recorded, and the
+                # same reply as for an element that does not exist.
+                mcp_resp = _mcp_call(client, token_a, tool_name, {"element_id": element_b.id})
+                mcp_result = json.loads(mcp_resp["result"]["content"][0]["text"])
+                assert mcp_result["success"] is False
+                assert mcp_result["code"] == "NOT_RECORDED"
+                continue
             # REST call as user A
             login_as(client, user_a)
             lens = tool_name.replace("ask_", "")

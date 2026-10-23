@@ -8,6 +8,7 @@ Viewpoints are perspectives on the architecture tailored to specific stakeholder
 from typing import Dict, List, Optional, Set
 
 from app.models import ArchiMateElement, ArchiMateRelationship, ArchitectureModel
+from app.models.archimate_element_types import base_type
 
 
 class ArchiMateViewpointService:
@@ -886,7 +887,7 @@ class ArchiMateViewpointService:
                 continue
 
             # Check element type (if specified)
-            if allowed_types and element.type not in allowed_types:
+            if allowed_types and base_type(element.type) not in allowed_types:
                 continue
 
             # Apply additional filters if provided

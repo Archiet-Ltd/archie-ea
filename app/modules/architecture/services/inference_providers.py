@@ -10,6 +10,7 @@ architect-quality names and descriptions for inferred elements.
 import logging
 from dataclasses import dataclass
 from typing import Any, Optional, Protocol, runtime_checkable
+from app.models.archimate_element_types import StandardTypeTable
 
 logger = logging.getLogger(__name__)
 
@@ -398,7 +399,7 @@ _technology = TechnologyProviderAdapter()
 _gap = GapProviderAdapter()
 _migration = MigrationProviderAdapter()
 
-PROVIDER_REGISTRY: dict[str, LayerProvider] = {
+PROVIDER_REGISTRY: dict[str, LayerProvider] = StandardTypeTable({
     # Motivation
     "Stakeholder": _motivation, "Driver": _motivation, "Assessment": _motivation,
     "Goal": _motivation, "Outcome": _motivation, "Principle": _motivation,
@@ -418,4 +419,4 @@ PROVIDER_REGISTRY: dict[str, LayerProvider] = {
     "Artifact": _technology, "CommunicationNetwork": _technology,
     # Implementation & Migration
     "Gap": _gap, "WorkPackage": _migration, "Deliverable": _migration, "Plateau": _migration,
-}
+})

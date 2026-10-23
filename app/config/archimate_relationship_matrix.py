@@ -12,6 +12,8 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Dict, List, Optional, Tuple
 
+from app.models.archimate_element_types import base_type
+
 # =============================================================================
 # Data Classes and Enumerations
 # =============================================================================
@@ -322,6 +324,11 @@ ALL_ELEMENTS = (
     + CONNECTOR_ELEMENTS
 )
 
+# Entelim extension elements (ADR-0014). They sit beside the 61 standard concepts, not
+# in ALL_ELEMENTS, so "61 ArchiMate 3.2 concepts" stays true. Each is a specialisation
+# resolved through ``base_type``; its matrix rows are generated at the end of this module.
+EXTENSION_ELEMENTS = ["Application"]
+
 # The layered elements only - useful when generating rules that should apply to
 # "every real element" without Grouping/Location/Junction recursing into
 # themselves.
@@ -351,6 +358,8 @@ VALID_RELATIONSHIPS: Dict[Tuple[str, str], List[str]] = {
     ("Resource", "Resource"): ["composition", "aggregation", "specialization", "association"],
     ("Resource", "Capability"): ["assignment", "association"],
     ("Resource", "CourseOfAction"): ["association"],
+    # Resource assigned to a Business Function: derivable per ArchiMate 3.2 Appendix B.
+    ("Resource", "BusinessFunction"): ["assignment", "association"],
     ("Resource", "ValueStream"): ["association"],
     # Capability relationships
     ("Capability", "Resource"): ["association"],
@@ -363,6 +372,12 @@ VALID_RELATIONSHIPS: Dict[Tuple[str, str], List[str]] = {
     # Course of Action relationships
     ("CourseOfAction", "Resource"): ["association"],
     ("CourseOfAction", "Capability"): ["association"],
+    # Application elements realize a Capability (ArchiMate 3.2 section 7.2): forward direction.
+    ("ApplicationComponent", "Capability"): ["realization", "association"],
+    ("ApplicationCollaboration", "Capability"): ["realization", "association"],
+    ("ApplicationFunction", "Capability"): ["realization", "association"],
+    ("ApplicationProcess", "Capability"): ["realization", "association"],
+    ("ApplicationService", "Capability"): ["realization", "association"],
     ("CourseOfAction", "CourseOfAction"): [
         "composition",
         "aggregation",
@@ -371,6 +386,8 @@ VALID_RELATIONSHIPS: Dict[Tuple[str, str], List[str]] = {
     ],
     ("CourseOfAction", "ValueStream"): ["association"],
     ("CourseOfAction", "Goal"): ["realization", "association"],
+    # Course of Action realizes Outcome (ArchiMate 3.2 section 7).
+    ("CourseOfAction", "Outcome"): ["realization", "association"],
     ("CourseOfAction", "Requirement"): ["realization", "association"],
     # Value Stream relationships
     ("ValueStream", "Resource"): ["association"],
@@ -1421,6 +1438,58 @@ for _pair, _types in VALID_RELATIONSHIPS.items():
 
 del _pair, _types, _tgt
 
+# Association may connect any two concepts (ArchiMate 3.2 section 5.4.3 and
+# Appendix B). Applied last, over the finished table, and only ever added: no
+# existing entry is removed or reordered.
+for _src in ALL_ELEMENTS:
+    for _dst in ALL_ELEMENTS:
+        _assoc = VALID_RELATIONSHIPS.setdefault((_src, _dst), [])
+        if "association" not in _assoc:
+            _assoc.append("association")
+
+del _src, _dst, _assoc
+
+
+# Entelim extension (ADR-0014): the rows for ``Application`` are copied from the finished
+# ``ApplicationComponent`` rows, after every other generated pass, so an Application is
+# valid wherever a component is. Never hand-written. Three narrowings then apply to the
+# pairs between the two kinds; each only removes relationships, so the relationships
+# allowed for any pair with an Application are always a subset of the same pair with
+# ApplicationComponent in its place, which is what keeps an exported model valid
+# ArchiMate 3.2.
+_APPLICATION = "Application"
+_COMPONENT = "ApplicationComponent"
+
+for (_src, _tgt), _types in list(VALID_RELATIONSHIPS.items()):
+    if _COMPONENT not in (_src, _tgt):
+        continue
+    _new_src = _APPLICATION if _src == _COMPONENT else _src
+    _new_tgt = _APPLICATION if _tgt == _COMPONENT else _tgt
+    _add_rule(_new_src, _new_tgt, list(_types))
+    if _src == _COMPONENT and _tgt == _COMPONENT:
+        # Both ends are components: the copy above made (Application, Application).
+        # The two mixed pairs start from the same finished row.
+        _add_rule(_APPLICATION, _COMPONENT, list(_types))
+        _add_rule(_COMPONENT, _APPLICATION, list(_types))
+
+# Application -> ApplicationComponent: a component is composed or aggregated, never
+# specialised (different types).
+VALID_RELATIONSHIPS[(_APPLICATION, _COMPONENT)] = [
+    r for r in VALID_RELATIONSHIPS[(_APPLICATION, _COMPONENT)] if r != "specialization"
+]
+# Application -> Application: an Application may aggregate another, never compose it.
+VALID_RELATIONSHIPS[(_APPLICATION, _APPLICATION)] = [
+    r for r in VALID_RELATIONSHIPS[(_APPLICATION, _APPLICATION)] if r != "composition"
+]
+# ApplicationComponent -> Application: a component never contains an Application.
+VALID_RELATIONSHIPS[(_COMPONENT, _APPLICATION)] = [
+    r
+    for r in VALID_RELATIONSHIPS[(_COMPONENT, _APPLICATION)]
+    if r not in ("composition", "aggregation", "specialization")
+]
+
+del _src, _tgt, _types, _new_src, _new_tgt
+
 
 # Relationships that can participate in derivation chains
 DERIVABLE_RELATIONSHIPS = {
@@ -1602,6 +1671,7 @@ def get_element_layer(element_type: str) -> Optional[str]:
     Returns:
         Layer name string, or None if not found
     """
+    element_type = base_type(element_type)
     if element_type in STRATEGY_ELEMENTS:
         return "Strategy"
     elif element_type in BUSINESS_ELEMENTS:
@@ -1629,6 +1699,7 @@ def get_element_aspect(element_type: str) -> Optional[str]:
     Returns:
         Aspect name string, or None if not found
     """
+    element_type = base_type(element_type)
     if element_type in ALL_ACTIVE_ELEMENTS:
         return "Active Structure"
     elif element_type in ALL_BEHAVIOR_ELEMENTS:
@@ -1778,11 +1849,11 @@ class RelationshipValidator:
         self.warnings = []
 
         # Check if element types are valid
-        if source_type not in ALL_ELEMENTS:
+        if source_type not in ALL_ELEMENTS and source_type not in EXTENSION_ELEMENTS:
             self.errors.append(f"Unknown source element type: {source_type}")
             return False
 
-        if target_type not in ALL_ELEMENTS:
+        if target_type not in ALL_ELEMENTS and target_type not in EXTENSION_ELEMENTS:
             self.errors.append(f"Unknown target element type: {target_type}")
             return False
 
@@ -1877,6 +1948,7 @@ __all__ = [
     "CONNECTOR_ELEMENTS",
     "LAYERED_ELEMENTS",
     "ALL_ELEMENTS",
+    "EXTENSION_ELEMENTS",
     "ALL_ACTIVE_ELEMENTS",
     "ALL_BEHAVIOR_ELEMENTS",
     "ALL_PASSIVE_ELEMENTS",

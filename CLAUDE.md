@@ -10,6 +10,8 @@ with Tailwind/shadcn tokens and Alpine.js on the front end.
 **Read `DESIGN.md` before editing any template, CSS, or front-end JS file.** It is the authoritative
 UI contract (color tokens, base templates, component macros, Alpine rules) and is not repeated here.
 
+Layout consistency is enforced by `design/patterns.json`. Do not introduce a new layout pattern from shadcn-examples unless it is explicitly added to this file first. Do not use React. Use only the prescribed patterns for each job.
+
 ## SDLC orchestration subagents — execution mechanism, not a second role system
 
 `.claude/agents/*.md` defines 27 Claude Code subagents (business-analyst,
@@ -434,6 +436,25 @@ CI enforcement has silently rotted for days at a time (green reported locally
 while CI was actually red) without anyone noticing. A single `gh run list --limit 5`
 costs nothing and catches it.
 
+**What a journey must assert (21 Oct 2026, mandatory for every model).** Driving a
+browser is not enough on its own: on 21 Oct the risk register's "Touches" link passed
+its journey test and two reviews while every risk linked to itself and opened an
+empty impact page. The test checked that the line rendered, never where the link
+went. So every journey test and every review of a change a person can see must:
+- **start from the user's goal** ("a CTO sees what this risk would hit") and assert
+  the outcome that goal needs, not that an element exists or a page returned 200;
+- **follow every new or changed link and assert the landing page has content** for
+  the thing clicked; a link to an empty state, a 404 or a 403 for a role that was
+  shown the link is a failure;
+- **run in an organisation seeded with linked data** (risks linked to applications,
+  owners, costs, relationships), plus one deliberately empty case so the empty
+  state is tested too, saying why it is empty and offering the next step;
+- **reject self-reference and filler**: an item shown as its own answer, a bare dash
+  or zero with no explanation, or the same figure disagreeing between two screens;
+- **fail before the change and pass after**, shown in the pull request;
+- **be walked by someone other than the builder**, signed in, at 1440 and 390 wide,
+  light and dark, with screenshots and a note of what a person sees.
+
 **What this standard is not:** it is not satisfied by `scripts/verify.py` alone —
 the browser/smoke tier is deliberately excluded from that command (see
 Verification below) — and it is not satisfied by a curl check or an API-level
@@ -486,7 +507,7 @@ counts only the families in `BANNED_FAMILIES` (`scripts/check_design_tokens.py`)
 `orange` or `cyan` class is right per DESIGN.md but moves this number by zero, and a
 line carrying a `token-migration-ok` marker is already excluded from the count.
 
-**All 72 gates, in registry order (`scripts/verify.py`, `build_gates`) — this table
+**All 73 gates, in registry order (`scripts/verify.py`, `build_gates`) — this table
 is a snapshot, not generated. Run `grep -oE '^\s*Gate\("[a-z-]+"' scripts/verify.py`
 to reconfirm the count before trusting it:**
 
@@ -509,7 +530,8 @@ to reconfirm the count before trusting it:**
 | `raw-sql-tenancy-writes` | raw SQL writing `organization_id` outside the canonical backfill | ratchet @ 5 |
 | `tenant-scoping` | ORM queries on a tenant-owned-but-unmixed model with no org predicate | ratchet @ 0 |
 | `untenanted-reads` | a read (`db.select`, `.query`, `session.get`) of ANY model with no `TenantMixin`, with no org predicate in the statement | ratchet @ 2361; a bare `tenant-scoping-ok` (no reason) or an org word inside another name does not clear a read |
-| `unfenced-tables` | a database table with no `TenantMixin` that is not listed in `scripts/unfenced_tables.txt` (a new one is a decision) | ratchet @ 0 |
+| `unfenced-tables` | a name added to `scripts/unfenced_tables.txt` beyond `scripts/unfenced_tables_baseline.txt` (the list can only shrink), a table with no `TenantMixin` that is neither listed nor declared in `scripts/shared_reference_tables.txt`, or a shared-reference line with no reason after `#` | ratchet @ 0 |
+| `request-field-writes` | a loop under `app/` that calls `setattr(obj, <loop key>, ...)`, so a request body can choose which columns are written | ratchet @ 137 |
 | `reuse-register` | a second copy of a concept registered in `docs/reuse-register.yml` (a definition matching a `must_not_create` pattern outside the canonical file and the known exceptions), or a canonical file or symbol that no longer exists; the failure prints what to reuse (`python scripts/check_reuse_register.py --entries`) | zero over per-file counts in `scripts/reuse_register_baseline.json` that only fall; `--update-baseline` refuses to raise one |
 | `llm-boundary` | a codegen emitter calling an LLM directly | ratchet @ 0 |
 | `evidence-contract` | behavioural changes/checkers missing evidence or provenance | ratchet @ 29 |

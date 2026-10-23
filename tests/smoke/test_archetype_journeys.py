@@ -386,6 +386,39 @@ def test_application_edit_and_fact_sheet_render_the_technical_profile_fields(pag
         "the fact sheet's Deployment panel did not show the value just saved on the edit form"
 
 
+def test_gap_analysis_convert_to_work_package_shows_the_new_package(page, live_server, seeded):
+    """Convert to Work Package fired a request and showed nothing new. Click
+    the real button on a gap, see the work package appear in the row, reload
+    and see it still there, and see the button no longer offer a second copy."""
+    import uuid
+
+    from app import create_app
+    from app.services.gap_register_service import create_gap
+
+    name = "Smoke convert gap %s" % uuid.uuid4().hex[:6]
+    app = create_app("testing")
+    with app.app_context():
+        gap, _ = create_gap(seeded["ids"]["org"], name, gap_type="coverage")
+        gap_id = gap.id
+        from app import db
+        db.session.commit()
+
+    _login(page, live_server, seeded["emails"]["enterprise_architect"])
+    _visit(page, live_server, "/enterprise/implementation/gap-analysis")
+    cell = page.locator('[data-testid="gap-work-packages-%d"]' % gap_id)
+    assert cell.count() == 1, "the gap row did not render"
+    assert cell.locator('[data-testid="gap-work-package-link"]').count() == 0
+    button = page.locator("tr", has=page.locator('[data-testid="gap-work-packages-%d"]' % gap_id)) \
+        .get_by_role("button", name="Convert this gap to a work package")
+    button.click()
+    cell.locator('[data-testid="gap-work-package-link"]').first.wait_for(timeout=PAGE_TIMEOUT)
+    assert button.is_disabled(), "the button still offers a second conversion"
+
+    _visit(page, live_server, "/enterprise/implementation/gap-analysis")
+    assert page.locator('[data-testid="gap-work-packages-%d"] [data-testid="gap-work-package-link"]' % gap_id).count() >= 1, \
+        "the work package was not there after reload"
+
+
 def test_application_manager_maintains_an_owned_application(page, live_server, seeded):
     """Set health on an owned application and see it reach the health overview."""
     _login(page, live_server, seeded["emails"]["application_manager"])
@@ -916,12 +949,32 @@ def test_non_solution_architect_reaches_interface_register_from_own_sidebar(
 
 
 def test_an_archetype_cannot_reach_another_personas_section(page, live_server, seeded):
-    """Authorisation is part of the journey, not a separate concern."""
+    """Authorisation is part of the journey, not a separate concern.
+
+    My Applications is open to every archetype (permission matrix) but personal:
+    procurement opens it and never sees the application the application manager
+    owns. Procurement contracts remain the persona-only section (POLICY:
+    procurement and portfolio_manager), refused to the application manager.
+    """
     _login(page, live_server, seeded["emails"]["procurement"])
-    response, _ = _visit(page, live_server, "/my-applications/")
+    response, _ = _visit(page, live_server, "/my-applications/list")
+    assert response.status == 200, (
+        "procurement could not open My Applications (HTTP %d)" % response.status)
+    assert "Smoke Payroll" not in page.inner_text("body"), (
+        "procurement was shown an application it does not own")
+
+    # Refusal example: /procurement/contracts is allowed to procurement and
+    # portfolio_manager only; application_manager is refused.
+    page.context.clear_cookies()
+    _login(page, live_server, seeded["emails"]["application_manager"])
+    response, _ = _visit(page, live_server, "/my-applications/list")
+    assert response.status == 200
+    assert "Smoke Payroll" in page.inner_text("body"), (
+        "the application manager does not see the application they own")
+    response, _ = _visit(page, live_server, "/procurement/contracts")
     assert response.status in (403, 404), (
-        "procurement reached the application manager's section (HTTP %d) - "
-        "requires_application_owner is not holding" % response.status)
+        "application_manager reached procurement contracts (HTTP %d) - "
+        "requires_procurement is not holding" % response.status)
 
 
 # Pages reachable from the navigation that no archetype journey visits. Each one

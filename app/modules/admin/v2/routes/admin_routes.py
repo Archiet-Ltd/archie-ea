@@ -501,21 +501,16 @@ def registered_users():
     require_org_or_platform_admin(g.current_org_id)
     users = _svc.get_all_users()
     roles = _svc.get_all_roles()
-    # A-02: get_all_users() is (correctly) org-scoped — see the
-    # tenant-scoping-ok note in AdminUserService.get_all_users. That scoping
-    # is right, but the page used to render as "Registered Users" with no
-    # indication of it, so 2 users here vs. 22 summed across
-    # /admin/organizations read as a platform undercounting itself rather
-    # than the same figure viewed at two different scopes. Name the scope
-    # and surface the platform-wide total so the two views reconcile.
+    # The page names its organisation and counts that organisation's users
+    # only (the same list the rows come from). No figure here is computed
+    # across organisations: the platform totals live on /admin/organizations,
+    # behind platform_admin_required.
     current_org = db.session.get(Organization, g.current_org_id)
-    platform_total_users = User.query.count()
     return render_template(
         "admin/registered_users.html",
         users=users,
         roles=roles,
         current_org=current_org,
-        platform_total_users=platform_total_users,
     )
 
 
