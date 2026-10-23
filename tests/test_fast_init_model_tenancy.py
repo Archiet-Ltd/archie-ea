@@ -180,24 +180,12 @@ def test_fast_init_application_component_is_tenant_scoped():
     assert completed.returncode == 0, completed.stdout + completed.stderr
 
 
-def test_fast_init_models_module_import_collides_on_technology_stack():
-    """Discovered while writing the test above -- documented, not fixed here.
+def test_fast_init_models_module_import_reuses_aliased_classes():
+    """The monolithic module must import cleanly after the fast-init subset.
 
-    models.py's own fast-init aliasing branch (models.py:190-198, "if this
-    monolithic module gets imported anyway") is currently unreachable without
-    crashing: app.models.models unconditionally defines TechnologyStack, and
-    app/models/__init__.py under fast-init separately imports the fast-init-only
-    app.models.technology_stack.TechnologyStack against the same table --
-    importing archimate_core (which triggers app.models.__init__) and then
-    app.models.models in the same process raises
-    sqlalchemy.exc.InvalidRequestError: Table 'technology_stacks' is already
-    defined for this MetaData instance.
-
-    This is a second instance of the same duplicate-model-class pattern this
-    bucket exists to close, but touching technology_stack.py or models.py is
-    explicitly out of Task 1's scope. Recorded here as a known-red xfail so it
-    is visible to refuter/tech-lead as a candidate for a follow-up task,
-    instead of being silently discovered and dropped.
+    APP_FAST_INIT routes import the lightweight modules first. If an indirect
+    import later brings in app.models.models, it must reuse the existing table
+    mappings rather than crash on a second definition.
     """
     completed = subprocess.run(
         [sys.executable, "-c", _ALIAS_SCRIPT],
@@ -208,13 +196,4 @@ def test_fast_init_models_module_import_collides_on_technology_stack():
         timeout=120,
         check=False,
     )
-    assert completed.returncode != 0, (
-        "models.py's fast-init alias branch no longer crashes on the "
-        "TechnologyStack collision -- if this now passes, update this test "
-        "to assert the alias directly instead of expecting the crash, and "
-        "close the follow-up task."
-    )
-    assert "technology_stacks" in completed.stderr and "already defined" in completed.stderr, (
-        "expected the known TechnologyStack collision; got a different failure:\n"
-        + completed.stdout + completed.stderr
-    )
+    assert completed.returncode == 0, completed.stdout + completed.stderr

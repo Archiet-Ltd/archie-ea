@@ -10,6 +10,13 @@ adopt/trial/assess/hold ring set by a human architect.
 Nothing here is inferred or defaulted to a ring — an unclassified technology
 element simply has no TechRadarEntry row, and the UI must render that as
 "not yet classified", never as a default ring.
+
+Retiring a standard: moving an entry to the hold ring with a sunset date
+(and, optionally, the replacement standard) is how a technology standard is
+phased out. The columns for that are nullable -- an entry that was never
+sunset simply has none -- and the applications running the technology, and
+their owners, are read live from the model at the time they are needed
+(app/modules/tech_radar/service.py), never copied onto this row.
 """
 
 from datetime import datetime
@@ -59,12 +66,23 @@ class TechRadarEntry(TenantMixin, db.Model):
         index=True,
     )
     set_by_user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
+    # Sunset: the date after which the technology may no longer be used, the
+    # standard that replaces it, and when the owners of the applications
+    # running it were told. All nullable: reconcile-schema adds them to
+    # existing databases, and an entry that was never sunset leaves them NULL.
+    sunset_date = db.Column(db.Date, nullable=True)
+    replacement_element_id = db.Column(
+        db.Integer, db.ForeignKey("archimate_elements.id"), nullable=True
+    )
+    owners_notified_at = db.Column(db.DateTime, nullable=True)
+    owners_notified_count = db.Column(db.Integer, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=True)
     updated_at = db.Column(
         db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=True
     )
 
     element = db.relationship("ArchiMateElement", foreign_keys=[archimate_element_id])
+    replacement = db.relationship("ArchiMateElement", foreign_keys=[replacement_element_id])
     set_by = db.relationship("User", foreign_keys=[set_by_user_id])
     requesting_initiative = db.relationship(
         "StrategicInitiative", foreign_keys=[requesting_initiative_id]
@@ -85,5 +103,12 @@ class TechRadarEntry(TenantMixin, db.Model):
                 self.requesting_initiative.name if self.requesting_initiative else None
             ),
             "set_by_user_id": self.set_by_user_id,
+            "sunset_date": self.sunset_date.isoformat() if self.sunset_date else None,
+            "replacement_element_id": self.replacement_element_id,
+            "replacement_name": self.replacement.name if self.replacement else None,
+            "owners_notified_at": (
+                self.owners_notified_at.isoformat() if self.owners_notified_at else None
+            ),
+            "owners_notified_count": self.owners_notified_count,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
         }

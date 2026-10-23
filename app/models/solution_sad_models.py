@@ -62,6 +62,12 @@ class SolutionIntegrationFlow(db.Model):
     pattern_id = db.Column(db.Integer, db.ForeignKey("integration_patterns.id"), nullable=True)
     governance_status = db.Column(db.String(30), default="undocumented")
 
+    # Last check of this interface against the pattern catalogue
+    # (ConformanceReviewer.check_interfaces). Nullable: an interface that was
+    # never checked has neither, and renders as "not checked yet".
+    conformance_checked_at = db.Column(db.DateTime, nullable=True)
+    conformance_breaches = db.Column(db.JSON, nullable=True)
+
     def to_dict(self):
         return {
             "id": self.id, "solution_id": self.solution_id,
@@ -82,6 +88,10 @@ class SolutionIntegrationFlow(db.Model):
             "error_handling": self.error_handling, "notes": self.notes,
             "pattern_id": self.pattern_id,
             "governance_status": self.governance_status or "undocumented",
+            "conformance_checked_at": (
+                self.conformance_checked_at.isoformat() if self.conformance_checked_at else None
+            ),
+            "conformance_breaches": self.conformance_breaches,
         }
 
 

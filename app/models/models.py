@@ -1351,6 +1351,7 @@ class TechnologyStack(db.Model):
     """Enterprise-approved technology stacks and platform configurations."""
 
     __tablename__ = "technology_stacks"
+    __table_args__ = {"extend_existing": True}
 
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(
@@ -1710,6 +1711,7 @@ class Outcome(TenantMixin, db.Model):
     """
 
     __tablename__ = "outcomes"
+    __table_args__ = {"extend_existing": True}
 
     organization_id = db.Column(
         db.Integer,
@@ -1830,7 +1832,9 @@ class Principle(TenantMixin, db.Model):
     status = db.Column(db.String(30), default="draft")
     # draft, under_review, approved, deprecated, superseded
 
+    citation_count = db.Column(db.Integer, nullable=True)
     superseded_by_id = db.Column(db.Integer, db.ForeignKey("principles.id"))
+    retired_into_id = db.Column(db.Integer, db.ForeignKey("principles.id"), nullable=True)
 
     # Relationships
     architecture_id = db.Column(db.Integer, db.ForeignKey("architecture_models.id"))
@@ -1843,7 +1847,18 @@ class Principle(TenantMixin, db.Model):
         "ArchiMateElement", foreign_keys=[archimate_element_id], backref="principle"
     )
     architecture = db.relationship("ArchitectureModel", backref="principles")
-    superseded_by = db.relationship("Principle", remote_side="Principle.id", backref="supersedes")
+    superseded_by = db.relationship(
+        "Principle",
+        foreign_keys=[superseded_by_id],
+        remote_side="Principle.id",
+        backref="supersedes",
+    )
+    retired_into = db.relationship(
+        "Principle",
+        foreign_keys=[retired_into_id],
+        remote_side="Principle.id",
+        backref="retired_principles",
+    )
 
     # Initiative relationships (Principles constrain Initiatives)
     initiatives = db.relationship(
