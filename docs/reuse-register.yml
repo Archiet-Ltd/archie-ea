@@ -739,3 +739,28 @@ entries:
     must_not_create:
       - id: type-table-class
         regex: 'class\s+\w*TypeTable\s*\('
+
+  - id: canvas-view
+    concept: Rendering a canvas template (Lean, Business Model, business case and every strategy
+      framework) and deciding which box an element belongs to
+    status: active
+    canonical:
+      path: app/services/composer_export_formats.py
+      symbols: [canvas_box_for_element, canvas_membership_profiles, canvas_profile_key, canvas_export_reasons]
+    reuse: >
+      Every canvas opens through the one canvas view and its layout hint; a new framework is a
+      CANVAS_TEMPLATES entry plus a prompt file, not a new screen. Decide which box an element is
+      filed in through composer_export_formats.canvas_box_for_element (the one membership rule);
+      read the values it carries with canvas_membership_profiles, under the key canvas_profile_key
+      names. Do not add a second canvas blueprint, a second canvas view template, a second canvas
+      renderer or chart, or a second membership rule that re-derives a box from an element's
+      profile. The parallel strategy_canvas module that did this was removed; this entry stops it
+      coming back.
+    must_not_create:
+      - id: second-strategy-canvas-blueprint
+        regex: 'Blueprint\(\s*["'']strategy_canvas["'']'
+      - id: second-canvas-membership-rule
+        regex: 'def\s+_?(canvas_box_for\w*|canvas_membership\w*|box_for_canvas\w*|canvas_profile_key\w*|place_canvas_elements?)\s*\('
+        scope: [app/services, app/modules]
+      - id: second-canvas-profile-reader
+        regex: 'def\s+_?(read|get|load)_(canvas_profile_value|canvas_profile)\w*\s*\('

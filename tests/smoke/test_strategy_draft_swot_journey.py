@@ -273,6 +273,8 @@ def test_architect_drafts_a_pestle_from_their_model(browser, live_server, requir
             _box(page, box_key).locator('[data-testid="strategy-filed-%s"] [data-testid="strategy-point"]' % box_key).first
         ).to_be_visible(timeout=PAGE_TIMEOUT)
     expect(_box(page, "social")).to_contain_text(edited_text, timeout=PAGE_TIMEOUT)
+    # The rejected point was never written.
+    expect(_box(page, "legal")).not_to_contain_text(rejected_text)
     # Every PESTLE citation link lands on the cited element's own detail page.
     link = _box(page, "political").locator('[data-testid="strategy-citation-link"]').first
     expect(link).to_be_visible(timeout=PAGE_TIMEOUT)
