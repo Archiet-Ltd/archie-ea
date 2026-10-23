@@ -204,6 +204,10 @@ signxml>=4.0.0,<6
 # R1-B12 PR 2: TOTP multi-factor authentication for administrators — no
 # existing MFA library in codebase.
 pyotp>=2.9.0,<3
+# QR code for the MFA enrolment page -- pure-python QR library
+# that renders the provisioning URI as an inline SVG on the server, so the
+# URI (which embeds the TOTP secret) never leaves the server.
+segno>=1.6.6,<2
 
 # Load Testing (S1-04)
 locust>=2.20.0
