@@ -44,13 +44,18 @@ def _run(root: str, *args: str):
     return result
 
 
-def _build_tree(tmp_path, routes, test_files):
+def _build_tree(tmp_path, routes, test_files, baseline=None):
     root = str(tmp_path)
     _write(os.path.join(root, "docs", "component-inventory.json"), _inventory(routes))
     # ensure the tests directory exists even when empty
     os.makedirs(os.path.join(root, "tests"), exist_ok=True)
     for rel, text in test_files.items():
         _write(os.path.join(root, rel), text)
+    if baseline is not None:
+        _write(
+            os.path.join(root, "scripts", "ci", "two_org_baseline.json"),
+            json.dumps({"accepted_uncovered": baseline}),
+        )
     return root
 
 
@@ -458,3 +463,182 @@ def test_escape_hatch_requires_reason_and_brief_id(tmp_path):
     result = _run(root, "--count")
     assert result.returncode == 0, result.stderr
     assert result.stdout.strip().splitlines()[-1] == "0"
+
+
+# ---------------------------------------------------------------------------- #
+# Finding 2: a missing / unparsable inventory is a GATE FAILURE, not a silent
+# empty pass.
+# ---------------------------------------------------------------------------- #
+def test_missing_inventory_is_a_gate_failure(tmp_path):
+    # No docs/component-inventory.json at all. The gate must fail loudly with a
+    # plain message, never pass by measuring an empty family set.
+    root = str(tmp_path)
+    os.makedirs(os.path.join(root, "tests"), exist_ok=True)
+    result = _run(root)
+    assert result.returncode == 1, result.stdout + result.stderr
+    assert "route inventory is missing" in result.stdout
+    assert result.stdout.strip().splitlines()[-1] == "1"
+
+
+def test_unparsable_inventory_is_a_gate_failure(tmp_path):
+    # A corrupt inventory must fail loudly, not silently pass.
+    root = str(tmp_path)
+    _write(os.path.join(root, "docs", "component-inventory.json"), "{ not json ]")
+    os.makedirs(os.path.join(root, "tests"), exist_ok=True)
+    result = _run(root)
+    assert result.returncode == 1, result.stdout + result.stderr
+    assert "could not be parsed" in result.stdout
+    assert result.stdout.strip().splitlines()[-1] == "1"
+
+
+# ---------------------------------------------------------------------------- #
+# Finding 1: dated, accountable baseline. The measured non-startup uncovered set
+# must EQUAL the set of still-valid (not past expiry) accepted families.
+# ---------------------------------------------------------------------------- #
+UNCOVERED_ROUTES = [
+    {"blueprint": "lonely", "login_required": True, "rule": "/lonely/panel"},
+]
+NO_TWO_ORG_TEST = {"tests/test_unrelated.py": "def test_nothing():\n    assert True\n"}
+
+
+def test_valid_dated_entry_for_uncovered_family_passes(tmp_path):
+    # A still-valid dated entry for the measured-uncovered family passes.
+    baseline = [
+        {"family": "lonely", "brief": "T-qa-99", "expiry": "2099-01-01"},
+    ]
+    root = _build_tree(tmp_path, UNCOVERED_ROUTES, NO_TWO_ORG_TEST, baseline=baseline)
+    result = _run(root, "--count")
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
+def test_uncovered_family_without_entry_fails(tmp_path):
+    # An uncovered family with NO accepted entry fails naming the family.
+    root = _build_tree(tmp_path, UNCOVERED_ROUTES, NO_TWO_ORG_TEST, baseline=[])
+    result = _run(root)
+    assert result.returncode == 1, result.stdout + result.stderr
+    assert "lonely" in result.stdout
+    assert "no valid accepted entry" in result.stdout
+
+
+def test_expired_entry_fails_naming_family_brief_and_date(tmp_path):
+    # An accepted entry PAST its expiry fails, naming family, brief and date.
+    baseline = [
+        {"family": "lonely", "brief": "T-qa-99", "expiry": "2000-01-01"},
+    ]
+    root = _build_tree(tmp_path, UNCOVERED_ROUTES, NO_TWO_ORG_TEST, baseline=baseline)
+    result = _run(root)
+    assert result.returncode == 1, result.stdout + result.stderr
+    out = result.stdout
+    assert "lonely" in out and "T-qa-99" in out and "2000-01-01" in out
+
+
+def test_accepted_family_that_gained_coverage_must_be_removed(tmp_path):
+    # The ratchet only falls: an accepted entry for a family that is no longer
+    # measured-uncovered (it gained a two-org test) must be removed, else fail.
+    routes = [
+        {"blueprint": "widgets", "login_required": True, "rule": "/widgets/list"},
+    ]
+    files = {
+        "tests/test_widgets_iso.py": (
+            "def two_orgs():\n    pass\n\n"
+            "def test_widgets_isolation(two_orgs):\n"
+            "    client.get('/widgets/list')\n"
+            "    assert True\n"
+        ),
+    }
+    baseline = [
+        {"family": "widgets", "brief": "T-qa-99", "expiry": "2099-01-01"},
+    ]
+    root = _build_tree(tmp_path, routes, files, baseline=baseline)
+    result = _run(root)
+    assert result.returncode == 1, result.stdout + result.stderr
+    assert "widgets" in result.stdout
+    assert "no longer uncovered" in result.stdout
+
+
+def test_startup_family_cannot_be_excused_by_a_dated_entry(tmp_path):
+    # A startup family can NEVER be excused by a baseline entry; it must carry a
+    # real two-organisation test. Here billing (admin billing) is uncovered and
+    # an entry tries to excuse it -- the gate must still fail on startup.
+    routes = [
+        {"blueprint": "billing", "login_required": True, "rule": "/admin/billing/"},
+    ]
+    baseline = [
+        {"family": "billing", "brief": "T-qa-99", "expiry": "2099-01-01"},
+    ]
+    root = _build_tree(tmp_path, routes, NO_TWO_ORG_TEST, baseline=baseline)
+    # startup-only must still report the startup family uncovered.
+    startup = _run(root, "--startup-only", "--count")
+    assert startup.returncode == 1, startup.stderr
+    assert startup.stdout.strip().splitlines()[-1] == "1"
+    # the full gate must also fail (startup broken).
+    full = _run(root)
+    assert full.returncode == 1, full.stdout + full.stderr
+    assert "admin billing" in full.stdout
+
+
+def test_malformed_bare_integer_baseline_is_rejected(tmp_path):
+    # The old bare-integer schema is no longer accepted: it must fail loudly so
+    # the ratchet can never be silently disabled by a stale integer file.
+    root = str(tmp_path)
+    _write(os.path.join(root, "docs", "component-inventory.json"), _inventory(UNCOVERED_ROUTES))
+    os.makedirs(os.path.join(root, "tests"), exist_ok=True)
+    _write(
+        os.path.join(root, "scripts", "ci", "two_org_baseline.json"),
+        json.dumps({"accepted_uncovered": 148}),
+    )
+    result = _run(root)
+    assert result.returncode == 1, result.stdout + result.stderr
+    assert "must be a list" in result.stdout
+
+
+# ---------------------------------------------------------------------------- #
+# Finding 4: one public decision function; the script exit and the decision
+# function's verdict agree for the same tree.
+# ---------------------------------------------------------------------------- #
+def test_decision_function_verdict_agrees_with_script_exit(tmp_path):
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("c2oc", SCRIPT)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+
+    # Scenario A: uncovered family with a valid entry -> both say OK.
+    baseline_ok = [{"family": "lonely", "brief": "T-qa-99", "expiry": "2099-01-01"}]
+    root_ok = _build_tree(tmp_path / "ok", UNCOVERED_ROUTES, NO_TWO_ORG_TEST, baseline=baseline_ok)
+    verdict_ok = module.evaluate(root_ok)
+    script_ok = _run(root_ok)
+    assert verdict_ok.ok is True
+    assert script_ok.returncode == 0, script_ok.stdout + script_ok.stderr
+
+    # Scenario B: same tree but no entry -> both say FAIL.
+    root_bad = _build_tree(tmp_path / "bad", UNCOVERED_ROUTES, NO_TWO_ORG_TEST, baseline=[])
+    verdict_bad = module.evaluate(root_bad)
+    script_bad = _run(root_bad)
+    assert verdict_bad.ok is False
+    assert script_bad.returncode == 1, script_bad.stdout + script_bad.stderr
+
+    # The verdict's boolean and the script's exit code agree by construction.
+    assert verdict_ok.ok == (script_ok.returncode == 0)
+    assert verdict_bad.ok == (script_bad.returncode == 0)
+
+
+def test_public_api_surface_is_exposed(tmp_path):
+    # Finding 6: the register gate imports only PUBLIC names. Assert the public
+    # API exists and the private aliases still point at the same objects.
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("c2oc_api", SCRIPT)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+
+    assert callable(module.associates)
+    assert callable(module.evaluate)
+    assert isinstance(module.STARTUP_FAMILIES, dict)
+    assert isinstance(module.BLUEPRINT_TO_STARTUP, dict)
+    assert hasattr(module, "InventoryError")
+    assert hasattr(module, "BaselineError")
+    # Private aliases remain for this module's own call sites but are the same
+    # objects, so nothing diverges.
+    assert module._associates is module.associates
+    assert module._BLUEPRINT_TO_STARTUP is module.BLUEPRINT_TO_STARTUP
