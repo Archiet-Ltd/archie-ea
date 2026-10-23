@@ -213,6 +213,26 @@ entries:
       - path: app/utils/tenant_sql.py
         reason: raw-SQL variant that returns None with no application context at all (getattr on flask.g raises when unbound); org_scope builds on it
 
+  - id: lookup-by-id-in-org
+    concept: Looking a tenant record up by id within the caller's organisation
+    status: active
+    canonical:
+      path: app/models/mixins/core.py
+      symbols: [TenantMixin]
+    reuse: >
+      Model.get_in_org(record_id) on any TenantMixin model. It runs a real query with organization_id in it and
+      returns None outside a tenant request, so a row already in the session's identity map for another organisation
+      is never returned. Do not call Model.query.get(id) or db.session.get(Model, id) on a tenant model (the
+      unfiltered-id-lookups gate counts them and the count only falls), and do not write a per-model by-id helper.
+    must_not_create:
+      - id: by-org-lookup-helper
+        regex: 'def\s+_?(?:get|load|find|fetch)_(?:in|for)_org(?:anization)?\s*\('
+    known_exceptions:
+      - path: app/models/agent_oversight_state.py
+        reason: get_for_org(organization_id) returns the organisation's single oversight row (get or create); it is keyed by organisation, not by id, so get_in_org does not replace it
+      - path: app/models/traceability.py
+        reason: get_for_organization(analysis_id, organization_id) takes the organisation as an explicit argument for a model that is not a TenantMixin model; kept
+
   - id: archimate-element-writer
     concept: Creating an ArchiMate element (the one element writer)
     status: active

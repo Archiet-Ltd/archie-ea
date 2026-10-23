@@ -79,6 +79,27 @@ class TenantMixin:  # migration-exempt
         from app import db
         return db.relationship("Organization", lazy="select")
 
+    @classmethod
+    def get_in_org(cls, record_id):
+        """The row with this id in the caller's active organisation, or None.
+
+        The one way to look a tenant record up by id. ``Model.query.get(id)`` and
+        ``db.session.get(Model, id)`` return an object already in the session's identity map
+        without running a query, so the ``do_orm_execute`` tenant filter never runs; this runs
+        a real query with ``organization_id`` written into it, so a row loaded earlier for
+        another organisation is never returned. None when there is no tenant context
+        (nothing is in "the caller's organisation" then) or the id is missing.
+        """
+        from app import db
+        from app.middleware.tenant_context import current_org_id
+
+        org_id = current_org_id()
+        if org_id is None or record_id is None:
+            return None
+        return db.session.execute(
+            db.select(cls).where(cls.id == record_id, cls.organization_id == org_id)
+        ).scalar_one_or_none()
+
 
 class HybridTenantMixin:  # migration-exempt
     """Add to a shared-catalogue model: platform-wide rows readable by every
