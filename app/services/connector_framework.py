@@ -1289,7 +1289,7 @@ def run_connector_sync(
 
     try:
         connector = build_connector(cfg, resolved)
-    except LookupError as exc:
+    except (LookupError, ConnectorWriteRefused) as exc:
         sync_log.status = "error"
         sync_log.error_message = str(exc)
         sync_log.completed_at = datetime.utcnow()
@@ -1417,6 +1417,8 @@ def build_connector(cfg: ConnectorConfig, org_id: int):
     Raises ``LookupError`` when the connector type has no concrete
     implementation registered in ``app/connectors/``.
     """
+    from app.modules.codegen.services.credential_encryption import CredentialUnreadable
+
     _register_concrete_connectors()
     connector_class = _CONNECTOR_CLASSES.get(cfg.connector_type)
     if connector_class is None:
@@ -1426,8 +1428,13 @@ def build_connector(cfg: ConnectorConfig, org_id: int):
         )
 
     base_config = dict(cfg.config or {})
-    merged_config = dict(base_config)
-    merged_config.update(_credential_field_map(cfg.connector_type, org_id, base_config))
+    try:
+        merged_config = dict(base_config)
+        merged_config.update(_credential_field_map(cfg.connector_type, org_id, base_config))
+    except CredentialUnreadable:
+        raise ConnectorWriteRefused(
+            "We could not read the saved token. Paste it again to reconnect."
+        )
 
     runtime_config = ConnectorConfig(
         id=cfg.id,
