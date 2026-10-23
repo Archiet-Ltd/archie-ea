@@ -1,0 +1,142 @@
+{#
+  Submission review panel — the elements a review touches, what fails if they
+  fail together, and the risks the change reaches. Each answer is read from
+  the one answer service's stored snapshot at its permanent address; nothing
+  here is recomputed.
+#}
+{% from 'macros/page_shell.html' import section_card %}
+{% from 'components/empty_state.html' import empty_state %}
+
+{% macro owner_text(row) -%}
+{%- if row.owners -%}{{ row.owners | map(attribute='name') | select | join(', ') or 'No owner recorded' }}
+{%- elif row.owner and row.owner.name -%}{{ row.owner.name }}
+{%- else -%}No owner recorded{%- endif -%}
+{%- endmacro %}
+
+{% macro basis_badge(truth_class) -%}
+{%- if truth_class == 'derived' -%}
+<span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-warning/10 text-warning-emphasis border border-warning/40" data-truth-class="derived">Worked out from recorded links</span>
+{%- elif truth_class == 'drawn' -%}
+<span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-success/10 text-success-emphasis border border-success/30" data-truth-class="drawn">Recorded by people</span>
+{%- else -%}
+<span class="text-xs text-muted-foreground">—</span>
+{%- endif -%}
+{%- endmacro %}
+
+{% set answers = submission_answers or {} %}
+{% set impact_raw = answers.get('set_impact') %}
+{% set risk_raw = answers.get('risk_propagation') %}
+{% set impact_missing = impact_raw is not none and impact_raw.get('not_found') %}
+{% set risk_missing = risk_raw is not none and risk_raw.get('not_found') %}
+{% set impact_answer = none if impact_missing else impact_raw %}
+{% set risk_answer = none if risk_missing else risk_raw %}
+
+{% set ns = namespace(names=[]) %}
+{% if impact_answer %}
+    {% for seed_id in impact_answer.params.element_ids or [] %}
+        {% set known = impact_answer.elements.get(seed_id | string) %}
+        {% set ns.names = ns.names + [known.name if known else '—'] %}
+    {% endfor %}
+{% elif risk_answer and risk_answer.params.element_id is not none %}
+    {% set known = risk_answer.elements.get(risk_answer.params.element_id | string) %}
+    {% set ns.names = [known.name if known else '—'] %}
+{% endif %}
+
+<div class="space-y-6" data-submission-review-panel data-answer-addresses="{{ impact_answer.address if impact_answer else '' }}{{ ' ' if impact_answer and risk_answer else '' }}{{ risk_answer.address if risk_answer else '' }}">
+    {% if impact_answer is none and risk_answer is none %}
+        {% if impact_missing or risk_missing %}
+        <p class="text-sm text-muted-foreground" data-elements-not-found data-not-found-reason="{{ impact_missing or risk_missing }}">The elements this review names were not found in your model.</p>
+        {% else %}
+        <p class="text-sm text-muted-foreground">This review names no elements, so there is nothing to show here.</p>
+        {% endif %}
+    {% else %}
+        <p class="text-sm text-foreground">Elements in scope: {{ ns.names | join(', ') or '—' }}</p>
+
+        {% if impact_answer %}
+        {% call section_card(title='What breaks if these fail together') %}
+            {% if impact_answer.rows %}
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm" data-answer-rows>
+                    <caption class="sr-only">Everything affected, ranked by how many of the failing elements reach it</caption>
+                    <thead>
+                        <tr class="text-left text-muted-foreground">
+                            <th scope="col" class="py-2 pr-4 font-medium">Element</th>
+                            <th scope="col" class="py-2 pr-4 font-medium">Reached from</th>
+                            <th scope="col" class="py-2 pr-4 font-medium">Steps away</th>
+                            <th scope="col" class="py-2 pr-4 font-medium">Owner</th>
+                            <th scope="col" class="py-2 font-medium">Basis</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in impact_answer.rows %}
+                        <tr class="border-t border-border" data-element-id="{{ row.element_id }}">
+                            {% set known = impact_answer.elements.get(row.element_id | string) %}
+                            <th scope="row" class="py-2 pr-4 text-left font-medium text-foreground">{{ known.name if known else '—' }}</th>
+                            <td class="py-2 pr-4 text-foreground" data-seeds="{{ row.seed_ids | join(',') if row.seed_ids else '' }}">
+                                {% for seed_id in row.seed_ids or [] %}
+                                    {% set seed_known = impact_answer.elements.get(seed_id | string) %}{{ seed_known.name if seed_known else '—' }}{% if not loop.last %}, {% endif %}
+                                {% endfor %}
+                            </td>
+                            <td class="py-2 pr-4 text-foreground">{{ row.depth }}</td>
+                            <td class="py-2 pr-4 text-foreground">{{ owner_text(row) }}</td>
+                            <td class="py-2">{{ basis_badge(row.truth_class) }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+                {{ empty_state(icon='search', title='Nothing is recorded as depending on these yet', description='No connections lead from here. Nothing is missing: there is simply nothing recorded.') }}
+            {% endif %}
+            <p class="mt-4 text-sm text-muted-foreground">Permanent address: <a class="underline" href="{{ impact_answer.page_url }}" data-answer-link>{{ impact_answer.page_url }}</a></p>
+            {% if impact_answer.citations %}
+            <p class="text-sm text-muted-foreground" data-citations>
+                {% for citation in impact_answer.citations %}{{ citation.type }} {{ citation.id }}{% if not loop.last %}, {% endif %}{% endfor %}
+            </p>
+            {% endif %}
+        {% endcall %}
+        {% endif %}
+
+        {% if risk_missing %}
+        {% call section_card(title='Risks reaching the first element listed') %}
+            <p class="text-sm text-muted-foreground" data-elements-not-found data-not-found-reason="{{ risk_missing }}">The first element this review names was not found in your model, so the risks reaching it cannot be shown. The risks of the other elements are not included yet.</p>
+        {% endcall %}
+        {% endif %}
+
+        {% if risk_answer %}
+        {% set risk_seed = risk_answer.elements.get(risk_answer.params.element_id | string) %}
+        {% call section_card(title='Risks reaching ' ~ (risk_seed.name if risk_seed else 'the first element listed')) %}
+            <p class="mb-4 text-sm text-muted-foreground" data-risk-scope>This covers the first element listed. The risks of the other elements are not included yet.</p>
+            {% if risk_answer.rows %}
+            <ul class="space-y-4" data-answer-rows>
+                {% for row in risk_answer.rows %}
+                <li class="rounded-lg border border-border p-4 space-y-2" data-risk-id="{{ row.risk_id }}">
+                    <div class="flex flex-wrap items-start justify-between gap-3">
+                        <h3 class="min-w-0 break-words text-base font-semibold text-foreground">{{ row.title }}</h3>
+                        <span class="text-sm text-foreground">{{ row.risk_level | capitalize }} · score {{ row.risk_score }}</span>
+                    </div>
+                    <p class="text-sm text-foreground">
+                        {% if row.indirect %}Starts at <span class="font-medium">{{ risk_answer.elements.get(row.seeded_on_element_id | string).name if risk_answer.elements.get(row.seeded_on_element_id | string) else '—' }}</span> and reaches this through:
+                        {% else %}Recorded directly on this.{% endif %}
+                    </p>
+                    {% if row.indirect %}
+                    <p class="text-sm text-foreground" data-path>
+                        {% for element_id in row.path_elements | reverse %}{% if not loop.first %} <span class="text-muted-foreground" aria-hidden="true">→</span> {% endif %}<span class="font-medium">{{ risk_answer.elements.get(element_id | string).name if risk_answer.elements.get(element_id | string) else '—' }}</span>{% endfor %}
+                    </p>
+                    {% endif %}
+                </li>
+                {% endfor %}
+            </ul>
+            {% else %}
+                {{ empty_state(icon='shield-check', title='No open risk reaches this', description='Nothing in the risk register is recorded on this or on anything it depends on. That is what is recorded today, not a guarantee.') }}
+            {% endif %}
+            <p class="mt-4 text-sm text-muted-foreground">Permanent address: <a class="underline" href="{{ risk_answer.page_url }}" data-answer-link>{{ risk_answer.page_url }}</a></p>
+            {% if risk_answer.citations %}
+            <p class="text-sm text-muted-foreground" data-citations>
+                {% for citation in risk_answer.citations %}{{ citation.type }} {{ citation.id }}{% if not loop.last %}, {% endif %}{% endfor %}
+            </p>
+            {% endif %}
+        {% endcall %}
+        {% endif %}
+    {% endif %}
+</div>
