@@ -47,7 +47,8 @@ from app.modules.intelligence.services.query_service import (
 KIND_IMPACT = "impact"
 KIND_SET_IMPACT = "set_impact"
 KIND_RISK_PROPAGATION = "risk_propagation"
-ANSWER_KINDS = (KIND_IMPACT, KIND_SET_IMPACT, KIND_RISK_PROPAGATION)
+KIND_SINGLE_POINTS_OF_FAILURE = "single_points_of_failure"
+ANSWER_KINDS = (KIND_IMPACT, KIND_SET_IMPACT, KIND_RISK_PROPAGATION, KIND_SINGLE_POINTS_OF_FAILURE)
 
 CONFIDENCE_LOWEST_DERIVED = "lowest_derived_row"
 CONFIDENCE_DRAWN_ONLY = "drawn_facts_only"
@@ -113,7 +114,7 @@ def as_whole_number(raw: Any, name: str = "value") -> Any:
     return raw
 
 
-# Natural-language cues for the three questions the service answers. The
+# Natural-language cues for the four questions the service answers. The
 # assistant uses it to tell an estate question (which must be answered from a
 # stored answer) from general conversation.
 _QUESTION_CUES = (
@@ -129,6 +130,7 @@ _QUESTION_CUES = (
             re.I,
         ),
     ),
+    (KIND_SINGLE_POINTS_OF_FAILURE, re.compile(r"\b(systems?)\b.*\b(stop|fail|go down|outage)\b.*\b(business trading)\b|\b(business trading)\b.*\b(stop|fail|go down|outage)\b.*\b(systems?)\b", re.I)),
 )
 
 
@@ -169,6 +171,16 @@ def normalise_params(kind: str, raw: Dict[str, Any]) -> Dict[str, Any]:
     if kind == KIND_RISK_PROPAGATION:
         return {
             "element_id": _as_int(raw.get("element_id"), "element_id"),
+            "max_depth": max_depth,
+            "include_derived": include_derived,
+        }
+
+    if kind == KIND_SINGLE_POINTS_OF_FAILURE:
+        # The single-points-of-failure walk always includes derived
+        # relationships: a system reached only through a derived link is still
+        # a single point of failure for the value streams that reach it.
+        include_derived = True
+        return {
             "max_depth": max_depth,
             "include_derived": include_derived,
         }
@@ -415,14 +427,21 @@ def _compute(kind: str, params: Dict[str, Any]) -> Dict[str, Any]:
         if not result["summary"]["resolved_seed_count"]:
             raise AnswerNotAskable(ELEMENT_NOT_FOUND_REASON)
         return result
-    result = IntelligenceQueryService.risk_propagation(
-        params["element_id"],
-        max_depth=params["max_depth"],
-        include_derived=params["include_derived"],
-    )
-    if ELEMENT_NOT_FOUND_REASON in result["reasons"]:
-        raise AnswerNotAskable(ELEMENT_NOT_FOUND_REASON)
-    return result
+    if kind == KIND_SINGLE_POINTS_OF_FAILURE:
+        result = IntelligenceQueryService.single_points_of_failure(
+            max_depth=params["max_depth"],
+            include_derived=params["include_derived"],
+        )
+        return result
+    if kind == KIND_RISK_PROPAGATION:
+        result = IntelligenceQueryService.risk_propagation(
+            params["element_id"],
+            max_depth=params["max_depth"],
+            include_derived=params["include_derived"],
+        )
+        if ELEMENT_NOT_FOUND_REASON in result["reasons"]:
+            raise AnswerNotAskable(ELEMENT_NOT_FOUND_REASON)
+        return result
 
 
 def ask_and_store(kind: str, raw_params: Dict[str, Any], *, user_id: Optional[int] = None):

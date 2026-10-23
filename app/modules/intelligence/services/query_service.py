@@ -19,7 +19,8 @@ response carries a ``no_ownership_records`` reason.
 
 from __future__ import annotations
 
-from typing import Any, Dict, Iterable, List, Optional, Tuple
+from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
+from collections import defaultdict
 
 from app.extensions import db
 from app.middleware.tenant_context import current_org_id
@@ -95,6 +96,9 @@ SEED_LIMIT_REACHED_REASON = validate_reason_code("seed_limit_reached")
 ROWS_TRUNCATED_REASON = validate_reason_code("rows_truncated")
 SET_IMPACT_MAX_SEEDS = 25
 SET_IMPACT_MAX_ROWS = 1000
+# Single points of failure walks once per value stream; at most this many
+# streams are walked (the same bound as the set-impact seed limit).
+SPOF_MAX_VALUE_STREAMS = SET_IMPACT_MAX_SEEDS
 
 # T-005 (D1): the NFR-5 measurement point is this exact, PINNED series --
 # never widened, never aggregated across label values.
@@ -406,6 +410,83 @@ def _resolve_application_owners_batch(
                 results[eid] = [
                     {"name": f"{shown} (from GitHub code owners; assign an owner)", "role": "GitHub code owner"}
                 ]
+
+    return results
+
+
+def _resolve_suppliers_batch(
+    element_ids: List[int], org_id: int
+) -> Dict[int, str]:
+    """Batch-resolve the supplier (vendor organisation name) for a set of
+    element ids, through the application portfolio's vendor master link.
+
+    Element → ApplicationComponent (archimate_element_id) → VendorProduct
+    (vendor_product_id) → VendorOrganization (name). Blank when no vendor
+    product is recorded; never a placeholder.
+
+    Returns ``{element_id: supplier_name_or_blank}``.
+    """
+    from app.models.application_portfolio import ApplicationComponent
+    from app.models.vendor.vendor_organization import VendorOrganization, VendorProduct
+
+    distinct_ids = sorted(set(element_ids))
+    results: Dict[int, str] = {eid: "" for eid in distinct_ids}
+    if not distinct_ids:
+        return results
+
+    # Element → component → vendor product, in one read each.
+    components = (
+        db.session.execute(
+            db.select(ApplicationComponent.id, ApplicationComponent.archimate_element_id, ApplicationComponent.vendor_product_id)
+            .where(ApplicationComponent.organization_id == org_id)
+            .where(ApplicationComponent.archimate_element_id.in_(distinct_ids))
+        )
+        .all()
+    )
+
+    element_to_product: Dict[int, int] = {}
+    product_ids: List[int] = []
+    for component_id, archimate_element_id, vendor_product_id in components:
+        if vendor_product_id is None:
+            continue
+        element_to_product[archimate_element_id] = vendor_product_id
+        product_ids.append(vendor_product_id)
+
+    if not product_ids:
+        return results
+
+    products = (
+        db.session.execute(
+            db.select(VendorProduct.id, VendorProduct.vendor_organization_id)
+            .where(VendorProduct.id.in_(product_ids))
+        )
+        .all()
+    )
+
+    product_to_vendor: Dict[int, int] = {}
+    vendor_ids: List[int] = []
+    for product_id, vendor_organization_id in products:
+        product_to_vendor[product_id] = vendor_organization_id
+        if vendor_organization_id is not None:
+            vendor_ids.append(vendor_organization_id)
+
+    if not vendor_ids:
+        return results
+
+    vendors = {
+        vendor.id: vendor.name
+        for vendor in db.session.execute(
+            db.select(VendorOrganization).where(VendorOrganization.id.in_(vendor_ids))
+        ).scalars()
+    }
+
+    for element_id, product_id in element_to_product.items():
+        vendor_org_id = product_to_vendor.get(product_id)
+        if vendor_org_id is None:
+            continue
+        supplier = vendors.get(vendor_org_id)
+        if supplier:
+            results[element_id] = supplier
 
     return results
 
@@ -862,6 +943,28 @@ def _not_computed_counts() -> Dict[str, Any]:
         "engine_version": None,
         "stale_count": None,
         "last_recompute_duration_ms": None,
+    }
+
+
+def _empty_spof_answer(reason, statement, considered, existing, elements, include_derived):
+    return {
+        "rows": [],
+        "summary": {
+            "explicit_count": 0,
+            "derived_count": 0,
+            "stale_count": 0,
+            "derivation_state": "not_computed",
+            "total": 0,
+            "value_streams_considered": considered,
+            "value_streams_existing": existing,
+            "include_derived": include_derived,
+            "statement": statement,
+        },
+        "reasons": [reason],
+        "elements": elements,
+        "total": 0,
+        "next_cursor": None,
+        "truncated": False,
     }
 
 
@@ -3294,6 +3397,176 @@ class IntelligenceQueryService:
             "initiatives": initiative_payloads,
             "reasons": [],
             "elements": all_elements,
+        }
+
+    @staticmethod
+    def single_points_of_failure(*, max_depth: int = 3, include_derived: bool = True) -> Dict[str, Any]:
+        """R1-B83 slice 1: which systems would stop the business trading.
+        Returns elements ranked by the number of distinct value streams that reach them.
+        """
+        from app.models.unified_capability import ValueStream
+
+        org_id = current_org_id()
+        if org_id is None:
+            return _empty_spof_answer(NO_TENANT_CONTEXT_REASON, "No organisation is active, so nothing could be worked out.", 0, 0, {}, include_derived)
+
+        # Value streams of the organisation that have an archimate element, in
+        # a stable order; at most SPOF_MAX_VALUE_STREAMS are walked.
+        vs_filter = (
+            ValueStream.organization_id == org_id,
+            ValueStream.archimate_element_id.is_not(None),
+        )
+        streams_existing = db.session.execute(
+            db.select(db.func.count()).select_from(ValueStream).where(*vs_filter)
+        ).scalar() or 0
+        value_streams = db.session.execute(
+            db.select(ValueStream).where(*vs_filter).order_by(ValueStream.id).limit(SPOF_MAX_VALUE_STREAMS)
+        ).scalars().all()
+        streams_capped = streams_existing > len(value_streams)
+
+        if not value_streams:
+            return _empty_spof_answer(NO_DATA_RECORDED_REASON, "No value stream with a linked element is recorded yet, so there is nothing to rank.", 0, 0, {}, include_derived)
+
+        # We will collect:
+        #   all_elements: dict[element_id] = {id, name, type, layer}
+        #   element_to_value_streams: dict[element_id] = set of value_stream_element_ids
+        #   element_to_row: dict[element_id] = row from the walk (first row seen for the element)
+        all_elements: Dict[int, Dict[str, Any]] = {}
+        element_to_value_streams: Dict[int, Set[int]] = defaultdict(set)
+        stream_by_id: Dict[int, Dict[str, Any]] = {}
+        element_to_row: Dict[int, Dict[str, Any]] = {}
+
+        # We will also track the latency using the existing record_query_latency
+        with record_query_latency("single_points_of_failure") as scope:
+            scope.organization_id = org_id
+
+            for vs in value_streams:
+                vs_element_id = vs.archimate_element_id
+                if vs_element_id is None:
+                    continue
+
+                stream_by_id[vs.id] = {"id": vs.id, "name": vs.name}
+
+                # Walk upstream from the value stream element
+                result = IntelligenceQueryService.cross_layer_impact(
+                    element_id=vs_element_id,
+                    direction="upstream",
+                    max_depth=max_depth,
+                    include_derived=include_derived,
+                    with_owner=True,
+                )
+
+                # Merge elements from this walk
+                elements_map = result.get("elements", {})
+                for eid, elem_info in elements_map.items():
+                    all_elements[eid] = elem_info
+
+                # Process each row in the walk
+                for row in result.get("rows", []):
+                    eid = row["element_id"]
+                    element_to_value_streams[eid].add(vs.id)
+                    if eid not in element_to_row:
+                        element_to_row[eid] = row
+
+        # If we have no elements after processing, return empty
+        if not element_to_row:
+            return _empty_spof_answer(NO_DATA_RECORDED_REASON, "Nothing is recorded as depending on the value streams considered.", len(value_streams), streams_existing, all_elements, include_derived)
+
+        # Prepare list of elements for sorting: (element_id, count, row)
+        elements_list: List[Tuple[int, int, Dict[str, Any]]] = []
+        for eid, row in element_to_row.items():
+            count = len(element_to_value_streams[eid])
+            elements_list.append((eid, count, row))
+
+        # Sort by count descending, then by element name ascending
+        elements_list.sort(
+            key=lambda x: (
+                -x[1],
+                ((all_elements.get(str(x[0])) or {}).get("name") or "").lower(),
+                x[0],
+            )
+        )
+
+        # Apply truncation limit
+        total_before_truncation = len(elements_list)
+        truncated = False
+        reasons = []
+        if total_before_truncation > SET_IMPACT_MAX_ROWS:
+            elements_list = elements_list[:SET_IMPACT_MAX_ROWS]
+            truncated = True
+            reasons.append(ROWS_TRUNCATED_REASON)
+        if streams_capped:
+            truncated = True
+            reasons.append(SEED_LIMIT_REACHED_REASON)
+
+        # Build the final rows list and compute summary counts
+        final_rows: List[Dict[str, Any]] = []
+        explicit_count = 0
+        derived_count = 0
+        stale_count = 0
+        for position, (eid, count, row) in enumerate(elements_list, start=1):
+            row["rank"] = position
+            row["value_stream_count"] = count
+            row["value_streams"] = sorted(
+                (stream_by_id[v] for v in element_to_value_streams[eid]),
+                key=lambda v: ((v["name"] or "").lower(), v["id"]),
+            )
+            final_rows.append(row)
+            # Update summary counts based on the row's relation
+            relation_kind = row.get("relation", {}).get("kind")
+            if relation_kind == "explicit":
+                explicit_count += 1
+            elif relation_kind == "derived":
+                derived_count += 1
+            if row.get("relation", {}).get("stale"):
+                stale_count += 1
+
+        # Owner and supplier on every ranked row. Owner comes from the walk's
+        # rows (with_owner=True on the cross_layer_impact call above); supplier
+        # comes from the vendor master link the application portfolio holds.
+        supplier_by_element = _resolve_suppliers_batch(
+            [eid for eid, _, _ in elements_list], org_id
+        )
+        for row in final_rows:
+            row.setdefault("owner", None)
+            row.setdefault("owners", [])
+            row["supplier"] = supplier_by_element.get(row["element_id"], "")
+
+        # Determine derivation_state
+        if not final_rows:
+            derivation_state = "not_computed"
+        elif stale_count > 0:
+            derivation_state = "stale"
+        elif derived_count > 0:
+            derivation_state = "current"
+        else:
+            derivation_state = "drawn_facts_only"
+
+        summary = {
+            "explicit_count": explicit_count,
+            "derived_count": derived_count,
+            "stale_count": stale_count,
+            "derivation_state": derivation_state,
+            "total": len(final_rows),  # Number of rows after truncation
+            "value_streams_considered": len(value_streams),
+            "value_streams_existing": streams_existing,
+            "include_derived": include_derived,
+            "statement": (
+                f"{len(value_streams)} of {streams_existing} value streams considered; "
+                f"relationships derived from drawn facts are {'included' if include_derived else 'excluded'}."
+            ),
+            # We can also add latency_ms from the scope
+            "latency_ms": scope.latency_ms,
+        }
+
+        return {
+            "rows": final_rows,
+            "summary": summary,
+            "reasons": reasons,
+            "elements": all_elements,
+            "total": total_before_truncation,
+            "next_cursor": None,
+            "truncated": truncated,
         }
 
 __all__ = ["IntelligenceQueryService"]

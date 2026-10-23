@@ -750,3 +750,320 @@ def test_the_statement_count_grows_linearly_with_the_number_of_seeds(app, db_ses
         assert used <= fixed + per_seed * n, (n, counts, top)
     # Linear, not worse: 25 seeds cost no more than five times what 5 seeds cost, plus slack.
     assert counts[25] <= 5 * counts[5] + fixed, counts
+
+
+# --- single points of failure (R1-B83 slice 1) -----------------------------
+
+
+def _value_stream(db_session, org_id, name, code, archimate_element_id=None):
+    from app.models.unified_capability import ValueStream
+
+    vs = ValueStream(
+        name=name,
+        code=code,
+        organization_id=org_id,
+        archimate_element_id=archimate_element_id,
+    )
+    db_session.add(vs)
+    db_session.flush()
+    return vs
+
+
+def test_single_points_of_failure_ranked_by_distinct_value_streams(
+    app, db_session, make_org, client, login_as
+):
+    """Three value streams, twenty elements: rank equals distinct value
+    streams reached; an element reached by two paths of one stream counts once.
+    """
+    org = make_org("spof-rank")
+    user = _user(db_session, org.id)
+    login_as(client, user)
+
+    vse1 = _element(db_session, org.id, "VS1 element", type_="BusinessService", layer="business")
+    vse2 = _element(db_session, org.id, "VS2 element", type_="BusinessService", layer="business")
+    vse3 = _element(db_session, org.id, "VS3 element", type_="BusinessService", layer="business")
+    _value_stream(db_session, org.id, "Value Stream One", "VS1", vse1.id)
+    _value_stream(db_session, org.id, "Value Stream Two", "VS2", vse2.id)
+    _value_stream(db_session, org.id, "Value Stream Three", "VS3", vse3.id)
+
+    elements = [
+        _element(db_session, org.id, f"Element {i:02d}", type_="ApplicationComponent", layer="application")
+        for i in range(1, 21)
+    ]
+
+    # VS1 reaches e1, e2, e3
+    _link(db_session, org.id, elements[0], vse1)
+    _link(db_session, org.id, elements[1], vse1)
+    _link(db_session, org.id, elements[2], vse1)
+    # VS2 reaches e4, e5, e6
+    _link(db_session, org.id, elements[3], vse2)
+    _link(db_session, org.id, elements[4], vse2)
+    _link(db_session, org.id, elements[5], vse2)
+    # VS3 reaches e7, e8, e9
+    _link(db_session, org.id, elements[6], vse3)
+    _link(db_session, org.id, elements[7], vse3)
+    _link(db_session, org.id, elements[8], vse3)
+    # e10 reached by VS1 and VS2 (rank 2)
+    _link(db_session, org.id, elements[9], vse1)
+    _link(db_session, org.id, elements[9], vse2)
+    # e11 reached by all three (rank 3)
+    _link(db_session, org.id, elements[10], vse1)
+    _link(db_session, org.id, elements[10], vse2)
+    _link(db_session, org.id, elements[10], vse3)
+    # e12 reached by VS1 via two paths (direct and via e13) - counts once
+    _link(db_session, org.id, elements[11], vse1)
+    _link(db_session, org.id, elements[12], elements[11])  # e13 -> e12
+    _link(db_session, org.id, elements[12], vse1)          # e13 -> vse1
+    # e13 reached by VS1 (rank 1)
+    # e14 reached by VS2 via two paths (direct and via e15) - counts once
+    _link(db_session, org.id, elements[13], vse2)
+    _link(db_session, org.id, elements[14], elements[13])  # e15 -> e14
+    _link(db_session, org.id, elements[14], vse2)          # e15 -> vse2
+    # e15 reached by VS2 (rank 1)
+    # e16 reached by VS3 via two paths (direct and via e17) - counts once
+    _link(db_session, org.id, elements[15], vse3)
+    _link(db_session, org.id, elements[16], elements[15])  # e17 -> e16
+    _link(db_session, org.id, elements[16], vse3)          # e17 -> vse3
+    # e17 reached by VS3 (rank 1)
+    # e18 reached by all three (rank 3)
+    _link(db_session, org.id, elements[17], vse1)
+    _link(db_session, org.id, elements[17], vse2)
+    _link(db_session, org.id, elements[17], vse3)
+    # e19 reached by VS1 and VS2 (rank 2)
+    _link(db_session, org.id, elements[18], vse1)
+    _link(db_session, org.id, elements[18], vse2)
+    # e20 reached by VS3 only (rank 1)
+    _link(db_session, org.id, elements[19], vse3)
+    db_session.commit()
+
+    data = _ask(client, question="single_points_of_failure").get_json()["data"]
+
+    # Rank 3 first (e11, e18), then rank 2 (e10, e19), then rank 1.
+    ranks = {row["element_id"]: row["rank"] for row in data["rows"]}
+    assert ranks[elements[10].id] == 1   # e11 - rank 3
+    assert ranks[elements[17].id] == 2   # e18 - rank 3
+    assert ranks[elements[9].id] == 3    # e10 - rank 2
+    assert ranks[elements[18].id] == 4   # e19 - rank 2
+    # e12 reached by VS1 via two paths counts once (rank 1, appears once)
+    element_ids = [row["element_id"] for row in data["rows"]]
+    assert element_ids.count(elements[11].id) == 1
+    assert ranks[elements[11].id] > 4
+    # Every row carries owner and supplier (blank when not recorded).
+    for row in data["rows"]:
+        assert "owner" in row
+        assert "supplier" in row
+        assert row["supplier"] == "" or isinstance(row["supplier"], str)
+
+
+def test_single_points_of_failure_permanent_address_no_new_record(
+    app, db_session, make_org, client, login_as
+):
+    """The permanent address returns the stored answer with no new AnswerRecord."""
+    org = make_org("spof-address")
+    user = _user(db_session, org.id)
+    vse = _element(db_session, org.id, "VS element", type_="BusinessService", layer="business")
+    el = _element(db_session, org.id, "Dependent", type_="ApplicationComponent", layer="application")
+    _link(db_session, org.id, el, vse)
+    _value_stream(db_session, org.id, "Value Stream", "VS", vse.id)
+    db_session.commit()
+    login_as(client, user)
+
+    before = _count(db_session, org.id)
+    asked = _ask(client, question="single_points_of_failure").get_json()["data"]
+    assert _count(db_session, org.id) == before + 1
+
+    address = asked["address"]
+    opened = client.get(f"/api/v1/intelligence/answers/{address}")
+    assert opened.status_code == 200
+    reopened = opened.get_json()["data"]
+    assert reopened["rows"] == asked["rows"]
+    assert reopened["computed_at"] == asked["computed_at"]
+    assert reopened["summary"] == asked["summary"]
+    # No new AnswerRecord was created by opening.
+    assert _count(db_session, org.id) == before + 1
+
+
+def test_single_points_of_failure_two_organisations_isolated(
+    app, db_session, make_org, client, login_as
+):
+    """Two organisations with identical element ids: B sees none of A's."""
+    org_a, org_b = make_org("spof-org-a"), make_org("spof-org-b")
+    user_a, user_b = _user(db_session, org_a.id), _user(db_session, org_b.id)
+
+    vse_a = _element(db_session, org_a.id, "VS A", type_="BusinessService", layer="business")
+    el_a = _element(db_session, org_a.id, "Dep A", type_="ApplicationComponent", layer="application")
+    _link(db_session, org_a.id, el_a, vse_a)
+    _value_stream(db_session, org_a.id, "Value Stream A", "VSA", vse_a.id)
+
+    vse_b = _element(db_session, org_b.id, "VS B", type_="BusinessService", layer="business")
+    el_b = _element(db_session, org_b.id, "Dep B", type_="ApplicationComponent", layer="application")
+    _link(db_session, org_b.id, el_b, vse_b)
+    _value_stream(db_session, org_b.id, "Value Stream B", "VSB", vse_b.id)
+    db_session.commit()
+
+    login_as(client, user_a)
+    data_a = _ask(client, question="single_points_of_failure").get_json()["data"]
+    assert len(data_a["rows"]) >= 1
+    a_element_ids = {row["element_id"] for row in data_a["rows"]}
+
+    login_as(client, user_b)
+    data_b = _ask(client, question="single_points_of_failure").get_json()["data"]
+    b_element_ids = {row["element_id"] for row in data_b["rows"]}
+
+    assert a_element_ids.isdisjoint(b_element_ids)
+
+
+def test_single_points_of_failure_no_value_streams_empty_answer(
+    app, db_session, make_org, client, login_as
+):
+    """An organisation with no value streams gets the empty answer with a reason."""
+    org = make_org("spof-no-vs")
+    user = _user(db_session, org.id)
+    db_session.commit()
+    login_as(client, user)
+
+    data = _ask(client, question="single_points_of_failure").get_json()["data"]
+
+    assert data["rows"] == []
+    assert data["summary"]["total"] == 0
+    assert "no_data_recorded" in data["reasons"] or data["reasons"]
+
+
+def test_single_points_of_failure_truncated_walk_is_marked(
+    app, db_session, make_org, client, login_as, monkeypatch
+):
+    """A truncated walk is marked."""
+    import app.modules.intelligence.services.query_service as qs
+
+    org = make_org("spof-truncate")
+    user = _user(db_session, org.id)
+    vse = _element(db_session, org.id, "VS element", type_="BusinessService", layer="business")
+    _value_stream(db_session, org.id, "Value Stream", "VS", vse.id)
+
+    # Create more elements than the truncation ceiling, all reaching the VS.
+    elements = [
+        _element(db_session, org.id, f"Dep {i:04d}", type_="ApplicationComponent", layer="application")
+        for i in range(60)
+    ]
+    for el in elements:
+        _link(db_session, org.id, el, vse)
+    db_session.commit()
+    login_as(client, user)
+
+    monkeypatch.setattr(qs, "SET_IMPACT_MAX_ROWS", 50)
+
+    data = _ask(client, question="single_points_of_failure").get_json()["data"]
+
+    assert data["truncated"] is True
+    assert len(data["rows"]) == 50
+    assert data["summary"]["total"] > 50
+
+
+def test_single_points_of_failure_rows_state_count_and_names_of_streams(
+    app, db_session, make_org, client, login_as
+):
+    """Each row carries the number of distinct value streams and names them;
+    two paths from one stream count once."""
+    org = make_org("spof-count")
+    user = _user(db_session, org.id)
+    login_as(client, user)
+    vse1 = _element(db_session, org.id, "VS1 element", type_="BusinessService", layer="business")
+    vse2 = _element(db_session, org.id, "VS2 element", type_="BusinessService", layer="business")
+    vs1 = _value_stream(db_session, org.id, "Order to Cash", "VS1", vse1.id)
+    vs2 = _value_stream(db_session, org.id, "Procure to Pay", "VS2", vse2.id)
+    both = _element(db_session, org.id, "Shared platform", type_="ApplicationComponent", layer="application")
+    twice = _element(db_session, org.id, "Billing", type_="ApplicationComponent", layer="application")
+    relay = _element(db_session, org.id, "Relay", type_="ApplicationComponent", layer="application")
+    _link(db_session, org.id, both, vse1)
+    _link(db_session, org.id, both, vse2)
+    _link(db_session, org.id, twice, vse1)
+    _link(db_session, org.id, twice, relay)
+    _link(db_session, org.id, relay, vse1)
+    db_session.commit()
+
+    rows = {
+        r["element_id"]: r
+        for r in _ask(client, question="single_points_of_failure").get_json()["data"]["rows"]
+    }
+    assert rows[both.id]["value_stream_count"] == 2
+    assert rows[both.id]["value_streams"] == [
+        {"id": vs1.id, "name": "Order to Cash"},
+        {"id": vs2.id, "name": "Procure to Pay"},
+    ]
+    assert rows[twice.id]["value_stream_count"] == 1
+    assert rows[twice.id]["value_streams"] == [{"id": vs1.id, "name": "Order to Cash"}]
+
+
+def test_single_points_of_failure_equal_counts_order_by_name_then_id(
+    app, db_session, make_org, client, login_as
+):
+    """Equal counts order by name, the same on consecutive runs."""
+    org = make_org("spof-tie")
+    user = _user(db_session, org.id)
+    login_as(client, user)
+    vse = _element(db_session, org.id, "VS element", type_="BusinessService", layer="business")
+    _value_stream(db_session, org.id, "Stream", "VS", vse.id)
+    # Created in an order that is not alphabetical.
+    for name in ("Zeta", "Mid", "Alpha"):
+        _link(
+            db_session,
+            org.id,
+            _element(db_session, org.id, name, type_="ApplicationComponent", layer="application"),
+            vse,
+        )
+    db_session.commit()
+
+    orders = []
+    for _ in range(2):
+        data = _ask(client, question="single_points_of_failure").get_json()["data"]
+        orders.append([data["elements"][str(r["element_id"])]["name"] for r in data["rows"]])
+    assert orders[0] == orders[1]
+    assert orders[0] == ["Alpha", "Mid", "Zeta"]
+
+
+def test_single_points_of_failure_stream_walks_are_capped_and_reported(
+    app, db_session, make_org, client, login_as
+):
+    """With one more value stream than the cap, the answer is marked truncated
+    and the summary reports streams considered of streams existing."""
+    import app.modules.intelligence.services.query_service as qs
+
+    cap = qs.SPOF_MAX_VALUE_STREAMS
+    org = make_org("spof-cap")
+    user = _user(db_session, org.id)
+    login_as(client, user)
+    for i in range(cap + 1):
+        vse = _element(db_session, org.id, f"VS element {i:02d}", type_="BusinessService", layer="business")
+        _value_stream(db_session, org.id, f"Stream {i:02d}", f"VS{i:02d}", vse.id)
+        _link(
+            db_session,
+            org.id,
+            _element(db_session, org.id, f"Dep {i:02d}", type_="ApplicationComponent", layer="application"),
+            vse,
+        )
+    db_session.commit()
+
+    data = _ask(client, question="single_points_of_failure").get_json()["data"]
+    assert data["truncated"] is True
+    assert data["summary"]["value_streams_considered"] == cap
+    assert data["summary"]["value_streams_existing"] == cap + 1
+    assert f"{cap} of {cap + 1} value streams" in data["summary"]["statement"]
+    assert len(data["rows"]) == cap
+
+
+def test_single_points_of_failure_empty_answer_carries_the_full_summary(
+    app, db_session, make_org, client, login_as
+):
+    """The no-value-streams answer carries every summary key the page reads."""
+    org = make_org("spof-empty-summary")
+    user = _user(db_session, org.id)
+    db_session.commit()
+    login_as(client, user)
+
+    summary = _ask(client, question="single_points_of_failure").get_json()["data"]["summary"]
+
+    assert summary["total"] == 0
+    assert summary["value_streams_considered"] == 0
+    assert summary["value_streams_existing"] == 0
+    assert summary["include_derived"] is True
+    assert "nothing to rank" in summary["statement"]
