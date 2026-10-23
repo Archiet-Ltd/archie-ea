@@ -1,0 +1,121 @@
+{% extends 'layouts/admin_base.html' %}
+{% block title %}Connect GitHub{% endblock %}
+{% from 'components/page_header.html' import page_header %}
+{% from 'components/alert.html' import alert as quiet_alert %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8">
+    {{ page_header(
+        title='Connect GitHub',
+        description='Paste a read-only token. Entelim reads your repositories and proposes a first model of your company: its applications, their parts, who owns them and how they depend on each other.',
+        breadcrumbs=[
+            {'label': 'Admin', 'href': url_for('admin.index')},
+            {'label': 'Connectors', 'href': url_for('m365_connector.connectors_index')},
+            {'label': 'GitHub'}
+        ]
+    ) }}
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            <div class="mb-6 space-y-2">
+                {% for category, message in messages %}
+                    {{ quiet_alert('success' if category == 'success' else ('danger' if category == 'error' else 'info'), text=message) }}
+                {% endfor %}
+            </div>
+        {% endif %}
+    {% endwith %}
+
+    <form method="POST" action="{{ url_for('m365_connector.github_connect_save') }}" class="space-y-6" data-testid="github-connect-form">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+        <div data-slot="card" class="rounded-lg border border-border bg-card">
+            <div class="p-4 sm:p-6 space-y-4">
+                <div>
+                    <label for="organization" class="block text-sm font-medium text-muted-foreground mb-1">GitHub organisation</label>
+                    <input type="text" id="organization" name="organization" required autocomplete="off"
+                        value="{{ status.organization or '' }}" placeholder="acme"
+                        class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring font-mono">
+                    <p class="text-xs text-muted-foreground mt-1">The name in github.com/&lt;name&gt;.</p>
+                </div>
+                <div>
+                    <label for="api_token" class="block text-sm font-medium text-muted-foreground mb-1">Read-only token</label>
+                    <input type="password" id="api_token" name="api_token" autocomplete="off" {% if not status.has_token %}required{% endif %}
+                        placeholder="{% if status.has_token %}A token is stored; paste a new one to replace it{% else %}Paste your token{% endif %}"
+                        class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring font-mono">
+                    <p class="text-xs text-muted-foreground mt-1">
+                        A fine-grained token with read-only access to repository contents and metadata, and to organisation members, is enough.
+                        It is stored encrypted for your organisation and never shown again.
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <div class="flex items-center justify-end gap-3">
+            <button type="submit"
+                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4">
+                {% if status.state == 'not_connected' %}Connect and read my repositories{% else %}Save and read again{% endif %}
+            </button>
+        </div>
+    </form>
+
+    {% if status.state != 'not_connected' %}
+    <section class="mt-8" aria-labelledby="github-progress-heading" data-testid="github-progress">
+        <h2 id="github-progress-heading" class="text-sm font-semibold mb-2">Progress</h2>
+        <div data-slot="card" class="rounded-lg border border-border bg-card p-4 sm:p-6 text-sm" aria-live="polite" id="github-progress-body">
+            <p id="github-progress-line" class="text-foreground">
+                {% if status.state == 'waiting' %}Waiting to start. This usually takes under a minute.
+                {% elif status.state == 'reading' %}Reading your repositories. This usually takes a few minutes.
+                {% elif status.state == 'done' %}Read {{ status.counts.repositories }} repositories. {{ status.counts.pending }} proposals are ready for you to review.
+                {% elif status.state == 'failed' %}{{ status.job.error if status.job and status.job.error else 'The read did not finish.' }}
+                {% else %}Connected to {{ status.organization }}.{% endif %}
+            </p>
+            <dl class="mt-3 grid grid-cols-3 gap-4 text-xs text-muted-foreground">
+                <div><dt>Applications in your model</dt><dd class="text-base text-foreground tabular-nums" id="github-count-applications">{{ status.counts.applications }}</dd></div>
+                <div><dt>Parts</dt><dd class="text-base text-foreground tabular-nums" id="github-count-components">{{ status.counts.components }}</dd></div>
+                <div><dt>Links</dt><dd class="text-base text-foreground tabular-nums" id="github-count-relationships">{{ status.counts.relationships }}</dd></div>
+            </dl>
+            <div class="mt-4 flex items-center justify-end gap-3">
+                <a href="{{ review_url }}"
+                    class="inline-flex items-center justify-center rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring h-9 px-4">
+                    Review what was found
+                </a>
+            </div>
+        </div>
+    </section>
+    {% endif %}
+</div>
+
+{% if status.state in ('waiting', 'reading') %}
+<script>
+(function () {
+    var line = document.getElementById('github-progress-line');
+    var url = {{ status_url|tojson }};
+    var tries = 0;
+    function show(s) {
+        var c = s.counts || {};
+        ['applications', 'components', 'relationships'].forEach(function (k) {
+            var el = document.getElementById('github-count-' + k);
+            if (el) { el.textContent = c[k] || 0; }
+        });
+        if (s.state === 'done') {
+            line.textContent = 'Read ' + (c.repositories || 0) + ' repositories. ' + (c.pending || 0) + ' proposals are ready for you to review.';
+        } else if (s.state === 'failed') {
+            line.textContent = (s.job && s.job.error) || 'The read did not finish.';
+        } else if (s.state === 'reading') {
+            line.textContent = 'Reading your repositories. This usually takes a few minutes.';
+        }
+    }
+    function poll() {
+        tries += 1;
+        Platform.fetch.get(url, null, { silent: true })
+            .then(function (s) {
+                show(s);
+                if ((s.state === 'waiting' || s.state === 'reading') && tries < 240) { window.setTimeout(poll, 5000); }
+            })
+            .catch(function () { if (tries < 240) { window.setTimeout(poll, 10000); } });
+    }
+    window.setTimeout(poll, 3000);
+})();
+</script>
+{% endif %}
+{% endblock %}
