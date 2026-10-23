@@ -58,5 +58,8 @@
   "bugs": {
     "url": "https://github.com/your-org/archie-platform/issues"
   },
-  "homepage": "https://github.com/your-org/archie-platform#readme"
+  "homepage": "https://github.com/your-org/archie-platform#readme",
+  "dependencies": {
+    "@tailwindcss/typography": "^0.5.20"
+  }
 }
