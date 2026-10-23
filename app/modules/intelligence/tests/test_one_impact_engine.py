@@ -1026,55 +1026,99 @@ def test_latency_ms_includes_the_owner_fetch(app, db_session, make_org, monkeypa
     assert result["summary"]["latency_ms"] >= 400.0
 
 
-def test_large_impact_walk_with_owners_within_budget(app, db_session, make_org):
-    """A 2,400-row impact walk with owners enabled returns the first page
-    within the latency budget and the owner fetch does not cause N+1."""
-    org = make_org("large-walk-owners")
-    root = _element(db_session, org.id, "Root-Large")
+def _first_page_work(app, org_id, root_id, page_size):
+    """Run the first page of a downstream walk with owners and return the
+    result, the SQL statement count, and the element ids each owner resolver
+    was asked about."""
+    from flask import g
+    from sqlalchemy import event
 
-    # Create 2,400 direct children.
-    children = []
-    batch_size = 500
-    for batch_start in range(0, 2400, batch_size):
-        batch = []
-        for i in range(batch_start, min(batch_start + batch_size, 2400)):
-            child = _element(db_session, org.id, f"Child-{i}")
-            _relationship(db_session, org.id, root, child)
-            batch.append(child)
-        children.extend(batch)
-        db_session.flush()
-    db_session.commit()
-
+    from app.extensions import db
+    from app.modules.intelligence.services import query_service
     from app.modules.intelligence.services.query_service import IntelligenceQueryService
 
-    with app.test_request_context("/"):
-        from flask import g
+    statements = []
+    owner_asks = {"legacy": [], "application": []}
+    real_legacy = query_service._resolve_owners_batch
+    real_app = query_service._resolve_application_owners_batch
 
-        g.current_org_id = org.id
+    def spy_legacy(ids, *args, **kwargs):
+        owner_asks["legacy"].append(len(list(ids)))
+        return real_legacy(ids, *args, **kwargs)
 
-        result = IntelligenceQueryService.cross_layer_impact(
-            root.id,
-            include_derived=False,
-            max_depth=3,
-            direction="downstream",
-            with_owner=True,
-            page_size=50,
-        )
+    def spy_app(ids, *args, **kwargs):
+        owner_asks["application"].append(len(list(ids)))
+        return real_app(ids, *args, **kwargs)
 
-    latency_ms = result["summary"]["latency_ms"]
-    budget_ms = 2000.0
-    assert latency_ms <= budget_ms, (
-        f"First page latency {latency_ms:.1f}ms exceeds budget {budget_ms}ms "
-        f"(2,400 rows, page_size=50, with_owner=True)"
-    )
+    def count(conn, cursor, statement, parameters, context, executemany):
+        statements.append(statement)
+
+    engine = db.engine
+    event.listen(engine, "before_cursor_execute", count)
+    query_service._resolve_owners_batch = spy_legacy
+    query_service._resolve_application_owners_batch = spy_app
+    try:
+        with app.test_request_context("/"):
+            g.current_org_id = org_id
+            result = IntelligenceQueryService.cross_layer_impact(
+                root_id,
+                include_derived=False,
+                max_depth=3,
+                direction="downstream",
+                with_owner=True,
+                page_size=page_size,
+            )
+    finally:
+        event.remove(engine, "before_cursor_execute", count)
+        query_service._resolve_owners_batch = real_legacy
+        query_service._resolve_application_owners_batch = real_app
+    return result, len(statements), owner_asks
+
+
+def _star(db_session, org, name, n):
+    root = _element(db_session, org.id, f"Root-{name}")
+    for start in range(0, n, 500):
+        for i in range(start, min(start + 500, n)):
+            _relationship(db_session, org.id, root, _element(db_session, org.id, f"{name}-{i}"))
+        db_session.flush()
+    db_session.commit()
+    return root
+
+
+def test_large_impact_walk_with_owners_first_page_work_is_bounded(app, db_session, make_org):
+    """The first page of a 2,400-row walk with owners resolves owners for the
+    page's rows only and issues the same number of SQL statements as a
+    60-row walk: its work does not grow with the walk.  Counts work, not
+    wall-clock, so it does not depend on runner speed."""
+    page_size = 50
+    small = _star(db_session, make_org("walk-owners-small"), "S", 60)
+    large_org = make_org("large-walk-owners")
+    large = _star(db_session, large_org, "L", 2400)
+    small_org_id = small.organization_id
+
+    small_result, small_stmts, small_asks = _first_page_work(app, small_org_id, small.id, page_size)
+    result, stmts, asks = _first_page_work(app, large_org.id, large.id, page_size)
 
     assert result["total"] == 2400, f"Expected 2400 total rows, got {result['total']}"
-    assert len(result["rows"]) == 50, f"First page should have 50 rows, got {len(result['rows'])}"
+    assert small_result["total"] == 60
+    assert len(result["rows"]) == page_size, f"First page should have 50 rows, got {len(result['rows'])}"
 
-    # Every row on the page must have an owners field.
+    # Owners are resolved once per resolver, for the page's rows only.
+    for name in ("legacy", "application"):
+        assert asks[name] == [page_size], f"{name} owner resolver asked for {asks[name]}, expected [{page_size}]"
+        assert small_asks[name] == [page_size]
+
+    # No N+1 and no per-row work: statement count is identical for 60 and 2,400 rows.
+    assert stmts == small_stmts, (
+        f"First page issued {stmts} SQL statements for 2,400 rows but {small_stmts} for 60 rows"
+    )
+
     for row in result["rows"]:
         assert "owners" in row, f"Row {row['element_id']} missing owners field"
         assert isinstance(row["owners"], list), f"Row {row['element_id']} owners is not a list"
+
+    # Smoke guard only (not the proof): generous bound that catches a hang.
+    assert result["summary"]["latency_ms"] < 60000.0
 
 
 def test_accountability_names_the_element_own_owner_when_only_the_root_is_owned(app, db_session, make_org):
