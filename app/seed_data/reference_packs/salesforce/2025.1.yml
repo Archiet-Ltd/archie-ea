@@ -1,0 +1,303 @@
+pack_key: salesforce
+pack_version: '2025.1'
+vendor: Salesforce
+product: Salesforce CRM Platform
+product_edition: ''
+segment_tags: []
+industry_tags: []
+attribution_text: Facts about Salesforce CRM Platform are taken from Salesforce's public product documentation,
+  read on 2026-09-23; product, module and service names are used as names only.
+trademark_line: Product and company names are the property of their respective owners; no affiliation
+  or endorsement is implied.
+modules:
+- key: core
+  question: Do you run Salesforce CRM Platform?
+- key: platform
+  question: Do you run the Salesforce CRM Platform platform components (hosting, integration, data)?
+elements:
+- type: ApplicationComponent
+  layer: application
+  name: Salesforce CRM Platform
+  description: Salesforce CRM Platform, the core application component of the Salesforce pack.
+  mandatory: true
+  source_urls:
+  - https://www.salesforce.com/crm/
+  element_key: application.salesforce-crm-platform
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Customer Relationship Management
+  description: End-to-end customer lifecycle management
+  mandatory: true
+  source_urls:
+  - https://www.salesforce.com/crm/
+  element_key: strategy.customer-relationship-management
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Sales Management
+  description: Lead-to-opportunity-to-close sales processes
+  mandatory: true
+  source_urls:
+  - https://www.salesforce.com/crm/
+  element_key: strategy.sales-management
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Service Management
+  description: Case and service request management
+  mandatory: true
+  source_urls:
+  - https://www.salesforce.com/crm/
+  element_key: strategy.service-management
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Marketing Automation
+  description: Campaign and journey management
+  mandatory: true
+  source_urls:
+  - https://www.salesforce.com/crm/
+  element_key: strategy.marketing-automation
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Commerce Management
+  description: B2B and B2C commerce capabilities
+  mandatory: true
+  source_urls:
+  - https://www.salesforce.com/crm/
+  element_key: strategy.commerce-management
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Lead Management
+  description: Lead capture, scoring, and qualification
+  mandatory: true
+  source_urls:
+  - https://www.salesforce.com/crm/
+  element_key: strategy.lead-management
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Opportunity Management
+  description: Sales pipeline and forecasting
+  mandatory: true
+  source_urls:
+  - https://www.salesforce.com/crm/
+  element_key: strategy.opportunity-management
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Case Management
+  description: Customer issue tracking and resolution
+  mandatory: true
+  source_urls:
+  - https://www.salesforce.com/crm/
+  element_key: strategy.case-management
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Campaign Management
+  description: Multi-channel marketing campaigns
+  mandatory: true
+  source_urls:
+  - https://www.salesforce.com/crm/
+  element_key: strategy.campaign-management
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Order Management
+  description: Quote-to-cash order processing
+  mandatory: true
+  source_urls:
+  - https://www.salesforce.com/crm/
+  element_key: strategy.order-management
+  module_keys:
+  - core
+- type: ApplicationComponent
+  layer: application
+  name: Salesforce Core Platform
+  description: Salesforce Core Platform, part of the platform.
+  mandatory: true
+  source_urls:
+  - https://www.salesforce.com/crm/
+  element_key: application.salesforce-core-platform
+  module_keys:
+  - core
+- type: ApplicationComponent
+  layer: application
+  name: Salesforce Lightning Experience
+  description: Salesforce Lightning Experience, part of the platform.
+  mandatory: true
+  source_urls:
+  - https://www.salesforce.com/crm/
+  element_key: application.salesforce-lightning-experience
+  module_keys:
+  - core
+- type: ApplicationComponent
+  layer: application
+  name: Salesforce Identity and SSO
+  description: Salesforce Identity and SSO, part of the platform.
+  mandatory: true
+  source_urls:
+  - https://www.salesforce.com/crm/
+  element_key: application.salesforce-identity-and-sso
+  module_keys:
+  - core
+- type: ApplicationComponent
+  layer: application
+  name: Salesforce REST and Bulk API
+  description: Salesforce REST and Bulk API, part of the platform.
+  mandatory: true
+  source_urls:
+  - https://www.salesforce.com/crm/
+  element_key: application.salesforce-rest-and-bulk-api
+  module_keys:
+  - core
+- type: SystemSoftware
+  layer: technology
+  name: Salesforce Event Bus
+  description: Salesforce Event Bus, part of the platform.
+  mandatory: false
+  source_urls:
+  - https://www.salesforce.com/crm/
+  element_key: technology.salesforce-event-bus
+  module_keys:
+  - platform
+- type: ApplicationComponent
+  layer: application
+  name: Salesforce Einstein
+  description: Salesforce Einstein, part of the platform.
+  mandatory: false
+  source_urls:
+  - https://www.salesforce.com/crm/
+  element_key: application.salesforce-einstein
+  module_keys:
+  - core
+- type: Node
+  layer: technology
+  name: Salesforce Data Cloud
+  description: Salesforce Data Cloud, part of the platform.
+  mandatory: false
+  source_urls:
+  - https://www.salesforce.com/crm/
+  element_key: technology.salesforce-data-cloud
+  module_keys:
+  - platform
+- type: Node
+  layer: technology
+  name: Heroku Runtime
+  description: Heroku Runtime, part of the platform.
+  mandatory: false
+  source_urls:
+  - https://www.salesforce.com/crm/
+  element_key: technology.heroku-runtime
+  module_keys:
+  - platform
+relationships:
+- source_key: application.salesforce-crm-platform
+  target_key: application.salesforce-core-platform
+  type: composition
+  module_keys:
+  - core
+- source_key: application.salesforce-crm-platform
+  target_key: application.salesforce-lightning-experience
+  type: composition
+  module_keys:
+  - core
+- source_key: application.salesforce-crm-platform
+  target_key: application.salesforce-identity-and-sso
+  type: composition
+  module_keys:
+  - core
+- source_key: application.salesforce-crm-platform
+  target_key: application.salesforce-rest-and-bulk-api
+  type: composition
+  module_keys:
+  - core
+- source_key: application.salesforce-crm-platform
+  target_key: application.salesforce-einstein
+  type: composition
+  module_keys:
+  - core
+- source_key: technology.salesforce-event-bus
+  target_key: application.salesforce-crm-platform
+  type: serving
+  module_keys:
+  - core
+  - platform
+- source_key: strategy.customer-relationship-management
+  target_key: application.salesforce-crm-platform
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.sales-management
+  target_key: application.salesforce-crm-platform
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.service-management
+  target_key: application.salesforce-crm-platform
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.marketing-automation
+  target_key: application.salesforce-crm-platform
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.commerce-management
+  target_key: application.salesforce-crm-platform
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.lead-management
+  target_key: application.salesforce-crm-platform
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.opportunity-management
+  target_key: application.salesforce-crm-platform
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.case-management
+  target_key: application.salesforce-crm-platform
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.campaign-management
+  target_key: application.salesforce-crm-platform
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.order-management
+  target_key: application.salesforce-crm-platform
+  type: association
+  module_keys:
+  - core
+- source_key: technology.salesforce-data-cloud
+  target_key: application.salesforce-crm-platform
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.heroku-runtime
+  target_key: application.salesforce-crm-platform
+  type: association
+  module_keys:
+  - core
+  - platform
+integrations: []
+capability_mappings: []

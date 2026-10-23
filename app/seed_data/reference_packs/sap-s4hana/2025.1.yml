@@ -1,0 +1,2261 @@
+pack_key: sap-s4hana
+pack_version: '2025.1'
+vendor: SAP
+product: SAP S/4HANA
+product_edition: ''
+segment_tags: []
+industry_tags: []
+attribution_text: Facts about SAP S/4HANA are taken from SAP's public product documentation, read on 2026-09-23;
+  product, module and service names are used as names only.
+trademark_line: Product and company names are the property of their respective owners; no affiliation
+  or endorsement is implied.
+modules:
+- key: core
+  question: Do you run SAP S/4HANA?
+- key: platform
+  question: Do you run the SAP S/4HANA platform components (hosting, integration, data)?
+elements:
+- type: ApplicationComponent
+  layer: application
+  name: SAP S/4HANA
+  description: SAP S/4HANA, the core application component of the SAP pack.
+  mandatory: true
+  source_urls:
+  - https://www.sap.com/products/erp/s4hana.html
+  element_key: application.sap-s-4hana
+  module_keys:
+  - core
+- type: Node
+  layer: technology
+  name: SAP S/4HANA Application Server 1
+  description: SAP S/4HANA Application Server 1
+  mandatory: true
+  source_urls:
+  - https://www.sap.com/products/erp/s4hana.html
+  element_key: technology.sap-s-4hana-application-server-1
+  module_keys:
+  - platform
+- type: Node
+  layer: technology
+  name: SAP S/4HANA Application Server 2
+  description: SAP S/4HANA Application Server 2
+  mandatory: true
+  source_urls:
+  - https://www.sap.com/products/erp/s4hana.html
+  element_key: technology.sap-s-4hana-application-server-2
+  module_keys:
+  - platform
+- type: Node
+  layer: technology
+  name: SAP HANA Primary Database
+  description: SAP HANA Primary Database
+  mandatory: true
+  source_urls:
+  - https://www.sap.com/products/erp/s4hana.html
+  element_key: technology.sap-hana-primary-database
+  module_keys:
+  - platform
+- type: Node
+  layer: technology
+  name: SAP HANA Secondary Database
+  description: SAP HANA Secondary Database
+  mandatory: false
+  source_urls:
+  - https://www.sap.com/products/erp/s4hana.html
+  element_key: technology.sap-hana-secondary-database
+  module_keys:
+  - platform
+- type: Node
+  layer: technology
+  name: SAP Web Dispatcher
+  description: SAP Web Dispatcher
+  mandatory: true
+  source_urls:
+  - https://www.sap.com/products/erp/s4hana.html
+  element_key: technology.sap-web-dispatcher
+  module_keys:
+  - platform
+- type: Node
+  layer: technology
+  name: SAP Solution Manager
+  description: SAP Solution Manager
+  mandatory: true
+  source_urls:
+  - https://www.sap.com/products/erp/s4hana.html
+  element_key: technology.sap-solution-manager
+  module_keys:
+  - platform
+- type: Node
+  layer: technology
+  name: SAP Gateway
+  description: SAP Gateway
+  mandatory: true
+  source_urls:
+  - https://www.sap.com/products/erp/s4hana.html
+  element_key: technology.sap-gateway
+  module_keys:
+  - platform
+- type: Node
+  layer: technology
+  name: SAP Fiori Frontend Server
+  description: SAP Fiori Frontend Server
+  mandatory: false
+  source_urls:
+  - https://www.sap.com/products/erp/s4hana.html
+  element_key: technology.sap-fiori-frontend-server
+  module_keys:
+  - platform
+- type: Device
+  layer: technology
+  name: SAP Router
+  description: Secure SAP network communication
+  mandatory: true
+  source_urls:
+  - https://www.sap.com/products/erp/s4hana.html
+  element_key: technology.sap-router
+  module_keys:
+  - platform
+- type: Device
+  layer: technology
+  name: Hardware Security Module
+  description: Cryptographic key management
+  mandatory: true
+  source_urls:
+  - https://www.sap.com/products/erp/s4hana.html
+  element_key: technology.hardware-security-module
+  module_keys:
+  - platform
+- type: Device
+  layer: technology
+  name: SAN Storage Array
+  description: High-performance storage for HANA
+  mandatory: true
+  source_urls:
+  - https://www.sap.com/products/erp/s4hana.html
+  element_key: technology.san-storage-array
+  module_keys:
+  - platform
+- type: Device
+  layer: technology
+  name: Load Balancer
+  description: Application server load balancing
+  mandatory: true
+  source_urls:
+  - https://www.sap.com/products/erp/s4hana.html
+  element_key: technology.load-balancer
+  module_keys:
+  - platform
+- type: Device
+  layer: technology
+  name: Firewall Cluster
+  description: Network security
+  mandatory: true
+  source_urls:
+  - https://www.sap.com/products/erp/s4hana.html
+  element_key: technology.firewall-cluster
+  module_keys:
+  - platform
+- type: SystemSoftware
+  layer: technology
+  name: SAP S/4HANA
+  description: SAP S/4HANA
+  mandatory: true
+  source_urls:
+  - https://www.sap.com/products/erp/s4hana.html
+  element_key: technology.sap-s-4hana
+  module_keys:
+  - platform
+- type: SystemSoftware
+  layer: technology
+  name: SAP HANA Database
+  description: SAP HANA Database
+  mandatory: true
+  source_urls:
+  - https://www.sap.com/products/erp/s4hana.html
+  element_key: technology.sap-hana-database
+  module_keys:
+  - platform
+- type: SystemSoftware
+  layer: technology
+  name: SAP NetWeaver
+  description: SAP NetWeaver
+  mandatory: true
+  source_urls:
+  - https://www.sap.com/products/erp/s4hana.html
+  element_key: technology.sap-netweaver
+  module_keys:
+  - platform
+- type: SystemSoftware
+  layer: technology
+  name: SAP Fiori
+  description: SAP Fiori
+  mandatory: true
+  source_urls:
+  - https://www.sap.com/products/erp/s4hana.html
+  element_key: technology.sap-fiori
+  module_keys:
+  - platform
+- type: SystemSoftware
+  layer: technology
+  name: SAP Gateway
+  description: SAP Gateway
+  mandatory: true
+  source_urls:
+  - https://www.sap.com/products/erp/s4hana.html
+  element_key: technology.sap-gateway-2
+  module_keys:
+  - platform
+- type: SystemSoftware
+  layer: technology
+  name: SAP Web Dispatcher
+  description: SAP Web Dispatcher
+  mandatory: true
+  source_urls:
+  - https://www.sap.com/products/erp/s4hana.html
+  element_key: technology.sap-web-dispatcher-2
+  module_keys:
+  - platform
+- type: SystemSoftware
+  layer: technology
+  name: SAP Solution Manager
+  description: SAP Solution Manager
+  mandatory: true
+  source_urls:
+  - https://www.sap.com/products/erp/s4hana.html
+  element_key: technology.sap-solution-manager-2
+  module_keys:
+  - platform
+- type: SystemSoftware
+  layer: technology
+  name: SAP Business Technology Platform
+  description: SAP Business Technology Platform
+  mandatory: true
+  source_urls:
+  - https://www.sap.com/products/erp/s4hana.html
+  element_key: technology.sap-business-technology-platform
+  module_keys:
+  - platform
+- type: SystemSoftware
+  layer: technology
+  name: SAP Event Mesh
+  description: SAP Event Mesh
+  mandatory: true
+  source_urls:
+  - https://www.sap.com/products/erp/s4hana.html
+  element_key: technology.sap-event-mesh
+  module_keys:
+  - platform
+- type: TechnologyService
+  layer: technology
+  name: SAP S/4HANA Application Server
+  description: Core ERP processing engine
+  mandatory: true
+  source_urls:
+  - https://www.sap.com/products/erp/s4hana.html
+  element_key: technology.sap-s-4hana-application-server
+  module_keys:
+  - platform
+- type: TechnologyService
+  layer: technology
+  name: SAP HANA Database Service
+  description: In-memory database with real-time analytics
+  mandatory: true
+  source_urls:
+  - https://www.sap.com/products/erp/s4hana.html
+  element_key: technology.sap-hana-database-service
+  module_keys:
+  - platform
+- type: TechnologyService
+  layer: technology
+  name: SAP Gateway Service
+  description: OData API exposure and management
+  mandatory: true
+  source_urls:
+  - https://www.sap.com/products/erp/s4hana.html
+  element_key: technology.sap-gateway-service
+  module_keys:
+  - platform
+- type: TechnologyService
+  layer: technology
+  name: SAP Fiori Launchpad
+  description: Unified user experience
+  mandatory: true
+  source_urls:
+  - https://www.sap.com/products/erp/s4hana.html
+  element_key: technology.sap-fiori-launchpad
+  module_keys:
+  - platform
+- type: TechnologyService
+  layer: technology
+  name: SAP Integration Suite
+  description: Enterprise application integration
+  mandatory: true
+  source_urls:
+  - https://www.sap.com/products/erp/s4hana.html
+  element_key: technology.sap-integration-suite
+  module_keys:
+  - platform
+- type: TechnologyService
+  layer: technology
+  name: SAP Workflow Service
+  description: Business process automation
+  mandatory: true
+  source_urls:
+  - https://www.sap.com/products/erp/s4hana.html
+  element_key: technology.sap-workflow-service
+  module_keys:
+  - platform
+- type: TechnologyService
+  layer: technology
+  name: SAP Master Data Governance
+  description: Master data quality and consistency
+  mandatory: true
+  source_urls:
+  - https://www.sap.com/products/erp/s4hana.html
+  element_key: technology.sap-master-data-governance
+  module_keys:
+  - platform
+- type: TechnologyService
+  layer: technology
+  name: SAP Extended Warehouse Management
+  description: Advanced warehouse operations
+  mandatory: true
+  source_urls:
+  - https://www.sap.com/products/erp/s4hana.html
+  element_key: technology.sap-extended-warehouse-management
+  module_keys:
+  - platform
+- type: TechnologyService
+  layer: technology
+  name: SAP Manufacturing Execution
+  description: Shop floor control and execution
+  mandatory: true
+  source_urls:
+  - https://www.sap.com/products/erp/s4hana.html
+  element_key: technology.sap-manufacturing-execution
+  module_keys:
+  - platform
+- type: TechnologyService
+  layer: technology
+  name: SAP Quality Management
+  description: Quality planning and inspection
+  mandatory: true
+  source_urls:
+  - https://www.sap.com/products/erp/s4hana.html
+  element_key: technology.sap-quality-management
+  module_keys:
+  - platform
+- type: TechnologyService
+  layer: technology
+  name: SAP Plant Maintenance
+  description: Asset and maintenance management
+  mandatory: true
+  source_urls:
+  - https://www.sap.com/products/erp/s4hana.html
+  element_key: technology.sap-plant-maintenance
+  module_keys:
+  - platform
+- type: TechnologyService
+  layer: technology
+  name: SAP Product Lifecycle Management
+  description: Product design and engineering
+  mandatory: true
+  source_urls:
+  - https://www.sap.com/products/erp/s4hana.html
+  element_key: technology.sap-product-lifecycle-management
+  module_keys:
+  - platform
+- type: TechnologyService
+  layer: technology
+  name: SAP Advanced Planning
+  description: Supply chain planning and optimization
+  mandatory: true
+  source_urls:
+  - https://www.sap.com/products/erp/s4hana.html
+  element_key: technology.sap-advanced-planning
+  module_keys:
+  - platform
+- type: TechnologyService
+  layer: technology
+  name: SAP Analytics Cloud
+  description: Real-time business intelligence
+  mandatory: true
+  source_urls:
+  - https://www.sap.com/products/erp/s4hana.html
+  element_key: technology.sap-analytics-cloud
+  module_keys:
+  - platform
+- type: Artifact
+  layer: technology
+  name: SAP Transport Package
+  description: SAP Transport Package
+  mandatory: true
+  source_urls:
+  - https://www.sap.com/products/erp/s4hana.html
+  element_key: technology.sap-transport-package
+  module_keys:
+  - platform
+- type: Artifact
+  layer: technology
+  name: ABAP Program
+  description: ABAP Program
+  mandatory: true
+  source_urls:
+  - https://www.sap.com/products/erp/s4hana.html
+  element_key: technology.abap-program
+  module_keys:
+  - platform
+- type: Artifact
+  layer: technology
+  name: SAP Add-On
+  description: SAP Add-On
+  mandatory: true
+  source_urls:
+  - https://www.sap.com/products/erp/s4hana.html
+  element_key: technology.sap-add-on
+  module_keys:
+  - platform
+- type: Artifact
+  layer: technology
+  name: HANA Backup
+  description: HANA Backup
+  mandatory: true
+  source_urls:
+  - https://www.sap.com/products/erp/s4hana.html
+  element_key: technology.hana-backup
+  module_keys:
+  - platform
+- type: Artifact
+  layer: technology
+  name: Fiori App
+  description: Fiori App
+  mandatory: true
+  source_urls:
+  - https://www.sap.com/products/erp/s4hana.html
+  element_key: technology.fiori-app
+  module_keys:
+  - platform
+- type: Artifact
+  layer: technology
+  name: Custom OData Service
+  description: Custom OData Service
+  mandatory: true
+  source_urls:
+  - https://www.sap.com/products/erp/s4hana.html
+  element_key: technology.custom-odata-service
+  module_keys:
+  - platform
+- type: Artifact
+  layer: technology
+  name: BRFplus Rule
+  description: BRFplus Rule
+  mandatory: true
+  source_urls:
+  - https://www.sap.com/products/erp/s4hana.html
+  element_key: technology.brfplus-rule
+  module_keys:
+  - platform
+- type: CommunicationNetwork
+  layer: technology
+  name: Production Data Network
+  description: Production Data Network
+  mandatory: true
+  source_urls:
+  - https://www.sap.com/products/erp/s4hana.html
+  element_key: technology.production-data-network
+  module_keys:
+  - platform
+- type: CommunicationNetwork
+  layer: technology
+  name: HANA Replication Network
+  description: HANA Replication Network
+  mandatory: true
+  source_urls:
+  - https://www.sap.com/products/erp/s4hana.html
+  element_key: technology.hana-replication-network
+  module_keys:
+  - platform
+- type: CommunicationNetwork
+  layer: technology
+  name: SAN Storage Network
+  description: SAN Storage Network
+  mandatory: true
+  source_urls:
+  - https://www.sap.com/products/erp/s4hana.html
+  element_key: technology.san-storage-network
+  module_keys:
+  - platform
+- type: CommunicationNetwork
+  layer: technology
+  name: Internet Gateway
+  description: Internet Gateway
+  mandatory: true
+  source_urls:
+  - https://www.sap.com/products/erp/s4hana.html
+  element_key: technology.internet-gateway
+  module_keys:
+  - platform
+- type: CommunicationNetwork
+  layer: technology
+  name: SAP Cloud Connector
+  description: SAP Cloud Connector
+  mandatory: true
+  source_urls:
+  - https://www.sap.com/products/erp/s4hana.html
+  element_key: technology.sap-cloud-connector
+  module_keys:
+  - platform
+- type: Capability
+  layer: strategy
+  name: Financial Management
+  description: General ledger, accounts payable/receivable, asset accounting
+  mandatory: true
+  source_urls:
+  - https://www.sap.com/products/erp/s4hana.html
+  element_key: strategy.financial-management
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Production Planning & Execution
+  description: MRP, production orders, capacity planning, shop floor control
+  mandatory: true
+  source_urls:
+  - https://www.sap.com/products/erp/s4hana.html
+  element_key: strategy.production-planning-execution
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Material Management
+  description: Procurement, inventory management, goods movement
+  mandatory: true
+  source_urls:
+  - https://www.sap.com/products/erp/s4hana.html
+  element_key: strategy.material-management
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Sales & Distribution
+  description: Order-to-cash, pricing, shipping, billing
+  mandatory: true
+  source_urls:
+  - https://www.sap.com/products/erp/s4hana.html
+  element_key: strategy.sales-distribution
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Quality Management
+  description: Inspection planning, quality control, non-conformance
+  mandatory: true
+  source_urls:
+  - https://www.sap.com/products/erp/s4hana.html
+  element_key: strategy.quality-management
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Plant Maintenance
+  description: Preventive maintenance, work orders, asset management
+  mandatory: true
+  source_urls:
+  - https://www.sap.com/products/erp/s4hana.html
+  element_key: strategy.plant-maintenance
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Warehouse Management
+  description: Advanced warehouse operations, slotting, labor management
+  mandatory: true
+  source_urls:
+  - https://www.sap.com/products/erp/s4hana.html
+  element_key: strategy.warehouse-management
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Supply Chain Planning
+  description: Demand planning, supply network planning, production scheduling
+  mandatory: true
+  source_urls:
+  - https://www.sap.com/products/erp/s4hana.html
+  element_key: strategy.supply-chain-planning
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Product Lifecycle Management
+  description: Product design, engineering change, recipe management
+  mandatory: true
+  source_urls:
+  - https://www.sap.com/products/erp/s4hana.html
+  element_key: strategy.product-lifecycle-management
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Master Data Governance
+  description: Material master, vendor master, customer master governance
+  mandatory: true
+  source_urls:
+  - https://www.sap.com/products/erp/s4hana.html
+  element_key: strategy.master-data-governance
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Real-Time Analytics
+  description: Embedded analytics, predictive insights, operational reporting
+  mandatory: true
+  source_urls:
+  - https://www.sap.com/products/erp/s4hana.html
+  element_key: strategy.real-time-analytics
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Manufacturing Execution
+  description: Shop floor data collection, batch management, process orders
+  mandatory: true
+  source_urls:
+  - https://www.sap.com/products/erp/s4hana.html
+  element_key: strategy.manufacturing-execution
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Regulatory Compliance
+  description: FDA 21 CFR Part 11, GAMP, serialization, batch genealogy
+  mandatory: true
+  source_urls:
+  - https://www.sap.com/products/erp/s4hana.html
+  element_key: strategy.regulatory-compliance
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Asset Performance Management
+  description: Predictive maintenance, IoT integration, asset health monitoring
+  mandatory: true
+  source_urls:
+  - https://www.sap.com/products/erp/s4hana.html
+  element_key: strategy.asset-performance-management
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Environmental Health & Safety
+  description: Incident management, regulatory reporting, safety protocols
+  mandatory: true
+  source_urls:
+  - https://www.sap.com/products/erp/s4hana.html
+  element_key: strategy.environmental-health-safety
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Human Capital Management
+  description: Personnel administration, time management, payroll
+  mandatory: true
+  source_urls:
+  - https://www.sap.com/products/erp/s4hana.html
+  element_key: strategy.human-capital-management
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Project System
+  description: Project planning, execution, cost tracking
+  mandatory: true
+  source_urls:
+  - https://www.sap.com/products/erp/s4hana.html
+  element_key: strategy.project-system
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Integrated Business Planning
+  description: S&OP, demand sensing, supply response
+  mandatory: true
+  source_urls:
+  - https://www.sap.com/products/erp/s4hana.html
+  element_key: strategy.integrated-business-planning
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Trade Compliance
+  description: Import/export management, customs, duty calculation
+  mandatory: true
+  source_urls:
+  - https://www.sap.com/products/erp/s4hana.html
+  element_key: strategy.trade-compliance
+  module_keys:
+  - core
+- type: Capability
+  layer: strategy
+  name: Digital Manufacturing
+  description: IoT, machine learning, digital twin integration
+  mandatory: true
+  source_urls:
+  - https://www.sap.com/products/erp/s4hana.html
+  element_key: strategy.digital-manufacturing
+  module_keys:
+  - core
+- type: BusinessService
+  layer: business
+  name: Financial Accounting Service
+  description: Record and report financial transactions
+  mandatory: true
+  source_urls:
+  - https://www.sap.com/products/erp/s4hana.html
+  element_key: business.financial-accounting-service
+  module_keys:
+  - core
+- type: BusinessService
+  layer: business
+  name: Production Scheduling Service
+  description: Plan and schedule manufacturing operations
+  mandatory: true
+  source_urls:
+  - https://www.sap.com/products/erp/s4hana.html
+  element_key: business.production-scheduling-service
+  module_keys:
+  - core
+- type: BusinessService
+  layer: business
+  name: Inventory Management Service
+  description: Track and manage material inventory
+  mandatory: true
+  source_urls:
+  - https://www.sap.com/products/erp/s4hana.html
+  element_key: business.inventory-management-service
+  module_keys:
+  - core
+- type: BusinessService
+  layer: business
+  name: Order Fulfillment Service
+  description: Process and fulfill customer orders
+  mandatory: true
+  source_urls:
+  - https://www.sap.com/products/erp/s4hana.html
+  element_key: business.order-fulfillment-service
+  module_keys:
+  - core
+- type: BusinessService
+  layer: business
+  name: Quality Inspection Service
+  description: Perform quality checks and inspections
+  mandatory: true
+  source_urls:
+  - https://www.sap.com/products/erp/s4hana.html
+  element_key: business.quality-inspection-service
+  module_keys:
+  - core
+- type: BusinessService
+  layer: business
+  name: Procurement Service
+  description: Source and purchase materials
+  mandatory: true
+  source_urls:
+  - https://www.sap.com/products/erp/s4hana.html
+  element_key: business.procurement-service
+  module_keys:
+  - core
+- type: BusinessService
+  layer: business
+  name: Maintenance Management Service
+  description: Plan and execute asset maintenance
+  mandatory: true
+  source_urls:
+  - https://www.sap.com/products/erp/s4hana.html
+  element_key: business.maintenance-management-service
+  module_keys:
+  - core
+- type: BusinessService
+  layer: business
+  name: Warehouse Operations Service
+  description: Manage warehouse activities
+  mandatory: true
+  source_urls:
+  - https://www.sap.com/products/erp/s4hana.html
+  element_key: business.warehouse-operations-service
+  module_keys:
+  - core
+- type: BusinessService
+  layer: business
+  name: Supply Chain Planning Service
+  description: Plan demand and supply
+  mandatory: true
+  source_urls:
+  - https://www.sap.com/products/erp/s4hana.html
+  element_key: business.supply-chain-planning-service
+  module_keys:
+  - core
+- type: BusinessService
+  layer: business
+  name: Analytics & Reporting Service
+  description: Provide business intelligence
+  mandatory: true
+  source_urls:
+  - https://www.sap.com/products/erp/s4hana.html
+  element_key: business.analytics-reporting-service
+  module_keys:
+  - core
+- type: BusinessProcess
+  layer: business
+  name: Manufacturing Order Processing
+  description: Create, release, execute production orders
+  mandatory: true
+  source_urls:
+  - https://www.sap.com/products/erp/s4hana.html
+  element_key: business.manufacturing-order-processing
+  module_keys:
+  - core
+- type: BusinessProcess
+  layer: business
+  name: Purchase Order Processing
+  description: Procure materials from suppliers
+  mandatory: true
+  source_urls:
+  - https://www.sap.com/products/erp/s4hana.html
+  element_key: business.purchase-order-processing
+  module_keys:
+  - core
+- type: BusinessProcess
+  layer: business
+  name: Sales Order Processing
+  description: Process customer orders
+  mandatory: true
+  source_urls:
+  - https://www.sap.com/products/erp/s4hana.html
+  element_key: business.sales-order-processing
+  module_keys:
+  - core
+- type: BusinessProcess
+  layer: business
+  name: MRP Planning Run
+  description: Calculate material requirements
+  mandatory: true
+  source_urls:
+  - https://www.sap.com/products/erp/s4hana.html
+  element_key: business.mrp-planning-run
+  module_keys:
+  - core
+- type: BusinessProcess
+  layer: business
+  name: Quality Inspection
+  description: Inspect materials and products
+  mandatory: true
+  source_urls:
+  - https://www.sap.com/products/erp/s4hana.html
+  element_key: business.quality-inspection
+  module_keys:
+  - core
+- type: BusinessProcess
+  layer: business
+  name: Preventive Maintenance
+  description: Execute scheduled maintenance
+  mandatory: true
+  source_urls:
+  - https://www.sap.com/products/erp/s4hana.html
+  element_key: business.preventive-maintenance
+  module_keys:
+  - core
+- type: BusinessObject
+  layer: business
+  name: Material Master
+  description: Material definition and attributes
+  mandatory: true
+  source_urls:
+  - https://www.sap.com/products/erp/s4hana.html
+  element_key: business.material-master
+  module_keys:
+  - core
+- type: BusinessObject
+  layer: business
+  name: Production Order
+  description: Manufacturing work order
+  mandatory: true
+  source_urls:
+  - https://www.sap.com/products/erp/s4hana.html
+  element_key: business.production-order
+  module_keys:
+  - core
+- type: BusinessObject
+  layer: business
+  name: Purchase Order
+  description: Procurement document
+  mandatory: true
+  source_urls:
+  - https://www.sap.com/products/erp/s4hana.html
+  element_key: business.purchase-order
+  module_keys:
+  - core
+- type: BusinessObject
+  layer: business
+  name: Sales Order
+  description: Customer order
+  mandatory: true
+  source_urls:
+  - https://www.sap.com/products/erp/s4hana.html
+  element_key: business.sales-order
+  module_keys:
+  - core
+- type: BusinessObject
+  layer: business
+  name: Bill of Material
+  description: Product structure
+  mandatory: true
+  source_urls:
+  - https://www.sap.com/products/erp/s4hana.html
+  element_key: business.bill-of-material
+  module_keys:
+  - core
+- type: BusinessObject
+  layer: business
+  name: Work Center
+  description: Production resource
+  mandatory: true
+  source_urls:
+  - https://www.sap.com/products/erp/s4hana.html
+  element_key: business.work-center
+  module_keys:
+  - core
+- type: BusinessObject
+  layer: business
+  name: Batch
+  description: Material lot with unique characteristics
+  mandatory: true
+  source_urls:
+  - https://www.sap.com/products/erp/s4hana.html
+  element_key: business.batch
+  module_keys:
+  - core
+- type: BusinessObject
+  layer: business
+  name: Equipment
+  description: Maintainable asset
+  mandatory: true
+  source_urls:
+  - https://www.sap.com/products/erp/s4hana.html
+  element_key: business.equipment
+  module_keys:
+  - core
+- type: BusinessObject
+  layer: business
+  name: Inspection Lot
+  description: Quality inspection document
+  mandatory: true
+  source_urls:
+  - https://www.sap.com/products/erp/s4hana.html
+  element_key: business.inspection-lot
+  module_keys:
+  - core
+- type: ApplicationComponent
+  layer: application
+  name: SAP S/4HANA Core
+  description: Core ERP application
+  mandatory: true
+  source_urls:
+  - https://www.sap.com/products/erp/s4hana.html
+  element_key: application.sap-s-4hana-core
+  module_keys:
+  - core
+- type: ApplicationComponent
+  layer: application
+  name: SAP HANA Database
+  description: In-memory database
+  mandatory: true
+  source_urls:
+  - https://www.sap.com/products/erp/s4hana.html
+  element_key: application.sap-hana-database
+  module_keys:
+  - core
+- type: ApplicationComponent
+  layer: application
+  name: SAP Fiori Launchpad
+  description: User interface framework
+  mandatory: true
+  source_urls:
+  - https://www.sap.com/products/erp/s4hana.html
+  element_key: application.sap-fiori-launchpad
+  module_keys:
+  - core
+- type: ApplicationComponent
+  layer: application
+  name: SAP Gateway
+  description: OData API layer
+  mandatory: true
+  source_urls:
+  - https://www.sap.com/products/erp/s4hana.html
+  element_key: application.sap-gateway
+  module_keys:
+  - core
+- type: ApplicationComponent
+  layer: application
+  name: SAP NetWeaver Application Server
+  description: Runtime environment
+  mandatory: true
+  source_urls:
+  - https://www.sap.com/products/erp/s4hana.html
+  element_key: application.sap-netweaver-application-server
+  module_keys:
+  - core
+- type: ApplicationComponent
+  layer: application
+  name: SAP Web Dispatcher
+  description: HTTP request distribution
+  mandatory: false
+  source_urls:
+  - https://www.sap.com/products/erp/s4hana.html
+  element_key: application.sap-web-dispatcher
+  module_keys:
+  - core
+- type: ApplicationComponent
+  layer: application
+  name: SAP Solution Manager
+  description: Application lifecycle management
+  mandatory: true
+  source_urls:
+  - https://www.sap.com/products/erp/s4hana.html
+  element_key: application.sap-solution-manager
+  module_keys:
+  - core
+- type: ApplicationComponent
+  layer: application
+  name: SAP Cloud Connector
+  description: Hybrid cloud connectivity
+  mandatory: true
+  source_urls:
+  - https://www.sap.com/products/erp/s4hana.html
+  element_key: application.sap-cloud-connector
+  module_keys:
+  - core
+- type: ApplicationComponent
+  layer: application
+  name: SAP Integration Suite
+  description: Application integration
+  mandatory: false
+  source_urls:
+  - https://www.sap.com/products/erp/s4hana.html
+  element_key: application.sap-integration-suite
+  module_keys:
+  - core
+- type: ApplicationComponent
+  layer: application
+  name: SAP Event Mesh
+  description: Event-driven architecture
+  mandatory: false
+  source_urls:
+  - https://www.sap.com/products/erp/s4hana.html
+  element_key: application.sap-event-mesh
+  module_keys:
+  - core
+- type: ApplicationComponent
+  layer: application
+  name: SAP Master Data Governance
+  description: Master data management
+  mandatory: true
+  source_urls:
+  - https://www.sap.com/products/erp/s4hana.html
+  element_key: application.sap-master-data-governance
+  module_keys:
+  - core
+- type: ApplicationComponent
+  layer: application
+  name: SAP BRFplus
+  description: Business rule management
+  mandatory: true
+  source_urls:
+  - https://www.sap.com/products/erp/s4hana.html
+  element_key: application.sap-brfplus
+  module_keys:
+  - core
+- type: ApplicationComponent
+  layer: application
+  name: SAP Workflow Engine
+  description: Business process automation
+  mandatory: true
+  source_urls:
+  - https://www.sap.com/products/erp/s4hana.html
+  element_key: application.sap-workflow-engine
+  module_keys:
+  - core
+- type: ApplicationComponent
+  layer: application
+  name: SAP Transport Management System
+  description: Change transport
+  mandatory: true
+  source_urls:
+  - https://www.sap.com/products/erp/s4hana.html
+  element_key: application.sap-transport-management-system
+  module_keys:
+  - core
+- type: ApplicationService
+  layer: application
+  name: SAP OData API
+  description: OData v2/v4 services
+  mandatory: true
+  source_urls:
+  - https://www.sap.com/products/erp/s4hana.html
+  element_key: application.sap-odata-api
+  module_keys:
+  - core
+- type: ApplicationService
+  layer: application
+  name: SAP RFC API
+  description: Remote Function Call
+  mandatory: true
+  source_urls:
+  - https://www.sap.com/products/erp/s4hana.html
+  element_key: application.sap-rfc-api
+  module_keys:
+  - core
+- type: ApplicationService
+  layer: application
+  name: SAP IDoc Interface
+  description: Electronic Data Interchange
+  mandatory: true
+  source_urls:
+  - https://www.sap.com/products/erp/s4hana.html
+  element_key: application.sap-idoc-interface
+  module_keys:
+  - core
+- type: ApplicationService
+  layer: application
+  name: SAP Web Services
+  description: Enterprise services
+  mandatory: true
+  source_urls:
+  - https://www.sap.com/products/erp/s4hana.html
+  element_key: application.sap-web-services
+  module_keys:
+  - core
+- type: ApplicationService
+  layer: application
+  name: SAP Cloud Platform Integration API
+  description: Integration flows
+  mandatory: true
+  source_urls:
+  - https://www.sap.com/products/erp/s4hana.html
+  element_key: application.sap-cloud-platform-integration-api
+  module_keys:
+  - core
+- type: ApplicationService
+  layer: application
+  name: SAP HANA SQL Interface
+  description: Direct database access
+  mandatory: true
+  source_urls:
+  - https://www.sap.com/products/erp/s4hana.html
+  element_key: application.sap-hana-sql-interface
+  module_keys:
+  - core
+- type: ApplicationService
+  layer: application
+  name: SAP Analytics API
+  description: Analytics and reporting
+  mandatory: true
+  source_urls:
+  - https://www.sap.com/products/erp/s4hana.html
+  element_key: application.sap-analytics-api
+  module_keys:
+  - core
+- type: ApplicationService
+  layer: application
+  name: SAP Mobile Services API
+  description: Mobile application backend
+  mandatory: true
+  source_urls:
+  - https://www.sap.com/products/erp/s4hana.html
+  element_key: application.sap-mobile-services-api
+  module_keys:
+  - core
+- type: ApplicationService
+  layer: application
+  name: SAP IoT API
+  description: IoT data ingestion
+  mandatory: true
+  source_urls:
+  - https://www.sap.com/products/erp/s4hana.html
+  element_key: application.sap-iot-api
+  module_keys:
+  - core
+- type: ApplicationService
+  layer: application
+  name: SAP Workflow API
+  description: Workflow management
+  mandatory: true
+  source_urls:
+  - https://www.sap.com/products/erp/s4hana.html
+  element_key: application.sap-workflow-api
+  module_keys:
+  - core
+- type: ApplicationInterface
+  layer: application
+  name: OData Interface
+  description: OData Interface
+  mandatory: true
+  source_urls:
+  - https://www.sap.com/products/erp/s4hana.html
+  element_key: application.odata-interface
+  module_keys:
+  - core
+- type: ApplicationInterface
+  layer: application
+  name: RFC Interface
+  description: RFC Interface
+  mandatory: true
+  source_urls:
+  - https://www.sap.com/products/erp/s4hana.html
+  element_key: application.rfc-interface
+  module_keys:
+  - core
+- type: ApplicationInterface
+  layer: application
+  name: IDoc Interface
+  description: IDoc Interface
+  mandatory: true
+  source_urls:
+  - https://www.sap.com/products/erp/s4hana.html
+  element_key: application.idoc-interface
+  module_keys:
+  - core
+- type: ApplicationInterface
+  layer: application
+  name: SOAP Interface
+  description: SOAP Interface
+  mandatory: true
+  source_urls:
+  - https://www.sap.com/products/erp/s4hana.html
+  element_key: application.soap-interface
+  module_keys:
+  - core
+- type: ApplicationInterface
+  layer: application
+  name: Database Interface
+  description: Database Interface
+  mandatory: true
+  source_urls:
+  - https://www.sap.com/products/erp/s4hana.html
+  element_key: application.database-interface
+  module_keys:
+  - core
+- type: ApplicationInterface
+  layer: application
+  name: File Interface
+  description: File Interface
+  mandatory: true
+  source_urls:
+  - https://www.sap.com/products/erp/s4hana.html
+  element_key: application.file-interface
+  module_keys:
+  - core
+- type: ApplicationInterface
+  layer: application
+  name: Event Mesh Interface
+  description: Event Mesh Interface
+  mandatory: true
+  source_urls:
+  - https://www.sap.com/products/erp/s4hana.html
+  element_key: application.event-mesh-interface
+  module_keys:
+  - core
+- type: ApplicationInterface
+  layer: application
+  name: JCo Interface
+  description: JCo Interface
+  mandatory: true
+  source_urls:
+  - https://www.sap.com/products/erp/s4hana.html
+  element_key: application.jco-interface
+  module_keys:
+  - core
+- type: DataObject
+  layer: application
+  name: Material Master Record
+  description: Material Master Record
+  mandatory: true
+  source_urls:
+  - https://www.sap.com/products/erp/s4hana.html
+  element_key: application.material-master-record
+  module_keys:
+  - core
+- type: DataObject
+  layer: application
+  name: Production Order
+  description: Production Order
+  mandatory: true
+  source_urls:
+  - https://www.sap.com/products/erp/s4hana.html
+  element_key: application.production-order
+  module_keys:
+  - core
+- type: DataObject
+  layer: application
+  name: Financial Document
+  description: Financial Document
+  mandatory: true
+  source_urls:
+  - https://www.sap.com/products/erp/s4hana.html
+  element_key: application.financial-document
+  module_keys:
+  - core
+- type: DataObject
+  layer: application
+  name: Batch Record
+  description: Batch Record
+  mandatory: true
+  source_urls:
+  - https://www.sap.com/products/erp/s4hana.html
+  element_key: application.batch-record
+  module_keys:
+  - core
+- type: DataObject
+  layer: application
+  name: Quality Record
+  description: Quality Record
+  mandatory: true
+  source_urls:
+  - https://www.sap.com/products/erp/s4hana.html
+  element_key: application.quality-record
+  module_keys:
+  - core
+- type: DataObject
+  layer: application
+  name: Audit Log
+  description: Audit Log
+  mandatory: true
+  source_urls:
+  - https://www.sap.com/products/erp/s4hana.html
+  element_key: application.audit-log
+  module_keys:
+  - core
+- type: DataObject
+  layer: application
+  name: Change Document
+  description: Change Document
+  mandatory: true
+  source_urls:
+  - https://www.sap.com/products/erp/s4hana.html
+  element_key: application.change-document
+  module_keys:
+  - core
+- type: DataObject
+  layer: application
+  name: Archive Object
+  description: Archive Object
+  mandatory: true
+  source_urls:
+  - https://www.sap.com/products/erp/s4hana.html
+  element_key: application.archive-object
+  module_keys:
+  - core
+- type: DataObject
+  layer: application
+  name: Temporary Data
+  description: Temporary Data
+  mandatory: true
+  source_urls:
+  - https://www.sap.com/products/erp/s4hana.html
+  element_key: application.temporary-data
+  module_keys:
+  - core
+- type: Facility
+  layer: physical
+  name: Primary Data Center
+  description: On-premise production SAP environment
+  mandatory: true
+  source_urls:
+  - https://www.sap.com/products/erp/s4hana.html
+  element_key: physical.primary-data-center
+  module_keys:
+  - platform
+- type: Facility
+  layer: physical
+  name: Disaster Recovery Site
+  description: DR failover site
+  mandatory: true
+  source_urls:
+  - https://www.sap.com/products/erp/s4hana.html
+  element_key: physical.disaster-recovery-site
+  module_keys:
+  - platform
+- type: Facility
+  layer: physical
+  name: SAP Cloud Infrastructure
+  description: Cloud extensions and BTP
+  mandatory: true
+  source_urls:
+  - https://www.sap.com/products/erp/s4hana.html
+  element_key: physical.sap-cloud-infrastructure
+  module_keys:
+  - platform
+- type: Equipment
+  layer: physical
+  name: SAP Application Servers
+  description: SAP Application Servers
+  mandatory: true
+  source_urls:
+  - https://www.sap.com/products/erp/s4hana.html
+  element_key: physical.sap-application-servers
+  module_keys:
+  - platform
+- type: Equipment
+  layer: physical
+  name: SAP HANA Servers
+  description: SAP HANA Servers
+  mandatory: true
+  source_urls:
+  - https://www.sap.com/products/erp/s4hana.html
+  element_key: physical.sap-hana-servers
+  module_keys:
+  - platform
+- type: Equipment
+  layer: physical
+  name: Storage Array
+  description: Storage Array
+  mandatory: true
+  source_urls:
+  - https://www.sap.com/products/erp/s4hana.html
+  element_key: physical.storage-array
+  module_keys:
+  - platform
+- type: Equipment
+  layer: physical
+  name: Network Switches
+  description: Network Switches
+  mandatory: true
+  source_urls:
+  - https://www.sap.com/products/erp/s4hana.html
+  element_key: physical.network-switches
+  module_keys:
+  - platform
+- type: Equipment
+  layer: physical
+  name: SAP Router
+  description: SAP Router
+  mandatory: true
+  source_urls:
+  - https://www.sap.com/products/erp/s4hana.html
+  element_key: physical.sap-router
+  module_keys:
+  - platform
+- type: DistributionNetwork
+  layer: physical
+  name: Data Center LAN
+  description: Data Center LAN
+  mandatory: true
+  source_urls:
+  - https://www.sap.com/products/erp/s4hana.html
+  element_key: physical.data-center-lan
+  module_keys:
+  - platform
+- type: DistributionNetwork
+  layer: physical
+  name: SAN Fabric
+  description: SAN Fabric
+  mandatory: true
+  source_urls:
+  - https://www.sap.com/products/erp/s4hana.html
+  element_key: physical.san-fabric
+  module_keys:
+  - platform
+- type: DistributionNetwork
+  layer: physical
+  name: WAN to Plants
+  description: WAN to Plants
+  mandatory: true
+  source_urls:
+  - https://www.sap.com/products/erp/s4hana.html
+  element_key: physical.wan-to-plants
+  module_keys:
+  - platform
+- type: DistributionNetwork
+  layer: physical
+  name: Internet Gateway
+  description: Internet Gateway
+  mandatory: true
+  source_urls:
+  - https://www.sap.com/products/erp/s4hana.html
+  element_key: physical.internet-gateway
+  module_keys:
+  - platform
+relationships:
+- source_key: application.sap-s-4hana
+  target_key: application.sap-s-4hana-core
+  type: composition
+  module_keys:
+  - core
+- source_key: application.sap-s-4hana
+  target_key: application.sap-hana-database
+  type: composition
+  module_keys:
+  - core
+- source_key: application.sap-s-4hana
+  target_key: application.sap-fiori-launchpad
+  type: composition
+  module_keys:
+  - core
+- source_key: application.sap-s-4hana
+  target_key: application.sap-gateway
+  type: composition
+  module_keys:
+  - core
+- source_key: application.sap-s-4hana
+  target_key: application.sap-netweaver-application-server
+  type: composition
+  module_keys:
+  - core
+- source_key: application.sap-s-4hana
+  target_key: application.sap-web-dispatcher
+  type: composition
+  module_keys:
+  - core
+- source_key: application.sap-s-4hana
+  target_key: application.sap-solution-manager
+  type: composition
+  module_keys:
+  - core
+- source_key: application.sap-s-4hana
+  target_key: application.sap-cloud-connector
+  type: composition
+  module_keys:
+  - core
+- source_key: application.sap-s-4hana
+  target_key: application.sap-integration-suite
+  type: composition
+  module_keys:
+  - core
+- source_key: application.sap-s-4hana
+  target_key: application.sap-event-mesh
+  type: composition
+  module_keys:
+  - core
+- source_key: application.sap-s-4hana
+  target_key: application.sap-master-data-governance
+  type: composition
+  module_keys:
+  - core
+- source_key: application.sap-s-4hana
+  target_key: application.sap-brfplus
+  type: composition
+  module_keys:
+  - core
+- source_key: application.sap-s-4hana
+  target_key: application.sap-workflow-engine
+  type: composition
+  module_keys:
+  - core
+- source_key: application.sap-s-4hana
+  target_key: application.sap-transport-management-system
+  type: composition
+  module_keys:
+  - core
+- source_key: technology.sap-s-4hana
+  target_key: application.sap-s-4hana
+  type: serving
+  module_keys:
+  - core
+  - platform
+- source_key: technology.sap-hana-database
+  target_key: application.sap-hana-database
+  type: serving
+  module_keys:
+  - core
+  - platform
+- source_key: technology.sap-netweaver
+  target_key: application.sap-s-4hana
+  type: serving
+  module_keys:
+  - core
+  - platform
+- source_key: technology.sap-fiori
+  target_key: application.sap-s-4hana
+  type: serving
+  module_keys:
+  - core
+  - platform
+- source_key: technology.sap-gateway-2
+  target_key: application.sap-gateway
+  type: serving
+  module_keys:
+  - core
+  - platform
+- source_key: technology.sap-web-dispatcher-2
+  target_key: application.sap-web-dispatcher
+  type: serving
+  module_keys:
+  - core
+  - platform
+- source_key: technology.sap-solution-manager-2
+  target_key: application.sap-solution-manager
+  type: serving
+  module_keys:
+  - core
+  - platform
+- source_key: technology.sap-business-technology-platform
+  target_key: application.sap-s-4hana
+  type: serving
+  module_keys:
+  - core
+  - platform
+- source_key: technology.sap-event-mesh
+  target_key: application.sap-event-mesh
+  type: serving
+  module_keys:
+  - core
+  - platform
+- source_key: technology.sap-s-4hana-application-server-1
+  target_key: application.sap-s-4hana
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.sap-s-4hana-application-server-2
+  target_key: application.sap-s-4hana
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.sap-hana-primary-database
+  target_key: application.sap-s-4hana
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.sap-hana-secondary-database
+  target_key: application.sap-s-4hana
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.sap-web-dispatcher
+  target_key: application.sap-s-4hana
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.sap-solution-manager
+  target_key: application.sap-s-4hana
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.sap-gateway
+  target_key: application.sap-s-4hana
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.sap-fiori-frontend-server
+  target_key: application.sap-s-4hana
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.sap-router
+  target_key: application.sap-s-4hana
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.hardware-security-module
+  target_key: application.sap-s-4hana
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.san-storage-array
+  target_key: application.sap-s-4hana
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.load-balancer
+  target_key: application.sap-s-4hana
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.firewall-cluster
+  target_key: application.sap-s-4hana
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.sap-s-4hana-application-server
+  target_key: application.sap-s-4hana
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.sap-hana-database-service
+  target_key: application.sap-s-4hana
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.sap-gateway-service
+  target_key: application.sap-s-4hana
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.sap-fiori-launchpad
+  target_key: application.sap-s-4hana
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.sap-integration-suite
+  target_key: application.sap-s-4hana
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.sap-workflow-service
+  target_key: application.sap-s-4hana
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.sap-master-data-governance
+  target_key: application.sap-s-4hana
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.sap-extended-warehouse-management
+  target_key: application.sap-s-4hana
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.sap-manufacturing-execution
+  target_key: application.sap-s-4hana
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.sap-quality-management
+  target_key: application.sap-s-4hana
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.sap-plant-maintenance
+  target_key: application.sap-s-4hana
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.sap-product-lifecycle-management
+  target_key: application.sap-s-4hana
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.sap-advanced-planning
+  target_key: application.sap-s-4hana
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.sap-analytics-cloud
+  target_key: application.sap-s-4hana
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.sap-s-4hana-application-server-1
+  target_key: technology.sap-transport-package
+  type: association
+  module_keys:
+  - platform
+- source_key: technology.sap-s-4hana-application-server-1
+  target_key: technology.abap-program
+  type: association
+  module_keys:
+  - platform
+- source_key: technology.sap-s-4hana-application-server-1
+  target_key: technology.sap-add-on
+  type: association
+  module_keys:
+  - platform
+- source_key: technology.sap-s-4hana-application-server-1
+  target_key: technology.hana-backup
+  type: association
+  module_keys:
+  - platform
+- source_key: technology.sap-s-4hana-application-server-1
+  target_key: technology.fiori-app
+  type: association
+  module_keys:
+  - platform
+- source_key: technology.sap-s-4hana-application-server-1
+  target_key: technology.custom-odata-service
+  type: association
+  module_keys:
+  - platform
+- source_key: technology.sap-s-4hana-application-server-1
+  target_key: technology.brfplus-rule
+  type: association
+  module_keys:
+  - platform
+- source_key: technology.production-data-network
+  target_key: application.sap-s-4hana
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.hana-replication-network
+  target_key: application.sap-s-4hana
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.san-storage-network
+  target_key: application.sap-s-4hana
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.internet-gateway
+  target_key: application.sap-s-4hana
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: technology.sap-cloud-connector
+  target_key: application.sap-s-4hana
+  type: association
+  module_keys:
+  - core
+  - platform
+- source_key: strategy.financial-management
+  target_key: application.sap-s-4hana
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.production-planning-execution
+  target_key: application.sap-s-4hana
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.material-management
+  target_key: application.sap-s-4hana
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.sales-distribution
+  target_key: application.sap-s-4hana
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.quality-management
+  target_key: application.sap-s-4hana
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.plant-maintenance
+  target_key: application.sap-s-4hana
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.warehouse-management
+  target_key: application.sap-s-4hana
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.supply-chain-planning
+  target_key: application.sap-s-4hana
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.product-lifecycle-management
+  target_key: application.sap-s-4hana
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.master-data-governance
+  target_key: application.sap-s-4hana
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.real-time-analytics
+  target_key: application.sap-s-4hana
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.manufacturing-execution
+  target_key: application.sap-s-4hana
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.regulatory-compliance
+  target_key: application.sap-s-4hana
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.asset-performance-management
+  target_key: application.sap-s-4hana
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.environmental-health-safety
+  target_key: application.sap-s-4hana
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.human-capital-management
+  target_key: application.sap-s-4hana
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.project-system
+  target_key: application.sap-s-4hana
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.integrated-business-planning
+  target_key: application.sap-s-4hana
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.trade-compliance
+  target_key: application.sap-s-4hana
+  type: association
+  module_keys:
+  - core
+- source_key: strategy.digital-manufacturing
+  target_key: application.sap-s-4hana
+  type: association
+  module_keys:
+  - core
+- source_key: application.sap-s-4hana
+  target_key: business.financial-accounting-service
+  type: association
+  module_keys:
+  - core
+- source_key: application.sap-s-4hana
+  target_key: business.production-scheduling-service
+  type: association
+  module_keys:
+  - core
+- source_key: application.sap-s-4hana
+  target_key: business.inventory-management-service
+  type: association
+  module_keys:
+  - core
+- source_key: application.sap-s-4hana
+  target_key: business.order-fulfillment-service
+  type: association
+  module_keys:
+  - core
+- source_key: application.sap-s-4hana
+  target_key: business.quality-inspection-service
+  type: association
+  module_keys:
+  - core
+- source_key: application.sap-s-4hana
+  target_key: business.procurement-service
+  type: association
+  module_keys:
+  - core
+- source_key: application.sap-s-4hana
+  target_key: business.maintenance-management-service
+  type: association
+  module_keys:
+  - core
+- source_key: application.sap-s-4hana
+  target_key: business.warehouse-operations-service
+  type: association
+  module_keys:
+  - core
+- source_key: application.sap-s-4hana
+  target_key: business.supply-chain-planning-service
+  type: association
+  module_keys:
+  - core
+- source_key: application.sap-s-4hana
+  target_key: business.analytics-reporting-service
+  type: association
+  module_keys:
+  - core
+- source_key: application.sap-s-4hana
+  target_key: business.manufacturing-order-processing
+  type: association
+  module_keys:
+  - core
+- source_key: application.sap-s-4hana
+  target_key: business.purchase-order-processing
+  type: association
+  module_keys:
+  - core
+- source_key: application.sap-s-4hana
+  target_key: business.sales-order-processing
+  type: association
+  module_keys:
+  - core
+- source_key: application.sap-s-4hana
+  target_key: business.mrp-planning-run
+  type: association
+  module_keys:
+  - core
+- source_key: application.sap-s-4hana
+  target_key: business.quality-inspection
+  type: association
+  module_keys:
+  - core
+- source_key: application.sap-s-4hana
+  target_key: business.preventive-maintenance
+  type: association
+  module_keys:
+  - core
+- source_key: business.material-master
+  target_key: application.sap-s-4hana
+  type: association
+  module_keys:
+  - core
+- source_key: business.production-order
+  target_key: application.sap-s-4hana
+  type: association
+  module_keys:
+  - core
+- source_key: business.purchase-order
+  target_key: application.sap-s-4hana
+  type: association
+  module_keys:
+  - core
+- source_key: business.sales-order
+  target_key: application.sap-s-4hana
+  type: association
+  module_keys:
+  - core
+- source_key: business.bill-of-material
+  target_key: application.sap-s-4hana
+  type: association
+  module_keys:
+  - core
+- source_key: business.work-center
+  target_key: application.sap-s-4hana
+  type: association
+  module_keys:
+  - core
+- source_key: business.batch
+  target_key: application.sap-s-4hana
+  type: association
+  module_keys:
+  - core
+- source_key: business.equipment
+  target_key: application.sap-s-4hana
+  type: association
+  module_keys:
+  - core
+- source_key: business.inspection-lot
+  target_key: application.sap-s-4hana
+  type: association
+  module_keys:
+  - core
+- source_key: application.sap-odata-api
+  target_key: application.sap-s-4hana
+  type: association
+  module_keys:
+  - core
+- source_key: application.sap-rfc-api
+  target_key: application.sap-s-4hana
+  type: association
+  module_keys:
+  - core
+- source_key: application.sap-idoc-interface
+  target_key: application.sap-s-4hana
+  type: association
+  module_keys:
+  - core
+- source_key: application.sap-web-services
+  target_key: application.sap-s-4hana
+  type: association
+  module_keys:
+  - core
+- source_key: application.sap-cloud-platform-integration-api
+  target_key: application.sap-s-4hana
+  type: association
+  module_keys:
+  - core
+- source_key: application.sap-hana-sql-interface
+  target_key: application.sap-s-4hana
+  type: association
+  module_keys:
+  - core
+- source_key: application.sap-analytics-api
+  target_key: application.sap-s-4hana
+  type: association
+  module_keys:
+  - core
+- source_key: application.sap-mobile-services-api
+  target_key: application.sap-s-4hana
+  type: association
+  module_keys:
+  - core
+- source_key: application.sap-iot-api
+  target_key: application.sap-s-4hana
+  type: association
+  module_keys:
+  - core
+- source_key: application.sap-workflow-api
+  target_key: application.sap-s-4hana
+  type: association
+  module_keys:
+  - core
+- source_key: application.odata-interface
+  target_key: application.sap-s-4hana
+  type: association
+  module_keys:
+  - core
+- source_key: application.rfc-interface
+  target_key: application.sap-s-4hana
+  type: association
+  module_keys:
+  - core
+- source_key: application.idoc-interface
+  target_key: application.sap-s-4hana
+  type: association
+  module_keys:
+  - core
+- source_key: application.soap-interface
+  target_key: application.sap-s-4hana
+  type: association
+  module_keys:
+  - core
+- source_key: application.database-interface
+  target_key: application.sap-s-4hana
+  type: association
+  module_keys:
+  - core
+- source_key: application.file-interface
+  target_key: application.sap-s-4hana
+  type: association
+  module_keys:
+  - core
+- source_key: application.event-mesh-interface
+  target_key: application.sap-s-4hana
+  type: association
+  module_keys:
+  - core
+- source_key: application.jco-interface
+  target_key: application.sap-s-4hana
+  type: association
+  module_keys:
+  - core
+- source_key: application.sap-s-4hana
+  target_key: application.material-master-record
+  type: association
+  module_keys:
+  - core
+- source_key: application.sap-s-4hana
+  target_key: application.production-order
+  type: association
+  module_keys:
+  - core
+- source_key: application.sap-s-4hana
+  target_key: application.financial-document
+  type: association
+  module_keys:
+  - core
+- source_key: application.sap-s-4hana
+  target_key: application.batch-record
+  type: association
+  module_keys:
+  - core
+- source_key: application.sap-s-4hana
+  target_key: application.quality-record
+  type: association
+  module_keys:
+  - core
+- source_key: application.sap-s-4hana
+  target_key: application.audit-log
+  type: association
+  module_keys:
+  - core
+- source_key: application.sap-s-4hana
+  target_key: application.change-document
+  type: association
+  module_keys:
+  - core
+- source_key: application.sap-s-4hana
+  target_key: application.archive-object
+  type: association
+  module_keys:
+  - core
+- source_key: application.sap-s-4hana
+  target_key: application.temporary-data
+  type: association
+  module_keys:
+  - core
+- source_key: physical.primary-data-center
+  target_key: technology.sap-s-4hana-application-server-1
+  type: association
+  module_keys:
+  - platform
+- source_key: physical.disaster-recovery-site
+  target_key: technology.sap-s-4hana-application-server-1
+  type: association
+  module_keys:
+  - platform
+- source_key: physical.sap-cloud-infrastructure
+  target_key: technology.sap-s-4hana-application-server-1
+  type: association
+  module_keys:
+  - platform
+- source_key: physical.sap-application-servers
+  target_key: technology.sap-s-4hana-application-server-1
+  type: association
+  module_keys:
+  - platform
+- source_key: physical.sap-hana-servers
+  target_key: technology.sap-s-4hana-application-server-1
+  type: association
+  module_keys:
+  - platform
+- source_key: physical.storage-array
+  target_key: technology.sap-s-4hana-application-server-1
+  type: association
+  module_keys:
+  - platform
+- source_key: physical.network-switches
+  target_key: technology.sap-s-4hana-application-server-1
+  type: association
+  module_keys:
+  - platform
+- source_key: physical.sap-router
+  target_key: technology.sap-s-4hana-application-server-1
+  type: association
+  module_keys:
+  - platform
+- source_key: physical.data-center-lan
+  target_key: physical.sap-application-servers
+  type: association
+  module_keys:
+  - platform
+- source_key: physical.san-fabric
+  target_key: physical.sap-application-servers
+  type: association
+  module_keys:
+  - platform
+- source_key: physical.wan-to-plants
+  target_key: physical.sap-application-servers
+  type: association
+  module_keys:
+  - platform
+- source_key: physical.internet-gateway
+  target_key: physical.sap-application-servers
+  type: association
+  module_keys:
+  - platform
+integrations: []
+capability_mappings: []
