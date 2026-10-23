@@ -66,21 +66,48 @@ class AgentCharter(TenantMixin, db.Model):
         """Check whether a tool call is within the persona's charter bounds."""
         charter = cls.current_for(persona, organization_id)
         if charter is None:
-            # No charter at all — fail CLOSED.
-            return False
-        forbidden = charter.forbidden_actions or []
+            # No charter recorded for this organisation yet: the persona works within the
+            # product's own default bounds (the same ones the seed writes) instead of
+            # refusing every tool, which left a new organisation's chat unable to look
+            # anything up. Writes still go through the approval queue as before.
+            bounds = _default_bounds(persona)
+            if bounds is None:
+                return False
+            forbidden, proposable = bounds
+        else:
+            forbidden = charter.forbidden_actions or []
+            proposable = charter.proposable_actions or []
         if tool_name in forbidden:
             return False
-        proposable = charter.proposable_actions or []
+        # A read-only tool is always within bounds unless the charter forbids it by name:
+        # the proposable list governs what a persona may propose or change, not what it
+        # may look up. Without this, a persona with a proposable list could not find an
+        # application or run an impact query, and sent people to other pages.
+        if _risk_class(tool_name) == "read":
+            return True
         if not proposable:
             # Empty proposable list — persona can only read.
-            from app.modules.ai_chat.tools.registry import TOOL_SCHEMA_BY_NAME
-
-            schema = TOOL_SCHEMA_BY_NAME.get(tool_name, {})
-            risk_class = schema.get("risk_class")
-            if risk_class in ("read", "propose"):
+            if _risk_class(tool_name) in ("read", "propose"):
                 return True
             return False
         if isinstance(proposable, str) and proposable == "all":
             return True
         return tool_name in proposable
+
+def _default_bounds(persona: str):
+    """(forbidden, proposable) from the product's own charter defaults, or None for an unknown persona."""
+    try:
+        from app.commands.seed_agent_charters import _CHARTER_BOUNDS
+    except ImportError:
+        return None
+    entry = _CHARTER_BOUNDS.get(persona)
+    if not entry:
+        return None
+    _purpose, _readable, proposable, forbidden = entry
+    return list(forbidden or []), (proposable if isinstance(proposable, str) else list(proposable or []))
+
+
+def _risk_class(tool_name: str):
+    from app.modules.ai_chat.tools.registry import TOOL_SCHEMA_BY_NAME
+
+    return TOOL_SCHEMA_BY_NAME.get(tool_name, {}).get("risk_class")
