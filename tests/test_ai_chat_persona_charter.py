@@ -120,3 +120,33 @@ def test_no_persona_is_unchanged_from_the_old_eight_word_note(app):
         "two or more personas produced an identical system prompt — this is the "
         "P-01 defect, where persona selection changed the label and not the expertise"
     )
+
+
+def test_every_page_the_charters_recommend_resolves(app):
+    """Every internal path the charters tell the assistant to recommend must be a real route.
+
+    The persona charters, and the shared evidence rules appended to every
+    prompt, name Entelim pages the assistant may send users to (for example
+    the audit log and the import page). Each extracted path must resolve in
+    the Flask url_map so the assistant can never cite a 404.
+    """
+    import re
+
+    from app.modules.ai_chat.services.architect_persona_charters import (
+        CHARTERS,
+        _EVIDENCE_RULES,
+    )
+
+    cue = re.compile(r"(?:e\.g\.|see|point to|action on|browse at)[^.;]*", re.IGNORECASE)
+    path = re.compile(r"/[a-z0-9][\w-]*(?:/[\w-]+)*")
+    recommended = []
+    for source in list(CHARTERS.values()) + [_EVIDENCE_RULES]:
+        for match in cue.finditer(source):
+            recommended.extend(path.findall(match.group(0)))
+
+    rules = {rule.rule.rstrip("/") for rule in app.url_map.iter_rules()}
+    for page in sorted(set(recommended)):
+        assert page.rstrip("/") in rules, (
+            f"{page!r} is recommended by a persona charter but is not a "
+            f"registered route — the assistant would send users to a 404"
+        )
