@@ -191,8 +191,12 @@ def boot_live_server(request, ai_protocol_stub, app, extra_env=None):
     # boot; mirror that here so browser journeys observe the real branch code,
     # not drift left behind by an older local schema.
     from app.commands.reconcile_schema import _reconcile
+    from app.commands.schema_migrations import dedupe_metadata_indexes
+    from app import db as _db
 
     with app.app_context():
+        dedupe_metadata_indexes(_db.metadata)
+        _db.create_all()
         _added, failed, _missing, _blocking = _reconcile(dry_run=False)
         assert not failed, "smoke live_server could not reconcile schema: %s" % failed
 
