@@ -414,7 +414,7 @@ async function openCapabilityDetail(capabilityId, capabilityName) {
         html += '<div class="mb-4 space-y-1">';
         if (cap.code) html += '<p class="text-xs text-muted-foreground">' + cap.code + '</p>';
         html += '<div class="flex items-center gap-2">';
-        html += '<span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-blue-500/10 text-blue-600 border border-blue-500/30">Level ' + (cap.level || '?') + '</span>';
+        html += '<span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-info/10 text-info-emphasis border border-info/30">Level ' + (cap.level || '?') + '</span>';
         html += '<span class="text-sm text-muted-foreground">' + (data.mapped_count || 0) + ' of ' + (data.total_count || 0) + ' apps mapped</span>';
         html += '</div></div>';
         if (cap.current_maturity !== undefined) {
