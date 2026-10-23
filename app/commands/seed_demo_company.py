@@ -1992,9 +1992,513 @@ def seed_demo_company() -> dict:
                     wp_by_name[wp_name].id, gap.id, organization_id=org_id)
         db.session.flush()
 
+        # ── 13. solution development chain ──────────────────────────────
+        _seed_solution_chain(org_id, stats)
+
         db.session.commit()
 
     return stats
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+#  solution development chain (gap -> vendor selection -> solution -> journey)
+# ═════════════════════════════════════════════════════════════════════════════
+# Written by the seed, never by a model: every score and sentence below is a
+# fixed value, so a prospect or a walk meets the same records on every run.
+# Every record is scoped to the demonstration organisation and is found again
+# by its name or title, so a second run creates nothing.
+
+import json as _json
+
+_CHAIN_GAP_EARLY = "Customer returns triage gap"
+_CHAIN_GAP_COMPLETE = "Field visit scheduling gap"
+
+_CHAIN_SOLUTIONS = [
+    # (name, adm_phase, description)
+    (
+        "Field Service Scheduling Modernisation",
+        "E",
+        "Replace the manual dispatch spreadsheets used by Field Service with one scheduling "
+        "platform that reads the existing asset register and the engineer skills matrix.",
+    ),
+    (
+        "Customer Returns Triage",
+        "B",
+        "Give Circular Recovery a single intake and triage step for returned units so "
+        "refurbish, repair and recycle decisions stop depending on who is on shift.",
+    ),
+]
+
+_CHAIN_OPTIONS = [
+    # (name, approach, summary, strategic_fit, risk_score, coverage, cost_band,
+    #  timeline_months, risk, recommended, pros, cons)
+    (
+        "Extend the current scheduler",
+        "extend",
+        "Add skills-based routing and mobile check-in to the Field Service Scheduler already in use.",
+        62, 35, 70, "low", 6, "medium", False,
+        ["Smallest change to engineer working practice", "No new licence"],
+        ["Routing logic stays custom code", "Does not retire the dispatch spreadsheets"],
+    ),
+    (
+        "Buy a field service platform",
+        "buy",
+        "Adopt a packaged field service platform and retire the spreadsheets and custom routing.",
+        84, 40, 88, "medium", 9, "medium", True,
+        ["Skills routing, scheduling and mobile app in one product",
+         "Fits the platform standard already used for service workflows"],
+        ["Annual subscription cost", "Data migration from the spreadsheets needed"],
+    ),
+    (
+        "Build in-house",
+        "build",
+        "Build a purpose-made scheduling service on the integration platform.",
+        55, 70, 80, "high", 14, "high", False,
+        ["Exact fit to Lantern Quay routing rules"],
+        ["Longest delivery time", "Ongoing ownership falls on a small team"],
+    ),
+]
+
+_CHAIN_CRITERIA = {
+    "cost": 0.25,
+    "capability_coverage": 0.25,
+    "risk": 0.20,
+    "strategic_fit": 0.15,
+    "implementation": 0.15,
+}
+
+_CHAIN_COMPLETE_ANALYSIS = "Field service platform selection"
+_CHAIN_DRAFT_ANALYSIS = "Document management replacement"
+
+_CHAIN_VENDORS = [
+    # (vendor, cost, coverage, risk, fit, implementation, tco_5yr, licence_yr, support_yr,
+    #  weeks, pros, cons)
+    ("ServiceNow", 74, 88, 72, 90, 70, 410000, 62000, 14000, 18,
+     ["Already the workflow platform for the service desk", "Strong scheduling and mobile engineer app"],
+     ["Highest licence cost of the four", "Needs a certified implementation partner"]),
+    ("Salesforce", 68, 84, 70, 76, 74, 385000, 58000, 13000, 20,
+     ["Customer record shared with the Customer Portal", "Large partner ecosystem"],
+     ["Asset register would need a custom object", "Separate identity model from the estate"]),
+    ("Oracle", 62, 80, 66, 70, 58, 450000, 66000, 15000, 26,
+     ["Already supplies Dispatch Planner and Finance System", "Single support contract"],
+     ["Longest implementation of the four", "Mobile experience trails the others"]),
+    ("SAP", 60, 78, 68, 64, 55, 440000, 64000, 15000, 28,
+     ["Already supplies Inventory Manager", "Spare parts and service planning in one suite"],
+     ["Heavy configuration effort", "Field engineer app needs an add-on"]),
+]
+
+_CHAIN_DRAFT_VENDORS = ["OpenText", "Microsoft"]
+
+_CHAIN_JOURNEY_TITLE = "Plan the Customer Returns Triage solution"
+
+
+def _chain_vendor(name):
+    """Return the shared catalogue vendor of this name, adding a bare entry only if absent."""
+    from app.models.vendor.vendor_organization import VendorOrganization
+
+    vendor = VendorOrganization.query.filter_by(name=name).first()
+    if vendor is None:
+        vendor = VendorOrganization(name=name, display_name=name, vendor_type="software_vendor")
+        db.session.add(vendor)
+        db.session.flush()
+    return vendor
+
+
+def _seed_solution_chain(org_id, stats):
+    """Seed solutions, options, decision, vendor selections, gap link and journey.
+
+    Runs inside the caller's tenant_scope and transaction. Returns nothing; it
+    adds counts to ``stats``.
+    """
+    from app.models.architecture_decision import ArchitectureDecision
+    from app.models.architecture_journey import ArchitectureJourney
+    from app.models.business_capabilities import BusinessCapability
+    from app.models.implementation_migration import Gap
+    from app.models.solution_lifecycle_models import SolutionOption
+    from app.models.solution_models import Solution
+    from app.models.vendor_analysis import (
+        AnalysisRecommendation,
+        OptionsAnalysis,
+        VendorOption,
+    )
+
+    demo_user = _resolve_users(org_id).get(_DEMO_USER_EMAIL)
+    if demo_user is None:
+        for key in (
+            "solutions_created", "solution_options_created", "decisions_created",
+            "vendor_analyses_created", "vendor_options_created", "journeys_created",
+            "chain_gaps_created",
+        ):
+            stats[key] = 0
+        return
+    now = _dt.datetime.utcnow()
+
+    # ── solutions ───────────────────────────────────────────────────────
+    solutions = {
+        s.name: s
+        for s in db.session.query(Solution).filter(Solution.organization_id == org_id).all()
+    }
+    solutions_created = 0
+    for name, phase, description in _CHAIN_SOLUTIONS:
+        if name in solutions:
+            continue
+        complete = phase == "E"
+        sol = Solution(
+            name=name,
+            description=description,
+            organization_id=org_id,
+            created_by_id=demo_user.id,
+            solution_type="Service",
+            business_domain="Field Service" if complete else "Circular Recovery",
+            complexity_level="Moderate",
+            adm_phase=phase,
+            status="in_progress" if complete else "planned",
+            deployment_status="design",
+            governance_status="proposed" if complete else "draft",
+            solution_owner="Ivo Reed",
+            technical_lead="Shared Services Director" if complete else None,
+            business_sponsor="Field Service Engineer" if complete else None,
+            business_value=(
+                "Fewer missed visit windows and less engineer travel between jobs."
+                if complete else "A consistent decision on every returned unit."
+            ),
+            scope_description=description,
+            estimated_cost=420000 if complete else None,
+            planned_start_date=_dt.date(2026, 11, 2) if complete else None,
+            planned_end_date=_dt.date(2027, 8, 31) if complete else None,
+            current_step=5 if complete else 2,
+        )
+        if complete:
+            sol.adm_phase_a_completed_at = now - _dt.timedelta(days=75)
+            sol.adm_phase_b_completed_at = now - _dt.timedelta(days=60)
+            sol.adm_phase_c_completed_at = now - _dt.timedelta(days=46)
+            sol.adm_phase_d_completed_at = now - _dt.timedelta(days=32)
+            sol.section_narratives = {
+                "executive_summary": (
+                    "Field Service plans visits in spreadsheets. This solution moves scheduling "
+                    "onto one platform that routes by engineer skill and reports completion from "
+                    "the engineer's phone."
+                ),
+                "vision_motivation": (
+                    "Reduce missed visit windows and travel time. Retire the dispatch "
+                    "spreadsheets by the end of the programme."
+                ),
+                "gap_analysis": (
+                    "The field service coverage gap is closed by the recommended platform option; "
+                    "the dispatch spreadsheets are retired in the first transition state."
+                ),
+            }
+            sol.blueprint_version = 1
+            sol.blueprint_updated_at = now - _dt.timedelta(days=5)
+            sol.blueprint_updated_by_id = demo_user.id
+        else:
+            sol.problem_clarification = (
+                "Returned units are triaged by whoever is on shift. The aim is one intake step "
+                "with one set of rules. Requirements are captured; options are not yet started."
+            )
+        db.session.add(sol)
+        solutions[name] = sol
+        solutions_created += 1
+    if solutions_created:
+        db.session.flush()
+    stats["solutions_created"] = solutions_created
+
+    complete_sol = solutions[_CHAIN_SOLUTIONS[0][0]]
+    early_sol = solutions[_CHAIN_SOLUTIONS[1][0]]
+
+    # ── solution options (three, scored) and the decision record ────────
+    existing_options = {
+        o.name
+        for o in db.session.query(SolutionOption)
+        .filter(SolutionOption.solution_id == complete_sol.id)
+        .all()
+    }
+    options_created = 0
+    for rank, (name, _approach, summary, fit, risk, cover, _cb, _tm, _rk, picked, pros, cons) in enumerate(
+        _CHAIN_OPTIONS, start=1
+    ):
+        if name in existing_options:
+            continue
+        db.session.add(SolutionOption(
+            solution_id=complete_sol.id,
+            organization_id=org_id,
+            name=name,
+            description=summary,
+            strategic_fit=fit,
+            risk_score=risk,
+            coverage=cover,
+            pros=pros,
+            cons=cons,
+            ai_generated=False,
+            is_selected=picked,
+            rank=1 if picked else rank + 1,
+            approval_status="approved",
+        ))
+        options_created += 1
+    if options_created:
+        db.session.flush()
+    stats["solution_options_created"] = options_created
+
+    decision_title = "Adopt a packaged field service platform for scheduling"
+    has_decision = (
+        db.session.query(ArchitectureDecision.id)
+        .filter(
+            ArchitectureDecision.organization_id == org_id,
+            ArchitectureDecision.solution_id == complete_sol.id,
+            ArchitectureDecision.title == decision_title,
+        )
+        .first()
+    )
+    if has_decision is None:
+        options_json = [
+            {
+                "name": n, "approach": a, "summary": s, "pros": pr, "cons": co,
+                "cost_band": cb, "timeline_months": tm, "risk": rk, "recommended": rec,
+            }
+            for (n, a, s, _f, _r, _c, cb, tm, rk, rec, pr, co) in _CHAIN_OPTIONS
+        ]
+        db.session.add(ArchitectureDecision(
+            decision_id=ArchitectureDecision.next_decision_id(),
+            title=decision_title,
+            solution_id=complete_sol.id,
+            organization_id=org_id,
+            status="accepted",
+            adm_phase="E",
+            context=(
+                "Field Service schedules visits in spreadsheets. Visit windows are missed when "
+                "an engineer with the right skill is not known to be free."
+            ),
+            decision=(
+                "Buy a packaged field service platform and retire the dispatch spreadsheets in "
+                "the first transition state."
+            ),
+            rationale=(
+                "The platform option scores highest on strategic fit and coverage, and carries "
+                "less delivery risk than building. Extending the current scheduler leaves the "
+                "spreadsheets in place."
+            ),
+            consequences=(
+                "Scheduling data moves to the platform. An annual subscription is added. "
+                "The custom routing code is no longer maintained."
+            ),
+            alternatives=_json.dumps(options_json),
+            estimated_effort="Large",
+            business_value="High",
+            decided_by_label="Architecture Review Board",
+            decided_at=now - _dt.timedelta(days=12),
+            created_by_id=demo_user.id,
+        ))
+        db.session.flush()
+        stats["decisions_created"] = 1
+    else:
+        stats["decisions_created"] = 0
+
+    # ── vendor selections ───────────────────────────────────────────────
+    def _capability(code):
+        return (
+            db.session.query(BusinessCapability)
+            .filter(BusinessCapability.organization_id == org_id, BusinessCapability.code == code)
+            .first()
+        )
+
+    analyses = {
+        a.name: a
+        for a in db.session.query(OptionsAnalysis)
+        .filter(OptionsAnalysis.organization_id == org_id)
+        .all()
+    }
+    analyses_created = 0
+    vendor_options_created = 0
+
+    if _CHAIN_COMPLETE_ANALYSIS not in analyses:
+        cap = _capability("LQ-CAP-FIELD-SERVICE")
+        if cap is not None:
+            analysis = OptionsAnalysis(
+                organization_id=org_id,
+                name=_CHAIN_COMPLETE_ANALYSIS,
+                description=(
+                    "Four platforms compared for scheduling and dispatching Field Service "
+                    "engineers, against weighted criteria."
+                ),
+                capability_id=cap.id,
+                created_by_id=demo_user.id,
+                status="completed",
+                criteria_weights=_json.dumps(_CHAIN_CRITERIA),
+                analysis_type="standard",
+                analysis_mode="single_product",
+                tco_years=5,
+                include_ai_recommendation=False,
+                started_at=now - _dt.timedelta(days=20),
+                completed_at=now - _dt.timedelta(days=19),
+                execution_duration_seconds=0,
+                total_vendors_analyzed=len(_CHAIN_VENDORS),
+                recommendation_confidence=0.78,
+                organization_size="enterprise",
+                industry_vertical="manufacturing",
+                deployment_scale="division",
+                user_count_estimate=120,
+                integration_complexity="medium",
+            )
+            db.session.add(analysis)
+            db.session.flush()
+            built = []
+            for (vname, cost, cover, risk, fit, impl, tco, lic, sup, weeks, pros, cons) in _CHAIN_VENDORS:
+                org_vendor = _chain_vendor(vname)
+                vo = VendorOption(
+                    organization_id=org_id,
+                    analysis_id=analysis.id,
+                    vendor_organization_id=org_vendor.id,
+                    vendor_type="organization",
+                    vendor_name=vname,
+                    analysis_status="completed",
+                    analysis_completed_at=now - _dt.timedelta(days=19),
+                    cost_score=cost,
+                    capability_coverage_score=cover,
+                    capability_match_percentage=cover,
+                    risk_score=risk,
+                    strategic_fit_score=fit,
+                    implementation_score=impl,
+                    tco_total=tco,
+                    license_cost_annual=lic,
+                    support_cost_annual=sup,
+                    estimated_implementation_weeks=weeks,
+                    pros=_json.dumps(pros),
+                    cons=_json.dumps(cons),
+                    analyst_notes="Scored by the architecture team for the Lantern Quay evaluation.",
+                )
+                vo.calculate_total_score(_CHAIN_CRITERIA)
+                db.session.add(vo)
+                built.append(vo)
+            built.sort(key=lambda v: v.total_score, reverse=True)
+            for rank, vo in enumerate(built, start=1):
+                vo.ranking = rank
+            db.session.flush()
+            db.session.add(AnalysisRecommendation(
+                organization_id=org_id,
+                analysis_id=analysis.id,
+                recommended_vendor_option_id=built[0].id,
+                second_choice_id=built[1].id,
+                third_choice_id=built[2].id,
+                rationale=(
+                    f"{built[0].vendor_name} ranks first on the weighted criteria and is already "
+                    "the workflow platform for the service desk, which shortens integration."
+                ),
+                confidence_score=0.78,
+                confidence_explanation="Scores were entered by the architecture team and agree across criteria.",
+                key_strengths=_json.dumps(built[0].get_pros_cons()[0]),
+                key_concerns=_json.dumps(built[0].get_pros_cons()[1]),
+                estimated_timeline_weeks=built[0].estimated_implementation_weeks,
+                reviewed_by_id=demo_user.id,
+                reviewed_at=now - _dt.timedelta(days=18),
+                human_agrees=True,
+            ))
+            analysis.recommended_vendor_id = None
+            analyses_created += 1
+            vendor_options_created += len(built)
+
+    if _CHAIN_DRAFT_ANALYSIS not in analyses:
+        cap = _capability("LQ-CAP-COMPLIANCE")
+        if cap is not None:
+            draft = OptionsAnalysis(
+                organization_id=org_id,
+                name=_CHAIN_DRAFT_ANALYSIS,
+                description="Replacement options for the Document Management application, now in sunset.",
+                capability_id=cap.id,
+                created_by_id=demo_user.id,
+                status="draft",
+                criteria_weights=_json.dumps(_CHAIN_CRITERIA),
+                analysis_type="standard",
+                analysis_mode="single_product",
+                tco_years=5,
+                include_ai_recommendation=False,
+                total_vendors_analyzed=0,
+            )
+            db.session.add(draft)
+            db.session.flush()
+            for vname in _CHAIN_DRAFT_VENDORS:
+                org_vendor = _chain_vendor(vname)
+                db.session.add(VendorOption(
+                    organization_id=org_id,
+                    analysis_id=draft.id,
+                    vendor_organization_id=org_vendor.id,
+                    vendor_type="organization",
+                    vendor_name=vname,
+                    analysis_status="pending",
+                ))
+                vendor_options_created += 1
+            analyses_created += 1
+    if analyses_created:
+        db.session.flush()
+    stats["vendor_analyses_created"] = analyses_created
+    stats["vendor_options_created"] = vendor_options_created
+
+    # ── gaps linked to the two solutions ────────────────────────────────
+    gap_specs = [
+        (_CHAIN_GAP_COMPLETE, "Visits are scheduled by hand, so engineer skills are not matched to jobs.",
+         "high", complete_sol),
+        (_CHAIN_GAP_EARLY, "Returned units have no single intake and triage step.",
+         "medium", early_sol),
+    ]
+    existing_gap_names = {
+        g.name for g in db.session.query(Gap).filter(Gap.organization_id == org_id).all()
+    }
+    chain_gaps_created = 0
+    for gname, gdesc, gseverity, gsol in gap_specs:
+        if gname in existing_gap_names:
+            continue
+        db.session.add(Gap(
+            organization_id=org_id,
+            name=gname,
+            description=gdesc,
+            gap_kind="capability_shortfall",
+            severity=gseverity,
+            context="solution",
+            context_id=gsol.id,
+            resolution_status="identified",
+        ))
+        chain_gaps_created += 1
+    stats["chain_gaps_created"] = chain_gaps_created
+
+    # ── one journey in progress, with the early solution started from it ─
+    journey = (
+        db.session.query(ArchitectureJourney)
+        .filter(
+            ArchitectureJourney.organization_id == org_id,
+            ArchitectureJourney.title == _CHAIN_JOURNEY_TITLE,
+        )
+        .first()
+    )
+    if journey is None:
+        db.session.add(ArchitectureJourney(
+            organization_id=org_id,
+            owner_id=demo_user.id,
+            title=_CHAIN_JOURNEY_TITLE,
+            intent="solution_design",
+            selected_layers=["business", "application"],
+            evidence_manifest=[
+                {
+                    "kind": "observation",
+                    "name": "Returns intake walk-through",
+                    "reference": "Circular Recovery team walk-through of the current returns intake steps",
+                    "document_id": None,
+                },
+                {
+                    "kind": "model",
+                    "name": "Circular Recovery process model",
+                    "reference": "The Circular Recovery processes and applications in the Lantern Quay model",
+                    "document_id": None,
+                },
+            ],
+            selected_deliverables=["solution_blueprint"],
+            outcome_type="solution",
+            journey_state={"step": 2, "note": "Requirements captured; options not started."},
+            current_stage="shape",
+            status="active",
+            solution_id=early_sol.id,
+        ))
+        stats["journeys_created"] = 1
+    else:
+        stats["journeys_created"] = 0
 
 
 # ═════════════════════════════════════════════════════════════════════════════
