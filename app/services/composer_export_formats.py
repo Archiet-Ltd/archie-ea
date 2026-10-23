@@ -431,6 +431,12 @@ def canvas_export_reasons(template_key: str, saved_diagram_id=None) -> List[Dict
                 els = ArchiMateElement.query.filter(ArchiMateElement.id.in_(element_ids)).all()
                 for el in els:
                     profile = (el.acm_properties or {}).get("profile")
+                    # The typed-property writer stores an enum as
+                    # {"value": ...} with provenance; an older plain string is
+                    # read as-is. Unwrap so the box-filled check compares a
+                    # string to a string either way.
+                    if isinstance(profile, dict):
+                        profile = profile.get("value")
                     if profile:
                         profiles_present.add(profile)
 
