@@ -267,3 +267,43 @@ def test_the_balance_check_never_fails_the_job(tmp_path, capsys):
     _junit(xml, [("tests.test_ci_shard_balance", "t", 1)])
     assert check_shard_balance.main([str(xml), "--table", str(tmp_path / "missing.json")]) == 0
     assert "::warning::" in capsys.readouterr().out
+
+
+def _assert_no_empty_shard(assignment, total):
+    homes = set(assignment.values())
+    empty = [i for i in range(total) if i not in homes]
+    assert not empty, f"shard(s) {empty} would select no test and fail with exit code 5"
+
+
+def test_a_smaller_suite_than_the_head_start_still_fills_shard_zero():
+    """The browser suite runs in three shards against a table that does not
+    know its files, so every file weighs the table's default rate. A fixed
+    246-second head start was more than shard 0's whole share and left it with
+    no file at all ("1487 deselected, 0 selected")."""
+    table = {"default_seconds_per_test": 0.317, "files": {}}
+    counts = {f"tests/smoke/test_journey_{n:03d}.py": 10 + n % 7 for n in range(110)}
+    assignment, loads = sharding.plan(counts, 3, table)
+    _assert_no_empty_shard(assignment, 3)
+    assert max(loads) <= (sum(loads) / 3) * 1.3, [round(ms / 60000, 1) for ms in loads]
+
+
+def test_one_file_heavier_than_all_others_together_still_leaves_no_shard_empty():
+    table = {"default_seconds_per_test": 1.0, "files": {}}
+    counts = {"tests/test_huge.py": 2000, "tests/test_small_a.py": 1, "tests/test_small_b.py": 1}
+    assignment, _loads = sharding.plan(counts, 3, table)
+    _assert_no_empty_shard(assignment, 3)
+
+
+@pytest.mark.parametrize("total", [2, 3, 5, 8])
+def test_no_shard_is_empty_whenever_there_are_enough_files(total):
+    table = {"default_seconds_per_test": 0.2, "files": {}}
+    counts = {f"tests/test_f{n}.py": (n * 37) % 11 + 1 for n in range(total)}
+    assignment, _loads = sharding.plan(counts, total, table)
+    _assert_no_empty_shard(assignment, total)
+
+
+def test_the_head_start_is_capped_at_a_fraction_of_one_even_share():
+    weights = {"tests/test_a.py": 60_000, "tests/test_b.py": 60_000, "tests/test_c.py": 60_000}
+    assert sharding.head_start_ms(weights, 3) == 30_000
+    big = {f"tests/test_{n}.py": 600_000 for n in range(30)}
+    assert sharding.head_start_ms(big, 8) == sharding.SHARD_0_CONNECTOR_HEAD_START_SECONDS * 1000

@@ -61,6 +61,12 @@ _FALLBACK_SECONDS_PER_TEST = 1.0
 # 39647761444, 39648269461, 39651713459, 39651981883.
 SHARD_0_CONNECTOR_HEAD_START_SECONDS = 246
 
+# The head start never exceeds this fraction of one shard's even share of the
+# work. A fixed 246 seconds is a small lead against the backend suite but was
+# more than a whole shard's share of a smaller suite, and shard 0 then
+# received no file at all and failed with "0 selected".
+SHARD_0_HEAD_START_MAX_FRACTION = 0.5
+
 
 def _file_of(item) -> str:
     return item.nodeid.split("::", 1)[0]
@@ -105,21 +111,37 @@ def file_weights(file_counts: dict[str, int], table: dict) -> dict[str, int]:
     return weights
 
 
+def head_start_ms(weights: dict[str, int], total: int) -> int:
+    """Shard 0's head start, capped at a fraction of one shard's even share."""
+    even_share = sum(weights.values()) / total
+    return min(SHARD_0_CONNECTOR_HEAD_START_SECONDS * 1000, int(even_share * SHARD_0_HEAD_START_MAX_FRACTION))
+
+
 def _bin_pack(weights: dict[str, int], total: int) -> dict[str, int]:
     """Greedy longest-processing-time-first assignment, file -> shard index.
 
-    Shard 0 starts with a fixed head start (ms) so the bin-packer assigns it
-    less ordinary work, compensating for the assistant-connector (MCP) step
-    that shard 0 runs but the balancing does not count.
+    Shard 0 starts with a head start (ms) so the bin-packer assigns it less
+    ordinary work, compensating for the assistant-connector (MCP) step that
+    shard 0 runs but the balancing does not count.
+
+    No shard is ever left empty while there are at least as many files as
+    shards: once the files still to place are only just enough to give each
+    empty shard one, every remaining file goes to an empty shard. An empty
+    shard selects no test and pytest fails it with exit code 5.
     """
     ordered = sorted(weights.items(), key=lambda pair: (-pair[1], pair[0]))
     loads = [0] * total
-    loads[0] = SHARD_0_CONNECTOR_HEAD_START_SECONDS * 1000
+    loads[0] = head_start_ms(weights, total)
+    used = [False] * total
     assignment: dict[str, int] = {}
-    for path, weight in ordered:
-        shard = min(range(total), key=lambda i: (loads[i], i))
+    for position, (path, weight) in enumerate(ordered):
+        remaining = len(ordered) - position
+        empty = [i for i in range(total) if not used[i]]
+        candidates = empty if remaining <= len(empty) else range(total)
+        shard = min(candidates, key=lambda i: (loads[i], i))
         assignment[path] = shard
         loads[shard] += weight
+        used[shard] = True
     return assignment
 
 
