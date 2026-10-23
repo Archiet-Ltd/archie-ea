@@ -1,13 +1,18 @@
 {% extends "layouts/admin_base.html" %}
-{% from "components/breadcrumb.html" import breadcrumb %}
+{% import 'components/breadcrumb.html' as breadcrumb %}
 
 {% block title %}SAFe Portfolio Kanban{% endblock %}
 
 {% block content %}
-{{ breadcrumb([
-    {'label': 'SAFe', 'url': None},
-    {'label': 'Portfolio Kanban', 'url': None}
-]) }}
+{% call breadcrumb.breadcrumb() %}
+    {% call breadcrumb.breadcrumb_item(active=true) %}
+        SAFe
+    {% endcall %}
+    {{ breadcrumb.breadcrumb_separator() }}
+    {% call breadcrumb.breadcrumb_item(active=true) %}
+        Portfolio Kanban
+    {% endcall %}
+{% endcall %}
 
 <div class="px-6 py-4">
     <div class="flex items-center justify-between mb-6">

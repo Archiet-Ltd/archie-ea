@@ -72,7 +72,7 @@ def test_portfolio_index_loads(app, client, test_user, epic_element, tenant_ctx)
     """GET /safe/portfolio returns 200 with the kanban board."""
     _login(client, test_user.id)
     with tenant_ctx(epic_element.organization_id):
-        response = client.get("/safe/portfolio")
+        response = client.get("/safe/portfolio/")
         assert response.status_code == 200
         assert b"Portfolio Kanban" in response.data
         assert b"Test Epic" in response.data

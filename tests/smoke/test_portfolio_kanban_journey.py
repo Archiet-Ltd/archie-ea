@@ -47,7 +47,7 @@ def _seed_epics(db_session, org_id):
             name=data["name"],
             type="WorkPackage",
             organization_id=org_id,
-            description=f"Smoke test epic for portfolio kanban",
+            description="Smoke test epic for portfolio kanban",
         )
         db_session.add(element)
         db_session.flush()
@@ -74,6 +74,7 @@ def test_portfolio_kanban_journey(browser, live_server, seeded, db_session):
 
     try:
         epic_ids = _seed_epics(db_session, org_id)
+        _ = epic_ids  # used implicitly via the seeded data
 
         # === Step 1: Login as Architect and load the board ===
         _login(page, live_server, seeded["emails"]["solution_architect"])
@@ -144,14 +145,12 @@ def test_portfolio_kanban_journey(browser, live_server, seeded, db_session):
 
         # Should see epics but no move dropdowns
         expect(page.get_by_text("Platform Modernization Epic")).to_be_visible(timeout=PAGE_TIMEOUT)
-        move_selects = page.locator("select").all()
         # If x-show="canWrite" is false, selects should not be rendered
         # Or they should be disabled if present
         # For this test, we'll just verify the page loads (actual permission check is in unit tests)
 
         # === Step 9: Test org B isolation - empty board ===
         if len(seeded["org_ids"]) > 1:
-            org_b_id = seeded["org_ids"][1]
             # Login as user from org B
             _login(page, live_server, seeded["emails"]["solution_architect_org_b"])
             response = page.goto(live_server + "/safe/portfolio", timeout=PAGE_TIMEOUT)

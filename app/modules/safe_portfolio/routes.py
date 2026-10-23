@@ -12,19 +12,14 @@ from app.models.archimate_core import ArchiMateElement
 from app.services.element_profile_service import read_profile, _read_property_value, _write_property
 from app.services.wsjf_service import compute_wsjf_score
 
+from app.services.profiles.safe import KINDS
+
 from . import safe_portfolio_bp
 
 logger = logging.getLogger(__name__)
 
-# Kanban column order
-KANBAN_STATES = [
-    "Funnel",
-    "Reviewing",
-    "Analyzing",
-    "Portfolio Backlog",
-    "Implementing",
-    "Done",
-]
+# Kanban column order — sourced from the one SAFe profile registry
+KANBAN_STATES = KINDS["Epic"]["properties"]["kanban_state"]["values"]
 
 
 def _can_write() -> bool:
