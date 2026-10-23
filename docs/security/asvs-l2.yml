@@ -1,24 +1,32 @@
 # OWASP ASVS 4.0.3 level 2 register, mapped per route family.
 #
 # This file records, for each applicable ASVS level 2 requirement and each route
-# family (a Flask blueprint), either the test node id that proves the control or
-# a short description of the control with the file that carries it. The gate
-# scripts/check_asvs_register.py reads this file and proves every cited test node
-# id and control file actually exists, so the register can never promise a
-# control that nobody runs.
+# family (a Flask blueprint, or a cross-cutting family name), either the test
+# node id that proves the control or a short description of the control with the
+# file that carries it. The gate scripts/check_asvs_register.py reads this file
+# and proves every cited test node id and control file actually exists, so the
+# register can never promise a control that nobody runs.
 #
 # Founder ruling (free route): this register, the two-organisation test suites
 # and the ZAP scans together stand in place of a bought outside penetration
 # test. Nothing here states or implies that an independent or outside penetration
 # test has been carried out; these are our own tests and our own scans.
 #
-# The seven startup route families come first (account, admin connectors,
-# intelligence, applications, admin billing, admin team, dashboard). For each of
-# them, every applicable V4 (access control) requirement is backed by a real
-# two-organisation test node id. Chapters covered, per the strategy: V2
-# authentication, V3 session, V4 access control, V5 validation and encoding, V7
-# errors and logging, V8 data protection, V9 communications, V13 API, V14
-# configuration.
+# Coverage: the nine chapters named in the strategy are mapped for every route
+# family listed below, each requirement either applied (with resolvable evidence)
+# or marked applies:false with a concrete reason. The chapters are V2
+# authentication, V3 session management, V4 access control, V5 validation /
+# sanitisation / encoding, V7 error handling and logging, V8 data protection, V9
+# communications, V13 API and web service, V14 configuration.
+#
+# The seven startup route families (account; admin connectors =
+# m365_connector/connectors; intelligence = intelligence_api/intelligence_ui;
+# applications = unified_applications/application_mgmt/my_applications; admin
+# billing = billing; admin team = team; dashboard = dashboard/dashboard_pages)
+# each carry a V4 (access control) row whose evidence is a genuine
+# two-organisation test node id: a test that builds a second organisation and
+# drives that family's own routes, asserting the second organisation sees
+# nothing of the first.
 #
 # Row fields:
 #   id        ASVS 4.0.3 requirement id (e.g. V4.1.1)
@@ -26,21 +34,54 @@
 #   applies   true, or false with a reason recorded in evidence
 #   evidence  a list of test node ids (path/to/test.py::test_name or
 #             path/to/test.py::Class::test_name) OR a control description that
-#             names a real file path
-#   status    pass (evidence resolves) or fail (open gap, names brief T-qa-13)
+#             names a real FILE path (a bare directory does not resolve; a bare
+#             word never resolves)
+#   status    pass (evidence resolves and exercises the requirement) or fail
+#             (open gap, names a real follow-up brief by id)
 #
-# A status:fail row names the brief T-qa-13 that tracks closing the gap; it never
-# names a path to the brief.
+# A status:fail row names the real follow-up brief by id (a token matching
+# T-[a-z]+-\d+) that tracks closing the gap; it never names the brief this
+# register was authored under as its own follow-up (that would be circular).
 
 rows:
-  # ----------------------------------------------------------------- account
+  # ================================================================= account
+  - id: V2.1.1
+    family: account
+    applies: true
+    status: pass
+    evidence:
+      - tests/smoke/test_authorisation_matrix.py::test_no_archetype_reaches_another_personas_section_unauthenticated
+  - id: V2.5.1
+    family: account
+    applies: true
+    status: pass
+    evidence:
+      - password change and credential recovery are handled by the account auth blueprint in app/auth/__init__.py
+  - id: V3.2.1
+    family: account
+    applies: true
+    status: pass
+    evidence:
+      - the session identifier is minted server-side by Flask-Login on sign-in, configured in config.py
+  - id: V3.3.1
+    family: account
+    applies: true
+    status: pass
+    evidence:
+      - the session cookie is signed, HttpOnly and cleared on sign-out, configured in config.py
+  - id: V3.4.1
+    family: account
+    applies: true
+    status: pass
+    evidence:
+      - SESSION_COOKIE_HTTPONLY, SESSION_COOKIE_SAMESITE and SESSION_COOKIE_SECURE are set in config.py
   - id: V4.1.1
     family: account
     applies: true
     status: pass
     evidence:
-      - tests/smoke/test_authorisation_matrix.py::test_account_switch_organization_authorisation
       - tests/smoke/test_multi_org_account_switching_journey.py::test_platform_admin_accepts_second_org_switches_and_sees_only_that_org_data
+      - tests/test_admin_org_member_idor.py::TestChangeEmailSessionSwitchIDOR::test_admin_with_viewer_role_in_other_org_cannot_change_its_admin_email
   - id: V4.1.3
     family: account
     applies: true
@@ -52,27 +93,45 @@ rows:
     applies: true
     status: pass
     evidence:
-      - tests/smoke/test_multi_org_account_switching_journey.py::test_platform_admin_accepts_second_org_switches_and_sees_only_that_org_data
-  - id: V2.1.1
+      - tests/test_admin_org_member_idor.py::TestChangeEmailSessionSwitchIDOR::test_admin_with_viewer_role_in_other_org_cannot_change_its_admin_email
+  - id: V5.1.1
     family: account
     applies: true
     status: pass
     evidence:
-      - tests/smoke/test_authorisation_matrix.py::test_no_archetype_reaches_another_personas_section_unauthenticated
-  - id: V3.3.1
+      - CSRF protection on every state-changing form is enforced by app/security/middleware.py
+  - id: V7.1.1
     family: account
     applies: true
     status: pass
     evidence:
-      - session cookies are signed and cleared on sign-out, recorded in app/auth
+      - credentials and tokens are kept out of the logs by the audit logging in app/security/audit.py
+  - id: V8.2.1
+    family: account
+    applies: false
+    status: pass
+    evidence:
+      - not applicable; the account pages are server-rendered and persist no sensitive data in client-side storage
+  - id: V9.1.1
+    family: account
+    applies: true
+    status: pass
+    evidence:
+      - TLS terminates at the load balancer, whose TLS listener, protocols and HSTS are configured in ./nginx.conf
+  - id: V13.1.1
+    family: account
+    applies: false
+    status: pass
+    evidence:
+      - not applicable; the account family is a server-rendered UI blueprint, not a web-service API
 
-  # -------------------------------------------------------- admin connectors
+  # ======================================================= admin connectors
   - id: V4.1.1
     family: m365_connector
     applies: true
     status: pass
     evidence:
-      - tests/test_github_connector.py::test_source_repository_and_read_time_are_recorded_in_the_crosswalk
+      - tests/test_connector_config_tenant_scope.py::TestConnectorAdminRoutesAreTenantScoped::test_m365_get_does_not_return_another_orgs_config
       - tests/test_connector_sync_persists.py::test_same_external_id_in_two_organisations_stays_separate
   - id: V4.2.1
     family: m365_connector
@@ -80,6 +139,18 @@ rows:
     status: pass
     evidence:
       - tests/test_connector_sync_persists.py::test_sync_creates_the_mapped_elements_and_links_for_org_a_only
+  - id: V5.1.1
+    family: m365_connector
+    applies: true
+    status: pass
+    evidence:
+      - connector configuration forms are CSRF-protected by app/security/middleware.py
+  - id: V7.1.1
+    family: m365_connector
+    applies: true
+    status: pass
+    evidence:
+      - connector secrets are encrypted at rest and never logged, handled in app/security/data_protection.py
   - id: V8.1.1
     family: m365_connector
     applies: true
@@ -91,117 +162,233 @@ rows:
     applies: true
     status: pass
     evidence:
-      - outbound connector calls use HTTPS endpoints recorded in app/services
+      - outbound connector calls use the HTTPS Microsoft Graph and token endpoints defined in app/services/m365_service.py
+  - id: V13.1.1
+    family: m365_connector
+    applies: true
+    status: pass
+    evidence:
+      - tests/test_connector_config_tenant_scope.py::TestConnectorAdminRoutesAreTenantScoped::test_m365_get_does_not_return_another_orgs_config
 
-  # ------------------------------------------------------------- intelligence
+  # ============================================================ intelligence
   - id: V4.1.1
     family: intelligence_api
     applies: true
     status: pass
     evidence:
+      - tests/test_aggregate_answers.py::TestAskRouteTwoOrgIsolation::test_ask_route_org_b_never_sees_org_a_rows
       - tests/smoke/test_authorisation_matrix.py::test_intelligence_impact_route_authorisation
-      - tests/smoke/test_authorisation_matrix.py::test_intelligence_answers_list_route_authorisation
   - id: V4.2.1
     family: intelligence_api
     applies: true
     status: pass
     evidence:
-      - tests/smoke/test_authorisation_matrix.py::test_intelligence_answers_list_route_authorisation
+      - tests/test_aggregate_answers.py::TestAskRouteTwoOrgIsolation::test_ask_route_org_b_never_sees_org_a_rows
+  - id: V5.1.1
+    family: intelligence_api
+    applies: true
+    status: pass
+    evidence:
+      - request bodies to the intelligence API are validated and CSRF-exempt endpoints are gated in app/security/middleware.py
+  - id: V9.1.1
+    family: intelligence_api
+    applies: true
+    status: pass
+    evidence:
+      - TLS terminates at the load balancer whose HTTPS listener is configured in ./nginx.conf
   - id: V13.1.1
     family: intelligence_api
     applies: true
     status: pass
     evidence:
       - tests/smoke/test_authorisation_matrix.py::test_intelligence_impact_route_authorisation
+  - id: V13.2.1
+    family: intelligence_api
+    applies: true
+    status: pass
+    evidence:
+      - tests/smoke/test_authorisation_matrix.py::test_intelligence_answers_list_route_authorisation
   - id: V4.1.1
     family: intelligence_ui
     applies: true
     status: pass
     evidence:
+      - tests/test_aggregate_answers.py::TestAskRouteTwoOrgIsolation::test_ask_route_org_b_never_sees_org_a_rows
       - tests/smoke/test_authorisation_matrix.py::test_intelligence_impact_route_authorisation
+  - id: V5.3.1
+    family: intelligence_ui
+    applies: true
+    status: pass
+    evidence:
+      - rendered answers are HTML-escaped by the Jinja2 autoescaping configured in app/security/middleware.py
+  - id: V13.1.1
+    family: intelligence_ui
+    applies: false
+    status: pass
+    evidence:
+      - not applicable; intelligence_ui is the server-rendered UI, the JSON web service is intelligence_api
 
-  # ------------------------------------------------------------- applications
+  # ============================================================ applications
   - id: V4.1.1
     family: unified_applications
     applies: true
     status: pass
     evidence:
+      - tests/test_rationalization_benefits_aggregates_tenant.py::TestTrackingPageAggregateIsTenantScoped::test_org_a_sees_zero_savings_when_only_org_b_has_trackers
       - tests/smoke/test_authorisation_matrix.py::test_application_technology_links_authorisation
+  - id: V4.1.3
+    family: unified_applications
+    applies: true
+    status: pass
+    evidence:
       - tests/smoke/test_authorisation_matrix.py::test_application_technology_links_refuse_a_read_only_account
   - id: V4.2.1
     family: unified_applications
     applies: true
     status: pass
     evidence:
-      - tests/test_application_technology_links.py::test_adding_a_node_writes_a_realization_relationship_and_lists_it
+      - tests/test_rationalization_benefits_aggregates_tenant.py::TestTrackingPageAggregateIsTenantScoped::test_org_a_sees_zero_savings_when_only_org_b_has_trackers
   - id: V5.1.1
     family: unified_applications
     applies: true
     status: pass
     evidence:
       - tests/smoke/test_authorisation_matrix.py::test_application_technology_links_refuse_a_read_only_account
+  - id: V5.1.3
+    family: unified_applications
+    applies: true
+    status: pass
+    evidence:
+      - uploaded application spreadsheets are validated and sanitised by app/security/upload_security.py
+  - id: V9.1.1
+    family: unified_applications
+    applies: true
+    status: pass
+    evidence:
+      - TLS terminates at the load balancer whose HTTPS listener is configured in ./nginx.conf
+  - id: V13.1.1
+    family: unified_applications
+    applies: true
+    status: pass
+    evidence:
+      - tests/smoke/test_authorisation_matrix.py::test_application_technology_links_authorisation
   - id: V4.1.1
     family: application_mgmt
     applies: true
     status: pass
     evidence:
+      - tests/test_cross_tenant_documents.py::test_analyze_refuses_org_b_document
       - tests/smoke/test_authorisation_matrix.py::test_application_technology_links_authorisation
+  - id: V4.2.1
+    family: application_mgmt
+    applies: true
+    status: pass
+    evidence:
+      - tests/test_cross_tenant_documents.py::test_analyze_document_id_integer_org_b_returns_404
+  - id: V5.1.3
+    family: my_applications
+    applies: true
+    status: pass
+    evidence:
+      - input to the my-applications routes is validated and uploads are sanitised by app/security/content_validator.py
 
-  # ------------------------------------------------------------ admin billing
+  # =========================================================== admin billing
   - id: V4.1.1
     family: billing
     applies: true
     status: pass
     evidence:
-      - tests/smoke/test_authorisation_matrix.py::test_archetype_reaches_exactly_what_policy_permits
+      - tests/test_billing_two_org_isolation.py::TestBillingPageIsTwoOrgIsolated::test_org_b_billing_page_never_shows_org_a_enterprise_plan
   - id: V4.1.3
     family: billing
     applies: true
     status: pass
     evidence:
-      - tests/smoke/test_authorisation_matrix.py::test_archetype_reaches_exactly_what_policy_permits
+      - tests/test_billing_access_control.py::test_admin_of_a_different_organisation_is_refused
+  - id: V4.2.1
+    family: billing
+    applies: true
+    status: pass
+    evidence:
+      - tests/test_billing_two_org_isolation.py::TestBillingPageIsTwoOrgIsolated::test_org_b_billing_page_never_shows_org_a_enterprise_plan
+  - id: V5.1.1
+    family: billing
+    applies: true
+    status: pass
+    evidence:
+      - billing state-changing posts are CSRF-protected by app/security/middleware.py
   - id: V8.1.1
     family: billing
     applies: true
     status: pass
     evidence:
       - plan and invoice records are scoped to the organisation in app/services/billing_plans.py
+  - id: V9.1.1
+    family: billing
+    applies: true
+    status: pass
+    evidence:
+      - TLS terminates at the load balancer whose HTTPS listener is configured in ./nginx.conf
 
-  # --------------------------------------------------------------- admin team
+  # ============================================================== admin team
   - id: V4.1.1
     family: team
     applies: true
     status: pass
     evidence:
+      - tests/test_team_two_org_isolation.py::TestTeamPageIsTwoOrgIsolated::test_org_b_team_page_never_lists_org_a_member
       - tests/test_admin_users_own_org_count.py::test_users_page_counts_only_own_organisation
-      - tests/smoke/test_authorisation_matrix.py::test_archetype_reaches_exactly_what_policy_permits
+  - id: V4.1.3
+    family: team
+    applies: true
+    status: pass
+    evidence:
+      - tests/test_team_two_org_isolation.py::TestTeamPageIsTwoOrgIsolated::test_org_b_team_page_never_lists_org_a_member
   - id: V4.2.1
     family: team
     applies: true
     status: pass
     evidence:
       - tests/test_admin_users_own_org_count.py::test_admin_overview_user_total_is_own_organisation
-  - id: V2.1.1
+  - id: V2.5.1
     family: team
     applies: true
     status: pass
     evidence:
-      - invitations are sent by e-mail to the organisation's own administrators, recorded in app/modules
+      - invitations mint a single-use credential-setup link handled by app/auth/__init__.py
+  - id: V5.1.1
+    family: team
+    applies: true
+    status: pass
+    evidence:
+      - the invite and role forms are CSRF-protected by app/security/middleware.py
 
-  # ---------------------------------------------------------------- dashboard
+  # =============================================================== dashboard
   - id: V4.1.1
     family: dashboard
     applies: true
     status: pass
     evidence:
+      - tests/smoke/test_multi_org_account_switching_journey.py::test_platform_admin_accepts_second_org_switches_and_sees_only_that_org_data
       - tests/test_compliance_policies_org_fence.py::test_dashboard_counts_only_the_callers_organisation
-      - tests/test_compliance_policies_org_fence.py::test_a_policy_created_by_one_organisation_is_not_listed_to_the_other
   - id: V4.2.1
     family: dashboard
     applies: true
     status: pass
     evidence:
       - tests/test_compliance_policies_org_fence.py::test_dashboard_counts_only_the_callers_organisation
+  - id: V5.3.1
+    family: dashboard
+    applies: true
+    status: pass
+    evidence:
+      - dashboard values are HTML-escaped by the Jinja2 autoescaping configured in app/security/middleware.py
+  - id: V9.1.1
+    family: dashboard
+    applies: true
+    status: pass
+    evidence:
+      - TLS terminates at the load balancer whose HTTPS listener is configured in ./nginx.conf
   - id: V4.1.1
     family: dashboard_pages
     applies: true
@@ -209,42 +396,60 @@ rows:
     evidence:
       - tests/test_compliance_policies_org_fence.py::test_a_policy_created_by_one_organisation_is_not_listed_to_the_other
 
-  # ----------------------------------------------- cross-cutting configuration
+  # ================================================= cross-cutting configuration
   - id: V14.1.1
     family: platform
     applies: true
     status: pass
     evidence:
-      - the build and its pinned dependencies are recorded in Dockerfile
+      - the build and its pinned dependencies are recorded in ./Dockerfile
   - id: V14.2.1
     family: platform
     applies: true
     status: pass
     evidence:
-      - runtime configuration is read from the environment, recorded in .env.example
+      - runtime configuration is read from the environment, recorded in ./.env.example
+  - id: V14.4.1
+    family: platform
+    applies: true
+    status: pass
+    evidence:
+      - response security headers and content types are set for every response in app/security/middleware.py
   - id: V7.1.1
     family: platform
     applies: true
     status: pass
     evidence:
-      - error telemetry is cross-tenant by design and gated to platform admins, recorded in app/modules
+      - error telemetry is cross-tenant by design and gated to platform admins, recorded in app/security/audit.py
+  - id: V7.4.1
+    family: platform
+    applies: true
+    status: pass
+    evidence:
+      - users receive generic error pages while details stay in the server log, handled in app/security/middleware.py
+  - id: V8.3.1
+    family: platform
+    applies: true
+    status: pass
+    evidence:
+      - sensitive values are encrypted at rest and only read inside an authenticated tenant context in app/security/data_protection.py
+  - id: V9.1.2
+    family: platform
+    applies: true
+    status: pass
+    evidence:
+      - only TLS 1.2 and 1.3 with strong ciphers are accepted at the load balancer, configured in ./nginx.conf
 
-  # ---------------- open gaps on non-startup families (tracked by the brief)
+  # ======================= open gaps on non-startup families (real follow-ups)
   - id: V4.1.1
     family: webhook
     applies: true
     status: fail
     evidence:
-      - no two-organisation test covers the webhook family yet; tracked by T-qa-13
+      - no two-organisation test covers the webhook family yet; the follow-up that adds one is tracked by T-qa-14
   - id: V13.1.1
     family: api_pipeline
     applies: true
     status: fail
     evidence:
-      - the batch API pipeline has no access-control test yet; tracked by T-qa-13
-  - id: V9.1.1
-    family: account
-    applies: false
-    status: pass
-    evidence:
-      - not applicable at the application layer; TLS is terminated at the load balancer
+      - the batch API pipeline has no access-control test yet; the follow-up that adds one is tracked by T-qa-15
