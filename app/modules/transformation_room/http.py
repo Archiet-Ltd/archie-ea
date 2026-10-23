@@ -22,6 +22,7 @@ from sqlalchemy.orm import Session
 from werkzeug.exceptions import BadRequest
 
 from app import db
+from app.middleware.tenant_isolation import set_database_tenant_context
 from app.models.transformation_programme import ProgrammeRoleAssignment
 from app.modules.transformation_room.domain import (
     ActorContext,
@@ -145,6 +146,7 @@ def resolve_enterprise_roles(
         else:
             statement = statement.where(ProgrammeRoleAssignment.workstream_id.is_(None))
         with Session(db.engine) as session:
+            set_database_tenant_context(session.connection(), organization_id)
             roles.update(session.scalars(statement).all())
     return frozenset(role for role in roles if role)
 

@@ -14,6 +14,7 @@ from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from app import db
+from app.middleware.tenant_isolation import set_database_tenant_context
 from app.models.architecture_review_board import ARBReviewCycle, ARBReviewItem
 from app.models.arb_decision_event import ARBCondition
 from app.models.benefit import Benefit
@@ -724,6 +725,7 @@ class TransformationExecutionService:
                 return attempt, False
             if attempt.status == "indeterminate":
                 with Session(db.engine) as session:
+                    set_database_tenant_context(session.connection(), actor.organization_id)
                     successor_id = session.scalar(
                         select(DeliveryExportAttempt.id).where(
                             DeliveryExportAttempt.organization_id
