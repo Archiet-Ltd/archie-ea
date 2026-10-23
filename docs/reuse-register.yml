@@ -192,6 +192,8 @@ entries:
         regex: 'def\s+_?(approve_and_execute|reject_approval|approve_and_run|execute_approval\w*|approve_pending\w*)\s*\('
       - id: model-approve-call
         regex: 'approval\.(approve|reject)\('
+      - id: approval-create
+        regex: 'def\s+_?create_(\w+_)?approval_record\w*\s*\('
     known_exceptions:
       - path: app/models/ai_chat_crud_approval.py
         reason: defines the model methods the service calls; the service is the only intended caller
@@ -233,6 +235,130 @@ entries:
         reason: defines the model
       - path: app/models/process_data.py
         reason: DataEntity and process model methods ensure_archimate_element predate the backbone writer
+
+  - id: connector-framework
+    concept: The connector framework (config, health, approval-gated sync of an external system into the model)
+    status: active
+    canonical:
+      path: app/services/connector_framework.py
+      symbols: [BaseConnector, ConnectorManager, FieldMapping, run_connector_sync, build_connector, apply_connector_change]
+    reuse: >
+      A new source system (Jira, GitHub, a cloud account, a spend feed) is a BaseConnector subclass registered in
+      connector_framework and run through run_connector_sync, so config, vault credentials, the approval gate,
+      SyncLog and crosswalk writes come for free. Do not create another connector manager, base connector class
+      or sync runner. The second ConnectorManager in connector_framework_v2 is recorded in the baseline and may
+      only be removed, not copied.
+    must_not_create:
+      - id: connector-manager
+        regex: 'class\s+\w*ConnectorManager\b'
+      - id: base-connector
+        regex: 'class\s+(Base\w*Connector|\w*ConnectorFramework\w*)\b'
+      - id: sync-runner
+        regex: 'def\s+_?(run|execute)_(\w+_)?connector_sync\w*\s*\('
+
+  - id: identity-crosswalk
+    concept: Linking an external system's record id to a model element (the identity crosswalk)
+    status: active
+    canonical:
+      path: app/modules/intelligence/services/crosswalk_service.py
+      symbols: [CrosswalkService.write_link, CrosswalkService.get_link_by_external_id, CrosswalkService.get_links_for_element]
+    reuse: >
+      Write and read external-id links only through CrosswalkService, the single writer that checks the connector
+      allowlist and the organisation. Matching an incoming record to an existing element is the entity-matching
+      entry (MatcherService). Do not construct ExternalIdentityCrosswalk rows elsewhere or add another
+      source-id to element-id table or lookup.
+    must_not_create:
+      - id: crosswalk-construction
+        regex: 'ExternalIdentityCrosswalk\s*\('
+      - id: crosswalk-helper
+        regex: 'def\s+(write_link|_?(upsert|link|get)_(\w+_)?(crosswalk|external_id_link)\w*)\s*\('
+    known_exceptions:
+      - path: app/models/external_identity_crosswalk.py
+        reason: defines the model
+
+  - id: cost-fact-store
+    concept: Storing a cost, budget or spend figure for an application or capability (the one cost fact store)
+    status: active
+    canonical:
+      path: app/services/cost_fact_store.py
+      symbols: [upsert_fact, clear_facts, list_facts, total_in_reporting_currency]
+    reuse: >
+      Every spend feed or spreadsheet cost column lands in CostFact through cost_fact_store.upsert_fact, which is
+      idempotent on source and source_id. Do not construct CostFact rows in a route or service, and do not add
+      another cost table, cost upsert or currency total.
+    must_not_create:
+      - id: cost-fact-construction
+        regex: '\bCostFact\s*\('
+      - id: cost-upsert
+        regex: 'def\s+_?(upsert|save|record|store)_(\w+_)?cost_fact\w*\s*\('
+    known_exceptions:
+      - path: app/models/cost_fact.py
+        reason: defines the model
+
+  - id: event-log
+    concept: The per-organisation ordered event log (relay from the outbox, offset reads, replay)
+    status: active
+    canonical:
+      path: app/services/event_log_service.py
+      symbols: [relay_outbox_batch, read_from_offset, replay_from, max_ordinal]
+    reuse: >
+      Model changes reach the event log through the outbox (emit_event, or the automatic element and relationship
+      listener) and event_log_service.relay_outbox_batch. Read it with read_from_offset / replay_from. Do not write
+      EventLogRecord rows directly, and do not add another relay, replay or ordinal counter.
+    must_not_create:
+      - id: event-log-construction
+        regex: '\bEventLogRecord\s*\('
+      - id: event-log-reader
+        regex: 'def\s+_?(relay_outbox\w*|read_from_offset|replay_from|next_ordinal|max_ordinal)\s*\('
+    known_exceptions:
+      - path: app/models/event_log.py
+        reason: defines the model
+
+  - id: answer-envelope
+    concept: An answer with its evidence (rows, truth class, confidence, citations, freshness, stored address)
+    status: active
+    canonical:
+      path: app/modules/intelligence/services/answer_envelope.py
+      symbols: [build_envelope, ask_and_store, open_answer, present]
+    reuse: >
+      Any answer that carries evidence, including a twin or sync answer, is built with answer_envelope.build_envelope
+      and stored with ask_and_store so truth class, confidence basis, citations and freshness have one shape. Do
+      not construct AnswerRecord rows elsewhere or define another envelope builder.
+    must_not_create:
+      - id: answer-record-construction
+        regex: '\bAnswerRecord\s*\('
+      - id: envelope-builder
+        regex: 'def\s+_?(build|make|create)_(\w+_)?(answer_)?envelope\w*\s*\('
+    known_exceptions:
+      - path: app/models/answer_record.py
+        reason: defines the model
+
+  - id: spreadsheet-import
+    concept: Importing applications from a spreadsheet or CSV (quick and governed modes, staging, rollback)
+    status: active
+    canonical:
+      path: app/modules/import_batch/services/import_orchestrator.py
+      symbols: [ImportOrchestrator, ImportOrchestrator.analyze_import, ImportOrchestrator.start_quick_import, ImportOrchestrator.start_governed_import]
+    reuse: >
+      Spreadsheet and CSV application imports run through ImportOrchestrator, which owns preview, validation, batch
+      approval, audit and rollback. Do not add another import orchestrator, engine or pipeline class. Source-specific
+      importers (Abacus, Lucid, SAP) and the duplicates recorded in the baseline are not templates for new ones.
+    must_not_create:
+      - id: import-engine
+        regex: 'class\s+\w*Import(Orchestrator|Engine|Pipeline|Manager)\b'
+
+  - id: open-exchange-import
+    concept: Importing an ArchiMate Open Exchange (OEF) file
+    status: active
+    canonical:
+      path: app/services/archimate_import_service.py
+      symbols: [ArchiMateImportService, ArchiMateImportService.preview_xml, ArchiMateImportService.import_xml, ArchiMateImportService.parse_oef_xml]
+    reuse: >
+      Open Exchange import is ArchiMateImportService (preview, conflict classification, strategies). Do not add
+      another OEF or ArchiMate-model parser or importer.
+    must_not_create:
+      - id: oef-importer
+        regex: 'class\s+\w*(ArchiMate|Archimate|Oef|OEF)\w*Import\w*\b|def\s+_?(parse|import|load)_(\w+_)?oef\w*\s*\('
 
   - id: critical-path
     concept: Critical path over the unified work package store
