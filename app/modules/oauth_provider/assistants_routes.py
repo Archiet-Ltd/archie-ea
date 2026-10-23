@@ -11,7 +11,17 @@ from __future__ import annotations
 
 import logging
 
-from flask import Blueprint, abort, flash, g, redirect, render_template, url_for
+from flask import (
+    Blueprint,
+    abort,
+    current_app,
+    flash,
+    g,
+    redirect,
+    render_template,
+    request,
+    url_for,
+)
 from flask_login import current_user, login_required
 
 from app.decorators import admin_required
@@ -22,6 +32,34 @@ from app.modules.oauth_provider.models import OAuthClient, OAuthToken
 logger = logging.getLogger(__name__)
 
 connected_assistants_bp = Blueprint("connected_assistants", __name__)
+
+
+def mcp_connection_address() -> str:
+    """The organisation's connection address for an AI chat client.
+
+    One origin, configured once as ``PUBLIC_BASE_URL`` and published as the
+    protected resource in the well-known metadata; the ``/mcp`` path is where
+    a client points. Empty when the server is not configured for connections,
+    so the page can say so plainly rather than show a broken address.
+    """
+    base = (current_app.config.get("PUBLIC_BASE_URL") or "").rstrip("/")
+    return f"{base}/mcp" if base else ""
+
+
+# One line per way a client connects, not one per brand: the server works with
+# any client that speaks the standard remote-chat protocol over HTTP and signs
+# in the same way a browser does, which is exactly what its own connector tests
+# drive end to end. A client that needs a different transport is not listed.
+SUPPORTED_CLIENTS = [
+    {
+        "name": "A desktop or editor AI chat that adds a remote connection",
+        "detail": "Paste the address where it asks for a remote server, then sign in when it opens this site.",
+    },
+    {
+        "name": "A command-line AI chat that adds an HTTP connection",
+        "detail": "Add the address as an HTTP server; it opens this site to sign in the first time.",
+    },
+]
 
 
 def connected_grants(user_id: int) -> list[dict]:
@@ -65,11 +103,25 @@ def connected_grants(user_id: int) -> list[dict]:
 @connected_assistants_bp.route("/account/manage/connected-assistants", methods=["GET"])
 @login_required
 def index():
+    # The question the person just got a cited answer for travels here as the
+    # element's id, so "Try it" and "Skip, ask here instead" carry it on. A
+    # value that is not a whole number is ignored, and the page opens without
+    # a question to try.
+    try_element_id = request.args.get("element", type=int)
+    ask_here_url = url_for("intelligence_ui.ask")
+    if try_element_id:
+        ask_here_url = url_for(
+            "intelligence_ui.ask", question="impact", element=try_element_id
+        )
     return render_template(
         "oauth/connected_assistants.html",
         grants=connected_grants(current_user.id),
         subject=current_user,
         admin_view=False,
+        connection_address=mcp_connection_address(),
+        supported_clients=SUPPORTED_CLIENTS,
+        try_element_id=try_element_id,
+        ask_here_url=ask_here_url,
     )
 
 

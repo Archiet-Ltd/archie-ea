@@ -83,6 +83,22 @@ function askSurface() {
             // trailing character and append the real id per lookup.
             var base = this.$el.getAttribute('data-rationalization-planning-url-base') || '';
             this.rationalizationPlanningUrlBase = base ? base.slice(0, -1) : '';
+
+            // A link can open Ask on a chosen question for a chosen element (so
+            // "ask here instead" lands with the question filled). The element's
+            // name comes back with its answer, same as picking it by hand; an
+            // absent or non-numeric id just leaves the picker ready.
+            var initialElement = parseInt(this.$el.getAttribute('data-initial-element'), 10);
+            if (isNaN(initialElement)) return;
+            var initialQuestion = this.$el.getAttribute('data-initial-question') || 'impact';
+            if (!Object.prototype.hasOwnProperty.call(questionHeadings, initialQuestion)) {
+                initialQuestion = 'impact';
+            }
+            var self = this;
+            this.$nextTick(function () {
+                self.openKey = initialQuestion;
+                self.dispatchAnswer({ id: initialElement, name: '' });
+            });
         },
 
         toggleQuestion(key) {
@@ -165,6 +181,10 @@ function askSurface() {
                 this.state = this.rows.length ? 'ready' : 'empty';
                 var name = Intelligence.nameOf(payload.elements || {}, elementId) || this.term.trim();
                 this.centreName = name;
+                // A prefilled visit (opened from a link, no typed term yet)
+                // shows the element's name in the picker, the way picking it
+                // by hand would.
+                if (name && !this.term) { this.term = name; this.selected = { id: elementId, name: name }; }
                 this.statusText = Intelligence.connectionsText(this.rows.length, name, answer.withheld);
             } catch (err) {
                 if (seq !== this._loadSeq) return;

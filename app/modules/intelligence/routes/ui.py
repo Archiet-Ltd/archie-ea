@@ -87,16 +87,44 @@ def _derivation_status():
         return None
 
 
+# The question lenses the Ask page can open on load. A link can hand a chosen
+# question across (so "ask here instead" lands on Ask with it filled); a value
+# outside this set is ignored and the page opens on its default.
+ASK_QUESTION_KEYS = (
+    "impact",
+    "strategy",
+    "risk",
+    "portfolio",
+    "programme",
+    "data",
+    "compliance",
+    "accountability",
+)
+
+
 @intelligence_ui.route("/ask", methods=["GET"])
 @login_required
 def ask():
-    """Ask a plain business question about what depends on a chosen element."""
+    """Ask a plain business question about what depends on a chosen element.
+
+    ``element`` (optional) is the id of the element to ask about, and
+    ``question`` (optional) the lens to open on, so a link from elsewhere
+    (the connect page's "ask here instead") lands on Ask with the question
+    filled. A non-numeric element or an unknown question is ignored and the
+    page opens on its picker, exactly as a bare visit does.
+    """
+    initial_element_id = request.args.get("element", type=int)
+    initial_question = request.args.get("question")
+    if initial_question not in ASK_QUESTION_KEYS:
+        initial_question = None
     workspace_is_empty = _workspace_is_empty()
     return render_template(
         "intelligence/ask.html",
         workspace_counts_available=workspace_is_empty is not None,
         workspace_is_empty=workspace_is_empty,
         derivation_status=_derivation_status(),
+        initial_element_id=initial_element_id,
+        initial_question=initial_question,
     )
 
 

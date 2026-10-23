@@ -697,6 +697,36 @@ def overview():
                 }
             )
 
+        # Ask the same questions from the AI chat you already use. Last and
+        # optional, so it is there once the earlier steps are done without ever
+        # getting in the way of the first answer. Marked done once a client is
+        # connected; skippable and resumable because it only links out.
+        if "connected_assistants.index" in current_app.view_functions:
+            already_connected = False
+            try:
+                from app.modules.oauth_provider.assistants_routes import (
+                    connected_grants,
+                )
+
+                already_connected = bool(connected_grants(current_user.id))
+            except Exception:
+                already_connected = False
+            guided_steps.append(
+                {
+                    "title": "Ask this in your own AI chat",
+                    "description": (
+                        "Your AI chat is connected. Ask it the same questions, for your organisation."
+                        if already_connected
+                        else "Connect the AI chat you already use and ask the same questions there."
+                    ),
+                    "href": safe_url_for_with_fallback(
+                        "connected_assistants.index", FALLBACK_HREF
+                    ),
+                    "cta": "Connect",
+                    "done": already_connected,
+                }
+            )
+
     # PROG-019: AI-governance alerts — cheap read of the latest EA briefing only
     # (never re-runs the expensive stewardship review on a dashboard load).
     governance_alerts = None

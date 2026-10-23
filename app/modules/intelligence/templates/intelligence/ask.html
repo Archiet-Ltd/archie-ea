@@ -54,7 +54,9 @@
 </a>
 {% endmacro %}
 <div class="p-6 space-y-6" x-data="askSurface()" data-twin-map-url="{{ url_for('intelligence_ui.twin_map') }}"
-     data-rationalization-planning-url-base="{{ url_for('unified_applications.rationalization_planning', app_id=0) }}">
+     data-rationalization-planning-url-base="{{ url_for('unified_applications.rationalization_planning', app_id=0) }}"
+     {% if initial_element_id %}data-initial-element="{{ initial_element_id }}"{% endif %}
+     {% if initial_question %}data-initial-question="{{ initial_question }}"{% endif %}>
     {{ page_shell(
         title='Ask',
         subtitle='Ask a plain business question about what you depend on and what could go wrong.',
