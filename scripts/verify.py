@@ -964,48 +964,38 @@ def gate_two_org_coverage() -> Result:
     rises above zero and the gate exits non-zero. Restore the file with
     git checkout -- and it is green at zero startup uncovered again.
     """
+    # One decision, shared with the script's own main(): import the gate's
+    # public evaluate() rather than re-deriving a pass/fail from counts here, so
+    # the gate verdict and the script exit code can never disagree. The script
+    # path is still named here so the unregistered-checks gate recognises
+    # "scripts/check_two_org_coverage.py" as a registered check.
     script = "scripts/check_two_org_coverage.py"
-    baseline_path = REPO_ROOT / "scripts" / "ci" / "two_org_baseline.json"
+    scripts_dir = str(REPO_ROOT / "scripts")
+    if scripts_dir not in sys.path:
+        sys.path.insert(0, scripts_dir)
     try:
-        baseline = int(json.loads(baseline_path.read_text(encoding="utf-8"))
-                       .get("accepted_uncovered", 0))
-    except (OSError, ValueError, json.JSONDecodeError):
+        import check_two_org_coverage as two_org  # noqa: PLC0415
+    except Exception as exc:  # noqa: BLE001 - surface an import failure as a gate failure
         return Result("two-org-coverage", FAIL,
-                      f"could not read baseline at {baseline_path}")
+                      f"could not import {script}: {exc}")
 
-    full = _run([sys.executable, script, "--count"])
-    startup = _run([sys.executable, script, "--startup-only", "--count"])
     try:
-        full_count = int(full.stdout.strip().splitlines()[-1])
-        startup_count = int(startup.stdout.strip().splitlines()[-1])
-    except (ValueError, IndexError):
-        bad = full if not full.stdout.strip() else startup
-        return Result("two-org-coverage", FAIL,
-                      f"could not parse count: {bad.stdout!r} {bad.stderr[:300]}")
+        verdict = two_org.evaluate(str(REPO_ROOT))
+    except (two_org.InventoryError, two_org.BaselineError) as exc:
+        return Result("two-org-coverage", FAIL, str(exc))
 
-    # The baseline only falls. It must never sit ABOVE the freshly measured
-    # count: a baseline above measured is an un-ratcheted number that can hide a
-    # later regression, and it cannot be justified from the diff. Refuse it as
-    # well as refusing measured > baseline and any uncovered startup family.
-    ok = full_count == baseline and startup_count == 0
     detail = ""
-    if not ok:
-        detail = _run([sys.executable, script]).stdout[-1800:]
-        if startup_count:
-            detail += f"\n  startup families uncovered: {startup_count} (must be 0)"
-        if full_count > baseline:
-            detail += (
-                f"\n  non-startup uncovered {full_count} > baseline {baseline} "
-                f"(the baseline can only fall)"
-            )
-        if full_count < baseline:
-            detail += (
-                f"\n  baseline {baseline} is ABOVE the measured non-startup "
-                f"uncovered {full_count}; lower accepted_uncovered to "
-                f"{full_count} in {script.replace('check_two_org_coverage.py', 'ci/two_org_baseline.json')}"
-                f" (the baseline cannot sit above measured)"
-            )
-    return Result("two-org-coverage", PASS if ok else FAIL, detail, full_count, baseline)
+    if not verdict.ok:
+        detail = "\n".join(verdict.messages)[-1800:]
+    # The reported number is the full (non-startup) uncovered count; the dated
+    # baseline's still-valid accepted set is the ratchet the detail explains.
+    return Result(
+        "two-org-coverage",
+        PASS if verdict.ok else FAIL,
+        detail,
+        verdict.other_count,
+        verdict.other_count,
+    )
 
 
 def gate_background_mechanisms(baseline: int, instances_baseline: int) -> Result:

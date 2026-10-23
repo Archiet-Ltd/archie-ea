@@ -90,6 +90,7 @@ from __future__ import annotations
 
 import argparse
 import ast
+import datetime
 import json
 import os
 import re
@@ -213,11 +214,16 @@ STARTUP_FAMILIES: dict[str, set[str]] = {
     "dashboard": {"dashboard", "dashboard_pages"},
 }
 
-# blueprint name -> startup family English name
-_BLUEPRINT_TO_STARTUP: dict[str, str] = {}
+# blueprint name -> startup family English name. Public API: the register gate
+# reuses BLUEPRINT_TO_STARTUP so the startup-family mapping has one source of
+# truth across both gates.
+BLUEPRINT_TO_STARTUP: dict[str, str] = {}
 for _fam, _bps in STARTUP_FAMILIES.items():
     for _bp in _bps:
-        _BLUEPRINT_TO_STARTUP[_bp] = _fam
+        BLUEPRINT_TO_STARTUP[_bp] = _fam
+
+# Backwards-compatible private alias kept for this module's own call sites.
+_BLUEPRINT_TO_STARTUP = BLUEPRINT_TO_STARTUP
 
 # The shortest static prefix of a route rule that is still distinctive enough to
 # associate a test with a family: at least two path segments and six characters,
@@ -252,11 +258,43 @@ def blueprint_route_prefixes(routes: list[dict]) -> dict[str, set[str]]:
     return prefixes
 
 
+class InventoryError(RuntimeError):
+    """The component inventory is missing or cannot be parsed.
+
+    Raised by :func:`load_routes` so a missing or corrupt
+    docs/component-inventory.json is a loud gate failure with a plain message,
+    never a silent empty list that passes every family.
+    """
+
+
 def load_routes(root: str) -> list[dict]:
-    """Read the route list from the component inventory without importing anything."""
+    """Read the route list from the component inventory without importing anything.
+
+    A missing or unparsable inventory is a GATE FAILURE, not a silent empty
+    list: without the inventory the gate cannot see any family and would pass
+    every tenant boundary by default. Raise :class:`InventoryError` with a plain
+    message so the caller reports it and exits non-zero.
+    """
     path = os.path.join(root, INVENTORY)
-    with open(path, encoding="utf-8") as fh:
-        data = json.load(fh)
+    try:
+        with open(path, encoding="utf-8") as fh:
+            data = json.load(fh)
+    except FileNotFoundError as exc:
+        raise InventoryError(
+            f"{INVENTORY}: [two-org-coverage] the route inventory is missing; "
+            f"the gate cannot measure any tenant boundary without it"
+        ) from exc
+    except (OSError, ValueError) as exc:
+        raise InventoryError(
+            f"{INVENTORY}: [two-org-coverage] the route inventory could not be "
+            f"parsed ({exc}); the gate cannot measure any tenant boundary from a "
+            f"broken inventory"
+        ) from exc
+    if not isinstance(data, dict) or not isinstance(data.get("routes"), list):
+        raise InventoryError(
+            f"{INVENTORY}: [two-org-coverage] the route inventory has no 'routes' "
+            f"list; the gate cannot measure any tenant boundary from it"
+        )
     return data.get("routes", [])
 
 
@@ -409,12 +447,16 @@ def _endpoint_in_string(blueprint: str, source: str) -> bool:
     return re.search(pattern, source) is not None
 
 
-def _associates(blueprint: str, source: str, prefixes: set[str]) -> bool:
+def associates(blueprint: str, source: str, prefixes: set[str]) -> bool:
     """Family-targeted association for one blueprint against one test source.
 
     Covered when the source references the blueprint's endpoint in a
     url_for-style string, or names one of the blueprint's own route rule
     prefixes. Bare English words are never matched.
+
+    Public API: :mod:`check_asvs_register` reuses this predicate so the
+    "a two-organisation test drives this family's own route" rule has one
+    implementation shared across both gates.
     """
     if _endpoint_in_string(blueprint, source):
         return True
@@ -422,6 +464,10 @@ def _associates(blueprint: str, source: str, prefixes: set[str]) -> bool:
         if prefix in source:
             return True
     return False
+
+
+# Backwards-compatible private alias kept for this module's own call sites.
+_associates = associates
 
 
 def covered_families(
@@ -525,14 +571,164 @@ def uncovered(root: str) -> tuple[list[str], list[str]]:
     return startup_missing, other_missing
 
 
-def load_baseline(root: str) -> int:
+class BaselineError(RuntimeError):
+    """scripts/ci/two_org_baseline.json is missing or malformed."""
+
+
+def _parse_date(value: str) -> "datetime.date | None":
+    try:
+        return datetime.date.fromisoformat(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def load_baseline(root: str) -> list[dict]:
+    """Read the dated accepted-uncovered entries from the baseline file.
+
+    The schema is a list of ``{family, brief, expiry}`` entries under
+    ``accepted_uncovered`` (see the file's own ``_comment``). A missing file is
+    an empty accepted set (nothing is excused). A present-but-malformed file is
+    a :class:`BaselineError` so the ratchet can never be silently disabled.
+    """
     path = os.path.join(root, BASELINE)
     try:
         with open(path, encoding="utf-8") as fh:
             data = json.load(fh)
     except FileNotFoundError:
-        return 0
-    return int(data.get("accepted_uncovered", 0))
+        return []
+    except (OSError, ValueError) as exc:
+        raise BaselineError(
+            f"{BASELINE}: [two-org-coverage] the baseline could not be parsed "
+            f"({exc}); the ratchet cannot run"
+        ) from exc
+
+    accepted = data.get("accepted_uncovered", [])
+    if not isinstance(accepted, list):
+        raise BaselineError(
+            f"{BASELINE}: [two-org-coverage] 'accepted_uncovered' must be a list "
+            f"of {{family, brief, expiry}} entries (the bare-integer schema is "
+            f"no longer accepted)"
+        )
+    entries: list[dict] = []
+    for entry in accepted:
+        if not isinstance(entry, dict):
+            raise BaselineError(
+                f"{BASELINE}: [two-org-coverage] every accepted entry must be a "
+                f"mapping with family, brief and expiry; got {entry!r}"
+            )
+        family = str(entry.get("family", "")).strip()
+        brief = str(entry.get("brief", "")).strip()
+        expiry = str(entry.get("expiry", "")).strip()
+        if not family or not BRIEF_ID.search(brief) or _parse_date(expiry) is None:
+            raise BaselineError(
+                f"{BASELINE}: [two-org-coverage] accepted entry for "
+                f"{family or '?'!r} must name a family, a brief id (T-area-n) and "
+                f"an ISO expiry date (YYYY-MM-DD); got "
+                f"family={family!r} brief={brief!r} expiry={expiry!r}"
+            )
+        entries.append({"family": family, "brief": brief, "expiry": expiry})
+    return entries
+
+
+class Verdict:
+    """The single pass/fail decision for two-organisation coverage.
+
+    Holds everything both callers need: the two measured counts, the overall
+    verdict, and the plain detail messages (including the dated-baseline rule).
+    One object so the script's exit code and verify.py's gate agree by
+    construction -- there is no second copy of the arithmetic.
+    """
+
+    def __init__(
+        self,
+        startup_missing: list[str],
+        other_missing: list[str],
+        ok: bool,
+        messages: list[str],
+    ) -> None:
+        self.startup_missing = startup_missing
+        self.other_missing = other_missing
+        self.ok = ok
+        self.messages = messages
+
+    @property
+    def startup_count(self) -> int:
+        return len(self.startup_missing)
+
+    @property
+    def other_count(self) -> int:
+        return len(self.other_missing)
+
+
+def evaluate(root: str, today: "datetime.date | None" = None) -> Verdict:
+    """Decide two-organisation coverage for a tree. The one public decision.
+
+    Rules enforced here (and nowhere else):
+
+    * Startup families must be 0 uncovered; a startup family can never be
+      excused by a baseline entry.
+    * For non-startup families, the measured uncovered set must EQUAL the set of
+      still-valid (not past expiry) accepted families:
+        - a measured-uncovered family with NO accepted entry fails;
+        - an accepted entry whose family is NOT measured-uncovered fails (the
+          ratchet only falls: a family that gained coverage must drop its
+          entry);
+        - an accepted entry PAST its expiry fails, naming the family, its brief
+          and its expiry date.
+    * A missing/broken inventory or a malformed baseline fails loudly (raised by
+      the loaders).
+    """
+    today = today or datetime.date.today()
+    startup_missing, other_missing = uncovered(root)
+    accepted = load_baseline(root)
+
+    measured = set(other_missing)
+    valid_families: set[str] = set()
+    messages: list[str] = []
+
+    for entry in accepted:
+        family, brief, expiry = entry["family"], entry["brief"], entry["expiry"]
+        expiry_date = _parse_date(expiry)
+        if family in STARTUP_FAMILIES or family in BLUEPRINT_TO_STARTUP:
+            messages.append(
+                f"{BASELINE}: [two-org-coverage] startup family {family!r} can "
+                f"never be excused by a baseline entry (brief {brief}, expiry "
+                f"{expiry}); it must carry a real two-organisation test"
+            )
+            continue
+        if expiry_date is not None and expiry_date < today:
+            messages.append(
+                f"{BASELINE}: [two-org-coverage] accepted family {family!r} is "
+                f"past its expiry {expiry} (brief {brief}); cover it or renew the "
+                f"entry with a new brief and date"
+            )
+            continue
+        valid_families.add(family)
+
+    unaccounted = sorted(measured - valid_families)
+    for family in unaccounted:
+        messages.append(
+            f"{BASELINE}: [two-org-coverage] family {family!r} is uncovered but "
+            f"has no valid accepted entry; add a two-organisation test or a dated "
+            f"{{family, brief, expiry}} entry naming the brief that will cover it"
+        )
+
+    stale = sorted(valid_families - measured)
+    for family in stale:
+        messages.append(
+            f"{BASELINE}: [two-org-coverage] accepted family {family!r} is no "
+            f"longer uncovered; remove its entry (the accepted set can only "
+            f"shrink)"
+        )
+
+    if startup_missing:
+        messages.append(
+            f"Startup families must be 0 uncovered; "
+            f"{len(startup_missing)} are uncovered: {', '.join(startup_missing)}."
+        )
+
+    ok = not startup_missing and measured == valid_families
+    return Verdict(startup_missing, other_missing, ok, messages)
 
 
 def main() -> int:
@@ -547,7 +743,18 @@ def main() -> int:
     args = parser.parse_args()
 
     root = os.path.abspath(args.root)
-    startup_missing, other_missing = uncovered(root)
+
+    try:
+        verdict = evaluate(root)
+    except (InventoryError, BaselineError) as exc:
+        # A missing/broken inventory or a malformed baseline is a loud failure,
+        # never a silent empty pass.
+        print(str(exc))
+        print(1)
+        return 1
+
+    startup_missing = verdict.startup_missing
+    other_missing = verdict.other_missing
 
     if args.startup_only:
         reported = list(startup_missing)
@@ -582,28 +789,17 @@ def main() -> int:
                 "T-qa-13>'\nnaming it (a startup family can never be excused)."
             )
 
-    baseline = load_baseline(root)
-    over_baseline = len(other_missing) > baseline
-    startup_broken = bool(startup_missing)
-
-    if not args.startup_only and not args.count and (over_baseline or startup_broken):
+    # The full (non-startup-only) gate obeys the dated-baseline decision.
+    if not args.startup_only and not args.count and not verdict.ok:
         print()
-        if startup_broken:
-            print(
-                f"Startup families must be 0 uncovered; "
-                f"{len(startup_missing)} are uncovered."
-            )
-        if over_baseline:
-            print(
-                f"Non-startup uncovered {len(other_missing)} exceeds the baseline "
-                f"{baseline} in {BASELINE} (the baseline can only fall)."
-            )
+        for message in verdict.messages:
+            print(message)
 
     print(len(reported))
 
     if args.startup_only:
         return 1 if startup_missing else 0
-    return 1 if (over_baseline or startup_broken) else 0
+    return 0 if verdict.ok else 1
 
 
 if __name__ == "__main__":

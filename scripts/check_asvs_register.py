@@ -82,6 +82,22 @@ REGISTER = os.path.join("docs", "security", "asvs-l2.yml")
 # A brief id token, e.g. T-qa-13. A status:fail row must name one.
 BRIEF_ID = re.compile(r"T-[a-z]+-\d+")
 
+# The required startup families, a FIXED list owned by THIS gate. Each must
+# carry a genuine V4 two-organisation row whether or not the register mentions
+# it: deleting a startup family's register rows must NOT remove the check. The
+# English names and their blueprint sets mirror
+# check_two_org_coverage.STARTUP_FAMILIES (the shared public source of truth);
+# we read that public map so the two gates never drift.
+REQUIRED_STARTUP_FAMILIES: tuple[str, ...] = (
+    "account",
+    "admin connectors",
+    "intelligence",
+    "applications",
+    "admin billing",
+    "admin team",
+    "dashboard",
+)
+
 # A test node id: a .py file path, then :: and a node path. The node path may
 # carry a parametrisation suffix on its final segment, e.g.
 # ``test_name[param-1]`` or ``TestClass::test_name[case]``; the suffix is
@@ -297,50 +313,48 @@ def _genuine_two_org_node(
     for blueprint in blueprints:
         prefixes = route_prefixes.get(blueprint, set())
         for unit in units:
-            if two_org._associates(blueprint, unit, prefixes):
+            if two_org.associates(blueprint, unit, prefixes):
                 return True
     return False
 
 
 def startup_v4_problems(root: str, rows: list) -> list[str]:
-    """One problem per startup family missing a V4 two-organisation row.
+    """One problem per required startup family missing a V4 two-organisation row.
 
-    A startup family must carry at least one V4 (access control; id starting
-    ``V4.``) row, applicable and not failing, whose evidence resolves to a
-    genuine two-organisation test node bound to that family. A startup family
-    present in the register with no such row is a hole the gate must refuse.
+    The required startup families are a FIXED list owned by this gate
+    (:data:`REQUIRED_STARTUP_FAMILIES`), checked WHETHER OR NOT the register
+    mentions them: deleting a startup family's register rows does NOT remove the
+    check. A family is satisfied only when SOME register row for one of its
+    blueprints is a V4 (access control; id starting ``V4.``) row, applicable and
+    not failing, whose evidence resolves to a genuine two-organisation test node
+    bound to that family. A required startup family with no such row -- whether
+    its rows were deleted, never written, or all cite single-organisation tests
+    -- is a hole the gate must refuse.
     """
     try:
         routes = two_org.load_routes(root)
-    except (OSError, ValueError):
-        # No route inventory in this tree: startup families cannot be scoped,
-        # so there is nothing to enforce. (A synthetic register under --root may
-        # ship no inventory; the real tree always has one.)
+    except two_org.InventoryError:
+        # No usable route inventory in this tree: startup families cannot be
+        # scoped here, so this gate enforces nothing (the two-org-coverage gate
+        # owns the missing-inventory failure). A synthetic register under --root
+        # may ship no inventory; the real tree always has one.
         return []
     route_prefixes = two_org.blueprint_route_prefixes(routes)
     org_families = two_org.families_reading_org_data(routes)
 
-    # Register family name -> startup family; the register's `family` is the
-    # blueprint name, which is exactly what STARTUP_FAMILIES maps.
-    blueprint_to_startup = two_org._BLUEPRINT_TO_STARTUP
+    # Register family name (a blueprint) -> startup family English name.
+    blueprint_to_startup = two_org.BLUEPRINT_TO_STARTUP
 
     # Startup family -> whether any of its V4 rows cites a genuine two-org node.
-    satisfied: dict[str, bool] = {}
-    present: set[str] = set()
+    satisfied: dict[str, bool] = {family: False for family in REQUIRED_STARTUP_FAMILIES}
 
     for row in rows:
         if not isinstance(row, dict):
             continue
         family = str(row.get("family", "")).strip()
         startup = blueprint_to_startup.get(family)
-        if startup is None:
+        if startup is None or startup not in satisfied:
             continue
-        # Only a family whose blueprint actually reads organisation data in the
-        # inventory is in scope -- the same scoping two_org uses.
-        if not (two_org.STARTUP_FAMILIES.get(startup, set()) & org_families):
-            continue
-        present.add(startup)
-        satisfied.setdefault(startup, False)
 
         row_id = str(row.get("id", "")).strip()
         if not row_id.startswith("V4."):
@@ -363,7 +377,14 @@ def startup_v4_problems(root: str, rows: list) -> list[str]:
                 break
 
     issues: list[str] = []
-    for startup in sorted(present):
+    for startup in REQUIRED_STARTUP_FAMILIES:
+        # Only enforce a family whose blueprint actually reads organisation data
+        # in this tree's inventory -- the same scoping two_org uses. A synthetic
+        # --root tree that ships none of a family's blueprints does not get a
+        # spurious requirement, but the real tree ships all seven.
+        in_scope = bool(two_org.STARTUP_FAMILIES.get(startup, set()) & org_families)
+        if not in_scope:
+            continue
         if not satisfied.get(startup, False):
             issues.append(
                 f"{REGISTER}: [asvs-register] startup family {startup!r} has no "
@@ -380,46 +401,53 @@ def startup_v4_problems(root: str, rows: list) -> list[str]:
 _PATH_TOKEN = re.compile(r"[\w./-]*[\w]")
 
 
-def _resolve_evidence(root: str, evidence: str) -> bool:
-    """True when the evidence names a real control precisely enough to resolve.
+def _named_files(root: str, evidence: str) -> list[str]:
+    """Return the relative paths in *evidence* that name an existing FILE.
 
-    The rules tightened for the second review:
-
-    * A token that names an existing FILE resolves (an existing ``.py``,
-      ``Dockerfile`` with a slash path, ``docs/.../x.md`` and so on).
-    * A token that names an existing DIRECTORY resolves ONLY when some OTHER
-      token in the same evidence names an existing file inside that directory,
-      so ``app/auth`` alone no longer passes but
-      ``app/auth app/auth/__init__.py`` does.
-    * A BARE WORD (no slash and no recognised file extension) NEVER resolves,
-      even if a same-named file or directory happens to exist on disk, so
-      ordinary prose can never pass by coincidence. A control named by a bare
-      top-level file must be cited with its path (``./Dockerfile``) or a real
-      extension.
+    A token resolves to a file only when it looks like a path (a slash or a
+    recognised extension) AND the file exists on disk. A bare word never
+    resolves, even if a same-named file happens to exist, so ordinary prose can
+    never pass by coincidence; a bare directory never resolves either.
     """
-    tokens = _PATH_TOKEN.findall(evidence)
-
-    has_named_file = False
-    has_directory = False
-    for token in tokens:
+    found: list[str] = []
+    for token in _PATH_TOKEN.findall(evidence):
         has_extension = token.endswith((".py", ".md", ".json", ".yml", ".yaml"))
         looks_like_path = "/" in token or has_extension
         if not looks_like_path:
-            # Bare word: never resolves, whatever happens to exist on disk.
             continue
         candidate = os.path.join(root, token)
         if os.path.isfile(candidate):
-            has_named_file = True
-        elif os.path.isdir(candidate):
-            has_directory = True
+            found.append(token)
+    return found
 
-    # A named existing file always resolves. This also satisfies the rule that a
-    # directory counts only when a file within it is named: that named file is
-    # itself the resolving token. A directory on its own never resolves.
-    if has_named_file:
-        return True
-    _ = has_directory  # a bare directory does not resolve
-    return False
+
+def _symbol_present(root: str, rel_path: str, symbol: str) -> bool:
+    """True when *symbol* text appears in the file at *rel_path*.
+
+    Plain substring search over the file text. A symbol is a code identifier or
+    setting name (``SESSION_COOKIE_SECURE``), a class/function name
+    (``SecurityMiddleware``), or a configuration directive token
+    (``ssl_protocols``). A plain text search is enough to prove the cited symbol
+    is really in the file the row names; it needs no import, parse or boot.
+    """
+    path = os.path.join(root, rel_path)
+    try:
+        with open(path, encoding="utf-8", errors="replace") as fh:
+            text = fh.read()
+    except OSError:
+        return False
+    return symbol in text
+
+
+def _resolve_evidence(root: str, evidence: str) -> bool:
+    """True when the evidence names at least one existing FILE.
+
+    Kept as the file-level half of control-evidence resolution; the symbol half
+    (finding 3) is checked separately in :func:`problems` using the row's
+    ``symbol`` field, because a symbol is meaningful only against the specific
+    file the row cites.
+    """
+    return bool(_named_files(root, evidence))
 
 
 # --------------------------------------------------------------------------- #
@@ -458,6 +486,8 @@ def problems(root: str) -> list[str]:
             # Not applicable: the evidence is a reason, not a control to resolve.
             continue
 
+        symbol = str(row.get("symbol", "")).strip()
+
         for entry in evidence:
             entry = str(entry).strip()
             if _looks_like_node_id(entry):
@@ -468,16 +498,33 @@ def problems(root: str) -> list[str]:
                         f"exist in the repository"
                     )
             else:
-                # Every piece of evidence must resolve to a real control: a test
-                # node id (handled above), an existing file, or an existing
-                # directory. Evidence that resolves to none of these -- a path
-                # that is not on disk, or free prose naming no path at all --
-                # fails the gate so a control can never pass silently.
-                if not _resolve_evidence(root, entry):
+                # A control-description row must name a FILE and a SYMBOL/setting,
+                # and that symbol must actually be present in the named file.
+                # A file alone no longer passes: prose that names an existing
+                # file but no symbol (or a symbol that is absent from the file)
+                # fails, so a row can never assert a control that has left the
+                # file it cites.
+                named_files = _named_files(root, entry)
+                if not named_files:
                     issues.append(
                         f"{REGISTER}: [asvs-register] row {row_id!r} (family "
                         f"{family!r}) cites evidence {entry!r} but it resolves to "
                         f"no test node or control file in the repository"
+                    )
+                    continue
+                if not symbol:
+                    issues.append(
+                        f"{REGISTER}: [asvs-register] row {row_id!r} (family "
+                        f"{family!r}) names control file(s) {named_files} but no "
+                        f"symbol/setting; add a 'symbol:' naming a token the file "
+                        f"must contain"
+                    )
+                    continue
+                if not any(_symbol_present(root, rel, symbol) for rel in named_files):
+                    issues.append(
+                        f"{REGISTER}: [asvs-register] row {row_id!r} (family "
+                        f"{family!r}) names symbol {symbol!r} but it is absent "
+                        f"from {named_files}"
                     )
 
     issues.extend(startup_v4_problems(root, rows))
