@@ -48,6 +48,7 @@ from app.extensions import csrf
 from app.modules.ai_chat.tools.executor import ToolCall, ToolExecutor
 from app.modules.ai_chat.tools.route_read_tools import (
     connector_tools,
+    fence_connector_result,
     resolve_connector_tool,
     scrub_credentials,
 )
@@ -274,9 +275,11 @@ def mcp_endpoint():
                 return jsonify(_jsonrpc_error(
                     req_id, JSONRPC_INTERNAL_ERROR, "Organisation scope unavailable.",
                 )), 403
-            result = scrub_credentials(ToolExecutor(user_id=user_id).execute(
-                ToolCall(id=f"mcp-{req_id}", name=catalogue_name, arguments=arguments),
-                propagate_errors=True,
+            result = fence_connector_result(catalogue_name, scrub_credentials(
+                ToolExecutor(user_id=user_id).execute(
+                    ToolCall(id=f"mcp-{req_id}", name=catalogue_name, arguments=arguments),
+                    propagate_errors=True,
+                )
             ))
             elapsed_ms = int((time.monotonic() - start) * 1000)
 

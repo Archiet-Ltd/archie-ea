@@ -10,7 +10,7 @@ Reference: The Open Group ArchiMate 3.2 Specification
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import Dict, List, Optional, Set
+from typing import Dict, List, Optional, Set, Tuple
 
 from app.models.constants import ArchiMateLayer
 
@@ -2002,6 +2002,51 @@ def base_type(element_type: Optional[str]) -> Optional[str]:
 def is_application_kind(element_type: Optional[str]) -> bool:
     """True for Application and for ApplicationComponent."""
     return base_type(element_type) == "ApplicationComponent"
+
+
+def application_kind_types() -> Tuple[str, ...]:
+    """Every stored type for which ``is_application_kind`` is true.
+
+    For SQL ``IN`` filters, where a Python predicate cannot be used. Derived from
+    ``SPECIALIZATIONS``, so there is no second list.
+    """
+    parents = set(SPECIALIZATIONS.values())
+    return tuple(sorted(parents | {s for s, p in SPECIALIZATIONS.items() if p in parents}))
+
+
+# The element property that names a specialisation in an exchange file (ADR-0014 Decision 5).
+SPECIALIZATION_PROPERTY = "entelim:specialization"
+
+
+def exchange_type_for(element_type: Optional[str]) -> Tuple[Optional[str], Dict[str, str]]:
+    """``(xsi_type, extra_properties)`` to write for *element_type* in an exchange file.
+
+    A specialisation is written as its standard parent with a property that names it, so every
+    ArchiMate tool can open the file and Entelim reads the specialisation back. Any other type
+    passes through unchanged with no extra property. This is the one place that mapping lives.
+    """
+    parent = SPECIALIZATIONS.get(element_type) if element_type else None
+    if parent:
+        return parent, {SPECIALIZATION_PROPERTY: element_type}
+    return element_type, {}
+
+
+class StandardTypeTable(dict):
+    """A dict keyed by standard ArchiMate type, read through ``base_type``.
+
+    A table that maps a standard type to a layer, a label, a model or a rule is wrapped in this class
+    so an Application (a specialisation) finds its parent's entry on ``get``, ``[]`` and ``in``.
+    Writes, iteration and ``keys()`` are unchanged and still show only the standard keys.
+    """
+
+    def __getitem__(self, key):
+        return super().__getitem__(base_type(key) if isinstance(key, str) else key)
+
+    def get(self, key, default=None):
+        return super().get(base_type(key) if isinstance(key, str) else key, default)
+
+    def __contains__(self, key):
+        return super().__contains__(base_type(key) if isinstance(key, str) else key)
 
 
 # =============================================================================

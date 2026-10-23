@@ -9,6 +9,7 @@ import logging
 from typing import Any, Dict, List, Optional
 
 from app.services.llm_service import LLMService
+from app.models.archimate_element_types import is_application_kind
 
 logger = logging.getLogger(__name__)
 
@@ -281,7 +282,7 @@ Only include fields that were listed as missing. Use null for fields you cannot 
 
     def _get_field_mapping(self, element_type: str) -> Dict[str, str]:
         """Get field name mapping for element type."""
-        if element_type == "ApplicationComponent":
+        if is_application_kind(element_type):
             return {
                 "name": "name",
                 "description": "description",

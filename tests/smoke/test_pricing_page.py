@@ -129,6 +129,42 @@ def test_pricing_reads_back_clean_and_stacks_on_mobile(browser, live_server):
         context.close()
 
 
+def test_heading_and_intro_share_left_edge_at_1440(browser, live_server):
+    """The Pricing heading and its intro paragraph share one left edge at 1440px."""
+    context, page = _open(browser, live_server, 1440, 900)
+    try:
+        h1 = page.locator("h1")
+        p = page.locator(".pp-lead p").first
+        expect(h1).to_be_visible(timeout=PAGE_TIMEOUT)
+        expect(p).to_be_visible()
+        h1_box = h1.bounding_box()
+        p_box = p.bounding_box()
+        assert h1_box is not None and p_box is not None
+        assert abs(h1_box["x"] - p_box["x"]) <= 1, (
+            f"heading left edge {h1_box['x']} != paragraph left edge {p_box['x']} at 1440px"
+        )
+    finally:
+        context.close()
+
+
+def test_heading_and_intro_share_left_edge_at_390(browser, live_server):
+    """The Pricing heading and its intro paragraph share one left edge at 390px."""
+    context, page = _open(browser, live_server, 390, 844)
+    try:
+        h1 = page.locator("h1")
+        p = page.locator(".pp-lead p").first
+        expect(h1).to_be_visible(timeout=PAGE_TIMEOUT)
+        expect(p).to_be_visible()
+        h1_box = h1.bounding_box()
+        p_box = p.bounding_box()
+        assert h1_box is not None and p_box is not None
+        assert abs(h1_box["x"] - p_box["x"]) <= 1, (
+            f"heading left edge {h1_box['x']} != paragraph left edge {p_box['x']} at 390px"
+        )
+    finally:
+        context.close()
+
+
 @pytest.mark.parametrize("width", [1024, 1100, 1280])
 def test_four_across_prices_fit_their_cards_and_the_buttons_share_a_row(browser, live_server, width):
     context, page = _open(browser, live_server, width=width)

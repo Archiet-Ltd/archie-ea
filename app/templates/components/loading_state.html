@@ -26,7 +26,7 @@
 {% macro loading_overlay(id='', text='Loading...') %}
 <div
   {% if id %}id="{{ id }}"{% endif %}
-  class="absolute inset-0 flex items-center justify-center bg-background/80 backdrop-blur-sm z-10"
+  class="absolute inset-0 flex items-center justify-center z-10 bg-overlay/50"
   role="status"
   aria-live="polite"
 >

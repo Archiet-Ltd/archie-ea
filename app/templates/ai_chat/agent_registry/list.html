@@ -11,10 +11,10 @@
       breadcrumb=[('Home', url_for('main.index')), ('Agent Registry', None)]
   ) }}
   <div class="mb-4">
-    <a href="{{ url_for('agent_registry.new') }}" class="inline-flex items-center rounded-md bg-primary text-primary-foreground px-3 py-2 text-sm font-medium hover:bg-primary/90 transition-colors">Register agent</a>
+    <a href="{{ url_for('agent_registry.new') }}" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">Register agent</a>
   </div>
   {% if registrations %}
-  <table class="w-full rounded-lg border border-border bg-card text-sm" data-testid="agent-registry-table">
+  <table class="dense-table w-full rounded-lg border border-border bg-card text-sm" data-testid="agent-registry-table">
     <thead>
       <tr class="border-b border-border text-left text-muted-foreground">
         <th class="p-3">Name</th>

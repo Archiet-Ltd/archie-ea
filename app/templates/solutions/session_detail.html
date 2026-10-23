@@ -23,12 +23,12 @@
     {% endmacro %}
     {% macro _ps_actions() %}
             <button type="button" @click="resumeAnalysis"
-                    class="inline-flex items-center gap-2 h-10 px-4 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors text-sm font-medium" aria-label="Resume analysis">
+                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center" aria-label="Resume analysis">
                 <i data-lucide="play" class="h-4 w-4" aria-hidden="true"></i>
                 Resume Analysis
             </button>
             <button type="button" @click="exportSession"
-                    class="inline-flex items-center gap-2 h-10 px-4 rounded-lg border border-input hover:bg-accent transition-colors text-sm font-medium" aria-label="Export">
+                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center" aria-label="Export">
                 <i data-lucide="download" class="h-4 w-4" aria-hidden="true"></i>
                 Export
             </button>
@@ -238,7 +238,7 @@
             <button type="button" @click="analyzeProblem()"
                     :disabled="analyzingProblem"
                     x-cloak
-                    class="inline-flex items-center gap-2 h-10 px-4 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors text-sm font-medium"
+                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center"
                     aria-label="Analyze problem with AI">
                 <span x-show="analyzingProblem" x-cloak>
                     <svg class="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -346,7 +346,7 @@
             </h2>
             <div class="space-y-2">
                 {% for constraint in problem.constraints %}
-                <div class="p-3 rounded-lg bg-warning/5 border border-warning/20">
+                <div class="px-3 py-2 rounded-md bg-warning/10 border border-warning/40">
                     <div class="font-medium">{{ constraint.name }}</div>
                     <div class="text-sm text-muted-foreground">{{ constraint.description }}</div>
                 </div>
@@ -360,7 +360,7 @@
             <button type="button" @click="analyzeProblem()"
                     :disabled="analyzingProblem"
                     x-cloak
-                    class="inline-flex items-center gap-2 h-10 px-6 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors text-sm font-medium"
+                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center"
                     aria-label="Analyze problem with AI">
                 <span x-show="analyzingProblem" x-cloak>Analyzing...</span>
                 <span x-show="!analyzingProblem" x-cloak>Analyze Problem</span>
@@ -455,7 +455,7 @@
                 </p>
                 <button type="button" @click="runOptionsAnalysis()"
                         :disabled="!hasProblemDefinition"
-                        class="inline-flex items-center gap-2 h-10 px-6 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium" aria-label="Run options analysis">
+                        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center" aria-label="Run options analysis">
                     <i data-lucide="play" class="h-4 w-4" aria-hidden="true"></i>
                     Run Options Analysis
                 </button>
@@ -476,7 +476,7 @@
                            x-text="analysisResults.length + ' options analyzed and ranked by score'"></p>
                     </div>
                     <button type="button" @click="runOptionsAnalysis()"
-                            class="inline-flex items-center gap-2 h-9 px-4 rounded-lg border border-input hover:bg-accent transition-colors text-sm font-medium" aria-label="Re-run options analysis">
+                            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center" aria-label="Re-run options analysis">
                         <i data-lucide="refresh-cw" class="h-4 w-4" aria-hidden="true"></i>
                         Re-run Analysis
                     </button>
@@ -609,7 +609,7 @@
                                     <button type="button"
                                         @click="acceptRecommendation(rec.id)"
                                         :disabled="acceptingRec === rec.id"
-                                        class="inline-flex items-center px-3 py-1.5 rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+                                        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center"
                                         aria-label="Accept recommendation and create solution">
                                         <span x-show="acceptingRec === rec.id" x-cloak>Creating Solution...</span>
                                         <span x-show="acceptingRec !== rec.id" x-cloak>Accept &amp; Create Solution</span>
@@ -741,7 +741,7 @@
 
         <!-- Error State -->
         <template x-if="analysisError">
-            <div class="bg-destructive/5 border border-destructive/20 rounded-lg p-4">
+            <div class="bg-destructive/10 border border-destructive/40 rounded-md px-3 py-2">
                 <div class="flex items-center gap-2 text-destructive-emphasis">
                     <i data-lucide="alert-circle" class="h-5 w-5" aria-hidden="true"></i>
                     <span class="font-medium">Analysis Error</span>
@@ -792,7 +792,7 @@
                     </div>
                     <button type="button" @click="generateAIElements()"
                             :disabled="!hasProblemDefinition || aiLoading.elements"
-                            class="inline-flex items-center gap-2 h-9 px-4 rounded-lg bg-primary text-primary-foreground hover:bg-primary disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium" aria-label="Generate architecture elements">
+                            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center" aria-label="Generate architecture elements">
                         <svg x-show="aiLoading.elements" x-cloak class="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
                             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
@@ -826,7 +826,7 @@
                             <div x-show="aiExpandedLayers[layer]" x-cloak x-transition class="mt-2 ml-6 space-y-2">
                                 <template x-for="elem in aiElements[layer]" :key="elem.name">
                                     <div class="flex items-start gap-3 p-3 rounded-lg border border-border">
-                                        <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-primary/10 text-primary shrink-0 mt-0.5"
+                                        <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-primary/10 text-info-emphasis shrink-0 mt-0.5"
                                               x-text="elem.element_type"></span>
                                         <div>
                                             <div class="font-medium text-sm" x-text="elem.name"></div>
@@ -845,7 +845,7 @@
                     <button type="button" @click="applyElements()"
                             :disabled="applyingElements || !APP_CONFIG.solutionId"
                             x-cloak
-                            class="inline-flex items-center gap-2 h-9 px-4 rounded-lg border border-input hover:bg-accent disabled:opacity-50 transition-colors text-sm font-medium"
+                            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center"
                             aria-label="Apply elements to solution">
                         <span x-show="applyingElements" x-cloak>Applying...</span>
                         <span x-show="!applyingElements" x-cloak>Apply to Solution</span>
@@ -958,7 +958,7 @@
                     </div>
                     <button type="button" @click="generateAIRequirements()"
                             :disabled="!hasProblemDefinition || aiLoading.requirements"
-                            class="inline-flex items-center gap-2 h-9 px-4 rounded-lg bg-primary text-primary-foreground hover:bg-primary disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium" aria-label="Generate requirements">
+                            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center" aria-label="Generate requirements">
                         <svg x-show="aiLoading.requirements" x-cloak class="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
                             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
@@ -1027,7 +1027,7 @@
                     <button type="button" @click="applyRequirements()"
                             :disabled="applyingRequirements"
                             x-cloak
-                            class="inline-flex items-center gap-2 h-9 px-4 rounded-lg border border-input hover:bg-accent disabled:opacity-50 transition-colors text-sm font-medium"
+                            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center"
                             aria-label="Apply requirements to problem definition">
                         <span x-show="applyingRequirements" x-cloak>Applying...</span>
                         <span x-show="!applyingRequirements" x-cloak>Apply to Problem Definition</span>
@@ -1135,7 +1135,7 @@
                     <button type="button" @click="applyRoadmap()"
                             :disabled="applyingRoadmap || !APP_CONFIG.solutionId"
                             x-cloak
-                            class="inline-flex items-center gap-2 h-9 px-4 rounded-lg border border-input hover:bg-accent disabled:opacity-50 transition-colors text-sm font-medium"
+                            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center"
                             aria-label="Apply roadmap to solution">
                         <span x-show="applyingRoadmap" x-cloak>Applying...</span>
                         <span x-show="!applyingRoadmap" x-cloak>Apply to Solution</span>

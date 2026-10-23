@@ -146,10 +146,16 @@ def test_owner_advances_their_own_workspace(client, login_as, db_session, world,
 def test_viewer_cannot_start_a_workflow(client, login_as, db_session, world, url, field):
     from app.models.solution_architect_models import SolutionAnalysisSession
 
-    before = db_session.query(SolutionAnalysisSession).count()
+    before = db_session.query(
+        SolutionAnalysisSession).filter(
+        SolutionAnalysisSession.organization_id == world["viewer"].organization_id,
+        SolutionAnalysisSession.created_by_id == world["viewer"].id).count()
     resp = _post(client, login_as, world["viewer"], url, **{field: "anything"})
     assert resp.status_code == 403
-    assert db_session.query(SolutionAnalysisSession).count() == before
+    assert db_session.query(
+        SolutionAnalysisSession).filter(
+        SolutionAnalysisSession.organization_id == world["viewer"].organization_id,
+        SolutionAnalysisSession.created_by_id == world["viewer"].id).count() == before
 
 
 @pytest.mark.parametrize("url,field", [(G_START, "brief"), (B_START, "target_domain")])

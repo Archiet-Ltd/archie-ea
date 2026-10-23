@@ -58,5 +58,5 @@
 {# The one control that opens the provenance drawer. #}
 {% macro why_button(key) %}
 <button type="button" @click="openWhy({{ key }})"
-        class="inline-flex h-8 min-w-8 items-center justify-center rounded-md border border-input bg-background px-3 text-sm font-medium text-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background">Why?</button>
+        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 min-w-8 items-center justify-center">Why?</button>
 {% endmacro %}

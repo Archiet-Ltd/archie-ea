@@ -16,6 +16,7 @@ from app import db
 from app.modules.architecture.services.inference_rules_registry import InferenceRulesRegistry
 from app.modules.architecture.services.architecture_graph_facade import ArchitectureGraphFacade
 from app.modules.architecture.services.inference_providers import PROVIDER_REGISTRY
+from app.models.archimate_element_types import is_application_kind
 
 logger = logging.getLogger(__name__)
 
@@ -237,7 +238,7 @@ class ArchiMateInferenceEngine:
         # Every ApplicationComponent must realize at least one ApplicationFunction.
         # Without this, the component has no defined behaviour and the codegen
         # will produce an empty service module with no business logic.
-        if node.element_type == "ApplicationComponent":
+        if is_application_kind(node.element_type):
             inbound = self.graph.get_neighbors(node.id, direction="in")
             has_function = any(n.element_type == "ApplicationFunction" for n in inbound)
             if not has_function:
