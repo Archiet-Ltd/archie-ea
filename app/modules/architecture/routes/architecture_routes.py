@@ -664,8 +664,17 @@ def _assemble_investment_priorities_context():
     fallback behaviour for that case.
     """
     from app.models.unified_application_capability_mapping import UnifiedApplicationCapabilityMapping
+    from app.models.application_portfolio import ApplicationComponent
 
-    mapping_count = UnifiedApplicationCapabilityMapping.query.count()
+    # Scope mapping count through ApplicationComponent (TenantMixin)
+    mapping_count = (
+        UnifiedApplicationCapabilityMapping.query
+        .join(
+            ApplicationComponent,
+            UnifiedApplicationCapabilityMapping.application_component_id == ApplicationComponent.id
+        )
+        .count()
+    )
     if mapping_count == 0:
         return None, mapping_count
 
@@ -713,9 +722,12 @@ def investment_priorities():
                 "total_capabilities": 0,
                 "critical_priorities": 0,
                 "high_priorities": 0,
-                "total_estimated_investment": 0,
-                "critical_investment": 0,
-                "high_investment": 0,
+                "total_estimated_investment": None,
+                "has_recorded_investment": False,
+                "mapped_application_count": 0,
+                "applications_with_cost": 0,
+                "critical_investment": None,
+                "high_investment": None,
                 "average_strategic_score": 0,
                 "average_coverage_score": 0,
                 "average_maturity_score": 0,
@@ -749,16 +761,13 @@ def _org_scoped_investment_context(analysis, limit=50):
     """Filter the whole-portfolio investment analysis down to capability
     names this org has actually mapped, capped at `limit` entries.
 
-    InvestmentPrioritizationService.analyze_investment_priorities() is built
-    from UnifiedCapability.query.all() + UnifiedApplicationCapabilityMapping
-    .query.all() — neither model carries an organization_id column, so the
-    raw analysis spans every organization on the install. Reuses the same
+    InvestmentPrioritizationService.analyze_investment_priorities() now scopes
+    UnifiedApplicationCapabilityMapping queries through ApplicationComponent
+    (TenantMixin), so the analysis already reflects only this org's mappings.
+    This function provides an additional capability-name filter using the same
     org-scoped-name derivation as the value-stream AI suggest endpoint
-    (value_stream_ai_service._org_scoped_capability_names, join through
-    CapabilityValueStreamMapping and UnifiedApplicationCapabilityMapping ->
-    ApplicationComponent, both TenantMixin) so only what this org has
-    actually mapped — never another org's capability catalog — ever reaches
-    the LLM prompt.
+    (value_stream_ai_service._org_scoped_capability_names) to ensure only
+    capabilities this org has actually mapped reach the LLM prompt.
 
     Returns None when this org has no capability in the analysis that it has
     actually mapped, so the caller can short-circuit before calling the LLM
@@ -832,8 +841,7 @@ def ai_investment_suggestions():
                      "(no capability mappings for this organization)."
         }), 502
 
-    # analysis spans every organization on the install (see
-    # _org_scoped_investment_context) — never hand it to the LLM as-is.
+    # Additional capability-name filter for LLM context
     org_context = _org_scoped_investment_context(analysis)
     if org_context is None:
         return jsonify({

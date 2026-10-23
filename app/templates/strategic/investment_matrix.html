@@ -47,12 +47,24 @@ const INVESTMENT_CAPABILITIES = {{ capability_scores | tojson }};
             icon='alert-triangle',
             value_class='text-destructive'
         ) }}
+        {% if portfolio_metrics.has_recorded_investment %}
         {{ metrics_card(
             title='Total Investment',
-            value=currency_symbol + "%.1f"|format(((portfolio_metrics.total_estimated_investment or 0) | float) / 1000000) + 'M',
+            value=currency_symbol + "%.1f"|format((portfolio_metrics.total_estimated_investment | float) / 1000000) + 'M',
             icon='dollar-sign',
-            value_class='text-primary'
+            value_class='text-primary',
+            description='Recorded annual cost of the ' ~ portfolio_metrics.applications_with_cost ~ ' of ' ~ portfolio_metrics.mapped_application_count ~ ' mapped applications with a cost on record.'
         ) }}
+        {% else %}
+        {{ metrics_card(
+            title='Total Investment',
+            value='No cost recorded',
+            icon='dollar-sign',
+            value_class='text-muted-foreground',
+            description='Record an annual cost on the mapped applications to see this figure. Open Applications to add it.',
+            href=url_for('unified_applications.application_list')
+        ) }}
+        {% endif %}
         {{ metrics_card(
             title='Avg Strategic Score',
             value=portfolio_metrics.average_strategic_score|string + '/25',
@@ -208,13 +220,17 @@ const INVESTMENT_CAPABILITIES = {{ capability_scores | tojson }};
                                 </td>
                                 <td class="p-4">
                                     <div class="flex items-center gap-1">
-                                        <span x-text="'{{ currency_symbol }}' + (cap.investment_need.estimated_cost / 1000).toFixed(1) + 'k'"></span>
+                                        <span x-show="cap.investment_need.estimated_cost !== null"
+                                            x-text="'{{ currency_symbol }}' + (cap.investment_need.estimated_cost / 1000).toFixed(1) + 'k'"></span>
+                                        <span x-show="cap.has_recorded_cost" x-cloak
+                                            class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-success/10 text-success-emphasis border border-success/20"
+                                            title="Recorded annual cost of this capability's applications">Recorded</span>
                                         <span x-show="cap.has_real_budget" x-cloak
                                             class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-success/10 text-success-emphasis border border-success/20"
                                             :title="'From linked initiative: ' + cap.linked_initiative_name">Live</span>
-                                        <span x-show="!cap.has_real_budget" x-cloak
-                                            class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-warning/10 text-warning-emphasis border border-warning/20"
-                                            title="Scoring-based estimate — no linked initiative">Est.</span>
+                                        <span x-show="cap.investment_need.estimated_cost === null" x-cloak
+                                            class="text-xs text-muted-foreground"
+                                            title="No annual cost recorded on this capability's applications yet">No cost recorded</span>
                                     </div>
                                 </td>
                                 <td class="p-4">
@@ -228,7 +244,8 @@ const INVESTMENT_CAPABILITIES = {{ capability_scores | tojson }};
                                         </div>
                                     </template>
                                     <template x-if="!cap.has_real_budget || !cap.linked_initiative_name">
-                                        <span class="text-xs text-muted-foreground">&mdash;</span>
+                                        <span class="text-xs text-muted-foreground"
+                                            title="No strategic initiative funds this capability yet">No linked initiative</span>
                                     </template>
                                 </td>
                                 <td class="p-4 text-sm" x-text="cap.investment_need.timeframe"></td>
@@ -538,10 +555,13 @@ new Chart(investmentCtx, {
         labels: ['Critical', 'High', 'Medium', 'Low'],
         datasets: [{
             label: 'Investment ($k)',
+            {% set _crit = portfolio_metrics.critical_investment or 0 %}
+            {% set _high = portfolio_metrics.high_investment or 0 %}
+            {% set _total = portfolio_metrics.total_estimated_investment or 0 %}
             data: [
-                {{ "%.1f"|format(portfolio_metrics.critical_investment/1000) }},
-                {{ "%.1f"|format(portfolio_metrics.high_investment/1000) }},
-                {{ "%.1f"|format((portfolio_metrics.total_estimated_investment - portfolio_metrics.critical_investment - portfolio_metrics.high_investment)/1000) }},
+                {{ "%.1f"|format(_crit/1000) }},
+                {{ "%.1f"|format(_high/1000) }},
+                {{ "%.1f"|format((_total - _crit - _high)/1000) }},
                 {{ "%.1f"|format(0) }}
             ],
             backgroundColor: ['#ef4444', '#f59e0b', '#06b6d4', '#6b7280']
