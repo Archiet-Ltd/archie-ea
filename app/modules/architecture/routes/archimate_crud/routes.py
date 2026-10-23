@@ -846,7 +846,7 @@ def api_layer_elements(layer):
     if source_filter != "portfolio":  # skip archimate_elements when filtering to portfolio-only
         try:
             seen_pairs = {(el["element_type"], el["id"]) for el in all_elements}
-            # Same alias matching as api_layer_count (ARCH-010) — otherwise the
+            # Match layer names the same way the layer count does — otherwise the
             # listing silently omits the elements the count now includes, and the
             # catalogue page keeps rendering the layer as empty.
             ae_q = ArchiMateElement.query.filter(
@@ -942,13 +942,13 @@ def api_layer_elements(layer):
                     "rel_count": _rel_count,
                 }
                 ae_dict["architecture_state"] = ae_dict["plateau"] or ""
-                # F-08(a): the F-04 dedup fix means every MIRRORED element
-                # (the overwhelming majority — anything created through
-                # the normal form) is now listed from here, not from the
-                # dedicated-table branch above. Without this lookup, this
-                # branch's elements would still lose their typed fields —
-                # trading the double-listing bug for a "typed fields only
-                # populate for the rare unmirrored row" bug instead.
+                # The dedup fix means every mirrored element (the overwhelming
+                # majority — anything created through the normal form) is now
+                # listed from here, not from the dedicated-table branch above.
+                # Without this lookup, this branch's elements would still lose
+                # their typed fields — trading the double-listing bug for a
+                # "typed fields only populate for the rare unmirrored row" bug
+                # instead.
                 ae_type_config = get_element_config(ae.type)
                 if ae_type_config:
                     type_rows = dedicated_rows_by_ae_id.get(ae.type, {})
