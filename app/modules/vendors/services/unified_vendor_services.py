@@ -180,42 +180,13 @@ class VendorOnboardingService:
     """Service for vendor onboarding operations."""
 
     @staticmethod
-    def activate_vendor(
-        vendor_id: int, contract_start_date=None, contract_end_date=None, contract_value=None
-    ) -> VendorOrganization:
-        """
-        Activate a vendor from catalog to contracted status.
+    def activate_vendor(*args, **kwargs):
+        """Delegates to the canonical onboarding service; kept so the facade's callers still resolve."""
+        from app.modules.vendors.services.vendor_onboarding_service import (
+            VendorOnboardingService as CanonicalOnboardingService,
+        )
 
-        Args:
-            vendor_id: ID of the vendor to activate
-            contract_start_date: Start date of the contract
-            contract_end_date: End date of the contract
-            contract_value: Annual contract value
-
-        Returns:
-            The activated vendor object
-        """
-        VendorOrganization = get_vendor_organization_model()
-        vendor = VendorOrganization.query.get(vendor_id)
-        if not vendor:
-            raise ValueError(f"Vendor with ID {vendor_id} not found")
-
-        # Update vendor contract information
-        vendor.contract_status = "contracted"
-        vendor.contract_start_date = contract_start_date
-        vendor.contract_end_date = contract_end_date
-        vendor.contract_value_annual = contract_value
-        vendor.status = "active"
-
-        # Set activation timestamp
-        vendor.updated_at = datetime.utcnow()
-
-        try:
-            db.session.commit()
-            return vendor
-        except Exception as e:
-            db.session.rollback()
-            raise e
+        return CanonicalOnboardingService.activate_vendor(*args, **kwargs)
 
     @staticmethod
     def deploy_product(vendor_id: int, product_id: int, deployment_config=None) -> Dict:

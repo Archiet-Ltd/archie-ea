@@ -11,8 +11,8 @@
 {% set capability_count = vendor_capabilities|length if vendor_capabilities else 0 %}
 {% set deployed_count = deployed_applications|length if deployed_applications else 0 %}
 {% set archimate_count = archimate_elements|length if archimate_elements else 0 %}
-{% set contract_status = vendor.contract_status or 'catalog' %}
-{% set contract_variant_map = {'deployed': 'success', 'contracted': 'primary', 'inactive': 'error', 'catalog': 'neutral'} %}
+{% set contract_status = ((org_contract.status if org_contract.status in ['draft', 'expired', 'terminated', 'renewed'] else 'contracted') if org_contract else 'catalog') %}
+{% set contract_variant_map = {'deployed': 'success', 'contracted': 'primary', 'renewed': 'primary', 'draft': 'neutral', 'expired': 'error', 'terminated': 'error', 'inactive': 'error', 'catalog': 'neutral'} %}
 {% set operational_variant_map = {'active': 'success', 'restricted': 'warning', 'deprecated': 'error'} %}
 {% set market_position = vendor.gartner_magic_quadrant_position or vendor.partnership_level or 'Not Classified' %}
 {% if vendor.employee_count %}
@@ -253,6 +253,9 @@
                 {% call card_description() %}Activation and contract management controls.{% endcall %}
             {% endcall %}
             {% call card_content() %}
+                {% if not org_contract %}
+                <p class="mb-3 text-sm text-muted-foreground">Not contracted by your organisation.</p>
+                {% endif %}
                 <div class="space-y-3 text-sm">
                     <div class="flex items-center justify-between">
                         <span class="text-muted-foreground">Current Status</span>
@@ -260,17 +263,17 @@
                     </div>
                     <div class="flex items-center justify-between">
                         <span class="text-muted-foreground">Start Date</span>
-                        <span class="font-medium">{{ vendor.contract_start_date.strftime('%Y-%m-%d') if vendor.contract_start_date else '-' }}</span>
+                        <span class="font-medium">{{ org_contract.start_date.strftime('%Y-%m-%d') if org_contract and org_contract.start_date else '-' }}</span>
                     </div>
                     <div class="flex items-center justify-between">
                         <span class="text-muted-foreground">End Date</span>
-                        <span class="font-medium">{{ vendor.contract_end_date.strftime('%Y-%m-%d') if vendor.contract_end_date else '-' }}</span>
+                        <span class="font-medium">{{ org_contract.end_date.strftime('%Y-%m-%d') if org_contract and org_contract.end_date else '-' }}</span>
                     </div>
                     <div class="flex items-center justify-between">
                         <span class="text-muted-foreground">Annual Contract Value</span>
                         <span class="font-medium">
-                            {% if vendor.contract_value_annual is not none %}
-                            {{ "%0.2f"|format(vendor.contract_value_annual) }} USD
+                            {% if org_contract and org_contract.annual_cost is not none %}
+                            {{ "%0.2f"|format(org_contract.annual_cost) }} {{ org_contract.currency or 'USD' }}
                             {% else %}
                             -
                             {% endif %}

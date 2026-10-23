@@ -683,21 +683,23 @@ def activate_vendor(vendor_id):
         end_date = datetime.strptime(contract_end, '%Y-%m-%d') if contract_end else None
         value = float(contract_value) if contract_value else None
         
-        # Activate vendor
-        vendor = VendorOnboardingService.activate_vendor(
+        # Activate vendor for the current organisation
+        contract = VendorOnboardingService.activate_vendor(
             vendor_id,
+            current_user.organization_id,
             contract_start_date=start_date,
             contract_end_date=end_date,
             contract_value=value
         )
         
-        flash(f'{vendor.name} activated successfully! Status: {vendor.contract_status}', 'success')
+        flash(f'{vendor.name} activated successfully! Status: contracted', 'success')
         
         if request.headers.get('Accept') == 'application/json':
             return jsonify({
                 'success': True,
                 'vendor_id': vendor.id,
-                'contract_status': vendor.contract_status
+                'contract_id': contract.id,
+                'contract_status': 'contracted'
             })
         
         return redirect(url_for('application_mgmt.vendor_detail', vendor_id=vendor_id))

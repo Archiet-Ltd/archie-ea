@@ -13,7 +13,7 @@ Routes:
 import logging
 
 from flask import current_app, flash, redirect, render_template, request, url_for
-from flask_login import login_required
+from flask_login import current_user, login_required
 
 from app import db
 from app.decorators import audit_log
@@ -181,6 +181,18 @@ def vendor_detail(vendor_id):
             joinedload(VendorOrganization.products)
         ).get_or_404(vendor_id)
 
+        # The vendor row is shared by every organisation; the contract shown is
+        # the viewing organisation's own, or none.
+        from app.models.application_portfolio import VendorContract
+
+        org_contract = (
+            VendorContract.query.filter_by(
+                vendor_id=vendor_id, organization_id=current_user.organization_id
+            )
+            .order_by(VendorContract.start_date.desc(), VendorContract.id.desc())
+            .first()
+        )
+
         # All reads below are wrapped in no_autoflush to prevent cascading
         # rollbacks from invalidating the session for subsequent queries.
         archimate_elements = []
@@ -193,12 +205,17 @@ def vendor_detail(vendor_id):
         with db.session.no_autoflush:
             # Get all ArchiMate elements linked to this vendor's products
             try:
-                archimate_elements = (
-                    ArchiMateElement.query.join(ArchiMateElement.vendor_products)
+                # Distinct ids first: DISTINCT over the element's JSON columns
+                # is rejected by PostgreSQL and aborts the transaction.
+                element_ids = (
+                    db.session.query(ArchiMateElement.id)
+                    .join(ArchiMateElement.vendor_products)
                     .filter(VendorProduct.vendor_organization_id == vendor_id)
                     .distinct()
-                    .all()
                 )
+                archimate_elements = ArchiMateElement.query.filter(
+                    ArchiMateElement.id.in_(element_ids)
+                ).all()
             except Exception as e:
                 current_app.logger.warning("Could not load ArchiMate elements: %s", e, exc_info=True)
 
@@ -333,6 +350,7 @@ def vendor_detail(vendor_id):
         return render_template(
             "vendors/vendor_detail.html",
             vendor=vendor,
+            org_contract=org_contract,
             archimate_elements=archimate_elements,
             elements_by_layer=elements_by_layer,
             vendor_capabilities=vendor_capabilities,
