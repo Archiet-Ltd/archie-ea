@@ -109,6 +109,57 @@ SECOND_ORG_NAME = re.compile(r"(?:^|_)(other_org|second_org|org_b|org_two)(?:_|$
 
 ALLOW = re.compile(r"two-org-coverage-ok:[ \t]*\S")
 
+# The family list that an escape-hatch marker names, parsed from exactly the
+# text after the colon and NEVER from the free-text reason that follows it.
+# The grammar is one of:
+#   two-org-coverage-ok: <name>[, <name> ...] [<free-text reason>]
+#   two-org-coverage-ok: [<name>, <name> ...] [<free-text reason>]
+# In the bare form the family names are the leading comma-separated identifier
+# tokens; parsing stops at the first token that is not an identifier or a comma
+# separator (so the reason prose after the names is never read as a family). In
+# the bracketed form only the identifiers inside the first [...] are families.
+_MARKER = re.compile(r"two-org-coverage-ok:[ \t]*(?P<rest>.*)$")
+_BRACKET = re.compile(r"^\[(?P<body>[^\]]*)\]")
+_IDENTIFIER = re.compile(r"[A-Za-z_][A-Za-z0-9_]{2,}")
+
+
+def _leading_identifiers(text: str) -> set[str]:
+    """The leading run of comma/whitespace-separated identifier tokens.
+
+    Parsing stops at the first token that is not a bare identifier, so any
+    free-text reason following the family list is never read as a family.
+    """
+    families: set[str] = set()
+    for token in re.split(r"\s*,\s*|\s+", text.strip()):
+        if _IDENTIFIER.fullmatch(token):
+            families.add(token)
+        else:
+            break
+    return families
+
+
+def _marker_families(line: str) -> set[str]:
+    """Family names a `two-org-coverage-ok:` marker on this line declares.
+
+    Reads only the family list immediately after the colon -- either a bracketed
+    ``[a, b]`` list or the leading comma-separated identifiers -- and stops at
+    the first free-text word, so a reason like ``webhook is a public endpoint``
+    yields only ``webhook``.
+    """
+    match = _MARKER.search(line)
+    if not match:
+        return set()
+    rest = match.group("rest").strip()
+    if not rest:
+        return set()
+
+    bracket = _BRACKET.match(rest)
+    if bracket:
+        return _leading_identifiers(bracket.group("body"))
+
+    return _leading_identifiers(rest)
+
+
 # The gates' own synthetic tests build fake route strings and fake second-org
 # fixtures to exercise this script; they are not product two-organisation tests
 # and must not count as coverage for any real family.
@@ -303,8 +354,7 @@ def excused_families(root: str) -> set[str]:
     for _rel, source in _iter_test_files(root):
         for line in source.split("\n"):
             if ALLOW.search(line):
-                for token in re.findall(r"[A-Za-z_][A-Za-z0-9_]{2,}", line):
-                    excused.add(token)
+                excused |= _marker_families(line)
     return excused
 
 

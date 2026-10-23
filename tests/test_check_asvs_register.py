@@ -188,6 +188,65 @@ def test_control_description_with_missing_file_fails(tmp_path):
     assert any("no_such_file" in line for line in lines[:-1])
 
 
+def test_control_description_with_existing_directory_passes(tmp_path):
+    # A directory path (no file extension) is valid evidence when it exists.
+    register = (
+        "rows:\n"
+        "  - id: V3.1.1\n"
+        "    family: account\n"
+        "    applies: true\n"
+        "    status: pass\n"
+        "    evidence:\n"
+        "      - session handling recorded in app/auth\n"
+    )
+    root = _build_tree(tmp_path, register, {})
+    os.makedirs(os.path.join(root, "app", "auth"), exist_ok=True)
+    result = _run(root, "--count")
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert result.stdout.strip().splitlines()[-1] == "0"
+
+
+def test_evidence_resolving_to_nothing_fails(tmp_path):
+    # Evidence that is neither a test node, an existing file, nor an existing
+    # directory must be reported with the row id and the unresolved text.
+    register = (
+        "rows:\n"
+        "  - id: V3.2.1\n"
+        "    family: account\n"
+        "    applies: true\n"
+        "    status: pass\n"
+        "    evidence:\n"
+        "      - control recorded in app/nowhere\n"
+    )
+    root = _build_tree(tmp_path, register, {})
+    result = _run(root)
+    assert result.returncode == 1, result.stdout + result.stderr
+    lines = result.stdout.strip().splitlines()
+    assert lines[-1] == "1"
+    assert any("V3.2.1" in line for line in lines[:-1])
+    assert any("app/nowhere" in line for line in lines[:-1])
+
+
+def test_free_prose_without_any_path_fails(tmp_path):
+    # Free prose that resolves to no node, file or directory fails: a control
+    # description with no recognisable path must not pass silently.
+    register = (
+        "rows:\n"
+        "  - id: V3.3.1\n"
+        "    family: account\n"
+        "    applies: true\n"
+        "    status: pass\n"
+        "    evidence:\n"
+        "      - the control is handled carefully by the team\n"
+    )
+    root = _build_tree(tmp_path, register, {})
+    result = _run(root)
+    assert result.returncode == 1, result.stdout + result.stderr
+    lines = result.stdout.strip().splitlines()
+    assert lines[-1] == "1"
+    assert any("V3.3.1" in line for line in lines[:-1])
+
+
 def test_count_prints_trailing_integer(tmp_path):
     register = (
         "rows:\n"

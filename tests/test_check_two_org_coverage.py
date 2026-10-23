@@ -138,6 +138,37 @@ def test_escape_hatch_excuses_a_family(tmp_path):
     assert result.stdout.strip().splitlines()[-1] == "0"
 
 
+def test_escape_hatch_reason_prose_does_not_excuse_other_families(tmp_path):
+    """Only the family named before the free-text reason is excused.
+
+    A marker ``two-org-coverage-ok: <family> is a public endpoint`` must excuse
+    only ``<family>``; the reason words (``is``, ``a``, ``public``, ``endpoint``)
+    must NOT be treated as family names. Here two families read org data: the
+    named one is excused and stays covered, while a family whose name happens to
+    be a reason word (``public``) is not excused and stays uncovered.
+    """
+    routes = [
+        {"blueprint": "webhook", "login_required": True, "rule": "/webhook/"},
+        {"blueprint": "public", "login_required": True, "rule": "/public/surface"},
+    ]
+    files = {
+        "tests/test_marker.py": (
+            "# two-org-coverage-ok: webhook is a public endpoint\n"
+            "def test_marker():\n    assert True\n"
+        ),
+    }
+    root = _build_tree(tmp_path, routes, files)
+    result = _run(root)
+    assert result.returncode == 1, result.stderr
+    lines = result.stdout.strip().splitlines()
+    # 'public' leaked out of the reason prose would wrongly be excused; it must
+    # remain uncovered, so exactly one family is reported.
+    assert lines[-1] == "1"
+    assert any("public" in line for line in lines[:-1])
+    # 'webhook' is genuinely named and must not be reported as uncovered.
+    assert not any("webhook" in line for line in lines[:-1])
+
+
 def test_count_prints_trailing_integer(tmp_path):
     routes = [
         {"blueprint": "a_bp", "login_required": True, "rule": "/a/"},

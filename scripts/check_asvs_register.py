@@ -16,8 +16,11 @@ proves the evidence it cites is real:
     ``path/to/test.py::Class::test_name``) is resolved to a file and AST-parsed
     (ast.parse, no import, no database, no Flask boot). The named function or
     method must exist in that file.
-  - Evidence that is a control description (free prose that names a real file
-    path, with no ``::``) passes when the file path it names exists.
+  - Evidence that is a control description (free prose with no ``::``) passes
+    only when it names an existing file or an existing directory. Evidence that
+    resolves to no test node, file or directory -- a path that is not on disk,
+    or prose naming no path at all -- fails with the row id and the unresolved
+    text, so a control can never pass silently.
   - A row with ``status: fail`` must name a brief by id (a token matching
     ``T-[a-z]+-\\d+``, e.g. T-qa-13) so an open gap always points at the work
     that will close it. A fail row with no brief id is malformed.
@@ -35,9 +38,9 @@ top-level ``rows:`` list of mappings whose values are scalars or a block list of
 strings under ``evidence:``). The register is authored in exactly that shape, so
 both loaders read it identically.
 
-The gate is must-be-0: one problem line per missing test node id, per missing
-control file, or per malformed fail row, then a trailing line that is the
-integer count.
+The gate is must-be-0: one problem line per missing test node id, per piece of
+evidence that resolves to no file or directory, or per malformed fail row, then
+a trailing line that is the integer count.
 
     python scripts/check_asvs_register.py            # list problems
     python scripts/check_asvs_register.py --count    # trailing line = count
@@ -211,12 +214,32 @@ def _looks_like_node_id(evidence: str) -> bool:
     return bool(NODE_ID.match(evidence.strip()))
 
 
-def _referenced_file(evidence: str) -> str | None:
-    """Pull the first token that looks like a repo file path out of free prose."""
-    for token in re.findall(r"[\w./-]+\.[A-Za-z0-9_]+", evidence):
-        if "/" in token or token.endswith((".py", ".md", ".json", ".yml", ".yaml")):
-            return token
-    return None
+# A path-like token in free prose: a run of word/dot/slash/dash characters.
+# This catches a file with an extension (app/services/billing_plans.py), a
+# bare top-level file (Dockerfile), and a directory path (app/auth, app/modules).
+_PATH_TOKEN = re.compile(r"[\w./-]*[\w]")
+
+
+def _resolve_evidence(root: str, evidence: str) -> bool:
+    """True when some token in the evidence resolves to a real file or directory.
+
+    Evidence prose is scanned for path-like tokens. A token resolves when it
+    names an existing file or an existing directory under the tree. A token that
+    is a single bare word (no slash, no extension) is only considered when it
+    actually names something on disk, so ordinary prose words never count.
+    """
+    for token in _PATH_TOKEN.findall(evidence):
+        looks_like_path = "/" in token or token.endswith(
+            (".py", ".md", ".json", ".yml", ".yaml")
+        )
+        candidate = os.path.join(root, token)
+        if looks_like_path:
+            if os.path.isfile(candidate) or os.path.isdir(candidate):
+                return True
+        elif os.path.isfile(candidate) or os.path.isdir(candidate):
+            # A bare word (e.g. Dockerfile) counts only if it really exists.
+            return True
+    return False
 
 
 # --------------------------------------------------------------------------- #
@@ -265,17 +288,17 @@ def problems(root: str) -> list[str]:
                         f"exist in the repository"
                     )
             else:
-                referenced = _referenced_file(entry)
-                if referenced is not None:
-                    if not os.path.exists(os.path.join(root, referenced)):
-                        issues.append(
-                            f"{REGISTER}: [asvs-register] row {row_id!r} (family "
-                            f"{family!r}) names control file {referenced!r} but it "
-                            f"does not exist in the repository"
-                        )
-                # Free prose with no file path and no node id is accepted as a
-                # recorded control note (e.g. an applies:false reason on a pass
-                # row), nothing to resolve.
+                # Every piece of evidence must resolve to a real control: a test
+                # node id (handled above), an existing file, or an existing
+                # directory. Evidence that resolves to none of these -- a path
+                # that is not on disk, or free prose naming no path at all --
+                # fails the gate so a control can never pass silently.
+                if not _resolve_evidence(root, entry):
+                    issues.append(
+                        f"{REGISTER}: [asvs-register] row {row_id!r} (family "
+                        f"{family!r}) cites evidence {entry!r} but it resolves to "
+                        f"no test node, file or directory in the repository"
+                    )
     return issues
 
 
