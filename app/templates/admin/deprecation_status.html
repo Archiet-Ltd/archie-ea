@@ -4,12 +4,206 @@
 {% block content %}
 <div class="p-6 space-y-6">
   {{ page_shell(title='Deprecation Status', breadcrumb=[('Home', '/'), ('Deprecation Status', none)]) }}
-  <div class="max-w-2xl mx-auto py-12 text-center">
-  <p class="text-muted-foreground mb-6">This feature is being built. Check back soon.</p>
-  <a href="{{ url_for('dashboard.overview') }}"
-     class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
-    Return to Dashboard
-  </a>
+
+  <div class="max-w-4xl mx-auto">
+    <h2 class="text-lg font-semibold">Interface consumers</h2>
+    <p class="text-sm text-muted-foreground">
+      Clients whose tokens called an interface operation, with their last call
+      and call count, for your organisation only. A platform administrator sees
+      the number of clients and calls per organisation, without names.
+    </p>
+
+    <div class="rounded-xl border bg-card">
+      <div class="p-4 border-b">
+        <h3 class="text-sm font-semibold">Clients</h3>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead id="clients-table-head">
+            <tr class="border-b">
+              <th class="text-left p-3 text-muted-foreground font-medium">Client</th>
+              <th class="text-left p-3 text-muted-foreground font-medium">Operation</th>
+              <th class="text-left p-3 text-muted-foreground font-medium">Last call</th>
+              <th class="text-right p-3 text-muted-foreground font-medium">Calls</th>
+            </tr>
+          </thead>
+          <tbody id="clients-table-body">
+            <tr>
+              <td colspan="4" class="p-3 text-muted-foreground text-center">Loading…</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    {% if can_mark_retiring %}
+    <div class="mt-6 rounded-xl border bg-card">
+      <div class="p-4 border-b">
+        <h3 class="text-sm font-semibold">Mark an operation as retiring for every caller</h3>
+      </div>
+      <div class="p-4 space-y-3">
+        <form id="mark-retiring-form" class="space-y-3">
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div>
+              <label class="block text-xs font-medium mb-1">Operation ID</label>
+              <input type="text" id="op-id"
+                     class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                     placeholder="e.g. listElements" required>
+            </div>
+            <div>
+              <label class="block text-xs font-medium mb-1">Retires on</label>
+              <input type="date" id="retires-on"
+                     class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                     required>
+            </div>
+            <div>
+              <label class="block text-xs font-medium mb-1">Replacement operation</label>
+              <input type="text" id="replacement"
+                     class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                     placeholder="e.g. listElementsV2">
+            </div>
+          </div>
+          <button type="submit"
+                  class="inline-flex items-center rounded-md text-sm font-medium border border-input bg-background hover:bg-accent h-9 px-4 py-2 transition-colors">
+            Mark as retiring
+          </button>
+          <button type="button" id="clear-retiring"
+                  class="inline-flex items-center rounded-md text-sm font-medium border border-input bg-background hover:bg-accent h-9 px-4 py-2 transition-colors">
+            Undo retirement
+          </button>
+          <div id="mark-result" class="hidden p-3 rounded-md bg-success/10 text-success-emphasis border border-success/20 text-sm"></div>
+          <div id="mark-error" class="hidden p-3 rounded-md bg-destructive/10 text-destructive-emphasis border border-destructive/20 text-sm"></div>
+        </form>
+      </div>
+    </div>
+    {% endif %}
   </div>
 </div>
+
+<script>
+(function () {
+  function loadClients() {
+    Platform.fetch('/admin/deprecation/api/clients')
+      .then(function (response) { return response.json(); })
+      .then(function (data) {
+        var body = document.getElementById('clients-table-body');
+        body.innerHTML = '';
+        if (data.organisations) {
+          document.getElementById('clients-table-head').innerHTML =
+            '<tr class="border-b">' +
+            '<th class="text-left p-3 text-muted-foreground font-medium">Organisation</th>' +
+            '<th class="text-left p-3 text-muted-foreground font-medium">Clients</th>' +
+            '<th class="text-left p-3 text-muted-foreground font-medium"></th>' +
+            '<th class="text-right p-3 text-muted-foreground font-medium">Calls</th></tr>';
+          if (data.organisations.length === 0) {
+            body.innerHTML = '<tr><td colspan="4" class="p-3 text-muted-foreground text-center">No calls recorded.</td></tr>';
+            return;
+          }
+          data.organisations.forEach(function (o) {
+            var tr = document.createElement('tr');
+            tr.className = 'border-b';
+            tr.innerHTML =
+              '<td class="p-3 text-foreground">' + escapeHtml(o.organization_id) + '</td>' +
+              '<td class="p-3 text-muted-foreground">' + escapeHtml(o.client_count) + '</td>' +
+              '<td class="p-3"></td>' +
+              '<td class="p-3 text-muted-foreground text-right">' + escapeHtml(o.total_calls) + '</td>';
+            body.appendChild(tr);
+          });
+          return;
+        }
+        var clients = data.clients || [];
+        if (clients.length === 0) {
+          body.innerHTML = '<tr><td colspan="4" class="p-3 text-muted-foreground text-center">No clients recorded.</td></tr>';
+          return;
+        }
+        clients.forEach(function (c) {
+          var tr = document.createElement('tr');
+          tr.className = 'border-b';
+          tr.innerHTML =
+            '<td class="p-3 text-foreground">' + escapeHtml(c.client_name || c.client_id) + '</td>' +
+            '<td class="p-3 text-muted-foreground">' + escapeHtml(c.operation_id) + '</td>' +
+            '<td class="p-3 text-muted-foreground">' + escapeHtml(c.last_called_at || '—') + '</td>' +
+            '<td class="p-3 text-muted-foreground text-right">' + escapeHtml(c.call_count) + '</td>';
+          body.appendChild(tr);
+        });
+      })
+      .catch(function (err) {
+        document.getElementById('clients-table-body').innerHTML =
+          '<tr><td colspan="4" class="p-3 text-destructive-emphasis text-center">Failed to load.</td></tr>';
+      });
+  }
+
+  function escapeHtml(text) {
+    var div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+  }
+
+  var markForm = document.getElementById('mark-retiring-form');
+  if (markForm) markForm.addEventListener('submit', function (e) {
+    e.preventDefault();
+    var opId = document.getElementById('op-id').value;
+    var retiresOn = document.getElementById('retires-on').value;
+    var replacement = document.getElementById('replacement').value;
+    var resultDiv = document.getElementById('mark-result');
+    var errorDiv = document.getElementById('mark-error');
+    resultDiv.classList.add('hidden');
+    errorDiv.classList.add('hidden');
+
+    Platform.fetch('/admin/deprecation/api/mark-retiring', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        operation_id: opId,
+        retires_on: retiresOn,
+        replacement_operation_id: replacement || null,
+      }),
+    })
+      .then(function (response) { return response.json(); })
+      .then(function (data) {
+        if (data.status === 'marked') {
+          resultDiv.textContent = 'Marked ' + data.operation_id + ' as retiring on ' + data.retires_on + '. ' + data.notices_created + ' notice(s) created.';
+          resultDiv.classList.remove('hidden');
+          loadClients();
+        } else {
+          errorDiv.textContent = data.error || 'Failed to mark operation.';
+          errorDiv.classList.remove('hidden');
+        }
+      })
+      .catch(function () {
+        errorDiv.textContent = 'Failed to mark operation.';
+        errorDiv.classList.remove('hidden');
+      });
+  });
+
+  var clearButton = document.getElementById('clear-retiring');
+  if (clearButton) clearButton.addEventListener('click', function () {
+    var resultDiv = document.getElementById('mark-result');
+    var errorDiv = document.getElementById('mark-error');
+    resultDiv.classList.add('hidden');
+    errorDiv.classList.add('hidden');
+    Platform.fetch('/admin/deprecation/api/clear-retiring', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({operation_id: document.getElementById('op-id').value}),
+    })
+      .then(function (response) { return response.json(); })
+      .then(function (data) {
+        if (data.status === 'cleared') {
+          resultDiv.textContent = 'Retirement of ' + data.operation_id + ' removed.';
+          resultDiv.classList.remove('hidden');
+        } else {
+          errorDiv.textContent = data.error || 'Failed to remove the retirement.';
+          errorDiv.classList.remove('hidden');
+        }
+      })
+      .catch(function () {
+        errorDiv.textContent = 'Failed to remove the retirement.';
+        errorDiv.classList.remove('hidden');
+      });
+  });
+
+  loadClients();
+})();
+</script>
 {% endblock %}

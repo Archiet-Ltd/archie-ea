@@ -21,6 +21,7 @@ import uuid
 from datetime import datetime, timezone
 
 from app.extensions import db
+from app.models.mixins.core import TenantMixin
 
 
 def _new_client_id(prefix: str = "cl") -> str:
@@ -479,3 +480,94 @@ def _register_user_listeners() -> None:
 
 
 _register_user_listeners()
+
+
+class ApiOperationCall(TenantMixin, db.Model):
+    """One row per (organisation, consumer, operation): last call and call count.
+
+    Written once per bearer call from ``require_api_scope`` so the deprecation
+    admin page can name the consumers of an interface operation before it
+    retires. ``consumer_key`` is the token's own client identifier, so both
+    token families fit one table: a registered OAuth client (``token_kind``
+    ``oauth_client``, ``client_id`` set) and a personal API token (``api_token``,
+    whose ``at_`` identifier has no ``oauth_clients`` row, so ``client_id`` is
+    null). TenantMixin supplies the organization_id column.
+    """
+
+    __tablename__ = "api_operation_calls"
+
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    client_id = db.Column(
+        db.String(128),
+        db.ForeignKey("oauth_clients.client_id", ondelete="CASCADE"),
+        nullable=True,
+        index=True,
+    )
+    consumer_key = db.Column(db.String(128), nullable=False, index=True)
+    token_kind = db.Column(db.String(16), nullable=False, server_default="oauth_client")
+    operation_id = db.Column(db.String(255), nullable=False, index=True)
+    last_called_at = db.Column(
+        db.DateTime(timezone=True), nullable=False, server_default=db.func.now()
+    )
+    call_count = db.Column(db.Integer, nullable=False, server_default="0")
+
+    __table_args__ = (
+        db.UniqueConstraint(
+            "organization_id",
+            "consumer_key",
+            "operation_id",
+            name="uq_api_operation_calls_org_consumer_operation",
+        ),
+    )
+
+
+class ApiOperationRetirement(db.Model):
+    """An API operation a platform administrator has marked as retiring.
+
+    One row per operation. An operation belongs to the one API contract, not to
+    an organisation, so this is platform data (no organization_id, no row-level
+    security) and one row drives the retirement headers for every caller. Kept
+    in the database rather than in process memory so every worker answers with
+    the same headers and a restart forgets nothing. ``require_api_scope`` reads
+    it to add the headers to the operation's real responses.
+    """
+
+    __tablename__ = "api_operation_retirements"
+
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    operation_id = db.Column(db.String(255), nullable=False, unique=True)
+    retires_on = db.Column(db.Date, nullable=False)
+    replacement_operation_id = db.Column(db.String(255), nullable=True)
+    marked_by_user_id = db.Column(
+        db.Integer, db.ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    marked_at = db.Column(
+        db.DateTime(timezone=True), nullable=False, server_default=db.func.now()
+    )
+
+
+class ApiRetirementNotice(db.Model):
+    """That a user has been told about a retirement, and for which date.
+
+    The unique (retirement, user) constraint is what makes concurrent markings
+    notify each owner once; ``notified_for`` lets an earlier retirement date
+    notify again.
+    """
+
+    __tablename__ = "api_retirement_notices"
+
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    retirement_id = db.Column(
+        db.Integer,
+        db.ForeignKey("api_operation_retirements.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    user_id = db.Column(
+        db.Integer, db.ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    notified_for = db.Column(db.Date, nullable=False)
+
+    __table_args__ = (
+        db.UniqueConstraint("retirement_id", "user_id", name="uq_api_retirement_notices_retirement_user"),
+    )

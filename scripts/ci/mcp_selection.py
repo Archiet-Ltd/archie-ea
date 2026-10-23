@@ -34,6 +34,22 @@ MCP_DIRS = (
 )
 NEEDS_MCP_OFF = ("app/modules/oauth_provider/tests/test_mcp_flag.py",)
 MCP_TESTS = (
+    "tests/test_interface_deprecation_notices.py::test_migration_runs_twice_and_the_tables_have_the_right_fence",
+    "tests/test_interface_deprecation_notices.py::test_both_token_families_are_recorded_and_the_row_is_committed",
+    "tests/test_interface_deprecation_notices.py::test_the_record_is_written_after_the_response_not_during_it",
+    "tests/test_interface_deprecation_notices.py::test_a_failing_recorder_never_costs_the_caller_a_response",
+    "tests/test_interface_deprecation_notices.py::test_a_failing_retirement_lookup_leaves_the_request_transaction_alone",
+    "tests/test_interface_deprecation_notices.py::test_org_admin_sees_own_clients_and_none_of_the_other_organisations",
+    "tests/test_interface_deprecation_notices.py::test_platform_admin_sees_counts_per_organisation_and_no_names",
+    "tests/test_interface_deprecation_notices.py::test_only_a_platform_admin_may_mark_or_undo_a_retirement",
+    "tests/test_interface_deprecation_notices.py::test_the_page_opens_for_an_org_admin_and_calls_live_endpoints",
+    "tests/test_interface_deprecation_notices.py::test_marking_validates_against_the_contract",
+    "tests/test_interface_deprecation_notices.py::test_a_platform_admin_with_no_organisation_can_mark_and_undo",
+    "tests/test_interface_deprecation_notices.py::test_retiring_operation_answers_every_caller_with_headers_on_success_and_error",
+    "tests/test_interface_deprecation_notices.py::test_a_link_to_an_operation_without_parameters_names_its_own_path",
+    "tests/test_interface_deprecation_notices.py::test_every_owner_in_every_organisation_is_notified_once_and_an_earlier_date_notifies_again",
+    "tests/test_interface_deprecation_notices.py::test_marking_the_same_operation_twice_in_a_row_is_an_upsert",
+    "tests/test_interface_deprecation_notices.py::test_an_unreadable_contract_never_fails_a_read",
     "tests/test_api_token_migration.py::test_migration_runs_twice_without_error",
     "tests/test_api_token_migration.py::test_downgrade_removes_the_added_columns",
     "tests/test_api_token_migration.py::test_backfill_assigns_the_users_org_and_revokes_what_it_cannot_fix",

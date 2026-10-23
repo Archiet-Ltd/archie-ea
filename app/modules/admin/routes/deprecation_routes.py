@@ -10,13 +10,24 @@ import os
 from datetime import datetime
 
 import requests
-from flask import Blueprint, jsonify, render_template, request
-from flask_login import login_required
+from flask import Blueprint, g, jsonify, render_template, request
+from flask_login import current_user, login_required
 
 from app.decorators import audit_log, admin_required
-from app.middleware.tenant_decorators import platform_admin_required
+from app.extensions import db
+from app.middleware.tenant_decorators import (
+    is_platform_admin,
+    org_admin_required,
+    platform_admin_required,
+)
 
-from app.utils.deprecation import get_deprecation_metrics
+from app.utils.deprecation import (
+    clear_operation_retirement,
+    create_retiring_notices,
+    get_deprecation_metrics,
+    mark_operation_retiring,
+    validate_retirement,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -150,18 +161,150 @@ def send_opsgenie_alert(alert_data):
         return {"success": False, "error": str(e)}
 
 
+def clients_response():
+    """The interface consumers of the active organisation, as a JSON response.
+
+    An organisation administrator sees their own organisation's consumers with
+    names, operation, last call and call count. A platform administrator sees
+    only a count of consumers and calls per organisation, never a name. Shared
+    by the live admin module and the guardrailed one so both answer alike.
+    """
+    from app.jobs.tenant_safe_job import platform_scope
+    from app.modules.oauth_provider.models import ApiOperationCall, OAuthClient
+
+    if is_platform_admin(current_user):
+        with platform_scope("deprecation consumer counts per organisation"):
+            rows = db.session.execute(
+                db.text(
+                    "SELECT organization_id, COUNT(DISTINCT consumer_key) AS client_count, "
+                    "SUM(call_count) AS total_calls FROM api_operation_calls "
+                    "GROUP BY organization_id ORDER BY organization_id"
+                )
+            ).all()
+        return jsonify(
+            {
+                "organisations": [
+                    {
+                        "organization_id": row.organization_id,
+                        "client_count": int(row.client_count),
+                        "total_calls": int(row.total_calls),
+                    }
+                    for row in rows
+                ]
+            }
+        )
+
+    rows = (
+        db.session.query(ApiOperationCall, OAuthClient.client_name)
+        .outerjoin(OAuthClient, ApiOperationCall.client_id == OAuthClient.client_id)
+        .filter(ApiOperationCall.organization_id == g.current_org_id)
+        .order_by(ApiOperationCall.operation_id, ApiOperationCall.consumer_key)
+        .all()
+    )
+    return jsonify(
+        {
+            "clients": [
+                {
+                    "client_id": call.consumer_key,
+                    "client_name": name or "Personal token",
+                    "token_kind": call.token_kind,
+                    "operation_id": call.operation_id,
+                    "last_called_at": (
+                        call.last_called_at.isoformat() if call.last_called_at else None
+                    ),
+                    "call_count": call.call_count,
+                }
+                for call, name in rows
+            ]
+        }
+    )
+
+
+def mark_retiring_response():
+    """Mark an operation as retiring for every caller, as a JSON response.
+
+    Platform administrators only: an operation belongs to the one API contract.
+    Stores the retirement, notifies the owners of every recorded consumer once
+    (an earlier date notifies them again), and commits both.
+    """
+    data = request.get_json(silent=True) or {}
+    try:
+        retires_on, replacement = validate_retirement(
+            data.get("operation_id"), data.get("retires_on"), data.get("replacement_operation_id")
+        )
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+
+    retirement = mark_operation_retiring(
+        data["operation_id"], retires_on, replacement, user_id=current_user.id
+    )
+    created = create_retiring_notices(retirement)
+    db.session.commit()
+    return jsonify(
+        {
+            "status": "marked",
+            "operation_id": retirement.operation_id,
+            "retires_on": retirement.retires_on.isoformat(),
+            "replacement_operation_id": retirement.replacement_operation_id,
+            "notices_created": created,
+        }
+    )
+
+
+def clear_retiring_response():
+    """Undo the retirement of an operation, as a JSON response (platform administrators)."""
+    data = request.get_json(silent=True) or {}
+    operation_id = data.get("operation_id")
+    if not operation_id:
+        return jsonify({"error": "operation_id is required"}), 400
+    cleared = clear_operation_retirement(operation_id)
+    db.session.commit()
+    if not cleared:
+        return jsonify({"error": "that operation is not marked as retiring"}), 404
+    return jsonify({"status": "cleared", "operation_id": operation_id})
+
+
 @deprecation_bp.route("/")
 @login_required
-# get_deprecation_metrics() is process-wide, deployment-level API usage
-# telemetry (not tenant data), and the webhook routes below send alerts to
-# PagerDuty/Slack/OpsGenie using shared, platform-level credentials.
-# admin_required alone let any tenant's own admin reach all of this
-# (R1 admin-rbac systemic fix).
-@platform_admin_required
-@admin_required
+# The page itself shows only the active organisation's interface consumers
+# (the platform administrator's view is counts), so an organisation
+# administrator may open it. The metrics, alert and webhook routes below stay
+# platform-only: get_deprecation_metrics() is process-wide, deployment-level
+# API usage telemetry (not tenant data), and the webhooks send alerts to
+# PagerDuty/Slack/OpsGenie using shared, platform-level credentials. A tenant
+# admin reaching all of that was the R1 admin-rbac systemic fix.
+@org_admin_required
 def dashboard():
     """Render the deprecation status dashboard."""
-    return render_template("admin/deprecation_status.html")
+    return render_template(
+        "admin/deprecation_status.html", can_mark_retiring=is_platform_admin(current_user)
+    )
+
+
+@deprecation_bp.route("/api/clients")
+@login_required
+@org_admin_required
+def api_clients():
+    """Interface consumers of the active organisation (counts only for a platform admin)."""
+    return clients_response()
+
+
+@deprecation_bp.route("/api/mark-retiring", methods=["POST"])
+@login_required
+@platform_admin_required
+@audit_log("mark_operation_retiring")
+def api_mark_retiring():
+    """Mark an operation as retiring and notify its consumers' owners once."""
+    return mark_retiring_response()
+
+
+@deprecation_bp.route("/api/clear-retiring", methods=["POST"])
+@login_required
+@platform_admin_required
+@audit_log("clear_operation_retirement")
+def api_clear_retiring():
+    """Undo the retirement of an operation."""
+    return clear_retiring_response()
 
 
 @deprecation_bp.route("/api/stats")

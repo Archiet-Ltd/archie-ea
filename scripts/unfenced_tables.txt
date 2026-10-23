@@ -31,6 +31,8 @@ ai_prompt_templates
 ai_recommendations
 ai_service_configs
 ai_suggestions
+# api_operation_retirements: declared as shared reference data in scripts/shared_reference_tables.txt
+# api_retirement_notices: declared as shared reference data in scripts/shared_reference_tables.txt
 application_business_actor_mapping
 application_business_metrics
 application_capability

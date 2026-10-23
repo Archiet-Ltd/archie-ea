@@ -762,3 +762,176 @@ def track_deprecated_route_usage(
     """
     metrics = get_deprecation_metrics()
     metrics.track_usage(endpoint, caller_ip, request_path, metadata)
+
+
+# ============================================================================
+# INTERFACE RETIREMENT (REST operations, platform-wide, persisted)
+# ============================================================================
+#
+# A platform administrator marks a contract operation as retiring. An operation
+# belongs to the one API contract, so there is one record per operation and it
+# drives the retirement headers for every caller. The mark lives in
+# ``api_operation_retirements`` rather than in a process dictionary: the table is
+# shared by every worker and survives a restart, and ``require_api_scope`` reads
+# it to add the headers to the operation's real responses.
+# ``get_deprecation_metrics`` above only counts calls to legacy routes in memory
+# and holds no per-operation record, so there was nothing to extend. Owners are
+# told per organisation: each organisation that recorded a consumer of the
+# operation has that consumer's token owners notified.
+
+RETIREMENT_NOTICE_EVENT = "deprecation_notice"
+RETIREMENT_NOTICE_ENTITY = "api_operation_retirement"
+
+
+def validate_retirement(
+    operation_id: str | None,
+    retires_on: str | None,
+    replacement_operation_id: str | None,
+):
+    """Check a retirement request against the contract.
+
+    Returns ``(retires_on_date, replacement_or_none)`` and raises
+    ``ValueError`` with a message fit to show the administrator when the
+    operation, the date or the replacement does not resolve.
+    """
+    from datetime import date
+
+    from app.modules.oauth_provider.scopes import operation_ids
+
+    known = operation_ids()
+    if not operation_id or operation_id not in known:
+        raise ValueError("operation_id must name an operation in the API contract")
+    try:
+        retirement_date = date.fromisoformat(str(retires_on))
+    except ValueError:
+        raise ValueError("retires_on must be a date in the form YYYY-MM-DD") from None
+    replacement = replacement_operation_id or None
+    if replacement is not None:
+        if replacement not in known:
+            raise ValueError("replacement_operation_id must name an operation in the API contract")
+        if replacement == operation_id:
+            raise ValueError("an operation cannot replace itself")
+    return retirement_date, replacement
+
+
+def mark_operation_retiring(
+    operation_id: str,
+    retires_on,
+    replacement_operation_id: str | None,
+    user_id: int | None = None,
+):
+    """Create or update the retirement record for an operation (one upsert).
+
+    The caller commits.
+    """
+    from app import db
+    from app.modules.oauth_provider.models import ApiOperationRetirement
+
+    from sqlalchemy.dialects.postgresql import insert
+
+    values = {
+        "retires_on": retires_on,
+        "replacement_operation_id": replacement_operation_id,
+        "marked_by_user_id": user_id,
+        "marked_at": db.func.now(),
+    }
+    # One atomic upsert on the operation id: two first markings at once cannot
+    # both insert and fail the unique constraint.
+    db.session.execute(
+        insert(ApiOperationRetirement.__table__)
+        .values(operation_id=operation_id, **values)
+        .on_conflict_do_update(index_elements=["operation_id"], set_=values)
+    )
+    row = (
+        db.session.query(ApiOperationRetirement)
+        .filter_by(operation_id=operation_id)
+        .populate_existing()
+        .one()
+    )
+    return row
+
+
+def clear_operation_retirement(operation_id: str) -> bool:
+    """Remove an operation's retirement record; True when there was one.
+
+    Its notice records go with it (cascade), so marking the operation again
+    notifies its owners afresh. The caller commits.
+    """
+    from app import db
+    from app.modules.oauth_provider.models import ApiOperationRetirement
+
+    row = db.session.query(ApiOperationRetirement).filter_by(operation_id=operation_id).first()
+    if row is None:
+        return False
+    db.session.delete(row)
+    db.session.flush()
+    return True
+
+
+def create_retiring_notices(retirement) -> int:
+    """Notify the owners of every recorded consumer of the operation, once each.
+
+    For every organisation with a recorded consumer of the operation, the users
+    holding tokens issued to those consumers get one notice. Runs in platform
+    scope because it spans organisations. The (retirement, user) record is
+    claimed with one atomic upsert that succeeds only for a user not yet told, or
+    told of a later date, so concurrent markings and repeat markings create no
+    duplicate and an earlier date notifies again. Adds the notices to the
+    session; the caller commits. Returns the number created.
+    """
+    from app import db
+    from app.jobs.tenant_safe_job import platform_scope
+    from app.services.notification_service import NotificationService
+
+    replacement = retirement.replacement_operation_id
+    message = (
+        f"The interface operation {retirement.operation_id} retires on "
+        f"{retirement.retires_on.isoformat()}."
+        + (f" Move to {replacement}." if replacement else "")
+    )
+    claim = db.text(
+        "INSERT INTO api_retirement_notices (retirement_id, user_id, notified_for) "
+        "VALUES (:retirement_id, :user_id, :retires_on) "
+        "ON CONFLICT (retirement_id, user_id) DO UPDATE SET notified_for = EXCLUDED.notified_for "
+        "WHERE api_retirement_notices.notified_for > EXCLUDED.notified_for "
+        "RETURNING id"
+    )
+    created = 0
+    with platform_scope("retirement notices to the owners of recorded consumers"):
+        owners = db.session.execute(
+            db.text(
+                "SELECT DISTINCT t.user_id, t.organization_id FROM api_operation_calls c "
+                "JOIN oauth_tokens t ON t.client_id = c.consumer_key "
+                "AND t.organization_id = c.organization_id "
+                "WHERE c.operation_id = :operation_id ORDER BY t.user_id"
+            ),
+            {"operation_id": retirement.operation_id},
+        ).all()
+        seen = set()
+        for user_id, org_id in owners:
+            if user_id in seen:
+                continue
+            seen.add(user_id)
+            won = db.session.execute(
+                claim,
+                {
+                    "retirement_id": retirement.id,
+                    "user_id": user_id,
+                    "retires_on": retirement.retires_on,
+                },
+            ).first()
+            if won is None:
+                continue
+            NotificationService.create(
+                user_id=user_id,
+                message=message,
+                url="/admin/deprecation",
+                organization_id=org_id,
+                event_type=RETIREMENT_NOTICE_EVENT,
+                entity_type=RETIREMENT_NOTICE_ENTITY,
+                entity_id=retirement.id,
+            )
+            created += 1
+        # Flush while the platform scope still admits writes for other organisations.
+        db.session.flush()
+    return created

@@ -1904,6 +1904,44 @@ def test_every_api_token_route_denies_the_other_org_under_the_runtime_role(app, 
                 assert "RLS-Home" in response.get_data(as_text=True), rule.rule
 
 
+def test_api_call_records_are_really_committed_and_scoped_for_the_runtime_role(app, rls, world):
+    """The record ``require_api_scope`` writes survives as a real COMMIT.
+
+    The write runs as the non-owner, NOBYPASSRLS runtime role through the real
+    ``_write_call``, then is read back over brand-new engine connections (not
+    the session that wrote it, and not a savepoint): the owner sees it, the
+    runtime role sees it only under the right organisation, and the runtime
+    role is refused a row for an organisation other than its session's.
+    """
+    from app import db
+    from app.modules.oauth_provider import scopes
+
+    a, b = world.org("calls-a"), world.org("calls-b")
+    key = f"at_{uuid.uuid4().hex}"
+    with _app_runs_as(app, rls.runtime), app.app_context():
+        db.session.remove()
+        scopes._write_call(app, a, key, "listElements")
+        scopes._write_call(app, a, key, "listElements")
+
+    sql = text("SELECT call_count, token_kind, client_id FROM api_operation_calls WHERE consumer_key = :k")
+    with rls.owner.connect() as connection:  # a connection nothing else has used
+        assert connection.execute(sql, {"k": key}).all() == [(2, "api_token", None)]
+    with rls.runtime_tx(a) as connection:
+        assert connection.execute(sql, {"k": key}).all() == [(2, "api_token", None)]
+    with rls.runtime_tx(b) as connection:
+        assert connection.execute(sql, {"k": key}).all() == []
+    with rls.runtime_tx(None) as connection:
+        assert connection.execute(sql, {"k": key}).all() == []
+
+    with pytest.raises(DBAPIError):
+        with rls.runtime_tx(a) as connection:
+            connection.execute(
+                text(
+                    "INSERT INTO api_operation_calls (organization_id, consumer_key, token_kind, operation_id, call_count) "
+                    "VALUES (:o, :k, 'api_token', 'getElement', 1)"
+                ),
+                {"o": b, "k": key},
+            )
 # --------------------------------------------------------------------------- #
 # app.utils.reference_numbers.next_reference: the 01 Sep 2026 cross-org
 # collision, reproduced and proven fixed under the real restricted runtime

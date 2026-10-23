@@ -8,7 +8,9 @@ Uses the new architecture:
 URL prefix preserved: /admin/deprecation (set on blueprint directly)
 Blueprint name: deprecation (same as v1 — no cross-module url_for refs found)
 
-All 7 routes preserved exactly from v1 deprecation_routes.py.
+All 7 routes preserved from v1 deprecation_routes.py, plus the interface
+consumer list and the mark-retiring route, which share their handlers with the
+live module so both answer alike.
 """
 import logging
 import os
@@ -16,13 +18,22 @@ from datetime import datetime
 
 import requests
 from flask import Blueprint, jsonify, render_template, request
-from flask_login import login_required
+from flask_login import current_user, login_required
 
 from app.decorators import admin_required, audit_log
-from app.middleware.tenant_decorators import platform_admin_required
+from app.middleware.tenant_decorators import (
+    is_platform_admin,
+    org_admin_required,
+    platform_admin_required,
+)
 
 from app.core.compat import mark_blueprint_guardrailed
 from app.core.decorators import timed_route
+from app.modules.admin.routes.deprecation_routes import (
+    clear_retiring_response,
+    clients_response,
+    mark_retiring_response,
+)
 from app.utils.deprecation import get_deprecation_metrics
 
 logger = logging.getLogger(__name__)
@@ -161,16 +172,44 @@ def send_opsgenie_alert(alert_data):
 @deprecation_bp_v2.route("/")
 @timed_route
 @login_required
-# get_deprecation_metrics() is process-wide, deployment-level API usage
-# telemetry (not tenant data), and the webhook routes below send alerts to
-# PagerDuty/Slack/OpsGenie using shared, platform-level credentials.
-# admin_required alone let any tenant's own admin reach all of this
-# (R1 admin-rbac systemic fix).
-@platform_admin_required
-@admin_required
+# The page shows only the active organisation's interface consumers (counts
+# for a platform administrator), so an organisation administrator may open it.
+# The metrics, alert and webhook routes below stay platform-only.
+@org_admin_required
 def dashboard():
     """Render the deprecation status dashboard."""
-    return render_template("admin/deprecation_status.html")
+    return render_template(
+        "admin/deprecation_status.html", can_mark_retiring=is_platform_admin(current_user)
+    )
+
+
+@deprecation_bp_v2.route("/api/clients")
+@timed_route
+@login_required
+@org_admin_required
+def api_clients():
+    """Interface consumers of the active organisation (counts only for a platform admin)."""
+    return clients_response()
+
+
+@deprecation_bp_v2.route("/api/mark-retiring", methods=["POST"])
+@timed_route
+@login_required
+@platform_admin_required
+@audit_log("mark_operation_retiring")
+def api_mark_retiring():
+    """Mark an operation as retiring and notify its consumers' owners once."""
+    return mark_retiring_response()
+
+
+@deprecation_bp_v2.route("/api/clear-retiring", methods=["POST"])
+@timed_route
+@login_required
+@platform_admin_required
+@audit_log("clear_operation_retirement")
+def api_clear_retiring():
+    """Undo the retirement of an operation."""
+    return clear_retiring_response()
 
 
 @deprecation_bp_v2.route("/api/stats")
