@@ -179,8 +179,18 @@ def _hierarchy_context():
                 "children": [cap_to_dict(k) for k in kids],
             }
 
-        # Root = L1 capabilities (no parent)
-        roots = [c for c in capabilities if c.level == 1]
+        # A capability is a root when it has no parent, or when its parent
+        # was not loaded in this org-scoped set (an orphan). Selecting roots
+        # by level == 1 silently dropped orphans whose level was not 1, so the
+        # tree showed fewer nodes than total_capabilities. Showing every
+        # parent-less capability at the top level keeps the two in agreement.
+        cap_ids = {c.id for c in capabilities}
+        roots = [
+            c
+            for c in capabilities
+            if not c.parent_capability_id or c.parent_capability_id not in cap_ids
+        ]
+        roots.sort(key=lambda c: (c.level if c.level is not None else 1_000_000, c.name))
         catalog = {"children": [cap_to_dict(r) for r in roots]}
 
         return {
@@ -261,7 +271,16 @@ def _simple_view_context():
                 "domain": cap.domain.name if cap.domain else "",
             }
 
-        roots = [c for c in capabilities if c.level == 1]
+        # Treat every parent-less capability (or one whose parent was not
+        # loaded in this org-scoped set) as a top-level root, so orphans are
+        # shown rather than dropped. See _hierarchy_context for the rationale.
+        cap_ids = {c.id for c in capabilities}
+        roots = [
+            c
+            for c in capabilities
+            if not c.parent_capability_id or c.parent_capability_id not in cap_ids
+        ]
+        roots.sort(key=lambda c: (c.level if c.level is not None else 1_000_000, c.name))
         capability_groups = [
             {
                 "name": root.name,
