@@ -31,10 +31,19 @@ def _customer_fields(form, customer):
 
 
 class PaymentProviderStub:
-    """Customers held in memory; every invoice list is empty."""
+    """Customers and plan prices held in memory; every invoice list is empty."""
 
     def __init__(self):
         self.customers = {}
+        # The recorded price of each configured plan: id -> (amount in cents, interval).
+        # They are the list prices on the public pricing page; a test changes one
+        # to prove the checkout reads the provider and not a copy.
+        self.prices = {
+            "price_smoke_startup_year": (49000, "year"),
+            "price_smoke_startup_month": (4900, "month"),
+            "price_smoke_team_year": (29000, "year"),
+            "price_smoke_team_month": (2900, "month"),
+        }
         self.requests = []
         self._lock = Lock()
         owner = self
@@ -78,6 +87,12 @@ class PaymentProviderStub:
                         if self.command == "POST":
                             _customer_fields(form, customer)
                         return self._reply(200, customer)
+                    price = re.fullmatch(r"/v1/prices/([\w]+)", path)
+                    if price and self.command == "GET" and price.group(1) in owner.prices:
+                        amount, interval = owner.prices[price.group(1)]
+                        return self._reply(200, {"id": price.group(1), "object": "price",
+                                                 "currency": "usd", "unit_amount": amount,
+                                                 "recurring": {"interval": interval}})
                     if path == "/v1/invoices" and self.command == "GET":
                         return self._reply(200, {"object": "list", "data": [], "has_more": False,
                                                  "url": "/v1/invoices"})
