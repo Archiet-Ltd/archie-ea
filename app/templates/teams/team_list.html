@@ -1,0 +1,64 @@
+{% extends "layouts/admin_base.html" %}
+{% from 'components/page_header.html' import page_header %}
+{% from 'components/empty_state.html' import empty_state %}
+
+{% block title %}Teams{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    {{ page_header(
+        title='Teams',
+        breadcrumbs=[{'label': 'Home', 'href': '/'}, {'label': 'Teams'}],
+        description='Teams working on applications and technologies'
+    ) }}
+
+    <div class="mb-6 flex justify-end">
+        <a href="{{ url_for('teams.team_create') }}"
+           class="inline-flex items-center px-4 py-2 rounded-md bg-primary text-primary-foreground hover:opacity-90 transition-opacity">
+            Create Team
+        </a>
+    </div>
+
+    {% if teams %}
+    <div class="overflow-x-auto rounded-lg border">
+        <table class="w-full">
+            <thead>
+                <tr class="border-b text-left text-sm font-medium text-muted-foreground">
+                    <th class="px-4 py-3">Name</th>
+                    <th class="px-4 py-3">Headcount</th>
+                    <th class="px-4 py-3">Description</th>
+                    <th class="px-4 py-3">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for team in teams %}
+                <tr class="border-b hover:bg-accent/5 transition-colors">
+                    <td class="px-4 py-3">
+                        <a href="{{ url_for('teams.team_detail', team_id=team.id) }}"
+                           class="font-medium text-foreground hover:underline">
+                            {{ team.name }}
+                        </a>
+                    </td>
+                    <td class="px-4 py-3 text-muted-foreground">{{ team.headcount or '—' }}</td>
+                    <td class="px-4 py-3 text-muted-foreground max-w-xs truncate">{{ team.description or '—' }}</td>
+                    <td class="px-4 py-3">
+                        <a href="{{ url_for('teams.team_detail', team_id=team.id) }}"
+                           class="text-sm text-muted-foreground hover:underline">View</a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="mt-8">
+        {{ empty_state(
+            icon='users',
+            headline='No teams yet',
+            body='Create your first team to start tracking which teams work on which applications and technologies.',
+            action={'label': 'Create Team', 'url': url_for('teams.team_create')}
+        ) }}
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

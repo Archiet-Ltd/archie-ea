@@ -1,0 +1,156 @@
+{% extends "layouts/admin_base.html" %}
+{% from 'components/page_header.html' import page_header %}
+{% from 'components/empty_state.html' import empty_state %}
+
+{% block title %}{{ team.name }} — Team{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    {{ page_header(
+        title=team.name,
+        breadcrumbs=[
+            {'label': 'Home', 'href': '/'},
+            {'label': 'Teams', 'href': url_for('teams.team_list')},
+            {'label': team.name}
+        ],
+        description=team.description or 'Team'
+    ) }}
+
+    {# ── Team Info Card ── #}
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        <div class="rounded-lg border p-4">
+            <div class="text-xs text-muted-foreground uppercase tracking-wider">Headcount</div>
+            <div class="text-2xl font-bold">{{ team.headcount or '—' }}</div>
+        </div>
+        <div class="rounded-lg border p-4">
+            <div class="text-xs text-muted-foreground uppercase tracking-wider">Allocated</div>
+            <div class="text-2xl font-bold">{{ total_share }}%</div>
+        </div>
+        <div class="rounded-lg border p-4">
+            <div class="text-xs text-muted-foreground uppercase tracking-wider">Unallocated</div>
+            <div class="text-2xl font-bold">{{ unallocated }}%</div>
+        </div>
+    </div>
+
+    {# ── Actions ── #}
+    <div class="mb-6 flex gap-3">
+        <a href="{{ url_for('teams.team_edit', team_id=team.id) }}"
+           class="inline-flex items-center px-4 py-2 rounded-md border text-sm hover:bg-accent/10 transition-colors">
+            Edit Team
+        </a>
+        <form method="POST" action="{{ url_for('teams.derive_allocations', team_id=team.id) }}"
+              class="inline">
+            <button type="submit"
+                    class="inline-flex items-center px-4 py-2 rounded-md border text-sm hover:bg-accent/10 transition-colors">
+                Derive from Applications
+            </button>
+        </form>
+        <form method="POST" action="{{ url_for('teams.team_delete', team_id=team.id) }}"
+              class="inline"
+              onsubmit="return confirm('Delete this team and all its allocations?')">
+            <button type="submit"
+                    class="inline-flex items-center px-4 py-2 rounded-md border text-sm text-destructive hover:bg-destructive/10 transition-colors">
+                Delete
+            </button>
+        </form>
+    </div>
+
+    {# ── Allocations ── #}
+    <div class="mt-4">
+        <h2 class="text-lg font-semibold mb-4">Allocations</h2>
+
+        {% if allocations %}
+        <div class="overflow-x-auto rounded-lg border">
+            <table class="w-full">
+                <thead>
+                    <tr class="border-b text-left text-sm font-medium text-muted-foreground">
+                        <th class="px-4 py-3">Element</th>
+                        <th class="px-4 py-3">Type</th>
+                        <th class="px-4 py-3">Share</th>
+                        <th class="px-4 py-3">Source</th>
+                        <th class="px-4 py-3">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in allocations %}
+                    {% set alloc = item.allocation %}
+                    <tr class="border-b hover:bg-accent/5 transition-colors">
+                        <td class="px-4 py-3 font-medium">{{ item.element_name }}</td>
+                        <td class="px-4 py-3 text-muted-foreground">{{ alloc.element_type }}</td>
+                        <td class="px-4 py-3">{{ alloc.share_percent }}%</td>
+                        <td class="px-4 py-3">
+                            {% if alloc.source == 'derived' %}
+                            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-muted/20 text-muted-foreground">
+                                Derived
+                            </span>
+                            {% else %}
+                            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-primary/10 text-primary">
+                                Recorded
+                            </span>
+                            {% endif %}
+                        </td>
+                        <td class="px-4 py-3">
+                            <form method="POST"
+                                  action="{{ url_for('teams.allocation_delete', team_id=team.id, allocation_id=alloc.id) }}"
+                                  class="inline"
+                                  onsubmit="return confirm('Remove this allocation?')">
+                                <button type="submit"
+                                        class="text-xs text-muted-foreground hover:text-destructive underline">
+                                    Remove
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="mt-4">
+            {{ empty_state(
+                icon='layers',
+                headline='No allocations yet',
+                body='Add allocations to track which applications and technologies this team works on.',
+            ) }}
+        </div>
+        {% endif %}
+    </div>
+
+    {# ── Add Allocation Form ── #}
+    <div class="mt-8 rounded-lg border p-6">
+        <h3 class="text-base font-semibold mb-4">Add Allocation</h3>
+        <form method="POST" action="{{ url_for('teams.allocation_add', team_id=team.id) }}">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                    <label for="element_type" class="block text-sm font-medium mb-1">Element Type</label>
+                    <select name="element_type" id="element_type" required
+                            class="w-full rounded-md border px-3 py-2 text-sm">
+                        <option value="">Select type...</option>
+                        <option value="application">Application</option>
+                        <option value="technology">Technology</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="element_id" class="block text-sm font-medium mb-1">Element ID</label>
+                    <input type="number" name="element_id" id="element_id" required min="1"
+                           class="w-full rounded-md border px-3 py-2 text-sm"
+                           placeholder="Element ID">
+                </div>
+                <div>
+                    <label for="share_percent" class="block text-sm font-medium mb-1">Share (%)</label>
+                    <input type="number" name="share_percent" id="share_percent" required
+                           min="1" max="100"
+                           class="w-full rounded-md border px-3 py-2 text-sm"
+                           placeholder="e.g. 50">
+                </div>
+            </div>
+            <div class="mt-4">
+                <button type="submit"
+                        class="inline-flex items-center px-4 py-2 rounded-md bg-primary text-primary-foreground hover:opacity-90 transition-opacity">
+                    Add Allocation
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

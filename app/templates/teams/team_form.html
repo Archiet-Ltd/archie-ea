@@ -1,0 +1,52 @@
+{% extends "layouts/admin_base.html" %}
+{% from 'components/page_header.html' import page_header %}
+
+{% block title %}{% if team %}Edit {{ team.name }}{% else %}Create Team{% endif %}{% endblock %}
+
+{% block content %}
+<div class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    {{ page_header(
+        title='Edit Team' if team else 'Create Team',
+        breadcrumbs=[
+            {'label': 'Home', 'href': '/'},
+            {'label': 'Teams', 'href': url_for('teams.team_list')},
+            {'label': team.name if team else 'New'}
+        ]
+    ) }}
+
+    <form method="POST" class="mt-6 space-y-4">
+        <div>
+            <label for="name" class="block text-sm font-medium mb-1">Team Name <span class="text-destructive">*</span></label>
+            <input type="text" name="name" id="name" required
+                   value="{{ team.name if team else '' }}"
+                   class="w-full rounded-md border px-3 py-2 text-sm"
+                   placeholder="e.g. Payments Team">
+        </div>
+
+        <div>
+            <label for="description" class="block text-sm font-medium mb-1">Description</label>
+            <textarea name="description" id="description" rows="3"
+                      class="w-full rounded-md border px-3 py-2 text-sm"
+                      placeholder="What does this team do?">{{ team.description or '' }}</textarea>
+        </div>
+
+        <div>
+            <label for="headcount" class="block text-sm font-medium mb-1">Headcount</label>
+            <input type="number" name="headcount" id="headcount" min="0"
+                   value="{{ team.headcount or 0 }}"
+                   class="w-full rounded-md border px-3 py-2 text-sm">
+        </div>
+
+        <div class="flex gap-3">
+            <button type="submit"
+                    class="inline-flex items-center px-4 py-2 rounded-md bg-primary text-primary-foreground hover:opacity-90 transition-opacity">
+                {% if team %}Save Changes{% else %}Create Team{% endif %}
+            </button>
+            <a href="{{ url_for('teams.team_list') }}"
+               class="inline-flex items-center px-4 py-2 rounded-md border text-sm hover:bg-accent/10 transition-colors">
+                Cancel
+            </a>
+        </div>
+    </form>
+</div>
+{% endblock %}
