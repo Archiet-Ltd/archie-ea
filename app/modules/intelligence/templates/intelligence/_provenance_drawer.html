@@ -67,25 +67,40 @@
                 <ol x-show="drawer.why.links.length > 0" class="space-y-2" aria-label="Links, in order">
                     <template x-for="link in drawer.why.links" :key="link.position">
                         <li class="min-w-0 rounded-md border border-border p-3 text-sm" data-why-link>
-                            <div x-show="link.resolved" class="space-y-1">
-                                <p x-show="link.sentence" class="break-words text-foreground" x-text="link.sentence"></p>
-                                <p class="flex flex-wrap items-center gap-x-1.5 gap-y-1 break-words">
-                                    <a x-show="link.sourceHref" :href="link.sourceHref" class="font-medium text-primary hover:underline" x-text="link.sourceName"></a>
-                                    <span x-show="!link.sourceHref">{{ provenance_badge('missing') }}</span>
-                                    <span aria-hidden="true" class="text-muted-foreground">&rarr;</span>
-                                    <a x-show="link.targetHref" :href="link.targetHref" class="font-medium text-primary hover:underline" x-text="link.targetName"></a>
-                                    <span x-show="!link.targetHref">{{ provenance_badge('missing') }}</span>
-                                </p>
-                                <p class="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs text-muted-foreground">
-                                    <span x-show="!link.originNamesItself">Drawn by</span>
-                                    <span x-show="link.drawnBy" class="text-foreground" x-text="link.drawnBy"></span>
-                                    <span x-show="!link.drawnBy">{{ provenance_badge('missing') }}</span>
-                                    <span aria-hidden="true">&middot;</span>
-                                    <span x-show="link.drawnAt" x-text="link.drawnAt"></span>
-                                    <span x-show="!link.drawnAt">{{ provenance_badge('missing') }}</span>
-                                </p>
-                            </div>
-                            <p x-show="!link.resolved" class="flex flex-wrap items-center gap-1.5 text-foreground">This link is no longer in the model {{ provenance_badge('missing') }}</p>
+                            {# x-if, not x-show, on the branches a loop item toggles
+                               between -- the same guard this drawer already uses on
+                               its date lines just above. A node x-for has just cloned
+                               is inserted and can be painted before Alpine has run the
+                               x-show on its children, so with x-show both the resolved
+                               and the "no longer in the model" branches, and the
+                               "Drawn by" label over an origin that already names itself
+                               ("Imported from <file>"), are on screen together for a
+                               frame -- read as "Drawn by Imported from <file>". x-if
+                               only ever puts the matching branch in the DOM, so the
+                               wrong branch is never there to be painted. #}
+                            <template x-if="link.resolved">
+                                <div class="space-y-1">
+                                    <p x-show="link.sentence" class="break-words text-foreground" x-text="link.sentence"></p>
+                                    <p class="flex flex-wrap items-center gap-x-1.5 gap-y-1 break-words">
+                                        <template x-if="link.sourceHref"><a :href="link.sourceHref" class="font-medium text-primary hover:underline" x-text="link.sourceName"></a></template>
+                                        <template x-if="!link.sourceHref"><span>{{ provenance_badge('missing') }}</span></template>
+                                        <span aria-hidden="true" class="text-muted-foreground">&rarr;</span>
+                                        <template x-if="link.targetHref"><a :href="link.targetHref" class="font-medium text-primary hover:underline" x-text="link.targetName"></a></template>
+                                        <template x-if="!link.targetHref"><span>{{ provenance_badge('missing') }}</span></template>
+                                    </p>
+                                    <p class="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs text-muted-foreground">
+                                        <template x-if="!link.originNamesItself"><span>Drawn by</span></template>
+                                        <template x-if="link.drawnBy"><span class="text-foreground" x-text="link.drawnBy"></span></template>
+                                        <template x-if="!link.drawnBy"><span>{{ provenance_badge('missing') }}</span></template>
+                                        <span aria-hidden="true">&middot;</span>
+                                        <template x-if="link.drawnAt"><span x-text="link.drawnAt"></span></template>
+                                        <template x-if="!link.drawnAt"><span>{{ provenance_badge('missing') }}</span></template>
+                                    </p>
+                                </div>
+                            </template>
+                            <template x-if="!link.resolved">
+                                <p class="flex flex-wrap items-center gap-1.5 text-foreground">This link is no longer in the model {{ provenance_badge('missing') }}</p>
+                            </template>
                         </li>
                     </template>
                 </ol>
