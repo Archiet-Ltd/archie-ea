@@ -45,6 +45,7 @@ document.addEventListener('alpine:init', function() {
             groupByType: false,
             collapsedTypes: {},
             sourceFilter: '',
+            kindFilter: '',
 
             bulkMode: false,
             selectedIds: [],
@@ -489,6 +490,7 @@ document.addEventListener('alpine:init', function() {
                     };
                     if (this.searchQuery) params.search = this.searchQuery;
                     if (this.sourceFilter) params.source = this.sourceFilter;
+                    if (this.kindFilter) params.kind = this.kindFilter;
                     // Viewpoint type filter takes precedence over manual type filter
                     if (this.viewpointTypeFilter.length > 0 && !this.typeFilter) {
                         params.element_type = this.viewpointTypeFilter.join(',');
