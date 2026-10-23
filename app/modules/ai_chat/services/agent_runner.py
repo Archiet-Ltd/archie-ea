@@ -1590,7 +1590,9 @@ class AgentRunner:
         "application fails, and I will answer from the recorded rows."
     )
 
-    def _apply_citation_gate(self, result: dict) -> None:
+    def _apply_citation_gate(
+        self, result: dict, domain: Optional[str] = None, persona: Optional[str] = None
+    ) -> None:
         """Check an answer's statements about the estate against this turn's
         tool results and context, according to ASSISTANT_CITATION_GATE_MODE.
 
@@ -1638,10 +1640,12 @@ class AgentRunner:
                 len(uncited),
             )
             result["response"] = self.CITATION_REFUSAL
+            # Persist the gate decision for actual refusal
+            self._log_would_refuse(uncited, domain, persona, validation_status="refused_uncited")
             return
-        self._log_would_refuse(uncited)
+        self._log_would_refuse(uncited, domain, persona, validation_status="would_refuse_uncited")
 
-    def _log_would_refuse(self, uncited: list) -> None:
+    def _log_would_refuse(self, uncited: list, domain: Optional[str], persona: Optional[str], validation_status: str = "would_refuse_uncited") -> None:
         """One structured WARNING per answer the gate would have refused. The
         unverified record names are logged; the answer text is not."""
         try:
@@ -1666,6 +1670,22 @@ class AgentRunner:
             "citation_gate_would_refuse %s", json.dumps(event, default=str),
             extra={"gate_event": event},
         )
+        # Write an audit row for the citation gate refusal, through the
+        # existing audit writer so the quality monitor can count it.
+        try:
+            from app.utils.ai_chat_audit import get_audit_logger
+            if self.user_id:
+                audit_logger = get_audit_logger(self.user_id)
+                audit_logger.log_citation_gate_decision(
+                    validation_status=validation_status,
+                    validation_details=reasons,
+                    chat_session_id=self.chat_session_id,
+                    domain=domain,
+                    persona=persona,
+                )
+        except Exception:
+            # An audit failure must not break the reply, but it is not silent.
+            logger.warning("citation_gate_audit_write_failed", exc_info=True)
 
     def _finalize(
         self,
@@ -1677,7 +1697,7 @@ class AgentRunner:
         model_used: Optional[str] = None,
     ) -> dict:
         """Apply the citation gate, record the run and return the result dict."""
-        self._apply_citation_gate(result)
+        self._apply_citation_gate(result, domain, persona)
         record_error = self._record_run(
             persona=persona,
             domain=domain,

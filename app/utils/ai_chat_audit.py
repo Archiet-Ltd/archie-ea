@@ -7,7 +7,7 @@ Captures user actions, AI decisions, data modifications, and system events.
 
 import json
 import logging
-from typing import Dict, Optional
+from typing import Dict, List, Optional
 
 from flask import request
 
@@ -349,6 +349,31 @@ class AIChatAuditLogger:
             severity=severity,
             message=event_description,
             metadata=metadata,
+        )
+
+    def log_citation_gate_decision(
+        self,
+        validation_status: str,
+        validation_details: Optional[List[str]] = None,
+        domain: Optional[str] = None,
+        persona: Optional[str] = None,
+        chat_session_id: Optional[str] = None,
+        severity: str = "warning",
+    ) -> Optional[AIChatAuditLog]:
+        """Record one citation-gate refusal or would-refusal decision.
+
+        The uncited claims are stored in validation_details so the quality
+        monitor can count the decision by organisation and period. The existing
+        event_type is used; no new enum value is needed for this.
+        """
+        return self._create_log_entry(
+            event_type=AuditEventType.ERROR_OCCURRED,
+            severity=severity,
+            validation_status=validation_status,
+            validation_details=validation_details,
+            chat_session_id=chat_session_id,
+            domain=domain,
+            persona=persona,
         )
 
 
