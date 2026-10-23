@@ -88,6 +88,9 @@ def test_capability_map_legend_uses_tokens_and_flow_loads_d3_only_when_opened(br
         assert not HEX.findall(page.content()), "raw hex colours after opening the flow view"
         fills = panel.locator("svg rect").evaluate_all("els => els.map(e => e.getAttribute('fill'))")
         assert all(f and f.startswith("hsl(") for f in fills if f != "none"), fills
+        # Domain, capability and application sit on different layers, so the
+        # diagram must show three colours, not one.
+        assert len(set(fills)) >= 3, "the flow diagram colours every node alike: %s" % set(fills)
         d3_after = [s for s in page.eval_on_selector_all("script[src]", "els => els.map(e => e.src)")
                     if "d3" in s.lower()]
         assert any("d3-sankey" in s for s in d3_after)

@@ -86,7 +86,7 @@ function traceabilitySankey(solutionId, apiUrl, lazy) {
         case 'status': return this.statusToken(node);
         case 'origin': return this.originToken(node);
         case 'risk':   return this.riskToken(node);
-        default:       return this.layerToken(node.layer);
+        default:       return this.layerToken(node.layerName ?? node.layer);
       }
     },
 
@@ -224,7 +224,8 @@ function traceabilitySankey(solutionId, apiUrl, lazy) {
         .extent([[margin.left,margin.top],[W-margin.right,H-margin.bottom]]);
 
       const graph = sankey({
-        nodes: connectedNodes.map((n,i) => ({...n, index:i})),
+        // d3-sankey overwrites `layer` with the column number, so keep the name.
+        nodes: connectedNodes.map((n,i) => ({...n, index:i, layerName:n.layer})),
         links: connectedLinks.map(l => ({...l, value:l.value||1})),
       });
 
@@ -234,7 +235,7 @@ function traceabilitySankey(solutionId, apiUrl, lazy) {
       svg.append('g').attr('fill','none')
         .selectAll('path').data(graph.links).join('path')
         .attr('d', d3.sankeyLinkHorizontal())
-        .attr('stroke', d => self.layerColor(graph.nodes[d.source.index]?.layer||''))
+        .attr('stroke', d => self.layerColor(graph.nodes[d.source.index]?.layerName||''))
         .attr('stroke-width', d => Math.max(1,d.width))
         .attr('stroke-opacity', 0.22)
         .on('mouseover', function() { d3.select(this).attr('stroke-opacity',0.5); })
