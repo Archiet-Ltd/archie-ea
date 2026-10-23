@@ -79,15 +79,22 @@ def api_usage_events():
 
     events = query.limit(limit).all()
 
+    def _safe_metadata(event_metadata):
+        # error_occurred events carry str(exception) in 'error_message' -- not
+        # something to hand back over an endpoint any signed-in user (of any
+        # tenant; this table has no organization_id) can call.
+        if not event_metadata:
+            return event_metadata
+        return {k: v for k, v in event_metadata.items() if k != 'error_message'}
+
     return jsonify([{
         'id': event.id,
         'feature_name': event.feature_name,
         'event_type': event.event_type,
         'route_path': event.route_path,
         'user_id': event.user_id,
-        'session_id': event.session_id,
         'timestamp': event.timestamp.isoformat(),
-        'event_metadata': event.event_metadata
+        'event_metadata': _safe_metadata(event.event_metadata)
     } for event in events])
 
 

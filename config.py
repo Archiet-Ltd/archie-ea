@@ -290,6 +290,11 @@ class Config:
         "INDEXNOW_API_KEY", "d51b9c0554cf9ff9c975e8f5a67c7892328f56e1e4afe0f73fb8c34507bb292f"  # gitleaks:allow
     )
 
+    # In-product usage analytics: one page-view row per module-directory endpoint
+    # visited, keyed by endpoint name. No personal data is stored; a signed-in
+    # user can opt out for themselves from Settings.
+    ENABLE_USAGE_ANALYTICS = True
+
     # Admin account
     ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD")
     if not ADMIN_PASSWORD:
@@ -591,6 +596,10 @@ class TestingConfig(Config):
     MAIL_SUPPRESS_SEND = _env_bool("MAIL_SUPPRESS_SEND", True)
     TRANSFORMATION_COMMAND_CAPABILITY_SECRET = "74" * 32
     TRANSFORMATION_COMMAND_CAPABILITY_PREVIOUS_SECRETS = ""
+
+    # Off by default under test; a test that needs usage analytics sets this
+    # explicitly on its own app instance.
+    ENABLE_USAGE_ANALYTICS = False
 
     # credential_encryption.py raises RuntimeError when this is unset, by
     # design (it must not silently store a credential in plaintext). Generated
