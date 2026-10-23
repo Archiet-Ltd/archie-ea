@@ -739,3 +739,20 @@ entries:
     must_not_create:
       - id: type-table-class
         regex: 'class\s+\w*TypeTable\s*\('
+
+  - id: ask-suggested-questions
+    concept: The suggested questions the Ask page and the dashboard checklist offer, written from an organisation's own services
+    status: active
+    canonical:
+      path: app/modules/intelligence/services/suggested_questions.py
+      symbols: [suggested_questions]
+    reuse: >
+      Call suggested_questions(organization_id) for the three questions offered once a model exists. It names
+      the organisation's own application-layer services, asks the one impact walk which of them have
+      dependents, and reads owners through the owner store, so a question it offers can always be answered and
+      a second organisation never sees the first one's names. Do not write a second generator of starter or
+      suggested questions for Ask, and do not build another list of impact questions beside this one; extend
+      this function instead.
+    must_not_create:
+      - id: suggestion-builder
+        regex: 'def\s+_?(suggested|starter|suggest)_(questions|prompts|asks)\w*\s*\('
