@@ -8,6 +8,7 @@ loaded several times before the write so that each worker has read the empty
 counts, and several times after it so that every worker is asked again.
 """
 
+import re
 import uuid
 
 import pytest
@@ -59,8 +60,10 @@ def test_a_new_application_is_counted_on_the_next_page_load(browser, live_server
             dialog.locator("button[type=submit]").click()
         row = page.locator("tr", has_text=name).first
         expect(row).to_be_visible(timeout=PAGE_TIMEOUT)
-        # The type was not recorded, so it reads as a dash, not as a value.
-        expect(row.locator("td", has_text="—").first).to_be_visible()
+        # The type was not recorded. Rather than a bare dash the person cannot
+        # act on, the cell says it is not set and offers the way to classify it.
+        app_type = row.get_by_test_id(re.compile(r"^app-type-\d+$")).first
+        expect(app_type).to_contain_text("Not set")
 
         # Immediately afterwards, whichever worker answers, the page has moved on.
         for attempt in range(LOADS_PER_CHECK):
