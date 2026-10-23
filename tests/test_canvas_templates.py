@@ -163,15 +163,16 @@ class TestSeedIdempotence:
         org = make_org("canvas-seed-idempotence")
 
         profile_type_count = len(CANVAS_PROFILE_OPTIONS_BY_TYPE)
+        template_count = len(CANVAS_TEMPLATES)
 
         first = seed_canvas_templates(org_id=org.id)
-        assert first == (3, 0, profile_type_count, 0)
+        assert first == (template_count, 0, profile_type_count, 0)
 
         second = seed_canvas_templates(org_id=org.id)
-        assert second == (0, 3, 0, profile_type_count)
+        assert second == (0, template_count, 0, profile_type_count)
 
         canvas_rows = ArchiMateViewpoint.query.filter_by(viewpoint_type="canvas").all()
-        assert len(canvas_rows) == 3
+        assert len(canvas_rows) == template_count
         assert {row.is_standard for row in canvas_rows} == {False}
 
         profile_rows = AcmPropertyTemplate.query.filter_by(property_key="profile").all()
@@ -189,7 +190,7 @@ class TestSeedIdempotence:
         org = make_org("canvas-seed-viewpoints")
 
         seed_viewpoints(org_id=org.id)
-        assert ArchiMateViewpoint.query.filter_by(viewpoint_type="canvas").count() == 3
+        assert ArchiMateViewpoint.query.filter_by(viewpoint_type="canvas").count() == len(CANVAS_TEMPLATES)
 
     def test_seed_property_templates_is_idempotent(self, app, db_session):
         from app.config.property_templates import PROPERTY_TEMPLATES
