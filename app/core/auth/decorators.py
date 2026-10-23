@@ -204,6 +204,21 @@ def require_permission(action, object_type):
 
             return f(*args, **kwargs)
 
+        # Discoverability marker for the url_map-wide active-organisation
+        # sweep (tests/test_admin_rbac_active_org_enforcement.py). A write
+        # route carries the matrix check against ``g.current_org_id`` (``can``
+        # reads the active organisation through the grant tables), so a Viewer
+        # of the active organisation must be refused -- the same property the
+        # sweep proves for admin_required/org_admin_required. Only non-read
+        # actions are marked: a read route is meant to admit a Viewer, so
+        # enrolling it would make the "must refuse a Viewer" sweep wrong.
+        # functools.wraps propagates this attribute up through any further
+        # decorators stacked on top, so it survives on
+        # app.view_functions[endpoint] regardless of stacking order or depth.
+        # Not read by any runtime code path -- test introspection only.
+        if str(action).lower() != "read":
+            decorated_function._active_org_rbac_gate = "require_permission"
+
         return decorated_function
 
     return decorator

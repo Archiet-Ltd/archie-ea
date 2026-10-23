@@ -196,6 +196,72 @@ class TestTwoOrganisations:
         assert not can(admin_a, "create", "review_workflow", org_b.id)
 
 
+class TestSwitchedSessionIsJudgedByTheActiveOrganisation:
+    """The matrix decorator must read the organisation the session is switched
+    INTO, not the account's home organisation.
+
+    ``TestTwoOrganisations`` above calls ``can(user, ..., org_id)`` with an
+    explicit organisation id. That proves the matrix answer is per-organisation,
+    but it does not prove the HTTP route resolves the organisation the same way
+    a browser does: an administrator of their own organisation who accepts a
+    Viewer invitation into another organisation and switches the active session
+    into it (the real ``/account/switch-organization`` flow) must be refused the
+    write route there, because ``require_permission`` reads the ACTIVE
+    organisation. If it ever read the account's home organisation instead, this
+    account -- a home-org Administrator -- would be admitted to a foreign
+    organisation's write route while holding only Viewer there.
+    """
+
+    def _switch_into(self, client, login_as, user, org):
+        login_as(client, user)
+        switched = client.post(
+            "/account/switch-organization",
+            data={"organization_id": str(org.id)},
+            follow_redirects=True,
+        )
+        assert switched.status_code == 200, (
+            f"fixture setup: switching the active session into {org.slug} failed "
+            f"({switched.status_code})"
+        )
+
+    def test_a_home_org_admin_switched_into_a_foreign_org_is_refused_the_write_route(
+        self, app, db_session, login_as, client, monkeypatch
+    ):
+        from app.models.org_role import OrgRole
+
+        _stub_arb_service(monkeypatch)
+
+        home_org = _org(db_session, "switch-home")
+        foreign_org = _org(db_session, "switch-foreign")
+        # Administrator of their OWN organisation ...
+        user = _user(db_session, home_org, "org_admin", platform_role="Administrator")
+        # ... but only a Viewer invited into the foreign organisation.
+        OrgRole.set_role(foreign_org.id, user.id, "viewer")
+        db_session.commit()
+
+        # Still an administrator at home: the write route admits them there, so
+        # the refusal below cannot be explained by a broken login or an
+        # unrelated 403.
+        self._switch_into(client, login_as, user, home_org)
+        admitted = client.post(ARB, json={"title": "Q", "reviewers": [1]})
+        assert admitted.status_code not in (401, 403), (
+            f"the same administrator, in their own organisation, was refused the "
+            f"write route ({admitted.status_code})"
+        )
+        assert admitted.status_code < 500
+
+        # Switch the active session into the foreign organisation and try the
+        # same write: only a Viewer there, so the matrix must refuse.
+        self._switch_into(client, login_as, user, foreign_org)
+        refused = client.post(ARB, json={"title": "Q", "reviewers": [1]})
+        assert refused.status_code == 403, (
+            f"a home-org Administrator, Viewer-only in the organisation the "
+            f"session is switched into ({foreign_org.slug}), reached the write "
+            f"route there with {refused.status_code} instead of 403 -- the matrix "
+            f"decorator read the home organisation, not the active one"
+        )
+
+
 class TestBulkDeleteGrantStaysInItsOrganisation:
     def test_a_bulk_delete_grant_in_a_never_bulk_deletes_in_b(
         self, app, db_session, login_as, client
