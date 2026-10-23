@@ -55,7 +55,7 @@ def test_bulk_forbidden_field_queues_nothing(client, login_as, db_session, world
     before = _approvals(db_session)
     resp = _bulk(client, login_as, world, path, id_key, world["recs_a"][kind],
                  {"organization_id": world["recs_b"]["org"]})
-    # The bulk routes execute per item and never queue; the item is refused.
+    # The item is refused before anything is queued.
     assert resp.get_json()["summary"]["success"] == 0
     assert "organization_id" in resp.get_data(as_text=True)
     assert _approvals(db_session) == before
