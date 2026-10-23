@@ -28,10 +28,13 @@
     </div>
     {% else %}
     {% set live_connectors = live_connectors|default([]) %}
+    {% set connectors_url = connectors_url|default(None) %}
     {% if 'github' in live_connectors %}
     <p class="text-sm text-muted-foreground">Nothing is linked yet. Link a GitHub item to trace where this element came from.</p>
-    {% else %}
+    {% elif connectors_url %}
     <p class="text-sm text-muted-foreground">Nothing is linked yet. Connect a source on the <a href="{{ connectors_url }}" class="text-primary hover:underline">Connectors page</a> to trace where this element came from.</p>
+    {% else %}
+    <p class="text-sm text-muted-foreground">Nothing is linked yet. Connect a source to trace where this element came from.</p>
     {% endif %}
     {% endif %}
 </div>
