@@ -141,6 +141,10 @@
                             <span class="text-muted-foreground">Renewal Date:</span>
                             <span class="ml-1">{{ (item.contract.renewal_date or item.contract.end_date).strftime('%d %b %Y') if (item.contract.renewal_date or item.contract.end_date) else '—' }}</span>
                         </div>
+                        <div>
+                            <span class="text-muted-foreground">Last Day to Cancel:</span>
+                            <span class="ml-1">{{ item.last_day_to_cancel.strftime('%d %b %Y') if item.last_day_to_cancel else '—' }}</span>
+                        </div>
                     </div>
                 </div>
                 <div class="flex flex-col items-end gap-2 ml-4">

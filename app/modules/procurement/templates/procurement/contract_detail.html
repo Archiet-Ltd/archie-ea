@@ -246,6 +246,37 @@
                     </div>
                 </dl>
             </div>
+
+            <!-- Linked Applications -->
+            <div class="bg-card border border-border rounded-lg p-6">
+                <h2 class="text-lg font-semibold mb-4">Linked Applications</h2>
+                {% if linked_applications %}
+                <ul class="space-y-2">
+                    {% for link in linked_applications %}
+                    <li class="flex items-center justify-between py-2 px-3 bg-muted/30 rounded-md">
+                        <span>{{ link.application.name }}</span>
+                        <form method="POST" action="{{ url_for('procurement.contract_unlink_application', contract_id=contract.id) }}"
+                              class="inline" @submit.prevent="Platform.modal.confirmSubmit($event, 'Unlink this application?')">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <input type="hidden" name="application_id" value="{{ link.application_id }}">
+                            <button type="submit" class="text-xs text-destructive-emphasis hover:underline">Remove</button>
+                        </form>
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% else %}
+                <p class="text-sm text-muted-foreground">No applications linked to this contract.</p>
+                {% endif %}
+                <div class="mt-3 pt-3 border-t border-border">
+                    <form method="POST" action="{{ url_for('procurement.contract_link_application', contract_id=contract.id) }}"
+                          class="flex items-center gap-2">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <input type="text" name="application_id" placeholder="Application ID"
+                               class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring">
+                        <button type="submit" class="px-3 py-2 rounded-md bg-primary text-primary-foreground text-sm">Link</button>
+                    </form>
+                </div>
+            </div>
         </div>
     </div>
 </div>

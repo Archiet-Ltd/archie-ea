@@ -485,8 +485,8 @@ class TestContractRenewals:
         assert expected_cancel == date(2026, 10, 3)  # 2027-01-01 minus 90 days
 
     def test_default_notice_period_value(self, db_session):
-        """When notice_period_days is not explicitly set, the model default (90)
-        is used, and last_cancel_day is None when no renewal_date is set."""
+        """When notice_period_days is not explicitly set, it is None,
+        and last_cancel_day is None when no renewal_date is set."""
         from app.models.application_portfolio import VendorContract
         from app.models.organization import Organization
         import uuid
@@ -514,7 +514,7 @@ class TestContractRenewals:
         if c.notice_period_days and c.renewal_date:
             last_cancel = c.renewal_date - timedelta(days=c.notice_period_days)
         assert last_cancel is None
-        assert c.notice_period_days == 90  # default value when notice period not explicitly set
+        assert c.notice_period_days is None  # nullable: no default when not set
 
 
 # ===========================================================================
