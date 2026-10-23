@@ -1440,6 +1440,85 @@ _CASE_ZONES = [
     ),
 ]
 
+# ── BCG growth-share matrix — the four quadrants of relative market share
+# against market growth, one box per quadrant. Each box holds the Products
+# whose `profile` names that quadrant, so a product sits in a box because
+# someone classified it, never because a score was invented. ──────────────
+_BCG_ZONES = [
+    _canvas_zone(
+        "stars", "Stars", 1, ["Product"], "star",
+        "type_profile", "strategy",
+    ),
+    _canvas_zone(
+        "question_marks", "Question marks", 2, ["Product"], "question_mark",
+        "type_profile", "strategy",
+    ),
+    _canvas_zone(
+        "cash_cows", "Cash cows", 3, ["Product"], "cash_cow",
+        "type_profile", "strategy",
+    ),
+    _canvas_zone(
+        "dogs", "Dogs", 4, ["Product"], "dog",
+        "type_profile", "strategy",
+    ),
+]
+
+# ── Ansoff growth matrix — existing and new products against existing and
+# new markets, one box per quadrant over the organisation's Products and
+# Business Services. ──────────────────────────────────────────────────────
+_ANSOFF_ZONES = [
+    _canvas_zone(
+        "market_penetration", "Market penetration", 1, ["Product", "BusinessService"],
+        "market_penetration", "type_profile", "business",
+    ),
+    _canvas_zone(
+        "market_development", "Market development", 2, ["Product", "BusinessService"],
+        "market_development", "type_profile", "business",
+    ),
+    _canvas_zone(
+        "product_development", "Product development", 3, ["Product", "BusinessService"],
+        "product_development", "type_profile", "business",
+    ),
+    _canvas_zone(
+        "diversification", "Diversification", 4, ["Product", "BusinessService"],
+        "diversification", "type_profile", "business",
+    ),
+]
+
+# ── Blue Ocean strategy canvas — the value curve's competing factors
+# (Assessment elements carrying an offering-level attribute, one point per
+# factor per player) and the eliminate-reduce-raise-create grid (Goal
+# elements, one box per action). The curve box is an attribute view over the
+# competing-factor Assessments, never a derived number. ────────────────────
+_BLUE_OCEAN_ZONES = [
+    _canvas_zone(
+        "competing_factors", "Competing factors", 1, ["Assessment"], "competing_factor",
+        "type_profile", "motivation",
+    ),
+    _canvas_zone(
+        "value_curve", "Value curve", 2, ["Assessment"], None,
+        "attribute", "composite",
+        anchor_box="competing_factors",
+        attribute_keys=["offering_level", "player"],
+    ),
+    _canvas_zone(
+        "eliminate", "Eliminate", 3, ["Goal"], "eliminate",
+        "type_profile", "motivation",
+    ),
+    _canvas_zone(
+        "reduce", "Reduce", 4, ["Goal"], "reduce",
+        "type_profile", "motivation",
+    ),
+    _canvas_zone(
+        "raise", "Raise", 5, ["Goal"], "raise",
+        "type_profile", "motivation",
+    ),
+    _canvas_zone(
+        "create", "Create", 6, ["Goal"], "create",
+        "type_profile", "motivation",
+    ),
+]
+
 CANVAS_TEMPLATES: Dict[str, dict] = {
     "lean_canvas": {
         "key": "lean_canvas",
@@ -1462,6 +1541,27 @@ CANVAS_TEMPLATES: Dict[str, dict] = {
         "projects": ["motivation", "strategy", "implementation_and_migration", "project"],
         "zones": _CASE_ZONES,
     },
+    "bcg_matrix": {
+        "key": "bcg_matrix",
+        "name": "BCG matrix",
+        "record": "elements",
+        "projects": ["strategy", "product"],
+        "zones": _BCG_ZONES,
+    },
+    "ansoff_matrix": {
+        "key": "ansoff_matrix",
+        "name": "Ansoff matrix",
+        "record": "elements",
+        "projects": ["strategy", "product"],
+        "zones": _ANSOFF_ZONES,
+    },
+    "blue_ocean_strategy": {
+        "key": "blue_ocean_strategy",
+        "name": "Blue Ocean strategy canvas",
+        "record": "elements",
+        "projects": ["motivation", "strategy"],
+        "zones": _BLUE_OCEAN_ZONES,
+    },
 }
 
 
@@ -1482,7 +1582,7 @@ def validate_canvas_templates(templates: Optional[Dict[str, dict]] = None) -> No
     templates = CANVAS_TEMPLATES if templates is None else templates
     for tpl_key, tpl in templates.items():
         assert tpl["key"] == tpl_key, f"{tpl_key}: key field does not match its dict key"
-        assert tpl["record"] in ("business_model_canvas", "business_case"), (
+        assert tpl["record"] in ("business_model_canvas", "business_case", "elements"), (
             f"{tpl_key}: unknown record {tpl['record']!r}"
         )
         assert isinstance(tpl["projects"], list) and tpl["projects"], f"{tpl_key}: no projects"
@@ -1552,7 +1652,7 @@ def validate_canvas_templates(templates: Optional[Dict[str, dict]] = None) -> No
 # spans more than any one zone's own `profile` field.
 CANVAS_PROFILE_OPTIONS_BY_TYPE: Dict[str, List[str]] = {
     "Driver": ["problem", "reason"],
-    "Assessment": ["existing_alternative", "current_state", "risk"],
+    "Assessment": ["existing_alternative", "current_state", "risk", "competing_factor"],
     "Stakeholder": ["customer_segment"],
     "Value": ["value_proposition"],
     "Requirement": ["solution_feature"],
@@ -1560,10 +1660,15 @@ CANVAS_PROFILE_OPTIONS_BY_TYPE: Dict[str, List[str]] = {
     "BusinessInterface": ["channel"],
     "Resource": ["unfair_advantage", "key_resource"],
     "Capability": ["key_activity"],
-    "BusinessService": ["customer_relationship"],
+    "BusinessService": ["customer_relationship", "market_penetration",
+                        "market_development", "product_development", "diversification"],
     "BusinessActor": ["key_partner"],
     "CourseOfAction": ["option"],
     "WorkPackage": ["plan_item"],
     "ImplementationEvent": ["milestone"],
     "Plateau": ["target_state"],
+    "Product": ["star", "question_mark", "cash_cow", "dog",
+                "market_penetration", "market_development",
+                "product_development", "diversification"],
+    "Goal": ["eliminate", "reduce", "raise", "create"],
 }
