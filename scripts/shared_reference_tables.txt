@@ -1,3 +1,5 @@
 # Tables that are shared reference data on purpose, excluded from the protection requirement.
 # One table per line with a reason after the hash, e.g.  apqc_process  # shared catalogue, seeded only by commands
 # A line with no reason fails the unfenced-tables gate.
+api_operation_retirements  # platform-wide by design: an operation belongs to the one API contract, so a retirement is platform-wide
+api_retirement_notices  # platform-wide by design: which user has been told about which retirement; reached through the retirement and the user
