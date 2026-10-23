@@ -26,8 +26,17 @@ def _can_write() -> bool:
     """Check if current user can modify the portfolio kanban."""
     if not current_user or not current_user.is_authenticated:
         return False
+    from app.services.rbac_service import rbac_service
+    org_id = current_org_id()
+    if org_id is None:
+        return False
+    # Check RBAC service first (OrgRole table), fall back to enterprise_role
+    if rbac_service.can_edit(org_id, current_user.id):
+        return True
     role = getattr(current_user, "enterprise_role", "Viewer")
-    return role in ("Architect", "CTO", "Admin")
+    return role in ("Architect", "CTO", "Admin", "solution_architect",
+                    "enterprise_architect", "business_architect",
+                    "security_architect", "data_architect")
 
 
 def _get_epics() -> List[Dict]:
