@@ -132,7 +132,6 @@ class TestElementBackedFrameworks:
         # key, so a classified product appears in both, and each "not yet
         # classified" count is per framework and honest.
         org = make_org("bcg-ansoff")
-        user = _architect(db_session, org.id)
 
         with tenant_ctx(org.id):
             engine.add_element("bcg_matrix", "stars", "Flagship product", org.id,
