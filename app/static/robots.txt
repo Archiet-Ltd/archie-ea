@@ -20,6 +20,7 @@ Allow: /pricing
 Allow: /privacy
 Allow: /security
 Allow: /team-annual-onboarding
+Allow: /known-issues
 Allow: /terms
 Allow: /sitemap.xml
 Allow: /llms.txt
