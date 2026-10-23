@@ -273,6 +273,35 @@ def derivation_status(organization_id: int, *, recent: int = 5) -> Dict[str, Any
     }
 
 
+def list_derived_element_ids(organization_id: int) -> set[int]:
+    """Return the set of element ids that appear as source or target in
+    non-stale derived relationships for the organisation.
+
+    Equivalent to collecting the source_element_id and target_element_id
+    from ``list_derived_facts(organization_id)``, but avoids materialising
+    the full derived relationship rows.
+    """
+    from app.modules.intelligence.models.derived_relationship import DerivedRelationship
+
+    # Distinct source element ids
+    source_ids = db.session.execute(
+        db.select(db.func.distinct(DerivedRelationship.source_element_id))
+        .where(
+            DerivedRelationship.organization_id == organization_id,
+            DerivedRelationship.stale.is_(False),
+        )
+    ).scalars()
+    # Distinct target element ids
+    target_ids = db.session.execute(
+        db.select(db.func.distinct(DerivedRelationship.target_element_id))
+        .where(
+            DerivedRelationship.organization_id == organization_id,
+            DerivedRelationship.stale.is_(False),
+        )
+    ).scalars()
+    return set(source_ids) | set(target_ids)
+
+
 def get_derived_fact(
     organization_id: int, derived_id: int, *, include_stale: bool = True
 ) -> Optional[Dict[str, Any]]:

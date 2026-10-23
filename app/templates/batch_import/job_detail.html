@@ -25,6 +25,16 @@
         ]
     ) }}
 
+    {% if 'intelligence_ui.coverage' in flask.current_app.view_functions %}
+    <p class="text-sm">
+        <a href="{{ url_for('intelligence_ui.coverage') }}"
+           class="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors">
+            <i data-lucide="network" class="h-4 w-4" aria-hidden="true"></i>
+            View derivation coverage for this organisation
+        </a>
+    </p>
+    {% endif %}
+
     <!-- Job Header -->
     {% call card.card() %}
         <div class="p-6">

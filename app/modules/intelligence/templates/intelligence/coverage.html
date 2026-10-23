@@ -1,0 +1,109 @@
+{% extends 'layouts/admin_base.html' %}
+{% from 'macros/page_shell.html' import page_shell %}
+
+{% block title %}Derivation coverage{% endblock %}
+
+{% block content %}
+{% set home_url = url_for('dashboard.overview') if 'dashboard.overview' in flask.current_app.view_functions else none %}
+<div class="p-6 space-y-6">
+    {{ page_shell(
+        title='Derivation coverage',
+        subtitle='Elements per ArchiMate layer, the relationships derivation has added, and the latest run\u2019s yield -- all read from stored rows for your organisation.',
+        breadcrumb=[('Home', home_url), ('Derivation coverage', none)]
+    ) }}
+
+    {% if coverage is none %}
+    <div class="rounded-xl border border-border bg-card p-6">
+        <p class="text-sm text-muted-foreground">We could not read the derivation coverage for your organisation.</p>
+    </div>
+    {% else %}
+    <section class="rounded-xl border border-border bg-card p-6" data-coverage-summary>
+        <h2 class="text-lg font-semibold text-foreground">Coverage</h2>
+        <dl class="mt-3 grid grid-cols-1 gap-x-6 gap-y-2 text-sm sm:grid-cols-3">
+            <div>
+                <dt class="text-muted-foreground">Derived relationships</dt>
+                <dd class="text-foreground">{{ coverage.derived_count }}</dd>
+            </div>
+            <div>
+                <dt class="text-muted-foreground">Latest run yield</dt>
+                <dd class="text-foreground">{{ coverage.latest_run.derived_count if coverage.latest_run else '—' }}</dd>
+            </div>
+            <div>
+                <dt class="text-muted-foreground">Latest run finished</dt>
+                <dd class="text-foreground">{{ coverage.latest_run.finished_at | format_datetime if coverage.latest_run and coverage.latest_run.finished_at else '—' }}</dd>
+            </div>
+        </dl>
+    </section>
+
+    <section class="rounded-xl border border-border bg-card p-6" data-coverage-layers>
+        <h2 class="text-lg font-semibold text-foreground">Elements per layer</h2>
+        {% if coverage.layers %}
+        <table class="w-full text-sm" data-coverage-layer-table>
+            <caption class="sr-only">Elements per ArchiMate layer</caption>
+            <thead>
+                <tr class="border-b border-border text-left text-muted-foreground">
+                    <th scope="col" class="py-2 pr-4 font-medium">Layer</th>
+                    <th scope="col" class="py-2 pr-4 font-medium text-right">Elements</th>
+                    <th scope="col" class="py-2 pr-4 font-medium text-right">No derived relationship</th>
+                    <th scope="col" class="py-2 pr-4 font-medium">List</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for layer_entry in coverage.layers %}
+                <tr class="border-b border-border last:border-0" data-coverage-layer-row>
+                    <td class="py-2 pr-4">{{ layer_entry.layer or '—' }}</td>
+                    <td class="py-2 pr-4 text-right">{{ layer_entry.element_count }}</td>
+                    <td class="py-2 pr-4 text-right">{{ layer_entry.missing_count }}</td>
+                    <td class="py-2 pr-4">
+                        {% if layer_entry.missing_count > 0 %}
+                        <a href="{{ url_for('intelligence_ui.coverage', layer=layer_entry.layer) }}"
+                           class="inline-flex items-center justify-center rounded-md border border-input bg-background px-3 text-sm font-medium text-foreground transition-colors hover:bg-accent hover:text-accent-foreground h-9">
+                            Show {{ layer_entry.missing_count }}
+                        </a>
+                        {% else %}
+                        <span class="text-xs text-muted-foreground">—</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <p class="mt-2 text-sm text-muted-foreground">No elements recorded yet.</p>
+        {% endif %}
+    </section>
+
+    {% if coverage.missing_total > 0 %}
+    <section class="rounded-xl border border-border bg-card p-6" data-coverage-missing>
+        <h2 class="text-lg font-semibold text-foreground">Elements with no derived relationship</h2>
+        {% if coverage.missing_total > coverage.missing|length %}
+        <p class="mt-2 text-sm text-muted-foreground">{{ coverage.missing_total }} elements have no derived relationship, showing the first {{ coverage.missing|length }}.</p>
+        {% else %}
+        <p class="mt-2 text-sm text-muted-foreground">{{ coverage.missing_total }} element{{ 's' if coverage.missing_total != 1 else '' }} have no derived relationship.</p>
+        {% endif %}
+        {% if coverage.missing %}
+        <table class="w-full text-sm mt-3" data-coverage-missing-table>
+            <caption class="sr-only">Elements with no derived relationship</caption>
+            <thead>
+                <tr class="border-b border-border text-left text-muted-foreground">
+                    <th scope="col" class="py-2 pr-4 font-medium">Element</th>
+                    <th scope="col" class="py-2 pr-4 font-medium">Type</th>
+                    <th scope="col" class="py-2 pr-4 font-medium">Layer</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for element_id, type_, node_layer in coverage.missing %}
+                <tr class="border-b border-border last:border-0" data-element-id="{{ element_id }}">
+                    <td class="py-2 pr-4">{{ element_id }}</td>
+                    <td class="py-2 pr-4">{{ type_ or '—' }}</td>
+                    <td class="py-2 pr-4">{{ node_layer or '—' }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% endif %}
+    </section>
+    {% endif %}
+    {% endif %}
+</div>
+{% endblock %}

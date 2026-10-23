@@ -87,6 +87,11 @@ POLICY = {
     # to the organisation that asked it (an address from another organisation
     # is a 404, pinned in the module tests and the journey).
     "/intelligence/answers":   set(ARCHETYPES),
+    # Derivation coverage report (R1-B82 slice 1): same boundary as the
+    # derivation status page -- @login_required and no role gate, so every
+    # archetype reaches it; the figures are fenced per tenant by the service
+    # behind the page.
+    "/intelligence/coverage":  set(ARCHETYPES),
 # Model Health / Drift: carries @login_required and no role gate, so every
     # archetype is expected to reach it.
     "/genome/model-health/":   set(ARCHETYPES),

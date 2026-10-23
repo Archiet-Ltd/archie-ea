@@ -193,6 +193,17 @@ class GraphProjection:
     def has_node(self, element_id: int) -> bool:
         return element_id in self._nodes
 
+    def nodes(self) -> List[Tuple[int, Optional[str], Optional[str]]]:
+        """Every node in this organisation's projection: element id, ArchiMate
+        type, layer. Read-only access over the in-memory projection -- no new
+        query over the element tables. Used by the derivation coverage report
+        to count elements per layer and to list elements with no derived
+        relationship."""
+        return [
+            (element_id, self._strings[type_code] or None, self._strings[layer_code] or None)
+            for element_id, (type_code, layer_code) in self._nodes.items()
+        ]
+
     # ------------------------------------------------------------------ #
     # Mutation (called while building, or under the lock when applying events)
     # ------------------------------------------------------------------ #
