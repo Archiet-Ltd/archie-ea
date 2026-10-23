@@ -19,19 +19,45 @@ serves the same bytes to everyone and has no tenant boundary to cross.
 
 Two-organisation tests are found by STATIC AST search (ast.parse, no import, no
 database, no Flask boot) across tests/ and app/modules/*/tests/. A test file
-counts as a two-organisation test when it defines or uses any of the known
-fixtures -- ``two_orgs``, ``two_organisations``, ``second_org_membership`` -- or
-is one of the suites named in the brief (the authorisation matrix, the isolation
-sweep, the MCP row-level-security two-org tool suite and the two cross-account
-journeys).
+counts as a two-organisation test when a static scan of its functions and
+fixtures shows a genuine SECOND-organisation signal:
 
-A two-organisation test is associated with a family when the family's blueprint
-name, or an alias keyword for a startup family, appears in the test file path or
-in the test source. The alias map below records, for each startup family, the
-blueprint names it owns and the keyword that recognises its two-organisation
-tests, so the seven startup families (account, admin connectors, intelligence,
-applications, admin billing, admin team, dashboard) resolve to zero uncovered
-with the two-organisation tests that exist today.
+* it defines or uses one of the shared two-organisation fixtures -- ``two_orgs``,
+  ``two_organisations``, ``second_org_membership``;
+* a function or fixture requests both of a dual-organisation pair -- ``org_a``
+  and ``org_b`` together (the tenant-isolation test convention); or
+* it defines or requests a fixture whose name names a second organisation --
+  ``other_org``, ``second_org``, ``org_b``, ``org_two`` (as a whole word).
+
+That last clause is why the authorisation matrix qualifies: it builds an
+``other_org`` initiative to prove a cross-organisation 404. There is no
+unconditional file-name allow-list -- a named suite that stopped building a
+second organisation would stop counting, which is what makes the red proof
+below bite.
+
+ASSOCIATION is family-targeted, not a loose keyword match. A two-organisation
+test covers a family only when the test source actually exercises that family's
+routes:
+
+* one of the blueprint's own route rules, taken from the inventory and reduced
+  to its static prefix (the part before the first ``<id>`` segment), appears in
+  the source -- e.g. ``/admin/billing``, ``/admin/team``, ``/intelligence/ask``,
+  ``/applications/``, ``/account/manage``; or
+* the blueprint's endpoint appears in a url_for-style string, ``"blueprint.view"``.
+
+Bare English words (``billing``, ``account``, ``application``) are NOT matched,
+and neither is a bare parent like ``/intelligence/``: they collide with ordinary
+test content -- a ``business_capability="Billing"`` value, an unrelated
+``/intelligence/`` string, a ``read_only_account`` parameter -- none of which is
+a cross-organisation test of that family. Only a concrete route of the family
+(``/intelligence/ask``) counts. A "covered" family therefore reflects a real,
+removable two-organisation test that drives that family's own routes.
+
+Startup families are measured at the family level: the seven startup families
+(account, admin connectors, intelligence, applications, admin billing, admin
+team, dashboard) each own one or more blueprints, and a family is covered when
+at least one of its blueprints has a family-targeted two-organisation test.
+These seven must always be zero uncovered.
 
 A family is uncovered when it reads organisation data AND no two-organisation
 test is associated with it AND no line carries the escape hatch
@@ -47,10 +73,14 @@ you cover a family; never raise it.
     python scripts/check_two_org_coverage.py --count    # trailing line = count
     python scripts/check_two_org_coverage.py --startup-only  # startup families only
 
-Proven-against: a startup family's two-organisation test removed (the
-authorisation matrix's two_orgs usage deleted on a scratch commit) -- red, the
-family it covered turns uncovered and startup count rises above 0; restored --
-green at 0.
+Proven-against: on a scratch edit, rename the authorisation matrix's second
+organisation away -- in tests/smoke/test_authorisation_matrix.py replace the
+``other_org`` fixture and its references (so the file no longer builds a second
+organisation) -- and run ``python scripts/check_two_org_coverage.py``: the
+``admin billing`` startup family, which only that suite covers through its
+``/admin/billing`` rows, goes uncovered, the startup count rises above 0 and the
+gate exits 1. Restore the file with ``git checkout --`` and it is green at 0
+startup uncovered again.
 """
 from __future__ import annotations
 
@@ -66,51 +96,81 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 INVENTORY = os.path.join("docs", "component-inventory.json")
 BASELINE = os.path.join("scripts", "ci", "two_org_baseline.json")
 
-# Fixture / marker names that make a test a two-organisation test.
+# Shared fixtures that, on their own, mark a test as a two-organisation test.
 TWO_ORG_NAMES = ("two_orgs", "two_organisations", "second_org_membership")
 
-# Suites the brief names explicitly as two-organisation tests.
-NAMED_SUITES = (
-    os.path.join("tests", "smoke", "test_authorisation_matrix.py"),
-    os.path.join("tests", "_isolation_sweep.py"),
-    os.path.join("app", "modules", "mcp", "tests", "test_rls_two_org_all_tools.py"),
-    os.path.join("tests", "smoke", "test_decisions_and_why_journey.py"),
-    os.path.join("tests", "smoke", "test_multi_org_account_switching_journey.py"),
-)
+# Dual-organisation fixture pairs: a function that requests both members of a
+# pair is a two-organisation test (the tenant-isolation convention).
+DUAL_ORG_PAIRS = ({"org_a", "org_b"}, {"org1", "org2"}, {"org_one", "org_two"})
+
+# A fixture or function whose name names a SECOND organisation. Matched as a
+# whole word so a `portfolio` or a `storage` identifier never trips it.
+SECOND_ORG_NAME = re.compile(r"(?:^|_)(other_org|second_org|org_b|org_two)(?:_|$)")
 
 ALLOW = re.compile(r"two-org-coverage-ok:[ \t]*\S")
 
-# Startup families: English name -> the blueprint names it owns and the keyword
-# that recognises its two-organisation tests by path or source. The startup
-# families must resolve to 0 uncovered with the two-organisation tests that
-# exist today.
-STARTUP_FAMILIES: dict[str, dict[str, object]] = {
-    "account": {"blueprints": {"account"}, "keywords": {"account"}},
-    "admin connectors": {
-        "blueprints": {"m365_connector", "connectors"},
-        "keywords": {"connector"},
-    },
-    "intelligence": {
-        "blueprints": {"intelligence_api", "intelligence_ui"},
-        "keywords": {"intelligence"},
-    },
-    "applications": {
-        "blueprints": {"unified_applications", "application_mgmt", "my_applications"},
-        "keywords": {"application"},
-    },
-    "admin billing": {"blueprints": {"billing"}, "keywords": {"billing"}},
-    "admin team": {"blueprints": {"team"}, "keywords": {"team"}},
-    "dashboard": {
-        "blueprints": {"dashboard", "dashboard_pages"},
-        "keywords": {"dashboard"},
-    },
+# The gates' own synthetic tests build fake route strings and fake second-org
+# fixtures to exercise this script; they are not product two-organisation tests
+# and must not count as coverage for any real family.
+SELF_TESTS = frozenset(
+    {
+        os.path.join("tests", "test_check_two_org_coverage.py"),
+        os.path.join("tests", "test_check_asvs_register.py"),
+    }
+)
+
+# Startup families: English name -> the blueprint names it owns. The seven
+# startup families must resolve to 0 uncovered at the family level, where a
+# family is covered when at least one of its blueprints has a family-targeted
+# two-organisation test. Association to a blueprint uses that blueprint's own
+# route rules from the inventory, so no per-family keyword list is kept here.
+STARTUP_FAMILIES: dict[str, set[str]] = {
+    "account": {"account"},
+    "admin connectors": {"m365_connector", "connectors"},
+    "intelligence": {"intelligence_api", "intelligence_ui"},
+    "applications": {"unified_applications", "application_mgmt", "my_applications"},
+    "admin billing": {"billing"},
+    "admin team": {"team"},
+    "dashboard": {"dashboard", "dashboard_pages"},
 }
 
 # blueprint name -> startup family English name
 _BLUEPRINT_TO_STARTUP: dict[str, str] = {}
-for _fam, _spec in STARTUP_FAMILIES.items():
-    for _bp in _spec["blueprints"]:  # type: ignore[union-attr]
+for _fam, _bps in STARTUP_FAMILIES.items():
+    for _bp in _bps:
         _BLUEPRINT_TO_STARTUP[_bp] = _fam
+
+# The shortest static prefix of a route rule that is still distinctive enough to
+# associate a test with a family: at least two path segments and six characters,
+# so ``/ai`` or ``/`` never associates but ``/admin/team`` does.
+_MIN_PREFIX_LEN = 6
+
+
+def _static_prefix(rule: str) -> str:
+    """The leading part of a rule before its first ``<id>`` segment."""
+    segments: list[str] = []
+    for segment in rule.split("/"):
+        if segment.startswith("<"):
+            break
+        segments.append(segment)
+    prefix = "/".join(segments)
+    if not prefix.startswith("/"):
+        prefix = "/" + prefix
+    prefix = prefix.rstrip("/")
+    return prefix or "/"
+
+
+def blueprint_route_prefixes(routes: list[dict]) -> dict[str, set[str]]:
+    """blueprint name -> the set of distinctive static rule prefixes it owns."""
+    prefixes: dict[str, set[str]] = {}
+    for route in routes:
+        blueprint = route.get("blueprint")
+        if not blueprint or not route.get("login_required"):
+            continue
+        prefix = _static_prefix(route.get("rule") or "")
+        if prefix.count("/") >= 2 and len(prefix) >= _MIN_PREFIX_LEN:
+            prefixes.setdefault(blueprint, set()).add(prefix)
+    return prefixes
 
 
 def load_routes(root: str) -> list[dict]:
@@ -155,66 +215,83 @@ def _iter_test_files(root: str):
                     continue
                 path = os.path.join(dirpath, filename)
                 rel = os.path.relpath(path, root)
-                if rel in seen:
+                if rel in seen or rel in SELF_TESTS:
                     continue
                 seen.add(rel)
                 with open(path, encoding="utf-8", errors="replace") as fh:
                     yield rel, fh.read()
 
 
-def two_org_tests(root: str) -> list[tuple[str, str]]:
-    """Return (relpath, source) for every file that is a two-organisation test.
+def _is_two_org_source(source: str) -> bool:
+    """True when a static scan shows a genuine second-organisation signal.
 
-    A file qualifies when it is one of the named suites, or when a static AST
-    scan finds a fixture definition, a fixture argument or a plain reference to
-    any of the known two-organisation names.
+    The signal is a fixture definition or a fixture argument -- never a bare
+    reference buried in an expression -- so an ordinary attribute like
+    ``config.org_b`` or a passing mention in a string cannot make a
+    single-organisation test look like a two-organisation one.
     """
+    try:
+        tree = ast.parse(source)
+    except SyntaxError:
+        return False
+    for node in ast.walk(tree):
+        if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            continue
+        name = node.name
+        if name in TWO_ORG_NAMES or SECOND_ORG_NAME.search(name):
+            return True
+        arg_names = {a.arg for a in node.args.args}
+        if arg_names & set(TWO_ORG_NAMES):
+            return True
+        if any(pair <= arg_names for pair in DUAL_ORG_PAIRS):
+            return True
+        if any(SECOND_ORG_NAME.search(a) for a in arg_names):
+            return True
+    return False
+
+
+def two_org_tests(root: str) -> list[tuple[str, str]]:
+    """Return (relpath, source) for every file that is a two-organisation test."""
     found: list[tuple[str, str]] = []
     for rel, source in _iter_test_files(root):
-        if rel in NAMED_SUITES:
-            found.append((rel, source))
-            continue
-        qualifies = False
-        try:
-            tree = ast.parse(source)
-        except SyntaxError:
-            tree = None
-        if tree is not None:
-            for node in ast.walk(tree):
-                if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-                    if node.name in TWO_ORG_NAMES:
-                        qualifies = True
-                        break
-                    arg_names = {a.arg for a in node.args.args}
-                    if arg_names & set(TWO_ORG_NAMES):
-                        qualifies = True
-                        break
-                elif isinstance(node, ast.Name) and node.id in TWO_ORG_NAMES:
-                    qualifies = True
-                    break
-        if qualifies:
+        if _is_two_org_source(source):
             found.append((rel, source))
     return found
 
 
-def covered_families(
-    org_families: set[str], tests: list[tuple[str, str]]
-) -> set[str]:
-    """Blueprints for which at least one two-organisation test is associated.
+def _endpoint_in_string(blueprint: str, source: str) -> bool:
+    """True when ``"blueprint.view"`` appears as a url_for-style string token."""
+    pattern = r"""["']""" + re.escape(blueprint) + r"\.[A-Za-z_]"
+    return re.search(pattern, source) is not None
 
-    Association: the blueprint name, or an alias keyword for the startup family
-    that owns the blueprint, appears in the test path or source (case-folded).
+
+def _associates(blueprint: str, source: str, prefixes: set[str]) -> bool:
+    """Family-targeted association for one blueprint against one test source.
+
+    Covered when the source references the blueprint's endpoint in a
+    url_for-style string, or names one of the blueprint's own route rule
+    prefixes. Bare English words are never matched.
     """
-    covered: set[str] = set()
-    corpus = [(rel.lower(), source.lower()) for rel, source in tests]
+    if _endpoint_in_string(blueprint, source):
+        return True
+    for prefix in prefixes:
+        if prefix in source:
+            return True
+    return False
 
+
+def covered_families(
+    org_families: set[str],
+    tests: list[tuple[str, str]],
+    route_prefixes: dict[str, set[str]],
+) -> set[str]:
+    """Blueprints for which at least one two-organisation test is associated."""
+    covered: set[str] = set()
+    sources = [source for _rel, source in tests]
     for blueprint in org_families:
-        tokens = {blueprint.lower()}
-        startup = _BLUEPRINT_TO_STARTUP.get(blueprint)
-        if startup:
-            tokens |= {k.lower() for k in STARTUP_FAMILIES[startup]["keywords"]}  # type: ignore[union-attr]
-        for rel_lower, src_lower in corpus:
-            if any(tok in rel_lower or tok in src_lower for tok in tokens):
+        prefixes = route_prefixes.get(blueprint, set())
+        for source in sources:
+            if _associates(blueprint, source, prefixes):
                 covered.add(blueprint)
                 break
     return covered
@@ -232,19 +309,38 @@ def excused_families(root: str) -> set[str]:
 
 
 def uncovered(root: str) -> tuple[list[str], list[str]]:
-    """Return (uncovered startup blueprints, uncovered non-startup blueprints), sorted."""
+    """Return (uncovered startup families, uncovered non-startup blueprints), sorted.
+
+    Startup coverage is measured at the FAMILY level: a startup family is
+    uncovered only when none of its blueprints is covered or excused. The first
+    list therefore holds startup family English names; the second holds
+    non-startup blueprint names.
+    """
     routes = load_routes(root)
     org_families = families_reading_org_data(routes)
+    route_prefixes = blueprint_route_prefixes(routes)
     tests = two_org_tests(root)
-    covered = covered_families(org_families, tests)
+    covered = covered_families(org_families, tests, route_prefixes)
     excused = excused_families(root)
 
-    missing = sorted(
-        bp for bp in org_families if bp not in covered and bp not in excused
+    def ok(blueprint: str) -> bool:
+        return blueprint in covered or blueprint in excused
+
+    startup_missing = sorted(
+        family
+        for family, blueprints in STARTUP_FAMILIES.items()
+        # a startup family is present only if at least one of its blueprints
+        # actually reads organisation data; if none do, it is not in scope
+        if (blueprints & org_families)
+        and not any(ok(bp) for bp in (blueprints & org_families))
     )
-    startup = [bp for bp in missing if bp in _BLUEPRINT_TO_STARTUP]
-    other = [bp for bp in missing if bp not in _BLUEPRINT_TO_STARTUP]
-    return startup, other
+
+    other_missing = sorted(
+        bp
+        for bp in org_families
+        if bp not in _BLUEPRINT_TO_STARTUP and not ok(bp)
+    )
+    return startup_missing, other_missing
 
 
 def load_baseline(root: str) -> int:
@@ -277,24 +373,30 @@ def main() -> int:
         reported = startup_missing + other_missing
 
     if not args.count:
-        for blueprint in reported:
-            family = _BLUEPRINT_TO_STARTUP.get(blueprint)
-            label = f" (startup family {family!r})" if family else ""
-            print(
-                f"docs/component-inventory.json: [two-org-coverage] route family "
-                f"{blueprint!r}{label} reads organisation data but has no "
-                f"two-organisation test"
-            )
+        for name in reported:
+            if name in STARTUP_FAMILIES:
+                print(
+                    f"docs/component-inventory.json: [two-org-coverage] startup "
+                    f"family {name!r} reads organisation data but has no "
+                    f"family-targeted two-organisation test"
+                )
+            else:
+                print(
+                    f"docs/component-inventory.json: [two-org-coverage] route "
+                    f"family {name!r} reads organisation data but has no "
+                    f"two-organisation test"
+                )
         if reported:
             print()
             print(
                 "A route family that reads organisation data with no "
                 "two-organisation\ntest is an untested isolation boundary. Add a "
                 "test under tests/ or\napp/modules/*/tests/ that creates two "
-                "organisations (use the two_orgs or\ntwo_organisations fixture) and "
-                "asserts one organisation cannot see the\nother's rows on that "
-                "family's routes. If the family genuinely has no\ntenant boundary, "
-                "append 'two-org-coverage-ok: <reason>' naming it."
+                "organisations (use the two_orgs or\ntwo_organisations fixture, or "
+                "an org_a/org_b pair) and drives one of that\nfamily's own routes, "
+                "asserting one organisation cannot see the other's\nrows. If the "
+                "family genuinely has no tenant boundary, append\n"
+                "'two-org-coverage-ok: <reason>' naming it."
             )
 
     baseline = load_baseline(root)

@@ -946,14 +946,20 @@ def gate_two_org_coverage() -> Result:
     isolation boundary: nothing proves one organisation cannot read another's
     rows. scripts/check_two_org_coverage.py groups the route inventory into
     families and finds the two-organisation suites by static AST search (no boot,
-    no database). The non-startup uncovered count is a ratchet read from
-    scripts/ci/two_org_baseline.json (accepted_uncovered); it can only fall. The
-    seven startup families must always resolve to zero uncovered, regardless of
-    that baseline.
+    no database). Association is family-targeted: a suite covers a family only
+    when it drives one of that family's own route rules, so a bare keyword
+    cannot stand in for a real cross-organisation test. The non-startup uncovered
+    count is a ratchet read from scripts/ci/two_org_baseline.json
+    (accepted_uncovered); it can only fall. The seven startup families must always
+    resolve to zero uncovered, regardless of that baseline.
 
-    Proven-against: a startup family's two-organisation test renamed so the family
-    goes uncovered -- red, the startup count rises above zero and the gate exits
-    non-zero; green again once the test name is restored.
+    Proven-against: on a scratch edit, remove the authorisation matrix's second
+    organisation -- in tests/smoke/test_authorisation_matrix.py rename the
+    other_org fixture and the test that uses it, so the file no longer builds a
+    second organisation. The admin billing startup family, which only that suite
+    covers through its /admin/billing rows, goes uncovered, the startup count
+    rises above zero and the gate exits non-zero. Restore the file with
+    git checkout -- and it is green at zero startup uncovered again.
     """
     script = "scripts/check_two_org_coverage.py"
     baseline_path = REPO_ROOT / "scripts" / "ci" / "two_org_baseline.json"
