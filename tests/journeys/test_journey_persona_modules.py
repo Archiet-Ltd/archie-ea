@@ -113,20 +113,75 @@ def test_detail_routes_404_cleanly_rather_than_500(app, client, path):
             cleanup(db, Organization, [org_id])
 
 
-def test_the_wrong_archetype_is_refused():
-    """Guard the guard: these modules are role-gated, and must stay that way.
+def test_the_wrong_archetype_is_refused(app, client):
+    """Guard the guard: procurement stays role-gated; My Applications is open but personal.
 
-    requires_procurement allows procurement and portfolio_manager;
-    requires_application_owner allows application_manager. Both implicitly allow
-    platform_admin. Asserted statically because the decorator wiring is what
-    matters, and a runtime check here would only re-test Flask.
+    requires_procurement allows procurement and portfolio_manager (and
+    platform_admin). The procurement routes keep that gate, asserted statically
+    for the wiring and at runtime for the refusal: an application_manager is
+    turned away from /procurement/contracts.
+
+    My Applications is no longer a persona-only section (it reads the permission
+    matrix, "read" on "application"). Every archetype opens it and sees only the
+    applications it owns: a procurement user opens it, and an application owned
+    by someone else in the same organisation is never shown.
     """
     import io
     import os
+    import uuid
+
+    from app import db
 
     root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     proc = io.open(os.path.join(root, "app/modules/procurement/routes.py"), encoding="utf-8").read()
-    myapp = io.open(os.path.join(root, "app/modules/my_applications/routes.py"), encoding="utf-8").read()
-
     assert proc.count("@requires_procurement") >= 5, "procurement routes lost their role gate"
-    assert myapp.count("@requires_application_owner") >= 4, "my_applications routes lost their role gate"
+
+    with app.app_context():
+        from app.models.application_owner import ApplicationOwner
+        from app.models.application_portfolio import ApplicationComponent
+        from app.models.organization import Organization
+        from app.models.user import User
+
+        org_id = make_org(db, "wrongarch")
+        owner_id = make_user(db, org_id, "owner", enterprise_role="application_manager")
+        proc_id = make_user(db, org_id, "proc", enterprise_role="procurement")
+        mine = ApplicationComponent(name="Mine-%s" % uuid.uuid4().hex[:8],
+                                    organization_id=org_id, lifecycle_status="active")
+        theirs = ApplicationComponent(name="Theirs-%s" % uuid.uuid4().hex[:8],
+                                      organization_id=org_id, lifecycle_status="active")
+        db.session.add_all([mine, theirs])
+        db.session.flush()
+        db.session.add(ApplicationOwner(application_id=mine.id, user_id=proc_id,
+                                        organization_id=org_id, ownership_type="primary"))
+        db.session.add(ApplicationOwner(application_id=theirs.id, user_id=owner_id,
+                                        organization_id=org_id, ownership_type="primary"))
+        db.session.commit()
+        mine_name, theirs_name = mine.name, theirs.name
+    try:
+        # Procurement opens My Applications and sees only its own application.
+        login(client, proc_id)
+        for path in ("/my-applications/", "/my-applications/list"):
+            resp = client.get(path, follow_redirects=False)
+            assert resp.status_code == 200, "%s refused procurement (%s)" % (path, resp.status_code)
+        body = client.get("/my-applications/list").get_data(as_text=True)
+        assert mine_name in body, "procurement does not see the application it owns"
+        assert theirs_name not in body, "another user's application is shown on My Applications"
+
+        # The refusal that remains: procurement contracts are not an application manager's section.
+        client.get("/account/logout")
+        login(client, owner_id)
+        resp = client.get("/procurement/contracts", follow_redirects=False)
+        assert resp.status_code in (302, 401, 403, 404), (
+            "application_manager reached procurement contracts (HTTP %s) - "
+            "requires_procurement is not holding" % resp.status_code)
+        if resp.status_code == 302:
+            assert "/procurement/contracts" not in resp.headers.get("Location", "")
+    finally:
+        with app.app_context():
+            from app.models.application_owner import ApplicationOwner
+            from app.models.application_portfolio import ApplicationComponent
+            ApplicationOwner.query.filter_by(organization_id=org_id).delete()
+            ApplicationComponent.query.filter_by(organization_id=org_id).delete()
+            db.session.commit()
+            cleanup(db, User, [owner_id, proc_id])
+            cleanup(db, Organization, [org_id])

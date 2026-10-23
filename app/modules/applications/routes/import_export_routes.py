@@ -37,7 +37,10 @@ from flask import (
 from flask_login import current_user, login_required
 from openpyxl import load_workbook
 from app import db
-from app.models.application_portfolio import ApplicationComponent
+from app.models.application_portfolio import (
+    APPLICATION_LIFECYCLE_STAGES,
+    ApplicationComponent,
+)
 from app.models.audit_log import AuditLog
 from app.services.ai_import_service import get_ai_import_service
 from app.utils.file_validation import (
@@ -997,6 +1000,113 @@ def application_import_page():
 # ---------------------------------------------------------------------------
 # 7. application_import  (POST /import)
 # ---------------------------------------------------------------------------
+_REFUSED_ROWS_SHOWN = 50
+_MAX_DATABASE_ERRORS_IN_A_ROW = 5
+
+# Labels people write in a spreadsheet that name exactly one stage. A label that could
+# mean more than one stage (end of life, retiring, retired ...) is deliberately absent:
+# the row is refused and the person chooses the stage.
+_LIFECYCLE_LABELS = {
+    "strategic": "2.1 strategic",
+    "tactical": "2.2 tactical",
+    "undetermined": "1. undetermined",
+    "sunset": "3. sunset",
+    "read-only": "4.3 read-only",
+    "read only": "4.3 read-only",
+    "stopped": "4.4 stopped",
+    "decommissioned": "5. decommissioned",
+}
+
+# What the spreadsheet column is called on the import page, for messages.
+_FIELD_LABELS = {
+    "name": "Name",
+    "component_type": "Type",
+    "application_category": "Category",
+    "technology_stack": "Technology Stack",
+    "version": "Version",
+    "deployment_status": "Status",
+    "business_domain": "Business Domain",
+    "business_owner": "Owner",
+    "development_team": "Team",
+    "business_criticality": "Criticality",
+    "description": "Description",
+    "lifecycle_status": "Lifecycle Status",
+    "vendor_name": "Vendor",
+    "cloud_provider": "Public Cloud Provider",
+    "imported_capabilities": "Capabilities",
+    "application_services": "Services",
+    "application_functions_text": "Functions",
+    "imported_apqc_codes": "APQC Codes",
+}
+
+
+class _RowRefused(ValueError):
+    """A spreadsheet row the import cannot save; the reason is shown to the person."""
+
+
+def _lifecycle_value(raw):
+    """The canonical lifecycle stage for a cell, or a refusal that lists the stages."""
+    if not isinstance(raw, str):
+        return raw
+    value = raw.strip()
+    if not value:
+        return None
+    folded = value.casefold()
+    for stage in APPLICATION_LIFECYCLE_STAGES:
+        if stage.casefold() == folded:
+            return stage
+    mapped = _LIFECYCLE_LABELS.get(folded)
+    if mapped:
+        return mapped
+    raise _RowRefused(
+        f"the lifecycle value '{value}' is not one of the allowed stages "
+        f"({'; '.join(APPLICATION_LIFECYCLE_STAGES)})"
+    )
+
+
+def _check_lengths(obj, header_by_field):
+    """Refuse a row whose text is longer than its column, naming the spreadsheet column."""
+    for column in obj.__table__.columns:
+        limit = getattr(column.type, "length", None)
+        field = column.key
+        if not limit or field not in _FIELD_LABELS:
+            continue
+        value = getattr(obj, field, None)
+        if isinstance(value, str) and len(value) > limit:
+            label = header_by_field.get(field) or _FIELD_LABELS[field]
+            raise _RowRefused(
+                f"the {label} value is {len(value)} characters; the limit is {limit}"
+            )
+
+
+def _database_reason(exc, row_number):
+    """A plain reason for a row the database refused; never the database's own text."""
+    from sqlalchemy.exc import DataError, IntegrityError
+
+    code = getattr(getattr(exc, "orig", None), "pgcode", None)
+    if isinstance(exc, IntegrityError):
+        if code == "23505":
+            return "an application with this name or identifier already exists"
+        if code == "23502":
+            return "a required value is missing"
+    if isinstance(exc, DataError):
+        return "one of the values is too long or in the wrong format"
+    return f"the row could not be saved; details are in the log for row {row_number}"
+
+
+def _refused_rows_message(refused):
+    shown = refused[:_REFUSED_ROWS_SHOWN]
+    lines = "; ".join(
+        f"Row {r['row']}" + (f" ({r['name']})" if r["name"] else "") + f": {r['reason']}"
+        for r in shown
+    )
+    head = f"{len(refused)} row{'s' if len(refused) != 1 else ''} refused"
+    if len(refused) > len(shown):
+        head += f" (showing the first {len(shown)})"
+    return f"{head}. {lines}"
+
+
+
 @unified_applications_bp.route("/import", methods=["POST"])
 @login_required
 @audit_log("application_import")
@@ -1127,6 +1237,12 @@ def application_import():
                 return value or None
             return value
 
+        def _set_if_present(record, attr, incoming):
+            """Merge rule: only a non-empty incoming value may overwrite."""
+            if incoming is None or incoming == "":
+                return
+            setattr(record, attr, incoming)
+
         def _parse_user_count(raw_value):
             if raw_value in (None, ""):
                 return None
@@ -1175,8 +1291,65 @@ def application_import():
             if not reader.fieldnames:
                 raise ValueError("CSV file is missing headers.")
 
+            # Column mapping sent by the import page: {file header: target field}.
+            mapped_header_by_target = {}
+            mappings_sent = False
+            _raw_mappings = request.form.get("field_mappings")
+            if _raw_mappings:
+                mappings_sent = True  # the page's mapping is then the complete one
+                try:
+                    _mappings = json.loads(_raw_mappings)
+                except json.JSONDecodeError:
+                    raise ValueError("The column mapping could not be read.")
+                if not isinstance(_mappings, dict):
+                    raise ValueError("The column mapping must be an object.")
+                # Only fields this import actually reads can be mapped; anything
+                # else would be accepted and silently dropped.
+                _readable_targets = {
+                    "name",
+                    "component_type",
+                    "application_category",
+                    "technology_stack",
+                    "version",
+                    "deployment_status",
+                    "business_domain",
+                    "business_owner",
+                    "development_team",
+                    "user_base_size",
+                    "business_criticality",
+                    "description",
+                    "lifecycle_status",
+                    "vendor_name",
+                    "cloud_provider",
+                    "imported_capabilities",
+                    "application_services",
+                    "application_functions_text",
+                    "imported_apqc_codes",
+                }
+                _file_headers = {h for h in reader.fieldnames if h}
+                _bad = []
+                for _header, _target in _mappings.items():
+                    if not _target:
+                        continue  # "Skip column"
+                    if _target not in _readable_targets:
+                        _bad.append(
+                            f"column '{_header}' is mapped to field '{_target}', "
+                            "which this import cannot fill"
+                        )
+                    elif _header not in _file_headers:
+                        _bad.append(f"mapped column '{_header}' is not in the file")
+                    elif _target in mapped_header_by_target:
+                        _bad.append(
+                            f"columns '{mapped_header_by_target[_target]}' and "
+                            f"'{_header}' are both mapped to '{_target}'"
+                        )
+                    else:
+                        mapped_header_by_target[_target] = _header
+                if _bad:
+                    raise ValueError("; ".join(_bad))
+
             # Find the name column (flexible matching)
-            name_column = None
+            name_column = mapped_header_by_target.get("name")
             name_variants = [
                 "name",
                 "application name",
@@ -1185,7 +1358,7 @@ def application_import():
                 "app_name",
                 "appname",
             ]
-            for field in reader.fieldnames:
+            for field in reader.fieldnames if not (name_column or mappings_sent) else ():
                 if field and field.lower().strip() in name_variants:
                     name_column = field
                     break
@@ -1199,6 +1372,12 @@ def application_import():
             def get_csv_field(row, *variants):
                 """Get field value trying multiple column name variants"""
                 for variant in variants:
+                    target = variant.lower().strip().replace(" ", "_")
+                    if target in mapped_header_by_target:
+                        return row.get(mapped_header_by_target[target])
+                for variant in variants:
+                    if mappings_sent:
+                        break  # not named in the mapping, so not imported
                     for key in row.keys():
                         if key and key.lower().strip() == variant.lower():
                             return row[key]
@@ -1216,6 +1395,9 @@ def application_import():
             skipped = 0
             updated = 0
             non_numeric_user_counts = []
+            refused = []  # {row, name, reason} for each row the import could not save
+            database_errors_in_a_row = 0
+            stopped_at_row = None
             # Track names processed in THIS import to detect duplicates within the same CSV file
             processed_names = set()
 
@@ -1237,7 +1419,10 @@ def application_import():
 
                 name = _clean(row.get(name_column))
                 if not name:
-                    raise ValueError(f"Row {index}: 'Name' is required.")
+                    refused.append(
+                        {"row": index, "name": "", "reason": "the Name cell is empty"}
+                    )
+                    continue
 
                 # Normalize name for duplicate checking (case-insensitive)
                 name_lower = name.lower()
@@ -1260,262 +1445,305 @@ def application_import():
                     skipped += 1
                     processed_names.add(name_lower)  # Track that we've seen this name
                     continue
-                elif existing_app and import_mode == "update":
-                    # Update existing record with flexible column matching
-                    existing_app.component_type = _clean(
-                        get_csv_field(
-                            row,
-                            "Type",
-                            "component_type",
-                            "Component Type",
-                            "App Type",
-                            "Application Type",
-                        )
-                    )
-                    existing_app.application_category = _clean(
-                        get_csv_field(
-                            row, "Category", "application_category", "App Category"
-                        )
-                    )
-                    existing_app.technology_stack = _clean(
-                        get_csv_field(
-                            row,
-                            "Technology Stack",
-                            "technology_stack",
-                            "Technology",
-                            "Tech Stack",
-                            "Stack",
-                        )
-                    )
-                    existing_app.version = _clean(get_csv_field(row, "Version"))
-                    existing_app.deployment_status = (
-                        _clean(
-                            get_csv_field(
-                                row,
-                                "Status",
-                                "deployment_status",
-                                "Deployment Status",
-                                "App Status",
-                                "Application Status",
-                            )
-                        )
-                        or "planned"
-                    )
-                    existing_app.business_domain = _clean(
-                        get_csv_field(
-                            row, "Business Domain", "business_domain", "Domain"
-                        )
-                    )
-                    existing_app.business_owner = _clean(
-                        get_csv_field(
-                            row,
-                            "Owner",
-                            "business_owner",
-                            "Business Owner",
-                            "App Owner",
-                        )
-                    )
-                    existing_app.development_team = _clean(
-                        get_csv_field(
-                            row,
-                            "Team",
-                            "development_team",
-                            "Development Team",
-                            "Dev Team",
-                        )
-                    )
-                    existing_app.user_base_size = _parse_user_count(
-                        get_csv_field(
-                            row, "Users", "user_count", "User Count", "Number of Users"
-                        )
-                    )
-                    existing_app.business_criticality = _clean(
-                        get_csv_field(
-                            row,
-                            "Criticality",
-                            "business_criticality",
-                            "Business Criticality",
-                        )
-                    )
-                    existing_app.description = _clean(
-                        get_csv_field(row, "Description", "App Description")
-                    )
-                    existing_app.lifecycle_status = _clean(
-                        get_csv_field(
-                            row, "Lifecycle Status", "lifecycle_status", "Lifecycle"
-                        )
-                    )
-
-                    # Add import fields for auto-mapping functionality
-                    existing_app.imported_capabilities = _clean(
-                        get_csv_field(
-                            row,
-                            "Capabilities",
-                            "imported_capabilities",
-                            "Business Capabilities",
-                            "Capability List",
-                        )
-                    )
-                    existing_app.application_services = _clean(
-                        get_csv_field(
-                            row,
-                            "Services",
-                            "application_services",
-                            "Application Services",
-                            "Service List",
-                        )
-                    )
-                    existing_app.application_functions_text = _clean(
-                        get_csv_field(
-                            row,
-                            "Functions",
-                            "application_functions_text",
-                            "Application Functions",
-                            "Function List",
-                        )
-                    )
-                    existing_app.imported_apqc_codes = _clean(
-                        get_csv_field(
-                            row,
-                            "APQC Codes",
-                            "imported_apqc_codes",
-                            "APQC",
-                            "Process Codes",
-                        )
-                    )
-
-                    updated += 1
-                    processed_names.add(name_lower)  # Track that we've seen this name
-                else:
-                    # Create new record (duplicate mode or doesn't exist) with flexible column matching
-                    app = ApplicationComponent(
-                        name=name,
-                        component_type=_clean(
-                            get_csv_field(
-                                row,
-                                "Type",
-                                "component_type",
-                                "Component Type",
-                                "App Type",
-                                "Application Type",
-                            )
-                        ),
-                        application_category=_clean(
-                            get_csv_field(
-                                row, "Category", "application_category", "App Category"
-                            )
-                        ),
-                        technology_stack=_clean(
-                            get_csv_field(
-                                row,
-                                "Technology Stack",
-                                "technology_stack",
-                                "Technology",
-                                "Tech Stack",
-                                "Stack",
-                            )
-                        ),
-                        version=_clean(get_csv_field(row, "Version")),
-                        deployment_status=_clean(
-                            get_csv_field(
-                                row,
-                                "Status",
-                                "deployment_status",
-                                "Deployment Status",
-                                "App Status",
-                                "Application Status",
-                            )
-                        )
-                        or "planned",
-                        business_domain=_clean(
-                            get_csv_field(
-                                row, "Business Domain", "business_domain", "Domain"
-                            )
-                        ),
-                        business_owner=_clean(
-                            get_csv_field(
-                                row,
-                                "Owner",
-                                "business_owner",
-                                "Business Owner",
-                                "App Owner",
-                            )
-                        ),
-                        development_team=_clean(
-                            get_csv_field(
-                                row,
-                                "Team",
-                                "development_team",
-                                "Development Team",
-                                "Dev Team",
-                            )
-                        ),
-                        user_base_size=_parse_user_count(
-                            get_csv_field(
-                                row,
-                                "Users",
-                                "user_count",
-                                "User Count",
-                                "Number of Users",
-                            )
-                        ),
-                        business_criticality=_clean(
-                            get_csv_field(
-                                row,
-                                "Criticality",
-                                "business_criticality",
-                                "Business Criticality",
-                            )
-                        ),
-                        description=_clean(
-                            get_csv_field(row, "Description", "App Description")
-                        ),
-                        lifecycle_status=_clean(
+                outcome = None
+                refusal = None
+                try:
+                    with db.session.begin_nested():
+                        row_lifecycle = _lifecycle_value(
                             get_csv_field(
                                 row, "Lifecycle Status", "lifecycle_status", "Lifecycle"
                             )
-                        ),
-                        # Add import fields for auto-mapping functionality
-                        imported_capabilities=_clean(
-                            get_csv_field(
-                                row,
-                                "Capabilities",
-                                "imported_capabilities",
-                                "Business Capabilities",
-                                "Capability List",
+                        )
+                        if existing_app and import_mode == "update":
+                            # Update existing record with flexible column matching
+                            _set_if_present(existing_app, "component_type", _clean(
+                                get_csv_field(
+                                    row,
+                                    "Type",
+                                    "component_type",
+                                    "Component Type",
+                                    "App Type",
+                                    "Application Type",
+                                )
+                            ))
+                            _set_if_present(existing_app, "application_category", _clean(
+                                get_csv_field(
+                                    row, "Category", "application_category", "App Category"
+                                )
+                            ))
+                            _set_if_present(existing_app, "technology_stack", _clean(
+                                get_csv_field(
+                                    row,
+                                    "Technology Stack",
+                                    "technology_stack",
+                                    "Technology",
+                                    "Tech Stack",
+                                    "Stack",
+                                )
+                            ))
+                            _set_if_present(existing_app, "version", _clean(get_csv_field(row, "Version")))
+                            _set_if_present(existing_app, "deployment_status", _clean(
+                                get_csv_field(
+                                    row,
+                                    "Status",
+                                    "deployment_status",
+                                    "Deployment Status",
+                                    "App Status",
+                                    "Application Status",
+                                )
+                            ))
+                            _set_if_present(existing_app, "business_domain", _clean(
+                                get_csv_field(
+                                    row, "Business Domain", "business_domain", "Domain"
+                                )
+                            ))
+                            _set_if_present(existing_app, "business_owner", _clean(
+                                get_csv_field(
+                                    row,
+                                    "Owner",
+                                    "business_owner",
+                                    "Business Owner",
+                                    "App Owner",
+                                )
+                            ))
+                            _set_if_present(existing_app, "development_team", _clean(
+                                get_csv_field(
+                                    row,
+                                    "Team",
+                                    "development_team",
+                                    "Development Team",
+                                    "Dev Team",
+                                )
+                            ))
+                            _set_if_present(existing_app, "user_base_size", _parse_user_count(
+                                get_csv_field(
+                                    row,
+                                    "Users",
+                                    "user_count",
+                                    "User Count",
+                                    "Number of Users",
+                                    "user_base_size",
+                                )
+                            ))
+                            _set_if_present(existing_app, "business_criticality", _clean(
+                                get_csv_field(
+                                    row,
+                                    "Criticality",
+                                    "business_criticality",
+                                    "Business Criticality",
+                                )
+                            ))
+                            _set_if_present(existing_app, "description", _clean(
+                                get_csv_field(row, "Description", "App Description")
+                            ))
+                            _set_if_present(existing_app, "lifecycle_status", row_lifecycle)
+                            # Vendor and hosting: a blank cell never erases what is stored.
+                            _vendor = _clean(
+                                get_csv_field(row, "Package Vendor", "Vendor", "vendor_name")
                             )
-                        ),
-                        application_services=_clean(
-                            get_csv_field(
-                                row,
-                                "Services",
-                                "application_services",
-                                "Application Services",
-                                "Service List",
+                            if _vendor is not None:
+                                existing_app.vendor_name = _vendor
+                            _hosting = _clean(
+                                get_csv_field(row, "Public Cloud Provider", "cloud_provider")
                             )
-                        ),
-                        application_functions_text=_clean(
-                            get_csv_field(
-                                row,
-                                "Functions",
-                                "application_functions_text",
-                                "Application Functions",
-                                "Function List",
+                            if _hosting is not None:
+                                existing_app.cloud_provider = _hosting
+
+                            # Add import fields for auto-mapping functionality
+                            _set_if_present(existing_app, "imported_capabilities", _clean(
+                                get_csv_field(
+                                    row,
+                                    "Capabilities",
+                                    "imported_capabilities",
+                                    "Business Capabilities",
+                                    "Capability List",
+                                )
+                            ))
+                            _set_if_present(existing_app, "application_services", _clean(
+                                get_csv_field(
+                                    row,
+                                    "Services",
+                                    "application_services",
+                                    "Application Services",
+                                    "Service List",
+                                )
+                            ))
+                            _set_if_present(existing_app, "application_functions_text", _clean(
+                                get_csv_field(
+                                    row,
+                                    "Functions",
+                                    "application_functions_text",
+                                    "Application Functions",
+                                    "Function List",
+                                )
+                            ))
+                            _set_if_present(existing_app, "imported_apqc_codes", _clean(
+                                get_csv_field(
+                                    row,
+                                    "APQC Codes",
+                                    "imported_apqc_codes",
+                                    "APQC",
+                                    "Process Codes",
+                                )
+                            ))
+
+                            _check_lengths(existing_app, mapped_header_by_target)
+                            outcome = "updated"
+                        else:
+                            # Create new record (duplicate mode or doesn't exist) with flexible column matching
+                            app = ApplicationComponent(
+                                name=name,
+                                component_type=_clean(
+                                    get_csv_field(
+                                        row,
+                                        "Type",
+                                        "component_type",
+                                        "Component Type",
+                                        "App Type",
+                                        "Application Type",
+                                    )
+                                ),
+                                application_category=_clean(
+                                    get_csv_field(
+                                        row, "Category", "application_category", "App Category"
+                                    )
+                                ),
+                                technology_stack=_clean(
+                                    get_csv_field(
+                                        row,
+                                        "Technology Stack",
+                                        "technology_stack",
+                                        "Technology",
+                                        "Tech Stack",
+                                        "Stack",
+                                    )
+                                ),
+                                version=_clean(get_csv_field(row, "Version")),
+                                deployment_status=_clean(
+                                    get_csv_field(
+                                        row,
+                                        "Status",
+                                        "deployment_status",
+                                        "Deployment Status",
+                                        "App Status",
+                                        "Application Status",
+                                    )
+                                )
+                                or "planned",
+                                business_domain=_clean(
+                                    get_csv_field(
+                                        row, "Business Domain", "business_domain", "Domain"
+                                    )
+                                ),
+                                business_owner=_clean(
+                                    get_csv_field(
+                                        row,
+                                        "Owner",
+                                        "business_owner",
+                                        "Business Owner",
+                                        "App Owner",
+                                    )
+                                ),
+                                development_team=_clean(
+                                    get_csv_field(
+                                        row,
+                                        "Team",
+                                        "development_team",
+                                        "Development Team",
+                                        "Dev Team",
+                                    )
+                                ),
+                                user_base_size=_parse_user_count(
+                                    get_csv_field(
+                                        row,
+                                        "Users",
+                                        "user_count",
+                                        "User Count",
+                                        "Number of Users",
+                                        "user_base_size",
+                                    )
+                                ),
+                                business_criticality=_clean(
+                                    get_csv_field(
+                                        row,
+                                        "Criticality",
+                                        "business_criticality",
+                                        "Business Criticality",
+                                    )
+                                ),
+                                description=_clean(
+                                    get_csv_field(row, "Description", "App Description")
+                                ),
+                                lifecycle_status=row_lifecycle,
+                                vendor_name=_clean(
+                                    get_csv_field(
+                                        row, "Package Vendor", "Vendor", "vendor_name"
+                                    )
+                                ),
+                                cloud_provider=_clean(
+                                    get_csv_field(row, "Public Cloud Provider", "cloud_provider")
+                                ),
+                                # Add import fields for auto-mapping functionality
+                                imported_capabilities=_clean(
+                                    get_csv_field(
+                                        row,
+                                        "Capabilities",
+                                        "imported_capabilities",
+                                        "Business Capabilities",
+                                        "Capability List",
+                                    )
+                                ),
+                                application_services=_clean(
+                                    get_csv_field(
+                                        row,
+                                        "Services",
+                                        "application_services",
+                                        "Application Services",
+                                        "Service List",
+                                    )
+                                ),
+                                application_functions_text=_clean(
+                                    get_csv_field(
+                                        row,
+                                        "Functions",
+                                        "application_functions_text",
+                                        "Application Functions",
+                                        "Function List",
+                                    )
+                                ),
+                                imported_apqc_codes=_clean(
+                                    get_csv_field(
+                                        row,
+                                        "APQC Codes",
+                                        "imported_apqc_codes",
+                                        "APQC",
+                                        "Process Codes",
+                                    )
+                                ),
                             )
-                        ),
-                        imported_apqc_codes=_clean(
-                            get_csv_field(
-                                row,
-                                "APQC Codes",
-                                "imported_apqc_codes",
-                                "APQC",
-                                "Process Codes",
-                            )
-                        ),
+                            _check_lengths(app, mapped_header_by_target)
+                            db.session.add(app)
+                            outcome = "created"
+                except _RowRefused as exc:
+                    refusal = str(exc)
+                except Exception as exc:
+                    current_app.logger.warning(
+                        "Application import: row %s refused: %s", index, exc
                     )
-                    db.session.add(app)
+                    refusal = _database_reason(exc, index)
+                    database_errors_in_a_row += 1
+                if refusal is not None:
+                    refused.append({"row": index, "name": name, "reason": refusal})
+                    if database_errors_in_a_row >= _MAX_DATABASE_ERRORS_IN_A_ROW:
+                        stopped_at_row = index
+                        break
+                    continue
+                database_errors_in_a_row = 0
+                if outcome == "updated":
+                    updated += 1
+                else:
                     count += 1
-                    processed_names.add(name_lower)  # Track that we've seen this name
+                processed_names.add(name_lower)  # Track that we've seen this name
 
             db.session.commit()
 
@@ -1710,8 +1938,20 @@ def application_import():
                 msg_parts.append(f"{updated} updated")
             if skipped > 0:
                 msg_parts.append(f"{skipped} skipped")
+            if refused:
+                msg_parts.append(f"{len(refused)} refused")
 
-            flash(f"Import complete: {', '.join(msg_parts)}", "success")
+            if stopped_at_row is not None:
+                flash(
+                    f"Import stopped after {_MAX_DATABASE_ERRORS_IN_A_ROW} database errors "
+                    f"in a row at row {stopped_at_row}; the rows after it were not read. "
+                    f"Saved so far: {', '.join(msg_parts)}",
+                    "error",
+                )
+            else:
+                flash(f"Import complete: {', '.join(msg_parts)}", "success")
+            if refused:
+                flash(_refused_rows_message(refused), "warning")
 
             # Add AI results to flash message if AI was enabled
             if enable_ai and (
@@ -1785,39 +2025,36 @@ def application_import():
                     continue
                 elif existing_app and import_mode == "update":
                     # Update existing record
-                    existing_app.component_type = _clean(item.get("component_type"))
-                    existing_app.application_category = _clean(
+                    _set_if_present(existing_app, "component_type", _clean(item.get("component_type")))
+                    _set_if_present(existing_app, "application_category", _clean(
                         item.get("application_category")
-                    )
-                    existing_app.technology_stack = _clean(item.get("technology_stack"))
-                    existing_app.version = _clean(item.get("version"))
-                    existing_app.deployment_status = (
-                        _clean(item.get("deployment_status")) or "planned"
-                    )
-                    existing_app.business_domain = _clean(item.get("business_domain"))
-                    existing_app.business_owner = _clean(item.get("business_owner"))
-                    existing_app.development_team = _clean(item.get("development_team"))
-                    existing_app.user_base_size = _parse_user_count(
+                    ))
+                    _set_if_present(existing_app, "technology_stack", _clean(item.get("technology_stack")))
+                    _set_if_present(existing_app, "version", _clean(item.get("version")))
+                    _set_if_present(existing_app, "deployment_status", _clean(item.get("deployment_status")))
+                    _set_if_present(existing_app, "business_domain", _clean(item.get("business_domain")))
+                    _set_if_present(existing_app, "business_owner", _clean(item.get("business_owner")))
+                    _set_if_present(existing_app, "development_team", _clean(item.get("development_team")))
+                    _set_if_present(existing_app, "user_base_size", _parse_user_count(
                         item.get("user_count")
-                    )
-                    existing_app.business_criticality = _clean(
+                    ))
+                    _set_if_present(existing_app, "business_criticality", _clean(
                         item.get("business_criticality")
-                    )
+                    ))
 
                     # Add import fields for auto-mapping functionality
-                    existing_app.imported_capabilities = _clean(
+                    _set_if_present(existing_app, "imported_capabilities", _clean(
                         item.get("imported_capabilities")
-                    )
-                    existing_app.application_services = _clean(
+                    ))
+                    _set_if_present(existing_app, "application_services", _clean(
                         item.get("application_services")
-                    )
-                    existing_app.application_functions_text = _clean(
+                    ))
+                    _set_if_present(existing_app, "application_functions_text", _clean(
                         item.get("application_functions_text")
-                    )
-                    existing_app.imported_apqc_codes = _clean(
+                    ))
+                    _set_if_present(existing_app, "imported_apqc_codes", _clean(
                         item.get("imported_apqc_codes")
-                    )
-
+                    ))
                     updated += 1
                     processed_names.add(name_lower)  # Track that we've seen this name
                 else:
@@ -2188,59 +2425,56 @@ def application_import():
                     continue
                 elif existing_app and import_mode == "update":
                     # Update existing record with your template column names
-                    existing_app.description = _clean(get_field("Description"))
-                    existing_app.application_category = _clean(
+                    _set_if_present(existing_app, "description", _clean(get_field("Description")))
+                    _set_if_present(existing_app, "application_category", _clean(
                         get_field("Category", "application_category")
-                    )
-                    existing_app.business_criticality = _clean(
+                    ))
+                    _set_if_present(existing_app, "business_criticality", _clean(
                         get_field("Business Criticality", "business_criticality")
-                    )
-                    existing_app.deployment_status = (
-                        _clean(
+                    ))
+                    _set_if_present(existing_app, "deployment_status", _clean(
                             get_field(
                                 "Application Status", "Status", "deployment_status"
                             )
-                        )
-                        or "planned"
-                    )
-                    existing_app.lifecycle_status = _clean(
+                        ))
+                    _set_if_present(existing_app, "lifecycle_status", _clean(
                         get_field("Lifecycle Status", "lifecycle_status")
-                    )
-                    existing_app.business_owner = _clean(
+                    ))
+                    _set_if_present(existing_app, "business_owner", _clean(
                         get_field(
                             "App Business Owner", "Business Owner", "business_owner"
                         )
-                    )
-                    existing_app.application_owner = _clean(
+                    ))
+                    _set_if_present(existing_app, "application_owner", _clean(
                         get_field("Application Manager", "application_owner")
-                    )
-                    existing_app.user_types = _clean(
+                    ))
+                    _set_if_present(existing_app, "user_types", _clean(
                         get_field("Target Users", "user_types")
-                    )
-                    existing_app.programming_languages = _clean(
+                    ))
+                    _set_if_present(existing_app, "programming_languages", _clean(
                         get_field("Programming Languages", "programming_languages")
-                    )
-                    existing_app.support_level = _clean(
+                    ))
+                    _set_if_present(existing_app, "support_level", _clean(
                         get_field("Support Level", "support_level")
-                    )
-                    existing_app.vendor_name = _clean(
+                    ))
+                    _set_if_present(existing_app, "vendor_name", _clean(
                         get_field("Package Vendor", "Vendor", "vendor_name")
-                    )
-                    existing_app.technical_risk = _clean(
+                    ))
+                    _set_if_present(existing_app, "technical_risk", _clean(
                         get_field("Risk Level", "technical_risk")
-                    )
-                    existing_app.number_of_integrations = _parse_user_count(
+                    ))
+                    _set_if_present(existing_app, "number_of_integrations", _parse_user_count(
                         get_field("Interfaces - Number", "number_of_integrations")
-                    )
-                    existing_app.cloud_provider = _clean(
+                    ))
+                    _set_if_present(existing_app, "cloud_provider", _clean(
                         get_field("Public Cloud Provider", "cloud_provider")
-                    )
-                    existing_app.rpo_hours = _parse_user_count(
+                    ))
+                    _set_if_present(existing_app, "rpo_hours", _parse_user_count(
                         get_field("RPO", "rpo_hours")
-                    )
-                    existing_app.rto_hours = _parse_user_count(
+                    ))
+                    _set_if_present(existing_app, "rto_hours", _parse_user_count(
                         get_field("RTO", "rto_hours")
-                    )
+                    ))
                     updated += 1
                     processed_names.add(name_lower)
                 else:

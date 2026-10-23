@@ -1,0 +1,26 @@
+{# The chat's starters: Ask's question chips and its element picker, in one place.
+
+   A chip names the question, the picker names the thing; choosing a match runs
+   the question straight from the stored answer (no model is asked). The chips
+   are the Ask page's own wording for the questions the chat can answer; the
+   picker is the one macro Ask and Twin map use. `prefix` keeps the picker's ids
+   unique when the starters appear in two places on the page. #}
+{% from 'intelligence/_entity_picker.html' import entity_picker with context %}
+
+{% macro chat_starters(prefix) %}
+<div x-data="chatStarters('{{ prefix }}')" class="space-y-2" data-chat-starters>
+    <div class="flex flex-wrap items-center gap-2" role="group" aria-label="Question">
+        {% for starter in starter_questions %}
+        <button type="button" data-starter="{{ starter.key }}"
+                class="inline-flex h-8 items-center rounded-md border px-3 text-13 font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                :class="question === '{{ starter.key }}' ? 'border-ring bg-muted text-info dark:bg-card' : 'border-input bg-background text-muted-foreground hover:bg-muted/50 hover:text-foreground'"
+                :aria-pressed="question === '{{ starter.key }}' ? 'true' : 'false'"
+                @click="choose_question('{{ starter.key }}')">
+            {{ starter.label }}
+        </button>
+        {% endfor %}
+    </div>
+    {{ entity_picker(prefix, prompt='Type a team, service or system name', input_class='h-9 w-full rounded-md border border-input bg-background px-3 text-sm') }}
+    <p class="text-xs text-muted-foreground" x-show="hint" x-cloak x-text="hint"></p>
+</div>
+{% endmacro %}

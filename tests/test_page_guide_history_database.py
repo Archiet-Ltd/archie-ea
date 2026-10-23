@@ -39,9 +39,11 @@ def test_saved_history_read_clear_remain_user_and_scope_isolated(
     user_ids = [user.id for user in users]
     rows = []
 
+    org_of = {user.id: user.organization_id for user in users}
+
     def add(user_id, page, scope, content, role='assistant'):
         row = ChatMessageEmbedding(
-            user_id=user_id, chat_session_id=f'guide_user_{user_id}_{page}_{scope}',
+            user_id=user_id, organization_id=org_of[user_id], chat_session_id=f'guide_user_{user_id}_{page}_{scope}',
             message_role=role, message_text=content, domain='guide',
             created_at=datetime(2026, 1, 1) + timedelta(seconds=len(rows)),
             metadata_json={'page_key': page, 'scope_key': scope, 'guide_mode': True})

@@ -739,7 +739,7 @@
         // AI
         { label: 'AI Assistant',                 href: '/ai-chat',                                               icon: 'bot',               section: 'AI & Analysis' },
         { label: 'Architecture Assistant',       href: '/architecture-assistant',                                icon: 'sparkles',          section: 'AI & Analysis' },
-        { label: 'Gap Discovery',                href: '/gap-analysis',                                          icon: 'search',            section: 'AI & Analysis' },
+        { label: 'Gap Discovery',                href: '{{ url_for("enterprise.gap_analysis") }}',                icon: 'search',            section: 'AI & Analysis' },
         { label: 'Market Intelligence',          href: '/market-intelligence',                                   icon: 'trending-up',       section: 'AI & Analysis' },
         // Governance
         { label: 'Governance',                   href: '/governance',                                            icon: 'shield',            section: 'Governance' },

@@ -51,6 +51,11 @@ logger = logging.getLogger("archie.intelligence.connector_allowlist")
 #   - servicenow, jira, m365, devops, lucidchart: architecture/ITSM tooling
 #     already in use, none of it carrying HR or security-sensitive payloads
 #     by itself.
+#   - github: the connector reads repository metadata only (names, languages,
+#     last push, archived flag, teams, code-owner files) with a read-only token.
+#     Code owner files name people by handle or work e-mail; a person is only
+#     recorded as an owner when that e-mail belongs to a user of the same
+#     organisation, and the connector never reads source code or commits.
 #   - ea_tool: architecture-tool exports (models, viewpoints, capability
 #     maps). It is already configurable today with no gate in front of it at
 #     all, and it carries architecture metadata, not personal, HR or
@@ -58,7 +63,7 @@ logger = logging.getLogger("archie.intelligence.connector_allowlist")
 #     was never restricted, for data that isn't the concern this gate exists
 #     to address.
 PERMITTED_CONNECTOR_TYPES = frozenset(
-    {"servicenow", "jira", "m365", "devops", "lucidchart", "ea_tool"}
+    {"servicenow", "jira", "m365", "devops", "lucidchart", "ea_tool", "github"}
 )
 
 # Sources known to require a compliance review before they can be connected

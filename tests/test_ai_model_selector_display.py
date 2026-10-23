@@ -36,7 +36,9 @@ def html():
              '{% block scripts %}{% endblock %}</body></html>')
     env = Environment(loader=ChoiceLoader([
         DictLoader({'layouts/admin_base.html': base}),
-        FileSystemLoader(ROOT / 'app/templates')]), autoescape=True)
+        FileSystemLoader(ROOT / "app/templates"),
+        FileSystemLoader(ROOT / "app/modules/intelligence/templates")]), autoescape=True)
+    env.filters["dash"] = lambda value, suffix="": "—" if value is None else f"{value}{suffix}"
     return env.get_template('ai_chat/index.html').render(
         llm_configured=True, domain_config={},
         persona_config={'categories': {}, 'personas': {}}, default_chat_persona='',
@@ -245,5 +247,5 @@ def test_ordinary_send_click_uses_same_stream_without_navigation(launch):
     expect(page.locator('#messages-container .message-content').last).to_contain_text('Fixture response.')
     assert payloads == [{'message': 'Send click fixture.', 'domain': 'general',
                          'element_id': None, 'context_type': None, 'persona': None,
-                         'model': None, 'thread_id': None}]
+                         'model': None, 'thread_id': None, 'starter': None}]
     assert page.url == initial_url

@@ -2,6 +2,7 @@
 {% from 'components/form_field.html' import form_group, form_footer %}
 {% block title %}AI Assistant{% endblock %}
 
+{% from 'ai_chat/_starters.html' import chat_starters with context %}
 {% block extra_css %}
 <!-- Marked.js for Markdown rendering in AI Chat. Integrity-gated like every
      other vendored asset: marked parses model output into HTML, so it is a
@@ -151,6 +152,7 @@
            shrink and wrap like normal text; `flex-wrap` on the parent lets
            the row itself grow to a second line instead of clipping. #}
         <span class="min-w-0 flex-1 basis-full sm:basis-auto">AI provider unavailable — no LLM provider is configured, so the assistant cannot answer.</span>
+        {% if without_model_line %}<span class="min-w-0 basis-full text-xs" data-without-model>{{ without_model_line }}</span>{% endif %}
         {% if current_user.is_admin() %}
         {# Literal path, not url_for: `admin` exists in BOTH the legacy and the
            app/modules layout and is selected at boot by USE_ADMIN_GUARDRAILS,
@@ -571,6 +573,9 @@
                         <p class="text-sm text-muted-foreground max-w-md mx-auto">Just type your question below — or pick a specialist for a role-tuned partner.</p>
                     </div>
 
+                    {# Starters: Ask's question chips and element picker, answered without a model. #}
+                    <div class="mx-auto max-w-[640px]" data-starters="empty-state">{{ chat_starters('chat-start') }}</div>
+
                     {# Everything below the heading/subtitle is browse-and-pick content:
                        the portfolio briefing box, the persona/domain suggestion cards, and
                        "More suggestions" — wrapped so a deep-link arrival (already headed
@@ -794,6 +799,7 @@
 
             <!-- Input Area - Always Visible -->
             <div class="border-t bg-muted/30 px-4 pt-3 pb-4">
+                <div class="mb-3" data-starters="above-input">{{ chat_starters('chat-ask') }}</div>
                 <form id="chat-form" class="space-y-4">
                     <div class="flex gap-3 items-end">
                         <label for="selected-element-id" class="sr-only">Selected element</label>
@@ -1117,6 +1123,9 @@
    Alpine, which is deferred — that is what lets x-data="genomePanel()" and the
    @click handlers resolve off window. Order matters: each module reads the
    namespace the ones above it built (render.js owns ArchieChat.state). #}
+<script src="{{ url_for('static', filename='js/intelligence/core.js') }}"></script>
+<script src="{{ url_for('static', filename='js/intelligence/picker.js') }}"></script>
+<script src="{{ url_for('static', filename='js/ai_chat/starters.js') }}"></script>
 <script src="{{ url_for('static', filename='js/ai_chat/transport.js') }}"></script>
 <script src="{{ url_for('static', filename='js/ai_chat/render.js') }}"></script>
 <script src="{{ url_for('static', filename='js/ai_chat/commands.js') }}"></script>

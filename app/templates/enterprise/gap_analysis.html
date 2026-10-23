@@ -3,6 +3,7 @@
 {% from 'components/page_header.html' import page_header %}
 {% from 'components/metrics_card.html' import metrics_card %}
 {% from 'components/status_badge.html' import status_badge %}
+{% from 'components/provenance.html' import answer_envelope %}
 
 {% block title %}Gap Analysis{% endblock %}
 
@@ -16,6 +17,25 @@
 {% endblock %}
 
 {% block content %}
+{# The one stored severity of a gap: the same field the prioritised action list ranks by. #}
+{% macro severity_badge(gap) %}
+    {% set sev = (gap.severity or '')|lower %}
+    {% if sev == 'critical' %}
+        {{ status_badge('Critical', 'error', class='!text-destructive-emphasis') }}
+    {% elif sev == 'high' %}
+        {{ status_badge('High', 'warning') }}
+    {% elif sev %}
+        {{ status_badge(sev|capitalize, 'neutral') }}
+    {% else %}
+        <span class="text-sm text-muted-foreground">Not recorded</span>
+    {% endif %}
+{% endmacro %}
+{% macro gap_type_cell(gap) %}
+    {% if gap.gap_type %}{{ gap.gap_type }}{% else %}
+    <a href="{{ url_for('archimate_crud.detail_element', layer='implementation', element_type='Gap', element_id=gap.id) }}"
+       class="text-sm text-muted-foreground hover:underline" data-testid="gap-type-unset">Not set: open the gap to classify it</a>
+    {% endif %}
+{% endmacro %}
 <div class="flex flex-col space-y-8 animate-in fade-in duration-500">
     <!-- Header -->
     {{ page_header(
@@ -29,10 +49,12 @@
     <!-- Gap Summary -->
     <div class="grid gap-4 md:grid-cols-4">
         {{ metrics_card(title='Recorded Gaps', value=total_gap_count|default(0), icon='target', description='ArchiMate Gap elements in the register') }}
-        {{ metrics_card(title='Critical', value=gaps|selectattr('priority', 'equalto', 'Critical')|list|length|default(0), icon='alert-triangle', icon_class='!text-destructive', value_class='text-destructive') }}
+        {{ metrics_card(title='Critical', value=gaps|selectattr('severity', 'equalto', 'critical')|list|length|default(0), icon='alert-triangle', description='By the severity recorded on each gap', icon_class='!text-destructive', value_class='text-destructive') }}
         {{ metrics_card(title='In Progress', value=gaps|selectattr('status', 'equalto', 'In Progress')|list|length|default(0), icon='loader', icon_class='!text-primary', value_class='text-primary') }}
         {{ metrics_card(title='Resolved', value=gaps|selectattr('status', 'equalto', 'Resolved')|list|length|default(0), icon='check-circle', icon_class='!text-success', value_class='text-success') }}
     </div>
+
+    <div class="mt-1">{{ answer_envelope(source='count of gaps in the gap register of this organisation') }}</div>
 
     <!-- Gaps Table -->
     <div data-slot="card" class="rounded-lg border border-border bg-card" x-data="gapAnalysisTable()">
@@ -58,7 +80,7 @@
                             {% endmacro %}
                             {{ sort_th('name', 'Gap') }}
                             {{ sort_th('gap_type', 'Type') }}
-                            {{ sort_th('priority', 'Priority') }}
+                            {{ sort_th('severity', 'Severity') }}
                             {{ sort_th('resolution_status', 'Status') }}
                             {{ sort_th('impact', 'Impact') }}
                             <th scope="col" class="h-10 px-2 align-middle text-left">Work packages</th>
@@ -66,24 +88,18 @@
                         
 {% endset %}
 {% call dense_table(header=_dt_header_2091, rows=(gaps|default([]))|length, empty_text='No gaps identified') %}{% for gap in gaps|default([]) %}
-                        <tr class="hover:bg-muted/50">
+                        <tr id="gap-{{ gap.id }}" class="hover:bg-muted/50 scroll-mt-24 target:bg-primary/10 target:outline target:outline-2 target:outline-primary" data-testid="gap-row" data-severity="{{ gap.severity|default('', true) }}">
                             <td class="px-2">
                                 <div class="font-medium">
                                     <a href="{{ url_for('archimate_crud.detail_element', layer='implementation', element_type='Gap', element_id=gap.id) }}"
                                        class="hover:underline" data-testid="gap-link-{{ gap.id }}">{{ gap.name|default('—', true) }}</a>
                                 </div>
                                 <div class="text-sm text-muted-foreground">{{ gap.description|default('', true)|truncate(50) }}</div>
+                                {# The Severity column scrolls out of sight behind the pinned Convert button on a phone, so the pinned first cell repeats it. #}
+                                <div class="mt-1 md:hidden" data-testid="gap-severity-narrow">{{ severity_badge(gap) }}</div>
                             </td>
-                            <td class="px-2">{{ gap.gap_type|default('—', true) }}</td>
-                            <td class="px-2">
-                                {% if gap.priority == 'Critical' %}
-                                    {{ status_badge(gap.priority|default('Normal'), 'error') }}
-                                {% elif gap.priority == 'High' %}
-                                    {{ status_badge(gap.priority|default('Normal'), 'warning') }}
-                                {% else %}
-                                    {{ status_badge(gap.priority|default('Normal'), 'neutral') }}
-                                {% endif %}
-                            </td>
+                            <td class="px-2">{{ gap_type_cell(gap) }}</td>
+                            <td class="px-2">{{ severity_badge(gap) }}</td>
                             <td class="px-2">
                                 {% if gap.resolution_status == 'resolved' %}
                                     {{ status_badge(gap.resolution_status|default('identified'), 'success') }}
@@ -99,7 +115,7 @@
                                 <div><a href="{{ url_for('implementation_planning.work_package_detail', work_package_id=wp.id) if 'implementation_planning.work_package_detail' in flask.current_app.view_functions else '#' }}"
                                         class="text-primary hover:underline" data-testid="gap-work-package-link">{{ wp.name|default('—', true) }}</a></div>
                                 {% else %}
-                                <span class="text-muted-foreground">—</span>
+                                <span class="text-muted-foreground" data-testid="gap-no-work-package">None yet: use Convert to Work Package</span>
                                 {% endfor %}
                             </td>
                             <td class="px-2">
@@ -125,8 +141,8 @@
                 These gaps have no work package linked to them. They remain open risks
                 in the transition from baseline to target architecture.
             </p>
-{% call dense_table(columns=[('Gap', ''), ('Type', ''), ('Priority', ''), ('Status', ''), ('Actions', '')], rows=(not_addressed_gaps|default([]))|length, empty_text='All gaps are addressed by work packages.') %}{% for gap in not_addressed_gaps|default([]) %}
-                        <tr class="hover:bg-muted/50">
+{% call dense_table(columns=[('Gap', ''), ('Type', ''), ('Severity', ''), ('Status', ''), ('Actions', '')], rows=(not_addressed_gaps|default([]))|length, empty_text='All gaps are addressed by work packages.') %}{% for gap in not_addressed_gaps|default([]) %}
+                        <tr class="hover:bg-muted/50" data-severity="{{ gap.severity|default('', true) }}">
                             <td class="px-2">
                                 <div class="font-medium">
                                     <a href="{{ url_for('archimate_crud.detail_element', layer='implementation', element_type='Gap', element_id=gap.id) }}"
@@ -134,16 +150,8 @@
                                 </div>
                                 <div class="text-sm text-muted-foreground">{{ gap.description|default('', true)|truncate(50) }}</div>
                             </td>
-                            <td class="px-2">{{ gap.gap_type|default('—', true) }}</td>
-                            <td class="px-2">
-                                {% if gap.priority == 'Critical' %}
-                                    {{ status_badge(gap.priority|default('Normal'), 'error') }}
-                                {% elif gap.priority == 'High' %}
-                                    {{ status_badge(gap.priority|default('Normal'), 'warning') }}
-                                {% else %}
-                                    {{ status_badge(gap.priority|default('Normal'), 'neutral') }}
-                                {% endif %}
-                            </td>
+                            <td class="px-2">{{ gap_type_cell(gap) }}</td>
+                            <td class="px-2">{{ severity_badge(gap) }}</td>
                             <td class="px-2">
                                 {% if gap.resolution_status == 'resolved' %}
                                     {{ status_badge(gap.resolution_status|default('identified'), 'success') }}

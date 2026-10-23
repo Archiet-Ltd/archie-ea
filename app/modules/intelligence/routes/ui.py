@@ -14,7 +14,7 @@ The provenance drawer is not a route. It opens over either page.
 
 from __future__ import annotations
 
-from flask import Blueprint, current_app, g, render_template, request
+from flask import Blueprint, current_app, g, redirect, render_template, request, url_for
 from flask_login import login_required
 
 intelligence_ui = Blueprint(
@@ -87,10 +87,43 @@ def _derivation_status():
         return None
 
 
+# The questions the chat carries as starters, keyed by the name the Ask address
+# uses for them. Every other lens is answered on the Ask page itself.
+CHAT_STARTERS = ("impact", "risk")
+
+
+def _chat_starter_redirect():
+    """The chat page's address for an Ask address the chat can answer, or None.
+
+    The chat answers two questions, impact and risk, about a picked element. An
+    address that carries one of them with an element, or an element alone (which
+    asks what breaks, as the Ask page does), becomes a starter that runs on
+    arrival. Everything else (a bare address, a question with no usable element,
+    any other lens) is None, and the Ask page answers it. An element that is not a
+    whole number counts as no element.
+    """
+    element_id = request.args.get("element", type=int)
+    if element_id is None or element_id <= 0:
+        return None
+    asked = request.args.get("question")
+    starter = asked if asked is not None else "impact"
+    if starter not in CHAT_STARTERS:
+        return None
+    return url_for("unified_ai_chat.index", starter=starter, element=element_id)
+
+
 @intelligence_ui.route("/ask", methods=["GET"])
 @login_required
 def ask():
-    """Ask a plain business question about what depends on a chosen element."""
+    """Ask a plain business question about what depends on a chosen element.
+
+    The impact and risk questions on a chosen element open in the chat, the one
+    place to ask them; every other request, and every other lens, is answered
+    here.
+    """
+    chat_address = _chat_starter_redirect()
+    if chat_address is not None:
+        return redirect(chat_address)
     workspace_is_empty = _workspace_is_empty()
     return render_template(
         "intelligence/ask.html",

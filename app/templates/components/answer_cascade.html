@@ -24,6 +24,7 @@
    a vertical hairline for siblings, an SVG elbow from the parent column for
    children. The 6px source pin sits right of the name; its tooltip is an
    Alpine x-show. No shadows anywhere. #}
+{% from 'components/provenance.html' import answer_envelope %}
 {% from 'intelligence/_parts.html' import element_name, owner_field, health_field %}
 {# rich    when true each node is a row of the Intelligence row model: the name
            is a heading (or the absence treatment), health and owner come from
@@ -32,7 +33,7 @@
 <section id="{{ id }}" class="cascade" data-cascade
          x-data="{ tip: null, selected: null, shared: false, saved: false,
                    continues(i, list) { var d = list[i].depth || 0; for (var j = i + 1; j < list.length; j++) { var dj = list[j].depth || 0; if (dj < d) { return false; } if (dj === d) { return true; } } return false; } }">
-    <p class="question-line mb-6 max-w-[640px]" x-text="{{ question }}"></p>
+    <p class="question-line mb-6 max-w-[640px] px-4" x-text="{{ question }}"></p>
     <ol class="relative space-y-2 py-6" role="list">
         {% if root %}
         {# Root node: the element the question was asked about. #}
@@ -42,6 +43,8 @@
                 <span class="truncate text-sm font-semibold text-foreground" x-text="{{ root }}"></span>
                 <span class="ml-auto shrink-0 text-2xs font-semibold uppercase tracking-[0.06em] text-muted-foreground">Asked about</span>
             </div>
+            {# The cascade is worked out from the relationships the model records. #}
+            <div class="mt-1">{{ answer_envelope(source='the relationships recorded in the model', kind='derived') }}</div>
         </li>
         {% endif %}
         <template x-for="(node, i) in ({{ rows }})" :key="node.key || i">
@@ -82,9 +85,14 @@
                             aria-label="Source of this connection"></button>
                     <div x-show="tip === node.key" x-cloak role="tooltip"
                          class="absolute left-0 top-full z-20 mt-1 w-72 rounded-md border border-border bg-popover p-2 text-xs leading-5 text-popover-foreground">
-                        <p class="font-medium" x-text="node.source_name || node.sourceName || (node.derived ? (node.kindLabel || 'Worked out from the model') : 'Recorded in the model')"></p>
-                        <p class="text-muted-foreground" x-show="node.source_timestamp || node.sourceTimestamp || node.staleLine" x-text="node.source_timestamp || node.sourceTimestamp || node.staleLine"></p>
-                        <p class="text-muted-foreground" x-show="node.source_confidence != null || node.sourceConfidence != null" x-text="node.source_confidence != null ? 'Confidence ' + node.source_confidence : (node.sourceConfidence != null ? 'Confidence ' + node.sourceConfidence : '')"></p>
+                        {# A derived row names what it was worked out from; a recorded row
+                           names its source only when the model recorded one. #}
+                        {{ answer_envelope(
+                            x_source="node.derived ? (node.kindLabel || 'the recorded relationships') : (node.source_name || node.sourceName || '')",
+                            x_as_of="node.source_timestamp || node.sourceTimestamp || node.staleLine || ''",
+                            x_confidence="(node.source_confidence != null ? node.source_confidence : (node.sourceConfidence != null ? node.sourceConfidence : null))",
+                            x_kind="node.derived ? 'derived' : 'measured'"
+                        ) }}
                     </div>
                     {% if rich %}
                     <div class="ml-auto flex flex-wrap items-center gap-x-6 gap-y-1">

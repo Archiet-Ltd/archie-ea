@@ -208,12 +208,17 @@
         var o = opts || {};
         var ran = Array.isArray(trail) && trail.length > 0;
         var cited = Array.isArray(sources) && sources.length > 0;
+        var carded = (o.cardCount || 0) > 0;
 
         var state, summary;
         if (ran) {
             state = 'retrieved';
             summary = trail.length + (trail.length === 1 ? ' lookup' : ' lookups')
                     + (cited ? ', ' + sources.length + ' record' + (sources.length === 1 ? '' : 's') + ' cited' : '');
+        } else if (carded) {
+            // The answer card under the reply carries its own sources.
+            state = 'retrieved';
+            summary = 'Answered from the recorded model; the sources are shown on the card.';
         } else if (o.contextUsed) {
             state = 'context';
             summary = 'No lookup ran. Answered from the ' +
@@ -421,11 +426,20 @@
 
     /* One call site for everything that hangs below an answer, so the completed
        and streamed paths cannot render different things. */
+    /* Ask's answer cards for the estate answers a turn's tools returned. The
+       markup is rendered on the server from the stored answer (never from the
+       model's text), so it is inserted as it arrived. */
+    function renderAnswerCards(cards) {
+        return Array.isArray(cards) ? cards.filter(function (c) { return typeof c === 'string'; }).join('') : '';
+    }
+
     function renderAnswerFooter(meta) {
         var m = meta || {};
-        return renderApiSettingsNotice(m.error) +
+        return renderAnswerCards(m.answerCards) +
+               renderApiSettingsNotice(m.error) +
                renderEvidence(m.trail, m.sources, {
                    contextUsed: m.contextUsed,
+                   cardCount: Array.isArray(m.answerCards) ? m.answerCards.length : 0,
                    domainLabel: m.domain
                }) +
                renderReceipts(m.actions) +

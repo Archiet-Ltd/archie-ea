@@ -252,6 +252,8 @@ class ChatMessageSchema(Schema):
     # Allow other optional fields (instance_id, document_context) to pass through
     instance_id = fields.Int(load_default=None, allow_none=True)
     document_context = fields.Dict(load_default=None, allow_none=True)
+    # A starter: a question chip with a picked element, answered without a model.
+    starter = fields.Dict(load_default=None, allow_none=True)
     # AIC-312: Workbench workspace ID — grounds chat in a workbench session
     workspace_id = fields.Int(
         load_default=None,

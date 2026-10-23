@@ -204,17 +204,18 @@ def test_config_fault_shows_at_most_one_toast_and_prefers_inline():
     """
     js = (ROOT / "app/static/js/ai_chat/app.js").read_text(encoding="utf-8")
 
-    # Streaming path: the isConfigFault branch renders appendError only.
+    # Streaming path: the isConfigFault branch adds nothing (the banner says it).
     streaming_branch = js.split("if (_streamErr && _streamErr.isConfigFault) {")[1].split(
         "return;"
     )[0]
     assert "Platform.toast.error" not in streaming_branch
-    assert "appendError(_streamErr.message, null, { adminLink: true })" in streaming_branch
+    # The banner is the one message; no inline card repeats it.
+    assert "appendError" not in streaming_branch
 
     # Non-streaming fallback path: same rule inside the `if (_isConfigFault)` branch.
     fallback_branch = js.split("if (_isConfigFault) {")[1].split("} else {")[0]
     assert "Platform.toast.error" not in fallback_branch
-    assert "appendError(errorMessage || fullError, null, { adminLink: true })" in fallback_branch
+    assert "appendError" not in fallback_branch
 
     # The non-config (transient/retryable) branch is unaffected -- it still
     # gets a toast, since no persistent banner covers a one-off failure.

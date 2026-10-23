@@ -37,6 +37,12 @@
 <span class="inline-flex items-center gap-1 rounded-md border border-destructive/30 bg-destructive/10 px-2 py-0.5 text-xs font-medium text-destructive-emphasis">
     <i data-lucide="unplug" class="h-3 w-3" aria-hidden="true"></i>Could not measure
 </span>
+{% elif kind == 'derived' %}
+{# Worked out from relationships the model records: a measured fact's consequence,
+   not a measurement itself and not a model's prose. #}
+<span class="inline-flex items-center gap-1 rounded-md border border-border bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
+    <i data-lucide="git-branch" class="h-3 w-3" aria-hidden="true"></i>Worked out
+</span>
 {% else %}
 <span class="inline-flex items-center gap-1 rounded-md border border-border bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
     <i data-lucide="ruler" class="h-3 w-3" aria-hidden="true"></i>Measured
@@ -62,6 +68,67 @@
     <span class="flex items-center gap-2 text-xs text-muted-foreground">
         {{ provenance_badge('ai') }} written by a model, advisory only
     </span>
+</div>
+{% endmacro %}
+
+
+{% macro answer_envelope(source=None, kind='measured', confidence=None, as_of=None, href=None, label=None, class='', x_source=None, x_as_of=None, x_confidence=None, x_kind=None) %}
+{# One line of provenance under a Tier 1 result: badge, source, as-of, confidence.
+
+   States (the badge vocabulary above, plus the one this macro adds):
+     measured    neutral      a count or figure over the named column. `source` names it.
+     derived     neutral      worked out from relationships the model records (the cascade,
+                              the Why dialog's derived rows). `source` says from what.
+     missing     warning      no source recorded — badge('missing') + "Source not recorded".
+     ai          primary      generated text. Always advisory, never a fact.
+     unavailable destructive  the query failed — no number is shown.
+
+   Field names (the cascade's and the Why dialog's): source_name -> source,
+   source_timestamp -> as_of, source_confidence -> confidence, derived -> kind
+   'derived', record_url -> href. The x_* parameters carry Alpine expressions for
+   client-rendered results: x_source is the source name (empty when none), x_kind
+   either 'derived' or 'measured', x_as_of and x_confidence the raw values. When
+   x_source is given the line is bound: it shows the source when the expression
+   has a value and "Source not recorded" when it has none, so a bound envelope
+   never invents a source. Otherwise it renders server-side.
+
+   Confidence formatting (server-side): a number <= 1 renders as a percentage
+   with no decimals (0.85 -> "85%"), a number > 1 as itself, a word as itself.
+   A bound confidence renders the value the expression gives.
+#}
+{% set _has_source = source is not none and source != '' %}
+{% set _display = label if label is not none else source %}
+<div class="text-xs text-muted-foreground mt-1 flex flex-wrap items-center gap-x-2 {{ class }}">
+    {% if x_source %}
+        {# Client-rendered: both outcomes are in the markup, Alpine shows one. #}
+        <span class="contents" x-show="({{ x_source }})">
+            {% if x_kind %}
+            <span class="contents" x-show="({{ x_kind }}) === 'derived'">{{ provenance_badge('derived') }}</span>
+            <span class="contents" x-show="({{ x_kind }}) !== 'derived'">{{ provenance_badge(kind) }}</span>
+            {% else %}
+            {{ provenance_badge(kind) }}
+            {% endif %}
+            {% if href %}<a href="{{ href }}" class="hover:underline" x-text="{{ x_source }}"></a>{% else %}<span x-text="{{ x_source }}"></span>{% endif %}
+            {% if x_as_of %}<span x-show="({{ x_as_of }})">as of <span x-text="{{ x_as_of }}"></span></span>{% endif %}
+            {% if x_confidence %}<span x-show="({{ x_confidence }}) != null">confidence <span x-text="{{ x_confidence }}"></span></span>{% endif %}
+        </span>
+        <span class="contents" x-show="!({{ x_source }})">{{ provenance_badge('missing') }}Source not recorded</span>
+    {% elif _has_source %}
+        {{ provenance_badge(kind) }}
+        {% if href %}
+        <a href="{{ href }}" class="hover:underline">{{ _display }}</a>
+        {% else %}
+        <span>{{ _display }}</span>
+        {% endif %}
+        {% if as_of %}
+        <span>as of {{ as_of }}</span>
+        {% endif %}
+        {% if confidence is not none %}
+        <span>confidence {% if confidence is string %}{{ confidence }}{% elif confidence <= 1 %}{{ (confidence * 100)|int }}%{% else %}{{ confidence }}{% endif %}</span>
+        {% endif %}
+    {% else %}
+        {{ provenance_badge('missing') }}Source not recorded
+    {% endif %}
 </div>
 {% endmacro %}
 

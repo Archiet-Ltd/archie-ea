@@ -151,6 +151,7 @@ def index():
     default_chat_persona = get_default_chat_persona(
         getattr(current_user, "enterprise_role", None)
     )
+    from app.modules.ai_chat.services.answer_card import STARTER_QUESTIONS, without_model_sentence
     from app.services.feature_flag_service import FeatureFlagService
 
     llm_provider_info = FeatureFlagService.get_configured_provider_info()
@@ -184,6 +185,10 @@ def index():
         default_chat_persona=default_chat_persona,
         llm_configured=llm_provider_info["configured"],
         llm_provider=llm_provider_info.get("provider"),
+        starter_questions=STARTER_QUESTIONS,
+        without_model_line=(
+            None if llm_provider_info["configured"] else without_model_sentence()
+        ),
         chat_persona_preference_key=f"archie_chat_persona_v2:{current_user.id}",
     )
 

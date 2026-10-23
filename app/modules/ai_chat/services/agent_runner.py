@@ -565,6 +565,8 @@ class AgentRunner:
         self._question_names = set()
         self._withheld_claims = []
         self._would_withhold = []
+        self._answer_cards = []
+        self._answer_states = []
         if self._gate_mode_now != "off":
             try:
                 from app.middleware.tenant_context import current_org_id
@@ -798,7 +800,13 @@ class AgentRunner:
                     self._grounding.add_tool_result(
                         result, mutates=tc.name in _MUTATING_TOOLS
                     )
-                    self._emit({"type": "tool_result", "tool": tc.name, "result": result})
+                    event = {"type": "tool_result", "tool": tc.name, "result": result}
+                    card, card_state = self._answer_card_for(tc.name, result)
+                    if card:
+                        event["card"] = card
+                        self._answer_cards.append(card)
+                        self._answer_states.append(card_state)
+                    self._emit(event)
 
                     if result.get("success"):
                         actions_taken.append({
@@ -1667,6 +1675,46 @@ class AgentRunner:
             extra={"gate_event": event},
         )
 
+    def _answer_unrouted_question(self, result: dict, user_message: str) -> None:
+        """A typed question no tool was called for is read by the plain-language
+        interpreter (which reads it by keyword when no model is configured).
+        When it maps onto a catalogue question, the answer replaces the model's
+        prose: the person sees that question's card and one short sentence."""
+        grounding = getattr(self, "_grounding", None)
+        if (
+            self._answer_cards
+            or result.get("actions_taken")
+            or result.get("pending_approvals")
+            or (grounding is not None and grounding.tool_results)
+        ):
+            return
+        try:
+            from app.modules.ai_chat.services.answer_card import answer_typed_question
+
+            answered = answer_typed_question(self.user_id, user_message)
+        except Exception:
+            logger.warning("AgentRunner: typed question interpretation failed", exc_info=True)
+            return
+        if answered is None:
+            return
+        self._emit({"type": "tool_result", "tool": "catalogue", "result": answered["result"],
+                    "card": answered["card"]})
+        self._answer_cards.append(answered["card"])
+        self._answer_states.append(answered["state"])
+        result["response"] = answered["sentence"]
+        result["system_generated"] = True
+        result.pop("error", None)
+
+    @staticmethod
+    def _answer_card_for(tool_name: str, result: dict):
+        """Ask's answer card for an estate answer a tool returned, with its state,
+        else ``(None, None)``."""
+        from app.modules.ai_chat.services.answer_card import card_from_tool_result, render_card
+
+        card = card_from_tool_result(tool_name, result)
+        html = render_card(card)
+        return (html, card["state"]) if html else (None, None)
+
     def _finalize(
         self,
         result: dict,
@@ -1677,7 +1725,18 @@ class AgentRunner:
         model_used: Optional[str] = None,
     ) -> dict:
         """Apply the citation gate, record the run and return the result dict."""
+        self._answer_unrouted_question(result, user_message)
+        if self._answer_states and all(s == "not_recorded" for s in self._answer_states):
+            # The model holds nothing for this question: the person is told so
+            # plainly and nothing the model wrote around it (a figure, a guess)
+            # is shown.
+            from app.modules.ai_chat.services.answer_card import NOT_RECORDED_SENTENCE
+
+            result["response"] = NOT_RECORDED_SENTENCE
+            result["system_generated"] = True
         self._apply_citation_gate(result)
+        if getattr(self, "_answer_cards", None):
+            result["answer_cards"] = list(self._answer_cards)
         record_error = self._record_run(
             persona=persona,
             domain=domain,

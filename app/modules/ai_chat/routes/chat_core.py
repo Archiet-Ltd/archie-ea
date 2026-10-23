@@ -683,6 +683,7 @@ def send_message():
                 "domain": domain,
                 "actions_taken": agent_result.get("actions_taken", []),
                 "pending_approvals": agent_result.get("pending_approvals", []),
+                "answer_cards": agent_result.get("answer_cards", []),
                 "requires_approval": bool(agent_result.get("pending_approvals")),
                 # The records the read tools actually returned this turn, so the
                 # reader can check the answer against the rows rather than
@@ -833,6 +834,105 @@ def submit_message_feedback():
     return jsonify({"success": True, "rating": rating})
 
 
+def _direct_stream(events):
+    """An event stream built from events already in hand (no model call)."""
+    import json as _json
+
+    def generate():
+        yield f"data: {_json.dumps({'type': 'keepalive'})}\n\n"
+        for event in events:
+            yield f"data: {_json.dumps(event, default=str)}\n\n"
+
+    return Response(
+        stream_with_context(generate()),
+        mimetype="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
+def _direct_turn(user_message, incoming_thread_id, tool, arguments, result, card, sentence):
+    """The events for a turn answered by one tool call and no model, saved to
+    the conversation like any other turn."""
+    done = {
+        "type": "done",
+        "response": sentence,
+        "actions_taken": [{
+            "tool": tool, "arguments": arguments, "result": result.get("result"),
+            "message": result.get("message"), "mutates": False,
+        }] if result.get("success") else [],
+        "pending_approvals": [],
+        "answer_cards": [card],
+    }
+    try:
+        from app.services.conversation_history import persist_turn
+
+        done["thread_id"] = persist_turn(
+            current_user.id, incoming_thread_id, user_message, sentence, model=None
+        )
+    except Exception:
+        logger.warning("direct answer persist_turn failed", exc_info=True)
+    return [
+        {"type": "tool_start", "tool": tool, "args": arguments},
+        {"type": "tool_result", "tool": tool, "result": result, "card": card},
+        done,
+    ]
+
+
+def _typed_question_without_model(message, incoming_thread_id):
+    """A typed question answered from the catalogue by keyword reading, or None."""
+    is_valid, validated, _error = validate_chat_message(message)
+    if not is_valid:
+        return None
+    from app.modules.ai_chat.services.answer_card import (
+        answer_estate_question_without_model,
+        answer_typed_question,
+    )
+
+    answered = answer_estate_question_without_model(current_user.id, validated)
+    if answered is not None:
+        return _direct_stream(_direct_turn(
+            validated, incoming_thread_id, answered["tool"], answered["arguments"],
+            answered["result"], answered["card"], answered["sentence"],
+        ))
+    answered = answer_typed_question(current_user.id, validated)
+    if answered is None or not answered["card"]:
+        return None
+    return _direct_stream(_direct_turn(
+        validated, incoming_thread_id, "catalogue", {}, answered["result"],
+        answered["card"], answered["sentence"],
+    ))
+
+
+def _starter_response(starter, message, incoming_thread_id):
+    """Run a starter (a question chip with a picked element) straight through the
+    answer tool: no model is asked, so there is no model cost."""
+    from app.modules.ai_chat.services.answer_card import (
+        STARTER_TOOL_QUESTION,
+        card_from_tool_result,
+        card_sentence,
+        render_card,
+    )
+    from app.modules.ai_chat.tools.executor import ToolCall, ToolExecutor
+    from app.modules.intelligence.services.answer_envelope import as_whole_number
+
+    question = starter.get("question") if isinstance(starter, dict) else None
+    element_id = as_whole_number(starter.get("element_id")) if isinstance(starter, dict) else None
+    if question not in STARTER_TOOL_QUESTION or isinstance(element_id, bool)             or not isinstance(element_id, int):
+        return validation_error_response("A starter needs a question and a picked element")
+    arguments = {"question": STARTER_TOOL_QUESTION[question], "element_id": element_id}
+    result = ToolExecutor(current_user.id).execute(
+        ToolCall(id="starter", name="answer", arguments=arguments)
+    )
+    card = card_from_tool_result("answer", result)
+    if card is None:
+        return validation_error_response("That starter could not be run")
+    sentence = card_sentence(card)
+    return _direct_stream(_direct_turn(
+        message or sentence, incoming_thread_id, "answer", arguments, result,
+        render_card(card), sentence,
+    ))
+
+
 @unified_ai_chat_bp.route("/message/stream", methods=["POST"])
 @login_required
 @rate_limit(30, "1h")
@@ -862,11 +962,17 @@ def send_message_stream():
         return _err
     data = _validated
 
+    if data.get("starter"):
+        return _starter_response(data["starter"], data.get("message", ""), incoming_thread_id)
+
     feature_guard = FeatureFlagService.require_ai_for_route(
         FeatureFlagService.FEATURE_CHAT, endpoint_name="send_message_stream"
     )
     if feature_guard:
-        return feature_guard
+        # No model: a question the plain-language reader can map by keyword is
+        # still answered; anything else gets the refusal below.
+        direct = _typed_question_without_model(data.get("message", ""), incoming_thread_id)
+        return direct if direct is not None else feature_guard
 
     user_message = data.get("message", "")
     is_valid, validated_message, error = validate_chat_message(user_message)
@@ -1463,9 +1569,12 @@ def _conv_dict(obj):
 def list_conversation_threads():
     """List the current user's conversations, newest first, for the rail."""
     try:
+        from app.middleware.tenant_context import current_org_id
         from app.services.conversation_history import get_history_service
 
-        threads = get_history_service().get_user_threads(current_user.id, limit=100)
+        threads = get_history_service().get_user_threads(
+            current_user.id, limit=100, organization_id=current_org_id()
+        )
         return jsonify({"success": True, "threads": [_conv_dict(t) for t in threads]})
     except Exception as e:
         current_app.logger.exception("list_conversation_threads failed: %s", e)

@@ -339,7 +339,7 @@
     /* The network half of a turn, separated from _submitTurn so the error
        card's Retry can run it again without echoing the user's message into
        the transcript a second time. */
-    async function _deliverTurn(message, timestamp) {
+    async function _deliverTurn(message, timestamp, starter) {
         // Show loading indicator
         const loadingId = 'loading-' + Date.now();
         const loadingDiv = document.createElement('div');
@@ -373,6 +373,8 @@
             persona: state.currentPersona || null,
             model: document.getElementById('model-selector')?.value || null,
             thread_id: window.__threadId || null,
+            // A starter is answered by the server without asking a model.
+            starter: starter || null,
         });
 
         // Stream the reply token-by-token (like ChatGPT). If streaming can't be
@@ -415,10 +417,19 @@
                 // so a toast on top of the inline error below was a third
                 // surface for one fault. Keep the inline message (it carries
                 // the admin-link remedy in context); drop the toast.
-                appendError(_streamErr.message, null, { adminLink: true });
+                // The banner states the fault and what still answers; one message only.
                 return;
             }
             /* fall through to non-streaming */
+        }
+
+        if (starter) {
+            /* A starter never falls back to the model endpoint: it is answered
+               without one, so a failure here is shown and can be retried. */
+            const _l = document.getElementById(loadingId);
+            if (_l) _l.remove();
+            appendError('That question could not be answered just now.', () => _retryTurn(message, timestamp, starter));
+            return;
         }
 
         try {
@@ -492,8 +503,8 @@
                 }
 
                 /* A missing provider is a configuration fault, not a transient
-                   one: Retry can only reproduce it. Route the user to the
-                   remedy instead. */
+                   one. The page banner already says so and says what can be
+                   answered without a model; no second message is added. */
                 const _isConfigFault =
                     ArchieChat.transport.isProviderConfigurationFault(data);
 
@@ -505,7 +516,7 @@
                     // surfaces (banner + toast + inline) say one thing. The
                     // inline message stays; it carries the admin-link remedy
                     // in context, which the banner and a toast both lack.
-                    appendError(errorMessage || fullError, null, { adminLink: true });
+                    return;
                 } else {
                     Platform.toast.error(fullError);
                     appendError(fullError, () => _retryTurn(message, timestamp));
@@ -535,6 +546,7 @@
                     contextUsed: true,
                     actions: data.actions_taken || [],
                     pendingApprovals: data.pending_approvals || [],
+                    answerCards: data.answer_cards || [],
                     /* agent_result.error survives internally even when the
                        route reports success:true (the endpoint always has an
                        answer to show — see chat_core.py) — agent_error is
@@ -557,10 +569,33 @@
         }
     }
 
-    function _retryTurn(message, timestamp) {
+    function _retryTurn(message, timestamp, starter) {
         _setSendingUI(true);
-        _deliverTurn(message, timestamp).finally(() => _setSendingUI(false));
+        _deliverTurn(message, timestamp, starter).finally(() => _setSendingUI(false));
     }
+
+    /* A starter: one of Ask's question chips with a picked element. It is shown
+       as the person's question and answered by the server straight from the
+       stored answer (no model is asked). */
+    const _STARTER_LABELS = { impact: 'What breaks if it fails?', risk: 'What could hurt it?' };
+    async function runStarter(question, element) {
+        if (!_STARTER_LABELS[question] || !element || !element.id) return;
+        const named = element.name ? String(element.name) : null;
+        const message = named
+            ? (question === 'risk' ? 'What could hurt ' + named + '?' : 'What breaks if ' + named + ' fails?')
+            : _STARTER_LABELS[question];
+        _hideWelcomeUI();
+        _setSendingUI(true);
+        const timestamp = new Date().toISOString();
+        state.chatHistory.push({ role: 'user', content: message, timestamp });
+        appendMessage('user', message);
+        try {
+            await _deliverTurn(message, timestamp, { question: question, element_id: element.id });
+        } finally {
+            _setSendingUI(false);
+        }
+    }
+    ArchieChat.runStarter = runStarter;
 
     // Stream an AI reply via SSE. Renders tokens live into a bubble; returns true
     // when it rendered a reply (caller then stops), throws/returns false to let
@@ -624,6 +659,7 @@
                         trail: _trail,
                         actions: result.actions || [],
                         pendingApprovals: result.pendingApprovals || [],
+                        answerCards: result.answerCards || [],
                         // No tool ran, but the domain snapshot was in the prompt:
                         // that is "context only", not "ungrounded".
                         contextUsed: _trail.length === 0,
@@ -1119,6 +1155,9 @@ Would you like me to provide more details about the extracted elements or help y
             // Same reasoning as the application deep-link branch above.
             _hideWelcomeSuggestions();
             appendSystemMessage(`${entityLabel} context loaded (ID: ${entityId}). Ask me anything about this ${contextType.replace(/_/g, ' ')}.`, 'info', { noScroll: true });
+        } else if (_STARTER_LABELS[urlParams.get('starter')] && parseInt(urlParams.get('element')) > 0) {
+            // The Ask address arrives here with its question and element: run it.
+            runStarter(urlParams.get('starter'), { id: parseInt(urlParams.get('element')), name: null });
         }
     });
 
@@ -1295,7 +1334,10 @@ Would you like me to provide more details about the extracted elements or help y
     try { window.loadSessionList(); } catch (e) { /* swallow-ok: loadSessionList renders its own "Couldn't load conversations" state; this guard only stops a throw at page load from aborting the rest of the script */ }
     try {
       var savedId = sessionStorage.getItem('archie_chat_thread_id');
-      if (savedId) window.loadSession(savedId);
+      // A page opened with a starter (the Ask address) runs it on arrival; restoring the
+      // tab's earlier conversation would clear the answer that run puts on screen.
+      var arrivedWithStarter = new URLSearchParams(window.location.search).has('starter');
+      if (savedId && !arrivedWithStarter) window.loadSession(savedId);
     } catch (e) { /* swallow-ok: storage may be unavailable (private browsing); user still reaches the Chats panel manually */ }
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot); else boot();

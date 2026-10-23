@@ -1662,8 +1662,39 @@ class ToolExecutor:
                 f"{total} row(s); showing {len(shown)}. Truth class: {body['truth_class']}. "
                 f"Answer address {body['address']} (open at {body['page_url']})."
                 + (" The list is partial: report the total, not the rows shown." if len(shown) < total else "")
+                + " The person sees these rows as a card with their sources; reply in one short sentence."
             )
         return {"success": True, "result": body, "message": message}
+
+    def run_catalogue_entry(self, entry_id: str, params: dict = None) -> dict:
+        """Run one named catalogue question for the caller's active organisation.
+
+        Not a registered tool: the assistant's tool list (and so the connection's)
+        is unchanged. It is the one place the chat reaches the catalogue, so the
+        organisation comes from the same context every tool uses.
+        """
+        from app.modules.intelligence.services.query_catalogue import CATALOGUE, run_entry
+
+        entry = CATALOGUE.get(entry_id) if isinstance(entry_id, str) else None
+        if entry is None:
+            return {"success": False, "error": "Not recorded: the question cannot be answered.",
+                    "code": "NOT_RECORDED", "reason": "element_not_found"}
+        # Only the entry's own declared parameters, and only text values, reach it.
+        safe = {
+            name: value for name, value in (params or {}).items()
+            if name in entry.params and isinstance(value, str)
+        }
+        try:
+            org_id = self._get_organization_id()
+        except Exception:
+            return {"success": False, "error": "Not recorded: the question cannot be answered.",
+                    "code": "NOT_RECORDED", "reason": "no_tenant_context"}
+        result = run_entry(entry_id, org_id, **safe)
+        return {
+            "success": True,
+            "result": {"entry_id": entry_id, "title": entry.title, "params": safe, **result},
+            "message": f"{entry.title} {result.get('total', 0)} found.",
+        }
 
     def _tool_answer(self, args: dict) -> dict:
         kind = args.get("question")
