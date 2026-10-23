@@ -446,10 +446,10 @@ rows:
     applies: true
     status: fail
     evidence:
-      - no two-organisation test covers the webhook family yet; the follow-up that adds one is tracked by T-qa-14
+      - no two-organisation test covers the webhook family yet; the follow-up that adds one is tracked by T-qa-20
   - id: V13.1.1
     family: api_pipeline
     applies: true
     status: fail
     evidence:
-      - the batch API pipeline has no access-control test yet; the follow-up that adds one is tracked by T-qa-15
+      - the batch API pipeline has no access-control test yet; the follow-up that adds one is tracked by T-qa-21
