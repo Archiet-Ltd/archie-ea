@@ -17,15 +17,25 @@ proves the evidence it cites is real:
     (ast.parse, no import, no database, no Flask boot). The named function or
     method must exist in that file.
   - Evidence that is a control description (free prose with no ``::``) passes
-    only when it names an existing file or an existing directory. Evidence that
-    resolves to no test node, file or directory -- a path that is not on disk,
-    or prose naming no path at all -- fails with the row id and the unresolved
-    text, so a control can never pass silently.
+    only when it names an existing FILE (a path with a slash or a recognised
+    extension). A directory on its own does not resolve -- the row must also
+    name a file within it -- and a bare word never resolves even if a same-named
+    path happens to exist, so ordinary prose can never pass by coincidence.
+    Evidence that resolves to no test node or file -- a path that is not on
+    disk, a bare directory, or prose naming no file at all -- fails with the row
+    id and the unresolved text, so a control can never pass silently.
   - A row with ``status: fail`` must name a brief by id (a token matching
     ``T-[a-z]+-\\d+``, e.g. T-qa-13) so an open gap always points at the work
     that will close it. A fail row with no brief id is malformed.
   - A row with ``applies: false`` records why the requirement does not apply and
     needs no test evidence.
+  - Every startup family (account, admin connectors, intelligence,
+    applications, admin billing, admin team, dashboard -- the same
+    STARTUP_FAMILIES map check_two_org_coverage uses) must carry at least one
+    V4 (access control) row whose evidence is a GENUINE two-organisation test:
+    the cited node resolves, its file builds a second organisation, and a
+    two-organisation unit in that file drives the family's own routes. A startup
+    family present in the register with no such V4 row fails the gate.
 
 The register file is YAML, but this gate must run in the static-gates job and
 locally without depending on PyYAML being importable: FEAT-level experience in
@@ -61,13 +71,25 @@ import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
+# One source of truth for the startup family -> blueprint map and the
+# two-organisation signal: both live in check_two_org_coverage. This gate shares
+# them rather than defining a second, divergent copy (reuse-register principle).
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import check_two_org_coverage as two_org  # noqa: E402
+
 REGISTER = os.path.join("docs", "security", "asvs-l2.yml")
 
 # A brief id token, e.g. T-qa-13. A status:fail row must name one.
 BRIEF_ID = re.compile(r"T-[a-z]+-\d+")
 
-# A test node id: a .py file path, then :: and a test (optionally Class::test).
-NODE_ID = re.compile(r"^(?P<path>[^\s:]+\.py)::(?P<rest>[\w:]+)$")
+# A test node id: a .py file path, then :: and a node path. The node path may
+# carry a parametrisation suffix on its final segment, e.g.
+# ``test_name[param-1]`` or ``TestClass::test_name[case]``; the suffix is
+# stripped before the base node is resolved against the file's real tests.
+NODE_ID = re.compile(r"^(?P<path>[^\s:]+\.py)::(?P<rest>[^\s]+)$")
+
+# A trailing pytest parametrisation suffix on a node's final segment.
+_PARAM_SUFFIX = re.compile(r"\[.*\]$")
 
 
 # --------------------------------------------------------------------------- #
@@ -188,13 +210,32 @@ def _test_names(tree: ast.AST) -> tuple[set[str], set[str]]:
     return functions, methods
 
 
+def _strip_parametrisation(rest: str) -> str:
+    """Drop a trailing ``[...]`` parametrisation suffix from the node's last segment.
+
+    ``test_name[param-1]`` -> ``test_name`` and
+    ``TestClass::test_name[case]`` -> ``TestClass::test_name``, so a
+    parametrised id resolves to the base test collected from the AST while a
+    typo in the base name still fails.
+    """
+    head, sep, tail = rest.rpartition("::")
+    tail = _PARAM_SUFFIX.sub("", tail)
+    return f"{head}{sep}{tail}" if sep else tail
+
+
 def node_exists(root: str, node_id: str) -> bool:
-    """True if the test function/method named by a node id exists in its file."""
+    """True if the base test named by a node id exists among the file's real tests.
+
+    The file is AST-parsed (never imported) and its actual test functions and
+    ``Class::method`` names are collected; membership is checked against that
+    set. A parametrised id resolves to its base test; a mistyped name fails
+    because it is not among the collected names.
+    """
     match = NODE_ID.match(node_id)
     if not match:
         return False
     rel = match.group("path")
-    rest = match.group("rest")
+    rest = _strip_parametrisation(match.group("rest"))
     path = os.path.join(root, rel)
     if not os.path.isfile(path):
         return False
@@ -214,6 +255,125 @@ def _looks_like_node_id(evidence: str) -> bool:
     return bool(NODE_ID.match(evidence.strip()))
 
 
+def _node_base_name(rest: str) -> str:
+    """The final base function/method name of a node path, suffix stripped."""
+    rest = _strip_parametrisation(rest)
+    return rest.rsplit("::", 1)[-1]
+
+
+def _genuine_two_org_node(
+    root: str, node_id: str, blueprints: set[str], route_prefixes: dict[str, set[str]]
+) -> bool:
+    """True when a cited node is a genuine two-organisation test bound to a family.
+
+    'Genuine' means all of:
+
+    * the node resolves to a real test in its file (:func:`node_exists`);
+    * the file carries a second-organisation signal; and
+    * a two-organisation UNIT in that file drives one of the family's own
+      route prefixes -- the same family-targeted association
+      check_two_org_coverage uses, so the second-org assertion is bound to the
+      family rather than merely co-occurring in the file.
+
+    The two-org signal helpers and the association predicate are reused from
+    check_two_org_coverage; nothing is reimplemented here.
+    """
+    match = NODE_ID.match(node_id.strip())
+    if not match:
+        return False
+    if not node_exists(root, node_id):
+        return False
+    rel = match.group("path")
+    path = os.path.join(root, rel)
+    try:
+        with open(path, encoding="utf-8", errors="replace") as fh:
+            source = fh.read()
+    except OSError:
+        return False
+
+    units = two_org.two_org_units(source)
+    if not units:
+        return False
+    for blueprint in blueprints:
+        prefixes = route_prefixes.get(blueprint, set())
+        for unit in units:
+            if two_org._associates(blueprint, unit, prefixes):
+                return True
+    return False
+
+
+def startup_v4_problems(root: str, rows: list) -> list[str]:
+    """One problem per startup family missing a V4 two-organisation row.
+
+    A startup family must carry at least one V4 (access control; id starting
+    ``V4.``) row, applicable and not failing, whose evidence resolves to a
+    genuine two-organisation test node bound to that family. A startup family
+    present in the register with no such row is a hole the gate must refuse.
+    """
+    try:
+        routes = two_org.load_routes(root)
+    except (OSError, ValueError):
+        # No route inventory in this tree: startup families cannot be scoped,
+        # so there is nothing to enforce. (A synthetic register under --root may
+        # ship no inventory; the real tree always has one.)
+        return []
+    route_prefixes = two_org.blueprint_route_prefixes(routes)
+    org_families = two_org.families_reading_org_data(routes)
+
+    # Register family name -> startup family; the register's `family` is the
+    # blueprint name, which is exactly what STARTUP_FAMILIES maps.
+    blueprint_to_startup = two_org._BLUEPRINT_TO_STARTUP
+
+    # Startup family -> whether any of its V4 rows cites a genuine two-org node.
+    satisfied: dict[str, bool] = {}
+    present: set[str] = set()
+
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        family = str(row.get("family", "")).strip()
+        startup = blueprint_to_startup.get(family)
+        if startup is None:
+            continue
+        # Only a family whose blueprint actually reads organisation data in the
+        # inventory is in scope -- the same scoping two_org uses.
+        if not (two_org.STARTUP_FAMILIES.get(startup, set()) & org_families):
+            continue
+        present.add(startup)
+        satisfied.setdefault(startup, False)
+
+        row_id = str(row.get("id", "")).strip()
+        if not row_id.startswith("V4."):
+            continue
+        if row.get("applies") is False:
+            continue
+        if str(row.get("status", "")).strip().lower() == "fail":
+            continue
+
+        evidence = row.get("evidence") or []
+        if isinstance(evidence, str):
+            evidence = [evidence]
+        blueprints = two_org.STARTUP_FAMILIES.get(startup, set())
+        for entry in evidence:
+            entry = str(entry).strip()
+            if _looks_like_node_id(entry) and _genuine_two_org_node(
+                root, entry, blueprints, route_prefixes
+            ):
+                satisfied[startup] = True
+                break
+
+    issues: list[str] = []
+    for startup in sorted(present):
+        if not satisfied.get(startup, False):
+            issues.append(
+                f"{REGISTER}: [asvs-register] startup family {startup!r} has no "
+                f"V4 row whose evidence is a genuine two-organisation test node "
+                f"(a V4.x row, applies:true, citing a resolvable test that builds "
+                f"a second organisation and drives this family's routes)"
+            )
+    return issues
+
+
 # A path-like token in free prose: a run of word/dot/slash/dash characters.
 # This catches a file with an extension (app/services/billing_plans.py), a
 # bare top-level file (Dockerfile), and a directory path (app/auth, app/modules).
@@ -221,24 +381,44 @@ _PATH_TOKEN = re.compile(r"[\w./-]*[\w]")
 
 
 def _resolve_evidence(root: str, evidence: str) -> bool:
-    """True when some token in the evidence resolves to a real file or directory.
+    """True when the evidence names a real control precisely enough to resolve.
 
-    Evidence prose is scanned for path-like tokens. A token resolves when it
-    names an existing file or an existing directory under the tree. A token that
-    is a single bare word (no slash, no extension) is only considered when it
-    actually names something on disk, so ordinary prose words never count.
+    The rules tightened for the second review:
+
+    * A token that names an existing FILE resolves (an existing ``.py``,
+      ``Dockerfile`` with a slash path, ``docs/.../x.md`` and so on).
+    * A token that names an existing DIRECTORY resolves ONLY when some OTHER
+      token in the same evidence names an existing file inside that directory,
+      so ``app/auth`` alone no longer passes but
+      ``app/auth app/auth/__init__.py`` does.
+    * A BARE WORD (no slash and no recognised file extension) NEVER resolves,
+      even if a same-named file or directory happens to exist on disk, so
+      ordinary prose can never pass by coincidence. A control named by a bare
+      top-level file must be cited with its path (``./Dockerfile``) or a real
+      extension.
     """
-    for token in _PATH_TOKEN.findall(evidence):
-        looks_like_path = "/" in token or token.endswith(
-            (".py", ".md", ".json", ".yml", ".yaml")
-        )
+    tokens = _PATH_TOKEN.findall(evidence)
+
+    has_named_file = False
+    has_directory = False
+    for token in tokens:
+        has_extension = token.endswith((".py", ".md", ".json", ".yml", ".yaml"))
+        looks_like_path = "/" in token or has_extension
+        if not looks_like_path:
+            # Bare word: never resolves, whatever happens to exist on disk.
+            continue
         candidate = os.path.join(root, token)
-        if looks_like_path:
-            if os.path.isfile(candidate) or os.path.isdir(candidate):
-                return True
-        elif os.path.isfile(candidate) or os.path.isdir(candidate):
-            # A bare word (e.g. Dockerfile) counts only if it really exists.
-            return True
+        if os.path.isfile(candidate):
+            has_named_file = True
+        elif os.path.isdir(candidate):
+            has_directory = True
+
+    # A named existing file always resolves. This also satisfies the rule that a
+    # directory counts only when a file within it is named: that named file is
+    # itself the resolving token. A directory on its own never resolves.
+    if has_named_file:
+        return True
+    _ = has_directory  # a bare directory does not resolve
     return False
 
 
@@ -297,8 +477,10 @@ def problems(root: str) -> list[str]:
                     issues.append(
                         f"{REGISTER}: [asvs-register] row {row_id!r} (family "
                         f"{family!r}) cites evidence {entry!r} but it resolves to "
-                        f"no test node, file or directory in the repository"
+                        f"no test node or control file in the repository"
                     )
+
+    issues.extend(startup_v4_problems(root, rows))
     return issues
 
 

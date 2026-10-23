@@ -950,7 +950,10 @@ def gate_two_org_coverage() -> Result:
     when it drives one of that family's own route rules, so a bare keyword
     cannot stand in for a real cross-organisation test. The non-startup uncovered
     count is a ratchet read from scripts/ci/two_org_baseline.json
-    (accepted_uncovered); it can only fall. The seven startup families must always
+    (accepted_uncovered); it can only fall. The gate fails when the measured
+    count rises ABOVE the baseline AND when the baseline sits above the measured
+    count (an un-ratcheted number that cannot be justified from the diff):
+    equal is the only accepted state. The seven startup families must always
     resolve to zero uncovered, regardless of that baseline.
 
     Proven-against: on a scratch edit, remove the authorisation matrix's second
@@ -980,14 +983,28 @@ def gate_two_org_coverage() -> Result:
         return Result("two-org-coverage", FAIL,
                       f"could not parse count: {bad.stdout!r} {bad.stderr[:300]}")
 
-    ok = full_count <= baseline and startup_count == 0
+    # The baseline only falls. It must never sit ABOVE the freshly measured
+    # count: a baseline above measured is an un-ratcheted number that can hide a
+    # later regression, and it cannot be justified from the diff. Refuse it as
+    # well as refusing measured > baseline and any uncovered startup family.
+    ok = full_count == baseline and startup_count == 0
     detail = ""
     if not ok:
         detail = _run([sys.executable, script]).stdout[-1800:]
         if startup_count:
             detail += f"\n  startup families uncovered: {startup_count} (must be 0)"
         if full_count > baseline:
-            detail += f"\n  non-startup uncovered {full_count} > baseline {baseline}"
+            detail += (
+                f"\n  non-startup uncovered {full_count} > baseline {baseline} "
+                f"(the baseline can only fall)"
+            )
+        if full_count < baseline:
+            detail += (
+                f"\n  baseline {baseline} is ABOVE the measured non-startup "
+                f"uncovered {full_count}; lower accepted_uncovered to "
+                f"{full_count} in {script.replace('check_two_org_coverage.py', 'ci/two_org_baseline.json')}"
+                f" (the baseline cannot sit above measured)"
+            )
     return Result("two-org-coverage", PASS if ok else FAIL, detail, full_count, baseline)
 
 

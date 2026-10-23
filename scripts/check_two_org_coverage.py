@@ -60,8 +60,12 @@ at least one of its blueprints has a family-targeted two-organisation test.
 These seven must always be zero uncovered.
 
 A family is uncovered when it reads organisation data AND no two-organisation
-test is associated with it AND no line carries the escape hatch
-``two-org-coverage-ok: <reason>`` naming the family.
+test is associated with it AND no line carries a VALID escape hatch naming the
+family. The escape hatch is ``two-org-coverage-ok: <family>[, <family> ...]
+<reason including a brief id>`` and is accepted only when it carries both a
+free-text reason AND a brief id token (``T-[a-z]+-\\d+``). A startup family can
+NEVER be excused: the hatch cannot stand in for a real startup two-organisation
+test, so a startup family named in a marker is ignored.
 
 Baseline that only falls: scripts/ci/two_org_baseline.json records the accepted
 uncovered count for NON-startup families. The gate fails when the non-startup
@@ -109,6 +113,11 @@ SECOND_ORG_NAME = re.compile(r"(?:^|_)(other_org|second_org|org_b|org_two)(?:_|$
 
 ALLOW = re.compile(r"two-org-coverage-ok:[ \t]*\S")
 
+# A brief id token, e.g. T-qa-13. An escape-hatch excuse must carry one so an
+# accepted gap always points at the work that owns it. Same shape as
+# check_asvs_register.BRIEF_ID -- one grammar for a brief id across both gates.
+BRIEF_ID = re.compile(r"T-[a-z]+-\d+")
+
 # The family list that an escape-hatch marker names, parsed from exactly the
 # text after the colon and NEVER from the free-text reason that follows it.
 # The grammar is one of:
@@ -129,13 +138,32 @@ def _leading_identifiers(text: str) -> set[str]:
     Parsing stops at the first token that is not a bare identifier, so any
     free-text reason following the family list is never read as a family.
     """
+    families, _reason = _split_families_reason(text)
+    return families
+
+
+def _split_families_reason(text: str) -> tuple[set[str], str]:
+    """Split a bare family-list-and-reason string into (families, reason).
+
+    The leading run of identifier tokens is the family list; everything from the
+    first non-identifier token onward is the free-text reason. A brief id such
+    as ``T-qa-13`` is not a bare identifier, so it always falls into the reason.
+    """
     families: set[str] = set()
-    for token in re.split(r"\s*,\s*|\s+", text.strip()):
+    tokens = re.split(r"(\s*,\s*|\s+)", text.strip())
+    i = 0
+    while i < len(tokens):
+        token = tokens[i]
+        if not token.strip():  # a separator chunk
+            i += 1
+            continue
         if _IDENTIFIER.fullmatch(token):
             families.add(token)
-        else:
-            break
-    return families
+            i += 1
+            continue
+        break
+    reason = "".join(tokens[i:]).strip()
+    return families, reason
 
 
 def _marker_families(line: str) -> set[str]:
@@ -273,40 +301,105 @@ def _iter_test_files(root: str):
                     yield rel, fh.read()
 
 
+def _unit_is_two_org(node: ast.FunctionDef | ast.AsyncFunctionDef) -> bool:
+    """True when this one function/fixture itself carries a second-org signal.
+
+    The signal is the unit's own name naming a second organisation, or one of
+    its parameters being a shared two-organisation fixture, a dual-org pair, or
+    a second-org-named fixture. A bare reference buried in an expression (an
+    attribute ``config.org_b``, a passing mention in a string) is never a
+    signal, so a single-organisation test cannot be mistaken for a two-org one.
+    """
+    name = node.name
+    if name in TWO_ORG_NAMES or SECOND_ORG_NAME.search(name):
+        return True
+    arg_names = {a.arg for a in node.args.args}
+    if arg_names & set(TWO_ORG_NAMES):
+        return True
+    if any(pair <= arg_names for pair in DUAL_ORG_PAIRS):
+        return True
+    if any(SECOND_ORG_NAME.search(a) for a in arg_names):
+        return True
+    return False
+
+
 def _is_two_org_source(source: str) -> bool:
     """True when a static scan shows a genuine second-organisation signal.
 
-    The signal is a fixture definition or a fixture argument -- never a bare
-    reference buried in an expression -- so an ordinary attribute like
-    ``config.org_b`` or a passing mention in a string cannot make a
-    single-organisation test look like a two-organisation one.
+    Kept for the file-level question "does this file build a second
+    organisation at all"; association is decided per unit by
+    :func:`two_org_units` so a second-org signal in one function cannot vouch
+    for an unrelated single-organisation test elsewhere in the same file.
     """
     try:
         tree = ast.parse(source)
     except SyntaxError:
         return False
     for node in ast.walk(tree):
-        if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-            continue
-        name = node.name
-        if name in TWO_ORG_NAMES or SECOND_ORG_NAME.search(name):
-            return True
-        arg_names = {a.arg for a in node.args.args}
-        if arg_names & set(TWO_ORG_NAMES):
-            return True
-        if any(pair <= arg_names for pair in DUAL_ORG_PAIRS):
-            return True
-        if any(SECOND_ORG_NAME.search(a) for a in arg_names):
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and _unit_is_two_org(node):
             return True
     return False
 
 
-def two_org_tests(root: str) -> list[tuple[str, str]]:
-    """Return (relpath, source) for every file that is a two-organisation test."""
-    found: list[tuple[str, str]] = []
+def _unit_source(source: str, node: ast.FunctionDef | ast.AsyncFunctionDef) -> str:
+    """The source text of a single function/fixture, used for route association."""
+    try:
+        return ast.get_source_segment(source, node) or ""
+    except Exception:  # noqa: BLE001 - defensive; fall back to whole source
+        return ""
+
+
+def two_org_units(source: str) -> list[str]:
+    """Source text of each test UNIT that is bound to a second organisation.
+
+    A unit qualifies when it carries the second-org signal itself (a two-org
+    fixture definition, a dual-org pair, a second-org-named fixture) OR when it
+    requests, as a parameter, a fixture defined in the same file that itself
+    carries the signal. This is what stops a file-level coincidence from
+    counting: the ``other_org`` fixture that feeds the interface-register test
+    does not lend its signal to an unrelated billing test that never requests
+    it.
+
+    Returns the source segment of each qualifying unit so association is checked
+    against that unit's own body, not against any line anywhere in the file.
+    """
+    try:
+        tree = ast.parse(source)
+    except SyntaxError:
+        return []
+
+    functions = [
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+    ]
+
+    # Names of same-file fixtures/functions that carry the signal directly.
+    two_org_fixture_names = {node.name for node in functions if _unit_is_two_org(node)}
+
+    units: list[str] = []
+    for node in functions:
+        bound = _unit_is_two_org(node)
+        if not bound:
+            arg_names = {a.arg for a in node.args.args}
+            if arg_names & two_org_fixture_names:
+                bound = True
+        if bound:
+            units.append(_unit_source(source, node))
+    return units
+
+
+def two_org_tests(root: str) -> list[tuple[str, list[str]]]:
+    """Return (relpath, two-org unit sources) for every two-organisation test file.
+
+    The second element is the list of per-unit source segments that are bound to
+    a second organisation; association is checked against these units only.
+    """
+    found: list[tuple[str, list[str]]] = []
     for rel, source in _iter_test_files(root):
-        if _is_two_org_source(source):
-            found.append((rel, source))
+        units = two_org_units(source)
+        if units:
+            found.append((rel, units))
     return found
 
 
@@ -333,28 +426,67 @@ def _associates(blueprint: str, source: str, prefixes: set[str]) -> bool:
 
 def covered_families(
     org_families: set[str],
-    tests: list[tuple[str, str]],
+    tests: list[tuple[str, list[str]]],
     route_prefixes: dict[str, set[str]],
 ) -> set[str]:
-    """Blueprints for which at least one two-organisation test is associated."""
+    """Blueprints for which at least one two-organisation test UNIT is associated.
+
+    Association is unit-level: the SAME unit that is bound to a second
+    organisation must also reference the family's route. A two-org fixture in
+    one function and a single-org reference to the family's route in a different
+    function no longer combine into coverage.
+    """
     covered: set[str] = set()
-    sources = [source for _rel, source in tests]
+    unit_sources = [unit for _rel, units in tests for unit in units]
     for blueprint in org_families:
         prefixes = route_prefixes.get(blueprint, set())
-        for source in sources:
-            if _associates(blueprint, source, prefixes):
+        for unit in unit_sources:
+            if _associates(blueprint, unit, prefixes):
                 covered.add(blueprint)
                 break
     return covered
 
 
+def _excused_by_marker(line: str) -> set[str]:
+    """Blueprints a single `two-org-coverage-ok:` line validly excuses.
+
+    An excuse is accepted only when it carries BOTH a free-text reason after the
+    family list AND a brief id token (``T-[a-z]+-\\d+``) in that reason. A marker
+    that is nothing but a family name excuses nothing. A startup family can never
+    be excused: any startup family named in the marker is dropped, so the escape
+    hatch cannot stand in for a real startup two-organisation test.
+    """
+    match = _MARKER.search(line)
+    if not match:
+        return set()
+    rest = match.group("rest").strip()
+    if not rest:
+        return set()
+
+    bracket = _BRACKET.match(rest)
+    if bracket:
+        families = _leading_identifiers(bracket.group("body"))
+        reason = rest[bracket.end():].strip()
+    else:
+        families, reason = _split_families_reason(rest)
+
+    if not families:
+        return set()
+    # The excuse needs a free-text reason that carries a brief id.
+    if not reason or not BRIEF_ID.search(reason):
+        return set()
+
+    # Startup families can never be excused by the hatch.
+    return {fam for fam in families if fam not in _BLUEPRINT_TO_STARTUP}
+
+
 def excused_families(root: str) -> set[str]:
-    """Blueprints excused by a `two-org-coverage-ok: <reason>` line anywhere in tests."""
+    """Blueprints excused by a valid `two-org-coverage-ok:` line anywhere in tests."""
     excused: set[str] = set()
     for _rel, source in _iter_test_files(root):
         for line in source.split("\n"):
             if ALLOW.search(line):
-                excused |= _marker_families(line)
+                excused |= _excused_by_marker(line)
     return excused
 
 
@@ -446,7 +578,8 @@ def main() -> int:
                 "an org_a/org_b pair) and drives one of that\nfamily's own routes, "
                 "asserting one organisation cannot see the other's\nrows. If the "
                 "family genuinely has no tenant boundary, append\n"
-                "'two-org-coverage-ok: <reason>' naming it."
+                "'two-org-coverage-ok: <family> <reason including a brief id like "
+                "T-qa-13>'\nnaming it (a startup family can never be excused)."
             )
 
     baseline = load_baseline(root)

@@ -154,6 +154,8 @@ def test_applies_false_row_needs_no_evidence(tmp_path):
 
 
 def test_control_description_with_existing_file_passes(tmp_path):
+    # A file named with a path (slash or extension) resolves. A bare top-level
+    # file must be cited with its path (./Dockerfile), not as a bare word.
     register = (
         "rows:\n"
         "  - id: V14.1.1\n"
@@ -161,7 +163,7 @@ def test_control_description_with_existing_file_passes(tmp_path):
         "    applies: true\n"
         "    status: pass\n"
         "    evidence:\n"
-        "      - build pipeline recorded in Dockerfile\n"
+        "      - build pipeline recorded in ./Dockerfile\n"
     )
     root = _build_tree(tmp_path, register, {})
     _write(os.path.join(root, "Dockerfile"), "FROM python:3.11\n")
@@ -189,7 +191,71 @@ def test_control_description_with_missing_file_fails(tmp_path):
 
 
 def test_control_description_with_existing_directory_passes(tmp_path):
-    # A directory path (no file extension) is valid evidence when it exists.
+    # A directory counts only when the row also names a FILE within it. The
+    # directory is named for context, and app/auth/__init__.py is the concrete
+    # control file that resolves the evidence.
+    register = (
+        "rows:\n"
+        "  - id: V3.1.1\n"
+        "    family: account\n"
+        "    applies: true\n"
+        "    status: pass\n"
+        "    evidence:\n"
+        "      - session handling recorded in app/auth app/auth/__init__.py\n"
+    )
+    root = _build_tree(tmp_path, register, {})
+    os.makedirs(os.path.join(root, "app", "auth"), exist_ok=True)
+    _write(os.path.join(root, "app", "auth", "__init__.py"), "")
+    result = _run(root, "--count")
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert result.stdout.strip().splitlines()[-1] == "0"
+
+
+def test_parametrised_node_id_resolves_to_base_test(tmp_path):
+    # A parametrised node id resolves to the base test collected from the AST.
+    register = (
+        "rows:\n"
+        "  - id: V4.1.1\n"
+        "    family: account\n"
+        "    applies: true\n"
+        "    status: pass\n"
+        "    evidence:\n"
+        "      - tests/test_access.py::test_org_isolation[org-b-case]\n"
+        "  - id: V4.1.3\n"
+        "    family: account\n"
+        "    applies: true\n"
+        "    status: pass\n"
+        "    evidence:\n"
+        "      - tests/test_access.py::TestAccess::test_method_boundary[case-1]\n"
+    )
+    root = _build_tree(tmp_path, register, {"tests/test_access.py": EXISTING_TEST})
+    result = _run(root, "--count")
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert result.stdout.strip().splitlines()[-1] == "0"
+
+
+def test_mistyped_node_id_fails(tmp_path):
+    # A base name that is not among the file's collected tests fails, even with
+    # a parametrisation suffix that makes it look shaped like a real node id.
+    register = (
+        "rows:\n"
+        "  - id: V4.1.1\n"
+        "    family: account\n"
+        "    applies: true\n"
+        "    status: pass\n"
+        "    evidence:\n"
+        "      - tests/test_access.py::test_org_isolatoin[org-b-case]\n"
+    )
+    root = _build_tree(tmp_path, register, {"tests/test_access.py": EXISTING_TEST})
+    result = _run(root)
+    assert result.returncode == 1, result.stdout + result.stderr
+    lines = result.stdout.strip().splitlines()
+    assert lines[-1] == "1"
+    assert any("test_org_isolatoin" in line for line in lines[:-1])
+
+
+def test_bare_directory_without_named_file_fails(tmp_path):
+    # A directory alone no longer resolves; a file within it must be named too.
     register = (
         "rows:\n"
         "  - id: V3.1.1\n"
@@ -201,9 +267,49 @@ def test_control_description_with_existing_directory_passes(tmp_path):
     )
     root = _build_tree(tmp_path, register, {})
     os.makedirs(os.path.join(root, "app", "auth"), exist_ok=True)
+    result = _run(root)
+    assert result.returncode == 1, result.stdout + result.stderr
+    lines = result.stdout.strip().splitlines()
+    assert lines[-1] == "1"
+    assert any("app/auth" in line for line in lines[:-1])
+
+
+def test_directory_with_named_file_passes(tmp_path):
+    # Naming a file within the directory resolves the evidence.
+    register = (
+        "rows:\n"
+        "  - id: V3.1.1\n"
+        "    family: account\n"
+        "    applies: true\n"
+        "    status: pass\n"
+        "    evidence:\n"
+        "      - session handling recorded in app/auth/session.py\n"
+    )
+    root = _build_tree(tmp_path, register, {})
+    _write(os.path.join(root, "app", "auth", "session.py"), "# control\n")
     result = _run(root, "--count")
     assert result.returncode == 0, result.stdout + result.stderr
     assert result.stdout.strip().splitlines()[-1] == "0"
+
+
+def test_bare_word_never_resolves(tmp_path):
+    # A bare word must never resolve, even when a same-named file exists on disk.
+    register = (
+        "rows:\n"
+        "  - id: V3.4.1\n"
+        "    family: account\n"
+        "    applies: true\n"
+        "    status: pass\n"
+        "    evidence:\n"
+        "      - control recorded in Dockerfile\n"
+    )
+    root = _build_tree(tmp_path, register, {})
+    _write(os.path.join(root, "Dockerfile"), "FROM python:3.11\n")
+    result = _run(root)
+    assert result.returncode == 1, result.stdout + result.stderr
+    lines = result.stdout.strip().splitlines()
+    assert lines[-1] == "1"
+    assert any("V3.4.1" in line for line in lines[:-1])
 
 
 def test_evidence_resolving_to_nothing_fails(tmp_path):
@@ -245,6 +351,78 @@ def test_free_prose_without_any_path_fails(tmp_path):
     lines = result.stdout.strip().splitlines()
     assert lines[-1] == "1"
     assert any("V3.3.1" in line for line in lines[:-1])
+
+
+def _write_inventory(root, routes):
+    import json
+
+    _write(
+        os.path.join(root, "docs", "component-inventory.json"),
+        json.dumps({"routes": routes}),
+    )
+
+
+BILLING_TWO_ORG_TEST = (
+    "def test_billing_two_org_isolation(org_a, org_b, client):\n"
+    "    client.get('/admin/billing/', org=org_a)\n"
+    "    resp = client.get('/admin/billing/', org=org_b)\n"
+    "    assert resp.status_code == 404\n"
+)
+
+
+def test_startup_family_with_v4_two_org_row_passes(tmp_path):
+    # A startup family (billing -> admin billing) with a V4 row citing a genuine
+    # two-organisation test that drives /admin/billing/ passes.
+    register = (
+        "rows:\n"
+        "  - id: V4.1.1\n"
+        "    family: billing\n"
+        "    applies: true\n"
+        "    status: pass\n"
+        "    evidence:\n"
+        "      - tests/test_billing_iso.py::test_billing_two_org_isolation\n"
+    )
+    root = _build_tree(
+        tmp_path, register, {"tests/test_billing_iso.py": BILLING_TWO_ORG_TEST}
+    )
+    _write_inventory(
+        root,
+        [{"blueprint": "billing", "login_required": True, "rule": "/admin/billing/"}],
+    )
+    result = _run(root, "--count")
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert result.stdout.strip().splitlines()[-1] == "0"
+
+
+def test_startup_family_missing_v4_two_org_row_fails(tmp_path):
+    # The startup family is present but its V4 row cites an ordinary single-org
+    # test that does not build a second organisation, so the family has no
+    # genuine two-organisation V4 row and the gate must fail.
+    register = (
+        "rows:\n"
+        "  - id: V4.1.1\n"
+        "    family: billing\n"
+        "    applies: true\n"
+        "    status: pass\n"
+        "    evidence:\n"
+        "      - tests/test_billing_single.py::test_billing_page_renders\n"
+    )
+    single_org_test = (
+        "def test_billing_page_renders(client):\n"
+        "    resp = client.get('/admin/billing/')\n"
+        "    assert resp.status_code == 200\n"
+    )
+    root = _build_tree(
+        tmp_path, register, {"tests/test_billing_single.py": single_org_test}
+    )
+    _write_inventory(
+        root,
+        [{"blueprint": "billing", "login_required": True, "rule": "/admin/billing/"}],
+    )
+    result = _run(root)
+    assert result.returncode == 1, result.stdout + result.stderr
+    lines = result.stdout.strip().splitlines()
+    assert any("admin billing" in line for line in lines[:-1])
 
 
 def test_count_prints_trailing_integer(tmp_path):

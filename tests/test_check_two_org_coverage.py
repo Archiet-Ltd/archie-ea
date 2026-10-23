@@ -128,7 +128,7 @@ def test_escape_hatch_excuses_a_family(tmp_path):
     ]
     files = {
         "tests/test_marker.py": (
-            "# two-org-coverage-ok: excused_bp is a read-only status surface\n"
+            "# two-org-coverage-ok: excused_bp read-only status surface, T-qa-13\n"
             "def test_marker():\n    assert True\n"
         ),
     }
@@ -153,7 +153,7 @@ def test_escape_hatch_reason_prose_does_not_excuse_other_families(tmp_path):
     ]
     files = {
         "tests/test_marker.py": (
-            "# two-org-coverage-ok: webhook is a public endpoint\n"
+            "# two-org-coverage-ok: webhook is a public endpoint, T-qa-13\n"
             "def test_marker():\n    assert True\n"
         ),
     }
@@ -315,5 +315,146 @@ def test_dual_org_fixture_pair_qualifies_as_two_org_test(tmp_path):
     }
     root = _build_tree(tmp_path, routes, files)
     result = _run(root, "--startup-only", "--count")
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.strip().splitlines()[-1] == "0"
+
+
+def test_two_org_signal_in_unrelated_function_does_not_cover_family(tmp_path):
+    """HIGH-3: a two-organisation fixture consumed by ONE test must not vouch for
+    a DIFFERENT, single-organisation test that merely references the family's
+    route in the same file.
+
+    This mirrors tests/smoke/test_authorisation_matrix.py exactly: an
+    ``other_org`` fixture feeds an interface-register isolation test, while a
+    separate single-organisation test references the billing family's route.
+    The file builds a second organisation, but not for billing, so billing must
+    stay uncovered -- the old file-level rule wrongly counted it.
+    """
+    routes = [
+        {"blueprint": "billing", "login_required": True, "rule": "/admin/billing/"},
+        {"blueprint": "interface_register", "login_required": True, "rule": "/interface-register/"},
+    ]
+    files = {
+        "tests/smoke/test_authorisation_matrix.py": (
+            "def other_org_initiative():\n"
+            "    return make_org('second')\n\n"
+            "def test_interface_register_other_org_is_404(other_org_initiative):\n"
+            "    client.get('/interface-register/?initiative_id=1')\n"
+            "    assert True\n\n"
+            "def test_billing_policy_matrix():\n"
+            "    # single-org policy matrix test, references the family route only\n"
+            "    client.get('/admin/billing/')\n"
+            "    assert True\n"
+        ),
+    }
+    root = _build_tree(tmp_path, routes, files)
+    # Billing (startup) has a second-org fixture only for the interface-register
+    # test; it must stay uncovered. interface_register (non-startup) is covered.
+    startup = _run(root, "--startup-only", "--count")
+    assert startup.returncode == 1, startup.stderr
+    assert startup.stdout.strip().splitlines()[-1] == "1"
+    named = _run(root, "--startup-only")
+    assert "admin billing" in named.stdout
+
+
+def test_same_unit_builds_two_orgs_and_drives_family_route_covers(tmp_path):
+    """HIGH-3 positive: when the SAME test both builds a second organisation and
+    drives the family's own route, the family is covered."""
+    routes = [
+        {"blueprint": "billing", "login_required": True, "rule": "/admin/billing/"},
+    ]
+    files = {
+        "tests/smoke/test_billing_iso.py": (
+            "def test_billing_two_org_isolation(org_a, org_b, client):\n"
+            "    client.get('/admin/billing/', org=org_a)\n"
+            "    resp = client.get('/admin/billing/', org=org_b)\n"
+            "    assert resp.status_code == 404\n"
+        ),
+    }
+    root = _build_tree(tmp_path, routes, files)
+    result = _run(root, "--startup-only", "--count")
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.strip().splitlines()[-1] == "0"
+
+
+def test_two_org_fixture_used_by_test_that_drives_family_route_covers(tmp_path):
+    """HIGH-3 positive variant: a two-org fixture is bound to a test that itself
+    drives the family route, so the test unit is associated through the fixture
+    it requests."""
+    routes = [
+        {"blueprint": "billing", "login_required": True, "rule": "/admin/billing/"},
+    ]
+    files = {
+        "tests/smoke/test_billing_iso.py": (
+            "def other_org():\n"
+            "    return make_org('second')\n\n"
+            "def test_billing_isolation(other_org, client):\n"
+            "    client.get('/admin/billing/')\n"
+            "    assert True\n"
+        ),
+    }
+    root = _build_tree(tmp_path, routes, files)
+    result = _run(root, "--startup-only", "--count")
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.strip().splitlines()[-1] == "0"
+
+
+def test_escape_hatch_cannot_excuse_startup_family(tmp_path):
+    """A startup family named in an escape-hatch marker is never excused: the
+    hatch cannot stand in for a real startup two-organisation test."""
+    routes = [
+        {"blueprint": "billing", "login_required": True, "rule": "/admin/billing/"},
+    ]
+    files = {
+        "tests/test_marker.py": (
+            "# two-org-coverage-ok: billing has no tenant boundary, T-qa-13\n"
+            "def test_marker():\n    assert True\n"
+        ),
+    }
+    root = _build_tree(tmp_path, routes, files)
+    result = _run(root, "--startup-only", "--count")
+    assert result.returncode == 1, result.stderr
+    assert result.stdout.strip().splitlines()[-1] == "1"
+    named = _run(root, "--startup-only")
+    assert "admin billing" in named.stdout
+
+
+def test_escape_hatch_requires_reason_and_brief_id(tmp_path):
+    """A marker that names a family but carries no reason-with-brief-id excuses
+    nothing: the family stays uncovered."""
+    routes = [
+        {"blueprint": "status_bp", "login_required": True, "rule": "/status/panel"},
+    ]
+    # A bare family name, no reason and no brief id -> not a valid excuse.
+    files = {
+        "tests/test_marker.py": (
+            "# two-org-coverage-ok: status_bp\n"
+            "def test_marker():\n    assert True\n"
+        ),
+    }
+    root = _build_tree(tmp_path, routes, files)
+    result = _run(root)
+    assert result.returncode == 1, result.stderr
+    lines = result.stdout.strip().splitlines()
+    assert lines[-1] == "1"
+    assert any("status_bp" in line for line in lines[:-1])
+
+    # A reason but still no brief id -> also not a valid excuse.
+    files["tests/test_marker.py"] = (
+        "# two-org-coverage-ok: status_bp read-only status surface\n"
+        "def test_marker():\n    assert True\n"
+    )
+    root = _build_tree(tmp_path, routes, files)
+    result = _run(root)
+    assert result.returncode == 1, result.stderr
+    assert result.stdout.strip().splitlines()[-1] == "1"
+
+    # A reason AND a brief id -> excused (non-startup family).
+    files["tests/test_marker.py"] = (
+        "# two-org-coverage-ok: status_bp read-only status surface, T-qa-13\n"
+        "def test_marker():\n    assert True\n"
+    )
+    root = _build_tree(tmp_path, routes, files)
+    result = _run(root, "--count")
     assert result.returncode == 0, result.stderr
     assert result.stdout.strip().splitlines()[-1] == "0"
