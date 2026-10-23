@@ -1992,9 +1992,405 @@ def seed_demo_company() -> dict:
                     wp_by_name[wp_name].id, gap.id, organization_id=org_id)
         db.session.flush()
 
+        # ── 13. data governance and data architecture ───────────────────
+        _seed_data_architecture(org_id, stats)
+
+        # ── 14. a worked solution with real blueprint content ───────────
+        _seed_solution(org_id, stats)
+
         db.session.commit()
 
     return stats
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+#  Data governance and data architecture
+# ═════════════════════════════════════════════════════════════════════════════
+
+# One master domain and the entities inside it, each mastered by a real seeded
+# application so the system-of-record page names a record rather than a blank.
+# (domain name, domain code, domain type)
+_DATA_DOMAIN = ("Calibration data", "LQ-DOM-CALIBRATION", "master")
+
+# (entity name, technical name, system-of-record application name, age in days,
+#  record count, retention days -- None means no retention policy)
+_DATA_ENTITIES = [
+    ("Calibration result", "calibration_result", "Calibration Ledger", 400, 1_250_000, 365),
+    ("Sensor reading", "sensor_reading", "Sensor Data Hub", 120, 9_800_000, None),
+    ("Batch release record", "batch_release_record", "Calibration Ledger", 900, 48_000, 730),
+    ("Dispatch manifest", "dispatch_manifest", "Dispatch Planner", 60, 310_000, None),
+]
+
+# A data issue raised against a seeded entity, so the issues page shows a row
+# a person can read rather than "no data".
+# (entity name, issue title, issue description)
+_DATA_ISSUES = [
+    ("Sensor reading",
+     "Duplicate readings from relaid events",
+     "The same sensor reading arrives twice when Event Relay replays a batch, "
+     "inflating the overnight calibration drift figures."),
+    ("Dispatch manifest",
+     "Manifest missing the recovered-assembly line",
+     "Returns processed through Circular Recovery are not written back to the "
+     "dispatch manifest, so the picked quantity and the shipped quantity disagree."),
+]
+
+# Three data models, one grounded in the next, so the data-architecture
+# dashboard and the data-models page count real rows.
+# (conceptual name, logical name, physical name, database)
+_DATA_MODELS = [
+    ("Calibration conceptual model", "Calibration logical schema",
+     "Calibration physical schema", "PostgreSQL"),
+    ("Sensor telemetry conceptual model", "Sensor telemetry logical schema",
+     "Sensor telemetry physical schema", "PostgreSQL"),
+]
+
+# Lineage edges between seeded DataObject elements, so the data-lineage page
+# shows grounded flows rather than an empty catalogue.
+# (source DataObject element name, target DataObject element name, lineage type)
+_DATA_LINEAGE = [
+    ("Sensor reading", "Calibration result", "ETL"),
+    ("Calibration result", "Batch release record", "ETL"),
+]
+
+
+def _seed_data_architecture(org_id, stats):
+    """Seed data governance and data architecture records for the demo
+    organisation, each linked to a seeded application or data object so every
+    data page shows something true. Idempotent: a re-run creates nothing new.
+    """
+    from app.models.process_data import DataDomain, DataEntity
+    from app.models.data_governance import DataRetentionPolicy
+    from app.models.data_issue import DataIssue
+    from app.models.all_missing_models import (
+        ConceptualDataModel, LogicalDataModel, PhysicalDataModel, DataLineage,
+    )
+    from app.models import ArchiMateElement
+
+    apps = _resolve_apps(org_id)
+    users = _resolve_users(org_id)
+    reporter = users.get(_DEMO_USER_EMAIL)
+
+    # ── 13a. master data domain ─────────────────────────────────────────
+    domain_name, domain_code, domain_type = _DATA_DOMAIN
+    domain = (
+        db.session.query(DataDomain)
+        .filter(DataDomain.organization_id == org_id, DataDomain.name == domain_name)
+        .first()
+    )
+    if domain is None:
+        domain = DataDomain(
+            organization_id=org_id, name=domain_name, code=domain_code,
+            domain_type=domain_type, criticality="business_critical",
+            data_steward="Ellis DataSteward",
+            description="Calibration and sensor data mastered across the estate.",
+        )
+        db.session.add(domain)
+        db.session.flush()
+
+    # ── 13b. data entities, each with a real system of record ───────────
+    now = _dt.datetime.utcnow()
+    existing_entities = {
+        e.name: e
+        for e in db.session.query(DataEntity)
+        .filter(DataEntity.organization_id == org_id)
+        .all()
+    }
+    entities_created = 0
+    for name, technical, sor_app_name, age_days, record_count, _ret in _DATA_ENTITIES:
+        if name in existing_entities:
+            continue
+        sor_app = apps.get(sor_app_name)
+        entity = DataEntity(
+            organization_id=org_id,
+            name=name,
+            technical_name=technical,
+            domain_id=domain.id,
+            entity_type="master",
+            estimated_record_count=record_count,
+            system_of_record_application_id=sor_app.id if sor_app else None,
+            system_of_record=sor_app_name if sor_app else None,
+            created_at=now - _dt.timedelta(days=age_days),
+            description=f"{name} mastered by {sor_app_name}.",
+        )
+        db.session.add(entity)
+        existing_entities[name] = entity
+        entities_created += 1
+    if entities_created:
+        db.session.flush()
+    stats["data_entities_created"] = entities_created
+
+    # ── 13c. retention policies (one entity exceeds its policy) ─────────
+    existing_policies = {
+        (p.data_entity_id, p.name)
+        for p in db.session.query(DataRetentionPolicy)
+        .filter(DataRetentionPolicy.organization_id == org_id)
+        .all()
+    }
+    policies_created = 0
+    for name, _technical, _sor, _age, _count, retention_days in _DATA_ENTITIES:
+        if retention_days is None:
+            continue
+        entity = existing_entities.get(name)
+        if entity is None:
+            continue
+        policy_name = f"{name} retention"
+        if (entity.id, policy_name) in existing_policies:
+            continue
+        db.session.add(DataRetentionPolicy(
+            organization_id=org_id,
+            name=policy_name,
+            data_entity_id=entity.id,
+            retention_period_days=retention_days,
+            retention_reason="Regulatory",
+            status="active",
+        ))
+        existing_policies.add((entity.id, policy_name))
+        policies_created += 1
+    if policies_created:
+        db.session.flush()
+    stats["retention_policies_created"] = policies_created
+
+    # ── 13d. data issues raised against an entity ───────────────────────
+    existing_issue_titles = {
+        i.title
+        for i in db.session.query(DataIssue)
+        .filter(DataIssue.organization_id == org_id)
+        .all()
+    }
+    issues_created = 0
+    for entity_name, title, description in _DATA_ISSUES:
+        entity = existing_entities.get(entity_name)
+        if entity is None or reporter is None or title in existing_issue_titles:
+            continue
+        db.session.add(DataIssue(
+            organization_id=org_id,
+            data_entity_id=entity.id,
+            title=title,
+            description=description,
+            reporter_id=reporter.id,
+            status="open",
+        ))
+        existing_issue_titles.add(title)
+        issues_created += 1
+    if issues_created:
+        db.session.flush()
+    stats["data_issues_created"] = issues_created
+
+    # ── 13e. conceptual / logical / physical data models ────────────────
+    existing_conceptual = {
+        c.name: c
+        for c in db.session.query(ConceptualDataModel)
+        .filter(ConceptualDataModel.organization_id == org_id)
+        .all()
+    }
+    existing_logical = {
+        m.name for m in db.session.query(LogicalDataModel)
+        .filter(LogicalDataModel.organization_id == org_id).all()
+    }
+    existing_physical = {
+        m.name for m in db.session.query(PhysicalDataModel)
+        .filter(PhysicalDataModel.organization_id == org_id).all()
+    }
+    models_created = 0
+    for conceptual_name, logical_name, physical_name, database in _DATA_MODELS:
+        conceptual = existing_conceptual.get(conceptual_name)
+        if conceptual is None:
+            conceptual = ConceptualDataModel(
+                organization_id=org_id, name=conceptual_name,
+                business_domain="Calibration", scope="Domain",
+                approval_status="approved",
+                description=f"{conceptual_name} for the demo estate.",
+            )
+            db.session.add(conceptual)
+            db.session.flush()
+            existing_conceptual[conceptual_name] = conceptual
+            models_created += 1
+        if logical_name not in existing_logical:
+            logical = LogicalDataModel(
+                organization_id=org_id, name=logical_name,
+                conceptual_model_id=conceptual.id, normalization_level="3NF",
+                description=f"{logical_name} realising {conceptual_name}.",
+            )
+            db.session.add(logical)
+            db.session.flush()
+            existing_logical.add(logical_name)
+            models_created += 1
+            if physical_name not in existing_physical:
+                db.session.add(PhysicalDataModel(
+                    organization_id=org_id, name=physical_name,
+                    logical_model_id=logical.id, database_type=database,
+                    deployment_environment="Production",
+                    description=f"{physical_name} deploying {logical_name}.",
+                ))
+                existing_physical.add(physical_name)
+                models_created += 1
+    if models_created:
+        db.session.flush()
+    stats["data_models_created"] = models_created
+
+    # ── 13f. data lineage between seeded data objects ───────────────────
+    data_objects = {
+        el.name: el
+        for el in db.session.query(ArchiMateElement)
+        .filter(
+            ArchiMateElement.organization_id == org_id,
+            ArchiMateElement.type == "DataObject",
+        )
+        .all()
+    }
+    existing_lineage = {
+        row.name
+        for row in db.session.query(DataLineage)
+        .filter(DataLineage.organization_id == org_id)
+        .all()
+    }
+    lineage_created = 0
+    for source_name, target_name, lineage_type in _DATA_LINEAGE:
+        source = data_objects.get(source_name)
+        target = data_objects.get(target_name)
+        if source is None or target is None:
+            continue
+        row_name = f"{source_name} -> {target_name}"
+        if row_name in existing_lineage:
+            continue
+        db.session.add(DataLineage(
+            organization_id=org_id,
+            name=row_name,
+            lineage_type=lineage_type,
+            archimate_element_id=source.id,
+            target_archimate_element_id=target.id,
+            source_system=source_name,
+            target_system=target_name,
+        ))
+        existing_lineage.add(row_name)
+        lineage_created += 1
+    if lineage_created:
+        db.session.flush()
+    stats["data_lineage_created"] = lineage_created
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+#  A worked solution with real blueprint content
+# ═════════════════════════════════════════════════════════════════════════════
+
+_SOLUTION_NAME = "Calibration data consolidation"
+
+# Each section's saved narrative, so the blueprint page shows real content
+# rather than an empty shell for the demo organisation.
+_SOLUTION_NARRATIVES = {
+    "executive_summary": (
+        "Lantern Quay Systems masters calibration results in the Calibration "
+        "Ledger but copies them into the Sensor Data Hub and the Data "
+        "Warehouse, where overnight drift figures disagree with the ledger. "
+        "This solution makes the Calibration Ledger the single system of "
+        "record, replays Event Relay batches idempotently, and retires the "
+        "duplicate copies. It touches four applications and is expected to "
+        "remove the nightly reconciliation the operations team runs by hand."
+    ),
+    "application_cooperation": (
+        "The Calibration Ledger masters calibration results. The Sensor Data "
+        "Hub and the Data Warehouse read them through the Integration Bus "
+        "rather than holding their own copies, and Event Relay deduplicates "
+        "replayed batches before they reach the ledger."
+    ),
+    "data_information": (
+        "Calibration result becomes a single mastered entity with the "
+        "Calibration Ledger as its declared system of record. Sensor reading "
+        "flows into it through a deduplicating pipeline; the batch release "
+        "record is derived from it."
+    ),
+}
+
+# Elements already seeded (by name) linked into the solution so the viewpoint
+# sections name real records. (element name, element role)
+_SOLUTION_ELEMENTS = [
+    ("Calibration Ledger", "in_scope"),
+    ("Sensor Data Hub", "in_scope"),
+    ("Integration Bus", "in_scope"),
+    ("Event Relay", "in_scope"),
+    ("Calibration result", "in_scope"),
+    ("Sensor reading", "in_scope"),
+]
+
+
+def _seed_solution(org_id, stats):
+    """Create one worked solution for the demo organisation with real
+    blueprint narratives and linked ArchiMate elements, so /solutions/<id>
+    shows content rather than an empty blueprint. Idempotent.
+    """
+    from app.models.solution_models import Solution
+    from app.models.solution_archimate_element import SolutionArchiMateElement
+    from app.models import ArchiMateElement
+
+    users = _resolve_users(org_id)
+    owner = users.get(_DEMO_USER_EMAIL)
+
+    solution = (
+        db.session.query(Solution)
+        .filter(Solution.organization_id == org_id, Solution.name == _SOLUTION_NAME)
+        .first()
+    )
+    created = 0
+    if solution is None:
+        solution = Solution(
+            organization_id=org_id,
+            name=_SOLUTION_NAME,
+            description=(
+                "Make the Calibration Ledger the single system of record for "
+                "calibration data and retire the duplicate copies."
+            ),
+            solution_type="Integration",
+            business_domain="Operations",
+            complexity_level="Moderate",
+            status="in_progress",
+            solution_owner="Ivo Reed",
+            business_sponsor="Chief Operations Officer",
+            technical_lead="Ivo Reed",
+            created_by_id=owner.id if owner else None,
+            section_narratives=dict(_SOLUTION_NARRATIVES),
+        )
+        db.session.add(solution)
+        db.session.flush()
+        created = 1
+    else:
+        # Repair an earlier seed that created the solution without narratives.
+        if not solution.section_narratives:
+            solution.section_narratives = dict(_SOLUTION_NARRATIVES)
+            db.session.flush()
+    stats["solutions_created"] = created
+
+    elements = {
+        el.name: el
+        for el in db.session.query(ArchiMateElement)
+        .filter(ArchiMateElement.organization_id == org_id)
+        .all()
+    }
+    linked_element_ids = {
+        link.element_id
+        for link in db.session.query(SolutionArchiMateElement)
+        .filter(SolutionArchiMateElement.solution_id == solution.id)
+        .all()
+    }
+    links_created = 0
+    for element_name, role in _SOLUTION_ELEMENTS:
+        element = elements.get(element_name)
+        if element is None or element.id in linked_element_ids:
+            continue
+        # The ArchiMate element itself was created earlier by the one element writer; this is the
+        # reuse-ok: solution-to-element junction row (SolutionArchiMateElement), not a second element.
+        db.session.add(SolutionArchiMateElement(
+            solution_id=solution.id,
+            element_id=element.id,
+            element_name=element.name,
+            layer_type=element.layer,
+            element_role=role,
+        ))
+        linked_element_ids.add(element.id)
+        links_created += 1
+    if links_created:
+        db.session.flush()
+    stats["solution_elements_linked"] = links_created
 
 
 # ═════════════════════════════════════════════════════════════════════════════
