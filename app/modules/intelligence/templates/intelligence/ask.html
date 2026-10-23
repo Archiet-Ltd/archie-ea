@@ -99,7 +99,7 @@
         {% endfor %}
     </div>
     <div id="ask-results" aria-busy="false" :aria-busy="busy ? 'true' : 'false'" x-show="answeredKey === 'impact' && state !== 'idle'" x-cloak class="space-y-4">
-        <h2 id="ask-results-heading" x-ref="resultsHeading" tabindex="-1" class="text-xl font-semibold tracking-[-0.01em] text-foreground focus:outline-none focus-visible:outline-none" x-text="headingText()"></h2>
+        <h2 id="ask-results-heading" x-ref="resultsHeading" tabindex="-1" class="scroll-mt-24 text-xl font-semibold tracking-[-0.01em] text-foreground focus:outline-none focus-visible:outline-none" x-text="headingText()"></h2>
         {{ impact_states("state === 'loading'") }}
         <div x-show="state === 'ready'" x-cloak>
             {% call answer_cascade('ask-cascade', question="'What breaks if ' + (centreName || '…') + ' fails or is under-resourced?'", rows='rows', ask='load(node.elementId)', save="Platform.fetch('/api/v1/intelligence/answers', { method: 'POST', body: { question: 'impact', element_id: centreId }, silent: true }).catch(function () {})", row_attrs='data-ask-row', root='centreName', rich=True) %}
@@ -109,6 +109,15 @@
                     <a :href="twinMapHref(node)" class="inline-flex h-8 items-center justify-center rounded-md px-2 text-13 font-medium text-muted-foreground transition-colors hover:bg-muted/50 hover:text-info">View on twin map</a>
                 </div>
                 <div class="basis-full text-xs text-muted-foreground">{{ stale_line('node.staleLine') }}</div>
+                <ul class="basis-full space-y-1 text-xs text-muted-foreground" data-citations aria-label="Where this was read from">
+                    <template x-for="(o, n) in node.origins" :key="n">
+                        <li data-citation>
+                            <span class="text-foreground" x-text="o.repository + (o.file ? ' · ' + o.file : '') + (o.short ? ' @ ' + o.short : '')"></span>
+                            <a x-show="o.url" :href="o.url" target="_blank" rel="noopener noreferrer" class="ml-2 underline hover:text-info">View file on GitHub</a>
+                        </li>
+                    </template>
+                    <li x-show="!node.origins.length" data-citation-missing>Source not recorded</li>
+                </ul>
                 <div class="basis-full">{{ full_detail({'detail': 'node.detail', 'uid': 'node.key'}) }}</div>
             {% endcall %}
         </div>

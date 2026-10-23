@@ -38,6 +38,11 @@
         </div>
     {% endif %}
 
+    <p class="mb-6 text-sm text-muted-foreground" data-testid="github-connect-link">
+        <a href="{{ url_for('m365_connector.github_connect') }}" class="underline text-primary">Connect GitHub</a>
+        to read your repositories and get a first model of your company: its applications, their parts, their owners and the links between them.
+    </p>
+
     <div class="grid gap-6 lg:grid-cols-3">
         <!-- Add / edit form -->
         <div data-slot="card" class="rounded-lg border border-input bg-card h-fit lg:col-span-1">
