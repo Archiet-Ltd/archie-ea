@@ -1,19 +1,19 @@
 {% extends 'layouts/admin_base.html' %}
-{% block title %}Vendor Options Analysis{% endblock %}
+{% block title %}Vendor selection{% endblock %}
 
 {% from "components/page_header.html" import page_header %}
 
 {% block content %}
 <div class="space-y-6" x-data="vendorAnalysisList()">
   {{ page_header(
-      title='Vendor Options Analysis',
+      title='Vendor selection',
       description='Compare vendor products with weighted scoring to support selection decisions',
       breadcrumbs=[
           {'label': 'Dashboard', 'href': url_for('main.index')},
-          {'label': 'Vendor Options Analysis'}
+          {'label': 'Vendor selection'}
       ],
       actions=[
-          {'text': 'New Analysis', 'icon': 'plus', 'href': url_for('application_mgmt.vendor_analysis_new'), 'variant': 'default'}
+          {'text': 'New vendor selection', 'icon': 'plus', 'href': url_for('application_mgmt.vendor_analysis_new'), 'variant': 'default'}
       ]
   ) }}
 
