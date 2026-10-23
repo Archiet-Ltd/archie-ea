@@ -174,6 +174,10 @@ class AccountService:
         try:
             db.session.flush()
             OrgRole.set_role(org.id, user.id, "org_admin", granted_by_id=user.id)
+            from app.models.usage_event import UsageEvent
+            from app.services.funnel_events import record_once
+
+            record_once(org.id, UsageEvent.EVENT_ORGANISATION_SIGNED_UP)
             db.session.commit()
         except Exception:
             db.session.rollback()

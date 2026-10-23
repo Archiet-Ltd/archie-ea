@@ -20,6 +20,7 @@ from __future__ import annotations
 from flask import abort, render_template, request
 from flask_login import current_user, login_required
 
+from app.extensions import db
 from app.middleware.tenant_context import current_org_id
 from app.modules.intelligence.routes.api import intelligence_api
 from app.modules.intelligence.routes.ui import intelligence_ui
@@ -84,6 +85,12 @@ def ask_answer():
             details={"reason": _ELEMENT_NOT_FOUND_REASON},
             status_code=404,
         )
+    if getattr(record, "citations", None):
+        from app.models.usage_event import UsageEvent
+        from app.services.funnel_events import record_once
+
+        if record_once(current_org_id(), UsageEvent.EVENT_FIRST_ANSWER_SHOWN):
+            db.session.commit()
     return success_response(envelope.present(record), status_code=201)
 
 
