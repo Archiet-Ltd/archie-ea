@@ -133,11 +133,6 @@ BANNED_CLAIMS = [
         "submitted URL",
     ),
     (
-        "your team's own AI assistants can work directly over your twin",
-        "no MCP server exists in this codebase; only Entelim's own AI chat works over a tenant's "
-        "model today",
-    ),
-    (
         "usage history",
         "no customer-visible usage-history page is confirmed to exist; dropped from every plan "
         "description rather than promised",
@@ -268,6 +263,12 @@ BANNED_CLAIMS = [
         "verification_baseline.json's own _note14 records 272 reads of slack accumulating "
         "this way before anyone noticed, and check_untenanted_reads.py --count measured "
         "2349 against a baseline of 2361 on this page's own PR, i.e. slack exists right now",
+    ),
+    (
+        "your team's own AI assistants can work directly over your twin",
+        "the assistant connector is read-only: an outside assistant can read and answer "
+        "questions over a tenant's model, but it cannot change it, so 'work directly over' "
+        "overclaims",
     ),
 ]
 

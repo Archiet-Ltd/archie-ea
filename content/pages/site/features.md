@@ -258,7 +258,7 @@ delegate, act on it, with one permission check, one approval queue and a full au
 **Today:** the in-product assistant works through the same permission check and approval inbox every
 agent will use.
 
-Your own AI assistants will be able to read the model securely from Q1 2027, with multi-step agent workflows following in 2027.
+Your own AI assistants can read the model securely today, with multi-step agent workflows following in 2027.
 
 Delivered today by: [AI Chat](/modules/ai-chat).
 
