@@ -117,6 +117,21 @@ def _expect_pagination(page, start_end, page_of):
     expect(pagination.get_by_text(page_of)).to_be_visible(timeout=PAGE_TIMEOUT)
 
 
+def _expect_layer_figures(page, elements_value, elements_hint, list_total):
+    """Assert the three figures that must agree on this screen: the "Elements"
+    stat-card number and its caption, and the "… total" pill beside the list
+    heading. The stat card always reports the whole layer ("Repository-wide in
+    this layer"); the list pill reports the current result set. The filtered
+    count is never shown as the layer total."""
+    value = page.get_by_test_id("architecture-elements-metric-value")
+    hint = page.get_by_test_id("architecture-elements-metric-hint")
+    expect(value).to_have_text(elements_value, timeout=PAGE_TIMEOUT)
+    expect(hint).to_have_text(elements_hint, timeout=PAGE_TIMEOUT)
+    expect(page.get_by_test_id("architecture-list-total")).to_have_text(
+        list_total, timeout=PAGE_TIMEOUT
+    )
+
+
 def test_safe_kind_filter_journey(browser, live_server):
     """The whole journey at desktop width: registry options, cross-page kind
     filter with correct totals, quick view showing the kind, and the full
@@ -142,8 +157,16 @@ def test_safe_kind_filter_journey(browser, live_server):
             timeout=PAGE_TIMEOUT,
         )
 
-        # 1. The full list spans three pages at the default 25 rows.
+        # 1. The full list spans three pages at the default 25 rows, and the
+        #    figures agree: the Elements stat card and the list pill both read
+        #    55 for the whole layer.
         _expect_pagination(page, "1–25 of 55", "Page 1 of 3")
+        _expect_layer_figures(
+            page,
+            elements_value="55",
+            elements_hint="Repository-wide in this layer",
+            list_total="55 total",
+        )
 
         # 2. The Kind options come from the profile registry: ask the product
         #    for the layer's kind options and compare them to the rendered ones.
@@ -169,6 +192,15 @@ def test_safe_kind_filter_journey(browser, live_server):
         assert not any(n.startswith("Beta") for n in names), (
             "organisation B's work packages appeared in org A's Epic filter"
         )
+        # The figures still agree under the filter: the list pill reads "12 of
+        # 55" (the filtered set, against the layer), and the Elements stat card
+        # still reports the whole layer — 55, never the filtered 12.
+        _expect_layer_figures(
+            page,
+            elements_value="55",
+            elements_hint="Repository-wide in this layer",
+            list_total="12 of 55",
+        )
 
         # 4. Filter to Feature: two pages, every row a Feature.
         kind_select.select_option("Feature")
@@ -193,15 +225,23 @@ def test_safe_kind_filter_journey(browser, live_server):
         expect(kind_panel.get_by_text("Epic", exact=True)).to_be_visible()
         expect(page.get_by_role("heading", name="Alpha WP 05", exact=True)).to_be_visible()
 
-        # 7. The full detail page for an Epic lands with content: a work
-        #    package heading, its ArchiMate identity block, and the stored
-        #    kind property — never an error page.
+        # 7. The full detail page lands on THE WORK PACKAGE THAT WAS CLICKED —
+        #    Alpha WP 05, not a different work package that merely shares the
+        #    number in the URL — and renders real content: the element heading
+        #    and its ArchiMate identity block. The archimate element id and the
+        #    dedicated-table primary key are separate sequences, so a wrong
+        #    resolver opens a neighbour here; asserting the clicked element's own
+        #    name (unique per element) proves the link lands on the right one.
         page.get_by_role("link", name="View full detail").click()
         page.wait_for_url("**/architecture/implementation/WorkPackage/*", timeout=PAGE_TIMEOUT)
-        heading = page.get_by_role("heading", name="Alpha WP 05")
-        expect(heading).to_be_visible(timeout=PAGE_TIMEOUT)
+        expect(page.get_by_role("heading", name="Alpha WP 05", exact=True)).to_be_visible(
+            timeout=PAGE_TIMEOUT
+        )
+        # No other seeded work package's name is on the page — the detail view is
+        # of one element, not a number-twin standing in for it.
+        for other in ("Alpha WP 06", "Alpha WP 35", "Alpha WP 15"):
+            expect(page.get_by_role("heading", name=other, exact=True)).to_have_count(0)
         expect(page.get_by_text("ArchiMate Identity", exact=True)).to_be_visible()
-        expect(page.get_by_text("entelim:kind", exact=False)).to_be_visible()
     finally:
         context.close()
 

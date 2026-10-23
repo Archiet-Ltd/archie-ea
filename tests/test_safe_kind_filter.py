@@ -309,3 +309,138 @@ def test_page_of_25_elements_costs_at_most_three_queries(app, db_session, make_o
         "the profile/relationship reads must be batched:\n%s"
         % (len(statements), "\n".join(s[:120] for s in statements))
     )
+
+
+# ------------------------------------------------------ detail link resolution
+
+
+def test_detail_link_opens_the_clicked_work_package_not_a_number_twin(
+    app, db_session, make_org, login_as
+):
+    """The list links a mirrored work package by its ArchiMate element id, and
+    the dedicated work_packages table keeps its own primary-key sequence. When
+    those two numbers collide the detail route must still open the work package
+    that was clicked — not a different one that merely shares the number.
+
+    This builds the collision deliberately: the target work package's ArchiMate
+    element id is reused as a DECOY work package's dedicated primary key. The
+    detail route is then asked for that id. Resolving by the dedicated primary
+    key first (the old behaviour) opens the decoy; resolving by the mirror
+    (archimate_element_id) opens the target.
+    """
+    from app.models.archimate_core import ArchiMateElement
+    from app.models.implementation_migration import WorkPackage
+    from app.services.element_profile_service import set_kind
+
+    org = make_org("detail-collision")
+
+    # The target: a mirrored work package. Its ArchiMate element id is the id the
+    # element list hands to the detail link.
+    target_ae = ArchiMateElement(
+        name="Target work package",
+        type="WorkPackage",
+        layer="Implementation",
+        organization_id=org.id,
+    )
+    db_session.add(target_ae)
+    db_session.flush()
+    collision_id = target_ae.id
+    target_wp = WorkPackage(
+        name="Target work package",
+        organization_id=org.id,
+        element_type="WorkPackage",
+        archimate_element_id=target_ae.id,
+    )
+    db_session.add(target_wp)
+    db_session.flush()
+    set_kind(target_ae, "Epic")
+
+    # The decoy: a different work package whose dedicated primary key is forced
+    # to equal the target's ArchiMate element id, so the two collide.
+    decoy_ae = ArchiMateElement(
+        name="Decoy work package",
+        type="WorkPackage",
+        layer="Implementation",
+        organization_id=org.id,
+    )
+    db_session.add(decoy_ae)
+    db_session.flush()
+    decoy_wp = WorkPackage(
+        id=collision_id,
+        name="Decoy work package",
+        organization_id=org.id,
+        element_type="WorkPackage",
+        archimate_element_id=decoy_ae.id,
+    )
+    db_session.add(decoy_wp)
+    db_session.flush()
+    set_kind(decoy_ae, "Feature")
+    db_session.commit()
+
+    assert decoy_wp.id == collision_id
+    assert target_wp.id != collision_id, (
+        "test setup invalid: target and collision ids must differ for the twin "
+        "to be a real twin"
+    )
+
+    user, _org = _make_architect(db_session, org.id, "detail-c")
+    c = app.test_client()
+    login_as(c, user)
+
+    resp = c.get("/architecture/implementation/WorkPackage/%d" % collision_id)
+    assert resp.status_code == 200, resp.get_data(as_text=True)
+    body = resp.get_data(as_text=True)
+    assert "Target work package" in body, (
+        "the detail link opened the wrong element: the clicked work package's "
+        "name is not on the page"
+    )
+    assert "Decoy work package" not in body, (
+        "the detail link opened the number-twin work package instead of the one "
+        "that was clicked"
+    )
+
+
+def test_detail_link_is_isolated_between_organisations(
+    app, db_session, make_org, login_as
+):
+    """Two real organisations: org A's work package, reached by its ArchiMate
+    element id, is not served to org B. B gets a 404, never A's element."""
+    from app.models.archimate_core import ArchiMateElement
+    from app.models.implementation_migration import WorkPackage
+
+    org_a = make_org("detail-iso-a")
+    org_b = make_org("detail-iso-b")
+
+    ae = ArchiMateElement(
+        name="Org A only work package",
+        type="WorkPackage",
+        layer="Implementation",
+        organization_id=org_a.id,
+    )
+    db_session.add(ae)
+    db_session.flush()
+    wp = WorkPackage(
+        name="Org A only work package",
+        organization_id=org_a.id,
+        element_type="WorkPackage",
+        archimate_element_id=ae.id,
+    )
+    db_session.add(wp)
+    db_session.commit()
+
+    user_a, _a = _make_architect(db_session, org_a.id, "detail-a")
+    user_b, _b = _make_architect(db_session, org_b.id, "detail-b")
+
+    c = app.test_client()
+
+    login_as(c, user_a)
+    resp = c.get("/architecture/implementation/WorkPackage/%d" % ae.id)
+    assert resp.status_code == 200
+    assert "Org A only work package" in resp.get_data(as_text=True)
+
+    login_as(c, user_b)
+    resp = c.get("/architecture/implementation/WorkPackage/%d" % ae.id)
+    assert resp.status_code == 404, (
+        "org B reached org A's work package through the detail link"
+    )
+    assert "Org A only work package" not in resp.get_data(as_text=True)
