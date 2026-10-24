@@ -87,6 +87,7 @@ GLOBAL_REFERENCE_MODELS = frozenset({
     "ARBGovernanceStandard",
     "ARBWorkflowStage",
     "EAWorkflowDefinition",
+    "ExternalSystem",  # shared integration config; organization_id indicates connection ownership, not tenant partitioning
 })
 
 SCAN_DIRS = [
