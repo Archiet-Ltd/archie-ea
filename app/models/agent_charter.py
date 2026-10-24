@@ -63,36 +63,35 @@ class AgentCharter(TenantMixin, db.Model):
 
     @classmethod
     def tool_allowed(cls, persona: str, tool_name: str, organization_id: int) -> bool:
-        """Check whether a tool call is within the persona's charter bounds."""
+        """Check whether a tool call is within the persona's charter bounds.
+
+        A recorded charter is the organisation's policy and is honoured as written: its forbidden
+        list refuses, its proposable list (or "all") governs what the persona may propose or change,
+        and read-only tools are allowed unless the charter forbids them by name, because a persona
+        that may propose changes must be able to look things up first. An organisation with no
+        charter recorded gets the product's default bounds for reads only: write and propose tools
+        stay refused until a charter exists, so nothing is loosened by the absence of a row.
+        """
         charter = cls.current_for(persona, organization_id)
+        risk = _risk_class(tool_name)
         if charter is None:
-            # No charter recorded for this organisation yet: the persona works within the
-            # product's own default bounds (the same ones the seed writes) instead of
-            # refusing every tool, which left a new organisation's chat unable to look
-            # anything up. Writes still go through the approval queue as before.
             bounds = _default_bounds(persona)
             if bounds is None:
                 return False
-            forbidden, proposable = bounds
-        else:
-            forbidden = charter.forbidden_actions or []
-            proposable = charter.proposable_actions or []
+            forbidden, _proposable = bounds
+            return risk == "read" and tool_name not in forbidden
+        forbidden = charter.forbidden_actions or []
         if tool_name in forbidden:
             return False
-        # A read-only tool is always within bounds unless the charter forbids it by name:
-        # the proposable list governs what a persona may propose or change, not what it
-        # may look up. Without this, a persona with a proposable list could not find an
-        # application or run an impact query, and sent people to other pages.
-        if _risk_class(tool_name) == "read":
+        if risk == "read":
             return True
+        proposable = charter.proposable_actions or []
         if not proposable:
-            # Empty proposable list — persona can only read.
-            if _risk_class(tool_name) in ("read", "propose"):
-                return True
-            return False
+            return risk == "propose"
         if isinstance(proposable, str) and proposable == "all":
             return True
         return tool_name in proposable
+
 
 def _default_bounds(persona: str):
     """(forbidden, proposable) from the product's own charter defaults, or None for an unknown persona."""
