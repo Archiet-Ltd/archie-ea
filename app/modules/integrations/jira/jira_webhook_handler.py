@@ -12,7 +12,11 @@ import logging
 from flask import current_app
 
 from app import db
-from app.models.adm_kanban import KanbanCard
+from app.modules.integrations.jira.jira_webhook_security import (
+    card_for_issue_in_org,
+    jira_connection_org_id,
+    webhook_secret_configured,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -63,15 +67,24 @@ def handle_jira_webhook(payload: dict, raw_body: bytes, secret_header: str) -> d
     Returns
     -------
     dict  with keys:
+        - configured (bool) — False when no webhook secret is set (refuse, 503)
         - verified (bool)  — False when signature check failed
         - updated  (bool)  — True when a KanbanCard was modified
         - card_ref (str|None) — jira_issue_key of the updated card
     """
     secret = current_app.config.get("JIRA_WEBHOOK_SECRET", "")
 
+    if not webhook_secret_configured(secret):
+        logger.error(
+            "[TPM-008] Jira webhook refused: JIRA_WEBHOOK_SECRET is not set. "
+            "The integration is disabled until a secret is configured; it will "
+            "not accept unverified calls."
+        )
+        return {"configured": False, "verified": False, "updated": False, "card_ref": None}
+
     if not _verify_signature(raw_body, secret_header, secret):
         logger.warning("[TPM-008] Jira webhook HMAC verification failed")
-        return {"verified": False, "updated": False, "card_ref": None}
+        return {"configured": True, "verified": False, "updated": False, "card_ref": None}
 
     # Extract issue key and status from Jira Cloud / Server payload shape
     issue = payload.get("issue") or {}
@@ -82,12 +95,21 @@ def handle_jira_webhook(payload: dict, raw_body: bytes, secret_header: str) -> d
 
     if not issue_key:
         logger.debug("[TPM-008] Webhook payload has no issue key — ignoring")
-        return {"verified": True, "updated": False, "card_ref": None}
+        return {"configured": True, "verified": True, "updated": False, "card_ref": None}
 
-    card = KanbanCard.query.filter_by(jira_issue_key=issue_key).first()
+    # Scope to the organisation that owns the signed Jira connection. A verified
+    # signature only proves the caller holds the connection's secret; it is this
+    # scope that keeps a call for one organisation from moving another
+    # organisation's card when both reference the same issue key.
+    organization_id = jira_connection_org_id()
+    card = card_for_issue_in_org(issue_key, organization_id)
     if card is None:
-        logger.debug("[TPM-008] No KanbanCard found for jira_issue_key=%s", issue_key)
-        return {"verified": True, "updated": False, "card_ref": issue_key}
+        logger.debug(
+            "[TPM-008] No KanbanCard found for jira_issue_key=%s in organisation %s",
+            issue_key,
+            organization_id,
+        )
+        return {"configured": True, "verified": True, "updated": False, "card_ref": issue_key}
 
     if jira_status:
         new_status = _JIRA_STATUS_MAP.get(jira_status, jira_status.lower().replace(" ", "_"))
@@ -103,4 +125,4 @@ def handle_jira_webhook(payload: dict, raw_body: bytes, secret_header: str) -> d
         logger.exception("[TPM-008] DB commit failed for card %s", issue_key)
         raise
 
-    return {"verified": True, "updated": True, "card_ref": issue_key}
+    return {"configured": True, "verified": True, "updated": True, "card_ref": issue_key}
