@@ -263,6 +263,7 @@
                             sources: ev.sources,
                             actions: ev.actions_taken || [],
                             pendingApprovals: ev.pending_approvals || [],
+                            answeredBy: ev.answered_by || null,
                             error: ev.error || null
                         };
                     } else if (ev.error) {
@@ -299,6 +300,7 @@
             sources: meta.sources,
             actions: meta.actions || [],
             pendingApprovals: meta.pendingApprovals || [],
+            answeredBy: meta.answeredBy || null,
             error: meta.error || null
         });
         return true;
