@@ -1,5 +1,9 @@
 {% extends "layouts/admin_base.html" %}
 {% from "components/page_header.html" import page_header %}
+{% from "components/form_field.html" import form_field, form_group %}
+{% from "components/button.html" import button %}
+{% from "components/select.html" import native_select %}
+{% from "components/card.html" import card, card_content %}
 
 {% block title %}New Change Request{% endblock %}
 
@@ -16,7 +20,8 @@
         ]
     ) }}
 
-    <div class="bg-card border border-border rounded-lg p-6">
+    {% call card() %}
+        {% call card_content() %}
         <form x-data="{
             submitting: false,
             title: '', description: '', trigger_type: '', capability_id: '', solution_id: '',
@@ -27,11 +32,14 @@
                 event.target.value = '';
             },
             removeFile(idx) { this.pendingFiles.splice(idx, 1); },
-            /* .then()/.catch(), not async/await: this body lives in an Alpine
-               attribute and is run by the CSP-safe interpreter
-               (app/static/js/csp/csp-evaluator.js), which cannot await. The
-               uploads are chained with reduce so they still run one at a time,
-               in order, exactly as the old sequential awaits did. */
+            triggerFileDialog() {
+                const inp = document.createElement('input');
+                inp.type = 'file';
+                inp.multiple = true;
+                inp.accept = '.pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.csv,.txt,.md,.png,.jpg,.jpeg,.gif,.zip';
+                inp.addEventListener('change', (e) => this.addFiles(e));
+                inp.click();
+            },
             submit() {
                 const self = this;
                 this.submitting = true;
@@ -41,8 +49,6 @@
                 return Platform.fetch.post('/arb/api/change-requests', payload, { silent: true })
                     .then(function (cr) {
                         const crId = cr.id;
-                        // Upload any attached files against the new change request,
-                        // sequentially — a rejection short-circuits the rest of the chain.
                         return self.pendingFiles.reduce(function (chain, file) {
                             return chain.then(function () {
                                 const fd = new FormData();
@@ -58,64 +64,22 @@
                     .catch(function () {
                         self.submitting = false;
                         Platform.toast.error('Submission failed');
-                        // The error is already logged by Platform.fetch; we do not rethrow
-                        // because the user-visible toast above is the report.
                     });
             }
         }" @submit.prevent="submit()" class="space-y-5">
 
-            <!-- Title -->
-            <div>
-                <label for="cr-title" class="block text-sm font-medium text-muted-foreground mb-1">
-                    Title <span class="text-destructive-emphasis">*</span>
-                </label>
-                <input id="cr-title" type="text" x-model="title" required
-                       placeholder="Brief title for this change request"
-                       class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring">
-            </div>
+            {{ form_field(id='cr-title', label='Title', name='title', required=true, placeholder='Brief title for this change request') }}
 
-            <!-- Description -->
-            <div>
-                <label for="cr-description" class="block text-sm font-medium text-muted-foreground mb-1">
-                    Description <span class="text-destructive-emphasis">*</span>
-                </label>
-                <textarea id="cr-description" x-model="description" required rows="5"
-                          placeholder="Describe the change, its rationale, and expected impact"
-                          class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring resize-y"></textarea>
-            </div>
+            {{ form_field(id='cr-description', label='Description', name='description', input_type='textarea', required=true, rows=5, placeholder='Describe the change, its rationale, and expected impact') }}
 
-            <!-- Trigger Type -->
-            <div>
-                <label for="cr-trigger-type" class="block text-sm font-medium text-muted-foreground mb-1">
-                    Trigger Type <span class="text-destructive-emphasis">*</span>
-                </label>
-                <select id="cr-trigger-type" x-model="trigger_type" required
-                        class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
-                    <option value="">Select trigger type…</option>
-                    {% for tt in trigger_types %}
-                    <option value="{{ tt }}">{{ tt | replace('_', ' ') | title }}</option>
-                    {% endfor %}
-                </select>
-            </div>
+            {% call form_group(id='cr-trigger-type', label='Trigger Type', required=true) %}
+            {% set trigger_options = [('', 'Select trigger type\u2026')] + [(tt, tt | replace('_', ' ') | title) for tt in trigger_types] %}
+            {{ native_select(id='cr-trigger-type', name='trigger_type', aria_label='Trigger Type', required=true, options=trigger_options, attrs_dict={'x-model': 'trigger_type'}) }}
+            {% endcall %}
 
-            <!-- Optional fields -->
-            <div class="grid grid-cols-1 gap-4">
-                <div>
-                    <label for="cr-capability-id" class="block text-sm font-medium text-muted-foreground mb-1">
-                        Linked Capability ID
-                    </label>
-                    <input id="cr-capability-id" type="number" x-model="capability_id" min="1"
-                           placeholder="Optional"
-                           class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring">
-                </div>
-                <div>
-                    <label for="cr-solution-id" class="block text-sm font-medium text-muted-foreground mb-1">
-                        Linked Solution ID
-                    </label>
-                    <input id="cr-solution-id" type="number" x-model="solution_id" min="1"
-                           placeholder="Optional"
-                           class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring">
-                </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {{ form_field(id='cr-capability-id', label='Linked Capability ID', type='number', placeholder='Optional') }}
+                {{ form_field(id='cr-solution-id', label='Linked Solution ID', type='number', placeholder='Optional') }}
             </div>
 
             <!-- Supporting Documents -->
@@ -125,50 +89,32 @@
                 </label>
                 <p class="text-xs text-muted-foreground">Attach impact assessments, cost analyses, architecture diagrams, or other evidence. Max 50 MB per file.</p>
 
-                <!-- Document type selector -->
                 <div class="flex items-center gap-3">
-                    <select x-model="docType" class="h-9 rounded-md border border-input bg-background px-3 text-xs focus:outline-none focus:ring-2 focus:ring-ring" aria-label="Supporting Documents (optional)">
-                        <option value="supporting">Supporting</option>
-                        <option value="evidence">Evidence</option>
-                        <option value="decision">Decision Record</option>
-                        <option value="minutes">Meeting Minutes</option>
-                    </select>
-                    <label class="inline-flex items-center gap-1.5 cursor-pointer rounded-md border border-dashed border-border px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground hover:border-foreground/40 transition-colors">
-                        <i data-lucide="plus" class="w-3.5 h-3.5"></i> Add file
-                        <input type="file" class="sr-only" multiple @change="addFiles($event)"
-                               accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.csv,.txt,.md,.png,.jpg,.jpeg,.gif,.zip">
-                    </label>
+                    {% set doc_type_options = [('supporting', 'Supporting'), ('evidence', 'Evidence'), ('decision', 'Decision Record'), ('minutes', 'Meeting Minutes')] %}
+                    {{ native_select(id='cr-doc-type', aria_label='Document type', options=doc_type_options, attrs_dict={'x-model': 'docType', 'class': 'text-xs'}) }}
+                    {{ button(text=' Add file', type='button', variant='outline', size='sm', attrs_dict={'@click': 'triggerFileDialog()'}) }}
                 </div>
 
-                <!-- Pending file list -->
                 <ul x-show="pendingFiles.length > 0" x-cloak class="space-y-1">
                     <template x-for="(f, idx) in pendingFiles" :key="idx">
                         <li class="flex items-center gap-2 text-xs text-foreground">
                             <i data-lucide="file" class="w-3.5 h-3.5 text-muted-foreground flex-shrink-0"></i>
                             <span class="flex-1 truncate" x-text="f.name"></span>
-                            <button aria-label="Remove" type="button" @click="removeFile(idx)"
-                                    class="text-muted-foreground hover:text-destructive-emphasis">
-                                <i data-lucide="x" class="w-3.5 h-3.5"></i>
-                            </button>
+                            {{ button(aria_label='Remove', type='button', variant='ghost', size='icon-xs', class='text-muted-foreground hover:text-destructive-emphasis', attrs_dict={'@click': 'removeFile(idx)'}) }}
                         </li>
                     </template>
                 </ul>
             </div>
 
-            <!-- Actions -->
             <div class="flex items-center gap-3 pt-2 border-t border-border">
-                <button type="submit"
-                        :disabled="submitting"
-                        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
-                    <span x-show="!submitting" x-cloak>Submit Change Request</span>
-                    <span x-show="submitting" x-cloak>Submitting…</span>
-                </button>
+                {{ button(text='Submit Change Request', type='submit', attrs_dict={':disabled': 'submitting'}) }}
                 <a href="{{ url_for('arb.change_request_list') }}"
                    class="text-sm text-muted-foreground hover:text-foreground transition-colors">
                     Cancel
                 </a>
             </div>
         </form>
-    </div>
+        {% endcall %}
+    {% endcall %}
 </div>
 {% endblock %}
