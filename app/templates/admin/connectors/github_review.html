@@ -1,3 +1,4 @@
+{# design-block: settings #}
 {% extends 'layouts/admin_base.html' %}
 {% block title %}Review what GitHub showed{% endblock %}
 {% from 'components/page_header.html' import page_header %}
@@ -35,7 +36,7 @@
         title='Review what GitHub showed',
         description='Each item below is a proposal with the reason it was made and the repository and commit it was read from. Nothing is in your model until you approve it.',
         breadcrumbs=[
-            {'label': 'Admin', 'href': url_for('admin.index')},
+            ({'label': 'Admin', 'href': url_for('admin.index')} if current_user.is_admin() else {'label': 'Workspace'}),
             {'label': 'Connectors', 'href': url_for('m365_connector.connectors_index')},
             {'label': 'GitHub', 'href': url_for('m365_connector.github_connect')},
             {'label': 'Review'}

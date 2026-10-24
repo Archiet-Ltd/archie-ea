@@ -785,6 +785,7 @@ _OWNER_USERS = [
     ("Ellis", "DataSteward", "ellis.datasteward@lantern-quay.example.com"),
     ("Cameron", "SysAdmin", "cameron.sysadmin@lantern-quay.example.com"),
     ("Ainsley", "NetEng", "ainsley.neteng@lantern-quay.example.com"),
+    ("Bryn", "BusinessArch", "bryn.businessarch@lantern-quay.example.com"),
 ]
 
 # The one demo user who can look but not change the model: a business analyst
@@ -792,6 +793,10 @@ _OWNER_USERS = [
 # beside its sixteen architects. Matches an entry of _OWNER_USERS.
 _DEMO_READER_EMAIL = "drew.dataanalyst@lantern-quay.example.com"
 _DEMO_READER_PERSONA = "business_analyst"
+
+# The one business architect in the demonstration, so what that persona does and
+# does not see (Connections yes, Billing no) can be walked signed in as them.
+_DEMO_BUSINESS_ARCHITECT_EMAIL = "bryn.businessarch@lantern-quay.example.com"
 
 # Map from display name (as used in BusinessActor elements) to User email.
 _OWNER_NAME_TO_EMAIL = {
@@ -1423,8 +1428,8 @@ _SOLUTIONS = [
         "One platform for scheduling, performing and certifying field calibrations.",
         "B", "proposed", None,
         [
-            ("Calibration process model", "in_progress", "business_architecture"),
-            ("Stakeholder impact assessment", "planned", "assessment"),
+            ("Calibration process model", "in_progress", "business_architecture", "Business Architecture document"),
+            ("Stakeholder impact assessment", "planned", "assessment", None),
         ],
     ),
     (
@@ -1432,9 +1437,9 @@ _SOLUTIONS = [
         "A shared portal where suppliers confirm orders, deliveries and certificates.",
         "D", "in_progress", None,
         [
-            ("Integration architecture", "in_progress", "technology_architecture"),
-            ("Supplier onboarding runbook", "planned", "runbook"),
-            ("Security review", "planned", "assessment"),
+            ("Integration architecture", "in_progress", "technology_architecture", "Technology Architecture"),
+            ("Supplier onboarding runbook", "planned", "runbook", None),
+            ("Security review", "planned", "assessment", None),
         ],
     ),
     (
@@ -1442,8 +1447,8 @@ _SOLUTIONS = [
         "Replaces point-to-point feeds with one governed event backbone.",
         "F", "approved", "development",
         [
-            ("Migration roadmap", "completed", "implementation_plan"),
-            ("Cut-over plan", "in_progress", "implementation_plan"),
+            ("Migration roadmap", "completed", "implementation_plan", "Finalized Implementation Plan"),
+            ("Cut-over plan", "in_progress", "implementation_plan", None),
         ],
     ),
 ]
@@ -1497,6 +1502,7 @@ def _seed_boards(org_id, demo_user_id) -> dict:
     Idempotent. A work package that already carries a kind is left alone, so
     a card an architect has moved is not put back by a re-run.
     """
+    from app.models.adm_deliverable import ADMDeliverable
     from app.models.business_capabilities import BusinessCapability
     from app.models.implementation_migration import Deliverable
     from app.models.solution_architect_models import (
@@ -1507,6 +1513,7 @@ def _seed_boards(org_id, demo_user_id) -> dict:
         CapabilityValueStreamMapping, ValueStream, ValueStreamStage,
     )
     from app.modules.capabilities.services import value_stream_service
+    from app.services.adm_deliverable_service import seed_deliverables
     from app.services.element_profile_service import (
         read_profile, set_kind, set_kind_property, set_wsjf_components,
     )
@@ -1540,13 +1547,30 @@ def _seed_boards(org_id, demo_user_id) -> dict:
         stats["safe_kinds_set"] += 1
     db.session.flush()
 
-    # Solutions, each with deliverables
+    # Solutions, each with deliverables matched to the phase's TOGAF checklist
+    seed_deliverables()
+    templates = {
+        (t.phase, t.name): t.id for t in db.session.query(ADMDeliverable).filter_by(is_template=True)
+    }
     solutions = {
         s.name: s
         for s in db.session.query(Solution).filter(Solution.organization_id == org_id)
     }
     for name, desc, phase, gov, deploy, deliverables in _SOLUTIONS:
         if name in solutions:
+            # Seeded before deliverables carried a checklist item: match them now.
+            for d_name, _s, _t, d_template in deliverables:
+                if d_template is None:
+                    continue
+                for existing in (
+                    db.session.query(Deliverable)
+                    .join(solution_deliverables,
+                          solution_deliverables.c.deliverable_id == Deliverable.id)
+                    .filter(solution_deliverables.c.solution_id == solutions[name].id,
+                            Deliverable.name == d_name,
+                            Deliverable.adm_template_id.is_(None))
+                ):
+                    existing.adm_template_id = templates.get((phase, d_template))
             continue
         sol = Solution(
             name=name, description=desc, organization_id=org_id,
@@ -1558,10 +1582,11 @@ def _seed_boards(org_id, demo_user_id) -> dict:
         db.session.flush()
         solutions[name] = sol
         stats["solutions_created"] += 1
-        for d_name, d_status, d_type in deliverables:
+        for d_name, d_status, d_type, d_template in deliverables:
             deliverable = Deliverable(
                 name=d_name, organization_id=org_id,
                 delivery_status=d_status, deliverable_type=d_type,
+                adm_template_id=templates.get((phase, d_template)),
             )
             db.session.add(deliverable)
             db.session.flush()
@@ -2367,6 +2392,7 @@ def seed_demo_company() -> dict:
         existing_owner_emails = {
             u.email for u in User.query.filter_by(organization_id=org_id).all()
         }
+        viewer_role = Role.query.filter_by(name="Viewer").first()
         owner_users_created = 0
         for first, last, email in _OWNER_USERS:
             if email in existing_owner_emails:
@@ -2379,7 +2405,11 @@ def seed_demo_company() -> dict:
                 organization_id=org_id,
                 confirmed=True,
                 role=viewer_role,
-                enterprise_role="enterprise_architect",
+                enterprise_role=(
+                    "business_architect"
+                    if email == _DEMO_BUSINESS_ARCHITECT_EMAIL
+                    else "enterprise_architect"
+                ),
             )
             db.session.add(u)
             owner_users_created += 1
@@ -2390,6 +2420,13 @@ def seed_demo_company() -> dict:
         ).first()
         if reader is not None and reader.enterprise_role != _DEMO_READER_PERSONA:
             reader.enterprise_role = _DEMO_READER_PERSONA
+            db.session.flush()
+
+        architect = User.query.filter_by(
+            email=_DEMO_BUSINESS_ARCHITECT_EMAIL, organization_id=org_id
+        ).first()
+        if architect is not None and architect.enterprise_role != "business_architect":
+            architect.enterprise_role = "business_architect"
             db.session.flush()
 
         apps = _resolve_apps(org_id)

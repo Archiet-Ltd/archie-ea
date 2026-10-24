@@ -233,5 +233,5 @@ module.exports = {
   },
   // Bundled in the standalone CLI at scripts/bin/tailwindcss[.exe] — resolves
   // with no npm install and no network, so the air-gap posture is unaffected.
-  plugins: [require('@tailwindcss/typography')],
+  plugins: [require('@tailwindcss/typography'), require('@tailwindcss/container-queries')],
 }
