@@ -14,7 +14,7 @@ from __future__ import annotations
 import logging
 import time
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import requests
@@ -198,7 +198,7 @@ def _read_site(site: str, model, max_pages: int, time_limit: float, delay: float
                 result["model_errors"] += 1
             result["pages"].append({"url": final_url, "fetched_at": fetched_at, "static": static,
                                     "analysis": analysis, "html": html if not result["pages"] else None})
-            for link in list(static["links"]) + [l for l in (analysis.get("links") or []) if isinstance(l, str)]:
+            for link in list(static["links"]) + [item for item in (analysis.get("links") or []) if isinstance(item, str)]:
                 link = urldefrag(urljoin(final_url, link))[0]
                 if link not in queued and same_site(link, site):
                     queued.add(link)
