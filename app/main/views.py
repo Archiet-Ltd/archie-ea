@@ -1007,6 +1007,33 @@ def public_dogfood():
     return render_template("public/page.html", page=page, jsonld=build_jsonld(page))
 
 
+@main.route("/architecture-health-check/sample")
+def architecture_health_check_sample():
+    """The health-check report for the sample company, so a buyer sees what they would receive."""
+    from app.services.health_check_report_service import load_sample_report
+
+    report = load_sample_report()
+    if report is None:
+        from flask import abort
+        abort(404)
+    return render_template("public/health_check_sample.html", report=report)
+
+
+@main.route("/architecture-health-check/sample.pdf")
+def architecture_health_check_sample_pdf():
+    """The sample report as the PDF a client receives."""
+    from pathlib import Path
+
+    from flask import abort, current_app, send_file
+
+    from app.services.health_check_report_service import REPORT_BASENAME, SAMPLE_DIR
+
+    path = Path(current_app.root_path).parent / SAMPLE_DIR / (REPORT_BASENAME + ".pdf")
+    if not path.is_file():
+        abort(404)
+    return send_file(path, mimetype="application/pdf", download_name="sample-architecture-health-check.pdf")
+
+
 @main.route(
     "/<any(about, security, privacy, terms, contact, features, pricing, docs, "
     "'architecture-health-check', 'team-annual-onboarding'):slug>"

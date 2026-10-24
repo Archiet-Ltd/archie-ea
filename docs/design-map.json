@@ -605,7 +605,8 @@
   "app/templates/archimate_crud/detail.html": "Element page",
   "app/templates/ai_chat/index.html": "AI chat",
   "app/templates/capability_map/index.html": "Capability map",
-  "app/modules/intelligence/templates/intelligence/ask.html": "Ask"
+  "app/modules/intelligence/templates/intelligence/ask.html": "Ask",
+  "app/templates/public/health_check_sample.html": "Sample health check report"
  },
  "personas": {
   "solution_architect": "Solution Architect",
@@ -30555,6 +30556,61 @@
    "original": "example:tasks",
    "page_type": "data-table",
    "reason": "Portfolio list.",
+   "tier": "B",
+   "type_changed": false
+  },
+  "app/templates/public/health_check_sample.html": {
+   "allowed_macros": [
+    "components/accessibility_helpers.html",
+    "components/alert.html",
+    "components/badge.html",
+    "components/button.html",
+    "components/card.html",
+    "components/public_faq.html",
+    "components/public_footer.html",
+    "components/public_navbar.html",
+    "macros/pricing_cta.html"
+   ],
+   "basis": "rule",
+   "block": "public",
+   "components": [
+    "badge",
+    "button",
+    "card",
+    "public-navbar",
+    "table"
+   ],
+   "controls": {
+    "link": 3
+   },
+   "extends": [
+    "layouts/public_base.html"
+   ],
+   "macros": [
+    "components/public_navbar.html"
+   ],
+   "persona": "startup_cto",
+   "reference": {
+    "shadcn": {
+     "name": "shadcn site home",
+     "url": "https://ui.shadcn.com"
+    },
+    "basecoat": {
+     "name": "flask-basecoat examples: home",
+     "image": "docs/design/reference/basecoat-index.webp"
+    }
+   },
+   "spec": null,
+   "status": "mapped",
+   "charts": [],
+   "confidence": "high",
+   "frame": "navigation-menu",
+   "inhouse_components": [
+    "public-navbar:Compose"
+   ],
+   "original": "gap:G-1",
+   "page_type": "public",
+   "reason": "The sample health-check report in the public shell: summary, six report sections as cards and tables.",
    "tier": "B",
    "type_changed": false
   },

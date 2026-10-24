@@ -54,6 +54,8 @@ entries:
         scope: ["."]
         suffixes: [.css, .scss, .html]
     known_exceptions:
+      - path: docs/sample-report/architecture-health-check.html
+        reason: the generated sample report, a standalone document that carries a copy of the token file so it opens anywhere
       - path: app/templates/errors/400.html
         reason: self-contained error page that must render without the application stylesheet
       - path: app/templates/errors/401.html

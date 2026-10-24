@@ -1,0 +1,27 @@
+{# design-block: public #}
+{# The sample health-check report, shown inside the public site shell.
+   smoke-coverage-ok: covered by tests/smoke/test_health_check_sample_journey.py #}
+{% extends 'layouts/public_base.html' %}
+{% from 'components/button.html' import button %}
+{% block body_theme %}theme-marketing{% endblock %}
+{% block title %}Sample architecture health check report{% endblock %}
+{% block meta_description %}
+<meta name="description" content="A sample architecture health check report for a fictional company: application inventory, what breaks if a critical system fails, duplicates, owners, scores and renewals.">
+{% endblock %}
+{% block header %}
+{% include 'components/public_navbar.html' %}
+{% endblock %}
+{% block content %}
+<div class="public-container">
+  <p class="public-eyebrow"><a href="/architecture-health-check">Architecture health check</a></p>
+  <h1 class="text-3xl font-bold" data-testid="hc-sample-title">Sample health check report</h1>
+  <p class="mt-3 max-w-2xl text-muted-foreground">This is the report a client receives, written for a fictional company so you can see every section before you buy. Where the company's records are incomplete, the report says so and does not guess.</p>
+  <div class="mt-6 flex flex-wrap gap-3">
+    {{ button(text='Request the health check', href='/architecture-health-check#request-the-health-check', variant='default', testid='hc-sample-request') }}
+    {{ button(text='Download the sample as PDF', href='/architecture-health-check/sample.pdf', variant='outline', testid='hc-sample-pdf') }}
+  </div>
+  <div class="mt-10">
+    {% include 'health_check/_report_body.html' %}
+  </div>
+</div>
+{% endblock %}

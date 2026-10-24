@@ -1,0 +1,734 @@
+{
+ "currency": "GBP",
+ "duplicates": {
+  "groups": [],
+  "overlaps": [
+   {
+    "applications": [
+     "Monitoring dashboard",
+     "Notification service",
+     "Order management system"
+    ],
+    "capability": "Track customer orders",
+    "contracts": {
+     "combined_annual_cost": null,
+     "items": [],
+     "nearest_end": null
+    },
+    "source": "Capability record: Track customer orders"
+   },
+   {
+    "applications": [
+     "Data warehouse",
+     "Inventory system"
+    ],
+    "capability": "Manage stock",
+    "contracts": {
+     "combined_annual_cost": null,
+     "items": [],
+     "nearest_end": null
+    },
+    "source": "Capability record: Manage stock"
+   },
+   {
+    "applications": [
+     "Finance system",
+     "Payments service"
+    ],
+    "capability": "Process online payments",
+    "contracts": {
+     "combined_annual_cost": null,
+     "items": [],
+     "nearest_end": null
+    },
+    "source": "Capability record: Process online payments"
+   },
+   {
+    "applications": [
+     "Customer web app",
+     "Identity provider"
+    ],
+    "capability": "Sell to customers online",
+    "contracts": {
+     "combined_annual_cost": null,
+     "items": [],
+     "nearest_end": null
+    },
+    "source": "Capability record: Sell to customers online"
+   }
+  ]
+ },
+ "generated_on": "2026-10-24",
+ "impact": {
+  "critical_total": 10,
+  "listed_per_system": 8,
+  "systems": [
+   {
+    "affected": [
+     {
+      "basis": "Stated in your data",
+      "hops": 1,
+      "layer": "strategy",
+      "name": "Sell to customers online",
+      "owner": "Alex Morgan"
+     }
+    ],
+    "affected_total": 1,
+    "by_layer": {
+     "strategy": 1
+    },
+    "criticality": "high",
+    "modelled": true,
+    "name": "Customer web app",
+    "owner": "Alex Morgan",
+    "source": "Application record: Customer web app"
+   },
+   {
+    "affected": [
+     {
+      "basis": "Stated in your data",
+      "hops": 1,
+      "layer": "strategy",
+      "name": "Manage stock",
+      "owner": "Alex Morgan"
+     }
+    ],
+    "affected_total": 1,
+    "by_layer": {
+     "strategy": 1
+    },
+    "criticality": "high",
+    "modelled": true,
+    "name": "Data warehouse",
+    "owner": "Alex Morgan",
+    "source": "Application record: Data warehouse"
+   },
+   {
+    "affected": [],
+    "affected_total": 0,
+    "by_layer": {},
+    "criticality": "high",
+    "modelled": true,
+    "name": "Document management",
+    "owner": "Alex Morgan",
+    "source": "Application record: Document management"
+   },
+   {
+    "affected": [
+     {
+      "basis": "Stated in your data",
+      "hops": 1,
+      "layer": "strategy",
+      "name": "Process online payments",
+      "owner": "Alex Morgan"
+     },
+     {
+      "basis": "Stated in your data",
+      "hops": 2,
+      "layer": "business",
+      "name": "Handle customer checkout",
+      "owner": null
+     }
+    ],
+    "affected_total": 2,
+    "by_layer": {
+     "business": 1,
+     "strategy": 1
+    },
+    "criticality": "high",
+    "modelled": true,
+    "name": "Finance system",
+    "owner": "Alex Morgan",
+    "source": "Application record: Finance system"
+   },
+   {
+    "affected": [
+     {
+      "basis": "Stated in your data",
+      "hops": 1,
+      "layer": "strategy",
+      "name": "Sell to customers online",
+      "owner": "Alex Morgan"
+     }
+    ],
+    "affected_total": 1,
+    "by_layer": {
+     "strategy": 1
+    },
+    "criticality": "high",
+    "modelled": true,
+    "name": "Identity provider",
+    "owner": "Alex Morgan",
+    "source": "Application record: Identity provider"
+   },
+   {
+    "affected": [
+     {
+      "basis": "Stated in your data",
+      "hops": 1,
+      "layer": "strategy",
+      "name": "Manage stock",
+      "owner": "Alex Morgan"
+     },
+     {
+      "basis": "Stated in your data",
+      "hops": 1,
+      "layer": "application",
+      "name": "Order management system",
+      "owner": "Alex Morgan"
+     },
+     {
+      "basis": "Stated in your data",
+      "hops": 2,
+      "layer": "application",
+      "name": "Customer web app",
+      "owner": "Alex Morgan"
+     },
+     {
+      "basis": "Stated in your data",
+      "hops": 2,
+      "layer": "strategy",
+      "name": "Track customer orders",
+      "owner": "Alex Morgan"
+     },
+     {
+      "basis": "Stated in your data",
+      "hops": 3,
+      "layer": "business",
+      "name": "Fulfil customer order",
+      "owner": null
+     },
+     {
+      "basis": "Stated in your data",
+      "hops": 3,
+      "layer": "strategy",
+      "name": "Sell to customers online",
+      "owner": "Alex Morgan"
+     }
+    ],
+    "affected_total": 6,
+    "by_layer": {
+     "application": 2,
+     "business": 1,
+     "strategy": 3
+    },
+    "criticality": "high",
+    "modelled": true,
+    "name": "Inventory system",
+    "owner": "Alex Morgan",
+    "source": "Application record: Inventory system"
+   },
+   {
+    "affected": [
+     {
+      "basis": "Stated in your data",
+      "hops": 1,
+      "layer": "strategy",
+      "name": "Track customer orders",
+      "owner": "Alex Morgan"
+     },
+     {
+      "basis": "Stated in your data",
+      "hops": 2,
+      "layer": "business",
+      "name": "Fulfil customer order",
+      "owner": null
+     }
+    ],
+    "affected_total": 2,
+    "by_layer": {
+     "business": 1,
+     "strategy": 1
+    },
+    "criticality": "high",
+    "modelled": true,
+    "name": "Monitoring dashboard",
+    "owner": "Alex Morgan",
+    "source": "Application record: Monitoring dashboard"
+   },
+   {
+    "affected": [
+     {
+      "basis": "Stated in your data",
+      "hops": 1,
+      "layer": "application",
+      "name": "Order management system",
+      "owner": "Alex Morgan"
+     },
+     {
+      "basis": "Stated in your data",
+      "hops": 1,
+      "layer": "strategy",
+      "name": "Track customer orders",
+      "owner": "Alex Morgan"
+     },
+     {
+      "basis": "Stated in your data",
+      "hops": 2,
+      "layer": "application",
+      "name": "Customer web app",
+      "owner": "Alex Morgan"
+     },
+     {
+      "basis": "Stated in your data",
+      "hops": 2,
+      "layer": "business",
+      "name": "Fulfil customer order",
+      "owner": null
+     },
+     {
+      "basis": "Stated in your data",
+      "hops": 3,
+      "layer": "strategy",
+      "name": "Sell to customers online",
+      "owner": "Alex Morgan"
+     }
+    ],
+    "affected_total": 5,
+    "by_layer": {
+     "application": 2,
+     "business": 1,
+     "strategy": 2
+    },
+    "criticality": "high",
+    "modelled": true,
+    "name": "Notification service",
+    "owner": "Alex Morgan",
+    "source": "Application record: Notification service"
+   },
+   {
+    "affected": [
+     {
+      "basis": "Stated in your data",
+      "hops": 1,
+      "layer": "application",
+      "name": "Customer web app",
+      "owner": "Alex Morgan"
+     },
+     {
+      "basis": "Stated in your data",
+      "hops": 1,
+      "layer": "strategy",
+      "name": "Track customer orders",
+      "owner": "Alex Morgan"
+     },
+     {
+      "basis": "Stated in your data",
+      "hops": 2,
+      "layer": "business",
+      "name": "Fulfil customer order",
+      "owner": null
+     },
+     {
+      "basis": "Stated in your data",
+      "hops": 2,
+      "layer": "strategy",
+      "name": "Sell to customers online",
+      "owner": "Alex Morgan"
+     }
+    ],
+    "affected_total": 4,
+    "by_layer": {
+     "application": 1,
+     "business": 1,
+     "strategy": 2
+    },
+    "criticality": "high",
+    "modelled": true,
+    "name": "Order management system",
+    "owner": "Alex Morgan",
+    "source": "Application record: Order management system"
+   },
+   {
+    "affected": [
+     {
+      "basis": "Stated in your data",
+      "hops": 1,
+      "layer": "application",
+      "name": "Customer web app",
+      "owner": "Alex Morgan"
+     },
+     {
+      "basis": "Stated in your data",
+      "hops": 1,
+      "layer": "application",
+      "name": "Order management system",
+      "owner": "Alex Morgan"
+     },
+     {
+      "basis": "Stated in your data",
+      "hops": 1,
+      "layer": "strategy",
+      "name": "Process online payments",
+      "owner": "Alex Morgan"
+     },
+     {
+      "basis": "Stated in your data",
+      "hops": 2,
+      "layer": "business",
+      "name": "Handle customer checkout",
+      "owner": null
+     },
+     {
+      "basis": "Stated in your data",
+      "hops": 2,
+      "layer": "strategy",
+      "name": "Sell to customers online",
+      "owner": "Alex Morgan"
+     },
+     {
+      "basis": "Stated in your data",
+      "hops": 2,
+      "layer": "strategy",
+      "name": "Track customer orders",
+      "owner": "Alex Morgan"
+     },
+     {
+      "basis": "Stated in your data",
+      "hops": 3,
+      "layer": "business",
+      "name": "Fulfil customer order",
+      "owner": null
+     }
+    ],
+    "affected_total": 7,
+    "by_layer": {
+     "application": 2,
+     "business": 2,
+     "strategy": 3
+    },
+    "criticality": "high",
+    "modelled": true,
+    "name": "Payments service",
+    "owner": "Alex Morgan",
+    "source": "Application record: Payments service"
+   }
+  ]
+ },
+ "inventory": {
+  "completeness": [
+   {
+    "field": "Owner",
+    "filled": 10,
+    "missing": 0,
+    "percent": 100,
+    "total": 10
+   },
+   {
+    "field": "Annual cost",
+    "filled": 10,
+    "missing": 0,
+    "percent": 100,
+    "total": 10
+   },
+   {
+    "field": "Lifecycle stage",
+    "filled": 10,
+    "missing": 0,
+    "percent": 100,
+    "total": 10
+   },
+   {
+    "field": "Business criticality",
+    "filled": 10,
+    "missing": 0,
+    "percent": 100,
+    "total": 10
+   },
+   {
+    "field": "Business unit",
+    "filled": 0,
+    "missing": 10,
+    "percent": 0,
+    "total": 10
+   },
+   {
+    "field": "Vendor",
+    "filled": 10,
+    "missing": 0,
+    "percent": 100,
+    "total": 10
+   }
+  ],
+  "rows": [
+   {
+    "annual_cost": 61200.0,
+    "business_unit": null,
+    "criticality": "high",
+    "lifecycle": "2.1 strategic",
+    "missing": [
+     "Business unit"
+    ],
+    "name": "Customer web app",
+    "owner": "Alex Morgan",
+    "source": "Application record: Customer web app",
+    "vendor": "In-house"
+   },
+   {
+    "annual_cost": 104400.0,
+    "business_unit": null,
+    "criticality": "high",
+    "lifecycle": "2.1 strategic",
+    "missing": [
+     "Business unit"
+    ],
+    "name": "Data warehouse",
+    "owner": "Alex Morgan",
+    "source": "Application record: Data warehouse",
+    "vendor": "Snowflake"
+   },
+   {
+    "annual_cost": 25800.0,
+    "business_unit": null,
+    "criticality": "high",
+    "lifecycle": "3. sunset",
+    "missing": [
+     "Business unit"
+    ],
+    "name": "Document management",
+    "owner": "Alex Morgan",
+    "source": "Application record: Document management",
+    "vendor": "OpenText"
+   },
+   {
+    "annual_cost": 88800.0,
+    "business_unit": null,
+    "criticality": "high",
+    "lifecycle": "2.2 tactical",
+    "missing": [
+     "Business unit"
+    ],
+    "name": "Finance system",
+    "owner": "Alex Morgan",
+    "source": "Application record: Finance system",
+    "vendor": "Oracle"
+   },
+   {
+    "annual_cost": 22800.0,
+    "business_unit": null,
+    "criticality": "high",
+    "lifecycle": "2.1 strategic",
+    "missing": [
+     "Business unit"
+    ],
+    "name": "Identity provider",
+    "owner": "Alex Morgan",
+    "source": "Application record: Identity provider",
+    "vendor": "Okta"
+   },
+   {
+    "annual_cost": 52800.0,
+    "business_unit": null,
+    "criticality": "high",
+    "lifecycle": "2.2 tactical",
+    "missing": [
+     "Business unit"
+    ],
+    "name": "Inventory system",
+    "owner": "Alex Morgan",
+    "source": "Application record: Inventory system",
+    "vendor": "Oracle"
+   },
+   {
+    "annual_cost": 13200.0,
+    "business_unit": null,
+    "criticality": "high",
+    "lifecycle": "2.2 tactical",
+    "missing": [
+     "Business unit"
+    ],
+    "name": "Monitoring dashboard",
+    "owner": "Alex Morgan",
+    "source": "Application record: Monitoring dashboard",
+    "vendor": "Datadog"
+   },
+   {
+    "annual_cost": 16200.0,
+    "business_unit": null,
+    "criticality": "high",
+    "lifecycle": "2.2 tactical",
+    "missing": [
+     "Business unit"
+    ],
+    "name": "Notification service",
+    "owner": "Alex Morgan",
+    "source": "Application record: Notification service",
+    "vendor": "Twilio"
+   },
+   {
+    "annual_cost": 81600.0,
+    "business_unit": null,
+    "criticality": "high",
+    "lifecycle": "2.2 tactical",
+    "missing": [
+     "Business unit"
+    ],
+    "name": "Order management system",
+    "owner": "Alex Morgan",
+    "source": "Application record: Order management system",
+    "vendor": "SAP"
+   },
+   {
+    "annual_cost": 74400.0,
+    "business_unit": null,
+    "criticality": "high",
+    "lifecycle": "2.1 strategic",
+    "missing": [
+     "Business unit"
+    ],
+    "name": "Payments service",
+    "owner": "Alex Morgan",
+    "source": "Application record: Payments service",
+    "vendor": "Stripe"
+   }
+  ],
+  "total": 10
+ },
+ "organisation": "Sample company",
+ "recommendations": {
+  "duplicates": "Review each overlapping group with its contracts and decide which application stays.",
+  "impact": "Confirm each affected owner can take the call when its supplier system fails.",
+  "inventory": "Fill business unit first; they are the fields most often missing.",
+  "renewals": "Share your contract list (vendor, annual cost, renewal date, auto-renewal) to produce this section.",
+  "scores": "Record the missing facts for the 10 applications not scored, then re-run the scoring.",
+  "unowned": "Every application has an accountable owner."
+ },
+ "renewals": {
+  "annual_cost": null,
+  "contracts_total": 0,
+  "rows": [],
+  "window_end": "2027-01-22",
+  "window_start": "2026-10-24"
+ },
+ "scores": {
+  "distribution": {
+   "ELIMINATE": 0,
+   "INVEST": 0,
+   "MIGRATE": 0,
+   "TOLERATE": 0
+  },
+  "scored": [],
+  "unscored": [
+   {
+    "missing": [
+     "Lifecycle Status",
+     "Risk Assessment"
+    ],
+    "name": "Customer web app",
+    "score": 59,
+    "source": "Application record: Customer web app",
+    "time": "INVEST"
+   },
+   {
+    "missing": [
+     "Lifecycle Status",
+     "Risk Assessment"
+    ],
+    "name": "Data warehouse",
+    "score": 54,
+    "source": "Application record: Data warehouse",
+    "time": "INVEST"
+   },
+   {
+    "missing": [
+     "Lifecycle Status",
+     "Risk Assessment"
+    ],
+    "name": "Document management",
+    "score": 68,
+    "source": "Application record: Document management",
+    "time": "INVEST"
+   },
+   {
+    "missing": [
+     "Lifecycle Status",
+     "Risk Assessment"
+    ],
+    "name": "Finance system",
+    "score": 59,
+    "source": "Application record: Finance system",
+    "time": "INVEST"
+   },
+   {
+    "missing": [
+     "Lifecycle Status",
+     "Risk Assessment"
+    ],
+    "name": "Identity provider",
+    "score": 61,
+    "source": "Application record: Identity provider",
+    "time": "INVEST"
+   },
+   {
+    "missing": [
+     "Lifecycle Status",
+     "Risk Assessment"
+    ],
+    "name": "Inventory system",
+    "score": 59,
+    "source": "Application record: Inventory system",
+    "time": "INVEST"
+   },
+   {
+    "missing": [
+     "Lifecycle Status",
+     "Risk Assessment"
+    ],
+    "name": "Monitoring dashboard",
+    "score": 61,
+    "source": "Application record: Monitoring dashboard",
+    "time": "INVEST"
+   },
+   {
+    "missing": [
+     "Lifecycle Status",
+     "Risk Assessment"
+    ],
+    "name": "Notification service",
+    "score": 61,
+    "source": "Application record: Notification service",
+    "time": "INVEST"
+   },
+   {
+    "missing": [
+     "Lifecycle Status",
+     "Risk Assessment"
+    ],
+    "name": "Order management system",
+    "score": 59,
+    "source": "Application record: Order management system",
+    "time": "INVEST"
+   },
+   {
+    "missing": [
+     "Lifecycle Status",
+     "Risk Assessment"
+    ],
+    "name": "Payments service",
+    "score": 59,
+    "source": "Application record: Payments service",
+    "time": "INVEST"
+   }
+  ]
+ },
+ "summary": [
+  "10 applications are recorded. 0 have no accountable owner.",
+  "Business unit is the least complete field: 10 of 10 applications have none recorded.",
+  "10 critical systems were traced for what would stop if they failed.",
+  "4 groups of overlapping applications share a capability, and 0 groups were flagged as duplicates.",
+  "0 of 10 applications could be scored; 10 need more evidence first.",
+  "No contracts are recorded, so renewals could not be reported."
+ ],
+ "unowned": {
+  "coverage": [
+   {
+    "business_unit": "No business unit recorded",
+    "owned": 10,
+    "percent": 100,
+    "total": 10
+   }
+  ],
+  "rows": [],
+  "total": 10
+ }
+}
