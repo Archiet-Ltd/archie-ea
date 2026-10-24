@@ -1328,7 +1328,7 @@ z-index: 45;
                                         </th>
                                     </template>
                     {% endset %}
-                    {% call dense_table(header=relmatrix_header, caption='Relationship matrix', class='m-2', table_class='text-xs') %}
+                    {% call dense_table(header=relmatrix_header, caption='Relationship matrix', table_class='text-xs') %}
                                 <template x-for="srcEl in relMatrixData.elements" :key="'row-' + srcEl.id">
                                     <tr>
                                         <td class="sticky left-0 z-10 px-2 py-1 font-medium border border-border min-w-[160px] whitespace-nowrap"
