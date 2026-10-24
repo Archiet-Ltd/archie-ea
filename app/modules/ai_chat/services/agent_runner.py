@@ -189,9 +189,11 @@ def build_provider_chain(first_provider: str, first_model: str, pin_first: bool 
 
     Built from the enabled providers only, never adds a paid one. The order is
     the ``AI_PROVIDER_ORDER`` setting (comma-separated provider names) when set;
-    otherwise the free providers come first when the organisation has no paid
-    key, because the shared free allowance runs out daily and the dedicated
-    one does not. ``pin_first`` keeps the caller's explicit choice at the front.
+    otherwise the providers the organisation has its own key for come first
+    (paid ones in priority order), then the free ones, NVIDIA before OpenRouter
+    because the shared OpenRouter allowance runs out daily. An organisation
+    without a key of its own starts on the free providers. ``pin_first`` keeps
+    the caller's explicit choice at the front.
     A provider contributes each of its models in turn, each with every key.
     """
     import os
@@ -216,7 +218,11 @@ def build_provider_chain(first_provider: str, first_model: str, pin_first: bool 
     elif not has_paid:
         order = [p for p in _FREE_PROVIDERS if p in names] + [p for p in names if p not in _FREE_PROVIDERS]
     else:
-        order = [first_provider] + [p for p in names if p != first_provider]
+        # The organisation's own paid key first, whatever the caller defaulted to;
+        # the free providers only after it, and only if it fails.
+        own = [p for p in names if p not in _FREE_PROVIDERS and p in rows]
+        rest = [p for p in _FREE_PROVIDERS if p in names] + [p for p in names if p not in own and p not in _FREE_PROVIDERS]
+        order = own + rest
     if pin_first:
         order = [first_provider] + [p for p in order if p != first_provider]
     if first_provider not in order:
