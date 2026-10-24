@@ -1,10 +1,12 @@
 {% extends "layouts/admin_base.html" %}
 {% from 'components/page_header.html' import page_header %}
-
 {% from 'components/button.html' import button %}
 {% from 'components/card.html' import card, card_header, card_title, card_content %}
 {% from 'components/badge.html' import badge %}
 {% from 'components/modal.html' import modal %}
+{% from 'components/table.html' import table, table_header, table_body, table_row, table_head, table_cell, table_empty_state %}
+{% from 'components/input.html' import input, label, textarea %}
+{% from 'components/select.html' import native_select %}
 
 {% block title %}{{ application.name }} Roadmap{% endblock %}
 
@@ -12,44 +14,57 @@
 <div class="space-y-6" x-data="applicationRoadmapCrud()" x-init="init()">
   <input type="hidden" id="roadmap-csrf-token" value="{{ csrf_token() }}">
 
-  <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-    {{ page_header(
-      title=application.name ~ ' Roadmap',
-      description='Tactical application transformation planning with full work-package CRUD',
-      breadcrumbs=[
-        {'label': 'Applications', 'url': url_for('unified_applications.application_list')},
-        {'label': application.name, 'url': url_for('unified_applications.application_detail', id=application.id)},
-        {'label': 'Roadmap'}
-      ]
-    ) }}
-    <div class="flex items-center gap-2">
-      {{ button('Back to Application', variant='outline', size='default', href=url_for('unified_applications.application_detail', id=application.id), icon='arrow-left') }}
-      <button type="button" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center"
-        @click="openCreateModal()">
-        Add Work Package
-      </button>
-    </div>
-  </div>
+  {{ page_header(
+    title=application.name ~ ' Roadmap',
+    description='Tactical application transformation planning with full work-package CRUD',
+    breadcrumbs=[
+      {'label': 'Applications', 'href': url_for('unified_applications.application_list')},
+      {'label': application.name, 'href': url_for('unified_applications.application_detail', id=application.id)},
+      {'label': 'Roadmap'}
+    ],
+    actions=[
+      {'text': 'Back to Application', 'icon': 'arrow-left', 'variant': 'outline', 'href': url_for('unified_applications.application_detail', id=application.id)},
+      {'text': 'Add Work Package', 'icon': 'plus', 'onclick': 'openCreateModal()', 'variant': 'default'}
+    ]
+  ) }}
 
+  {# Summary stat cards #}
   <div class="grid grid-cols-1 gap-4 md:grid-cols-4">
-    <div data-slot="card" class="rounded-lg border border-border bg-card p-4">
-      <p class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Total</p>
-      <p class="mt-2 text-2xl font-semibold" x-text="metrics.total"></p>
-    </div>
-    <div data-slot="card" class="rounded-lg border border-border bg-card p-4">
-      <p class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Planned</p>
-      <p class="mt-2 text-2xl font-semibold" x-text="metrics.planned"></p>
-    </div>
-    <div data-slot="card" class="rounded-lg border border-border bg-card p-4">
-      <p class="text-xs font-medium uppercase tracking-wide text-muted-foreground">In Progress</p>
-      <p class="mt-2 text-2xl font-semibold" x-text="metrics.in_progress"></p>
-    </div>
-    <div data-slot="card" class="rounded-lg border border-border bg-card p-4">
-      <p class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Completed</p>
-      <p class="mt-2 text-2xl font-semibold" x-text="metrics.completed"></p>
-    </div>
+    {% call card() %}
+      {% call card_header() %}
+        <p class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Total</p>
+      {% endcall %}
+      {% call card_content() %}
+        <p class="text-2xl font-semibold" x-text="metrics.total"></p>
+      {% endcall %}
+    {% endcall %}
+    {% call card() %}
+      {% call card_header() %}
+        <p class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Planned</p>
+      {% endcall %}
+      {% call card_content() %}
+        <p class="text-2xl font-semibold" x-text="metrics.planned"></p>
+      {% endcall %}
+    {% endcall %}
+    {% call card() %}
+      {% call card_header() %}
+        <p class="text-xs font-medium uppercase tracking-wide text-muted-foreground">In Progress</p>
+      {% endcall %}
+      {% call card_content() %}
+        <p class="text-2xl font-semibold" x-text="metrics.in_progress"></p>
+      {% endcall %}
+    {% endcall %}
+    {% call card() %}
+      {% call card_header() %}
+        <p class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Completed</p>
+      {% endcall %}
+      {% call card_content() %}
+        <p class="text-2xl font-semibold" x-text="metrics.completed"></p>
+      {% endcall %}
+    {% endcall %}
   </div>
 
+  {# Work packages table card #}
   {% call card() %}
     {% call card_header() %}
       {% call card_title() %}Work Packages{% endcall %}
@@ -60,173 +75,166 @@
           Create, update, and delete roadmap work packages for this application.
         </p>
         <div class="flex items-center gap-2">
-          <label for="roadmap-filter" class="text-sm text-muted-foreground">Status</label>
-          <select id="roadmap-filter" x-model="statusFilter" class="rounded-md border border-input bg-background px-3 py-2 text-sm">
+          <label for="roadmap-filter" class="text-sm font-medium text-muted-foreground">Status</label>
+          {% call native_select(id='roadmap-filter', name='status_filter', size='sm', aria_label='Status filter', attrs_dict={'x-model': 'statusFilter'}) %}
             <option value="">All</option>
             <option value="planned">Planned</option>
             <option value="in_progress">In Progress</option>
             <option value="blocked">Blocked</option>
             <option value="completed">Completed</option>
-          </select>
+          {% endcall %}
         </div>
       </div>
 
-      <div class="overflow-x-auto rounded-lg border">
-        <table class="dense-table min-w-full text-sm">
-          <thead class="bg-muted/50">
-            <tr>
-              <th class="px-4 py-3 text-left font-medium text-muted-foreground">Name</th>
-              <th class="px-4 py-3 text-left font-medium text-muted-foreground">Type</th>
-              <th class="px-4 py-3 text-left font-medium text-muted-foreground">Status</th>
-              <th class="px-4 py-3 text-left font-medium text-muted-foreground">Priority</th>
-              <th class="px-4 py-3 text-left font-medium text-muted-foreground">Timeline</th>
-              <th class="px-4 py-3 text-right font-medium text-muted-foreground">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr x-show="filteredItems.length === 0">
-              <td colspan="6" class="px-4 py-10 text-center text-muted-foreground">
-                No work packages for this filter.
-              </td>
-            </tr>
-            <template x-for="item in filteredItems" :key="item.id">
-              <tr class="border-t">
-                <td class="px-4 py-3 align-top">
-                  <p class="font-medium text-foreground" x-text="item.name"></p>
-                  <p class="mt-1 text-xs text-muted-foreground" x-text="item.description || 'No description'"></p>
-                  <div class="mt-1 flex flex-wrap gap-1.5">
-                    <span x-show="item.plateau_name" class="inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium bg-info/10 text-primary border border-info/30"
-                        x-text="'Plateau: ' + item.plateau_name"></span>
-                    <span x-show="item.archimate_element_name" class="inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium bg-info/10 text-info-emphasis border border-info/30"
-                        x-text="item.archimate_element_name"></span>
-                    <span x-show="item.capability_name" class="inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium bg-warning/10 text-warning-emphasis border border-warning/30"
-                        x-text="'Cap: ' + item.capability_name"></span>
-                  </div>
-                </td>
-                <td class="px-4 py-3 align-top" x-text="formatLabel(item.transformation_type || 'Modernization')"></td>
-                <td class="px-4 py-3 align-top">
-                  <span class="inline-flex rounded-full border px-2 py-0.5 text-xs capitalize"
-                    :class="statusClass(item.status)"
-                    x-text="formatLabel(item.status || 'planned')"></span>
-                </td>
-                <td class="px-4 py-3 align-top" x-text="formatLabel(item.priority || 'medium')"></td>
-                <td class="px-4 py-3 align-top text-xs text-muted-foreground">
-                  <span x-text="formatDate(item.start_date)"></span>
-                  <span> → </span>
-                  <span x-text="formatDate(item.target_date)"></span>
-                </td>
-                <td class="px-4 py-3 align-top text-right">
-                  <div class="inline-flex items-center gap-2">
-                    <button type="button" class="rounded-md border px-2.5 py-1.5 text-xs hover:bg-muted"
-                      @click="openEditModal(item)">
-                      Edit
-                    </button>
-                    <button type="button" class="rounded-md border border-destructive/30 px-2.5 py-1.5 text-xs text-destructive-emphasis hover:bg-destructive/10"
-                      @click="deleteItem(item)">
-                      Delete
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            </template>
-          </tbody>
-        </table>
-      </div>
+      {% call table() %}
+        {% call table_header() %}
+          <tr>
+            {% call table_head() %}Name{% endcall %}
+            {% call table_head() %}Type{% endcall %}
+            {% call table_head() %}Status{% endcall %}
+            {% call table_head() %}Priority{% endcall %}
+            {% call table_head() %}Timeline{% endcall %}
+            {% call table_head(class='text-right') %}Actions{% endcall %}
+          </tr>
+        {% endcall %}
+        {% call table_body(attrs_dict={'x-show': 'filteredItems.length === 0'}) %}
+          {{ table_empty_state(message='No work packages for this filter.', icon='inbox') }}
+        {% endcall %}
+        {% call table_body() %}
+          <template x-for="item in filteredItems" :key="item.id">
+            {% call table_row() %}
+              {% call table_cell() %}
+                <p class="font-medium text-foreground" x-text="item.name"></p>
+                <p class="mt-1 text-xs text-muted-foreground" x-text="item.description || 'No description'"></p>
+                <div class="mt-1 flex flex-wrap gap-1.5">
+                  <span x-show="item.plateau_name" class="inline-flex items-center rounded-md border border-info/30 bg-info/10 px-2 py-0.5 text-xs font-medium text-info-emphasis"
+                      x-text="'Plateau: ' + item.plateau_name"></span>
+                  <span x-show="item.archimate_element_name" class="inline-flex items-center rounded-md border border-info/30 bg-info/10 px-2 py-0.5 text-xs font-medium text-info-emphasis"
+                      x-text="item.archimate_element_name"></span>
+                  <span x-show="item.capability_name" class="inline-flex items-center rounded-md border border-warning/30 bg-warning/10 px-2 py-0.5 text-xs font-medium text-warning-emphasis"
+                      x-text="'Cap: ' + item.capability_name"></span>
+                </div>
+              {% endcall %}
+              {% call table_cell() %}
+                <span x-text="formatLabel(item.transformation_type || 'Modernization')"></span>
+              {% endcall %}
+              {% call table_cell() %}
+                <span :class="statusClass(item.status)" class="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold capitalize"
+                  x-text="formatLabel(item.status || 'planned')"></span>
+              {% endcall %}
+              {% call table_cell() %}
+                <span x-text="formatLabel(item.priority || 'medium')"></span>
+              {% endcall %}
+              {% call table_cell(class='text-xs text-muted-foreground') %}
+                <span x-text="formatDate(item.start_date)"></span>
+                <span> → </span>
+                <span x-text="formatDate(item.target_date)"></span>
+              {% endcall %}
+              {% call table_cell(class='text-right') %}
+                <div class="inline-flex items-center gap-2">
+                  {{ button('Edit', variant='outline', size='xs', on_click='openEditModal(item)') }}
+                  {{ button('Delete', variant='ghost', size='xs', class='text-destructive-emphasis hover:bg-destructive/10', on_click='deleteItem(item)') }}
+                </div>
+              {% endcall %}
+            {% endcall %}
+          </template>
+        {% endcall %}
+      {% endcall %}
     {% endcall %}
   {% endcall %}
 
-  {# The shared macro keeps display:flex off the closed root: a flex utility
-     overrides native hidden and would intercept the Add button's first click. #}
+  {# CRUD modal for creating and editing work packages #}
   {% call modal(id='roadmap-work-package-modal', size='lg', labelledby='roadmap-modal-title') %}
-      <h3 id="roadmap-modal-title" class="text-base font-semibold text-foreground text-foreground pr-8 mb-4" x-text="isEditing ? 'Edit Work Package' : 'Create Work Package'"></h3>
+      <h3 id="roadmap-modal-title" class="text-base font-semibold text-foreground pr-8 mb-4" x-text="isEditing ? 'Edit Work Package' : 'Create Work Package'"></h3>
       <form class="space-y-4" @submit.prevent="submitForm()">
         <div class="grid gap-4 grid-cols-1">
-          <div class="">
-            <label class="block text-sm font-medium text-muted-foreground mb-1">Name</label>
-            <input type="text" x-model="form.name" required class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm" aria-label="Name">
+          <div>
+            {% call label(for='wp-name', required=true) %}Name{% endcall %}
+            {{ input(id='wp-name', required=true, aria_label='Name', placeholder='Work package name', attrs_dict={'x-model': 'form.name'}) }}
           </div>
           <div>
-            <label class="block text-sm font-medium text-muted-foreground mb-1">Transformation Type</label>
-            <select x-model="form.transformation_type" required class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm" aria-label="Transformation Type">
+            {% call label(for='wp-transformation-type', required=true) %}Transformation Type{% endcall %}
+            {% call native_select(id='wp-transformation-type', name='transformation_type', aria_label='Transformation Type', attrs_dict={'x-model': 'form.transformation_type'}) %}
               <option value="Modernization">Modernization</option>
               <option value="Integration">Integration</option>
               <option value="Migration">Migration</option>
               <option value="Optimization">Optimization</option>
-            </select>
+            {% endcall %}
           </div>
           <div>
-            <label class="block text-sm font-medium text-muted-foreground mb-1">Status</label>
-            <select x-model="form.status" class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm" aria-label="Status">
+            {% call label(for='wp-status') %}Status{% endcall %}
+            {% call native_select(id='wp-status', name='status', aria_label='Status', attrs_dict={'x-model': 'form.status'}) %}
               <option value="planned">Planned</option>
               <option value="in_progress">In Progress</option>
               <option value="blocked">Blocked</option>
               <option value="completed">Completed</option>
-            </select>
+            {% endcall %}
           </div>
           <div>
-            <label class="block text-sm font-medium text-muted-foreground mb-1">Priority</label>
-            <select x-model="form.priority" class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm" aria-label="Priority">
+            {% call label(for='wp-priority') %}Priority{% endcall %}
+            {% call native_select(id='wp-priority', name='priority', aria_label='Priority', attrs_dict={'x-model': 'form.priority'}) %}
               <option value="low">Low</option>
               <option value="medium">Medium</option>
               <option value="high">High</option>
               <option value="critical">Critical</option>
-            </select>
+            {% endcall %}
           </div>
           <div>
-            <label class="block text-sm font-medium text-muted-foreground mb-1">Application Phase</label>
-            <input type="text" x-model="form.application_phase" class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm" aria-label="Application Phase">
+            {% call label(for='wp-phase') %}Application Phase{% endcall %}
+            {{ input(id='wp-phase', placeholder='e.g. Implementation', attrs_dict={'x-model': 'form.application_phase'}) }}
           </div>
           <div>
-            <label class="block text-sm font-medium text-muted-foreground mb-1">Target Plateau</label>
-            <select x-model.number="form.plateau_id" class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm" aria-label="Target Plateau">
+            {% call label(for='wp-plateau') %}Target Plateau{% endcall %}
+            {% call native_select(id='wp-plateau', name='plateau_id', aria_label='Target Plateau', attrs_dict={'x-model.number': 'form.plateau_id'}) %}
               <option :value="null">— None —</option>
               <template x-for="p in plateaus" :key="p.id">
                 <option :value="p.id" x-text="p.name"></option>
               </template>
-            </select>
+            {% endcall %}
           </div>
           <div>
-            <label class="block text-sm font-medium text-muted-foreground mb-1">Linked Capability</label>
-            <select x-model.number="form.capability_id" class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm" aria-label="Linked Capability">
+            {% call label(for='wp-capability') %}Linked Capability{% endcall %}
+            {% call native_select(id='wp-capability', name='capability_id', aria_label='Linked Capability', attrs_dict={'x-model.number': 'form.capability_id'}) %}
               <option :value="null">— None —</option>
               <template x-for="c in capabilities" :key="c.id">
                 <option :value="c.id" x-text="c.name"></option>
               </template>
-            </select>
+            {% endcall %}
           </div>
-          <div class="">
-            <label class="block text-sm font-medium text-muted-foreground mb-1">Target Architecture Element</label>
-            <select x-model.number="form.archimate_element_id" class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm" aria-label="Target Architecture Element">
+          <div>
+            {% call label(for='wp-archimate-element') %}Target Architecture Element{% endcall %}
+            {% call native_select(id='wp-archimate-element', name='archimate_element_id', aria_label='Target Architecture Element', attrs_dict={'x-model.number': 'form.archimate_element_id'}) %}
               <option :value="null">-- Auto (ApplicationComponent) --</option>
               <template x-for="el in archiElements" :key="el.id">
                 <option :value="el.id" x-text="el.name + ' (' + el.type + ')'"></option>
               </template>
-            </select>
+            {% endcall %}
           </div>
           <div>
-            <label class="block text-sm font-medium text-muted-foreground mb-1">Start Date</label>
-            <input type="date" x-model="form.start_date" required class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm" aria-label="Start Date">
+            {% call label(for='wp-start-date', required=true) %}Start Date{% endcall %}
+            {{ input(id='wp-start-date', type='date', required=true, attrs_dict={'x-model': 'form.start_date'}) }}
           </div>
           <div>
-            <label class="block text-sm font-medium text-muted-foreground mb-1">Target Date</label>
-            <input type="date" x-model="form.target_date" required class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm" aria-label="Target Date">
+            {% call label(for='wp-target-date', required=true) %}Target Date{% endcall %}
+            {{ input(id='wp-target-date', type='date', required=true, attrs_dict={'x-model': 'form.target_date'}) }}
           </div>
           <div>
-            <label class="block text-sm font-medium text-muted-foreground mb-1">Estimated Effort Hours</label>
-            <input type="number" min="0" step="1" x-model.number="form.estimated_effort_hours" class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm" aria-label="Estimated Effort Hours">
+            {% call label(for='wp-effort') %}Estimated Effort Hours{% endcall %}
+            {{ input(id='wp-effort', type='number', placeholder='0', attrs_dict={'min': '0', 'step': '1', 'x-model.number': 'form.estimated_effort_hours'}) }}
           </div>
-          <div class="">
-            <label class="block text-sm font-medium text-muted-foreground mb-1">Description</label>
-            <textarea x-model="form.description" rows="3" class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm" aria-label="Description"></textarea>
+          <div>
+            {% call label(for='wp-description') %}Description{% endcall %}
+            {% call textarea(id='wp-description', rows=3, attrs_dict={'x-model': 'form.description'}) %}{% endcall %}
           </div>
         </div>
         <div class="flex items-center justify-end gap-2 border-t pt-4">
-          <button type="button" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4" data-modal-close="roadmap-work-package-modal">Cancel</button>
-          <button type="submit" class="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50"
-            :disabled="isSubmitting">
-            <span x-show="!isSubmitting" x-cloak x-text="isEditing ? 'Save Changes' : 'Create Work Package'"></span>
-            <span x-show="isSubmitting" x-cloak>Saving...</span>
-          </button>
+          {{ button('Cancel', variant='ghost', attrs_dict={'data-modal-close': 'roadmap-work-package-modal'}) }}
+          {% call button('', variant='default', type='submit', aria_label='Create Work Package', attrs_dict={':disabled': 'isSubmitting', ':aria-label': "isEditing ? 'Save Changes' : 'Create Work Package'"}) %}
+            <span x-show="!isSubmitting" class="inline-flex items-center gap-2">
+              <span x-text="isEditing ? 'Save Changes' : 'Create Work Package'">Create Work Package</span>
+            </span>
+            <span x-show="isSubmitting" x-cloak class="inline-flex items-center gap-2">Saving...</span>
+          {% endcall %}
         </div>
       </form>
   {% endcall %}
@@ -294,7 +302,7 @@
         } catch (e) {
           // Plateau/capability lists are optional for the form, so this is a
           // heads-up rather than a blocker — but the user must still be told
-          // the dropdowns may be incomplete.
+          // the dropdowns may be unavailable.
           Platform.toast.warning(e.message + ' — some dropdown options may be unavailable.');
         }
       },
