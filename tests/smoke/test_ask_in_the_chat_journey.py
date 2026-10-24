@@ -46,7 +46,7 @@ def _role_of(live_server, email):
 
 def _load_sample(page, base):
     page.goto(base + "/dashboard/overview", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
-    page.get_by_role("button", name="Load sample").first.click()
+    page.get_by_test_id("first-action-sample").click()
     expect(page.locator('[data-testid="sample-company-indicator"]')).to_be_visible(timeout=PAGE_TIMEOUT * 2)
 
 
