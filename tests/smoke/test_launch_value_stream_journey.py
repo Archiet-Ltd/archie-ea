@@ -102,8 +102,8 @@ def _assert_stage_definitions(page, s1, s2, cap_a, cap_b, mat_a):
     card2 = _stage_card(page, s2)
     expect(card2.locator('[data-stage-field="entry_criteria"]')).to_have_text("Application accepted")
     expect(card2.locator('[data-stage-field="stakeholders"] li')).to_have_text(["Compliance officer"])
-    # Nothing recorded for this stage's value items: an em dash, not an empty list or a 0.
-    expect(card2.locator('[data-stage-field="value_items"]')).to_have_text("—")
+    # Nothing recorded for this stage's value items: the field says so, not an empty list or a 0.
+    expect(card2.locator('[data-stage-field="value_items"]')).to_contain_text("No value items yet")
     expect(card2.locator('[data-stage-field="capabilities"] li', has_text=cap_b).locator("[data-maturity]")).to_have_text("—")
 
     # Stage order is the order the stages were added.

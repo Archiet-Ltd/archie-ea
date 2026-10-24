@@ -13,6 +13,8 @@ state instead of a 500.
 import logging
 from typing import Any, Dict, List, Optional
 
+from flask import url_for
+
 from app import db
 from app.datetime_helpers import utcnow
 from app.models.unified_capability import (
@@ -352,6 +354,37 @@ def delete_stage(stage_id: int) -> bool:
 # ---------------------------------------------------------------------------
 
 
+def _business_capability_ids(capabilities) -> Dict[int, int]:
+    """Map unified capability id -> business capability id, by recorded provenance."""
+    out: Dict[int, int] = {}
+    for cap in capabilities:
+        if cap.source_table == "business_capability" and str(cap.source_id or "").isdigit():
+            out[cap.id] = int(cap.source_id)
+    return out
+
+
+def _fact_sheet_url(business_capability_id: Optional[int]) -> Optional[str]:
+    if business_capability_id is None:
+        return None
+    return url_for("enterprise_crud.capability_fact_sheet", capability_id=business_capability_id)
+
+
+def _health_scores(business_ids) -> Dict[int, Optional[int]]:
+    """Health score per business capability id, from the service the capability health screen reads."""
+    if not business_ids:
+        return {}
+    try:
+        from app.modules.capabilities.services.capability_health_service import (
+            CapabilityHealthService,
+        )
+
+        metrics = CapabilityHealthService().get_capability_health_metrics()
+        return {h["id"]: h["score"] for h in metrics.get("health_by_capability", [])}
+    except Exception:
+        logger.error("Failed to read capability health for the value stream grid", exc_info=True)
+        return {}
+
+
 def build_bizbok_grid(value_stream_id: int) -> Dict[str, Any]:
     """
     Build the BIZBOK capability (rows) x value-stream-stage (columns) grid.
@@ -434,9 +467,17 @@ def build_bizbok_grid(value_stream_id: int) -> Dict[str, Any]:
             "stage_criticality": m.stage_criticality,
         }
 
+    business_ids = _business_capability_ids(capabilities_by_id.values())
+    health_by_source = _health_scores(business_ids.values())
+
     capability_rows = [
         {
             "id": cap.id,
+            # The capability's own page, and the health score the capability
+            # health screen shows for it. None when it has no business
+            # capability record or has not been scored: the grid says so.
+            "fact_sheet_url": _fact_sheet_url(business_ids.get(cap.id)),
+            "health_score": health_by_source.get(business_ids.get(cap.id)),
             "name": cap.name,
             "code": cap.code,
             "level": cap.level,
@@ -497,6 +538,8 @@ def list_unmapped_capabilities(
         )
         caps = []
 
+    business_ids = _business_capability_ids(caps)
+    health_by_source = _health_scores(business_ids.values())
     return [
         {
             "id": c.id,
@@ -505,6 +548,8 @@ def list_unmapped_capabilities(
             "level": c.level,
             "current_maturity_level": c.current_maturity_level,
             "target_maturity_level": c.target_maturity_level,
+            "fact_sheet_url": _fact_sheet_url(business_ids.get(c.id)),
+            "health_score": health_by_source.get(business_ids.get(c.id)),
         }
         for c in caps
     ]
