@@ -45,7 +45,7 @@
        sees — assigning state.currentDomain here is visible to render.js. */
     const state = ArchieChat.state;
     const {
-        getColorClass, appendMessage, appendSystemMessage, appendError,
+        getColorClass, appendMessage, appendSystemMessage, appendError, appendAnswerCards,
         beginStreamedMessage, updateStreamedMessage, finaliseStreamedMessage
     } = ArchieChat.render;
     const {
@@ -362,6 +362,21 @@
         messagesContainer.appendChild(loadingDiv);
         messagesContainer.scrollTop = messagesContainer.scrollHeight;
         lucide.createIcons();
+
+        // A question that names something in the organisation's records is answered
+        // from those records, as cited cards, before any model is asked.
+        try {
+            const estate = await ArchieChat.transport.askEstate(message);
+            if (estate.found) {
+                { const _l = document.getElementById(loadingId); if (_l) _l.remove(); }
+                appendAnswerCards(estate.html);
+                return;
+            }
+        } catch (_estateErr) {
+            { const _l = document.getElementById(loadingId); if (_l) _l.remove(); }
+            appendError('We could not answer that just now.', () => _retryTurn(message, timestamp));
+            return;
+        }
 
         const startTime = performance.now();
         // Shared payload. thread_id keeps multi-turn chats in one conversation.
