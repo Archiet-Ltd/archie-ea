@@ -138,7 +138,12 @@ def application_list():
             decommissioned=None,
             owner_assigned=None,
             vendor_assigned=None,
+            summary_total=None,
+            no_owner=None,
+            no_capability=None,
+            no_vendor=None,
         ),
+        owner_names_by_app={},
         sort="",
         dir="asc",
         load_error="The application portfolio could not be read.",
@@ -342,29 +347,29 @@ def application_list():
         if domain_filter:
             query = query.filter(ApplicationComponent.business_domain == domain_filter)
 
-        # T-council-10: data-quality summary filters
+        # T-council-10: data-quality summary filters. Each gap is one predicate,
+        # used by the filter here and by the summary counts below, so the figure
+        # in the summary is the number of rows its link then shows.
+        _has_owner = has_assigned_owner(current_user.organization_id)
+        # The capability a row shows comes from application_capability_mapping,
+        # so that is the store the summary and the filter read.
+        _has_capability = db.exists().where(
+            ApplicationCapabilityMapping.application_component_id == ApplicationComponent.id,
+            ApplicationCapabilityMapping.business_capability_id.isnot(None),
+        )
+        _has_vendor = db.or_(
+            db.and_(
+                ApplicationComponent.vendor_name.isnot(None),
+                ApplicationComponent.vendor_name != "",
+            ),
+            ApplicationComponent.vendor_product_id.isnot(None),
+        )
         if no_owner_filter:
-            query = query.filter(~has_assigned_owner(current_user.organization_id))
+            query = query.filter(~_has_owner)
         if no_capability_filter:
-            # Applications with no capability mapping
-            from app.models.unified_application_capability_mapping import (
-                UnifiedApplicationCapabilityMapping,
-            )
-            query = query.filter(
-                ~db.exists().where(
-                    UnifiedApplicationCapabilityMapping.application_component_id == ApplicationComponent.id
-                )
-            )
+            query = query.filter(~_has_capability)
         if no_vendor_filter:
-            query = query.filter(
-                db.and_(
-                    db.or_(
-                        ApplicationComponent.vendor_name.is_(None),
-                        ApplicationComponent.vendor_name == "",
-                    ),
-                    ApplicationComponent.vendor_product_id.is_(None),
-                )
-            )
+            query = query.filter(~_has_vendor)
 
         # ── 4. Count filtered results ─────────────────────────────────────────
         if has_relationship_joins:
@@ -412,6 +417,31 @@ def application_list():
         owners_by_app = ApplicationOwner.get_display_rows_for_applications(
             application_ids, current_user.organization_id
         )
+        # The Owner column answers the same question as the summary and the
+        # no-owner filter: is this application owned (has_assigned_owner)?
+        # When it is, show the people on its owner records, or the owner text
+        # recorded on the application when no record names anyone.
+        owned_ids = set()
+        if application_ids:
+            owned_ids = {
+                row[0]
+                for row in db.session.query(ApplicationComponent.id)
+                .filter(ApplicationComponent.id.in_(application_ids), _has_owner)
+                .all()
+            }
+        owner_names_by_app = {}
+        for listed in pagination.items:
+            if listed.id not in owned_ids:
+                continue
+            names = [
+                o["user_name"]
+                for o in owners_by_app.get(listed.id, [])
+                if o.get("user_name") and o["user_name"] != "\u2014"
+            ]
+            if not names:
+                legacy = (listed.legacy_business_owner or listed.legacy_application_owner or "").strip()
+                names = [legacy] if legacy else ["Name not recorded"]
+            owner_names_by_app[listed.id] = names
 
         # ── 6. Build filter option lists (deduplicated, normalised) ───────────
         def _distinct_normalised(col):
@@ -501,15 +531,20 @@ def application_list():
             )
         ).count()
 
-        # T-council-10: count applications with capability mappings
-        from app.models.unified_application_capability_mapping import (
-            UnifiedApplicationCapabilityMapping,
-        )
-        capability_mapped_count = _stats_base.filter(
-            db.exists().where(
-                UnifiedApplicationCapabilityMapping.application_component_id == ApplicationComponent.id
+        # T-council-10: count applications with a capability mapping
+        capability_mapped_count = _stats_base.filter(_has_capability).count()
+
+        # The summary counts the applications the list shows by default (the
+        # active portfolio unless decommissioned ones are included), so
+        # "N of M have no owner" is the number of rows its link then lists.
+        _summary_base = _stats_base
+        if not include_decom:
+            _summary_base = _summary_base.filter(
+                db.or_(
+                    ApplicationComponent.lifecycle_status.is_(None),
+                    func.lower(ApplicationComponent.lifecycle_status) != "5. decommissioned",
+                )
             )
-        ).count()
 
         stats = {
             "total": portfolio_total,
@@ -521,6 +556,10 @@ def application_list():
             "owner_assigned": owner_assigned_count,
             "vendor_assigned": vendor_assigned_count,
             "capability_mapped": capability_mapped_count,
+            "summary_total": _summary_base.count(),
+            "no_owner": _summary_base.filter(~_has_owner).count(),
+            "no_capability": _summary_base.filter(~_has_capability).count(),
+            "no_vendor": _summary_base.filter(~_has_vendor).count(),
         }
 
         # ── 8. Currency symbol ────────────────────────────────────────────────
@@ -578,6 +617,7 @@ def application_list():
             dir=sort_dir,
             active_filters=active_filters,
             owners_by_app=owners_by_app,
+            owner_names_by_app=owner_names_by_app,
         )
 
     except Exception as exc:
