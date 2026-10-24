@@ -167,9 +167,11 @@ def test_element_traceability_links_reach_their_own_chains(
 
         # Every linked element in the chain is a link that lands on that
         # element's own traceability page with content.
+        # The element appears in both the layer chain card and the linked
+        # elements table, so there are two matching links.
         biz_link = page.get_by_role("link", name=linked_trace_data["biz_name"])
-        expect(biz_link).to_have_count(1, timeout=PAGE_TIMEOUT)
-        biz_link.click()
+        expect(biz_link.first).to_be_visible(timeout=PAGE_TIMEOUT)
+        biz_link.first.click()
         page.wait_for_url(lambda url: "/architecture/traceability/" in url
                           and "/architecture/traceability/%s" % linked_trace_data["app_el_id"] not in url,
                           timeout=PAGE_TIMEOUT)
