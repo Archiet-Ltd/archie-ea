@@ -37,30 +37,26 @@
      (scripts/capture_proof_assets.py). -->
 <section class="home-hero" data-testid="home-hero">
   <div class="mx-auto max-w-5xl px-4 text-center">
-    {% call badge(size='pill') %}
-      <span class="sm:hidden">Open source &middot; Self-host free</span>
-      <span class="hidden sm:inline">Open source under AGPL-3.0 &middot; Self-host free, forever</span>
-    {% endcall %}
-
     <h1 class="home-display">
-      The company brain for every enterprise.
+      See what breaks before you change it.
     </h1>
 
     <p class="home-lead">
-      One living, explainable model of your enterprise: its strategy, systems, data, people, money, risk,
-      suppliers and AI, kept current and turned into cited answers &mdash; built so that when your AI agents
-      need to know how your company actually works, there is a governed source to ask, not a guess. Entelim is
-      an open-source enterprise architecture and intelligence platform built on ArchiMate 3.2. Import your
-      model and get a free, cited answer to what breaks if a system fails, in minutes.
+      Connect GitHub and Entelim maps your services, owners and dependencies, then answers in plain words,
+      citing the file and commit behind every fact.
     </p>
 
     <div class="mt-9 flex flex-col gap-3 sm:flex-row sm:justify-center">
       <a href="{{ url_for('account.register') }}" class="public-btn public-btn--lg public-btn--primary">Start free</a>
       <a href="/pricing" class="public-btn public-btn--lg public-btn--outline">See pricing</a>
     </div>
+
+    <p class="mt-6 text-sm text-muted-foreground">
+      Open source under AGPL-3.0. Self-host free.
+    </p>
   </div>
 
-  <div class="home-hero__stage mt-16">
+  <div class="home-hero__stage mt-8">
     <figure class="home-hero__figure" data-testid="home-hero-figure">
       <div class="home-frame">
         <div class="home-frame__bar" aria-hidden="true">
