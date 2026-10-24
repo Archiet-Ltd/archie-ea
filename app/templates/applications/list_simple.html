@@ -85,6 +85,7 @@
         class="inline-flex h-9 items-center gap-1.5 rounded-md bg-primary text-primary-foreground px-4 text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2" aria-label="Add application">
         <i data-lucide="plus" class="h-4 w-4" aria-hidden="true"></i>Add Application
       </button>
+      {% endif %}
       
       <div class="hidden sm:block h-6 border-l border-input" aria-hidden="true"></div>
       <button type="button" data-testid="btn-import" data-modal-open="application-import-modal"
@@ -616,7 +617,7 @@
               class="inline-flex items-center gap-1 h-8 px-2.5 rounded-md text-xs font-medium hover:bg-accent transition-colors">
               <i data-lucide="file-text" class="h-3.5 w-3.5" aria-hidden="true"></i>Fact sheet
             </a>
-            {% endif %}
+            
             <div class="relative" x-data="{ mapOpen: false }"
               data-app-map-id="{{ app.id }}"
               data-app-map-name="{{ app.name | e }}">
@@ -815,8 +816,7 @@
           <span x-text="aiMap.accepting ? 'Saving...' : 'Accept & Save'">Accept &amp; Save</span>
         </button>
       </div>
-    </div>
-  </div>
+{% endcall %}
 </div>{# end app-portfolio-root #}
 
 {# ─ Include existing unified mapping modal ─ #}
