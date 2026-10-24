@@ -25,8 +25,38 @@ let ComposerRenderer = (function() {
     };
     let DEFAULT_LAYER = { fill: '#f8fafc', stroke: '#1a1a1a', text: '#1a1a1a', port: '#64748b', badge: '#e2e8f0', accent: '#94a3b8' };
 
+    /* Notation mode (opt-in, the composer turns it on): layer colours are read from the
+       --notation-* tokens in the token file, so light and dark both follow the theme and
+       no colour is written here. Off, every caller keeps the literals above. */
+    let NOTATION_ON = false;
+    let NOTATION_SPRITE = '/static/img/archimate-notation.svg';
+
+    function notationToken(name, alpha) {
+        let raw = '';
+        try { raw = getComputedStyle(document.documentElement).getPropertyValue(name).trim(); } catch (e) { raw = ''; }
+        if (!raw) return null;
+        return 'hsl(' + raw + (alpha != null ? ' / ' + alpha : '') + ')';
+    }
+
+    function notationLayer(layer) {
+        let key = layer || 'other';
+        if (!notationToken('--notation-' + key)) key = 'other';
+        return {
+            get fill() { return notationToken('--notation-' + key) || 'none'; },
+            get stroke() { return notationToken('--notation-' + key + '-stroke') || 'currentColor'; },
+            get text() { return notationToken('--foreground') || 'currentColor'; },
+            get port() { return notationToken('--notation-' + key + '-stroke') || 'currentColor'; },
+            get badge() { return notationToken('--notation-' + key + '-stroke', 0.3) || 'none'; },
+            get accent() { return notationToken('--notation-' + key + '-stroke') || 'currentColor'; },
+        };
+    }
+
+    function useNotation(on) { NOTATION_ON = on !== false; }
+
     function layerColor(layer) {
-        return LAYER_COLORS[(layer || '').toLowerCase()] || DEFAULT_LAYER;
+        let key = (layer || '').toLowerCase();
+        if (NOTATION_ON) return notationLayer(key);
+        return LAYER_COLORS[key] || DEFAULT_LAYER;
     }
 
     /* ── Element type palette ─────────────────────────────── */
@@ -332,6 +362,7 @@ let ComposerRenderer = (function() {
             { tagName: 'rect', selector: 'accentBar' },
             { tagName: 'rect', selector: 'iconBox' },
             { tagName: 'path', selector: 'typeIcon' },
+            { tagName: 'use', selector: 'notationIcon' },
             { tagName: 'rect', selector: 'maturityBadgeBg' },
             { tagName: 'text', selector: 'maturityBadgeLabel' },
             { tagName: 'text', selector: 'nameLabel' },
@@ -397,6 +428,7 @@ let ComposerRenderer = (function() {
                 { tagName: 'rect',     selector: 'accentBar' },
                 { tagName: 'rect',     selector: 'iconBox' },
                 { tagName: 'path',     selector: 'typeIcon' },
+                { tagName: 'use', selector: 'notationIcon' },
                 { tagName: 'rect',     selector: 'maturityBadgeBg' },
                 { tagName: 'text',     selector: 'maturityBadgeLabel' },
                 { tagName: 'text',     selector: 'nameLabel' },
@@ -437,6 +469,7 @@ let ComposerRenderer = (function() {
                 { tagName: 'rect',    selector: 'accentBar' },
                 { tagName: 'rect',    selector: 'iconBox' },
                 { tagName: 'path',    selector: 'typeIcon' },
+                { tagName: 'use', selector: 'notationIcon' },
                 { tagName: 'rect',    selector: 'maturityBadgeBg' },
                 { tagName: 'text',    selector: 'maturityBadgeLabel' },
                 { tagName: 'text',    selector: 'nameLabel' },
@@ -475,6 +508,7 @@ let ComposerRenderer = (function() {
                 { tagName: 'rect', selector: 'accentBar' },
                 { tagName: 'rect', selector: 'iconBox' },
                 { tagName: 'path', selector: 'typeIcon' },
+                { tagName: 'use', selector: 'notationIcon' },
                 { tagName: 'rect', selector: 'maturityBadgeBg' },
                 { tagName: 'text', selector: 'maturityBadgeLabel' },
                 { tagName: 'text', selector: 'nameLabel' },
@@ -545,6 +579,7 @@ let ComposerRenderer = (function() {
                 { tagName: 'rect', selector: 'headerSep' },
                 { tagName: 'rect', selector: 'iconBox' },
                 { tagName: 'path', selector: 'typeIcon' },
+                { tagName: 'use', selector: 'notationIcon' },
                 { tagName: 'text', selector: 'nameLabel' },
                 { tagName: 'text', selector: 'typeLabel' },
                 { tagName: 'rect', selector: 'resizeHandle' },
@@ -817,6 +852,19 @@ let ComposerRenderer = (function() {
         return zone;
     }
 
+    /* Notation mode: the type symbol sits in the top-right corner, as the standard draws
+       it, taken from the one sprite; the card's own left-hand icon box is hidden. */
+    function applyNotationIcon(node, elType, c) {
+        if (!NOTATION_ON || !elType) return;
+        node.attr('notationIcon', {
+            href: NOTATION_SPRITE + '#am-' + elType,
+            refX: '100%', x: -28, y: 6, width: 20, height: 14,
+            color: c.stroke,
+        });
+        node.attr('typeIcon/display', 'none');
+        node.attr('iconBox/display', 'none');
+    }
+
     /* ── Create a styled ArchiMate node ────────────────────────
      *  Selects the correct JointJS shape class based on SHAPE_CATEGORY
      *  so each element type renders with its proper ArchiMate 3.2 geometry.
@@ -848,7 +896,7 @@ let ComposerRenderer = (function() {
            iconBox drops its background/border so the icon reads as part of the
            notation rather than a UI chrome affordance. */
         let shapeAttrs = {
-            body:      { fill: c.fill, stroke: 'rgba(17,24,39,0.55)' },
+            body:      { fill: c.fill, stroke: NOTATION_ON ? c.stroke : 'rgba(17,24,39,0.55)', strokeWidth: NOTATION_ON ? 1 : undefined },
             accentBar: { fill: c.fill, opacity: 0 },
             iconBox:   { fill: 'none', stroke: 'none' },
             typeIcon:  iconPath ? { d: iconPath, stroke: c.text, strokeWidth: 1.1 } : { d: '' },
@@ -866,6 +914,7 @@ let ComposerRenderer = (function() {
             size: { width: 200, height: 130 },
             attrs: shapeAttrs,
         });
+        applyNotationIcon(node, elType, c);
 
         /* UX-CMP-001: Override port colors with layer accent.
          * Ports are pre-declared in CARD_PORTS.items; here we just restyle them. */
@@ -1072,6 +1121,7 @@ let ComposerRenderer = (function() {
             container.portProp(p.id, 'attrs/circle/stroke', _cs);
         });
 
+        applyNotationIcon(container, elType, c);
         container.set('elementId', elementId);
         container.set('elType', elType);
         container.set('elLayer', layer);
@@ -2104,6 +2154,7 @@ let ComposerRenderer = (function() {
         createContainerNode: createContainerNode,
         applyImportedElementPresentation: applyImportedElementPresentation,
         createSpecialNode: createSpecialNode,
+        useNotation: useNotation,
         defineArchiMateShape: defineArchiMateShape,
         createAnnotation: createAnnotation,
         createLayerZone: createLayerZone,
