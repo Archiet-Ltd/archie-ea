@@ -513,6 +513,7 @@
     window.defaultChatPersona = {{ default_chat_persona | tojson }};
     window.chatPersonaPreferenceKey = {{ chat_persona_preference_key | tojson }};
     window.csrfToken = '{{ csrf_token() }}';
+    window.chatIsAdmin = {{ 'true' if current_user.is_admin() else 'false' }};
 </script>
 
 {# Chat modules. Classic scripts, so they execute in source order and before Alpine, which is

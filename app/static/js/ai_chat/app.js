@@ -429,7 +429,7 @@
             }
         } catch (_estateErr) {
             { const _l = document.getElementById(loadingId); if (_l) _l.remove(); }
-            appendError('We could not answer that just now.', () => _retryTurn(message, timestamp));
+            appendError('The assistant could not answer just now. Your question is saved; try again in a moment.', () => _retryTurn(message, timestamp));
             return;
         }
 
@@ -485,7 +485,7 @@
                 // so a toast on top of the inline error below was a third
                 // surface for one fault. Keep the inline message (it carries
                 // the admin-link remedy in context); drop the toast.
-                appendError(_streamErr.message, null, { adminLink: true });
+                appendError('The assistant could not answer just now. Your question is saved; try again in a moment.', () => _retryTurn(message, timestamp), { adminLink: true });
                 return;
             }
             /* fall through to non-streaming */
@@ -575,10 +575,10 @@
                     // surfaces (banner + toast + inline) say one thing. The
                     // inline message stays; it carries the admin-link remedy
                     // in context, which the banner and a toast both lack.
-                    appendError(errorMessage || fullError, null, { adminLink: true });
+                    appendError('The assistant could not answer just now. Your question is saved; try again in a moment.', () => _retryTurn(message, timestamp), { adminLink: true });
                 } else {
                     Platform.toast.error(fullError);
-                    appendError(fullError, () => _retryTurn(message, timestamp));
+                    appendError('The assistant could not answer just now. Your question is saved; try again in a moment.', () => _retryTurn(message, timestamp));
                 }
             } else {
                 // Add AI response to history
@@ -623,7 +623,7 @@
 
         } catch (error) {
             { const _l = document.getElementById(loadingId); if (_l) _l.remove(); }
-            appendError(`Network error: ${error.message}`, () => _retryTurn(message, timestamp));
+            appendError('The assistant could not answer just now. Your question is saved; try again in a moment.', () => _retryTurn(message, timestamp));
         }
     }
 

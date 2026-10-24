@@ -16,6 +16,7 @@ from app.modules.ai_chat.tools.executor import ToolCall
 import json
 import logging
 from typing import Callable, Optional
+from app.modules.ai_chat.services.failure_messages import ASSISTANT_UNAVAILABLE
 from app.modules.ai_chat.services.ai_hallucination_detector import (
     Grounding,
     find_uncited_claims,
@@ -1465,12 +1466,7 @@ class AgentRunner:
 
     def _fallback(self, reason: str) -> dict:
         reason_l = (reason or "").lower()
-        if any(t in reason_l for t in ("no api key", "not configured", "no provider", "no keys")):
-            msg = (
-                "AI features aren't configured yet — add an API key under "
-                "Admin → API Settings to enable the assistant."
-            )
-        elif any(
+        if any(
             t in reason_l
             for t in ("quota", "insufficient", "rate limit", "429", "billing", "exceeded")
         ):
@@ -1479,10 +1475,7 @@ class AgentRunner:
                 "Wait a minute, then press Retry."
             )
         else:
-            msg = (
-                "The AI request couldn't be completed. See the error detail below "
-                "or check Admin → API Settings."
-            )
+            msg = ASSISTANT_UNAVAILABLE
         return {
             "response": msg,
             "actions_taken": [],
