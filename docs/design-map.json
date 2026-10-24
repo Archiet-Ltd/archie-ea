@@ -4716,6 +4716,7 @@
     "components/data_card.html",
     "components/dense_table.html",
     "components/dialog.html",
+    "components/drawer.html",
     "components/dropdown_menu.html",
     "components/empty_state.html",
     "components/error_boundary.html",
@@ -4732,6 +4733,7 @@
     "components/skeleton.html",
     "components/status_badge.html",
     "components/tabs.html",
+    "macros/adm_cycle.html",
     "macros/kanban_board.html",
     "macros/page_shell.html"
    ],
@@ -4756,17 +4758,19 @@
    ],
    "confidence": "high",
    "controls": {
-    "button": 54,
+    "button": 57,
     "form": 1,
     "link": 1,
-    "modal": 4,
-    "testid": 6
+    "modal": 5,
+    "testid": 19
    },
    "extends": [
     "layouts/admin_base.html"
    ],
    "extra_macros": [
-    "macros/kanban_board.html"
+    "macros/kanban_board.html",
+    "components/drawer.html",
+    "macros/adm_cycle.html"
    ],
    "frame": "dashboard-01",
    "inhouse_components": [
@@ -4777,9 +4781,13 @@
     "components/badge.html",
     "components/button.html",
     "components/checkbox.html",
+    "components/dialog.html",
+    "components/drawer.html",
     "components/empty_state.html",
     "components/input.html",
     "components/select.html",
+    "components/skeleton.html",
+    "macros/adm_cycle.html",
     "macros/kanban_board.html",
     "macros/page_shell.html"
    ],
@@ -5875,6 +5883,7 @@
     "components/skeleton.html",
     "components/status_badge.html",
     "components/switch.html",
+    "components/table.html",
     "components/tabs.html",
     "macros/check_password.html",
     "macros/form_macros.html",
@@ -5901,21 +5910,34 @@
    ],
    "confidence": "high",
    "controls": {
-    "button": 4,
+    "button": 9,
     "form": 4,
-    "link": 12,
+    "link": 6,
+    "modal": 1,
     "table": 1,
     "testid": 9
    },
    "extends": [
     "layouts/admin_base.html"
    ],
+   "extra_macros": [
+    "components/table.html"
+   ],
    "frame": "dashboard-01",
    "inhouse_components": [
     "page-shell:Replace"
    ],
    "macros": [
-    "macros/page_shell.html"
+    "components/alert.html",
+    "components/badge.html",
+    "components/button.html",
+    "components/card.html",
+    "components/dialog.html",
+    "components/empty_state.html",
+    "components/form_field.html",
+    "components/input.html",
+    "components/page_header.html",
+    "components/table.html"
    ],
    "original": "preview-02",
    "page_type": "settings",
@@ -9880,6 +9902,7 @@
     "components/confirmation_dialog.html",
     "components/dense_table.html",
     "components/dialog.html",
+    "components/drawer.html",
     "components/dropdown_menu.html",
     "components/empty_state.html",
     "components/error_boundary.html",
@@ -9923,14 +9946,17 @@
    ],
    "confidence": "high",
    "controls": {
-    "button": 38,
+    "button": 30,
     "form": 2,
     "link": 3,
-    "modal": 2,
+    "modal": 3,
     "testid": 10
    },
    "extends": [
     "layouts/admin_base.html"
+   ],
+   "extra_macros": [
+    "components/drawer.html"
    ],
    "frame": "dashboard-01",
    "inhouse_components": [
@@ -9941,6 +9967,7 @@
     "components/badge.html",
     "components/button.html",
     "components/card.html",
+    "components/drawer.html",
     "components/dropdown_menu.html",
     "components/empty_state.html",
     "components/form_field.html",
@@ -21339,7 +21366,7 @@
     "form": 3,
     "link": 14,
     "table": 4,
-    "testid": 33
+    "testid": 34
    },
    "extends": [
     "layouts/admin_base.html"

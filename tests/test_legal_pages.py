@@ -122,3 +122,36 @@ def test_every_template_sees_only_the_links_the_flag_allows(app, monkeypatch):
         with app.test_request_context("/admin/billing/"):
             rendered = render_template_string(snippet)
         assert [s for s in everything if f'href="/{s}"' in rendered] == expected
+
+
+def _page_text(client, path):
+    import re
+
+    html = client.get(path).get_data(as_text=True)
+    return re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", html))
+
+
+def test_privacy_page_names_every_ai_provider_country_and_the_missing_agreement(flag_off):
+    client = flag_off.test_client()
+    response = client.get("/privacy")
+    assert response.status_code == 200
+    html = response.get_data(as_text=True)
+    text = _page_text(client, "/privacy")
+    assert 'id="sub-processors"' in html and 'id="ai-features"' in html
+    for name in ("OpenRouter", "NVIDIA", "DeepSeek", "United States", "People's Republic of China"):
+        assert name in text, name
+    assert "no data processing agreement" in text.lower()
+    assert "train" in text
+    assert "No data from your organisation's model is sent to a third party" not in text
+
+
+def test_data_agreement_no_longer_promises_a_safeguard_for_ai_providers(flag_on):
+    client = flag_on.test_client()
+    response = client.get("/data-processing-agreement")
+    assert response.status_code == 200
+    text = _page_text(client, "/data-processing-agreement")
+    assert "We will not transfer your personal data outside the United Kingdom unless" not in text
+    assert "Each sub-processor is bound by written terms" not in text
+    assert "on request" not in text.split("6. Sub-processors")[1].split("7.")[0].split("AI model providers are named")[0]
+    assert "This does not apply to the AI features" in text
+    assert 'href="/privacy#sub-processors"' in client.get("/data-processing-agreement").get_data(as_text=True)

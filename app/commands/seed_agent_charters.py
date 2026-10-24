@@ -99,6 +99,12 @@ _CHARTER_BOUNDS = {
         [],
         ALL_WRITE_TOOLS,
     ),
+    "cto_founder": (
+        "Technical founder's view — what breaks, who owns it, what it costs, what to fix first.",
+        ["application", "capability", "risk"],
+        [],
+        ALL_WRITE_TOOLS,
+    ),
     "procurement": (
         "Commercial steward — contracts, licences, spend legible and governed.",
         ["vendor", "contract", "licence", "vendor_product"],

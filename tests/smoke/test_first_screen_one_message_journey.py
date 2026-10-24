@@ -92,9 +92,14 @@ def test_empty_workspace_first_screen_is_one_message(browser, live_server, seede
         # nothing else: no figures, tabs or quick links until there is data
         for testid in ("kpi-tile-applications", "layer-tab-overview", "layer-tab-motivation", "architecture-health"):
             expect(page.locator('[data-testid="%s"]' % testid)).to_have_count(0)
-        # this architect is not an administrator, so the page says who connects instead of a dead link
-        expect(page.locator('[data-testid="first-action-connect"]')).to_have_count(0)
-        expect(message).to_contain_text("organisation administrator")
+        # this architect is not an administrator but brings sources in, so the button is
+        # there and opens the GitHub page with its form rather than a refusal
+        expect(page.locator('[data-testid="first-action-connect"]')).to_have_count(1)
+        expect(message).not_to_contain_text("organisation administrator")
+        page.locator('[data-testid="first-action-connect"]').click()
+        page.wait_for_url("**/admin/connectors/github", timeout=PAGE_TIMEOUT)
+        expect(page.get_by_role("button", name="Connect and read my repositories")).to_be_visible()
+        page.goto(live_server + "/dashboard/overview", wait_until="networkidle", timeout=PAGE_TIMEOUT)
 
         # the question lands on the chat with the question waiting
         question.fill("what breaks if payments fails?")
