@@ -254,9 +254,8 @@
         const iconElement = document.getElementById('domain-icon');
         iconElement.innerHTML = `<i data-lucide="${config.icon}" class="h-5 w-5"></i>`;
 
-        // Update colors using safe class mapping
-        const bgClass = getColorClass(config.color || 'primary', 'bg');
-        iconElement.className = `flex h-9 w-9 items-center justify-center rounded-lg ${bgClass} text-primary-foreground transition-all duration-300`; // token-migration-ok
+        // The icon is read by assistive technology only; showing it put a coloured tile on its own row above the toolbar.
+        iconElement.className = 'sr-only';
 
         // Re-initialize lucide icons
         lucide.createIcons();

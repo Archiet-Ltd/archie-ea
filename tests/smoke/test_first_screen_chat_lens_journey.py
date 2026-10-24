@@ -72,11 +72,12 @@ def test_chat_opens_in_the_ctos_lens_with_a_one_line_toolbar(browser, live_serve
         assert "Enterprise Architect" not in chosen, chosen
         assert re.search(r"CTO|CIO|Executive", chosen), chosen
 
-        header = page.locator('[data-testid="chat-header-row"]')
+        # the whole header, not just its control row: nothing may sit on a line of its own above it
+        header = page.locator("main header, header").filter(has=page.locator('[data-testid="chat-header-row"]')).first
         height = header.evaluate("e => e.getBoundingClientRect().height")
+        assert height <= 72, height
         if name == "390":
             # one line: the assistant and scope selects wait inside the settings sheet
-            assert height <= 56, height
             expect(selector).to_be_hidden()
             page.get_by_role("button", name="Toggle advanced settings").click()
             expect(selector).to_be_visible()
