@@ -21,7 +21,7 @@ know what you run, stay in control, get answers before you need them, and connec
 Turn what you intend into goals, objectives and the capabilities that deliver them, and see whether
 the strategy is actually being carried out.
 
-**Today:** map your value streams stage by stage to the capabilities behind them, see which value
+**Today:** browse your business capabilities as a map, map your value streams stage by stage to the capabilities behind them, see which value
 streams are at risk, lay out drivers and goals in a motivation model, and capture the business model
 on one canvas.
 
@@ -301,3 +301,12 @@ For certifications and what we do and do not claim today, see [Security](/securi
 
 Every capability above is in the product today or has a quarter on the published roadmap. See [how
 it's priced](/pricing) or [try it](/account/register).
+
+<h2 id="coming-soon">Coming soon</h2>
+
+These are not available yet. Open one to join its waiting list and we will tell you the day it ships.
+
+- [Build your model from your tools](/modules/build-your-model-from-your-tools): start your model from the tools you already use.
+- [Scenarios](/modules/scenario-modelling): compare what-if plans side by side before you commit.
+- [Every answer shows its sources](/modules/answer-sources): see the records behind each figure in an answer.
+- [Software and tool discovery](/modules/software-and-tool-discovery): discover the software and tools you actually pay for and use.

@@ -82,6 +82,7 @@ def _assert_cards_have_badge_id_title_date_avatar(page):
         title = card.locator("h3.line-clamp-2")
         assert title.count() >= 1, "Card missing title"
         assert len(title.inner_text()) > 0, "Card title is empty"
+        assert title.first.inner_text().strip() in card_text, "Card text does not contain its own title"
 
         # Date with icon
         calendar_icon = card.locator("i[data-lucide='calendar']")

@@ -80,6 +80,7 @@ FEATURE_INTEREST_CONSENT_TEXT = (
 )
 IMG_MODULES_DIR = STATIC_ROOT / "img" / "modules"
 IMG_USE_CASES_DIR = STATIC_ROOT / "img" / "use-cases"
+IMG_ROLES_DIR = STATIC_ROOT / "img" / "roles"
 VIDEO_USE_CASES_DIR = STATIC_ROOT / "video" / "use-cases"
 
 # ── seeded demo personas (Lantern Quay Systems -- app/commands/seed_demo_company.py) ──
@@ -90,6 +91,52 @@ DEMO_PERSONA = "demo@lantern-quay.example.com"
 ITOPS_ADMIN_PERSONA = "sage.itops@lantern-quay.example.com"
 APP_MANAGER_PERSONA = "casey.inventory@lantern-quay.example.com"
 PROCUREMENT_PERSONA = "taylor.procurement@lantern-quay.example.com"
+
+# Role pages: each role's workspace in Ask, open on the impact question for the
+# Calibration Ledger application with its first answer row shown
+# (scripts/capture_proof_assets.py --roles). Same 5-tuple shape as MODULE_CAPTURES.
+def _role_capture(slug: str, role: str) -> tuple[str, str, str, str, str]:
+    article = "an" if role[0] in "AEIOUaeiou" or role.startswith("IT ") else "a"
+    return (
+        slug, "/intelligence/ask", DEMO_PERSONA,
+        f"The Ask panel as {article} {role} sees it: the impact question put to Calibration Ledger, with the first row of the answer showing what depends on it.",
+        f"Screenshot of the Ask panel signed in as {article} {role}, with the impact question asked of Calibration Ledger and the first result row displayed.",
+    )
+
+
+# The screen each role page's hero shows, named in the browser frame (Ask unless listed).
+ROLE_FRAME_LABELS = {
+    "business-architects": "Capability maturity",
+    "security-architects": "Risk register",
+    "data-architects": "Data lineage",
+    "chief-architects": "Capability health",
+    "scale-up-cto-and-vp-engineering": "Import applications",
+}
+
+ROLE_CAPTURES: list[tuple[str, str, str, str, str]] = [
+    _role_capture("enterprise-architects", "enterprise architect"),
+    _role_capture("cto-and-cio", "CTO or CIO"),
+    _role_capture("it-portfolio-managers", "IT portfolio manager"),
+    _role_capture("solution-architects", "solution architect"),
+    # Roles whose primary screen is not Ask: the path is the screen the page's own
+    # text names first, and capture_role photographs the top of it.
+    ("business-architects", "/capability-maturity/heatmap", DEMO_PERSONA,
+     "The capability maturity heat map as a business architect sees it: current against target maturity for each capability, the gap and the date it was assessed.",
+     "Screenshot of the capability maturity heat map signed in as a business architect, listing capabilities with current and target maturity, the gap and the assessment date."),
+    ("chief-architects", "/strategic/capability-health", DEMO_PERSONA,
+     "The capability health dashboard as a chief architect sees it: average portfolio health, critical capabilities, at-risk hotspots and the domain health index.",
+     "Screenshot of the capability health dashboard signed in as a chief architect, with portfolio health, critical capabilities, at-risk hotspots and a domain health index with a status chart."),
+    ("scale-up-cto-and-vp-engineering", "/applications/import", DEMO_PERSONA,
+     "The application import as a scale-up CTO sees it: a spreadsheet chosen, its first rows previewed and each column matched to an application field.",
+     "Screenshot of the Import Applications dialog with the Upload File tab open, a template download link, merge or duplicate handling and a preview of the first rows of an application spreadsheet."),
+    ("security-architects", "/risks/", DEMO_PERSONA,
+     "The risk register as a security architect sees it: the top risks ranked by how many elements each reaches, with the elements it touches.",
+     "Screenshot of the risk register signed in as a security architect, with the top risks ranked by the number of elements each reaches."),
+    ("data-architects", "/architecture/data-lineage", DEMO_PERSONA,
+     "Data lineage as a data architect sees it: data objects, recorded lineage edges and the form for recording a flow between two modelled data objects.",
+     "Screenshot of the data lineage screen signed in as a data architect, with counts of data objects and recorded lineage edges above the form for recording a lineage flow."),
+]
+
 
 # ── module & use-case screenshot/recording registry ─────────────────────────
 # Single source of truth for which live pages get a captured screen: the path
@@ -517,10 +564,106 @@ def use_case_redirect_target(old_filename_slug: str) -> str | None:
 # pixels are twice their CSS size, so the <img> width/height attributes halve them and the
 # image displays 1:1. Every other module image is a 1x capture and keeps its file size.
 TWO_X_MODULE_IMAGES = frozenset({"applications", "arb"})
+# The four role-page captures are 2x as well (capture_role in the same script).
+TWO_X_ROLE_IMAGES = frozenset({
+    "enterprise-architects", "cto-and-cio", "it-portfolio-managers", "solution-architects",
+    "business-architects", "security-architects", "data-architects",
+    "chief-architects", "scale-up-cto-and-vp-engineering",
+})
+
+
+# More real screens for each role page, from the captures already committed for the
+# product's own pages (app/static/img/modules). Each role page shows its own hero screen
+# plus these, so a visitor sees the role's job on more than one screen. Entry:
+# (image file under static/img, density, frame label, caption, alt text).
+ROLE_MORE_SCREENS: dict[str, list[tuple[str, int, str, str, str]]] = {
+    "enterprise-architects": [
+        ("modules/arb.webp", 2, "Architecture Review Board",
+         "The review board dashboard: reviews, how many are pending, the approval rate and the average cycle time.",
+         "Screenshot of the Architecture Review Board with total reviews, pending reviews, approval rate and cycle time above a chart of review status."),
+        ("modules/architecture-model.webp", 1, "Architecture model",
+         "The architecture model: every ArchiMate element in a layer, counted and filterable.",
+         "Screenshot of the architecture model for one ArchiMate layer, with element counts, filters and a table of elements and their relationships."),
+    ],
+    "solution-architects": [
+        ("modules/solutions.webp", 1, "Solutions",
+         "The solutions list: each design with its phase, readiness and next action.",
+         "Screenshot of the All Solutions screen with counts of solutions by readiness and a list of solutions with phase, maturity and next action."),
+        ("modules/arb.webp", 2, "Architecture Review Board",
+         "The review board dashboard a design goes to for a decision.",
+         "Screenshot of the Architecture Review Board with total reviews, pending reviews, approval rate and cycle time above a chart of review status."),
+    ],
+    "cto-and-cio": [
+        ("modules/portfolio.webp", 1, "Portfolio",
+         "The portfolio: initiatives with approved budget, spend to date, health and sponsor.",
+         "Screenshot of the portfolio screen with initiative, budget and spend totals above a table of initiatives with phase, budget, spend, variance and sponsor."),
+        ("modules/business-case.webp", 1, "Business cases",
+         "Business cases: options, costs and expected return for each investment.",
+         "Screenshot of the Business Cases list with each case's status, total cost of ownership, return on investment and last update."),
+    ],
+    "it-portfolio-managers": [
+        ("modules/duplicate-detection.webp", 1, "Duplicate detection",
+         "Duplicate detection: groups of applications that do the same job, with the estimated saving.",
+         "Screenshot of the Duplicate Detection screen with duplicate groups, estimated annual saving and priority counts above a filterable list of groups."),
+        ("modules/applications.webp", 2, "Applications",
+         "The application portfolio: lifecycle, owner and capability for every application.",
+         "Screenshot of the Applications screen with active portfolio counts, a data quality notice and a table of applications with type, lifecycle status and capability."),
+    ],
+    "chief-architects": [
+        ("modules/arb.webp", 2, "Architecture Review Board",
+         "The review board dashboard: total reviews, pending reviews, approval rate and cycle time.",
+         "Screenshot of the Architecture Review Board with total reviews, pending reviews, approval rate and cycle time above a chart of review status."),
+    ],
+    "scale-up-cto-and-vp-engineering": [
+        ("modules/applications.webp", 2, "Applications",
+         "The portfolio the import fills, with how many applications have a named owner and a vendor.",
+         "Screenshot of the Applications screen with active portfolio counts, a data quality notice about owners and a table of applications with lifecycle status."),
+    ],
+    "business-architects": [
+        ("modules/projects.webp", 1, "Work packages",
+         "Work packages: the changes that close a gap, with status, priority and progress.",
+         "Screenshot of the Work Packages screen with a table of packages showing status, priority, a progress bar and due date."),
+    ],
+    "security-architects": [
+        ("modules/compliance-frameworks.webp", 1, "Regulatory compliance",
+         "Regulatory compliance: the frameworks in scope and the controls mapped to each.",
+         "Screenshot of the Regulatory Compliance screen with active frameworks and controls counts above a table of frameworks with jurisdiction and enforcement."),
+    ],
+    "data-architects": [
+        ("modules/architecture-model.webp", 1, "Architecture model",
+         "The architecture model: elements by layer, including the data objects lineage is recorded between.",
+         "Screenshot of the architecture model for one ArchiMate layer, with element counts, filters and a table of elements and their relationships."),
+    ],
+}
+
+
+def get_role_more_screens(page: "PublicPage") -> list[dict[str, Any]]:
+    """The extra real screens a role page shows below its hero (ROLE_MORE_SCREENS).
+
+    Only files that exist on disk are returned, so a missing capture can never ship a
+    broken <img>."""
+    if page.page_family != "role" or page.front_matter.get("capture_status") != "live":
+        return []
+    from PIL import Image
+
+    out = []
+    for rel, density, label, caption, alt in ROLE_MORE_SCREENS.get(page.slug, []):
+        path = STATIC_ROOT / "img" / rel
+        if not path.is_file():
+            continue
+        with Image.open(path) as im:
+            width, height = im.size[0] // density, im.size[1] // density
+        out.append({"url": f"/static/img/{rel}", "width": width, "height": height,
+                    "frame_label": f"{label} \u00b7 Demonstration company", "caption": caption, "alt": alt})
+    return out
 
 
 def _screenshot_density(slug: str, page_family: str) -> int:
-    return 2 if page_family == "module" and slug in TWO_X_MODULE_IMAGES else 1
+    if page_family == "module" and slug in TWO_X_MODULE_IMAGES:
+        return 2
+    if page_family == "role" and slug in TWO_X_ROLE_IMAGES:
+        return 2
+    return 1
 
 
 def get_page_screenshot(page: "PublicPage") -> dict[str, Any] | None:
@@ -543,6 +686,10 @@ def get_page_screenshot(page: "PublicPage") -> dict[str, Any] | None:
         registry = USE_CASE_SCREENSHOT_CAPTURES
         static_dir = IMG_USE_CASES_DIR
         url_prefix = "/static/img/use-cases"
+    elif page.page_family == "role":
+        registry = ROLE_CAPTURES
+        static_dir = IMG_ROLES_DIR
+        url_prefix = "/static/img/roles"
     else:
         return None
 
@@ -580,6 +727,8 @@ def get_page_screenshot(page: "PublicPage") -> dict[str, Any] | None:
         "mobile": mobile,
         "alt": alt,
         "caption": caption,
+        "frame_label": f"{ROLE_FRAME_LABELS.get(page.slug, 'Ask')} \u00b7 Demonstration company"
+        if page.page_family == "role" else None,
     }
 
 
@@ -809,7 +958,10 @@ def build_jsonld(page: PublicPage) -> str:
         ld = _jsonld_faq(page, site_url)
     elif family == "vision":
         ld = _jsonld_software_app(page, site_url)
-    elif family == "module":
+    elif family == "module" and page.cta != "waiting_list":
+        # A module still on the waiting list is a plain page: no
+        # SoftwareApplication or offer is emitted for a capability that
+        # cannot be used yet.
         ld = _jsonld_software_app(page, site_url)
     elif family == "function-per-segment":
         ld = _jsonld_webpage(page, site_url)
@@ -1306,14 +1458,14 @@ def _jsonld_faq(page: PublicPage, site_url: str) -> dict[str, Any]:
     }
 
 
-# ── Landing layout (module, use-case and comparison pages) ──────────────────
-# These three families render as a landing page (hero, alternating section
+# ── Landing layout (module, use-case, comparison and role pages) ──────────────────
+# These four families render as a landing page (hero, alternating section
 # bands, link lists as cards, a closing action band) instead of one prose
 # column; every other family keeps the document layout. Keyed on
 # ``page.family`` (the content directory), never ``page.page_family``, so
 # front matter cannot switch a legal or site page into it.
 
-LANDING_FAMILIES: frozenset[str] = frozenset({"module", "function-per-segment", "comparison"})
+LANDING_FAMILIES: frozenset[str] = frozenset({"module", "function-per-segment", "comparison", "role"})
 
 # The one segment-label table: the /use-cases index groups by it and a
 # use-case page's hero names its segment from it.
@@ -1650,8 +1802,12 @@ def build_landing(page: PublicPage) -> Landing | None:
 
     if page.cta == "waiting_list":
         primary_action = ("Tell us you need this", "#feature-interest")
+        # A page for something not built yet never points at pricing: its
+        # second action is a conversation, not a plan.
+        secondary_action = ("Talk to us", "/contact")
     else:
         primary_action = ("Start free", url_for("account.register"))
+        secondary_action = ("See pricing", "/pricing")
 
     return Landing(
         title=page.title,
@@ -1662,4 +1818,5 @@ def build_landing(page: PublicPage) -> Landing | None:
         breadcrumb=parent,
         segment_label=segment_label,
         primary_action=primary_action,
+        secondary_action=secondary_action,
     )

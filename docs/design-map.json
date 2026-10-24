@@ -1167,63 +1167,6 @@
    "spec": null,
    "status": "mapped"
   },
-  "app/modules/intelligence/templates/intelligence/twin_map.html": {
-   "allowed_macros": [
-    "components/accessibility_helpers.html",
-    "components/alert.html",
-    "components/badge.html",
-    "components/breadcrumb.html",
-    "components/breadcrumb_nav.html",
-    "components/button.html",
-    "components/card.html",
-    "components/confirmation_dialog.html",
-    "components/data_card.html",
-    "components/dense_table.html",
-    "components/dialog.html",
-    "components/dropdown_menu.html",
-    "components/empty_state.html",
-    "components/error_boundary.html",
-    "components/filter_bar.html",
-    "components/form_field.html",
-    "components/inline_hint.html",
-    "components/input.html",
-    "components/loading_state.html",
-    "components/modal.html",
-    "components/page_header.html",
-    "components/provenance.html",
-    "components/search_bar.html",
-    "components/select.html",
-    "components/skeleton.html",
-    "components/status_badge.html",
-    "components/tabs.html",
-    "macros/page_shell.html"
-   ],
-   "basis": "rule",
-   "block": "board",
-   "controls": {
-    "button": 1,
-    "link": 1
-   },
-   "extends": [
-    "layouts/admin_base.html"
-   ],
-   "macros": [
-    "components/empty_state.html",
-    "macros/page_shell.html"
-   ],
-   "reference": {
-    "shadcn": {
-     "name": "shadcn examples: cards",
-     "url": "https://ui.shadcn.com/examples/cards"
-    },
-    "basecoat": {
-     "name": "flask-basecoat examples: Kanban",
-     "image": "docs/design/reference/basecoat-kanban.webp"
-    }
-   },
-   "spec": null,
-   "status": "mapped"
-  },
   "app/modules/intelligence/templates/intelligence/value_streams_at_risk.html": {
    "allowed_macros": [
     "components/accessibility_helpers.html",
@@ -2680,12 +2623,13 @@
     "button": 5,
     "form": 3,
     "link": 1,
-    "testid": 2
+    "testid": 3
    },
    "extends": [
     "layouts/admin_base.html"
    ],
    "macros": [
+    "components/company_kind.html",
     "components/page_header.html",
     "macros/check_password.html",
     "macros/form_macros.html"
@@ -2978,6 +2922,7 @@
     "layouts/admin_base.html"
    ],
    "macros": [
+    "macros/kanban_board.html",
     "macros/page_shell.html"
    ],
    "reference": {
@@ -7381,10 +7326,11 @@
    "basis": "reviewed",
    "block": "record-detail",
    "controls": {
-    "button": 21,
+    "button": 23,
     "form": 8,
-    "link": 25,
-    "table": 6
+    "link": 24,
+    "table": 6,
+    "testid": 2
    },
    "extends": [
     "layouts/admin_base.html"
@@ -7392,6 +7338,7 @@
    "macros": [
     "components/badge.html",
     "components/breadcrumb_nav.html",
+    "components/button.html",
     "components/card.html",
     "components/dense_table.html",
     "components/page_header.html",
@@ -7578,21 +7525,31 @@
    "basis": "reviewed",
    "block": "data-table",
    "controls": {
-    "button": 45,
-    "form": 3,
-    "link": 12,
+    "button": 22,
+    "form": 1,
+    "link": 9,
     "modal": 2,
     "table": 1,
-    "testid": 31
+    "testid": 25
    },
    "extends": [
     "layouts/admin_base.html"
    ],
    "macros": [
+    "components/alert.html",
+    "components/badge.html",
+    "components/button.html",
+    "components/card.html",
+    "components/checkbox.html",
+    "components/completeness_ring.html",
     "components/dense_table.html",
+    "components/dropdown_menu.html",
     "components/empty_state.html",
     "components/form_field.html",
+    "components/input.html",
     "components/modal.html",
+    "components/provenance.html",
+    "components/select.html",
     "components/skeleton.html",
     "components/unified_mapping_modal.html",
     "macros/page_shell.html"
@@ -8841,17 +8798,18 @@
    ],
    "block": "board",
    "controls": {
-    "button": 79,
+    "button": 81,
     "link": 1,
     "modal": 6,
-    "table": 1,
-    "testid": 2
+    "table": 2,
+    "testid": 3
    },
    "extends": [
     "layouts/composer_base.html"
    ],
    "macros": [
-    "components/breadcrumb_nav.html"
+    "components/breadcrumb_nav.html",
+    "components/empty_state.html"
    ],
    "reference": {
     "shadcn": {
@@ -9283,13 +9241,19 @@
    "block": "record-detail",
    "controls": {
     "button": 7,
-    "link": 9
+    "link": 14,
+    "modal": 1,
+    "table": 1,
+    "testid": 26
    },
    "extends": [
     "layouts/admin_base.html"
    ],
    "macros": [
-    "macros/page_shell.html"
+    "components/badge.html",
+    "components/modal.html",
+    "macros/page_shell.html",
+    "macros/shadcn_compat.html"
    ],
    "reference": {
     "shadcn": {
@@ -14373,17 +14337,22 @@
    "basis": "reviewed",
    "block": "dashboard",
    "controls": {
-    "button": 2,
+    "button": 3,
+    "form": 1,
     "link": 15,
     "table": 4,
-    "testid": 16
+    "testid": 17
    },
    "extends": [
     "layouts/admin_base.html"
    ],
    "macros": [
     "components/answer_cascade.html",
+    "components/button.html",
+    "components/company_kind.html",
     "components/dense_table.html",
+    "components/input.html",
+    "components/table.html",
     "macros/page_shell.html"
    ],
    "reference": {
@@ -16731,7 +16700,7 @@
    "basis": "rule",
    "block": "data-table",
    "controls": {
-    "button": 27,
+    "button": 26,
     "link": 2,
     "modal": 2,
     "table": 1
@@ -16740,8 +16709,16 @@
     "layouts/admin_base.html"
    ],
    "macros": [
+    "components/badge.html",
     "components/breadcrumb_nav.html",
-    "components/page_header.html"
+    "components/button.html",
+    "components/checkbox.html",
+    "components/dense_table.html",
+    "components/form_field.html",
+    "components/input.html",
+    "components/modal.html",
+    "components/page_header.html",
+    "components/select.html"
    ],
    "reference": {
     "shadcn": {
@@ -20998,6 +20975,70 @@
     "basecoat": {
      "name": "flask-basecoat examples: dashboard",
      "image": "docs/design/reference/basecoat-dashboard.webp"
+    }
+   },
+   "spec": null,
+   "status": "mapped"
+  },
+  "app/templates/safe_portfolio/kanban.html": {
+   "allowed_macros": [
+    "components/accessibility_helpers.html",
+    "components/alert.html",
+    "components/avatar.html",
+    "components/badge.html",
+    "components/breadcrumb.html",
+    "components/breadcrumb_nav.html",
+    "components/button.html",
+    "components/card.html",
+    "components/confirmation_dialog.html",
+    "components/data_card.html",
+    "components/dense_table.html",
+    "components/dialog.html",
+    "components/dropdown_menu.html",
+    "components/empty_state.html",
+    "components/error_boundary.html",
+    "components/filter_bar.html",
+    "components/form_field.html",
+    "components/inline_hint.html",
+    "components/input.html",
+    "components/loading_state.html",
+    "components/modal.html",
+    "components/page_header.html",
+    "components/provenance.html",
+    "components/search_bar.html",
+    "components/select.html",
+    "components/skeleton.html",
+    "components/status_badge.html",
+    "components/tabs.html",
+    "macros/kanban_board.html",
+    "macros/page_shell.html"
+   ],
+   "basis": "declared",
+   "block": "board",
+   "controls": {
+    "button": 1
+   },
+   "extends": [
+    "layouts/admin_base.html"
+   ],
+   "extra_macros": [
+    "components/avatar.html",
+    "macros/kanban_board.html"
+   ],
+   "macros": [
+    "components/avatar.html",
+    "components/badge.html",
+    "macros/kanban_board.html",
+    "macros/page_shell.html"
+   ],
+   "reference": {
+    "shadcn": {
+     "name": "shadcn examples: cards",
+     "url": "https://ui.shadcn.com/examples/cards"
+    },
+    "basecoat": {
+     "name": "flask-basecoat examples: Kanban",
+     "image": "docs/design/reference/basecoat-kanban.webp"
     }
    },
    "spec": null,
