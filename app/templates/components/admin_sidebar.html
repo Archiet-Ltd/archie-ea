@@ -144,6 +144,9 @@ DEPENDENCIES:
                 <input
                     type="text"
                     x-ref="searchInput"
+                    name="sidebar-nav-search"
+                    autocomplete="off"
+                    data-1p-ignore data-lpignore="true"
                     x-model="searchQuery"
                     @focus="searchFocused = true"
                     @blur="searchFocused = false"
