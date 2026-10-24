@@ -1,7 +1,11 @@
 {% extends "layouts/admin_base.html" %}
 {% from "components/page_header.html" import page_header %}
 {% from 'components/status_badge.html' import status_badge %}
-{% from 'components/modal.html' import modal %}
+{% from 'components/button.html' import button %}
+{% from 'components/select.html' import native_select %}
+{% from 'components/table.html' import table, table_header, table_body, table_row, table_head, table_cell %}
+{% from 'components/card.html' import card, card_header, card_title, card_content %}
+{% from 'components/form_field.html' import form_field %}
 
 {% block title %}{{ cr.acr_reference }} — Change Request{% endblock %}
 
@@ -12,13 +16,9 @@
         dispositionLoading: false,
         noticeLoading: false,
         selectedDisposition: {{ (cr.disposition or "") | tojson }},
-        noticeText: "",
         flashMessage: "",
         flashType: "",
         showFlash(msg, type) { this.flashMessage = msg; this.flashType = type; setTimeout(() => this.flashMessage = "", 4000); },
-        /* .then()/.catch(), not async/await: Alpine attribute expressions here are
-           run by the CSP-safe interpreter (app/static/js/csp/csp-evaluator.js),
-           which cannot await and rejects `async`. */
         assessImpact() {
             const self = this;
             this.assessLoading = true;
@@ -50,9 +50,10 @@
         },
         issueNotice() {
             const self = this;
-            if (!this.noticeText.trim()) { this.showFlash("Enter notice text first.", "error"); return Promise.resolve(); }
+            const noticeTextEl = document.getElementById("input-notice-text");
+            if (!noticeTextEl || !noticeTextEl.value.trim()) { this.showFlash("Enter notice text first.", "error"); return Promise.resolve(); }
             this.noticeLoading = true;
-            return Platform.fetch.post("/arb/api/arb/change-requests/{{ cr.id }}/issue-notice", {notice_text: this.noticeText}, { silent: true })
+            return Platform.fetch.post("/arb/api/arb/change-requests/{{ cr.id }}/issue-notice", {notice_text: noticeTextEl.value}, { silent: true })
                 .then(function () {
                     self.showFlash("Change notice issued — page will refresh.", "success");
                     setTimeout(function () { location.reload(); }, 1500);
@@ -89,56 +90,60 @@
         <div class="lg:col-span-2 space-y-6">
 
             <!-- Core Info -->
-            <div class="bg-card border border-border rounded-lg p-6 space-y-4">
-                <h2 class="text-base font-semibold text-foreground">Change Request Details</h2>
-                <dl class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 text-sm">
-                    <div>
-                        <dt class="text-muted-foreground font-medium">Reference</dt>
-                        <dd class="font-mono text-foreground">{{ cr.acr_reference }}</dd>
-                    </div>
-                    <div>
-                        <dt class="text-muted-foreground font-medium">Status</dt>
-                        <dd>
-                            {% if cr.status == 'open' %}{{ status_badge('Open', 'info') }}
-                            {% elif cr.status == 'assessing' %}{{ status_badge('Assessing', 'warning') }}
-                            {% elif cr.status == 'disposition_set' %}{{ status_badge('Disposition Set', 'secondary') }}
-                            {% elif cr.status == 'closed' %}{{ status_badge('Closed', 'success') }}
-                            {% else %}{{ status_badge(cr.status | title, 'neutral') }}{% endif %}
-                        </dd>
-                    </div>
-                    <div>
-                        <dt class="text-muted-foreground font-medium">Trigger Type</dt>
-                        <dd>{{ (cr.trigger_type or '—') | replace('_', ' ') | title }}</dd>
-                    </div>
-                    <div>
-                        <dt class="text-muted-foreground font-medium">Disposition</dt>
-                        <dd>{{ (cr.disposition or '—') | replace('_', ' ') | title }}</dd>
-                    </div>
-                    <div>
-                        <dt class="text-muted-foreground font-medium">Raised By</dt>
-                        <dd>{{ cr.raised_by.full_name if cr.raised_by else (cr.raised_by or '—') }}</dd>
-                    </div>
-                    <div>
-                        <dt class="text-muted-foreground font-medium">Raised At</dt>
-                        <dd>{{ cr.raised_at.strftime('%Y-%m-%d') if cr.raised_at else '—' }}</dd>
-                    </div>
-                    {% if cr.description %}
-                    <div class="sm:col-span-2">
-                        <dt class="text-muted-foreground font-medium">Description</dt>
-                        <dd class="mt-1 text-foreground whitespace-pre-wrap">{{ cr.description }}</dd>
-                    </div>
-                    {% endif %}
-                    {% if cr.trigger_description %}
-                    <div class="sm:col-span-2">
-                        <dt class="text-muted-foreground font-medium">Trigger Description</dt>
-                        <dd class="mt-1 text-foreground whitespace-pre-wrap">{{ cr.trigger_description }}</dd>
-                    </div>
-                    {% endif %}
-                </dl>
-            </div>
+            {% call card() %}
+                {% call card_header() %}
+                    {% call card_title() %}Change Request Details{% endcall %}
+                {% endcall %}
+                {% call card_content() %}
+                    <dl class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 text-sm">
+                        <div>
+                            <dt class="text-muted-foreground font-medium">Reference</dt>
+                            <dd class="font-mono text-foreground">{{ cr.acr_reference }}</dd>
+                        </div>
+                        <div>
+                            <dt class="text-muted-foreground font-medium">Status</dt>
+                            <dd>
+                                {% if cr.status == 'open' %}{{ status_badge('Open', 'info') }}
+                                {% elif cr.status == 'assessing' %}{{ status_badge('Assessing', 'warning') }}
+                                {% elif cr.status == 'disposition_set' %}{{ status_badge('Disposition Set', 'secondary') }}
+                                {% elif cr.status == 'closed' %}{{ status_badge('Closed', 'success') }}
+                                {% else %}{{ status_badge(cr.status | title, 'neutral') }}{% endif %}
+                            </dd>
+                        </div>
+                        <div>
+                            <dt class="text-muted-foreground font-medium">Trigger Type</dt>
+                            <dd>{{ (cr.trigger_type or '—') | replace('_', ' ') | title }}</dd>
+                        </div>
+                        <div>
+                            <dt class="text-muted-foreground font-medium">Disposition</dt>
+                            <dd>{{ (cr.disposition or '—') | replace('_', ' ') | title }}</dd>
+                        </div>
+                        <div>
+                            <dt class="text-muted-foreground font-medium">Raised By</dt>
+                            <dd>{{ cr.raised_by.full_name if cr.raised_by else (cr.raised_by or '—') }}</dd>
+                        </div>
+                        <div>
+                            <dt class="text-muted-foreground font-medium">Raised At</dt>
+                            <dd>{{ cr.raised_at.strftime('%Y-%m-%d') if cr.raised_at else '—' }}</dd>
+                        </div>
+                        {% if cr.description %}
+                        <div class="sm:col-span-2">
+                            <dt class="text-muted-foreground font-medium">Description</dt>
+                            <dd class="mt-1 text-foreground whitespace-pre-wrap">{{ cr.description }}</dd>
+                        </div>
+                        {% endif %}
+                        {% if cr.trigger_description %}
+                        <div class="sm:col-span-2">
+                            <dt class="text-muted-foreground font-medium">Trigger Description</dt>
+                            <dd class="mt-1 text-foreground whitespace-pre-wrap">{{ cr.trigger_description }}</dd>
+                        </div>
+                        {% endif %}
+                    </dl>
+                {% endcall %}
+            {% endcall %}
 
             <!-- Impact Assessments -->
-            <div class="bg-card border border-border rounded-lg overflow-hidden">
+            {% call card(class='overflow-hidden') %}
                 <div class="px-6 py-4 border-b border-border flex items-center justify-between">
                     <div>
                         <h2 class="text-base font-semibold text-foreground">Impact Assessments</h2>
@@ -146,52 +151,54 @@
                     </div>
                     <span class="text-sm font-medium text-muted-foreground">{{ impacts | length }}</span>
                 </div>
+                {% call card_content(class='p-0') %}
                 {% if impacts %}
                 <div class="overflow-x-auto">
-                <table class="dense-table w-full text-sm">
-                    <thead class="bg-muted/50 border-b border-border">
-                        <tr>
-                            <th class="px-4 py-3 text-left font-medium text-muted-foreground">Capability</th>
-                            <th class="px-4 py-3 text-left font-medium text-muted-foreground">Decision</th>
-                            <th class="px-4 py-3 text-left font-medium text-muted-foreground">Impact Level</th>
-                            <th class="px-4 py-3 text-left font-medium text-muted-foreground">Notes</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-border">
+                {% call table(class='border-collapse') %}
+                    {% call table_header() %}
+                        {% call table_row() %}
+                            {% call table_head() %}Capability{% endcall %}
+                            {% call table_head() %}Decision{% endcall %}
+                            {% call table_head() %}Impact Level{% endcall %}
+                            {% call table_head() %}Notes{% endcall %}
+                        {% endcall %}
+                    {% endcall %}
+                    {% call table_body() %}
                         {% for ia in impacts %}
-                        <tr class="hover:bg-muted/30">
-                            <td class="px-4 py-3 text-muted-foreground">
+                        {% call table_row(class='hover:bg-muted/30') %}
+                            {% call table_cell(class='text-muted-foreground') %}
                                 {% if ia.affected_capability_id %}
                                   {% if 'business_capability_management.capability_detail' in flask.current_app.view_functions %}
                                   <a href="{{ url_for('business_capability_management.capability_detail', capability_id=ia.affected_capability_id) }}"
                                      class="text-primary hover:underline">Cap #{{ ia.affected_capability_id }}</a>
                                   {% else %}Cap #{{ ia.affected_capability_id }}{% endif %}
                                 {% else %}—{% endif %}
-                            </td>
-                            <td class="px-4 py-3">
+                            {% endcall %}
+                            {% call table_cell() %}
                                 {% if ia.affected_decision %}
                                 <span class="font-medium text-foreground">{{ ia.affected_decision.title }}</span>
                                 {% elif ia.affected_decision_id %}
                                 <span class="text-muted-foreground">Decision #{{ ia.affected_decision_id }}</span>
                                 {% else %}—{% endif %}
-                            </td>
-                            <td class="px-4 py-3">
+                            {% endcall %}
+                            {% call table_cell() %}
                                 {% if ia.impact_level == 'high' %}{{ status_badge('High', 'destructive') }}
                                 {% elif ia.impact_level == 'medium' %}{{ status_badge('Medium', 'warning') }}
                                 {% else %}{{ status_badge(ia.impact_level | title, 'secondary') }}{% endif %}
-                            </td>
-                            <td class="px-4 py-3 text-muted-foreground text-xs">{{ ia.impact_description or '—' }}</td>
-                        </tr>
+                            {% endcall %}
+                            {% call table_cell(class='text-muted-foreground text-xs') %}{{ ia.impact_description or '—' }}{% endcall %}
+                        {% endcall %}
                         {% endfor %}
-                    </tbody>
-                </table>
+                    {% endcall %}
+                {% endcall %}
                 </div>
                 {% else %}
                 <div class="px-6 py-8 text-center text-muted-foreground text-sm">
                     No impact assessments yet. Use the <strong>Assess Impact</strong> action to auto-generate.
                 </div>
                 {% endif %}
-            </div>
+                {% endcall %}
+            {% endcall %}
 
             <!-- Change Notices -->
             {% if notices %}
@@ -225,13 +232,7 @@
                     <h3 class="text-sm font-semibold text-foreground">Assess Impact</h3>
                 </div>
                 <p class="text-xs text-muted-foreground">Auto-query linked capabilities and decisions to build an impact assessment list.</p>
-                <button type="button" @click="assessImpact()"
-                        :disabled="assessLoading"
-                        id="btn-assess-impact"
-                        class="w-full inline-flex items-center justify-center gap-2 rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors">
-                    <span x-show="!assessLoading" x-cloak>Assess Impact</span>
-                    <span x-show="assessLoading" x-cloak>Running…</span>
-                </button>
+                {{ button(text='Assess Impact', type='button', class='w-full', attrs_dict={'@click': 'assessImpact()', ':disabled': 'assessLoading', 'id': 'btn-assess-impact'}) }}
             </div>
 
             <!-- Step 2: Set Disposition -->
@@ -241,21 +242,11 @@
                     <h3 class="text-sm font-semibold text-foreground">Set Disposition</h3>
                 </div>
                 <p class="text-xs text-muted-foreground">Decide how this change should be handled in the ADM.</p>
-                <select x-model="selectedDisposition"
-                        id="select-disposition"
-                        class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm" aria-label="Select disposition…">
-                    <option value="">Select disposition…</option>
-                    {% for d in valid_dispositions %}
-                    <option value="{{ d }}" {% if cr.disposition == d %}selected{% endif %}>{{ d | replace('_', ' ') | title }}</option>
-                    {% endfor %}
-                </select>
-                <button type="button" @click="setDisposition()"
-                        :disabled="dispositionLoading"
-                        id="btn-set-disposition"
-                        class="w-full inline-flex items-center justify-center gap-2 rounded-md bg-warning px-3 py-2 text-sm font-medium text-warning-foreground hover:bg-warning/90 disabled:opacity-50 transition-colors">
-                    <span x-show="!dispositionLoading" x-cloak>Set Disposition</span>
-                    <span x-show="dispositionLoading" x-cloak>Saving…</span>
-                </button>
+                {% set disposition_options = [('', 'Select disposition\u2026')] + [(d, d | replace('_', ' ') | title) for d in valid_dispositions] %}
+                <div class="mb-3">
+                {{ native_select(id='select-disposition', aria_label='Select disposition', options=disposition_options, selected=cr.disposition, attrs_dict={'x-model': 'selectedDisposition'}) }}
+                </div>
+                {{ button(text='Set Disposition', type='button', variant='secondary', class='w-full', attrs_dict={'@click': 'setDisposition()', ':disabled': 'dispositionLoading', 'id': 'btn-set-disposition'}) }}
             </div>
 
             <!-- Step 3: Issue Change Notice -->
@@ -265,18 +256,8 @@
                     <h3 class="text-sm font-semibold text-foreground">Issue Change Notice</h3>
                 </div>
                 <p class="text-xs text-muted-foreground">Issue an Architecture Change Notice to close this request.</p>
-                <textarea x-model="noticeText"
-                          id="input-notice-text"
-                          placeholder="Describe the scope and outcome of this change…"
-                          rows="4"
-                          class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-ring" aria-label="Describe the scope and outcome of this change…"></textarea>
-                <button type="button" @click="issueNotice()"
-                        :disabled="noticeLoading"
-                        id="btn-issue-notice"
-                        class="w-full inline-flex items-center justify-center gap-2 rounded-md bg-success px-3 py-2 text-sm font-medium text-success-foreground hover:bg-success/90 disabled:opacity-50 transition-colors">
-                    <span x-show="!noticeLoading" x-cloak>Issue Notice</span>
-                    <span x-show="noticeLoading" x-cloak>Issuing…</span>
-                </button>
+                {{ form_field(id='input-notice-text', input_type='textarea', rows=4, placeholder='Describe the scope and outcome of this change\u2026') }}
+                {{ button(text='Issue Notice', type='button', variant='destructive', class='w-full', attrs_dict={'@click': 'issueNotice()', ':disabled': 'noticeLoading', 'id': 'btn-issue-notice'}) }}
             </div>
 
         </div>
