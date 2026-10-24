@@ -1,3 +1,4 @@
+{# design-block: record-detail #}
 {% extends 'layouts/admin_base.html' %}
 {% from 'macros/page_shell.html' import page_shell %}
 {% from 'components/provenance.html' import provenance_badge %}
@@ -15,7 +16,7 @@
     {{ page_shell(
         title='Model as of',
         subtitle='The architecture model as it stood on a specific date.',
-        breadcrumb=[('Home', home_url), ('Intelligence', url_for('intelligence_ui.ask')), ('Model as of', none)],
+        breadcrumb=[('Home', home_url), ('Intelligence', url_for('intelligence_ui.answers_page')), ('Model as of', none)],
     ) }}
 
     <section class="rounded-lg border border-border bg-card p-6">
