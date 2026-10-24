@@ -8,6 +8,8 @@
    See also: public_base.html (unauthenticated), base.html (legacy, avoid).
 #}
 {% from 'components/button.html' import button %}
+{% from 'components/dialog.html' import dialog %}
+{% from 'components/input.html' import input %}
 <!DOCTYPE html>
 <html lang="en" class="h-full">
 <head>
@@ -185,11 +187,13 @@
                     {# Sample company indicator: shows when the sample is loaded #}
                     {% if sample_company_restore_point_id %}
                     <div class="mb-4 flex items-center justify-between gap-3 rounded-md border border-border bg-card px-4 py-2 text-sm" data-testid="sample-company-indicator">
-                        <p class="text-muted-foreground">
-                            You are looking at the sample company.
-                            <a href="{{ url_for('architect_ui.import_restore_preview', log_id=sample_company_restore_point_id) }}"
-                               class="text-info hover:underline">Remove it when you are ready</a>.
-                        </p>
+                        <p class="text-muted-foreground">You are looking at the sample company.</p>
+                        {% call dialog(trigger_text='Remove it', trigger_label='Remove the sample company', start_hidden=false, title='Remove the sample company?', description='The sample applications, capabilities and risks go away. Anything you added yourself stays.') %}
+                        <form method="post" action="{{ url_for('architect_ui.remove_sample_company') }}" class="flex justify-end">
+                            {{ input(type='hidden', name='csrf_token', value=csrf_token()) }}
+                            {{ button(text='Remove the sample company', type='submit', variant='destructive', testid='sample-company-remove-confirm') }}
+                        </form>
+                        {% endcall %}
                     </div>
                     {% endif %}
                     {# Inline page hints — templates fill this block with the inline_hint macro #}

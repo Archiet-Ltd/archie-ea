@@ -90,6 +90,9 @@
         <div class="rounded-lg border border-border bg-muted/30 px-4 py-3" data-testid="company-kind-selector">
             <h3 class="text-sm font-medium text-foreground mb-2">What kind of company are you?</h3>
             {{ company_kind_picker(kind=company_kind or 'startup') }}
+            <div class="mt-2">
+                {{ button(text='Not now', variant='ghost', size='sm', testid='company-kind-not-now', attrs_dict={'data-company-kind-default': 'startup'}) }}
+            </div>
         </div>
         <ol class="space-y-3">
             {% for step in guided_steps %}

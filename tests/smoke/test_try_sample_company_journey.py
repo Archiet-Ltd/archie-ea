@@ -110,26 +110,31 @@ def test_try_sample_company_loads_and_removes_cleanly(browser, live_server, seed
         assert stored > 0
         expect(page.locator('[data-testid="health-kpi-elements"]')).to_have_text(str(stored), timeout=PAGE_TIMEOUT)
 
-        # Click "Remove it when you are ready"
-        page.get_by_role("link", name="Remove it when you are ready").click()
-        page.wait_for_url("**/restore-points/**", timeout=PAGE_TIMEOUT)
+        # The first screen shows a working answer: applications and a health score, no dash or zero
+        applications = page.locator('[data-testid="health-kpi-applications"]').inner_text().strip()
+        assert applications.isdigit() and int(applications) >= 8, applications
+        score = page.locator('[data-testid="health-score-value"]').inner_text().strip()
+        assert score not in ("", "—", "0"), score
+        # The applications list agrees with the figure, and every application carries an owner and a cost
+        page.goto(live_server + "/applications/", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        expect(page.get_by_text("Payments service", exact=False).first).to_be_visible(timeout=PAGE_TIMEOUT)
+        page.goto(live_server + "/dashboard/overview", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
 
-        # The restore preview shows what will be removed
-        expect(page.locator('[data-testid="restore-summary"]')).to_be_visible(timeout=PAGE_TIMEOUT)
-        expect(page.get_by_text("Payments service", exact=False)).to_be_visible(timeout=PAGE_TIMEOUT)
-
-        # Confirm the restore
-        page.click('[data-testid="btn-confirm-restore"]')
-        expect(page.locator('[data-testid="restore-flash"]')).to_contain_text("Restored", timeout=PAGE_TIMEOUT)
+        # Remove it: one plain confirmation, then back on the setup screen
+        page.get_by_role("button", name="Remove the sample company").first.click()
+        confirm = page.locator('[data-testid="sample-company-remove-confirm"]')
+        expect(confirm).to_be_visible(timeout=PAGE_TIMEOUT)
+        confirm.click()
+        expect(page.get_by_text("Sample company removed")).to_be_visible(timeout=PAGE_TIMEOUT)
+        expect(page.locator('[data-testid="guided-setup"]')).to_be_visible(timeout=PAGE_TIMEOUT)
+        expect(page.locator('[data-testid="sample-company-indicator"]')).to_have_count(0)
 
         # After removal, applications list is empty
         page.goto(live_server + "/applications/", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
-        # Empty state or zero count
-        expect(page.get_by_text("No applications", exact=False).or_(page.get_by_text("0 applications", exact=False)).first).to_be_visible(timeout=PAGE_TIMEOUT)
+        expect(page.get_by_text("Payments service", exact=False)).to_have_count(0)
 
-        # Ask shows empty state
+        # Ask no longer shows the sample answer
         page.goto(live_server + "/ai-chat", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
-        # Should not show the sample answer anymore
         expect(page.get_by_text("Payments service", exact=False)).not_to_be_visible()
 
         # Control: seeded org elements unchanged

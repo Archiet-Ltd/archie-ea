@@ -69,6 +69,12 @@ def test_company_kind_saves_and_is_one_component(browser, live_server, seeded, v
         expect(block).to_be_visible()
         assert _selected(page, "startup")
 
+        # "Not now" is offered and keeps Startup, saying so
+        page.locator('[data-testid="company-kind-not-now"]').click()
+        expect(page.locator('[data-testid="company-kind-status"]')).to_contain_text("Startup", timeout=PAGE_TIMEOUT)
+        assert _selected(page, "startup")
+        assert _stored_kind(org_id) == "startup"
+
         page.locator('[data-testid="company-kind-scaleup"]').click()
         expect(page.locator('[data-testid="company-kind-status"]')).to_contain_text("Saved", timeout=PAGE_TIMEOUT)
         assert _selected(page, "scaleup") and not _selected(page, "startup")
@@ -118,10 +124,20 @@ def test_load_sample_is_a_real_click_and_lands_on_content(browser, live_server, 
             stored = ArchiMateElement.query.filter(ArchiMateElement.organization_id == org_id).count()
         assert stored > 0
         expect(page.locator('[data-testid="health-kpi-elements"]')).to_have_text(str(stored), timeout=PAGE_TIMEOUT)
-        # the link beside it lands on a page listing what was loaded
-        page.get_by_role("link", name="Remove it when you are ready").click()
-        page.wait_for_url("**/restore-points/**", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT * 3)
-        expect(page.locator('[data-testid="restore-summary"]')).to_be_visible(timeout=PAGE_TIMEOUT)
+        # the first screen shows a working answer: applications and a health score, not a dash or zero
+        applications = page.locator('[data-testid="health-kpi-applications"]').inner_text().strip()
+        assert applications.isdigit() and int(applications) >= 8, applications
+        score = page.locator('[data-testid="health-score-value"]').inner_text().strip()
+        assert score not in ("", "—", "0"), score
+        # the applications link lands on a list holding those applications
+        page.goto(live_server + "/applications/", wait_until="networkidle", timeout=PAGE_TIMEOUT)
         expect(page.get_by_text("Payments service", exact=False).first).to_be_visible()
+        page.goto(live_server + "/dashboard/overview", wait_until="networkidle", timeout=PAGE_TIMEOUT)
+        # removal is one confirmation that returns to the setup screen
+        page.get_by_role("button", name="Remove the sample company").first.click()
+        page.locator('[data-testid="sample-company-remove-confirm"]').click()
+        expect(page.get_by_text("Sample company removed")).to_be_visible(timeout=PAGE_TIMEOUT)
+        expect(page.locator('[data-testid="guided-setup"]')).to_be_visible(timeout=PAGE_TIMEOUT)
+        assert not errors, errors
     finally:
         context.close()

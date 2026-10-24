@@ -51,6 +51,14 @@
         });
     }
 
+    // "Not now" keeps Startup, the default, and says so the same way a choice does.
+    document.addEventListener('click', function (event) {
+        var skip = event.target.closest && event.target.closest('[data-company-kind-default]');
+        if (!skip) return;
+        var picker = document.querySelector('[data-company-kind-picker]');
+        if (picker) save(picker, skip.getAttribute('data-company-kind-default'));
+    });
+
     document.addEventListener('click', function (event) {
         var btn = event.target.closest && event.target.closest('[data-company-kind]');
         if (!btn) return;
