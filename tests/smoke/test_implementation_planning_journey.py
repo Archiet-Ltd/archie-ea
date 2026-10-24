@@ -17,7 +17,7 @@ pytestmark = [pytest.mark.smoke, pytest.mark.journey]
 
 SCREENSHOT_DIR = os.environ.get(
     "SCREENSHOT_DIR",
-    "/home/ubuntu/verify/seats/mg3ip066b/walk",
+    "/home/ubuntu/verify/seats/mg3ip066c/walk",
 )
 
 CREATE = "/implementation/work-packages/create"
@@ -35,6 +35,7 @@ def _role_assertions(page):
 
 def _take_screenshots(page, prefix, viewport_width):
     """Capture light and dark screenshots at a given viewport width."""
+    page.set_viewport_size({"width": viewport_width, "height": 1000})
     page.evaluate("() => document.documentElement.classList.remove('dark')")
     page.wait_for_timeout(300)
     page.screenshot(

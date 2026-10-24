@@ -14,7 +14,7 @@ from .fresh_org import create_fresh_org, sign_in
 
 pytestmark = [pytest.mark.smoke]
 
-SCREENSHOT_DIR = os.environ.get("SCREENSHOT_DIR", "/home/ubuntu/verify/seats/mg3ip066b/walk")
+SCREENSHOT_DIR = os.environ.get("SCREENSHOT_DIR", "/home/ubuntu/verify/seats/mg3ip066c/walk")
 TEMPLATES = {
     "work_package_form": "/implementation/work-packages/create",
     "work_package_detail": "/implementation/work-packages/1",
@@ -26,7 +26,7 @@ def test_screenshots(browser, live_server):
     org = create_fresh_org("portfolio_manager")
 
     for theme in ("light", "dark"):
-        for width, narrow in [(1440, ""), (390, "-narrow")]:
+        for width in (1440, 390):
             context = browser.new_context(
                 ignore_https_errors=True,
                 viewport={"width": width, "height": 1000},
@@ -42,7 +42,7 @@ def test_screenshots(browser, live_server):
             for name, path in TEMPLATES.items():
                 page.goto(live_server + path, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
                 page.wait_for_timeout(500)
-                filename = "%s-%s%s.png" % (name, theme, narrow)
+                filename = "%s-%dw-%s.png" % (name, width, theme)
                 filepath = os.path.join(SCREENSHOT_DIR, filename)
                 os.makedirs(os.path.dirname(filepath), exist_ok=True)
                 page.screenshot(path=filepath, full_page=True)
