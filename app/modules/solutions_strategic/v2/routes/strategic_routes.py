@@ -19,6 +19,7 @@ from flask import Blueprint, current_app, jsonify, render_template, request
 from flask_login import current_user, login_required
 
 from app.models.business_capability import BusinessCapability
+from app.modules.genome.services.roadmap_links import redirect_to_roadmap
 from app.modules.solutions_strategic.v2.services.architecture_governance_service import (
     ArchitectureGovernanceService,
 )
@@ -404,24 +405,8 @@ def api_dependency_analysis():
 @strategic_bp.route("/technology-roadmap")
 @login_required
 def technology_roadmap():
-    """Technology roadmap dashboard."""
-    try:
-        service = TechnologyRoadmapService()
-        analysis = service.analyze_technology_portfolio(include_innovation=True)
-
-        return render_template(
-            "strategic/technology_roadmap.html",
-            technology_analyses=analysis["technology_analyses"],
-            critical_technology=analysis["critical_technology"],
-            high_technology=analysis["high_technology"],
-            medium_technology=analysis["medium_technology"],
-            low_technology=analysis["low_technology"],
-            portfolio_metrics=analysis["portfolio_metrics"],
-            roadmap_phases=analysis["roadmap_phases"],
-            recommendations=analysis["recommendations"],
-        )
-    except Exception:
-        return jsonify({"error": "An internal error occurred"}), 500
+    """The technology roadmap is the one roadmap, Technology view."""
+    return redirect_to_roadmap("technology")
 
 
 @strategic_bp.route("/api/technology-analysis")

@@ -242,8 +242,10 @@ def _build_solution_traceability_fallback_matrix(limit=50):
 @architect_ui_bp.route("/roadmap-builder/")
 @login_required
 def roadmap_builder():
-    """Redirect to Enterprise Roadmap (capability-roadmap). Roadmap Builder is retired."""
-    return redirect(url_for("main.capability_roadmap"))
+    """Roadmap Builder is retired: the one roadmap replaces it."""
+    from app.modules.genome.services.roadmap_links import redirect_to_roadmap
+
+    return redirect_to_roadmap("strategic")
 
 
 # =============================================================================
