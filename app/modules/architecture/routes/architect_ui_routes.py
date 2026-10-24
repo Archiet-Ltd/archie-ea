@@ -459,7 +459,6 @@ def load_sample_company():
     {"success": true, "redirect": "..."} depending on state.
     """
     import os
-    from flask import g
     from app.services.archimate_import_service import ArchiMateImportService, ImportRequestError
 
     wants_json = request.headers.get("Accept", "").startswith("application/json") or request.is_json
@@ -472,8 +471,7 @@ def load_sample_company():
     ).first()
 
     if sample_marker:
-        # Find the element to link to
-        payments_element_id = sample_marker.id
+        # Sample already loaded, redirect to the answer
         answer_url = url_for("intelligence_ui.ask", q="What breaks if the payments service fails?")
 
         if wants_json:
