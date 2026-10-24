@@ -356,6 +356,22 @@ def gate_nav_verified(baseline: int) -> Result:
     return Result("nav-verified", PASS, "", count, baseline)
 
 
+def gate_counted_rule(name: str, script: str, rule: str, baseline: int) -> Result:
+    """One counted rule of a template checker, ratcheted: the count may fall, never rise.
+
+    The shell rules live in scripts/check_shell_conformance.py and the
+    component rules in scripts/check_ui_contract.py; both list the findings
+    with `--rule <rule> --list`, one `file:line: message` each.
+    """
+    proc = _run([sys.executable, script, "--rule", rule, "--count"])
+    try:
+        count = int(proc.stdout.strip().splitlines()[-1])
+    except (ValueError, IndexError):
+        return Result(name, FAIL, f"could not parse count: {proc.stdout!r} {proc.stderr[:300]}")
+    detail = "" if count <= baseline else f"run python {script} --rule {rule} --list"
+    return Result(name, PASS if count <= baseline else FAIL, detail, count, baseline)
+
+
 def gate_nav_coverage(baseline: int) -> Result:
     """Business-architecture outputs that have routes but no sidebar link.
 
@@ -1923,6 +1939,36 @@ def build_gates(baseline: dict) -> list[Gate]:
         Gate("shell-conformance", "No new pages off the platform shell (header macro + page width)",
              "ratchet", lambda: gate_shell_conformance(baseline["shell_conformance"]),
              remediation="use page_header/page_shell and p-6 space-y-6; see DESIGN.md, or add 'shell-ok: <reason>'",
+             tags=["static", "ui"]),
+        Gate("shell-layout", "every page extends an approved layout (admin, public or composer)",
+             "ratchet",
+             lambda: gate_counted_rule("shell-layout", "scripts/check_shell_conformance.py", "layout", baseline["shell_layout"]),
+             remediation="extend layouts/admin_base.html, public_base.html or composer_base.html, or add 'shell-ok: <reason>'",
+             tags=["static", "ui"]),
+        Gate("shell-chrome", "no page draws its own sidebar, top bar, navigation or breadcrumb",
+             "ratchet",
+             lambda: gate_counted_rule("shell-chrome", "scripts/check_shell_conformance.py", "chrome", baseline["shell_chrome"]),
+             remediation="use the shell macros (page_header/page_shell breadcrumb) instead of <aside>/<nav>/<header>, or add 'shell-ok: <reason>'",
+             tags=["static", "ui"]),
+        Gate("shell-escapes", "every shell-ok escape hatch is counted and can only fall",
+             "ratchet",
+             lambda: gate_counted_rule("shell-escapes", "scripts/check_shell_conformance.py", "escapes", baseline["shell_escapes"]),
+             remediation="remove the shell-ok comment by moving the page onto the shell",
+             tags=["static", "ui"]),
+        Gate("dialog-title", "every dialog, sheet and drawer has a title",
+             "ratchet",
+             lambda: gate_counted_rule("dialog-title", "scripts/check_ui_contract.py", "dialog-title", baseline["dialog_title"]),
+             remediation="pass title= to the modal/dialog/drawer macro, or point aria-labelledby at a heading id",
+             tags=["static", "ui"]),
+        Gate("empty-state-macro", "empty states use the empty_state macro",
+             "ratchet",
+             lambda: gate_counted_rule("empty-state-macro", "scripts/check_ui_contract.py", "empty-state", baseline["empty_state_macro"]),
+             remediation="use components/empty_state.html instead of an icon and a hand-written 'No ... yet'",
+             tags=["static", "ui"]),
+        Gate("form-field-macro", "every form control sits inside form_field or form_group",
+             "ratchet",
+             lambda: gate_counted_rule("form-field-macro", "scripts/check_ui_contract.py", "form-field", baseline["form_field_macro"]),
+             remediation="render it with form_field, or wrap it in a form_group call",
              tags=["static", "ui"]),
         Gate("nav-coverage",
              "No business-architecture output with routes is missing from every sidebar",

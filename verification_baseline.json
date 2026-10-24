@@ -56,6 +56,12 @@
     "tenant_isolation_route_coverage_pct": 44.0,
     "interface_contract_unimplemented": 0,
     "design_map_outside_block": 48,
-    "design_map_unmarked": 376
+    "design_map_unmarked": 376,
+    "shell_layout": 16,
+    "shell_chrome": 54,
+    "shell_escapes": 1,
+    "dialog_title": 65,
+    "empty_state_macro": 166,
+    "form_field_macro": 583
   }
 }
