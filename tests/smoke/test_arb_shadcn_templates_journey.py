@@ -152,10 +152,12 @@ def test_arb_member_sees_standards_and_detail(browser, live_server, seeded, arb_
         assert "Security Architecture Standard" in body_text
         assert "Mandatory" in body_text
 
-        # Breadcrumb links the user back to ARB dashboard and standards
-        breadcrumb_els = page.locator("nav[aria-label=breadcrumb] a, [data-slot=breadcrumb] a, .breadcrumb a, a:has-text('ARB')").all()
-        breadcrumb_texts = [l.text_content().strip() for l in breadcrumb_els]
+        # Breadcrumb in the page header links the user back to ARB and Standards
+        breadcrumb = page.locator('nav[aria-label="Breadcrumb"]').first
+        assert breadcrumb.is_visible(), "Breadcrumb trail not rendered in page header"
+        breadcrumb_texts = [t.strip() for t in breadcrumb.inner_text().splitlines() if t.strip()]
         assert any("ARB" in t for t in breadcrumb_texts), f"Expected ARB breadcrumb, got {breadcrumb_texts}"
+        assert any("Standard" in t for t in breadcrumb_texts), f"Expected Standards breadcrumb, got {breadcrumb_texts}"
     finally:
         page.close()
         context.close()
