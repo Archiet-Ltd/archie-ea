@@ -79,6 +79,14 @@
             draggingCard: null,
             dragOverColumn: null,
 
+            // Cards rendered after a fetch need their icons drawn once the DOM has them.
+            refreshIcons: function () {
+                var draw = function () {
+                    if (global.lucide && typeof global.lucide.createIcons === 'function') global.lucide.createIcons();
+                };
+                if (this.$nextTick) this.$nextTick(draw); else global.setTimeout(draw, 0);
+            },
+
             // -- Column helpers ---------------------------------------
 
             // The cards in one column, kept in sortKey order (highest first).

@@ -1,4 +1,4 @@
-{# design-block: board #}
+{# design-block: data-table #}
 {% extends "layouts/admin_base.html" %}
 {% from 'macros/page_shell.html' import page_shell %}
 {% from 'macros/kanban_board.html' import kanban_board, kanban_card %}
@@ -168,6 +168,7 @@ function prioritisationApp() {
         this.error = 'Failed to load requirements: ' + e.message;
       } finally {
         this.loading = false;
+        this.refreshIcons();
       }
     },
 

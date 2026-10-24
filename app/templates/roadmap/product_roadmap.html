@@ -1,4 +1,4 @@
-{# design-block: board #}
+{# design-block: dashboard #}
 {% extends "layouts/admin_base.html" %}
 {% from 'macros/page_shell.html' import page_shell %}
 {% from 'macros/kanban_board.html' import kanban_board, kanban_card %}
@@ -87,9 +87,9 @@
                 </div>
               </div>
             </template>
-            <p x-show="allSprints().length === 0" x-cloak class="text-xs text-muted-foreground">No sprints are planned yet. Sprints appear here once they are assigned to a horizon.</p>
           </div>
         </div>
+        <p x-show="allSprints().length === 0" x-cloak class="text-xs text-muted-foreground">No sprints are planned yet. Sprints appear here once they are assigned to a horizon.</p>
       {% endcall %}
     {% endcall %}
   </div>
@@ -134,6 +134,7 @@ function productRoadmap() {
         this.error = 'Error loading roadmap: ' + e.message;
       } finally {
         this.loaded = true;
+        this.refreshIcons();
       }
     },
 

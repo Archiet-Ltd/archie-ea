@@ -96,11 +96,11 @@
                  @dragleave="onDragLeave($event)"
                  @drop.prevent="onDrop($event, '{{ state }}')"{% endif %}>
                 {% call card(class='bg-muted/30') %}
-                    {% call card_header(class='!flex-row !items-center !justify-between !gap-2 !space-y-0 !p-3') %}
-                        <div class="kanban-column-header flex min-w-0 flex-1 items-center justify-between gap-2"
+                    {% call card_header(class='!flex-row !items-start !justify-between !gap-2 !space-y-0 !p-3') %}
+                        <div class="kanban-column-header flex min-w-0 flex-1 flex-wrap items-start justify-between gap-x-2 gap-y-1"
                              {% if group and not plain_headers %}data-stage-group="{{ group }}"{% endif %}
                              :class="wipAtLimit('{{ state }}') ? 'rounded-md border border-destructive bg-destructive/10 px-2 py-1' : ''">
-                            <div class="flex min-w-0 items-center gap-2">
+                            <div class="flex min-w-0 flex-wrap items-start gap-2">
                                 {% if group and not plain_headers %}
                                 <span class="h-2 w-2 shrink-0 rounded-full
                                     {% if group == 'discovery' %}bg-info
@@ -109,7 +109,7 @@
                                     {% endif %}"
                                     aria-hidden="true"></span>
                                 {% endif %}
-                                <h2 class="truncate text-sm font-medium text-foreground">{{ label }}</h2>
+                                <h2 class="min-w-0 break-words text-sm font-medium text-foreground">{{ label }}</h2>
                                 {% call badge('neutral') %}<span x-text="columnCount('{{ state }}')"></span><span class="sr-only"> {{ unit }}s</span>{% endcall %}
                             </div>
                             {% if show_wip %}
@@ -211,7 +211,7 @@
             <span x-show="canWrite" class="mt-0.5 shrink-0 text-muted-foreground" data-kanban-grip aria-hidden="true">
                 <i data-lucide="grip-vertical" class="h-4 w-4"></i>
             </span>
-            <h3 class="min-w-0 flex-1 line-clamp-2 text-sm font-medium text-foreground" x-text="{{ title }}"></h3>
+            <h3 class="min-w-0 flex-1 break-words line-clamp-2 text-sm font-medium text-foreground" x-text="{{ title }}"></h3>
         </div>
         {{ body() }}
         {{ kanban_move_menu(states, labels) }}
