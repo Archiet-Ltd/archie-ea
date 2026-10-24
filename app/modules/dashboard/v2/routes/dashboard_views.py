@@ -666,6 +666,7 @@ def overview():
     )
 
     guided_steps = []
+    first_actions = {"connect": False, "sample": False, "import_href": None}
     if dashboard_mode == "guided":
         from app.template_helpers import safe_url_for_with_fallback
         from app.utils.role_access import can_edit_capabilities
@@ -746,6 +747,25 @@ def overview():
                     "done": False,
                 }
             guided_steps.insert(0, sample_step)
+            first_actions["sample"] = _can_load_sample
+        # Same test the connector pages apply, so the link is only shown to
+        # someone it opens for.
+        try:
+            from app.middleware.tenant_decorators import is_platform_admin
+            from app.services.rbac_service import rbac_service
+
+            first_actions["connect"] = bool(
+                'm365_connector.github_connect' in current_app.view_functions
+                and (
+                    is_platform_admin(current_user)
+                    or rbac_service.is_org_admin(current_user, g.current_org_id)
+                )
+            )
+        except Exception:
+            first_actions["connect"] = False
+        first_actions["import_href"] = safe_url_for_with_fallback(
+            "unified_applications.application_list", FALLBACK_HREF, **{"import": 1}
+        )
         try:
             _can_invite = bool(current_user.is_admin())
         except Exception:
@@ -830,6 +850,7 @@ def overview():
         governance_alerts=governance_alerts,
         dashboard_mode=dashboard_mode,
         guided_steps=guided_steps,
+        first_actions=first_actions,
         capability_mapping_count=capability_mapping_count,
         company_kind=company_kind,
         priority_actions=priority_actions,

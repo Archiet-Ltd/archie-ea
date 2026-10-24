@@ -6,6 +6,7 @@
 {% from 'components/company_kind.html' import company_kind_picker %}
 {% from 'components/button.html' import button %}
 {% from 'components/input.html' import input %}
+{% from 'components/card.html' import card, card_header, card_title, card_description, card_content %}
 {% from 'components/table.html' import table, table_header, table_body, table_row, table_head, table_cell, table_empty_state %}
 {% block title %}Dashboard{% endblock %}
 {% block guided_mode_steps %}
@@ -23,6 +24,12 @@
 <script src="{{ url_for('static', filename='js/dashboard/company_kind.js') }}"></script>
 {% endblock %}
 {% block content %}
+{% macro question_box() %}
+<form method="get" action="/ai-chat" class="flex flex-col gap-2 sm:flex-row" data-testid="first-question-form">
+    {{ input(name='q', type='text', placeholder='Ask anything, for example: what breaks if our payments service fails?', aria_label='Ask a question about your company', class='sm:flex-1', attrs_dict={'data-testid': 'first-question-input', 'maxlength': '2000', 'autocomplete': 'off'}) }}
+    {{ button(text='Ask', type='submit', icon='arrow-right', icon_position='right', testid='first-question-submit') }}
+</form>
+{% endmacro %}
 {# Overview pattern (design/patterns.json: dashboard-01): page header, KPI
    band, lens tabs, chart, answer cascade, dense table. No navigation card grid. #}
 {% set mode = dashboard_mode|default('data') %}
@@ -71,6 +78,36 @@
     {# ══════════════════════════════════════════════════════════════════════
        GUIDED MODE — sparse org: a setup journey, not a failing report card.
        ══════════════════════════════════════════════════════════════════════ #}
+    {% call card(class='') %}
+    <div data-testid="first-message">
+        {% call card_header() %}
+            {% call card_title(class='text-xl') %}{{ 'Bring in your company, or look around a sample first' if (first_actions.sample or first_actions.connect) else 'Bring your applications in' }}{% endcall %}
+            {% call card_description(class='max-w-[60ch]') %}Connect GitHub or Jira and {{ config.APP_NAME }} maps your services, owners and dependencies, then answers in plain words and cites the source of every fact. Nothing to connect yet? A sample company shows you what that looks like in under a minute.{% endcall %}
+        {% endcall %}
+        {% call card_content(class='space-y-4') %}
+            <div class="flex flex-col gap-3 sm:flex-row" data-testid="first-actions">
+                {% if first_actions.connect %}
+                {{ button(text='Connect GitHub', href=url_for('m365_connector.github_connect'), icon='github', testid='first-action-connect') }}
+                {% endif %}
+                {% if first_actions.sample %}
+                <form method="post" action="{{ url_for('architect_ui.load_sample_company') }}" data-testid="first-action-sample-form">
+                    {{ input(type='hidden', name='csrf_token', value=csrf_token()) }}
+                    {{ button(text='See a sample company', type='submit', variant='outline' if first_actions.connect else 'default', testid='first-action-sample') }}
+                </form>
+                {% endif %}
+                {% if not first_actions.connect and not first_actions.sample %}
+                {{ button(text='Import your applications', href=first_actions.import_href, testid='first-action-import') }}
+                {% endif %}
+            </div>
+            {% if not first_actions.connect %}
+            <p class="text-sm text-muted-foreground">Connecting GitHub or Jira is done by an organisation administrator.</p>
+            {% endif %}
+            {{ question_box() }}
+        {% endcall %}
+    </div>
+    {% endcall %}
+
+    {# The checklist sits beneath the one message. #}
     {% call section_card(title="Set up your workspace") %}
     <div class="space-y-4" data-testid="guided-setup">
         <p class="text-sm text-muted-foreground max-w-[60ch]">
@@ -111,6 +148,31 @@
     </div>
     {% endcall %}
     {% else %}
+
+    {# The one message: a question box and, beneath it, the first cited answer. #}
+    {% call card() %}
+    <div data-testid="first-message">
+        {% call card_header() %}
+            {% call card_title(class='text-xl') %}Ask your company a question{% endcall %}
+            {% call card_description() %}Answers cite the records they come from.{% endcall %}
+        {% endcall %}
+        {% call card_content(class='space-y-6') %}
+            {{ question_box() }}
+        <section aria-labelledby="impact-answer-heading" x-data="overviewCascade()" data-testid="overview-cascade">
+            <h2 id="impact-answer-heading" class="mb-3 text-base font-semibold text-foreground">What breaks if it fails</h2>
+            <div x-show="state === 'loading'" class="space-y-2" aria-busy="true">
+                <div class="h-5 w-2/3 max-w-[640px] rounded bg-muted"></div>
+                <div class="h-10 rounded-md border border-border bg-card"></div>
+                <div class="ml-5 h-10 rounded-md border border-border bg-card"></div>
+            </div>
+            <div x-show="state === 'ready'" x-cloak>
+                {{ answer_cascade('overview-answer-cascade', question='questionText', rows='rows', ask='load(node.elementId)', root='centreName') }}
+            </div>
+            <p x-show="state === 'empty'" x-cloak class="text-sm text-muted-foreground">No connections recorded yet. <a href="{{ url_for('intelligence_ui.ask') }}" class="text-info hover:underline">Ask about anything you depend on</a>.</p>
+            <p x-show="state === 'error'" x-cloak role="status" class="text-sm text-muted-foreground">We could not load an answer just now. <a href="{{ url_for('intelligence_ui.ask') }}" class="text-info hover:underline">Open Ask</a>.</p>
+        {% endcall %}
+    </div>
+    {% endcall %}
 
     {# KPI band: four tiles, each with number, source, as-of date, and link to the list.
        Council-07: each tile is clickable and links to the list it counts. Real zeros
@@ -348,25 +410,11 @@
     {% endif %}
     {% endcall %}
 
-    {# Answer cascade: one high-impact answer, full width. #}
-    <section aria-labelledby="impact-answer-heading" x-data="overviewCascade()" data-testid="overview-cascade">
-        <h2 id="impact-answer-heading" class="mb-3 text-base font-semibold text-foreground">What breaks if it fails</h2>
-        <div x-show="state === 'loading'" class="space-y-2" aria-busy="true">
-            <div class="h-5 w-2/3 max-w-[640px] rounded bg-muted"></div>
-            <div class="h-10 rounded-md border border-border bg-card"></div>
-            <div class="ml-5 h-10 rounded-md border border-border bg-card"></div>
-        </div>
-        <div x-show="state === 'ready'" x-cloak>
-            {{ answer_cascade('overview-answer-cascade', question='questionText', rows='rows', ask='load(node.elementId)', root='centreName') }}
-        </div>
-        <p x-show="state === 'empty'" x-cloak class="text-sm text-muted-foreground">No connections recorded yet. <a href="{{ url_for('intelligence_ui.ask') }}" class="text-info hover:underline">Ask about anything you depend on</a>.</p>
-        <p x-show="state === 'error'" x-cloak role="status" class="text-sm text-muted-foreground">We could not load an answer just now. <a href="{{ url_for('intelligence_ui.ask') }}" class="text-info hover:underline">Open Ask</a>.</p>
-
         {# Dense table: capability coverage, 48px rows, sticky header, tabular
            figures, hover-revealed action. Gaps are the at-risk rows. #}
         {% set ch = capability_health|default([]) %}
         {% set gap_count = ch | selectattr('coverage_status', 'equalto', 'gap') | list | length %}
-        <section aria-labelledby="capability-coverage-heading" class="mt-8 rounded-lg border border-border bg-card" data-testid="capability-health-widget">
+        <section aria-labelledby="capability-coverage-heading" class="rounded-lg border border-border bg-card" data-testid="capability-health-widget">
             <div class="flex items-center justify-between border-b border-border px-4 py-2">
                 <h2 id="capability-coverage-heading" class="text-base font-semibold text-foreground">Capability coverage</h2>
                 <span class="text-2xs font-semibold uppercase tracking-[0.06em] text-muted-foreground tabular-nums">{{ gap_count }} gap{{ 's' if gap_count != 1 else '' }} of {{ ch|length }}</span>
@@ -386,7 +434,6 @@
                         </tr>
                         {% endfor %}{% endcall %}
         </section>
-    </section>
     </div>
 
     {# ══════════════════════════════════════════════════════════════════════
