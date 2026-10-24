@@ -116,7 +116,7 @@
               </div>
               {# Today marker #}
               <div x-show="timelineRange.start && timelineRange.end" class="absolute top-0 bottom-0 w-px bg-destructive/50 z-10"
-                   :style="{'--x': todayPosition + '%'}"
+                   x-effect="if (timelineRange.start && timelineRange.end) $el.style.setProperty('--x', todayPosition + '%')"
                    :aria-label="'Today: ' + todayLabel">
                 <span class="absolute -top-4 left-1/2 -translate-x-1/2 text-[10px] text-destructive-emphasis whitespace-nowrap" x-text="todayLabel"></span>
               </div>
