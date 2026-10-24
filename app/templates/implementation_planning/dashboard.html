@@ -1,3 +1,4 @@
+{# design-block: dashboard #}
 {# implementation_planning/dashboard.html
    Tier C3, frame dashboard-01, reference gap G-4
    Components: card, toggle-group, sheet, dialog, badge
@@ -64,7 +65,7 @@
 
     {# A failed load must be visible on the page, not only in a toast #}
     <div x-show="loadError" x-cloak class="px-4 lg:px-6">
-      {% call alert(kind='danger', dismissible=true) %}<span x-text="loadError"></span>{% endcall %}
+      {% call alert(kind='danger', dismissible=true) %}<span x-text="loadError"></span>{% endcall %} {# ui-contract-ok: the alert macro, not a native dialog #}
     </div>
 
     <!-- Gap register card -->
@@ -220,6 +221,8 @@ function implementationPlanningDashboard() {
                     Platform.modal.close('create-work-package');
                     form.reset();
                     this.loadDashboardData();
+                    const refresh = window['initArchimateGanttimpl-archimate-gantt'];
+                    if (refresh) refresh();
                 })
                 .catch(error => {
                     this.errorMsg = (error && error.message) ? error.message : 'Could not create the work package.';

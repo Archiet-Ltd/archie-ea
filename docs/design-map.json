@@ -27805,7 +27805,13 @@
    "page_type": "timeline",
    "reason": "Implementation plan on the timeline component.",
    "tier": "C3",
-   "type_changed": true
+   "type_changed": true,
+   "extra_macros": [
+    "components/archimate_gantt_widget.html",
+    "components/checkbox.html",
+    "components/form_field.html",
+    "components/select.html"
+   ]
   },
   "app/templates/implementation_planning/plateaus.html": {
    "allowed_macros": [
