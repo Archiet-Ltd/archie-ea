@@ -191,22 +191,34 @@ def test_flow_analytics_journey(browser, live_server):
         expect(page.locator("#cycleTimeChart")).to_be_visible()
         expect(page.locator("#throughputChart")).to_be_visible()
 
-        # 5. The WIP snapshot table renders with column headers
+        # 5. The shadcn-nearest meta tag is present
+        meta_shadcn = page.locator('meta[name="shadcn-nearest"]')
+        expect(meta_shadcn).to_have_attribute("content", "dashboard-01")
+
+        # 6. The page has rendered data (not empty state) — metric values are shown
+        # These assertions implicitly wait for Alpine to finish loading data
+        expect(page.get_by_text("13d").first).to_be_visible()
+        expect(page.get_by_text("5").first).to_be_visible()
+        expect(page.get_by_text("100%").first).to_be_visible()
+
+        # 7. The throughput chart has data points (non-zero values)
+        # Check after data is rendered via Chart.js instance
+        throughput_has_data = page.evaluate("""() => {
+            const chart = Chart.getChart('throughputChart');
+            if (!chart) return false;
+            const ds = chart.data.datasets;
+            if (!ds || ds.length === 0) return false;
+            return ds[0].data.some(v => v > 0);
+        }""")
+        assert throughput_has_data, "Throughput chart must have data points (non-zero completed cards)"
+
+        # 8. The WIP snapshot table renders with column headers
         expect(page.locator("text=WIP Snapshot").first).to_be_visible()
         expect(page.locator("text=Board column").first).to_be_visible()
         expect(page.locator("text=Cards").first).to_be_visible()
 
-        # 6. The total WIP count is shown
+        # 8. The total WIP count is shown
         expect(page.locator("text=total:").first).to_be_visible()
-
-        # 7. The shadcn-nearest meta tag is present
-        meta_shadcn = page.locator('meta[name="shadcn-nearest"]')
-        expect(meta_shadcn).to_have_attribute("content", "dashboard-01")
-
-        # 8. The page has rendered data (not empty state) — metric values are shown
-        expect(page.get_by_text("13d").first).to_be_visible()
-        expect(page.get_by_text("5").first).to_be_visible()
-        expect(page.get_by_text("100%").first).to_be_visible()
 
         # 9. The empty state template exists in the HTML source
         html = page.content()

@@ -37,7 +37,7 @@
     {{ page_shell(title='Flow Analytics', breadcrumb=[('Home', '/'), ('Flow Analytics', none)], subtitle='Throughput, cycle time, and WIP metrics from Kanban card flow.', actions_caller=_ps_actions) }}
 
     <!-- Metric Summary Cards -->
-    <div class="grid grid-cols-1 gap-4 px-4 lg:px-6 @xl/main:grid-cols-2 @5xl/main:grid-cols-4">
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 px-4 lg:px-6">
         {{ metrics_card(
             title='Avg Cycle Time',
             value_alpine="cycleData ? cycleData.average_cycle_time_days + 'd' : '\u2014'",
@@ -102,7 +102,7 @@
                         {% call card_title() %}Cycle Time Distribution{% endcall %}
                     {% endcall %}
                     {% call card_content() %}
-                        <div class="relative h-[260px]">
+                        <div class="relative h-64">
                             <canvas id="cycleTimeChart"></canvas>
                         </div>
                         <template x-if="cycleData && cycleData.data_points.length === 0">
@@ -117,7 +117,7 @@
                         {% call card_title() %}Throughput per Period{% endcall %}
                     {% endcall %}
                     {% call card_content() %}
-                        <div class="relative h-[260px]">
+                        <div class="relative h-64">
                             <canvas id="throughputChart"></canvas>
                         </div>
                         <template x-if="throughputData && throughputData.periods.length === 0">
