@@ -5,6 +5,8 @@
 {% from 'components/button.html' import button %}
 {% from 'components/badge.html' import badge %}
 {% from 'components/modal.html' import modal %}
+{% from 'components/input.html' import input, textarea %}
+{% from 'components/select.html' import native_select %}
 
 {% block title %}{{ selected_layer.title }}{% endblock %}
 
@@ -13,9 +15,7 @@
     <div class="@container/main flex flex-1 flex-col gap-2">
         <div class="flex flex-col gap-4 py-4 md:gap-6 md:py-6">
             <div class="px-4 lg:px-6">
-                <section class="border-l-4 pl-4" data-testid="architecture-page-header"
-                         x-data="{}"
-                         :style="'border-left-color: hsl(var(' + (layerConfig['{{ selected_layer.key }}']?.color_token || '--primary') + '));'">
+                <section class="border-l-4 pl-4 border-{{ selected_layer.color_token[2:] }}" data-testid="architecture-page-header">
                 {% macro _ps_sub() %}<span class="block max-w-3xl">{{ selected_layer.description }}
                     <span aria-hidden="true">&mdash;</span>
                     <span x-text="layerTotalKnown ? layerTotal + ' repository ' + (layerTotal === 1 ? 'item' : 'items') : 'repository total unavailable'">repository total unavailable</span></span>{% endmacro %}
@@ -143,36 +143,18 @@
             </div>
             <!-- Edit mode -->
             <div x-cloak x-show="!detailLoading && detailEditing" class="space-y-4">
-                <div>
-                    <label class="block text-xs font-medium text-muted-foreground mb-1">Name</label>
-                    <input type="text" x-model="detailForm.name"
-                           class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
-                           aria-label="Element name">
-                </div>
-                <div>
-                    <label class="block text-xs font-medium text-muted-foreground mb-1">Layer</label>
-                    <select data-testid="detail-layer-select" x-model="detailForm.layer" @change="onDetailLayerChange()"
-                            class="flex h-9 w-full items-center justify-between whitespace-nowrap rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50" aria-label="Layer">
-                        <template x-for="[key, cfg] in Object.entries(layerConfig)" :key="key">
-                            <option :value="key" x-text="cfg.name"></option>
-                        </template>
-                    </select>
-                </div>
-                <div>
-                    <label class="block text-xs font-medium text-muted-foreground mb-1">Type</label>
-                    <select data-testid="detail-type-select" x-model="detailForm.element_type"
-                            class="flex h-9 w-full items-center justify-between whitespace-nowrap rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50" aria-label="Type">
-                        <template x-for="et in detailFormLayerTypes" :key="et">
-                            <option :value="et" x-text="formatTypeName(et)"></option>
-                        </template>
-                    </select>
-                </div>
-                <div>
-                    <label class="block text-xs font-medium text-muted-foreground mb-1">Description</label>
-                    <textarea x-model="detailForm.description" rows="3"
-                              class="flex min-h-[60px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
-                              placeholder="Optional description" aria-label="Description"></textarea>
-                </div>
+                {{ input(aria_label='Element name', attrs_dict={'x-model': 'detailForm.name'}) }}
+                {% call native_select(aria_label='Layer', attrs_dict={'x-model': 'detailForm.layer', '@change': 'onDetailLayerChange()'}, testid='detail-layer-select') %}
+                    <template x-for="[key, cfg] in Object.entries(layerConfig)" :key="key">
+                        <option :value="key" x-text="cfg.name"></option>
+                    </template>
+                {% endcall %}
+                {% call native_select(aria_label='Type', attrs_dict={'x-model': 'detailForm.element_type'}, testid='detail-type-select') %}
+                    <template x-for="et in detailFormLayerTypes" :key="et">
+                        <option :value="et" x-text="formatTypeName(et)"></option>
+                    </template>
+                {% endcall %}
+                {{ textarea(aria_label='Description', placeholder='Optional description', attrs_dict={'x-model': 'detailForm.description'}) }}
                 <div class="flex gap-2">
                     {{ button(text='Save', variant='default', attrs_dict={'@click': 'saveDetailEdit()', ':disabled': 'detailSaving'}, testid='detail-save-btn', aria_label='Save changes') }}
                     {{ button(text='Cancel', variant='outline', attrs_dict={'@click': 'detailEditing = false'}, aria_label='Cancel edit') }}
@@ -252,63 +234,45 @@
     {% call modal(id='archimate-form-modal', title='', labelledby='archimate-form-modal-title', size='lg') %}
         <div class="flex items-center justify-between mb-4" data-modal-header>
             <h2 id="archimate-form-modal-title" class="text-xl font-bold" x-text="editingElement ? 'Edit Element' : 'Create Element'"></h2>
-            {{ button(variant='ghost', size='icon-sm', icon='x', aria_label='Close', attrs_dict={'@click': 'Platform.modal.close(\'archimate-form-modal\')'}) }}
+            {{ button(variant='ghost', size='icon-sm', icon='x', aria_label='Close', attrs_dict={'@click': "Platform.modal.close('archimate-form-modal')"}) }}
         </div>
         <div x-cloak x-show="formError" class="mb-4 px-3 py-2 bg-destructive/10 text-destructive-emphasis text-sm rounded-md" x-text="formError"></div>
         <form @submit.prevent="submitForm()" class="space-y-4">
             <div x-cloak x-show="!editingElement">
-                <label class="block text-sm font-medium text-muted-foreground mb-1">Element Type <span class="text-destructive-emphasis">*</span></label>
-                <select x-model="formData.element_type" @change="resetTypedFields()"
-                    class="flex h-9 w-full items-center justify-between whitespace-nowrap rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50" aria-label="Element Type">
+                {% call native_select(aria_label='Element Type', attrs_dict={'x-model': 'formData.element_type', '@change': 'resetTypedFields()'}) %}
                     <option value="">Select type...</option>
                     <template x-for="et in currentLayerTypes" :key="et">
                         <option :value="et" x-text="formatTypeName(et)"></option>
                     </template>
-                </select>
+                {% endcall %}
             </div>
             <div x-cloak x-show="editingElement" class="text-sm text-muted-foreground">
                 Type: <span class="font-medium text-foreground" x-text="formatTypeName(formData.element_type)"></span>
             </div>
-            <div>
-                <label class="block text-sm font-medium text-muted-foreground mb-1">Name <span class="text-destructive-emphasis">*</span></label>
-                <input type="text" x-model="formData.name" required
-                    class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
-                    placeholder="Element name" aria-label="Element name">
-            </div>
-            <div>
-                <label class="block text-sm font-medium text-muted-foreground mb-1">Description</label>
-                <textarea x-model="formData.description" rows="3"
-                    class="flex min-h-[60px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
-                    placeholder="Optional description" aria-label="Description"></textarea>
-            </div>
+            {{ input(aria_label='Element name', placeholder='Element name', attrs_dict={'x-model': 'formData.name', 'required': ''}) }}
+            {{ textarea(aria_label='Description', placeholder='Optional description', attrs_dict={'x-model': 'formData.description'}) }}
             <template x-for="fld in currentTypeFields" :key="fld.name">
                 <div>
                     <label class="block text-sm font-medium text-muted-foreground mb-1" x-text="fld.label + (fld.required ? ' *' : '')"></label>
                     <template x-if="fld.type === 'select'">
-                        <select x-model="formData[fld.name]"
-                            class="flex h-9 w-full items-center justify-between whitespace-nowrap rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
-                            :aria-label="fld.label">
+                        {% call native_select(attrs_dict={'x-model': 'formData[fld.name]'}) %}
                             <option value="">Select...</option>
                             <template x-for="opt in fld.options" :key="opt.value">
                                 <option :value="opt.value" x-text="opt.label"></option>
                             </template>
-                        </select>
+                        {% endcall %}
                     </template>
                     <template x-if="fld.type === 'textarea'">
-                        <textarea x-model="formData[fld.name]" rows="3"
-                            class="flex min-h-[60px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
-                            :placeholder="fld.placeholder" :aria-label="fld.label"></textarea>
+                        {{ textarea(attrs_dict={'x-model': 'formData[fld.name]', ':placeholder': 'fld.placeholder', ':aria-label': 'fld.label'}) }}
                     </template>
                     <template x-if="fld.type !== 'select' && fld.type !== 'textarea'">
-                        <input type="text" x-model="formData[fld.name]"
-                            class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
-                            :placeholder="fld.placeholder" :aria-label="fld.label">
+                        {{ input(attrs_dict={'x-model': 'formData[fld.name]', ':placeholder': 'fld.placeholder', ':aria-label': 'fld.label'}) }}
                     </template>
                 </div>
             </template>
             <div class="flex gap-2 pt-4 border-t">
-                {% call button(variant='default', attrs_dict={':disabled': 'saving'}, aria_label='Submit') %}<span x-text="saving ? 'Saving...' : (editingElement ? 'Update' : 'Create')">Create</span>{% endcall %}
-                {{ button(text='Cancel', variant='ghost', attrs_dict={'@click': 'Platform.modal.close(\'archimate-form-modal\')'}) }}
+                {% call button(variant='default', attrs_dict={':disabled': 'saving', ':aria-label': 'Submit'}) %}<span x-text="saving ? 'Saving...' : (editingElement ? 'Update' : 'Create')">Create</span>{% endcall %}
+                {{ button(text='Cancel', variant='ghost', attrs_dict={'@click': "Platform.modal.close('archimate-form-modal')"}) }}
                 <template x-if="editingElement">
                     {{ button(text='Full Edit Page →', variant='link', attrs_dict={':href': 'editPageUrl(editingElement)'}) }}
                 </template>
@@ -320,37 +284,23 @@
     {% call modal(id='ai-generate-modal', labelledby='ai-generate-modal-title', size='lg') %}
         <div class="flex items-center justify-between mb-4" data-modal-header>
             <h2 id="ai-generate-modal-title" class="text-base font-semibold text-foreground">Generate Element with AI</h2>
-            {{ button(variant='ghost', size='icon-sm', icon='x', aria_label='Close', attrs_dict={'@click': 'Platform.modal.close(\'ai-generate-modal\')'}) }}
+            {{ button(variant='ghost', size='icon-sm', icon='x', aria_label='Close', attrs_dict={'@click': "Platform.modal.close('ai-generate-modal')"}) }}
         </div>
         <div x-cloak x-show="aiGenerate.error" class="mb-4 px-3 py-2 bg-destructive/10 text-destructive-emphasis text-sm rounded-md" x-text="aiGenerate.error" data-testid="ai-generate-error" role="alert"></div>
 
         <div x-show="!aiGenerate.result" x-cloak class="space-y-4">
-            <div>
-                <label class="block text-sm font-medium mb-2">Layer <span class="text-destructive-emphasis">*</span></label>
-                <select x-model="aiGenerate.layer" @change="aiGenerate.elementType = ''"
-                    class="flex h-9 w-full items-center justify-between whitespace-nowrap rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50" aria-label="Layer">
-                    <template x-for="(cfg, key) in layerConfig" :key="key">
-                        <option :value="key" x-text="cfg.name"></option>
-                    </template>
-                </select>
-            </div>
-            <div>
-                <label class="block text-sm font-medium mb-2">Element Type <span class="text-destructive-emphasis">*</span></label>
-                <select x-model="aiGenerate.elementType"
-                    class="flex h-9 w-full items-center justify-between whitespace-nowrap rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50" aria-label="Element Type" data-testid="ai-generate-element-type">
-                    <option value="">Select type...</option>
-                    <template x-for="et in aiGenerateLayerTypes" :key="et">
-                        <option :value="et" x-text="formatTypeName(et)"></option>
-                    </template>
-                </select>
-            </div>
-            <div>
-                <label class="block text-sm font-medium mb-2">Prompt <span class="text-destructive-emphasis">*</span></label>
-                <textarea x-model="aiGenerate.prompt" rows="4"
-                    class="flex min-h-[60px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
-                    placeholder="Describe the element to generate, e.g. 'A driver capturing the need to comply with the new data residency regulation'"
-                    aria-label="Prompt" data-testid="ai-generate-prompt"></textarea>
-            </div>
+            {% call native_select(aria_label='Layer', attrs_dict={'x-model': 'aiGenerate.layer', '@change': 'aiGenerate.elementType = ""'}) %}
+                <template x-for="(cfg, key) in layerConfig" :key="key">
+                    <option :value="key" x-text="cfg.name"></option>
+                </template>
+            {% endcall %}
+            {% call native_select(aria_label='Element Type', attrs_dict={'x-model': 'aiGenerate.elementType'}, testid='ai-generate-element-type') %}
+                <option value="">Select type...</option>
+                <template x-for="et in aiGenerateLayerTypes" :key="et">
+                    <option :value="et" x-text="formatTypeName(et)"></option>
+                </template>
+            {% endcall %}
+            {{ textarea(aria_label='Prompt', placeholder="Describe the element to generate, e.g. 'A driver capturing the need to comply with the new data residency regulation'", attrs_dict={'x-model': 'aiGenerate.prompt'}, testid='ai-generate-prompt') }}
         </div>
 
         <div x-show="aiGenerate.loading" x-cloak class="flex items-center gap-2 text-sm text-muted-foreground py-6 justify-center" data-testid="ai-generate-loading">
@@ -374,7 +324,7 @@
             {{ button(text='Generate', variant='default', attrs_dict={'x-show': '!aiGenerate.result', '@click': 'runAiGenerate()', ':disabled': 'aiGenerate.loading'}, testid='btn-ai-generate-run', aria_label='Generate') }}
             {{ button(text='Use Draft & Review', variant='default', attrs_dict={'x-show': 'aiGenerate.result', '@click': 'useAiGenerateResult()'}, testid='btn-ai-generate-use', aria_label='Use this draft') }}
             {{ button(text='Generate Again', variant='outline', attrs_dict={'x-show': 'aiGenerate.result', '@click': 'aiGenerate.result = null'}, aria_label='Generate again') }}
-            {{ button(text='Cancel', variant='ghost', attrs_dict={'@click': 'Platform.modal.close(\'ai-generate-modal\')'}) }}
+            {{ button(text='Cancel', variant='ghost', attrs_dict={'@click': "Platform.modal.close('ai-generate-modal')"}) }}
         </div>
     {% endcall %}
 
@@ -393,7 +343,7 @@
                     This cannot be undone.
                 </p>
                 <div class="flex gap-3 w-full">
-                    {{ button(text='Cancel', variant='outline', attrs_dict={'@click': 'showDeleteConfirm = false; deletingElement = null', 'class': 'flex-1'}, aria_label='Delete') }}
+                    {{ button(text='Cancel', variant='outline', attrs_dict={'@click': 'showDeleteConfirm = false; deletingElement = null', 'class': 'flex-1'}, aria_label='Cancel') }}
                     {{ button(text='Delete', variant='destructive', attrs_dict={'@click': 'executeDelete()', ':disabled': 'deleting', 'class': 'flex-1'}, aria_label='Delete') }}
                 </div>
             </div>
