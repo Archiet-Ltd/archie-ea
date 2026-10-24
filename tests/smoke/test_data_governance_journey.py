@@ -6,6 +6,8 @@ on a page with content. Two organisations isolate the data.
 
 from __future__ import annotations
 
+import os
+import pathlib
 import uuid
 from datetime import datetime, timedelta
 
@@ -17,10 +19,30 @@ from tests.smoke.conftest import PAGE_TIMEOUT, PASSWORD
 pytestmark = [pytest.mark.smoke, pytest.mark.journey]
 
 GOVERNANCE_BASE = "/data-governance"
+SHOTS = pathlib.Path(os.environ.get("DGOV02_SHOTS",
+                      "/home/ubuntu/verify/seats/mg3datagovernanceb050b/walk"))
 
 
 def _uid():
     return uuid.uuid4().hex[:8]
+
+
+def _assert_role(email):
+    """Assert from the database that the user's enterprise_role is data_architect
+    and the platform role is not an administrator."""
+    from app import create_app, db
+    from app.models.user import User
+
+    app = create_app("testing")
+    with app.app_context():
+        user = User.query.filter_by(email=email).one()
+        assert user.enterprise_role == "data_architect", (
+            "expected data_architect, got %s" % user.enterprise_role
+        )
+        assert user.role.name not in ("Administrator", "Platform Admin"), (
+            "expected non-admin platform role, got %s" % user.role.name
+        )
+        db.session.remove()
 
 
 def _seed_dg_org(suffix):
@@ -45,7 +67,7 @@ def _seed_dg_org(suffix):
         db.session.commit()
         out["org_id"] = org.id
 
-        for role in ("data_architect", "procurement"):
+        for role in ("data_architect", "procurement", "compliance"):
             email = f"dg.{role}.{suffix}@example.com"
             user = User(
                 email=email, first_name="DG", last_name=role[:12],
@@ -163,6 +185,7 @@ def test_data_architect_can_reach_no_steward_page(page, live_server, world):
     badge and button macros."""
     org = world["org1"]
     sign_in(page, str(live_server), org["emails"]["data_architect"])
+    _assert_role(org["emails"]["data_architect"])
 
     page.goto(f"{live_server}{GOVERNANCE_BASE}/no-steward", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
 
@@ -210,6 +233,7 @@ def test_retention_breaches_page_shows_breached_entities(page, live_server, worl
     with numeric columns in tabular figures and the owning application."""
     org = world["org1"]
     sign_in(page, str(live_server), org["emails"]["data_architect"])
+    _assert_role(org["emails"]["data_architect"])
 
     page.goto(f"{live_server}{GOVERNANCE_BASE}/retention-breaches", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
 
@@ -246,6 +270,7 @@ def test_undeclared_copies_page_shows_duplicate_holds(page, live_server, world):
     with no declared system of record, ranked by consumer count."""
     org = world["org1"]
     sign_in(page, str(live_server), org["emails"]["data_architect"])
+    _assert_role(org["emails"]["data_architect"])
 
     page.goto(f"{live_server}{GOVERNANCE_BASE}/undeclared-copies", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
 
@@ -287,6 +312,7 @@ def test_tabs_navigate_between_data_governance_pages(page, live_server, world):
     without leaving the section; each tab lands on a page with content."""
     org = world["org1"]
     sign_in(page, str(live_server), org["emails"]["data_architect"])
+    _assert_role(org["emails"]["data_architect"])
 
     page.goto(f"{live_server}{GOVERNANCE_BASE}/no-steward", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
     expect(page.locator("h1")).to_contain_text("Critical entities with no steward")
@@ -311,3 +337,35 @@ def test_tabs_navigate_between_data_governance_pages(page, live_server, world):
     sor_tab.click()
     page.wait_for_url(lambda url: "/data-governance/entities" in url, timeout=PAGE_TIMEOUT)
     expect(page.locator("h1")).to_contain_text("System of record")
+
+
+def _capture(browser, live_server, email, page_path, name_pfx):
+    """Capture screenshots of a data governance page at 1440 and 390,
+    light and dark, signed in as the given persona."""
+    for width, dark in ((1440, False), (390, False), (1440, True), (390, True)):
+        theme = "dark" if dark else "light"
+        context = browser.new_context(viewport={"width": width, "height": 900},
+                                      color_scheme=theme)
+        context.set_default_timeout(PAGE_TIMEOUT)
+        try:
+            page = context.new_page()
+            sign_in(page, str(live_server), email)
+            page.goto(f"{live_server}{page_path}", wait_until="networkidle", timeout=PAGE_TIMEOUT)
+            page.locator("h1").wait_for(state="visible", timeout=PAGE_TIMEOUT)
+            SHOTS.mkdir(parents=True, exist_ok=True)
+            out_path = SHOTS / ("%s-%s-%d.png" % (name_pfx, theme, width))
+            page.screenshot(path=str(out_path), full_page=True)
+        finally:
+            context.close()
+
+
+@pytest.mark.parametrize("dummy", [1])
+def test_screenshots_of_all_data_governance_pages(browser, live_server, world, dummy):
+    """Capture screenshots of no_steward, retention_breaches,
+    and undeclared copies at both viewports, light and dark."""
+    org = world["org1"]
+    email = org["emails"]["data_architect"]
+
+    _capture(browser, live_server, email, "/data-governance/no-steward", "no-steward")
+    _capture(browser, live_server, email, "/data-governance/retention-breaches", "retention-breaches")
+    _capture(browser, live_server, email, "/data-governance/undeclared-copies", "undeclared-copies")
