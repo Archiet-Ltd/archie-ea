@@ -13,11 +13,12 @@ import uuid
 from .conftest import PAGE_TIMEOUT, PASSWORD
 
 
-def create_fresh_org(enterprise_role, *, org_admin=False, extra_roles=()):
+def create_fresh_org(enterprise_role, *, org_admin=False, extra_roles=(), platform_role="Architect"):
     """Create an empty organisation and a person in it; return the ids.
 
     ``extra_roles`` adds more people to the same organisation (for a second
-    persona a journey hands work to). Returns
+    persona a journey hands work to). ``platform_role`` names the platform
+    role the first person holds; the others always hold Architect. Returns
     ``{"org_id", "suffix", "emails": {role: email}, "user_ids": {role: id}}``.
     """
     from app import create_app, db
@@ -32,6 +33,7 @@ def create_fresh_org(enterprise_role, *, org_admin=False, extra_roles=()):
 
         Role.insert_roles()
         architect_role = Role.query.filter_by(name="Architect").one()
+        first_role = Role.query.filter_by(name=platform_role).one()
         org = Organization(name="Launch Org %s" % suffix, slug="launch-%s" % suffix)
         db.session.add(org)
         db.session.commit()
@@ -41,7 +43,7 @@ def create_fresh_org(enterprise_role, *, org_admin=False, extra_roles=()):
             is_org_admin = bool(org_admin and role == enterprise_role)
             user = User(email=email, first_name="Launch", last_name=role[:12],
                         organization_id=org.id, enterprise_role=role, confirmed=True)
-            user.role = architect_role
+            user.role = first_role if role == enterprise_role else architect_role
             user.is_org_admin = is_org_admin
             user.password = PASSWORD
             db.session.add(user)

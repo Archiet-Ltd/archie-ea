@@ -13,8 +13,8 @@
     </thead>
 {% endmacro %}
 
-{% macro table_body(class='') %}
-    <tbody class="[&_tr:last-child]:border-0 {{ class }}">
+{% macro table_body(class='', attrs_dict={}) %}
+    <tbody class="[&_tr:last-child]:border-0 {{ class }}" {{ attrs_dict|xmlattr }}>
         {{ caller() }}
     </tbody>
 {% endmacro %}

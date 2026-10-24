@@ -9712,7 +9712,12 @@
     }
    },
    "spec": null,
-   "status": "mapped"
+   "status": "mapped",
+   "extra_macros": [
+    "components/card.html",
+    "components/progress.html"
+   ],
+   "note": "Matrix page with overview tiles and a coverage bar above the table; the card and progress macros are the library ones."
   },
   "app/templates/architecture/cto_scorecard.html": {
    "allowed_macros": [
