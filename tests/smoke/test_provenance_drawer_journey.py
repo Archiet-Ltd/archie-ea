@@ -1,5 +1,6 @@
-"""The Why drawer shows provenance for recorded links: where the link came from,
-who recorded it and when, and a link to open the relationship record.
+"""The answer cards in the AI chat show provenance for every connection: where a recorded
+link came from, who recorded it and when, a link to open the relationship record, and for a
+worked-out connection the links it was worked out from.
 
 Two organisations, each with the same shape of model:
 
@@ -20,6 +21,7 @@ import pytest
 
 from playwright.sync_api import expect
 
+from .chat_ask import ask, role_of
 from .conftest import PAGE_TIMEOUT, PASSWORD
 from .intelligence_graph import seed_impact_graph
 
@@ -142,144 +144,96 @@ def _login(page, base, email):
     page.wait_for_url(lambda url: "/account/login" not in url, timeout=PAGE_TIMEOUT)
 
 
-def _ready(page, factory):
-    page.wait_for_function(
-        "(f) => { const el = document.querySelector('[x-data=\"' + f + '()\"]');"
-        " return !!(el && el._x_dataStack); }",
-        arg=factory,
-    )
+def _row_for(card, name, kind):
+    """The connection card for *name* reached by a link of *kind*."""
+    return card.locator("[data-slot='card']").filter(
+        has=card.page.locator("[data-answer-row][data-kind='%s']" % kind)
+    ).filter(has=card.page.get_by_role("link", name=name, exact=True))
 
 
-def _dismiss_first_run(page):
-    page.eval_on_selector_all("[x-show='showOnboarding']", "els => els.forEach(e => e.remove())")
-
-
-def _open_ask(page, base):
-    page.goto(base + "/intelligence/ask", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
-    _ready(page, "askSurface")
-
-
-def _open_question(page):
-    page.locator("#ask-question-impact").click()
-    expect(page.locator("#ask-picker-input")).to_be_focused()
-
-
-def _type_and_wait(page, prefix, term):
-    box = page.locator("#%s-picker-input" % prefix)
-    box.press_sequentially(term, delay=15)
-    page.wait_for_selector("#%s-picker-listbox [role=option]" % prefix)
-    return box
-
-
-def _pick_by_click(page, prefix, name):
-    page.locator("#%s-picker-listbox [role=option]" % prefix, has_text=name).click()
-
-
-def _row_for(page, name, kind=None):
-    rows = page.locator("[data-ask-row]" + ('[data-kind="%s"]' % kind if kind else ""))
-    return rows.filter(has=page.get_by_role("heading", name=name, exact=True))
-
-
-def _open_why(page, base, org, centre, other, kind):
-    """Sign in, ask what depends on `centre`, open Why? on the row for `other`."""
+def _open_row(page, base, org, centre, other, kind):
+    """Sign in as the organisation's architect, ask what depends on `centre` in the chat,
+    and return the card for `other`."""
     names = org["names"]
+    assert role_of(org["email"]) == "enterprise_architect"  # the persona, not an administrator
     _login(page, base, org["email"])
-    _open_ask(page, base)
-    _dismiss_first_run(page)
-    _open_question(page)
-    _type_and_wait(page, "ask", org["noun"])
-    _pick_by_click(page, "ask", names[centre])
-    page.wait_for_selector("[data-ask-row]")
-    row = _row_for(page, names[other], kind)
+    card = ask(page, base, "What breaks if %s fails" % names[centre])
+    row = _row_for(card, names[other], kind)
     expect(row).to_have_count(1)
-    row.get_by_role("button", name="Why?").click()
-    dialog = page.locator("#drawer-provenance [role=dialog]")
-    dialog.wait_for(state="visible")
-    return dialog
+    return row
 
 
-def _origin_section(dialog):
-    section = dialog.locator("[data-provenance-record]")
-    expect(section).to_be_visible()
-    return section
-
-
-def _one_date(section, pattern):
+def _one_date(row, pattern):
     """Exactly one date line, in the product's date format, and no 'not recorded' beside it."""
-    dates = section.locator("[data-provenance-date]")
+    dates = row.locator("[data-provenance-date]")
     expect(dates).to_have_count(1)
     expect(dates).to_have_text(re.compile(pattern))
-    assert "Date not recorded" not in section.text_content()
+    assert "Date not recorded" not in row.text_content()
 
 
-def test_drawer_says_imported_from_the_file_and_when(page, live_server, two_organisations):
+def test_card_says_imported_from_the_file_and_when(page, live_server, two_organisations):
     """A CTO asks what depends on the mainframe; the imported link says where it came from."""
     ours = two_organisations["ours"]
-    dialog = _open_why(page, live_server, ours, "mainframe", "gateway", "explicit")
-    section = _origin_section(dialog)
-    expect(section.locator("p").first).to_have_text("Imported from estate.xml")
-    _one_date(section, r"^Recorded 1 Sept? 2026, 10:30$")
+    row = _open_row(page, live_server, ours, "mainframe", "gateway", "explicit")
+    expect(row.locator("[data-provenance-text]")).to_have_text("Imported from estate.xml")
+    _one_date(row, r"^Recorded 1 Sept? 2026, 10:30$")
 
 
-def test_drawer_says_drawn_by_the_person_and_when(page, live_server, two_organisations):
+def test_card_says_drawn_by_the_person_and_when(page, live_server, two_organisations):
     """A hand-drawn link says who drew it and when."""
     ours = two_organisations["ours"]
-    dialog = _open_why(page, live_server, ours, "gateway", "portal", "explicit")
-    section = _origin_section(dialog)
-    expect(section.locator("p").first).to_have_text("Drawn by Grace Hopper Ours")
-    _one_date(section, r"^Recorded 2 Sept? 2026, 14:00$")
+    row = _open_row(page, live_server, ours, "gateway", "portal", "explicit")
+    expect(row.locator("[data-provenance-text]")).to_have_text("Drawn by Grace Hopper Ours")
+    _one_date(row, r"^Recorded 2 Sept? 2026, 14:00$")
 
 
-def test_drawer_says_origin_not_recorded_for_an_old_link(page, live_server, two_organisations):
+def test_card_says_origin_not_recorded_for_an_old_link(page, live_server, two_organisations):
     """A link from before origins were kept says so, and shows the only date it has."""
     ours = two_organisations["ours"]
-    dialog = _open_why(page, live_server, ours, "mainframe", "portal", "explicit")
-    section = _origin_section(dialog)
-    expect(section.locator("p").first).to_have_text("Origin not recorded")
-    _one_date(section, r"^Recorded 1 Aug 2026, 09:00$")
+    row = _open_row(page, live_server, ours, "mainframe", "portal", "explicit")
+    expect(row.locator("[data-provenance-text]")).to_have_text("Origin not recorded")
+    _one_date(row, r"^Recorded 1 Aug 2026, 09:00$")
 
 
-def test_drawer_link_opens_the_relationship_record(page, live_server, two_organisations):
+def test_card_link_opens_the_relationship_record(page, live_server, two_organisations):
     """Clicking 'Open relationship record' lands on a page that shows that very link."""
     ours = two_organisations["ours"]
     other = two_organisations["other"]
     names = ours["names"]
-    dialog = _open_why(page, live_server, ours, "mainframe", "gateway", "explicit")
-    dialog.get_by_role("link", name="Open relationship record").click()
+    row = _open_row(page, live_server, ours, "mainframe", "gateway", "explicit")
+    row.get_by_role("link", name="Open relationship record").click()
     page.wait_for_url(re.compile(r"/architecture/relationships#relationship-%s$" % ours["rel1_id"]))
 
-    row = page.locator("#relationship-%s" % ours["rel1_id"])
-    expect(row).to_have_count(1)
-    expect(row).to_contain_text(names["mainframe"])
-    expect(row).to_contain_text(names["gateway"])
-    expect(row).to_contain_text("Serving")
+    record = page.locator("#relationship-%s" % ours["rel1_id"])
+    expect(record).to_have_count(1)
+    expect(record).to_contain_text(names["mainframe"])
+    expect(record).to_contain_text(names["gateway"])
+    expect(record).to_contain_text("Serving")
     # The page is this organisation's own and nobody else's.
     assert other["noun"] not in page.locator("main").inner_text()
 
 
-def test_worked_out_row_still_shows_the_links_behind_it(page, live_server, two_organisations):
-    """As before: a worked-out row explains itself from the links it was worked out from."""
+def test_worked_out_card_still_shows_the_links_behind_it(page, live_server, two_organisations):
+    """As before: a worked-out connection explains itself from the links it was worked out from."""
     ours = two_organisations["ours"]
     names = ours["names"]
-    dialog = _open_why(page, live_server, ours, "mainframe", "portal", "derived")
-    chain = dialog.locator("[data-why-chain]")
-    expect(chain).to_be_visible()
-    expect(chain.locator("[data-why-rule]")).to_contain_text("serving link followed by a serving link")
-    links = chain.locator("[data-why-link]")
+    row = _open_row(page, live_server, ours, "mainframe", "portal", "derived")
+    expect(row.locator("[data-why-rule]")).to_contain_text("serving link followed by a serving link")
+    links = row.locator("[data-why-link]")
     expect(links).to_have_count(2)
     expect(links.nth(0)).to_contain_text(names["mainframe"])
     expect(links.nth(0)).to_contain_text(names["gateway"])
     expect(links.nth(1)).to_contain_text(names["gateway"])
     expect(links.nth(1)).to_contain_text(names["portal"])
-    # The recorded-link section belongs to recorded rows only.
-    expect(dialog.locator("[data-provenance-record]")).to_be_hidden()
+    # The recorded-link section belongs to recorded connections only.
+    assert row.locator("[data-provenance-text]").count() == 0
 
 
 def test_worked_out_links_name_their_origin_once(page, live_server, two_organisations):
-    """Each link behind a worked-out row reads 'Imported from <file>' or 'Drawn by <person>', never 'Drawn by Imported from'."""
+    """Each link behind a worked-out connection reads 'Imported from <file>' or 'Drawn by <person>', never 'Drawn by Imported from'."""
     ours = two_organisations["ours"]
-    dialog = _open_why(page, live_server, ours, "mainframe", "portal", "derived")
-    links = dialog.locator("[data-why-chain] [data-why-link]")
+    row = _open_row(page, live_server, ours, "mainframe", "portal", "derived")
+    links = row.locator("[data-why-link]")
     expect(links).to_have_count(2)
     first = re.sub(r"\s+", " ", links.nth(0).inner_text())
     second = re.sub(r"\s+", " ", links.nth(1).inner_text())

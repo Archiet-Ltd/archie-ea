@@ -13,6 +13,7 @@ import re
 import pytest
 from playwright.sync_api import expect
 
+from tests.smoke.chat_ask import ask, sign_in_as
 from tests.smoke.conftest import PAGE_TIMEOUT
 from tests.smoke.fresh_org import create_fresh_org, sign_in
 from tests.smoke.intelligence_graph import seed_impact_graph
@@ -109,14 +110,15 @@ def test_old_twin_map_address_goes_to_the_same_composer_view(page, live_server, 
     _wait_drawn(page, [graph["names"]["service"], graph["names"]["gateway"]])
 
 
-def test_ask_row_link_lands_on_the_composer_with_the_element_drawn(page, live_server, seeded, graph):
-    sign_in(page, live_server, seeded["emails"]["enterprise_architect"])
-    page.goto("%s/intelligence/ask" % live_server, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
-    page.wait_for_function(
-        "() => { const el = document.querySelector('[x-data^=\"askSurface\"]'); return !!(el && el._x_dataStack); }")
-    page.get_by_role("link", name="Open in the Composer").first.click()
-    page.wait_for_url(re.compile(r"/archimate/composer$"), timeout=PAGE_TIMEOUT)
+def test_chat_connection_link_lands_on_the_composer_with_the_element_drawn(page, live_server, seeded, graph):
+    sign_in_as(page, live_server, seeded, "enterprise_architect")
+    answer = ask(page, live_server, "What breaks if %s fails" % graph["names"]["service"])
+    first = answer.locator("[data-answer-row] a").first
+    name = first.inner_text().strip()
+    first.click()
+    page.wait_for_url(re.compile(r"/archimate/composer\?element=\d+$"), timeout=PAGE_TIMEOUT)
     expect(page.locator(APP)).to_be_visible(timeout=PAGE_TIMEOUT)
+    _wait_drawn(page, [name])
 
 
 def test_old_twin_map_address_with_no_element_opens_the_composer(page, live_server, seeded):
