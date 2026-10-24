@@ -71,10 +71,12 @@
                 <div class="shrink-0 w-12 text-center">
                     <span class="text-xs font-medium" :class="s.confidence >= 0.8 ? 'text-primary' : s.confidence >= 0.5 ? 'text-warning-emphasis' : 'text-muted-foreground'" x-text="Math.round(s.confidence * 100) + '%'"></span>
                 </div>
-                <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-muted text-muted-foreground shrink-0" x-text="s.source_method"></span>
+                <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-muted text-muted-foreground shrink-0">
+                    <span x-text="sourceMethodLabel(s.source_method)"></span>
+                </span>
                 <div class="flex items-center gap-1 shrink-0">
-                    {{ button(icon='check', variant='ghost', size='icon-sm', aria_label='Accept', class='rounded-md bg-primary/10 text-primary hover:bg-primary/20 disabled:opacity-50', attrs_dict={'@click': 'acceptSuggestion(s.id)', ':disabled': 'processing'}) }}
-                    {{ button(icon='x', variant='ghost', size='icon-sm', aria_label='Reject', class='rounded-md bg-destructive/10 text-destructive-emphasis hover:bg-destructive/20 disabled:opacity-50', attrs_dict={'@click': 'rejectSuggestion(s.id)', ':disabled': 'processing'}) }}
+                    {{ button(text='Accept', icon='check', variant='outline', size='sm', class='rounded-md border-primary/30 text-primary hover:bg-primary/10 disabled:opacity-50 gap-1', attrs_dict={'@click': 'acceptSuggestion(s.id)', ':disabled': 'processing'}) }}
+                    {{ button(text='Reject', icon='x', variant='outline', size='sm', class='rounded-md border-destructive/30 text-destructive-emphasis hover:bg-destructive/10 disabled:opacity-50 gap-1', attrs_dict={'@click': 'rejectSuggestion(s.id)', ':disabled': 'processing'}) }}
                 </div>
             </div>
         </template>
@@ -156,7 +158,16 @@ function reviewQueue() {
             };
             return c[(l||'').toLowerCase()] || 'bg-muted text-muted-foreground border-input';
         },
-        showStatus(m,e=false) { this.statusMessage=m; this.statusError=e; setTimeout(()=>this.statusMessage='',3000); }
+        sourceMethodLabel(m) {
+            const labels = {
+                'llm_semantic': 'Suggested by AI',
+                'knowledge_graph': 'Knowledge Graph',
+                'transitive_inference': 'Inferred',
+                'co_occurrence': 'Co-occurrence',
+                'abacus_import': 'Import'
+            };
+            return labels[m] || m || 'Unknown';
+        },
     };
 }
 </script>
