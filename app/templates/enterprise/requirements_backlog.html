@@ -7,6 +7,7 @@
 {% from 'components/modal.html' import modal %}
 {% from 'components/dense_table.html' import dense_table %}
 {% from 'components/badge.html' import badge %}
+{% from 'components/form_field.html' import form_group %}
 
 {% block title %}Requirements Backlog{% endblock %}
 
@@ -33,30 +34,36 @@
 
     <!-- Filters bar -->
     <div data-slot="card" class="rounded-lg border border-border bg-card p-4">
-        <div class="flex flex-wrap gap-3 items-center">
-            {{ input(type='search', placeholder='Search requirements…', aria_label='Search requirements', size='sm', class='w-60', attrs_dict={'x-model': 'filters.search', '@input.debounce.300ms': 'applyFilters()'}) }}
-            {% call native_select(size='sm', aria_label='Filter by status', attrs_dict={'x-model': 'filters.status', '@change': 'applyFilters()'}) %}
+        <div class="flex flex-wrap gap-3 items-end">
+            {% call form_group(id='filter-search', label='Search') %}{{ input(type='search', id='filter-search', placeholder='Search requirements…', aria_label='Search requirements', size='sm', class='w-60', attrs_dict={'x-model': 'filters.search', '@input.debounce.300ms': 'applyFilters()'}) }}{% endcall %}
+            {% call form_group(id='filter-status', label='Status') %}
+            {% call native_select(id='filter-status', size='sm', aria_label='Filter by status', attrs_dict={'x-model': 'filters.status', '@change': 'applyFilters()'}) %}
                 <option value="">All statuses</option>
                 <option value="Draft">Draft</option>
                 <option value="Refined">Refined</option>
                 <option value="Approved">Approved</option>
                 <option value="Implemented">Implemented</option>
             {% endcall %}
-            {% call native_select(size='sm', aria_label='Filter by MoSCoW priority', attrs_dict={'x-model': 'filters.moscow', '@change': 'applyFilters()'}) %}
+            {% endcall %}
+            {% call form_group(id='filter-moscow', label='Priority') %}
+            {% call native_select(id='filter-moscow', size='sm', aria_label='Filter by MoSCoW priority', attrs_dict={'x-model': 'filters.moscow', '@change': 'applyFilters()'}) %}
                 <option value="">All priorities</option>
                 <option value="MUST">MUST</option>
                 <option value="SHOULD">SHOULD</option>
                 <option value="COULD">COULD</option>
                 <option value="WONT">WONT</option>
             {% endcall %}
-            {% call native_select(size='sm', aria_label='Filter by capability', attrs_dict={'x-model': 'filters.capability_id', '@change': 'applyFilters()'}) %}
+            {% endcall %}
+            {% call form_group(id='filter-capability', label='Capability') %}
+            {% call native_select(id='filter-capability', size='sm', aria_label='Filter by capability', attrs_dict={'x-model': 'filters.capability_id', '@change': 'applyFilters()'}) %}
                 <option value="">All capabilities</option>
                 {% for cap in capabilities %}
                 <option value="{{ cap.id }}">{{ cap.name }}</option>
                 {% endfor %}
             {% endcall %}
+            {% endcall %}
             <span class="ml-auto text-sm text-muted-foreground" x-text="filtered.length + ' requirements'"></span>
-            {% call button(variant='default', class='gap-2 justify-center', aria_label='Add requirement', attrs_dict={'@click': 'showCreateModal = true'}) %}
+            {% call button(variant='default', class='gap-2 justify-center', aria_label='Add requirement', attrs_dict={'@click': "createError = ''; showCreateModal = true"}) %}
                 <i data-lucide="plus" class="h-4 w-4" aria-hidden="true"></i>
                 Add Requirement
             {% endcall %}
@@ -246,7 +253,7 @@
 
                 <div>
                     <label class="block text-sm font-medium mb-1.5" for="new-req-name">Requirement Name <span class="text-destructive-emphasis">*</span></label>
-                    {{ input(type='text', id='new-req-name', placeholder='As a user, I need…', size='sm', attrs_dict={'x-model': 'newReq.requirement_name'}) }}
+                    {{ input(type='text', id='new-req-name', placeholder='As a user, I need…', size='sm', attrs_dict={'x-model': 'newReq.name'}) }}
                 </div>
                 <div>
                     <label class="block text-sm font-medium mb-1.5" for="new-req-desc">Description</label>
@@ -257,7 +264,7 @@
                         <label class="block text-sm font-medium mb-1.5" for="new-req-type">Type</label>
                         {% call native_select(id='new-req-type', size='sm', class='w-full', attrs_dict={'x-model': 'newReq.requirement_type'}) %}
                             <option value="functional">Functional</option>
-                            <option value="non-functional">Non-functional</option>
+                            <option value="quality">Non-functional (quality)</option>
                             <option value="constraint">Constraint</option>
                         {% endcall %}
                     </div>
@@ -274,9 +281,9 @@
                 <div>
                     <label class="block text-sm font-medium mb-1.5" for="new-req-priority">Priority</label>
                     {% call native_select(id='new-req-priority', size='sm', class='w-full', attrs_dict={'x-model': 'newReq.priority'}) %}
-                        <option value="high">High</option>
-                        <option value="medium">Medium</option>
-                        <option value="low">Low</option>
+                        <option value="2">High</option>
+                        <option value="3">Medium</option>
+                        <option value="4">Low</option>
                     {% endcall %}
                 </div>
                 <div class="grid grid-cols-2 gap-4">
@@ -291,9 +298,10 @@
                 </div>
             </div>
 
+            <p x-show="createError" x-cloak role="alert" class="mt-4 text-sm text-destructive-emphasis" x-text="createError"></p>
             <div class="flex justify-end gap-3 mt-6">
                 {% call button(variant='outline', class='justify-center', attrs_dict={'@click': 'showCreateModal = false'}) %}Cancel{% endcall %}
-                {% call button(variant='default', class='justify-center', attrs_dict={'@click': 'createRequirement()', ':disabled': 'creating || !newReq.requirement_name.trim()'}) %}
+                {% call button(variant='default', class='justify-center', attrs_dict={'@click': 'createRequirement()', ':disabled': 'creating || !newReq.name.trim()'}) %}
                     <template x-if="creating">
                         <i data-lucide="loader-2" class="h-3.5 w-3.5 mr-2 animate-spin" aria-hidden="true"></i>
                     </template>
@@ -454,18 +462,18 @@
                                 <div>
                                     <label class="block text-xs font-medium mb-1" :for="'req-archimate-req-' + activeReq.id">ArchiMate Requirement <span class="text-muted-foreground font-normal">(formal requirement element)</span></label>
                                     <div class="relative">
-                                        {{ input(type='text', aria_label='Search ArchiMate requirements', size='xs', attrs_dict={':id': "'req-archimate-req-' + activeReq.id", 'x-model': 'archiReqSearch', '@input.debounce.300ms': 'searchArchiReqs()', '@focus': 'archiReqDropdownOpen = true', ':placeholder': "activeReq.archimate_requirement_name || 'Search ArchiMate requirements…'"}) }}
+                                        {{ input(type='text', aria_label='Search ArchiMate requirements', size='xs', attrs_dict={':id': "'req-archimate-req-' + activeReq.id", 'x-model': 'archiReqSearch', '@input.debounce.300ms': 'searchArchiReqs()', '@focus': 'archiReqDropdownOpen = true', ':placeholder': "activeReq.archimate_name || 'Search ArchiMate requirements…'"}) }}
                                         <div x-show="archiReqDropdownOpen && archiReqError" x-cloak class="absolute z-50 w-full mt-1 rounded-md border border-border bg-popover px-3 py-1.5 text-xs text-destructive-emphasis" x-text="archiReqError" @click.outside="archiReqDropdownOpen = false"></div>
                                         <div x-show="archiReqDropdownOpen && !archiReqError && archiReqResults.length > 0" x-cloak class="absolute z-50 w-full mt-1 max-h-40 overflow-y-auto rounded-md border bg-popover" @click.outside="archiReqDropdownOpen = false">
                                             <template x-for="elem in archiReqResults" :key="elem.id">
-                                                {% call button(variant='ghost', size='sm', class='text-left', attrs_dict={'@click': 'activeReq.archimate_requirement_id = elem.id; activeReq.archimate_requirement_name = elem.title; archiReqSearch = elem.title; archiReqDropdownOpen = false', 'x-text': 'elem.title'}) %}{% endcall %}
+                                                {% call button(variant='ghost', size='sm', class='text-left', attrs_dict={'@click': 'activeReq.archimate_requirement_id = elem.id; activeReq.archimate_name = elem.title; archiReqSearch = elem.title; archiReqDropdownOpen = false', 'x-text': 'elem.title'}) %}{% endcall %}
                                             </template>
                                         </div>
                                     </div>
                                     <template x-if="activeReq.archimate_requirement_id">
                                         <div class="flex items-center gap-2 mt-1">
-                                            <span class="text-2xs text-muted-foreground" x-text="'Linked: ' + (activeReq.archimate_requirement_name || 'ID #' + activeReq.archimate_requirement_id)"></span>
-                                            {% call button(variant='link', attrs_dict={'@click': "activeReq.archimate_requirement_id = null; activeReq.archimate_requirement_name = null; archiReqSearch = ''"}) %}Unlink{% endcall %}
+                                            <span class="text-2xs text-muted-foreground" x-text="'Linked: ' + (activeReq.archimate_name || 'ID #' + activeReq.archimate_requirement_id)"></span>
+                                            {% call button(variant='link', attrs_dict={'@click': "activeReq.archimate_requirement_id = null; activeReq.archimate_name = null; archiReqSearch = ''"}) %}Unlink{% endcall %}
                                         </div>
                                     </template>
                                 </div>
@@ -551,10 +559,10 @@
                                 <label class="text-xs font-medium text-muted-foreground">MoSCoW</label>
                                 {% call native_select(size='xs', class='w-full', aria_label='MoSCoW', attrs_dict={'x-model': 'activeReq.moscow_priority'}) %}
                                     <option value="">— unset —</option>
-                                    <option value="Must">Must Have</option>
-                                    <option value="Should">Should Have</option>
-                                    <option value="Could">Could Have</option>
-                                    <option value="Wont">Won't Have</option>
+                                    <option value="MUST">Must Have</option>
+                                    <option value="SHOULD">Should Have</option>
+                                    <option value="COULD">Could Have</option>
+                                    <option value="WONT">Won't Have</option>
                                 {% endcall %}
                             </div>
                             <!-- Story Points -->
@@ -643,7 +651,9 @@
                     </div>
 
                     <!-- Actions -->
+                    <p x-show="deleteError" x-cloak role="alert" class="mt-4 text-sm text-destructive-emphasis" x-text="deleteError"></p>
                     <div class="flex justify-end gap-3 mt-6">
+                        {% call button(variant='destructive', class='justify-center mr-auto', attrs_dict={'@click': 'deleteRequirement()', ':disabled': 'deleting', 'x-text': "confirmDelete ? 'Confirm delete' : 'Delete requirement'"}) %}{% endcall %}
                         {% call button(variant='outline', class='justify-center', attrs_dict={'@click': 'activeReq = null'}) %}Cancel{% endcall %}
                         {% call button(variant='default', class='justify-center', attrs_dict={'@click': 'saveDetail()', ':disabled': 'saving'}) %}
                             <template x-if="saving">
@@ -681,7 +691,11 @@ function requirementsBacklog() {
         usersList: [],
         showCreateModal: false,
         creating: false,
-        newReq: { requirement_name: '', description: '', requirement_type: 'functional', moscow_priority: 'MUST', priority: 'high', solution_id: null, capability_id: null, story_points: null, epic_parent_id: null, layer: '', template_id: null },
+        createError: '',
+        deleting: false,
+        confirmDelete: false,
+        deleteError: '',
+        newReq: { name: '', description: '', requirement_type: 'functional', moscow_priority: 'MUST', priority: 3, solution_id: null, capability_id: null, story_points: null, epic_parent_id: null, layer: '', template_id: null },
         // Template picker state (added for RRT-003)
         pickerStep: 0,
         pickerLayers: [],
@@ -710,6 +724,27 @@ function requirementsBacklog() {
         syncModal(id, open) {
             if (open) Platform.modal.open(id);
             else Platform.modal.close(id);
+        },
+
+        async deleteRequirement() {
+            if (!this.activeReq || this.deleting) return;
+            if (!this.confirmDelete) { this.confirmDelete = true; return; }
+            this.deleting = true;
+            this.deleteError = '';
+            try {
+                const id = this.activeReq.id;
+                const d = await Platform.fetch(`/api/enterprise/requirements/${id}`, { method: 'DELETE', silent: true });
+                if (!d.success) throw new Error(d.error || 'The requirement could not be deleted.');
+                this.all = this.all.filter(x => x.id !== id);
+                this.applyFilters();
+                if (this.showEpicTree) this.loadEpics();
+                this.activeReq = null;
+            } catch (e) {
+                this.deleteError = e.message || 'The requirement could not be deleted.';
+            } finally {
+                this.deleting = false;
+                this.confirmDelete = false;
+            }
         },
 
         onModalClose(id) {
@@ -745,7 +780,7 @@ function requirementsBacklog() {
 
         applyTemplate(tpl) {
             this.pickerTemplate = tpl;
-            this.newReq.requirement_name = tpl.name;
+            this.newReq.name = tpl.name;
             this.newReq.description = tpl.description || '';
             this.newReq.layer = tpl.layer;
             this.newReq.template_id = tpl.id;
@@ -868,11 +903,13 @@ function requirementsBacklog() {
         },
 
         openDetail(req) {
+            this.confirmDelete = false;
+            this.deleteError = '';
             this.activeReq = { ...req };
             this.acGenerating = false;
             this.tcGenerating = false;
             this.tcResult = '';
-            this.archiReqSearch = req.archimate_requirement_name || '';
+            this.archiReqSearch = req.archimate_name || '';
             this.archiReqResults = [];
             this.archiReqDropdownOpen = false;
             this.$nextTick(() => lucide.createIcons());
@@ -998,15 +1035,16 @@ function requirementsBacklog() {
         },
 
         async createRequirement() {
-            if (!this.newReq.requirement_name.trim() || this.creating) return;
+            if (!this.newReq.name.trim() || this.creating) return;
             this.creating = true;
+            this.createError = '';
             try {
-                const d = await Platform.fetch.post('/api/enterprise/requirements', this.newReq, { silent: true });
+                const d = await Platform.fetch.post('/api/enterprise/requirements', { ...this.newReq, priority: Number(this.newReq.priority) }, { silent: true });
                 if (d.success) {
                     const req = d.requirement;
                     this.applyRequirementUpdate({
                         id: req.id,
-                        name: req.requirement_name,
+                        name: req.name,
                         description: req.description,
                         requirement_type: req.requirement_type,
                         moscow_priority: req.moscow_priority,
@@ -1021,16 +1059,18 @@ function requirementsBacklog() {
                         dod_checklist: [],
                         dod_complete: false,
                     });
-                    this.newReq = { requirement_name: '', description: '', requirement_type: 'functional', moscow_priority: 'MUST', priority: 'high', solution_id: null, capability_id: null, story_points: null, epic_parent_id: null, layer: '', template_id: null };
+                    this.newReq = { name: '', description: '', requirement_type: 'functional', moscow_priority: 'MUST', priority: 3, solution_id: null, capability_id: null, story_points: null, epic_parent_id: null, layer: '', template_id: null };
                     this.pickerStep = 0;
                     this.pickerTemplate = null;
                     this.showCreateModal = false;
                     if (this.showEpicTree) this.loadEpics();
                 } else {
-                    Platform.toast.error(d.error || 'Could not create the requirement.');
+                    this.createError = d.error || 'The requirement could not be created. Check the fields and try again.';
                 }
             } catch (e) {
-                Platform.toast.error(e.message || 'Could not create the requirement.');
+                // Shown in the dialog, in a sentence; a generic transport status is not a message.
+                const m = (e && e.message) || '';
+                this.createError = (m && !/^(internal server error|bad request|\d+)/i.test(m)) ? m : 'The requirement could not be created. Check the fields and try again.';
             } finally {
                 this.creating = false;
             }
