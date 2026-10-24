@@ -1,15 +1,17 @@
 {% extends 'layouts/admin_base.html' %}
 {% from 'components/page_header.html' import page_header %}
 {% from 'components/button.html' import button %}
-{% from 'components/card.html' import card, card_content %}
-{% from 'components/input.html' import label %}
+{% from 'components/card.html' import card, card_content, card_header, card_title %}
+{% from 'components/input.html' import input, textarea, label %}
+{% from 'components/select.html' import native_select %}
 
 {% block title %}{{ action }} Work Package{% endblock %}
 
 {% block content %}
 <div class="space-y-6">
     {{ page_header(
-        title=action + ' Work Package', breadcrumbs=[{'label': 'Home', 'href': '/'}, {'label': action + ' Work Package'}],
+        title=action + ' Work Package',
+        breadcrumbs=[{'label': 'Home', 'href': '/'}, {'label': action + ' Work Package'}],
         description='Manage implementation work package details',
         actions=[
             {'text': 'Back to Dashboard', 'icon': 'arrow-left', 'href': url_for('implementation_planning.implementation_dashboard'), 'variant': 'outline'}
@@ -17,6 +19,9 @@
     ) }}
 
     {% call card() %}
+        {% call card_header() %}
+            {% call card_title() %}Work Package Details{% endcall %}
+        {% endcall %}
         {% call card_content() %}
             <form method="POST" action="{{ request.path }}" class="space-y-6">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
@@ -24,78 +29,69 @@
                 <div class="grid grid-cols-1 gap-6">
                     <div class="space-y-2">
                         {% call label(for='name', required=true) %}Work Package Name{% endcall %}
-                        <input type="text" id="name" name="name"
-                               value="{{ work_package.name if work_package else '' }}"
-                               required
-                               class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                               placeholder="Enter work package name" aria-label="Enter work package name">
+                        {{ input(id='name', name='name', type='text', value=work_package.name if work_package else '', required=true, placeholder='Enter work package name', aria_label='Enter work package name') }}
                     </div>
                     <div class="space-y-2">
                         {% call label(for='status') %}Status{% endcall %}
-                        <select id="status" name="status"
-                                class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2" aria-label="Select Status">
-                            <option value="">Select Status</option>
-                            <option value="planned" {% if work_package and work_package.status == 'planned' %}selected{% endif %}>Planned</option>
-                            <option value="in_progress" {% if work_package and work_package.status == 'in_progress' %}selected{% endif %}>In Progress</option>
-                            <option value="completed" {% if work_package and work_package.status == 'completed' %}selected{% endif %}>Completed</option>
-                            <option value="on_hold" {% if work_package and work_package.status == 'on_hold' %}selected{% endif %}>On Hold</option>
-                        </select>
+                        {% set wp_status = work_package.status if work_package else '' %}
+                        {% call native_select(id='status', name='status', aria_label='Select Status') %}
+                            <option value=""{% if not wp_status %} selected{% endif %}>Select Status</option>
+                            <option value="planned"{% if wp_status == 'planned' %} selected{% endif %}>Planned</option>
+                            <option value="in_progress"{% if wp_status == 'in_progress' %} selected{% endif %}>In Progress</option>
+                            <option value="completed"{% if wp_status == 'completed' %} selected{% endif %}>Completed</option>
+                            <option value="on_hold"{% if wp_status == 'on_hold' %} selected{% endif %}>On Hold</option>
+                        {% endcall %}
                     </div>
                 </div>
 
                 <div class="space-y-2">
                     {% call label(for='programme_id') %}Programme{% endcall %}
-                    <select id="programme_id" name="programme_id" class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2" aria-label="Select programme">
+                    {% set wp_programme = work_package.enterprise_initiative_id if work_package else '' %}
+                    {% call native_select(id='programme_id', name='programme_id', aria_label='Select programme') %}
                         <option value="">No programme</option>
                         {% for programme in programmes %}
-                        <option value="{{ programme.id }}" {% if work_package and work_package.enterprise_initiative_id == programme.id %}selected{% endif %}>{{ programme.name }}</option>
+                        <option value="{{ programme.id }}"{% if wp_programme == programme.id %} selected{% endif %}>{{ programme.name }}</option>
                         {% endfor %}
-                    </select>
+                    {% endcall %}
                 </div>
 
                 <div class="space-y-2">
                     {% call label(for='description') %}Description{% endcall %}
-                    <textarea id="description" name="description" rows="3"
-                              class="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                              placeholder="Describe the work package scope and objectives" aria-label="Describe the work package scope and objectives">{{ work_package.description if work_package else '' }}</textarea>
+                    {% call textarea(id='description', name='description', rows=3, placeholder='Describe the work package scope and objectives', aria_label='Describe the work package scope and objectives') %}{{ work_package.description if work_package else '' }}{% endcall %}
                 </div>
 
-                <div class="grid grid-cols-1 gap-6">
+                <div class="grid grid-cols-2 gap-4">
                     <div class="space-y-2">
                         {% call label(for='start_date') %}Start Date{% endcall %}
-                        <input type="date" id="start_date" name="start_date"
-                               value="{{ work_package.start_date.strftime('%Y-%m-%d') if work_package and work_package.start_date else '' }}"
-                               class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2" aria-label="Start date">
+                        {{ input(id='start_date', name='start_date', type='date', value=work_package.start_date.strftime('%Y-%m-%d') if work_package and work_package.start_date else '', aria_label='Start date') }}
                     </div>
                     <div class="space-y-2">
                         {% call label(for='end_date') %}End Date{% endcall %}
-                        <input type="date" id="end_date" name="end_date"
-                               value="{{ work_package.end_date.strftime('%Y-%m-%d') if work_package and work_package.end_date else '' }}"
-                               class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2" aria-label="End date">
+                        {{ input(id='end_date', name='end_date', type='date', value=work_package.end_date.strftime('%Y-%m-%d') if work_package and work_package.end_date else '', aria_label='End date') }}
                     </div>
                 </div>
 
                 <div class="flex justify-between pt-4">
-                    <a href="{{ url_for('implementation_planning.implementation_dashboard') }}"
-                       class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center whitespace-nowrap">
-                        Cancel
-                    </a>
+                    {{ button('Cancel', variant='outline', href=url_for('implementation_planning.implementation_dashboard')) }}
                     {{ button(action + ' Work Package', variant='default', type='submit', icon='save') }}
                 </div>
             </form>
         {% endcall %}
     {% endcall %}
+
     {% if work_package %}
     {% call card() %}
+        {% call card_header() %}
+            {% call card_title() %}Depends on{% endcall %}
+        {% endcall %}
         {% call card_content() %}
-            <h2 class="text-lg font-semibold mb-3">Depends on</h2>
             <ul id="dependency-list" class="space-y-2 mb-4">
                 {% for dep_id, dep_name in dependencies %}
                 <li class="flex items-center justify-between text-sm" data-dependency-id="{{ dep_id }}">
                     <span>{{ dep_name or ('Work package #' ~ dep_id) }}</span>
-                    <form method="POST" action="{{ url_for('implementation_planning.remove_work_package_dependency', work_package_id=work_package.id, dependency_id=dep_id) }}">
+                    <form method="POST" action="{{ url_for('implementation_planning.remove_work_package_dependency', work_package_id=work_package.id, dependency_id=dep_id) }}" class="inline">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-                        <button type="submit" class="text-sm underline">Remove</button>
+                        {{ button('Remove', variant='link', type='submit') }}
                     </form>
                 </li>
                 {% else %}
@@ -106,11 +102,11 @@
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                 <div class="space-y-2 flex-1">
                     {% call label(for='dependency_id') %}Add a dependency{% endcall %}
-                    <select id="dependency_id" name="dependency_id" class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2" aria-label="Select the work package this depends on">
+                    {% call native_select(id='dependency_id', name='dependency_id', aria_label='Select the work package this depends on') %}
                         {% for other in other_work_packages %}
                         <option value="{{ other.id }}">{{ other.name }}</option>
                         {% endfor %}
-                    </select>
+                    {% endcall %}
                 </div>
                 {{ button('Add dependency', variant='outline', type='submit') }}
             </form>
