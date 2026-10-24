@@ -1322,15 +1322,15 @@ _SOLUTIONS = [
     ),
 ]
 
-# ── one value stream, four stages, each enabled by capabilities ────────────
+# ── one value stream, four stages, each supported by capabilities (by code) ─
 _VALUE_STREAM = (
     "Calibration Request to Certificate", "LQ-VS-CALIBRATION",
     "From a customer's calibration request to the certificate that closes it.",
     [
-        ("Receive Request", ["Order Fulfilment"]),
-        ("Schedule Engineer", ["Field Service Management", "Workforce Planning"]),
-        ("Calibrate and Test", ["Sensor Calibration", "Quality Assurance"]),
-        ("Certify and Report", ["Regulatory Compliance", "Water Quality Monitoring"]),
+        ("Receive Request", ["LQ-CAP-FULFILMENT"]),
+        ("Schedule Engineer", ["LQ-CAP-FIELD-SERVICE", "LQ-CAP-WORKFORCE"]),
+        ("Calibrate and Test", ["LQ-CAP-CALIBRATION", "LQ-CAP-QUALITY"]),
+        ("Certify and Report", ["LQ-CAP-COMPLIANCE", "LQ-CAP-WATER-QUALITY"]),
     ],
 )
 
@@ -1371,15 +1371,15 @@ def _seed_boards(org_id, demo_user_id) -> dict:
     Idempotent. A work package that already carries a kind is left alone, so
     a card an architect has moved is not put back by a re-run.
     """
-    from app.models import ArchiMateElement
     from app.models.business_capabilities import BusinessCapability
     from app.models.implementation_migration import Deliverable
-    from app.models.relationship_tables import value_stream_stage_capabilities
     from app.models.solution_architect_models import (
         RequirementType, SolutionRequirement,
     )
     from app.models.solution_models import Solution, solution_deliverables
-    from app.models.unified_capability import ValueStream, ValueStreamStage
+    from app.models.unified_capability import (
+        CapabilityValueStreamMapping, ValueStream, ValueStreamStage,
+    )
     from app.modules.capabilities.services import value_stream_service
     from app.services.element_profile_service import (
         read_profile, set_kind, set_kind_property, set_wsjf_components,
@@ -1460,12 +1460,8 @@ def _seed_boards(org_id, demo_user_id) -> dict:
         })
         stats["value_streams_created"] += 1
     vs_id = vs.id
-    caps = {
-        c.name: c
-        for c in db.session.query(BusinessCapability)
-        .filter(BusinessCapability.organization_id == org_id)
-    }
-    for order, (stage_name, cap_names) in enumerate(stages, start=1):
+    unified = _resolve_caps(org_id)
+    for order, (stage_name, cap_codes) in enumerate(stages, start=1):
         stage = (
             db.session.query(ValueStreamStage)
             .filter(ValueStreamStage.value_stream_id == vs_id,
@@ -1476,27 +1472,27 @@ def _seed_boards(org_id, demo_user_id) -> dict:
             stage = value_stream_service.create_stage(
                 vs_id, {"name": stage_name, "stage_order": order})
             stats["value_stream_stages_created"] += 1
-        linked = {
-            row.business_capability_id
-            for row in db.session.execute(
-                value_stream_stage_capabilities.select().where(
-                    value_stream_stage_capabilities.c.value_stream_stage_id == stage.id)
-            )
+        mapped = {
+            m.capability_id
+            for m in db.session.query(CapabilityValueStreamMapping)
+            .filter(CapabilityValueStreamMapping.value_stream_stage_id == stage.id)
         }
-        for cap_name in cap_names:
-            cap = caps.get(cap_name)
-            if cap is None or cap.id in linked:
+        for code in cap_codes:
+            cap = unified.get(code)
+            if cap is None or cap.id in mapped:
                 continue
-            db.session.execute(
-                value_stream_stage_capabilities.insert().values(
-                    value_stream_stage_id=stage.id,
-                    business_capability_id=cap.id,
-                    capability_role="enabling",
-                    importance="high",
-                )
+            value_stream_service.upsert_mapping_cell(
+                cap.id, vs_id, stage.id,
+                {"support_type": "primary", "support_level": 4, "impact_level": "high"},
             )
             stats["stage_capabilities_linked"] += 1
 
+    # Requirements name the capability they serve by its name
+    caps = {
+        c.name: c
+        for c in db.session.query(BusinessCapability)
+        .filter(BusinessCapability.organization_id == org_id)
+    }
     # Requirements backlog
     existing = {
         r.name

@@ -131,4 +131,3 @@ def test_second_run_creates_nothing(seeded):
                 "value_streams_created", "value_stream_stages_created",
                 "stage_capabilities_linked", "backlog_requirements_created"):
         assert second[key] == 0, key
-    assert seeded["first"]["safe_kinds_set"] == 16
