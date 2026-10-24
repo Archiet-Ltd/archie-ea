@@ -144,8 +144,8 @@ def _get_configured_chat_models():
                 model_info["recommended_for"] = ["Complex reasoning", "Analysis"]
             elif provider_name == "gemini":
                 model_info["recommended_for"] = ["Multi-modal", "General tasks"]
-            elif provider_name == "deepseek":
-                model_info["recommended_for"] = ["Code analysis", "Technical tasks"]
+            elif provider_name == "nvidia":
+                model_info["recommended_for"] = ["General conversation", "Technical tasks"]
 
             models.append(model_info)
 

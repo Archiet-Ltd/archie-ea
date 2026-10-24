@@ -102,6 +102,7 @@
     {# Trigger Button #}
     <button
         type="button"
+        id="{{ unique_id }}-trigger"
         data-menu-trigger
         @click="menuOpen = !menuOpen"
         :aria-expanded="menuOpen"
@@ -135,6 +136,7 @@
         x-cloak
         class="absolute {{ positions.get(position, 'right-0') }} mt-2 {{ menu_width }} rounded-lg border border-border bg-card z-50"
         role="menu"
+        aria-labelledby="{{ unique_id }}-trigger"
         aria-orientation="vertical"
     >
         <div class="py-1" role="none">
