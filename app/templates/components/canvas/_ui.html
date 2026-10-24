@@ -5,6 +5,7 @@
 {% import 'components/badge.html' as bd %}
 {% import 'components/table.html' as t %}
 {% import 'components/input.html' as inp %}
+{% import 'components/empty_state.html' as es %}
 
 {% macro lucide(name, class='') %}<i data-lucide="{{ name }}" class="{{ class }}" aria-hidden="true"></i>{% endmacro %}
 
@@ -28,3 +29,23 @@
 {% macro table_cell(text='', class='', attrs={}) %}{% set inner = caller() if caller is defined else '' %}{% call t.table_cell(class=class, attrs_dict=attrs) %}{{ text }}{{ inner }}{% endcall %}{% endmacro %}
 
 {% macro hidden(name, value) %}{{ inp.input(type='hidden', name=name, value=value) }}{% endmacro %}
+
+{# The small overlays the canvas frame uses, drawn with Alpine and tokens only (help-and-overlays-v1): a tooltip that names an
+   icon-only control, a popover opened by the "i" button, and a hover card previewing a note. #}
+{% macro tooltip(label) %}{% set inner = caller() %}<span class="group/tip relative inline-flex">{{ inner }}<span role="tooltip" class="pointer-events-none absolute bottom-full left-1/2 z-50 mb-1 hidden -translate-x-1/2 whitespace-nowrap rounded-md bg-foreground px-2 py-1 text-xs text-background group-hover/tip:block group-focus-within/tip:block">{{ label }}</span></span>{% endmacro %}
+
+{% macro popover(label, title, body, example='') %}
+<span class="relative inline-flex" x-data="{ open: false, up: false, end: false, toggle(el) { this.open = !this.open; if (this.open) { const r = el.getBoundingClientRect(); const box = el.closest('[role=region]').getBoundingClientRect(); this.up = window.innerHeight - r.bottom < 280; this.end = r.right - box.left > 288; } } }" @keydown.escape="open = false" @click.outside="open = false">
+  {% call button(variant='ghost', size='icon-xs', class='text-muted-foreground', attrs={'aria-label': label, ':aria-expanded': 'open', '@click': 'toggle($el)'}) %}{{ lucide('info') }}{% endcall %}
+  <div x-show="open" x-cloak role="dialog" aria-label="{{ title }}" class="absolute z-50 w-64 rounded-md border bg-popover p-3 text-sm text-popover-foreground" :class="[up ? 'bottom-full mb-1' : 'top-full mt-1', end ? 'right-0' : 'left-0']">
+    <p class="font-medium">{{ title }}</p>
+    <p class="mt-1 text-sm text-muted-foreground">{{ body }}</p>
+    {% if example %}<p class="mt-2 text-xs text-muted-foreground">Example: {{ example }}</p>{% endif %}
+  </div>
+</span>
+{% endmacro %}
+
+{% macro hover_card(side_class='left-0 top-full mt-1') %}{% set inner = caller() %}<div class="relative min-w-0" x-data="{ open: false }" @mouseenter="open = true" @mouseleave="open = false" @focusin="open = true" @focusout="open = false" @keydown.escape="open = false">{{ inner }}</div>{% endmacro %}
+{% macro hover_card_content(class='') %}{% set inner = caller() %}<div x-show="open" x-cloak class="absolute left-0 top-full z-50 mt-1 w-64 rounded-md border bg-popover p-3 text-popover-foreground {{ class }}">{{ inner }}</div>{% endmacro %}
+
+{% macro empty(title, description, icon='inbox', cta_text=none, cta_onclick=none, cta_href=none) %}{{ es.empty_state(icon=icon, title=title, description=description, cta_text=cta_text, cta_onclick=cta_onclick, cta_href=cta_href, cta_icon=('plus' if cta_onclick else none)) }}{% endmacro %}
