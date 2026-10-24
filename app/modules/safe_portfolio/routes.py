@@ -124,6 +124,21 @@ def _get_epics() -> List[Dict]:
             job_size=js,
         )
 
+        # Get owner name if available
+        owner_name = None
+        if element.created_by_id:
+            from app.models.user import User
+            owner = db.session.query(User).filter_by(id=element.created_by_id).first()
+            if owner:
+                owner_name = f"{owner.first_name} {owner.last_name}".strip() or owner.email
+
+        # Format date
+        date_str = None
+        if element.updated_at:
+            date_str = element.updated_at.strftime("%Y-%m-%d")
+        elif element.created_at:
+            date_str = element.created_at.strftime("%Y-%m-%d")
+
         epics.append(
             {
                 "id": element.id,
@@ -139,6 +154,8 @@ def _get_epics() -> List[Dict]:
                 "time_criticality": tc,
                 "risk_reduction": rr,
                 "job_size": js,
+                "owner_name": owner_name,
+                "updated_at": date_str,
             }
         )
 

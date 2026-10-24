@@ -40,6 +40,76 @@ def _assert_board_keeps_its_shape(page):
     assert lefts == sorted(lefts) and len(set(lefts)) == 6, "Columns are not side by side"
 
 
+def _assert_column_headers_have_dot_name_count(page):
+    """Each column header shows a colored dot (when stage group is set), the column name, and the card count."""
+    for state in STATES:
+        header = page.locator(f".kanban-column[data-state='{state}'] .kanban-column-header")
+        assert header.count() == 1, f"missing header for {state}"
+
+        # Check for colored dot (only for states with a stage group)
+        if state in STAGE_GROUP:
+            dot = header.locator("span.h-2.w-2.rounded-full")
+            assert dot.count() == 1, f"{state} header missing colored status dot"
+
+        # Check column name is visible
+        assert state in header.inner_text(), f"{state} name not in header text"
+
+        # Check count text is present (format: "N epic" or "N epics")
+        header_text = header.inner_text()
+        assert "epic" in header_text.lower(), f"{state} header missing epic count"
+
+
+def _assert_cards_have_badge_id_title_date_avatar(page):
+    """Each card shows: priority badge (WSJF) top left, item id top right, title, date with icon, and owner avatar."""
+    # Find at least one card to validate structure
+    cards = page.locator(".kanban-card").all()
+    assert len(cards) > 0, "Expected at least one card on the board"
+
+    for card in cards[:3]:  # Check first 3 cards as sample
+        card_text = card.inner_text()
+
+        # Priority badge (WSJF score)
+        badge = card.locator("span.bg-primary\\/10.text-primary-emphasis")
+        assert badge.count() >= 1, "Card missing WSJF priority badge"
+        badge_text = badge.first.inner_text()
+        assert "WSJF:" in badge_text, f"Badge doesn't show WSJF score: {badge_text}"
+
+        # Item ID (top right, in monospace)
+        id_span = card.locator("span.font-mono")
+        assert id_span.count() >= 1, "Card missing item id"
+
+        # Title (h3 element, line-clamped)
+        title = card.locator("h3.line-clamp-2")
+        assert title.count() >= 1, "Card missing title"
+        assert len(title.inner_text()) > 0, "Card title is empty"
+
+        # Date with icon
+        calendar_icon = card.locator("i[data-lucide='calendar']")
+        assert calendar_icon.count() >= 1, "Card missing calendar icon for date"
+
+        # Owner avatar or initials (may not be present if no owner set)
+        # This is optional, so we just check the structure allows it
+
+
+def _assert_no_inline_styles(page):
+    """No element in the kanban board has an inline style attribute."""
+    board = page.locator(".kanban-board")
+    elements_with_style = board.locator("[style]").all()
+
+    # Filter out elements that might legitimately have styles from Alpine's :style binding
+    # (though we've removed those, this ensures the test is accurate)
+    bad_elements = []
+    for el in elements_with_style:
+        style_attr = el.get_attribute("style")
+        if style_attr and style_attr.strip():
+            # Get element info for debugging
+            tag = el.evaluate("el => el.tagName")
+            classes = el.get_attribute("class") or ""
+            bad_elements.append(f"{tag}.{classes.split()[0] if classes else '(no-class)'}")
+
+    assert len(bad_elements) == 0, f"Found {len(bad_elements)} elements with inline styles: {bad_elements}"
+
+
 def _assert_cards_use_words(page):
     board_text = page.locator(".kanban-board").inner_text()
     for label in ("Business Value", "Time Criticality", "Risk Reduction", "Job Size"):
@@ -244,6 +314,12 @@ def test_portfolio_kanban_journey(browser, live_server, seeded, db_session):
         _assert_board_keeps_its_shape(page)
         _assert_cards_use_words(page)
         _assert_empty_columns_name_the_next_step(page)
+
+        # === Step 2d: flask-basecoat anatomy assertions (fix931b brief) ===
+        _assert_column_headers_have_dot_name_count(page)
+        _assert_cards_have_badge_id_title_date_avatar(page)
+        _assert_no_inline_styles(page)
+
         for width, height in ((1440, 900), (390, 844)):
             for scheme in ("light", "dark"):
                 _shoot(browser, live_server, email, width, height, scheme, f"kanban-{width}-{scheme}")

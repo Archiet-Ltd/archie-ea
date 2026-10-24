@@ -82,10 +82,20 @@
                 <div class="kanban-column-header border rounded-lg p-3 mb-3 flex items-center justify-between gap-2"
                      {% if group %}data-stage-group="{{ group }}"{% endif %}
                      :class="wipAtLimit('{{ state }}') ? 'border-destructive bg-destructive/10' : 'border-border'">
-                    <div class="min-w-0">
-                        <h2 class="text-sm font-medium text-foreground truncate">{{ label }}</h2>
-                        <span class="text-xs text-muted-foreground"
-                              x-text="`${columnCount('{{ state }}')} epic${columnCount('{{ state }}') !== 1 ? 's' : ''}`"></span>
+                    <div class="flex items-start gap-2 min-w-0">
+                        {% if group %}
+                        <span class="shrink-0 h-2 w-2 rounded-full mt-1.5
+                            {% if group == 'discovery' %}bg-info
+                            {% elif group == 'execution' %}bg-success
+                            {% elif group == 'done' %}bg-muted-foreground
+                            {% endif %}"
+                            aria-hidden="true"></span>
+                        {% endif %}
+                        <div class="min-w-0">
+                            <h2 class="text-sm font-medium text-foreground truncate">{{ label }}</h2>
+                            <span class="text-xs text-muted-foreground"
+                                  x-text="`${columnCount('{{ state }}')} epic${columnCount('{{ state }}') !== 1 ? 's' : ''}`"></span>
+                        </div>
                     </div>
                     {% if show_wip %}
                     <template x-if="wipLimit('{{ state }}') > 0">
