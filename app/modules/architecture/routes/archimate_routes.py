@@ -1257,7 +1257,15 @@ def composer_page():
         initial_viewpoint=viewpoint,
         initial_layer=initial_layer,
         focus=focus,
+        workspace_is_empty=_composer_workspace_is_empty() if focus is None else False,
     )
+
+
+def _composer_workspace_is_empty():
+    """True when the organisation has nothing modelled, ``None`` when that
+    cannot be read (an unreadable count is never shown as an empty workspace)."""
+    from app.modules.intelligence.routes.ui import _workspace_is_empty  # noqa: PLC0415
+    return _workspace_is_empty()
 
 
 @archimate_bp.route("/api/elements/materialize", methods=["POST"])

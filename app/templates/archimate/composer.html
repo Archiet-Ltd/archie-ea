@@ -1,4 +1,5 @@
 {% extends "layouts/composer_base.html" %}
+{% from 'components/empty_state.html' import empty_state %}
 {% block title %}Architecture Composer{% endblock %}
 
 {% block breadcrumb %}
@@ -866,6 +867,12 @@ nav[aria-label="Composer toolbar"] { margin-bottom: 0 !important; }
                 <div x-show="!viewpointLoading && elementCount === 0 && (!graph || graph.getElements().length === 0)" x-cloak
                      class="absolute inset-0 flex items-start justify-center p-8 pt-12 z-10 pointer-events-none overflow-y-auto">
                     <div class="flex flex-col items-center gap-6 max-w-2xl w-full pointer-events-auto">
+                        {% if workspace_is_empty is sameas true and not focus %}
+                        {# Nothing is modelled in this organisation: say so and offer the way in #}
+                        <div class="w-full rounded-lg border border-border bg-card" data-testid="composer-empty-workspace">
+                            {{ empty_state(icon='layers', title='Nothing is modelled yet', description='Connect GitHub and your systems, and the elements they connect to, appear here to open and explore.', cta_text='Connect GitHub', cta_href=url_for('m365_connector.github_connect') if 'm365_connector.github_connect' in flask.current_app.view_functions else none) }}
+                        </div>
+                        {% endif %}
                         {# Hero #}
                         <div class="flex flex-col items-center gap-3 text-center">
                             <div class="size-14 rounded-lg bg-card border border-border flex items-center justify-center text-primary">
@@ -1522,6 +1529,39 @@ nav[aria-label="Composer toolbar"] { margin-bottom: 0 !important; }
                         x-text="focusView ? ('Unsaved view: ' + focusView.name + ', ' + _focusHopsText(focusView.depth)) : ''"></h3>
                     <p class="text-xs text-muted-foreground mb-1" id="composer-focus-empty-note" x-show="focusView && focusView.empty">No connections at this depth</p>
                     <p class="text-xs text-muted-foreground mb-2" id="composer-focus-derived-note" x-show="focusView && focusView.hasDerived">Worked-out connections are shown dashed and are not stored with a saved diagram.</p>
+                    <div class="mb-2" x-show="focusView && !focusView.empty">
+                        <button type="button" id="composer-focus-list-toggle" @click="focusView.listOpen = !focusView.listOpen"
+                                :aria-expanded="focusView && focusView.listOpen ? 'true' : 'false'" aria-controls="composer-focus-list"
+                                class="text-xs font-medium text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                x-text="focusView && focusView.listOpen ? 'Hide the connections as a list' : ('Show the connections as a list (' + (focusView ? focusView.rows.length : 0) + ')')"></button>
+                        <div id="composer-focus-list" x-show="focusView && focusView.listOpen" x-cloak class="mt-2 max-h-64 overflow-auto rounded-md border border-border">
+                            <table class="dense-table w-full text-left text-xs">
+                                <caption class="sr-only">Connections of the chosen element</caption>
+                                <thead class="bg-muted/50 text-muted-foreground">
+                                    <tr>
+                                        <th scope="col" class="px-2 py-1 font-medium">From</th>
+                                        <th scope="col" class="px-2 py-1 font-medium">Relationship</th>
+                                        <th scope="col" class="px-2 py-1 font-medium">To</th>
+                                        <th scope="col" class="px-2 py-1 font-medium">Kind</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <template x-for="row in (focusView ? focusView.rows : [])" :key="row.key">
+                                        <tr class="border-t border-border" data-focus-row>
+                                            <td class="px-2 py-1 text-foreground" x-text="row.from || 'Unnamed element'"></td>
+                                            <td class="px-2 py-1 text-foreground" x-text="row.relation"></td>
+                                            <td class="px-2 py-1">
+                                                <button type="button" @click="openFocusConnection(row.elementId)"
+                                                        class="text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                                        x-text="row.name || 'Unnamed element'"></button>
+                                            </td>
+                                            <td class="px-2 py-1 text-foreground" x-text="row.kind"></td>
+                                        </tr>
+                                    </template>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
                     <div class="flex gap-2">
                         <button type="button" id="composer-focus-save" @click="saveFocusView()"
                                 :disabled="focusView && focusView.saving"

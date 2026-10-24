@@ -73,7 +73,7 @@ PLANS: Tuple[Plan, ...] = (
     Plan(
         key="free",
         name="Community",
-        summary="One organisation, three people. Every question, the Business Model Canvas, the twin map.",
+        summary="One organisation, three people. Every question, the Business Model Canvas, the ArchiMate Composer.",
         purchasable=False,
         user_limit=3,
         display_price_monthly=0,

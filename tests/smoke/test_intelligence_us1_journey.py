@@ -1,6 +1,6 @@
-"""A person asks a question, reads the answer, asks why, and sees the map: in a real browser.
+"""A person asks a question, reads the answer, asks why, and opens the element in the Composer: in a real browser.
 
-This drives the Ask page, the provenance drawer and the Twin map exactly as a
+This drives the Ask page, the provenance drawer and the hand-over to the Composer exactly as a
 person does, against a tenant that holds a small chain of connected things:
 
     Service --serves--> Gateway --serves--> Ops Team
@@ -169,19 +169,6 @@ def _open_question(page):
     expect(page.locator("#ask-picker-input")).to_be_focused()
 
 
-def _open_twin_map(page, base, element_id=None):
-    url = base + "/intelligence/twin-map" + ("?element=%s" % element_id if element_id else "")
-    page.goto(url, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
-    _ready(page, "twinMapSurface")
-
-
-def _wait_for_map(page):
-    """The map is drawn: its connections exist (a perfectly vertical line has no width, so
-    it is attached rather than "visible" to the browser) and its elements can be seen."""
-    page.wait_for_selector("svg .intel-edge", state="attached")
-    page.wait_for_selector("[data-graph-nodes] button", state="visible")
-
-
 def _settled(page, selector):
     """The element has slid fully into the window: its right edge is inside the viewport."""
     page.wait_for_function(
@@ -264,8 +251,7 @@ def test_a_first_time_user_gets_an_answer_from_a_typed_noun_and_can_ask_why(
     Open Ask from the sidebar, open the question, type a noun, choose a match,
     read the rows (an owner where there is one, "Not recorded" where there is not),
     open the drawer from a connection nobody drew, read the sentence the server
-    wrote, expand Full detail, follow View on twin map, move the hop depth, turn
-    the worked-out connections off and on, and see the derived edge dashed.
+    wrote, expand Full detail, follow Open in the Composer and see the element drawn with what it connects to.
     """
     _login(page, live_server, seeded["emails"][persona])
     _ask_about(page, live_server, graph)
@@ -317,60 +303,14 @@ def test_a_first_time_user_gets_an_answer_from_a_typed_noun_and_can_ask_why(
     for name in (names["service"], names["gateway"], names["ops"]):
         assert name in text  # the chain, as names
 
-    # Close, then follow View on twin map from a row.
+    # Close, then open the element in the Composer from a row.
     page.keyboard.press("Escape")
     dialog.wait_for(state="hidden")
-    _row_for(page, names["gateway"], "explicit").get_by_role("link", name="View on twin map").click()
-    page.wait_for_url(re.compile(r"/intelligence/twin-map\?element=%s$" % graph["gateway"]))
-    _ready(page, "twinMapSurface")
-    _wait_for_map(page)
-    assert page.locator("[data-map-row]").count() >= 1
-
-    # The map centred on the Service, then hop depth and the worked-out toggle.
-    _open_twin_map(page, live_server, graph["service"])
-    _wait_for_map(page)
-    assert page.locator("svg path[data-kind=derived]").count() == 1
-    assert page.locator("svg path[data-kind=explicit]").count() == 3
-    assert page.locator("[data-map-row]").count() == 4
-
-    slider = page.locator("#twin-hop-depth")
-    slider.focus()
-    with page.expect_request(lambda r: "max_depth=1" in r.url and "/impact/" in r.url):
-        page.keyboard.press("Home")
-    page.wait_for_function("() => document.querySelectorAll('[data-map-row]').length === 2")
-    assert page.locator("svg path[data-kind=derived]").count() == 0
-    with page.expect_request(lambda r: "max_depth=5" in r.url and "/impact/" in r.url):
-        page.keyboard.press("End")
-    page.wait_for_function("() => document.querySelectorAll('[data-map-row]').length === 4")
-
-    toggle_box = page.locator("#twin-show-derived")
-    with page.expect_request(lambda r: "include_derived=false" in r.url and "/impact/" in r.url):
-        toggle_box.uncheck()
-    page.wait_for_function("() => document.querySelectorAll('[data-map-row]').length === 3")
-    assert page.locator("svg path[data-kind=derived]").count() == 0
-    with page.expect_request(lambda r: "include_derived=true" in r.url and "/impact/" in r.url):
-        toggle_box.check()
-    page.wait_for_selector("svg path[data-kind=derived]")
-
-
-def test_the_derived_edge_is_dashed_and_badged_and_explicit_edges_are_solid(
-    page, live_server, seeded, graph
-):
-    """Derived-versus-explicit survives greyscale: it rides the stroke pattern and a
-    written badge, read off the rendered SVG."""
-    _login(page, live_server, seeded["emails"]["solution_architect"])
-    _open_twin_map(page, live_server, graph["service"])
-    page.wait_for_selector("svg path[data-kind=derived]")
-    derived = page.locator("svg path[data-kind=derived]")
-    assert derived.get_attribute("stroke-dasharray") in ("5,5", "5, 5")
-    solid = page.locator("svg path[data-kind=explicit]")
-    for index in range(solid.count()):
-        assert solid.nth(index).get_attribute("stroke-dasharray") is None
-    badges = page.locator("svg g.intel-badge")
-    assert badges.count() == 1
-    assert badges.locator("text").text_content() == "Worked out"
-    # No colour of its own: every fill and stroke comes from a token class.
-    assert page.locator("svg [style*='#'], svg [fill^='#'], svg [stroke^='#']").count() == 0
+    _row_for(page, names["gateway"], "explicit").get_by_role("link", name="Open in the Composer").click()
+    page.wait_for_url(re.compile(r"/archimate/composer\?element=%s$" % graph["gateway"]))
+    page.wait_for_function(
+        "() => { const a = Alpine.$data(document.querySelector('[x-data^=\"composerApp\"]'));"
+        " return !!a.focusView && a.graph.getElements().length >= 2; }")
 
 
 # --- keyboard and focus helpers ---------------------------------------------
@@ -624,36 +564,10 @@ def test_the_whole_journey_by_keyboard_alone(page, live_server, seeded, graph):
     page.wait_for_function("() => document.activeElement === window.__opener")
     _assert_focus_is_visible(_focus(page), "the opener after closing the drawer")
 
-    # On to the Twin map through the row's link.
-    _tab_until(page, lambda s: s["text"] == "View on twin map", "View on twin map")
+    # On to the Composer through the row's link.
+    _tab_until(page, lambda s: s["text"] == "Open in the Composer", "Open in the Composer")
     page.keyboard.press("Enter")
-    page.wait_for_url(re.compile(r"/intelligence/twin-map\?element=\d+$"))
-    _ready(page, "twinMapSurface")
-    _wait_for_map(page)
-
-    # Hop depth: arrows, Home and End, no pointer.
-    _tab_until(page, lambda s: s["id"] == "twin-hop-depth", "the hop depth control")
-    with page.expect_request(lambda r: "max_depth=1" in r.url and "/impact/" in r.url):
-        page.keyboard.press("Home")
-    assert page.locator("#twin-hop-depth").input_value() == "1"
-    page.keyboard.press("ArrowRight")
-    assert page.locator("#twin-hop-depth").input_value() == "2"
-    with page.expect_request(lambda r: "max_depth=5" in r.url and "/impact/" in r.url):
-        page.keyboard.press("End")
-    assert page.locator("#twin-hop-depth").input_value() == "5"
-
-    # The worked-out toggle is a checkbox: Space flips it and re-asks.
-    _tab_until(page, lambda s: s["id"] == "twin-show-derived", "the worked-out toggle")
-    with page.expect_request(lambda r: "include_derived=false" in r.url and "/impact/" in r.url):
-        page.keyboard.press("Space")
-    with page.expect_request(lambda r: "include_derived=true" in r.url and "/impact/" in r.url):
-        page.keyboard.press("Space")
-
-    # A map element is reachable and selectable, and so is the table.
-    _tab_until(page, lambda s: bool(s["node"]), "a map element")
-    page.keyboard.press("Enter")
-    assert page.locator("button[data-node][aria-pressed=true]").count() == 1
-    _tab_until(page, lambda s: s["inTable"], "the map table")
+    page.wait_for_url(re.compile(r"/archimate/composer\?element=\d+$"))
     assert page.evaluate("JSON.parse(sessionStorage.getItem('__pointer') || '[]')") == [], (
         "a pointer event fired during a keyboard-only journey")
 
@@ -683,7 +597,7 @@ def test_every_control_is_at_least_24_by_24_css_pixels(page, live_server, seeded
     row = _row_for(page, graph["names"]["gateway"], "explicit")
     measurements["Why? (Ask row)"] = _measure(row.get_by_role("button", name="Why?"))
     measurements["Full detail (Ask row)"] = _measure(row.locator("[data-full-detail-toggle]"))
-    measurements["View on twin map"] = _measure(row.get_by_role("link", name="View on twin map"))
+    measurements["Open in the Composer"] = _measure(row.get_by_role("link", name="Open in the Composer"))
     row.get_by_role("button", name="Why?").click()
     dialog = page.locator("#drawer-provenance [role=dialog]")
     dialog.wait_for(state="visible")
@@ -691,18 +605,6 @@ def test_every_control_is_at_least_24_by_24_css_pixels(page, live_server, seeded
     measurements["Full detail (drawer)"] = _measure(dialog.locator("[data-full-detail-toggle]"))
     page.keyboard.press("Escape")
 
-    _open_twin_map(page, live_server, graph["service"])
-    _wait_for_map(page)
-    measurements["Hop depth slider"] = _measure(page.locator("#twin-hop-depth"))
-    measurements["Worked-out toggle"] = _measure(page.locator("#twin-show-derived"))
-    measurements["Selected element (rail)"] = _measure(page.locator("#twin-rail-toggle"))
-    nodes = page.locator("[data-graph-nodes] button")
-    for index in range(nodes.count()):
-        measurements["Map element %d" % (index + 1)] = _measure(nodes.nth(index))
-    first = page.locator("[data-map-row]").first
-    measurements["Why? (table row)"] = _measure(first.get_by_role("button", name="Why?"))
-    measurements["Centre on this"] = _measure(first.get_by_role("button", name="Centre on this"))
-    measurements["Full detail (rail)"] = _measure(page.locator("#twin-rail [data-full-detail-toggle]"))
     _record(measurements)
 
     small = {name: m for name, m in measurements.items()
@@ -711,42 +613,6 @@ def test_every_control_is_at_least_24_by_24_css_pixels(page, live_server, seeded
 
 
 # --- the slider needs no dragging ----------------------------------
-
-
-def test_the_hop_depth_slider_works_without_dragging(page, live_server, seeded, graph):
-    """A native range input: keys and a single click set it, it has a name, and the new
-    value is announced politely."""
-    _login(page, live_server, seeded["emails"]["solution_architect"])
-    _open_twin_map(page, live_server, graph["service"])
-    _wait_for_map(page)
-    slider = page.get_by_role("slider", name="Hop depth")
-    assert slider.count() == 1
-    assert page.locator("#twin-hop-depth").evaluate("el => el.tagName + el.type") == "INPUTrange"
-    live = page.locator("[role=status][aria-live=polite]", has_text=re.compile(r"^Hop depth: \d$"))
-
-    slider.focus()
-    page.keyboard.press("Home")
-    assert slider.input_value() == "1"
-    page.keyboard.press("ArrowRight")
-    assert slider.input_value() == "2"
-    page.keyboard.press("ArrowUp")
-    assert slider.input_value() == "3"
-    page.keyboard.press("ArrowLeft")
-    assert slider.input_value() == "2"
-    page.keyboard.press("ArrowDown")
-    assert slider.input_value() == "1"
-    page.keyboard.press("End")
-    assert slider.input_value() == "5"
-    assert live.count() == 1
-    assert live.get_attribute("aria-atomic") == "true"
-    assert live.inner_text() == "Hop depth: 5"
-
-    # One click on the track, no drag: the value moves to where the click landed.
-    box = slider.bounding_box()
-    with page.expect_request(lambda r: "/impact/" in r.url and "max_depth=" in r.url):
-        page.mouse.click(box["x"] + box["width"] * 0.2, box["y"] + box["height"] / 2)
-    assert int(slider.input_value()) < 5
-    assert live.inner_text() == "Hop depth: %s" % slider.input_value()
 
 
 # --- focus is never obscured ----------------------------------------
@@ -765,60 +631,6 @@ def _uncovered(page, locator):
         }""",
         locator.element_handle(),
     )
-
-
-def test_focus_is_never_obscured_by_the_drawer_or_the_side_panel(
-    page, live_server, seeded, graph
-):
-    """With the drawer open, focus is inside it and uncovered. On the map, the last
-    element's focus ring is fully visible; closing the side panel from a map element
-    moves neither the focus nor the selection."""
-    _login(page, live_server, seeded["emails"]["solution_architect"])
-    _open_ask(page, live_server)
-    _open_question(page)
-    _type_and_wait(page, "ask", graph["noun"])
-    _pick_by_click(page, "ask", graph["names"]["service"])
-    page.wait_for_selector("[data-ask-row]")
-    _rows(page).first.get_by_role("button", name="Why?").click()
-    dialog = page.locator("#drawer-provenance [role=dialog]")
-    dialog.wait_for(state="visible")
-    page.wait_for_function("() => !!document.activeElement.closest('#drawer-provenance [role=dialog]')")
-    _settled(page, "#drawer-provenance [role=dialog]")
-    for _ in range(6):
-        state = _focus(page)
-        assert state["inDialog"], "focus left the open drawer: %r" % state
-        assert _uncovered(page, page.locator(":focus")) is True
-        page.keyboard.press("Tab")
-    page.keyboard.press("Escape")
-    dialog.wait_for(state="hidden")
-
-    _open_twin_map(page, live_server, graph["service"])
-    _wait_for_map(page)
-    expect(page.locator("#twin-rail")).to_be_visible()
-    canvas = _measure(page.locator("[data-twin-canvas]"))
-    assert canvas["width"] >= 600, "the map is narrower than 600 CSS pixels: %r" % canvas
-
-    page.locator("#twin-hop-depth").focus()
-    last = page.locator("[data-graph-nodes] button").last
-    last_id = last.get_attribute("data-node")
-    reached = _tab_until(page, lambda s: s["node"] == last_id, "the last map element")
-    assert reached["ring"] and reached["inViewport"]
-    assert _uncovered(page, last) is True
-
-    # Choose it, then close the side panel with Escape from that element.
-    page.keyboard.press("Enter")
-    expect(last).to_have_attribute("aria-pressed", "true")
-    page.keyboard.press("Escape")
-    expect(page.locator("#twin-rail")).to_be_hidden()
-    assert _focus(page)["node"] == last_id
-    expect(last).to_have_attribute("aria-pressed", "true")
-    assert page.locator("button[data-node][aria-pressed=true]").count() == 1
-
-    # And back again with the panel's own control: the selection is where it was.
-    page.locator("#twin-rail-toggle").focus()
-    page.keyboard.press("Enter")
-    expect(page.locator("#twin-rail")).to_be_visible()
-    expect(last).to_have_attribute("aria-pressed", "true")
 
 
 # --- the drawer is named, escapable, and gives focus back -------------
@@ -877,89 +689,6 @@ def _listed_edges(page):
         "[data-map-row]", "els => els.map(e => e.getAttribute('data-edge-row'))"))
 
 
-def test_the_map_table_lists_every_edge_the_graph_draws_and_no_others(
-    page, live_server, seeded, graph
-):
-    """The table is on the page with no toggle, is built from the same answer as the
-    picture, and moves with the hop depth and the worked-out toggle."""
-    _login(page, live_server, seeded["emails"]["solution_architect"])
-    _open_twin_map(page, live_server, graph["service"])
-    _wait_for_map(page)
-    names = graph["names"]
-
-    # No control anywhere on the page swaps the picture for the table.
-    assert page.get_by_role("button", name=re.compile(r"table|list|text", re.I)).count() == 0
-    table = page.locator("table[data-map-table]")
-    expect(table).to_be_visible()
-    payload = _impact_api(page, live_server, graph["service"])
-    assert len(payload["rows"]) == 4
-    assert page.locator("[data-map-row]").count() == 4
-    assert _drawn_edges(page) == _listed_edges(page)
-    assert len(_drawn_edges(page)) == 4
-
-    caption = table.locator("caption").inner_text()
-    assert caption == "Connections for %s: 4 things, 4 connections" % names["service"]
-    graph_label = page.locator("[data-graph-svg]")
-    assert graph_label.get_attribute("role") == "img"
-    assert names["service"] in graph_label.get_attribute("aria-label")
-    assert "4 things, 4 connections" in graph_label.get_attribute("aria-label")
-
-    kinds = page.eval_on_selector_all(
-        "[data-map-row]", "els => els.map(e => [e.getAttribute('data-kind'), e.children[3].innerText.trim()])")
-    assert sorted(kinds) == [["derived", "Worked out"], ["explicit", "Explicit"],
-                             ["explicit", "Explicit"], ["explicit", "Explicit"]]
-    every_target = {names["gateway"], names["portal"], names["ops"]}
-    targets = page.eval_on_selector_all(
-        "[data-map-row]", "els => els.map(e => e.children[2].innerText.trim())")
-    assert set(targets) == every_target
-    sources = page.eval_on_selector_all(
-        "[data-map-row]", "els => els.map(e => e.children[0].innerText.trim())")
-    assert set(sources) <= {names["service"], names["gateway"]}
-    # The centre is named in the caption; every other element is in a Source or Target cell.
-    assert (set(sources) | set(targets)) | {names["service"]} == set(names.values())
-
-    # Hop depth changes the picture and the table together.
-    page.locator("#twin-hop-depth").focus()
-    with page.expect_request(lambda r: "max_depth=1" in r.url and "/impact/" in r.url):
-        page.keyboard.press("Home")
-    page.wait_for_function("() => document.querySelectorAll('[data-map-row]').length === 2")
-    assert _drawn_edges(page) == _listed_edges(page) and len(_drawn_edges(page)) == 2
-    assert page.locator("table[data-map-table] caption").inner_text() == (
-        "Connections for %s: 3 things, 2 connections" % names["service"])
-    with page.expect_request(lambda r: "max_depth=3" in r.url and "/impact/" in r.url):
-        page.keyboard.press("ArrowRight")
-        page.keyboard.press("ArrowRight")
-    page.wait_for_function("() => document.querySelectorAll('[data-map-row]').length === 4")
-
-    # The worked-out toggle does the same.
-    with page.expect_request(lambda r: "include_derived=false" in r.url and "/impact/" in r.url):
-        page.locator("#twin-show-derived").uncheck()
-    page.wait_for_function("() => document.querySelectorAll('[data-map-row]').length === 3")
-    assert _drawn_edges(page) == _listed_edges(page) and len(_drawn_edges(page)) == 3
-    assert page.locator("[data-map-row][data-kind=derived]").count() == 0
-    page.locator("#twin-show-derived").check()
-    page.wait_for_function("() => document.querySelectorAll('[data-map-row]').length === 4")
-
-    # Each row's Why? opens the same drawer.
-    derived_row = page.locator("[data-map-row][data-kind=derived]")
-    derived_row.get_by_role("button", name="Why?").click()
-    dialog = page.locator("#drawer-provenance [role=dialog]")
-    dialog.wait_for(state="visible")
-    assert page.locator("#drawer-provenance [data-plain-terms]").inner_text() == next(
-        row["relation"]["plain_terms"] for row in payload["rows"] if row["relation"]["kind"] == "derived")
-    page.keyboard.press("Escape")
-    dialog.wait_for(state="hidden")
-
-    # A row can re-centre the map on its target.
-    page.locator("[data-map-row][data-kind=explicit]").filter(
-        has=page.get_by_role("cell", name=names["gateway"], exact=True).nth(0)
-    ).get_by_role("button", name="Centre on this").first.click()
-    page.wait_for_function(
-        "(name) => document.querySelector('table[data-map-table] caption')"
-        ".textContent.startsWith('Connections for ' + name)",
-        arg=names["gateway"])
-
-
 # --- technical detail lives only inside Full detail -------------------
 
 LEVEL_THREE = """
@@ -1003,19 +732,11 @@ def test_technical_detail_appears_only_inside_full_detail(page, live_server, see
     assert re.search(r"\d{4}-\d{2}-\d{2}T", inside), "the time it was worked out is missing"
     assert page.evaluate(LEVEL_THREE, technical + ["1.0"]) == []
 
-    # Same on the map, with the drawer open as well.
-    _open_twin_map(page, live_server, graph["service"])
-    _wait_for_map(page)
-    assert page.evaluate(LEVEL_THREE, technical) == []
-    page.locator("[data-map-row][data-kind=derived]").get_by_role("button", name="Why?").click()
-    page.locator("#drawer-provenance [role=dialog]").wait_for(state="visible")
-    assert page.evaluate(LEVEL_THREE, technical) == []
-
 
 # --- the empty workspace ---------------------------------------------
 
 
-@pytest.mark.parametrize("path", ["/intelligence/ask", "/intelligence/twin-map"])
+@pytest.mark.parametrize("path", ["/intelligence/ask"])
 def test_an_empty_workspace_says_so_and_leads_to_setup(path, page, live_server, empty_tenant):
     """Nothing modelled: the page shows the setup state in place of the picker, its
     button lands on the guided setup, and nothing mentions connectors or onboarding."""
@@ -1036,7 +757,7 @@ def test_an_empty_workspace_says_so_and_leads_to_setup(path, page, live_server, 
     page.wait_for_selector("text=Set up your workspace")
 
 
-@pytest.mark.parametrize("path", ["/intelligence/ask", "/intelligence/twin-map"])
+@pytest.mark.parametrize("path", ["/intelligence/ask"])
 def test_a_populated_workspace_shows_the_picker_and_no_setup_state(
     path, page, live_server, seeded, graph
 ):
@@ -1045,10 +766,7 @@ def test_a_populated_workspace_shows_the_picker_and_no_setup_state(
     main = page.locator("main")
     assert "Nothing is modelled yet" not in main.inner_text()
     assert main.get_by_text("Set up your workspace").count() == 0
-    if path.endswith("/ask"):
-        page.wait_for_selector("#ask-question-impact")
-    else:
-        page.wait_for_selector("#twin-picker-input")
+    page.wait_for_selector("#ask-question-impact")
 
 
 # --- absence, the not-worked-out state, busy and error states -
@@ -1373,96 +1091,6 @@ def test_ask_still_shows_a_stale_connection_marked_with_a_notice_and_an_action(
     page.wait_for_function("() => document.activeElement.id === 'ask-results-heading'")
 
 
-def test_twin_map_still_draws_a_stale_connection_marked_and_the_table_agrees(
-    page, live_server, stale_tenant
-):
-    """On the map the stale connection is drawn dashed with a badge that says it may be
-    out of date, listed in the table as "Worked out, may be out of date", and the two
-    agree edge for edge; the notice and the action are there."""
-    names = stale_tenant["names"]
-    _login(page, live_server, stale_tenant["email"])
-    _dismiss_first_run(page)
-    _open_twin_map(page, live_server, stale_tenant["service"])
-    _wait_for_map(page)
-
-    assert _drawn_edges(page) == _listed_edges(page)
-    assert len(_drawn_edges(page)) == 4
-    assert page.locator("svg path[data-kind=derived]").count() == 1
-    assert page.locator("svg path[data-kind=derived]").get_attribute("stroke-dasharray") in ("5,5", "5, 5")
-    badge = page.locator("svg g.intel-badge")
-    assert badge.count() == 1
-    assert badge.locator("text").text_content() == "Worked out, may be out of date"
-    assert badge.locator("[aria-label='Last worked out']").count() == 1
-
-    kinds = page.eval_on_selector_all(
-        "[data-map-row]", "els => els.map(e => [e.getAttribute('data-kind'), e.children[3].innerText.trim()])")
-    assert sorted(kinds) == [["derived", "Worked out, may be out of date"], ["explicit", "Explicit"],
-                             ["explicit", "Explicit"], ["explicit", "Explicit"]]
-    expect(page.locator("table[data-map-table] caption")).to_have_text(
-        "Connections for %s: 4 things, 4 connections" % names["service"])
-    expect(page.locator("#twin-picker-input").locator("xpath=ancestor::section//*[@role='status']")).to_have_text(
-        "4 connections for %s" % names["service"])
-    derived_row = page.locator("[data-map-row][data-kind=derived]")
-    expect(derived_row.get_by_label("Last worked out")).to_have_count(1)
-
-    notice = page.locator("[data-stale-notice]")
-    expect(notice).to_be_visible()
-    expect(notice).to_contain_text("The connections we worked out may be out of date.")
-    expect(notice.get_by_role("button", name="Work them out now")).to_be_visible()
-
-    why = derived_row.get_by_role("button", name="Why?")
-    why.click()
-    dialog = page.get_by_role(
-        "dialog", name=re.compile("^" + re.escape(names["ops"]) + r"\s+Worked out$"))
-    dialog.wait_for(state="visible")
-    assert STALE_LINE.search(dialog.inner_text())
-    page.keyboard.press("Escape")
-    dialog.wait_for(state="hidden")
-    # Closing hands focus back to the control that opened it. That can land after
-    # the dialog is hidden, so wait for it before moving focus on; otherwise Space
-    # below reaches "Why?" again and reopens the drawer.
-    expect(why).to_be_focused()
-
-    # With worked-out connections switched off the page asks without them, the table and
-    # the map still agree, and the notice about the model stays.
-    page.locator("#twin-show-derived").focus()
-    expect(page.locator("#twin-show-derived")).to_be_focused()
-    with page.expect_request(lambda r: "include_derived=false" in r.url and "/impact/" in r.url):
-        page.keyboard.press("Space")
-    page.wait_for_function("() => document.querySelectorAll('[data-map-row]').length === 3")
-    assert _drawn_edges(page) == _listed_edges(page) and len(_drawn_edges(page)) == 3
-    expect(page.locator("[data-stale-notice]")).to_be_visible()
-
-    # Recalculating from the map brings the current connection back and clears the notice.
-    page.locator("#twin-show-derived").check()
-    page.wait_for_function("() => document.querySelectorAll('[data-map-row]').length === 4")
-    before = page.locator("[data-map-row][data-kind=derived]").get_attribute("data-edge-row")
-    with page.expect_request(
-        lambda r: r.method == "POST" and r.url.endswith("/api/v1/intelligence/derivation/recompute")
-    ):
-        page.locator("[data-stale-notice]").get_by_role("button", name="Work them out now").click()
-    expect(page.locator("[data-stale-notice]")).to_be_hidden()
-    # The notice hides as soon as the map starts asking again, before the new answer
-    # arrives, and the row count is 4 both before and after. Recalculating gives the
-    # worked-out connection a new id, so wait for that recomputed answer to be the one
-    # both the table and the map show, read in one pass so no update can land between
-    # the two reads, before comparing them.
-    page.wait_for_function(
-        "(before) => { const drawn = [...document.querySelectorAll('svg g.intel-edge')]"
-        ".map(e => e.getAttribute('data-edge')).sort().join();"
-        " const listed = [...document.querySelectorAll('[data-map-row]')]"
-        ".map(e => e.getAttribute('data-edge-row')).sort().join();"
-        " const derived = document.querySelector('[data-map-row][data-kind=derived]');"
-        " return !!derived && derived.getAttribute('data-edge-row') !== before && drawn === listed; }",
-        arg=before,
-    )
-    assert _drawn_edges(page) == _listed_edges(page)
-    assert before not in _listed_edges(page)
-    expect(page.locator("[data-map-row][data-kind=derived] [aria-label='Last worked out']")).to_be_hidden()
-    expect(page.locator("svg g.intel-badge text")).to_have_text("Worked out")
-    page.wait_for_function("() => document.activeElement.id === 'twin-map-heading'")
-
-
 def _without_worked_out(route):
     """Answer as the endpoint does when out-of-date connections are not asked for: the
     real answer, with its worked-out rows taken out and its state left as stale."""
@@ -1481,7 +1109,7 @@ def test_an_answer_that_leaves_worked_out_connections_out_says_so_in_its_counts(
 ):
     """Supplement, for an answer the page's own request no longer produces: if an answer
     is stale and lists no worked-out connection, the notice says they are not shown and
-    neither the count on Ask nor the caption on the map pretends the list is complete."""
+    the count on Ask does not pretend the list is complete."""
     names = stale_tenant["names"]
     _login(page, live_server, stale_tenant["email"])
     _dismiss_first_run(page)
@@ -1498,12 +1126,6 @@ def test_an_answer_that_leaves_worked_out_connections_out_says_so_in_its_counts(
     expect(notice.get_by_role("button", name="Work them out now")).to_be_visible()
     expect(page.locator("#ask-question-panel [role=status]")).to_have_text(
         "3 connections for %s, worked-out connections not shown" % names["service"])
-
-    _open_twin_map(page, live_server, stale_tenant["service"])
-    _wait_for_map(page)
-    expect(page.locator("table[data-map-table] caption")).to_have_text(
-        "Connections for %s: 4 things, 3 connections, worked-out connections not shown" % names["service"])
-    expect(page.locator("[data-stale-notice]")).to_contain_text("are not shown because they may be out of date")
 
 
 # --- what the picker's status region says --------------------------------------
@@ -1536,16 +1158,3 @@ def test_the_status_region_counts_results_after_typing_and_connections_after_cho
     expect(status).to_have_text("2 results for %s" % bare_tenant["noun"])
 
 
-def test_the_map_panel_control_is_named_for_the_panel_not_as_a_second_disclosure(
-    page, live_server, seeded, graph
-):
-    """The control that collapses the side panel carries the panel's own name, so it is
-    not read as a second "show more" next to "Full detail"."""
-    _login(page, live_server, seeded["emails"]["solution_architect"])
-    _open_twin_map(page, live_server, graph["service"])
-    _wait_for_map(page)
-    toggle = page.get_by_role("button", name="Selected element")
-    expect(toggle).to_have_count(1)
-    assert toggle.get_attribute("id") == "twin-rail-toggle"
-    assert page.get_by_role("button", name="Details").count() == 0
-    expect(page.locator("#twin-rail")).to_have_attribute("aria-label", "Selected element")
