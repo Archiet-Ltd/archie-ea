@@ -3,7 +3,7 @@
    white RGB triplet; renders identically in the only reachable theme (light: --background is 0 0% 100%,
    same white the old fallback always produced since --background-rgb was never actually declared anywhere);
    no dark-mode toggle exists yet to reach the branch where the two differ #}
-{% macro dialog(trigger_text='Open', title='', description='', trigger_label=none) %}
+{% macro dialog(trigger_text='Open', title='', description='', trigger_label=none, start_hidden=true) %}
     <div x-data="{ dialogOpen: false }">
         <button type="button" @click="dialogOpen = true" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center" aria-label="{{ trigger_label or 'Open' }}">
             {{ trigger_text }}
@@ -13,11 +13,11 @@
             x-show="dialogOpen" x-trap.inert="dialogOpen" x-cloak role="dialog" aria-modal="true"
             @keydown.escape.window="dialogOpen = false"
             x-transition.opacity
-            class="modal-root hidden" style="position:fixed;inset:0;z-index:50;background:rgb(15 23 42 / 0.5);" >  <!-- inline-style-ok -->
+            class="modal-root{{ ' hidden' if start_hidden }}" style="position:fixed;inset:0;z-index:50;background:rgb(15 23 42 / 0.5);" >  <!-- inline-style-ok -->
             <div
                 @click.away="dialogOpen = false"
                 x-transition
-                class="fixed left-[50%] top-[50%] z-50 grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 rounded-lg border border-border bg-card p-6 hidden" >
+                class="fixed left-[50%] top-[50%] z-50 grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 rounded-lg border border-border bg-card p-6{{ ' hidden' if start_hidden }}" >
                 <div class="flex flex-col space-y-1.5 text-left">
                     <h2 class="text-base font-semibold text-foreground">{{ title }}</h2>
                     {% if description %}
