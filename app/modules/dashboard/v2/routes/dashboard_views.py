@@ -13,6 +13,7 @@ The dashboard_api blueprint (9 routes) is nested inside this blueprint.
 URL prefix /dashboard applied via register() in v2/__init__.py — route decorators must not repeat it.
 """
 
+import datetime as _dt
 import logging
 
 from flask import Blueprint, current_app, g, jsonify, redirect, render_template, request, session, url_for
@@ -733,6 +734,7 @@ def overview():
                     "description": "See a working answer in under a minute, without connecting anything yet.",
                     "href": safe_url_for_with_fallback("architect_ui.load_sample_company", FALLBACK_HREF),
                     "cta": "Load sample",
+                    "method": "post",
                     "done": False,
                 }
             else:
@@ -831,6 +833,7 @@ def overview():
         capability_mapping_count=capability_mapping_count,
         company_kind=company_kind,
         priority_actions=priority_actions,
+        as_of_date=_dt.datetime.utcnow().strftime("%d %b %Y"),
     )
 
 

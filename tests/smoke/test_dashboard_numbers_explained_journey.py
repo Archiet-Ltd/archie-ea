@@ -17,27 +17,36 @@ from datetime import datetime, timedelta
 import pytest
 from playwright.sync_api import Page, expect
 
+from tests.smoke.conftest import PASSWORD
 
-def test_dashboard_numbers_explained_journey(
-    page: Page,
-    browser_name: str,
-    live_server_url: str,
-    seeded,
-):
+
+PAGE_TIMEOUT = 30000
+
+
+def _login(page, base, email):
+    page.goto(base + "/account/login", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    page.fill("#email", email)
+    page.fill("#password", PASSWORD)
+    page.locator("#submit").click()
+    page.wait_for_url(lambda url: "/account/login" not in url, timeout=PAGE_TIMEOUT)
+
+
+@pytest.fixture
+def page(browser, live_server, seeded):
+    context = browser.new_context(ignore_https_errors=True, viewport={"width": 1440, "height": 900})
+    context.add_init_script("localStorage.setItem('archie_onboarding_ts', '1')")
+    page = context.new_page()
+    page.set_default_timeout(PAGE_TIMEOUT)
+    _login(page, live_server, seeded["emails"]["cto"])
+    yield page
+    context.close()
+
+
+@pytest.mark.smoke
+def test_dashboard_numbers_explained_journey(page: Page, live_server: str):
     """Council-07: Dashboard numbers carry source, as-of date, link to list; health parts
     explain unmeasured components; priority actions present; workspace links removed."""
-
-    # Login as CTO (seeded organisation with linked data: applications with owners,
-    # no risks, no ARB reviews)
-    from tests.smoke.conftest import PASSWORD
-
-    email = seeded["emails"]["cto"]
-    page.goto(f"{live_server_url}/auth/login")
-    page.fill('input[name="email"]', email)
-    page.fill('input[name="password"]', PASSWORD)
-    page.click('button[type="submit"]')
-
-    # Navigate to dashboard
+    live_server_url = live_server
     page.goto(f"{live_server_url}/dashboard/overview")
     expect(page).to_have_url(re.compile(r"/dashboard/overview"))
 
@@ -132,10 +141,10 @@ def test_dashboard_numbers_explained_journey(
         expect(disclosure).to_be_visible()
 
         # Should name the four parts
-        expect(disclosure.locator("text=Phase Maturity")).to_be_visible()
-        expect(disclosure.locator("text=Risk Posture")).to_be_visible()
-        expect(disclosure.locator("text=Capability Coverage")).to_be_visible()
-        expect(disclosure.locator("text=Governance")).to_be_visible()
+        assert "Phase Maturity".lower() in disclosure.inner_text().lower(), "Phase Maturity part is named"
+        assert "Risk Posture".lower() in disclosure.inner_text().lower(), "Risk Posture part is named"
+        assert "Capability Coverage".lower() in disclosure.inner_text().lower(), "Capability Coverage part is named"
+        assert "Governance".lower() in disclosure.inner_text().lower(), "Governance part is named"
 
         # In seeded org with no risks and no ARB reviews, these should show as unmeasured
         # with explanations
@@ -146,12 +155,13 @@ def test_dashboard_numbers_explained_journey(
 
     # 4. No "0.0%" and no bare "—" appear (without explanation)
     # We check architecture health section
+    page.locator('[data-testid="layer-tab-overview"]').click()
     arch_health = page.locator('[data-testid="architecture-health"]')
     expect(arch_health).to_be_visible()
     arch_health_text = arch_health.text_content()
     # Check that any "—" is accompanied by an explanation
     # and no "0.0%" is present
-    assert "0.0%" not in arch_health_text, "Should not show '0.0%' for unmeasured components"
+    assert not re.search(r"(?<![\d.])0\.0%", arch_health_text), "Should not show '0.0%' for unmeasured components"
 
     # 5. Priority actions list present
     # Note: Might be empty if no actions, but component should be present or gracefully absent
@@ -182,14 +192,14 @@ def test_dashboard_numbers_explained_journey(
     # Check sidebar has "my_work" zone links
     # Common links: My Tasks, My Reviews, etc.
     # At minimum, verify sidebar is present and has some navigation
-    sidebar = page.locator('[role="navigation"]').first
+    sidebar = page.get_by_role("navigation").first
     expect(sidebar).to_be_visible()
 
     # 8. Lens tabs are split into two groups
     # Check for "View as" label
-    expect(page.locator("text=View as")).to_be_visible()
-    # Check for "Layer" label
-    expect(page.locator("text=Layer")).to_be_visible()
+    expect(page.locator("text=View as").first).to_be_visible()
+    # Check for "Layer" label (appears in multiple places, check the first one)
+    expect(page.locator("label").filter(has_text="Layer")).to_be_visible()
 
     # Verify the three "View as" buttons
     expect(page.locator('[data-testid="layer-tab-overview"]')).to_be_visible()

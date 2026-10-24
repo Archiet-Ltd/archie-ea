@@ -1,5 +1,8 @@
 {% extends 'layouts/admin_base.html' %}
 {% from 'components/dense_table.html' import dense_table %}
+{% from 'components/button.html' import button %}
+{% from 'components/input.html' import input %}
+{% from 'components/dropdown_menu.html' import dropdown_menu %}
 {% from 'macros/page_shell.html' import page_shell, section_card %}
 {% from 'components/answer_cascade.html' import answer_cascade %}
 {% block title %}Dashboard{% endblock %}
@@ -58,12 +61,7 @@
             <span class="font-medium">Welcome to {{ config.APP_NAME }}</span>
             <span class="text-muted-foreground"> — <a href="/ai-chat" class="text-info hover:underline">ask the AI architect</a> anytime, no setup needed.</span>
         </p>
-        <button type="button"
-                @click="dismiss()"
-                class="shrink-0 text-muted-foreground hover:text-foreground transition-colors"
-                aria-label="Dismiss welcome message">
-            <i data-lucide="x" class="h-4 w-4" aria-hidden="true"></i>
-        </button>
+        {% call button(variant='ghost', size='icon', class='h-6 w-6 shrink-0', on_click='dismiss()', aria_label='Dismiss welcome message') %}<i data-lucide="x" class="h-4 w-4" aria-hidden="true"></i>{% endcall %}
     </div>
     {% endif %}
     {% if mode == 'guided' %}
@@ -80,59 +78,36 @@
         <div x-data="{
             kind: '{{ company_kind or 'startup' }}',
             saving: false,
-            async save(selectedKind) {
+            save(selectedKind) {
                 if (this.saving) return;
                 this.saving = true;
                 this.kind = selectedKind;
-                try {
-                    const response = await (window.Platform?.fetch || fetch)('/dashboard/api/company-kind', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ kind: selectedKind })
-                    });
+                (window.Platform?.fetch || fetch)('/dashboard/api/company-kind', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ kind: selectedKind })
+                }).then((response) => {
                     if (!response.ok) throw new Error('Failed to save');
-                } catch (err) {
-                    console.error('Failed to save company kind:', err);
-                } finally {
-                    this.saving = false;
-                }
+                }).catch(() => {
+                    window.Platform?.toast?.('Could not save the company kind. Try again.', 'error');
+                }).finally(() => { this.saving = false; });
             }
         }" class="rounded-lg border border-border bg-muted/30 px-4 py-3" data-testid="company-kind-selector">
             <h3 class="text-sm font-medium text-foreground mb-2">What kind of company are you?</h3>
             <div class="flex flex-wrap items-center gap-2">
-                <button type="button"
-                        @click="save('startup')"
-                        :disabled="saving"
-                        :class="kind === 'startup' ? 'bg-primary text-primary-foreground' : 'bg-background text-foreground hover:bg-accent'"
-                        class="h-8 rounded-md px-3 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50"
-                        data-testid="company-kind-startup">
+                {% call button(variant='ghost', size='sm', class='text-xs', on_click="save('startup')", testid='company-kind-startup', attrs_dict={':disabled': 'saving', ':class': "kind === 'startup' ? 'bg-primary text-primary-foreground' : 'bg-background text-foreground'"}) %}
                     Startup
                     <span class="ml-1.5 text-2xs opacity-75">— validating product-market fit</span>
-                </button>
-                <button type="button"
-                        @click="save('scaleup')"
-                        :disabled="saving"
-                        :class="kind === 'scaleup' ? 'bg-primary text-primary-foreground' : 'bg-background text-foreground hover:bg-accent'"
-                        class="h-8 rounded-md px-3 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50"
-                        data-testid="company-kind-scaleup">
+                {% endcall %}
+                {% call button(variant='ghost', size='sm', class='text-xs', on_click="save('scaleup')", testid='company-kind-scaleup', attrs_dict={':disabled': 'saving', ':class': "kind === 'scaleup' ? 'bg-primary text-primary-foreground' : 'bg-background text-foreground'"}) %}
                     Scale-up
                     <span class="ml-1.5 text-2xs opacity-75">— rapid growth and expansion</span>
-                </button>
-                <button type="button"
-                        @click="save('enterprise')"
-                        :disabled="saving"
-                        :class="kind === 'enterprise' ? 'bg-primary text-primary-foreground' : 'bg-background text-foreground hover:bg-accent'"
-                        class="h-8 rounded-md px-3 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50"
-                        data-testid="company-kind-enterprise">
+                {% endcall %}
+                {% call button(variant='ghost', size='sm', class='text-xs', on_click="save('enterprise')", testid='company-kind-enterprise', attrs_dict={':disabled': 'saving', ':class': "kind === 'enterprise' ? 'bg-primary text-primary-foreground' : 'bg-background text-foreground'"}) %}
                     Enterprise
                     <span class="ml-1.5 text-2xs opacity-75">— established organisation at scale</span>
-                </button>
-                <button type="button"
-                        @click="kind = 'startup'; /* Not now keeps startup as default */"
-                        class="h-8 rounded-md px-3 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                        data-testid="company-kind-not-now">
-                    Not now
-                </button>
+                {% endcall %}
+                {% call button(variant='ghost', size='sm', class='text-xs', on_click="kind = 'startup'", testid='company-kind-not-now') %}Not now{% endcall %}
             </div>
         </div>
         <ol class="space-y-3">
@@ -145,9 +120,16 @@
                     <p class="text-sm font-medium text-foreground">{{ step.title }}</p>
                     <p class="text-xs text-muted-foreground mt-0.5">{{ step.description }}</p>
                 </div>
+                {% if step.method == 'post' and not step.done %}
+                <form method="post" action="{{ step.href }}" class="shrink-0">
+                    {{ input(name='csrf_token', type='hidden', value=csrf_token(), class='hidden') }}
+                    {% call button(variant='link', size='sm', type='submit', class='h-auto gap-1 px-0 text-xs', testid='guided-step-action') %}{{ step.cta|default('Start') }} <i data-lucide="arrow-right" class="h-3 w-3" aria-hidden="true"></i>{% endcall %}
+                </form>
+                {% else %}
                 <a href="{{ step.href }}" class="shrink-0 inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline">
                     {{ 'Done' if step.done else (step.cta|default('Start')) }} <i data-lucide="arrow-right" class="h-3 w-3" aria-hidden="true"></i>
                 </a>
+                {% endif %}
             </li>
             {% endfor %}
         </ol>
@@ -159,7 +141,7 @@
        Council-07: each tile is clickable and links to the list it counts. Real zeros
        are explained with next steps; unmeasured values never show as "0.0%". #}
     {% from 'components/explained_value.html' import explained_value %}
-    {% set _now = now().strftime("%d %b %Y") %}
+    {% set _now = as_of_date %}
     <section aria-label="Key figures" class="grid grid-cols-2 gap-4 lg:grid-cols-4">
         {# Applications #}
         <a href="{{ url_for('unified_applications.application_list') if 'unified_applications.application_list' in flask.current_app.view_functions else '/applications/' }}"
@@ -201,12 +183,10 @@
             {% if health_score is not none %}
             <p class="mt-1 text-28 font-semibold leading-9 tabular-nums text-foreground" data-testid="health-score-value">{{ health_score_text }}</p>
             <p class="mt-1 text-xs text-muted-foreground">weighted composite, as of {{ _now }}</p>
-            <button type="button" @click="open = !open"
-                    class="mt-2 text-xs font-medium text-primary hover:underline"
-                    data-testid="health-score-disclosure-button">
+            {% call button(variant='link', size='sm', class='mt-2 h-auto px-0 text-xs', on_click='open = !open', testid='health-score-disclosure-button') %}
                 <span x-show="!open">How this is worked out</span>
                 <span x-show="open" x-cloak>Hide details</span>
-            </button>
+            {% endcall %}
             <div x-show="open" x-cloak class="mt-3 space-y-2 border-t border-border pt-3" data-testid="health-score-disclosure">
                 <p class="text-xs font-medium text-foreground">Weighted from:</p>
                 <ul class="space-y-1.5 text-xs text-muted-foreground">
@@ -249,13 +229,7 @@
             <label class="text-xs font-medium text-muted-foreground">View as</label>
             <div class="flex w-fit items-center gap-0.5 rounded-md bg-muted p-0.5">
                 {% for role_key, role_label in [('overview', 'Overview'), ('cto', 'CTO'), ('cfo', 'CFO')] %}
-                <button type="button" @click="activeRole = '{{ role_key }}'"
-                        data-testid="layer-tab-{{ role_key }}"
-                        :aria-pressed="activeRole === '{{ role_key }}' ? 'true' : 'false'"
-                        :class="activeRole === '{{ role_key }}' ? 'bg-background text-foreground' : 'text-muted-foreground hover:text-foreground'"
-                        class="h-7 rounded px-2.5 text-xs font-medium transition-colors">
-                    {{ role_label }}
-                </button>
+                {% call button(variant='ghost', size='sm', class='h-7 px-2.5 text-xs', on_click="activeRole = '" ~ role_key ~ "'", testid='layer-tab-' ~ role_key, attrs_dict={':aria-pressed': "activeRole === '" ~ role_key ~ "' ? 'true' : 'false'", ':class': "activeRole === '" ~ role_key ~ "' ? 'bg-background text-foreground' : ''"}) %}{{ role_label }}{% endcall %}
                 {% endfor %}
             </div>
         </div>
@@ -266,30 +240,11 @@
             {# Desktop: segmented control #}
             <div class="hidden sm:flex w-fit items-center gap-0.5 rounded-md bg-muted p-0.5">
                 {% for role_key, role_label in [('motivation', 'Motivation'), ('strategy', 'Strategy'), ('business', 'Business'), ('application', 'Application'), ('technology', 'Technology'), ('implementation', 'Implementation & Migration')] %}
-                <button type="button" @click="activeRole = '{{ role_key }}'"
-                        data-testid="layer-tab-{{ role_key }}"
-                        :aria-pressed="activeRole === '{{ role_key }}' ? 'true' : 'false'"
-                        :class="activeRole === '{{ role_key }}' ? 'bg-background text-foreground' : 'text-muted-foreground hover:text-foreground'"
-                        class="h-7 rounded px-2.5 text-xs font-medium transition-colors whitespace-nowrap">
-                    {{ role_label }}
-                </button>
+                {% call button(variant='ghost', size='sm', class='h-7 px-2.5 text-xs whitespace-nowrap', on_click="activeRole = '" ~ role_key ~ "'", testid='layer-tab-' ~ role_key, attrs_dict={':aria-pressed': "activeRole === '" ~ role_key ~ "' ? 'true' : 'false'", ':class': "activeRole === '" ~ role_key ~ "' ? 'bg-background text-foreground' : ''"}) %}{{ role_label }}{% endcall %}
                 {% endfor %}
             </div>
             {# Mobile: select #}
-            <select @change="activeRole = $event.target.value"
-                    :value="activeRole"
-                    class="sm:hidden h-9 rounded-md border border-border bg-background px-3 text-xs"
-                    data-testid="layer-select-mobile">
-                <option value="overview">Overview</option>
-                <option value="cto">CTO</option>
-                <option value="cfo">CFO</option>
-                <option value="motivation">Motivation</option>
-                <option value="strategy">Strategy</option>
-                <option value="business">Business</option>
-                <option value="application">Application</option>
-                <option value="technology">Technology</option>
-                <option value="implementation">Implementation & Migration</option>
-            </select>
+            {{ dropdown_menu(id='layer-select-mobile', trigger_text='Choose a view', position='left', class='sm:hidden', menu_width='w-64', items=[{'text': 'Overview', 'onclick': "activeRole = 'overview'"}, {'text': 'CTO', 'onclick': "activeRole = 'cto'"}, {'text': 'CFO', 'onclick': "activeRole = 'cfo'"}, {'text': 'Motivation', 'onclick': "activeRole = 'motivation'"}, {'text': 'Strategy', 'onclick': "activeRole = 'strategy'"}, {'text': 'Business', 'onclick': "activeRole = 'business'"}, {'text': 'Application', 'onclick': "activeRole = 'application'"}, {'text': 'Technology', 'onclick': "activeRole = 'technology'"}, {'text': 'Implementation & Migration', 'onclick': "activeRole = 'implementation'"}]) }}
         </div>
     </div>
 
@@ -354,7 +309,7 @@
         <svg viewBox="0 0 {{ W }} {{ H }}" class="block h-[320px] w-full" role="img" aria-label="Applications by lifecycle stage">
             {% for g in [0, 1, 2, 3, 4] %}
             {% set y = top + plot_h - (plot_h * g / 4) %}
-            <line x1="{{ left }}" y1="{{ y }}" x2="{{ W - right }}" y2="{{ y }}" class="stroke-slate-100 dark:stroke-slate-800" stroke-width="1" />
+            <line x1="{{ left }}" y1="{{ y }}" x2="{{ W - right }}" y2="{{ y }}" class="stroke-border" stroke-width="1" />
             <text x="{{ left - 8 }}" y="{{ y + 4 }}" text-anchor="end" class="fill-muted-foreground tabular-nums" font-size="11">{{ ((maxc * g / 4) | round | int) }}</text>
             {% endfor %}
             {% for item in lc %}
@@ -511,44 +466,22 @@
                 <span class="text-2xs font-semibold uppercase tracking-[0.06em] text-muted-foreground">Open items by level and status</span>
             </div>
             <div class="grid grid-cols-1 gap-px bg-border md:grid-cols-2">
-                <div class="bg-card">
-                    <table class="dense-table w-full border-collapse text-sm" data-testid="cto-risk-by-impact">
-                        <caption class="sr-only">Risks by impact level</caption>
-                        <thead class="bg-card">
-                            <tr class="border-b border-border">
-                                <th scope="col" class="h-10 px-4 text-left align-middle">Risk by impact</th>
-                                <th scope="col" class="h-10 px-4 text-right align-middle">Open</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for level, tone in [('critical', 'text-destructive-emphasis'), ('high', 'text-warning-emphasis'), ('medium', 'text-info'), ('low', 'text-success-emphasis')] %}
+                {% call dense_table(columns=[('Risk by impact', ''), ('Open', 'text-right')], caption='Risks by impact level', testid='cto-risk-by-impact', flush=true) %}
+{% for level, tone in [('critical', 'text-destructive-emphasis'), ('high', 'text-warning-emphasis'), ('medium', 'text-info'), ('low', 'text-success-emphasis')] %}
                             <tr class="h-10 border-b border-border last:border-b-0">
-                                <td class="px-4 align-middle capitalize {{ tone }}">{{ level }}</td>
-                                <td class="px-4 text-right align-middle tabular-nums text-foreground">{{ ((cto.get('risk_counts') or {}).get(level))|dash }}</td>
+                                <td class="px-2 align-middle capitalize {{ tone }}">{{ level }}</td>
+                                <td class="px-2 text-right align-middle tabular-nums text-foreground">{{ ((cto.get('risk_counts') or {}).get(level))|dash }}</td>
                             </tr>
                             {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-                <div class="bg-card">
-                    <table class="dense-table w-full border-collapse text-sm" data-testid="cto-arb-pipeline">
-                        <caption class="sr-only">ARB pipeline by status</caption>
-                        <thead class="bg-card">
-                            <tr class="border-b border-border">
-                                <th scope="col" class="h-10 px-4 text-left align-middle">ARB pipeline</th>
-                                <th scope="col" class="h-10 px-4 text-right align-middle">Reviews</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for status_key, label, tone in [('pending', 'Pending', 'text-warning-emphasis'), ('approved', 'Approved', 'text-success-emphasis'), ('rejected', 'Rejected', 'text-destructive-emphasis')] %}
+{% endcall %}
+                {% call dense_table(columns=[('ARB pipeline', ''), ('Reviews', 'text-right')], caption='ARB pipeline by status', testid='cto-arb-pipeline', flush=true) %}
+{% for status_key, label, tone in [('pending', 'Pending', 'text-warning-emphasis'), ('approved', 'Approved', 'text-success-emphasis'), ('rejected', 'Rejected', 'text-destructive-emphasis')] %}
                             <tr class="h-10 border-b border-border last:border-b-0">
-                                <td class="px-4 align-middle {{ tone }}">{{ label }}</td>
-                                <td class="px-4 text-right align-middle tabular-nums text-foreground">{{ ((cto.get('arb_pipeline') or {}).get(status_key))|dash }}</td>
+                                <td class="px-2 align-middle {{ tone }}">{{ label }}</td>
+                                <td class="px-2 text-right align-middle tabular-nums text-foreground">{{ ((cto.get('arb_pipeline') or {}).get(status_key))|dash }}</td>
                             </tr>
                             {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
+{% endcall %}
             </div>
         </section>
     </div>
@@ -579,25 +512,16 @@
                 <span class="text-2xs font-semibold uppercase tracking-[0.06em] text-muted-foreground tabular-nums">Total ${{ '{:,.0f}'.format(cfo.get('total_tco')) }}</span>
                 {% endif %}
             </div>
-            <table class="dense-table w-full border-collapse text-sm" data-testid="cfo-tco-by-category">
-                <caption class="sr-only">Total cost of ownership by category</caption>
-                <thead class="bg-card">
-                    <tr class="border-b border-border">
-                        <th scope="col" class="h-10 px-4 text-left align-middle">Category</th>
-                        <th scope="col" class="h-10 px-4 text-right align-middle">Total cost</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for cat, amount in (cfo.get('tco_by_category') or {}).items() %}
+            {% call dense_table(columns=[('Category', ''), ('Total cost', 'text-right')], caption='Total cost of ownership by category', testid='cfo-tco-by-category', flush=true) %}
+{% for cat, amount in (cfo.get('tco_by_category') or {}).items() %}
                     <tr class="h-12 border-b border-border last:border-b-0">
-                        <td class="px-4 align-middle capitalize text-foreground">{{ cat }}</td>
-                        <td class="px-4 text-right align-middle font-medium tabular-nums text-foreground">${{ '{:,.0f}'.format(amount) }}</td>
+                        <td class="px-2 align-middle capitalize text-foreground">{{ cat }}</td>
+                        <td class="px-2 text-right align-middle font-medium tabular-nums text-foreground">${{ '{:,.0f}'.format(amount) }}</td>
                     </tr>
                     {% else %}
-                    <tr><td colspan="2" class="h-12 px-4 text-sm text-muted-foreground">No TCO data recorded yet.</td></tr>
+                    <tr><td colspan="2" class="h-12 px-2 text-sm text-muted-foreground">No TCO data recorded yet.</td></tr>
                     {% endfor %}
-                </tbody>
-            </table>
+{% endcall %}
         </section>
     </div>
 
