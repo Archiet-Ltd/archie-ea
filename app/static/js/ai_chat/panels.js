@@ -174,7 +174,7 @@
                 contextContainer.innerHTML = `
                     <div class="text-center py-8 text-muted-foreground">
                         <i data-lucide="inbox" class="h-8 w-8 mx-auto mb-2 opacity-50"></i>
-                        <p class="text-sm">No specific context available for ${escape(domain)}</p>
+                        <p class="text-sm">Nothing is recorded under ${escape(domain)} yet, so the answer uses your whole portfolio.</p>
                     </div>
                 `;
             }
