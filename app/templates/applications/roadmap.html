@@ -124,16 +124,21 @@
               <div class="space-y-2 pt-4">
                 <template x-for="item in filteredItems" :key="item.id">
                   <div class="relative h-8">
-                    <button type="button" data-slot="roadmap-timeline-bar"
-                      :style="{'--x': itemTimelineLeft(item) + '%', '--w': itemTimelineWidth(item) + '%'}"
-                      :class="timelineBarClass(item) + ' left-[var(--x)] w-[var(--w)]'"
-                      :aria-label="item.name + ', ' + formatDate(item.start_date) + ' to ' + formatDate(item.target_date) + ', ' + formatLabel(item.status)"
-                      class="absolute h-full rounded-md px-2 text-xs font-medium truncate border text-left transition-colors hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                      @click="openEditModal(item)"
-                      title="">
+                    {% call button(
+                        variant='bare',
+                        size='bare',
+                        class='absolute h-full rounded-md px-2 text-xs font-medium truncate border text-left transition-colors hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                        on_click='openEditModal(item)',
+                        attrs_dict={
+                            'data-slot': 'roadmap-timeline-bar',
+                            ':style': "{'--x': itemTimelineLeft(item) + '%', '--w': itemTimelineWidth(item) + '%'}",
+                            ':class': "timelineBarClass(item) + ' left-[var(--x)] w-[var(--w)]'",
+                            ':aria-label': "item.name + ', ' + formatDate(item.start_date) + ' to ' + formatDate(item.target_date) + ', ' + formatLabel(item.status)"
+                        }
+                    ) %}
                       <span class="truncate" x-text="item.name"></span>
                       <span class="ml-1 opacity-70" x-text="formatLabel(item.status)"></span>
-                    </button>
+                    {% endcall %}
                   </div>
                 </template>
               </div>
