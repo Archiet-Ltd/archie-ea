@@ -115,6 +115,8 @@ def test_try_sample_company_loads_and_removes_cleanly(browser, live_server, seed
         assert applications.isdigit() and int(applications) >= 8, applications
         score = page.locator('[data-testid="health-score-value"]').inner_text().strip()
         assert score not in ("", "—", "0"), score
+        solutions = page.locator('[data-testid="health-kpi-solutions"]').inner_text().strip()
+        assert solutions.isdigit() and int(solutions) > 0, solutions
         # The applications list agrees with the figure, and every application carries an owner and a cost
         page.goto(live_server + "/applications/", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
         expect(page.get_by_text("Payments service", exact=False).first).to_be_visible(timeout=PAGE_TIMEOUT)

@@ -129,6 +129,8 @@ def test_load_sample_is_a_real_click_and_lands_on_content(browser, live_server, 
         assert applications.isdigit() and int(applications) >= 8, applications
         score = page.locator('[data-testid="health-score-value"]').inner_text().strip()
         assert score not in ("", "—", "0"), score
+        solutions = page.locator('[data-testid="health-kpi-solutions"]').inner_text().strip()
+        assert solutions.isdigit() and int(solutions) > 0, solutions
         # the applications link lands on a list holding those applications
         page.goto(live_server + "/applications/", wait_until="networkidle", timeout=PAGE_TIMEOUT)
         expect(page.get_by_text("Payments service", exact=False).first).to_be_visible()

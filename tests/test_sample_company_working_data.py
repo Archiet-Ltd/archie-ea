@@ -29,6 +29,7 @@ _TABLES = {
     "mappings": "application_capability_mapping",
     "capabilities": "business_capability",
     "risks": "risks",
+    "solutions": "solutions",
     "elements": "archimate_elements",
     "cost_facts": "cost_facts",
     "unified_capabilities": "unified_capabilities",
@@ -78,6 +79,8 @@ def test_loading_the_sample_gives_applications_with_owners_costs_and_a_health_sc
     page = client.get("/dashboard/overview").get_data(as_text=True)
     assert _figure(page, "health-kpi-applications") == str(counts["applications"])
     assert _figure(page, "health-score-value") not in ("", "—", "0")
+    assert counts["solutions"] > 0
+    assert _figure(page, "health-kpi-solutions") == str(counts["solutions"])
     assert _counts(other.id) == other_before
 
 

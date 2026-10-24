@@ -4,7 +4,7 @@ The OEF file loaded by ``/architecture/sample-company/load`` carries the
 ArchiMate elements. A first screen built from those alone counts no
 applications and cannot score health, so this adds what a real estate carries:
 an application inventory with an owner, a lifecycle stage and a recorded annual
-cost, the capabilities those applications support, and a few open risks.
+cost, the capabilities those applications support, a few open risks and two solutions in progress.
 
 Rows are written the way the demonstration seed writes them
 (``app/commands/seed_demo_company.py``): the same application, owner, cost and
@@ -79,6 +79,15 @@ _RISKS = [
 ]
 
 
+# (name, description, ADM phase, element name)
+_SOLUTIONS = [
+    ("Add a second payment gateway", "Take card payments through two providers so one outage does not stop checkout.",
+     "C", "Payments service"),
+    ("Real-time stock across channels", "Keep web and warehouse stock counts in step as orders arrive.",
+     "B", "Inventory system"),
+]
+
+
 def _display_name(user) -> str:
     name = " ".join(p for p in (getattr(user, "first_name", None), getattr(user, "last_name", None)) if p)
     return name or getattr(user, "email", "") or "Workspace owner"
@@ -115,6 +124,7 @@ def add_working_data(org_id: int, user, log) -> Dict[str, int]:
     from app.models.archimate_core import ArchiMateElement
     from app.models.business_capabilities import BusinessCapability
     from app.models.risk import Risk, RiskStatus
+    from app.models.solution_models import Solution
     from app.services.application_cost_accessor import sync_cost_fact
 
     elements = {
@@ -225,8 +235,24 @@ def add_working_data(org_id: int, user, log) -> Dict[str, int]:
         db.session.flush()
         note("risks", risk)
 
+    for name, description, phase, element_name in _SOLUTIONS:
+        element = elements.get(element_name)
+        solution = Solution(
+            name=name,
+            description=description,
+            adm_phase=phase,
+            status="in_progress",
+            solution_type="Service",
+            organization_id=org_id,
+            archimate_element_id=element.id if element else None,
+        )
+        db.session.add(solution)
+        db.session.flush()
+        note("solutions", solution)
+
     _remember(log, noted, mirrors)
-    return {"applications": len(applications), "capabilities": len(capabilities), "risks": len(_RISKS)}
+    return {"applications": len(applications), "capabilities": len(capabilities), "risks": len(_RISKS),
+            "solutions": len(_SOLUTIONS)}
 
 
 def remove(org_id: int, user_id: int) -> Optional[Dict[str, Any]]:
@@ -239,6 +265,7 @@ def remove(org_id: int, user_id: int) -> Optional[Dict[str, Any]]:
     from app.models.application_portfolio import ApplicationComponent
     from app.models.business_capabilities import BusinessCapability
     from app.models.risk import Risk
+    from app.models.solution_models import Solution
     from app.services import import_restore_service
     from app.services.application_cost_accessor import sync_cost_fact
 
@@ -270,7 +297,7 @@ def remove(org_id: int, user_id: int) -> Optional[Dict[str, Any]]:
     db.session.flush()
     for app in rows(ApplicationComponent, "application_components"):
         db.session.delete(app)
-    for model, table in ((BusinessCapability, "business_capability"), (Risk, "risks")):
+    for model, table in ((BusinessCapability, "business_capability"), (Risk, "risks"), (Solution, "solutions")):
         for row in rows(model, table):
             db.session.delete(row)
     db.session.flush()
