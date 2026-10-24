@@ -204,3 +204,90 @@ def test_business_architect_models_onboarding_value_stream(browser, live_server)
     page2.goto(base + CAPABILITIES_PAGE, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
     expect(page2.locator("body")).not_to_contain_text(cap_a)
     context2.close()
+
+
+def test_business_architect_sets_stage_type_flags_and_support_choices(browser, live_server):
+    """The stage and cell dialogs keep what a person chooses, and the stage card says so after a reload."""
+    base = live_server
+    tag = uuid.uuid4().hex[:6]
+    cap = "Claims Triage %s" % tag
+    vs_name = "Claims Handling %s" % tag
+    stage = "Assess claim %s" % tag
+    other = "Pay claim %s" % tag
+
+    org = create_fresh_org("business_architect")
+    context, page = _new_page(browser)
+    sign_in(page, base, org["emails"]["business_architect"])
+    _create_capability(page, base, cap)
+
+    page.goto(base + "/value-streams/", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    page.get_by_role("button", name="New Value Stream").first.click()
+    create_modal = page.locator("#vs-create-modal")
+    expect(create_modal).to_be_visible(timeout=PAGE_TIMEOUT)
+    create_modal.locator("#vs-name").fill(vs_name)
+    with page.expect_navigation(timeout=PAGE_TIMEOUT):
+        create_modal.get_by_role("button", name="Create").click()
+    detail_url = page.url
+
+    # Two stages: the first is left on its defaults, so only the second carries flags.
+    _add_stage(page, other, "Claim approved", "Payment sent", "Finance", "Payout")
+    page.get_by_role("button", name="Add Stage").first.click()
+    modal = page.locator("#stage-create-modal")
+    expect(modal).to_be_visible(timeout=PAGE_TIMEOUT)
+    modal.locator("#stage-name").fill(stage)
+    expect(modal.get_by_role("radio", name="Operational")).to_be_checked()
+    modal.get_by_role("radio", name="Strategic").check()
+    modal.get_by_label("Customer facing").check()
+    with page.expect_navigation(timeout=PAGE_TIMEOUT):
+        modal.get_by_role("button", name="Add Stage").click()
+
+    card = _stage_card(page, stage)
+    expect(card.get_by_text("Strategic")).to_be_visible(timeout=PAGE_TIMEOUT)
+    expect(card.get_by_text("Customer Facing")).to_be_visible()
+    expect(card.get_by_text("Quality Gate")).to_have_count(0)
+    expect(_stage_card(page, other).get_by_text("Operational")).to_be_visible()
+    expect(_stage_card(page, other).get_by_text("Customer Facing")).to_have_count(0)
+
+    # Edit the stage: the dialog opens with what was saved, and a changed choice persists.
+    card.get_by_role("button", name="Edit stage").click()
+    edit = page.locator("#stage-edit-modal")
+    expect(edit).to_be_visible(timeout=PAGE_TIMEOUT)
+    expect(edit.get_by_role("radio", name="Strategic")).to_be_checked()
+    expect(edit.get_by_label("Customer facing")).to_be_checked()
+    expect(edit.get_by_label("Quality gate")).not_to_be_checked()
+    edit.get_by_role("radio", name="Supporting").check()
+    edit.get_by_label("Quality gate").check()
+    with page.expect_navigation(timeout=PAGE_TIMEOUT):
+        edit.get_by_role("button", name="Save").click()
+    page.reload(wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    card = _stage_card(page, stage)
+    expect(card.get_by_text("Supporting")).to_be_visible(timeout=PAGE_TIMEOUT)
+    expect(card.get_by_text("Quality Gate")).to_be_visible()
+    expect(card.get_by_text("Customer Facing")).to_be_visible()
+
+    # Map the capability with a chosen support type and impact, then reopen the cell.
+    # The picker opens the first stage's cell, which is the stage added first.
+    _pick_capability(page, cap)
+    cell = page.locator("#cell-edit-modal")
+    expect(cell).to_be_visible(timeout=PAGE_TIMEOUT)
+    cell.get_by_role("radio", name="Secondary").check()
+    cell.get_by_role("radio", name="Critical").check()
+    _save_cell(page)
+    page.reload(wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    page.get_by_role("button", name="Set support for %s at %s" % (cap, other)).click()
+    expect(cell).to_be_visible(timeout=PAGE_TIMEOUT)
+    expect(cell.get_by_role("radio", name="Secondary")).to_be_checked()
+    expect(cell.get_by_role("radio", name="Critical")).to_be_checked()
+    expect(cell.get_by_role("button", name="Clear Mapping")).to_be_visible()
+    cell.get_by_role("button", name="Cancel").click()
+
+    # Delete the second stage through the confirmation: it is gone after the reload.
+    _stage_card(page, other).get_by_role("button", name="Delete stage").click()
+    confirm = page.locator("#stage-delete-modal")
+    expect(confirm).to_contain_text(other)
+    with page.expect_navigation(timeout=PAGE_TIMEOUT):
+        confirm.get_by_role("button", name="Delete").click()
+    page.goto(detail_url, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    expect(page.locator("[data-stage-card]", has_text=other)).to_have_count(0)
+    expect(_stage_card(page, stage)).to_be_visible()
+    context.close()

@@ -4,10 +4,32 @@
 {% from 'components/empty_state.html' import empty_state %}
 {% from 'components/skeleton.html' import skeleton_table %}
 {% from 'components/status_badge.html' import status_badge %}
+{% from 'components/button.html' import button %}
+{% from 'components/input.html' import input, textarea, label %}
+{% from 'components/checkbox.html' import checkbox %}
+{% from 'components/radio_group.html' import radio_group %}
+{% from 'components/form_field.html' import form_group, form_footer %}
+{% from 'components/dense_table.html' import dense_table %}
+{% import 'components/card.html' as card %}
 
 {% block title %}{{ value_stream.name }} — Value Stream{% endblock %}
 
+{% macro meta_tile(title, value_class='') %}
+{% set body = caller() %}
+{% call card.card() %}
+    {% call card.card_content(class='pt-6') %}
+        <p class="text-xs font-medium text-muted-foreground uppercase tracking-wide">{{ title }}</p>
+        <p class="mt-1 text-lg font-semibold {{ value_class }}">{{ body }}</p>
+    {% endcall %}
+{% endcall %}
+{% endmacro %}
+
 {% block content %}
+{% set stage_types = [
+    {'value': 'operational', 'label': 'Operational'},
+    {'value': 'strategic', 'label': 'Strategic'},
+    {'value': 'supporting', 'label': 'Supporting'}
+] %}
 <div class="flex-1 overflow-auto"
      x-data="bizbokGrid({ valueStreamId: {{ value_stream.id }} })"
      x-init="init()" x-cloak>
@@ -29,57 +51,43 @@
     <div class="p-6 space-y-6">
         <!-- Value Stream metadata -->
         <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div class="rounded-xl border border-input bg-background p-4">
-                <p class="text-xs font-medium text-muted-foreground uppercase tracking-wide">Code</p>
-                <p class="text-lg font-semibold font-mono mt-1">{{ value_stream.code or '—' }}</p>
-            </div>
-            <div class="rounded-xl border border-input bg-background p-4">
-                <p class="text-xs font-medium text-muted-foreground uppercase tracking-wide">Type</p>
-                <p class="text-lg font-semibold mt-1">{{ (value_stream.value_stream_type or '—')|replace('_', ' ')|title }}</p>
-            </div>
-            <div class="rounded-xl border border-input bg-background p-4">
-                <p class="text-xs font-medium text-muted-foreground uppercase tracking-wide">Cycle Time (Current / Target)</p>
-                <p class="text-lg font-semibold mt-1">
-                    {{ value_stream.current_cycle_time if value_stream.current_cycle_time is not none else '—' }}
-                    /
-                    {{ value_stream.target_cycle_time if value_stream.target_cycle_time is not none else '—' }} days
-                </p>
-            </div>
-            <div class="rounded-xl border border-input bg-background p-4">
-                <p class="text-xs font-medium text-muted-foreground uppercase tracking-wide">Quality (Current / Target)</p>
-                <p class="text-lg font-semibold mt-1">
-                    {{ value_stream.current_quality if value_stream.current_quality is not none else '—' }}%
-                    /
-                    {{ value_stream.quality_target if value_stream.quality_target is not none else '—' }}%
-                </p>
-            </div>
+            {% call meta_tile('Code', value_class='font-mono') %}{{ value_stream.code or '—' }}{% endcall %}
+            {% call meta_tile('Type') %}{{ (value_stream.value_stream_type or '—')|replace('_', ' ')|title }}{% endcall %}
+            {% call meta_tile('Cycle Time (Current / Target)') %}
+                {{ value_stream.current_cycle_time if value_stream.current_cycle_time is not none else '—' }}
+                /
+                {{ value_stream.target_cycle_time if value_stream.target_cycle_time is not none else '—' }} days
+            {% endcall %}
+            {% call meta_tile('Quality (Current / Target)') %}
+                {{ value_stream.current_quality if value_stream.current_quality is not none else '—' }}%
+                /
+                {{ value_stream.quality_target if value_stream.quality_target is not none else '—' }}%
+            {% endcall %}
         </div>
 
         <!-- Stage swimlane -->
-        <div class="rounded-xl border border-input bg-background">
-            <div class="px-5 py-4 border-b border-border flex items-center justify-between">
-                <h3 class="text-lg font-semibold text-foreground">Stage Swimlane</h3>
+        {% call card.card() %}
+            {% call card.card_header(class='border-b border-border') %}
+            <div class="flex w-full items-center justify-between gap-3">
+                {% call card.card_title(class='text-lg') %}Stage Swimlane{% endcall %}
                 <span class="text-sm text-muted-foreground">{{ value_stream.stages|length }} stage{{ 's' if value_stream.stages|length != 1 else '' }}</span>
             </div>
-            <div class="p-5">
+            {% endcall %}
+            {% call card.card_content(class='pt-4') %}
                 {% if value_stream.stages %}
                 <div class="overflow-x-auto">
                     <div class="flex items-stretch gap-3 min-w-max pb-2">
                         {% for stage in value_stream.stages %}
                         <div class="w-64 shrink-0 rounded-md border border-border bg-muted/20 px-3 py-2 relative" data-stage-card data-stage-id="{{ stage.id }}">
                             <div class="flex items-center justify-between mb-2">
-                                <span class="inline-flex items-center justify-center h-6 w-6 rounded-full bg-primary/10 text-info-emphasis text-xs font-bold">{{ stage.stage_order }}</span>
+                                <span class="inline-flex items-center justify-center h-6 w-6 rounded-full bg-primary/10 text-primary text-xs font-bold">{{ stage.stage_order }}</span>
                                 <div class="flex items-center gap-1">
-                                    <button type="button" aria-label="Edit stage"
-                                            @click='openStageEditModal({{ stage|tojson }})'
-                                            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 w-9 p-0 items-center justify-center w-6">
-                                        <i data-lucide="pencil" class="h-3 w-3" aria-hidden="true"></i>
-                                    </button>
-                                    <button type="button" aria-label="Delete stage"
-                                            @click='openStageDeleteModal({ id: {{ stage.id }}, name: {{ stage.name|tojson }} })'
-                                            class="inline-flex items-center justify-center rounded-md hover:bg-destructive/10 hover:text-destructive-emphasis h-6 w-6">
-                                        <i data-lucide="trash-2" class="h-3 w-3" aria-hidden="true"></i>
-                                    </button>
+                                    {% call button(variant='ghost', size='icon', class='h-6 w-6 p-0', aria_label='Edit stage',
+                                                   on_click='openStageEditModal(JSON.parse($el.dataset.stage))',
+                                                   attrs_dict={'data-stage': stage|tojson|forceescape}) %}<i data-lucide="pencil" class="h-3 w-3" aria-hidden="true"></i>{% endcall %}
+                                    {% call button(variant='ghost', size='icon', class='h-6 w-6 p-0 hover:bg-destructive/10 hover:text-destructive-emphasis', aria_label='Delete stage',
+                                                   on_click='openStageDeleteModal({ id: Number($el.dataset.stageId), name: $el.dataset.stageName })',
+                                                   attrs_dict={'data-stage-id': stage.id, 'data-stage-name': stage.name}) %}<i data-lucide="trash-2" class="h-3 w-3" aria-hidden="true"></i>{% endcall %}
                                 </div>
                             </div>
                             <h4 class="font-semibold text-sm text-foreground truncate" :title='{{ stage.name|tojson }}'>{{ stage.name }}</h4>
@@ -161,25 +169,26 @@
                     cta_icon='plus'
                 ) }}
                 {% endif %}
-            </div>
-        </div>
+            {% endcall %}
+        {% endcall %}
 
         <!-- AI mapping suggestions -->
-        <div class="rounded-xl border border-input bg-background">
-            <div class="px-5 py-4 border-b border-border flex items-center justify-between gap-3 flex-wrap">
+        {% call card.card() %}
+            {% call card.card_header(class='border-b border-border') %}
+            <div class="flex w-full flex-wrap items-center justify-between gap-3">
                 <div class="flex items-center gap-2">
                     <i data-lucide="sparkles" class="h-4 w-4 text-primary" aria-hidden="true"></i>
-                    <h3 class="text-sm font-semibold text-foreground">AI Mapping Suggestions</h3>
-                    <span class="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-info-emphasis font-medium">AI-suggested draft</span>
+                    {% call card.card_title(class='text-sm') %}AI Mapping Suggestions{% endcall %}
+                    {{ status_badge('AI-suggested draft', 'info') }}
                 </div>
-                <button type="button" @click="suggestMappings()" :disabled="aiLoading"
-                        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center"
-                        aria-label="Suggest capability mappings">
-                    <span x-show="aiLoading" x-cloak class="animate-spin h-3.5 w-3.5 border-2 border-current border-t-transparent rounded-full inline-block"></span>
+                {% call button(variant='default', aria_label='Suggest capability mappings', on_click='suggestMappings()',
+                               attrs_dict={':disabled': 'aiLoading'}) %}
+                    <span x-show="aiLoading" x-cloak class="animate-spin h-3.5 w-3.5 border-2 border-current border-t-transparent rounded-full inline-block mr-2"></span>
                     <span x-text="aiLoading ? 'Suggesting…' : (aiSuggestions.length ? 'Regenerate suggestions' : 'Suggest mappings')"></span>
-                </button>
             </div>
-            <div class="p-5">
+                {% endcall %}
+            {% endcall %}
+            {% call card.card_content(class='pt-4') %}
                 <p class="text-xs text-muted-foreground">
                     AI-suggested capability &times; stage pairs from this stream's real stages and the org capability
                     catalog. Advisory only — nothing is mapped until you click Apply, which writes through the same
@@ -201,43 +210,42 @@
                                 </p>
                                 <p class="text-xs text-muted-foreground mt-0.5" x-text="suggestion.rationale"></p>
                             </div>
-                            <button type="button" @click="applySuggestion(index)"
-                                    :disabled="suggestion.applied || aiApplyingIndex === index"
-                                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 shrink-0 items-center justify-center">
+                            {% call button(variant='outline', class='shrink-0', on_click='applySuggestion(index)',
+                                           attrs_dict={':disabled': 'suggestion.applied || aiApplyingIndex === index'}) %}
                                 <span x-show="aiApplyingIndex === index" x-cloak class="animate-spin h-3 w-3 border-2 border-current border-t-transparent rounded-full inline-block mr-1.5"></span>
                                 <span x-text="suggestion.applied ? 'Applied' : 'Apply'"></span>
-                            </button>
+                            {% endcall %}
                         </li>
                     </template>
                 </ul>
-            </div>
-        </div>
+            {% endcall %}
+        {% endcall %}
 
         <!-- BIZBOK Capability x Stage Grid -->
-        <div class="rounded-xl border border-input bg-background">
-            <div class="px-5 py-4 border-b border-border flex items-center justify-between gap-3 flex-wrap">
+        {% call card.card() %}
+            {% call card.card_header(class='border-b border-border') %}
+            <div class="flex w-full flex-wrap items-center justify-between gap-3">
                 <div>
-                    <h3 class="text-lg font-semibold text-foreground">BIZBOK Capability &times; Stage Grid</h3>
+                    {% call card.card_title(class='text-lg') %}BIZBOK Capability &times; Stage Grid{% endcall %}
                     <p class="text-xs text-muted-foreground mt-0.5">Click a cell to set or clear how strongly a capability supports a stage.</p>
                 </div>
                 <div class="relative">
-                    <input type="text" x-model="capabilitySearch" @input.debounce.300ms="searchCapabilities()"
-                           placeholder="Add capability to grid..."
-                           class="flex h-9 w-64 rounded-md border border-input bg-transparent px-3 py-1 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" aria-label="Add capability to grid...">
+                    {{ input(type='text', placeholder='Add capability to grid...', aria_label='Add capability to grid...', class='w-64 h-9',
+                             attrs_dict={'x-model': 'capabilitySearch', '@input.debounce.300ms': 'searchCapabilities()'}) }}
                     <div x-show="capabilityResults.length > 0" x-cloak @click.outside="capabilityResults = []"
                          class="absolute z-10 mt-1 w-full rounded-md border border-border bg-card max-h-64 overflow-y-auto">
                         <template x-for="cap in capabilityResults" :key="cap.id">
-                            <button type="button" @click="selectCapabilityToAdd(cap)"
-                                    class="block w-full text-left px-3 py-2 text-sm hover:bg-accent hover:text-accent-foreground">
+                            {% call button(variant='ghost', class='block w-full justify-start rounded-none px-3 py-2 font-normal text-foreground', on_click='selectCapabilityToAdd(cap)') %}
                                 <span x-text="cap.name"></span>
                                 <span class="text-muted-foreground text-xs" x-text="cap.code ? ' · ' + cap.code : ''"></span>
-                            </button>
+                            {% endcall %}
                         </template>
                     </div>
                 </div>
             </div>
+            {% endcall %}
 
-            <div class="p-5">
+            {% call card.card_content(class='pt-4') %}
                 <!-- Loading state -->
                 <div x-show="loading" x-cloak>
                     {{ skeleton_table(rows=5, columns=5) }}
@@ -253,7 +261,7 @@
                 <!-- Error state -->
                 <template x-if="!loading && loadError">
                     <div class="text-center py-12 text-sm text-destructive-emphasis">
-                        Failed to load the grid. <button type="button" class="underline" @click="loadGrid()">Retry</button>
+                        Failed to load the grid. {{ button(text='Retry', variant='link', class='h-auto p-0 underline', on_click='loadGrid()') }}
                     </div>
                 </template>
 
@@ -266,38 +274,30 @@
 
                 <!-- Populated grid -->
                 <template x-if="!loading && !loadError && stages.length > 0 && capabilities.length > 0">
-                    <div class="overflow-x-auto">
-                        <table class="dense-table min-w-full border-separate border-spacing-0">
-                            <thead>
-                                <tr>
-                                    <th class="sticky left-0 bg-background text-left text-xs font-medium text-muted-foreground uppercase tracking-wider px-3 py-2 border-b border-border">Capability</th>
-                                    <th class="text-center text-xs font-medium text-muted-foreground uppercase tracking-wider px-3 py-2 border-b border-border whitespace-nowrap">Maturity</th>
-                                    <template x-for="stage in stages" :key="stage.id">
-                                        <th class="text-center text-xs font-medium text-muted-foreground uppercase tracking-wider px-3 py-2 border-b border-border whitespace-nowrap" x-text="stage.name"></th>
-                                    </template>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <template x-for="cap in capabilities" :key="cap.id">
-                                    <tr>
-                                        <td class="sticky left-0 bg-background text-sm font-medium text-foreground px-3 py-2 border-b border-border whitespace-nowrap" x-text="cap.name"></td>
-                                        <td class="text-center text-sm font-mono text-muted-foreground px-3 py-2 border-b border-border whitespace-nowrap" data-maturity :title="'Current / target maturity of ' + cap.name" x-text="maturityLabel(cap)"></td>
-                                        <template x-for="stage in stages" :key="stage.id">
-                                            <td class="text-center px-2 py-2 border-b border-border">
-                                                <button type="button"
-                                                        :aria-label="'Set support for ' + cap.name + ' at ' + stage.name"
-                                                        @click="openCellModal(cap, stage)"
-                                                        class="w-16 h-9 rounded-md border text-xs font-semibold transition-colors"
-                                                        :class="cellClass(cap.id, stage.id)">
-                                                    <span x-text="cellLabel(cap.id, stage.id)"></span>
-                                                </button>
-                                            </td>
-                                        </template>
-                                    </tr>
+                    {% set grid_header %}
+                        <th scope="col" class="h-10 px-3 text-left sticky left-0 bg-card">Capability</th>
+                        <th scope="col" class="h-10 px-3 text-center whitespace-nowrap">Maturity</th>
+                        <template x-for="stage in stages" :key="stage.id">
+                            <th scope="col" class="h-10 px-3 text-center whitespace-nowrap" x-text="stage.name"></th>
+                        </template>
+                    {% endset %}
+                    {% call dense_table(header=grid_header, caption='Capability by stage support', flush=true) %}
+                        <template x-for="cap in capabilities" :key="cap.id">
+                            <tr>
+                                <td class="sticky left-0 bg-card text-sm font-medium text-foreground px-3 py-2 whitespace-nowrap" x-text="cap.name"></td>
+                                <td class="text-center text-sm font-mono text-muted-foreground px-3 py-2 whitespace-nowrap" data-maturity :title="'Current / target maturity of ' + cap.name" x-text="maturityLabel(cap)"></td>
+                                <template x-for="stage in stages" :key="stage.id">
+                                    <td class="text-center px-2 py-2">
+                                        {% call button(variant='outline', class='w-16 border text-xs font-semibold',
+                                                       on_click='openCellModal(cap, stage)',
+                                                       attrs_dict={':aria-label': "'Set support for ' + cap.name + ' at ' + stage.name", ':class': 'cellClass(cap.id, stage.id)'}) %}
+                                            <span x-text="cellLabel(cap.id, stage.id)"></span>
+                                        {% endcall %}
+                                    </td>
                                 </template>
-                            </tbody>
-                        </table>
-                    </div>
+                            </tr>
+                        </template>
+                    {% endcall %}
                 </template>
 
                 <!-- Legend -->
@@ -309,8 +309,8 @@
                     <span class="inline-flex items-center gap-1"><span class="w-3 h-3 rounded bg-success/70 border border-success/60"></span>5 (critical)</span>
                     <span class="inline-flex items-center gap-1"><span class="w-3 h-3 rounded bg-muted border border-border"></span>Not mapped</span>
                 </div>
-            </div>
-        </div>
+            {% endcall %}
+        {% endcall %}
     </div>
 
     <!-- Cell edit modal -->
@@ -322,53 +322,29 @@
                 <span class="text-muted-foreground"> supports </span>
                 <span class="font-medium text-foreground" x-text="activeCell && activeCell.stageName"></span>
             </div>
-            <div>
-                <label class="block text-sm font-medium text-muted-foreground mb-1">Support Level (1-5)</label>
-                <input type="range" min="1" max="5" step="1" x-model.number="cellForm.support_level"
-                       class="mt-2 w-full" aria-label="Support Level (1-5)">
+            {% call form_group(id='cell-support-level', label='Support Level (1-5)') %}
+                {{ input(id='cell-support-level', type='range', aria_label='Support Level (1-5)', class='mt-2 h-auto border-0 p-0',
+                         attrs_dict={'min': 1, 'max': 5, 'step': 1, 'x-model.number': 'cellForm.support_level'}) }}
                 <div class="text-center text-sm font-semibold mt-1" x-text="cellForm.support_level"></div>
-            </div>
-            <div>
-                <label class="block text-sm font-medium text-muted-foreground mb-1">Contribution (%)</label>
-                <input type="number" min="0" max="100" x-model.number="cellForm.capability_contribution"
-                       class="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" aria-label="Contribution (%)">
-            </div>
-            <div class="grid grid-cols-1 gap-4">
-                <div>
-                    <label class="block text-sm font-medium text-muted-foreground mb-1">Support Type</label>
-                    <select x-model="cellForm.support_type"
-                            class="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" aria-label="Support Type">
-                        <option value="primary">Primary</option>
-                        <option value="secondary">Secondary</option>
-                        <option value="supporting">Supporting</option>
-                    </select>
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-muted-foreground mb-1">Impact Level</label>
-                    <select x-model="cellForm.impact_level"
-                            class="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" aria-label="Impact Level">
-                        <option value="critical">Critical</option>
-                        <option value="high">High</option>
-                        <option value="medium">Medium</option>
-                        <option value="low">Low</option>
-                    </select>
-                </div>
-            </div>
+            {% endcall %}
+            {% call form_group(id='cell-contribution', label='Contribution (%)') %}
+                {{ input(id='cell-contribution', type='number', aria_label='Contribution (%)', class='h-9',
+                         attrs_dict={'min': 0, 'max': 100, 'x-model.number': 'cellForm.capability_contribution'}) }}
+            {% endcall %}
+            {{ radio_group(name='cell_support_type', label='Support Type', inline=true, id_prefix='cell', attrs={'x-model': 'cellForm.support_type'},
+                           options=[{'value': 'primary', 'label': 'Primary'}, {'value': 'secondary', 'label': 'Secondary'}, {'value': 'supporting', 'label': 'Supporting'}]) }}
+            {{ radio_group(name='cell_impact_level', label='Impact Level', inline=true, id_prefix='cell', attrs={'x-model': 'cellForm.impact_level'},
+                           options=[{'value': 'critical', 'label': 'Critical'}, {'value': 'high', 'label': 'High'}, {'value': 'medium', 'label': 'Medium'}, {'value': 'low', 'label': 'Low'}]) }}
             <div class="flex items-center justify-between pt-2">
-                <button type="button" x-show="activeCell && activeCell.mappingId" x-cloak @click="clearCell()"
-                        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-destructive text-destructive-foreground text-sm font-semibold transition-colors hover:bg-destructive/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
-                    Clear Mapping
-                </button>
+                <div x-show="activeCell && activeCell.mappingId" x-cloak>
+                    {{ button(text='Clear Mapping', variant='danger', on_click='clearCell()') }}
+                </div>
                 <div class="flex gap-2 ml-auto">
-                    <button type="button" data-modal-close="cell-edit-modal"
-                            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4">
-                        Cancel
-                    </button>
-                    <button type="submit" :disabled="saving"
-                            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
+                    {{ button(text='Cancel', variant='ghost', attrs_dict={'data-modal-close': 'cell-edit-modal'}) }}
+                    {% call button(type='submit', attrs_dict={':disabled': 'saving'}) %}
                         <span x-show="saving" class="animate-spin h-4 w-4 border-2 border-current border-t-transparent rounded-full inline-block mr-2"></span>
                         Save
-                    </button>
+                    {% endcall %}
                 </div>
             </div>
         </form>
@@ -378,152 +354,41 @@
     <!-- Stage create modal -->
     {% call modal(id='stage-create-modal', title='Add Stage', size='default') %}
     <form method="POST" action="{{ url_for('value_stream.create_stage', value_stream_id=value_stream.id) }}" class="space-y-4">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <div>
-            <label for="stage-name" class="block text-sm font-medium text-muted-foreground mb-1">Name</label>
-            <input type="text" id="stage-name" name="name" required
-                   class="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
-        </div>
-        <div>
-            <label for="stage-description" class="block text-sm font-medium text-muted-foreground mb-1">Description</label>
-            <textarea id="stage-description" name="description" rows="2"
-                      class="mt-1 flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"></textarea>
-        </div>
-        <div>
-            <label for="stage-entry-criteria" class="block text-sm font-medium text-muted-foreground mb-1">Entry criteria</label>
-            <textarea id="stage-entry-criteria" name="entry_criteria" rows="2"
-                      class="mt-1 flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"></textarea>
-        </div>
-        <div>
-            <label for="stage-exit-criteria" class="block text-sm font-medium text-muted-foreground mb-1">Exit criteria</label>
-            <textarea id="stage-exit-criteria" name="exit_criteria" rows="2"
-                      class="mt-1 flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"></textarea>
-        </div>
-        <div class="grid grid-cols-1 gap-4">
-            <div>
-                <label for="stage-stakeholders" class="block text-sm font-medium text-muted-foreground mb-1">Stakeholders (one per line)</label>
-                <textarea id="stage-stakeholders" name="stakeholders" rows="2"
-                          class="mt-1 flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"></textarea>
-            </div>
-            <div>
-                <label for="stage-value-items" class="block text-sm font-medium text-muted-foreground mb-1">Value items (one per line)</label>
-                <textarea id="stage-value-items" name="value_items" rows="2"
-                          class="mt-1 flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"></textarea>
-            </div>
-        </div>
-        <div class="grid grid-cols-1 gap-4">
-            <div>
-                <label for="stage-type" class="block text-sm font-medium text-muted-foreground mb-1">Stage Type</label>
-                <select id="stage-type" name="stage_type"
-                        class="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
-                    <option value="operational">Operational</option>
-                    <option value="strategic">Strategic</option>
-                    <option value="supporting">Supporting</option>
-                </select>
-            </div>
-            <div>
-                <label for="stage-order" class="block text-sm font-medium text-muted-foreground mb-1">Order</label>
-                <input type="number" id="stage-order" name="stage_order" min="1"
-                       class="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                       placeholder="Auto">
-            </div>
-        </div>
+        {{ input(type='hidden', name='csrf_token', value=csrf_token()) }}
+        {% call form_group(id='stage-name', label='Name') %}{{ input(id='stage-name', name='name', required=true, class='h-9') }}{% endcall %}
+        {% call form_group(id='stage-description', label='Description') %}{{ textarea(id='stage-description', name='description', rows=2) }}{% endcall %}
+        {% call form_group(id='stage-entry-criteria', label='Entry criteria') %}{{ textarea(id='stage-entry-criteria', name='entry_criteria', rows=2) }}{% endcall %}
+        {% call form_group(id='stage-exit-criteria', label='Exit criteria') %}{{ textarea(id='stage-exit-criteria', name='exit_criteria', rows=2) }}{% endcall %}
+        {% call form_group(id='stage-stakeholders', label='Stakeholders (one per line)') %}{{ textarea(id='stage-stakeholders', name='stakeholders', rows=2) }}{% endcall %}
+        {% call form_group(id='stage-value-items', label='Value items (one per line)') %}{{ textarea(id='stage-value-items', name='value_items', rows=2) }}{% endcall %}
+        {{ radio_group(name='stage_type', label='Stage Type', inline=true, value='operational', id_prefix='create', options=stage_types) }}
+        {% call form_group(id='stage-order', label='Order') %}{{ input(id='stage-order', name='stage_order', type='number', placeholder='Auto', class='h-9', attrs_dict={'min': 1}) }}{% endcall %}
         <div class="flex items-center gap-6">
-            <label class="inline-flex items-center gap-2 text-sm text-foreground">
-                <input type="checkbox" name="customer_facing" class="rounded border-input text-primary focus-visible:ring-ring">
-                Customer facing
-            </label>
-            <label class="inline-flex items-center gap-2 text-sm text-foreground">
-                <input type="checkbox" name="quality_gate" class="rounded border-input text-primary focus-visible:ring-ring">
-                Quality gate
-            </label>
+            {{ checkbox(id='stage-customer-facing', name='customer_facing', label='Customer facing') }}
+            {{ checkbox(id='stage-quality-gate', name='quality_gate', label='Quality gate') }}
         </div>
-        <div class="flex justify-end gap-2 pt-2">
-            <button type="button" data-modal-close="stage-create-modal"
-                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4">
-                Cancel
-            </button>
-            <button type="submit"
-                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
-                Add Stage
-            </button>
-        </div>
+        {{ form_footer(submit_text='Add Stage', cancel_attrs={'data-modal-close': 'stage-create-modal'}) }}
     </form>
     {% endcall %}
 
     <!-- Stage edit modal -->
     {% call modal(id='stage-edit-modal', title='Edit Stage', size='default') %}
     <form method="POST" x-bind:action="stageEditForm.id ? '{{ url_for('value_stream.edit_stage', stage_id=0) }}'.replace('/0/', '/' + stageEditForm.id + '/') : '#'" class="space-y-4">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <input type="hidden" name="value_stream_id" value="{{ value_stream.id }}">
-        <div>
-            <label class="block text-sm font-medium text-muted-foreground mb-1">Name</label>
-            <input type="text" name="name" x-model="stageEditForm.name" required
-                   class="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" aria-label="Name">
-        </div>
-        <div>
-            <label class="block text-sm font-medium text-muted-foreground mb-1">Description</label>
-            <textarea name="description" x-model="stageEditForm.description" rows="2"
-                      class="mt-1 flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" aria-label="Description"></textarea>
-        </div>
-        <div>
-            <label for="stage-edit-entry-criteria" class="block text-sm font-medium text-muted-foreground mb-1">Entry criteria</label>
-            <textarea id="stage-edit-entry-criteria" name="entry_criteria" x-model="stageEditForm.entry_criteria" rows="2"
-                      class="mt-1 flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"></textarea>
-        </div>
-        <div>
-            <label for="stage-edit-exit-criteria" class="block text-sm font-medium text-muted-foreground mb-1">Exit criteria</label>
-            <textarea id="stage-edit-exit-criteria" name="exit_criteria" x-model="stageEditForm.exit_criteria" rows="2"
-                      class="mt-1 flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"></textarea>
-        </div>
-        <div class="grid grid-cols-1 gap-4">
-            <div>
-                <label for="stage-edit-stakeholders" class="block text-sm font-medium text-muted-foreground mb-1">Stakeholders (one per line)</label>
-                <textarea id="stage-edit-stakeholders" name="stakeholders" x-model="stageEditForm.stakeholders" rows="2"
-                          class="mt-1 flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"></textarea>
-            </div>
-            <div>
-                <label for="stage-edit-value-items" class="block text-sm font-medium text-muted-foreground mb-1">Value items (one per line)</label>
-                <textarea id="stage-edit-value-items" name="value_items" x-model="stageEditForm.value_items" rows="2"
-                          class="mt-1 flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"></textarea>
-            </div>
-        </div>
-        <div class="grid grid-cols-1 gap-4">
-            <div>
-                <label class="block text-sm font-medium text-muted-foreground mb-1">Stage Type</label>
-                <select name="stage_type" x-model="stageEditForm.stage_type"
-                        class="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" aria-label="Stage Type">
-                    <option value="operational">Operational</option>
-                    <option value="strategic">Strategic</option>
-                    <option value="supporting">Supporting</option>
-                </select>
-            </div>
-            <div>
-                <label class="block text-sm font-medium text-muted-foreground mb-1">Order</label>
-                <input type="number" name="stage_order" min="1" x-model.number="stageEditForm.stage_order"
-                       class="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" aria-label="Order">
-            </div>
-        </div>
+        {{ input(type='hidden', name='csrf_token', value=csrf_token()) }}
+        {{ input(type='hidden', name='value_stream_id', value=value_stream.id) }}
+        {% call form_group(id='stage-edit-name', label='Name') %}{{ input(id='stage-edit-name', name='name', required=true, class='h-9', attrs_dict={'x-model': 'stageEditForm.name'}) }}{% endcall %}
+        {% call form_group(id='stage-edit-description', label='Description') %}{{ textarea(id='stage-edit-description', name='description', rows=2, attrs_dict={'x-model': 'stageEditForm.description'}) }}{% endcall %}
+        {% call form_group(id='stage-edit-entry-criteria', label='Entry criteria') %}{{ textarea(id='stage-edit-entry-criteria', name='entry_criteria', rows=2, attrs_dict={'x-model': 'stageEditForm.entry_criteria'}) }}{% endcall %}
+        {% call form_group(id='stage-edit-exit-criteria', label='Exit criteria') %}{{ textarea(id='stage-edit-exit-criteria', name='exit_criteria', rows=2, attrs_dict={'x-model': 'stageEditForm.exit_criteria'}) }}{% endcall %}
+        {% call form_group(id='stage-edit-stakeholders', label='Stakeholders (one per line)') %}{{ textarea(id='stage-edit-stakeholders', name='stakeholders', rows=2, attrs_dict={'x-model': 'stageEditForm.stakeholders'}) }}{% endcall %}
+        {% call form_group(id='stage-edit-value-items', label='Value items (one per line)') %}{{ textarea(id='stage-edit-value-items', name='value_items', rows=2, attrs_dict={'x-model': 'stageEditForm.value_items'}) }}{% endcall %}
+        {{ radio_group(name='stage_type', label='Stage Type', inline=true, id_prefix='edit', attrs={'x-model': 'stageEditForm.stage_type'}, options=stage_types) }}
+        {% call form_group(id='stage-edit-order', label='Order') %}{{ input(id='stage-edit-order', name='stage_order', type='number', class='h-9', attrs_dict={'min': 1, 'x-model.number': 'stageEditForm.stage_order'}) }}{% endcall %}
         <div class="flex items-center gap-6">
-            <label class="inline-flex items-center gap-2 text-sm text-foreground">
-                <input type="checkbox" name="customer_facing" x-model="stageEditForm.customer_facing" class="rounded border-input text-primary focus-visible:ring-ring">
-                Customer facing
-            </label>
-            <label class="inline-flex items-center gap-2 text-sm text-foreground">
-                <input type="checkbox" name="quality_gate" x-model="stageEditForm.quality_gate" class="rounded border-input text-primary focus-visible:ring-ring">
-                Quality gate
-            </label>
+            {{ checkbox(id='stage-edit-customer-facing', name='customer_facing', label='Customer facing', attrs_dict={':checked': 'stageEditForm.customer_facing'}) }}
+            {{ checkbox(id='stage-edit-quality-gate', name='quality_gate', label='Quality gate', attrs_dict={':checked': 'stageEditForm.quality_gate'}) }}
         </div>
-        <div class="flex justify-end gap-2 pt-2">
-            <button type="button" data-modal-close="stage-edit-modal"
-                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4">
-                Cancel
-            </button>
-            <button type="submit"
-                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
-                Save
-            </button>
-        </div>
+        {{ form_footer(cancel_attrs={'data-modal-close': 'stage-edit-modal'}) }}
     </form>
     {% endcall %}
 
@@ -534,17 +399,10 @@
             <p class="text-sm text-muted-foreground">
                 Delete stage <span class="font-medium text-foreground" x-text="stageDeleteForm.name"></span> and all its capability mappings? This cannot be undone.
             </p>
-            <form method="POST" x-bind:action="'{{ url_for('value_stream.delete_stage', stage_id=0) }}'.replace('/0/', '/' + stageDeleteForm.id + '/')" class="flex justify-end gap-2">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                <input type="hidden" name="value_stream_id" value="{{ value_stream.id }}">
-                <button type="button" data-modal-close="stage-delete-modal"
-                        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4">
-                    Cancel
-                </button>
-                <button type="submit"
-                        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-destructive text-destructive-foreground text-sm font-semibold transition-colors hover:bg-destructive/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
-                    Delete
-                </button>
+            <form method="POST" x-bind:action="'{{ url_for('value_stream.delete_stage', stage_id=0) }}'.replace('/0/', '/' + stageDeleteForm.id + '/')">
+                {{ input(type='hidden', name='csrf_token', value=csrf_token()) }}
+                {{ input(type='hidden', name='value_stream_id', value=value_stream.id) }}
+                {{ form_footer(submit_text='Delete', submit_variant='destructive', cancel_attrs={'data-modal-close': 'stage-delete-modal'}) }}
             </form>
         </div>
     </template>
@@ -553,39 +411,18 @@
     <!-- Value stream edit modal -->
     {% call modal(id='vs-edit-modal', title='Edit Value Stream', size='default') %}
     <form method="POST" action="{{ url_for('value_stream.edit', value_stream_id=value_stream.id) }}" class="space-y-4">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <div>
-            <label class="block text-sm font-medium text-muted-foreground mb-1">Name</label>
-            <input type="text" name="name" value="{{ value_stream.name }}" required
-                   class="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" aria-label="Name">
-        </div>
-        <div>
-            <label class="block text-sm font-medium text-muted-foreground mb-1">Description</label>
-            <textarea name="description" rows="3"
-                      class="mt-1 flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" aria-label="Description">{{ value_stream.description or '' }}</textarea>
-        </div>
-        <div class="grid grid-cols-1 gap-4">
-            <div>
-                <label class="block text-sm font-medium text-muted-foreground mb-1">Target Cycle Time (days)</label>
-                <input type="number" name="target_cycle_time" value="{{ value_stream.target_cycle_time if value_stream.target_cycle_time is not none else '' }}"
-                       class="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" aria-label="Target Cycle Time (days)">
-            </div>
-            <div>
-                <label class="block text-sm font-medium text-muted-foreground mb-1">Current Cycle Time (days)</label>
-                <input type="number" name="current_cycle_time" value="{{ value_stream.current_cycle_time if value_stream.current_cycle_time is not none else '' }}"
-                       class="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" aria-label="Current Cycle Time (days)">
-            </div>
-        </div>
-        <div class="flex justify-end gap-2 pt-2">
-            <button type="button" data-modal-close="vs-edit-modal"
-                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4">
-                Cancel
-            </button>
-            <button type="submit"
-                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
-                Save
-            </button>
-        </div>
+        {{ input(type='hidden', name='csrf_token', value=csrf_token()) }}
+        {% call form_group(id='vs-edit-name', label='Name') %}{{ input(id='vs-edit-name', name='name', value=value_stream.name, required=true, class='h-9') }}{% endcall %}
+        {% call form_group(id='vs-edit-description', label='Description') %}
+            {% call textarea(id='vs-edit-description', name='description', rows=3) %}{{ value_stream.description or '' }}{% endcall %}
+        {% endcall %}
+        {% call form_group(id='vs-edit-target', label='Target Cycle Time (days)') %}
+            {{ input(id='vs-edit-target', name='target_cycle_time', type='number', class='h-9', value=value_stream.target_cycle_time if value_stream.target_cycle_time is not none else '') }}
+        {% endcall %}
+        {% call form_group(id='vs-edit-current', label='Current Cycle Time (days)') %}
+            {{ input(id='vs-edit-current', name='current_cycle_time', type='number', class='h-9', value=value_stream.current_cycle_time if value_stream.current_cycle_time is not none else '') }}
+        {% endcall %}
+        {{ form_footer(cancel_attrs={'data-modal-close': 'vs-edit-modal'}) }}
     </form>
     {% endcall %}
 
@@ -595,16 +432,9 @@
         <p class="text-sm text-muted-foreground">
             Delete <span class="font-medium text-foreground">{{ value_stream.name }}</span> along with all its stages and capability mappings? This cannot be undone.
         </p>
-        <form method="POST" action="{{ url_for('value_stream.delete', value_stream_id=value_stream.id) }}" class="flex justify-end gap-2">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <button type="button" data-modal-close="vs-delete-modal"
-                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4">
-                Cancel
-            </button>
-            <button type="submit"
-                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-destructive text-destructive-foreground text-sm font-semibold transition-colors hover:bg-destructive/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
-                Delete
-            </button>
+        <form method="POST" action="{{ url_for('value_stream.delete', value_stream_id=value_stream.id) }}">
+            {{ input(type='hidden', name='csrf_token', value=csrf_token()) }}
+            {{ form_footer(submit_text='Delete', submit_variant='destructive', cancel_attrs={'data-modal-close': 'vs-delete-modal'}) }}
         </form>
     </div>
     {% endcall %}
