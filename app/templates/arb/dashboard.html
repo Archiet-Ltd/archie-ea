@@ -132,12 +132,12 @@
     {% set completed_reviews = dashboard_data.metrics.approved_items + dashboard_data.metrics.rejected_items %}
     {% set approval_rate_display = (("%.1f"|format(dashboard_data.metrics.approval_rate)) ~ '%') if completed_reviews > 0 else '—' %}
     {% set cycle_time_display = (("%.1f"|format(cycle_time.avg_days)) ~ ' days') if cycle_time.get('total_reviews', 0) > 0 else '—' %}
-    <section aria-label="Governance performance" class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+    <section aria-label="Governance performance" class="grid grid-cols-2 gap-4 lg:grid-cols-4">
         {{ metrics_card(
             title='Total reviews',
             value=dashboard_data.metrics.total_items,
             icon='clipboard-list',
-            description='Governed review items in this tenant'
+            description='Governed review items in your organisation'
         ) }}
         {{ metrics_card(
             title='Pending',

@@ -15,19 +15,13 @@
     {{ page_header(
         title='ARB Reviews',
         description='Architecture review items submitted for governance assessment',
-        breadcrumbs=[('Home', url_for('main.index')), ('Governance', None), ('ARB Reviews', None)],
-        actions=[
-            {'text': 'New Review', 'icon': 'plus', 'onclick': "Platform.modal.open('create-arb-review')"}
-        ]
+        breadcrumbs=[{'label': 'Home', 'href': url_for('main.index')}, {'label': 'Governance'}, {'label': 'ARB Reviews'}]
     ) }}
     {% else %}
     {{ page_header(
         title='ARB Sessions',
         description='Scheduled Architecture Review Board meetings',
-        breadcrumbs=[('Home', url_for('main.index')), ('Governance', None), ('ARB Sessions', None)],
-        actions=[
-            {'text': 'New Session', 'icon': 'plus', 'onclick': "Platform.modal.open('create-arb-session')"}
-        ]
+        breadcrumbs=[{'label': 'Home', 'href': url_for('main.index')}, {'label': 'Governance'}, {'label': 'ARB Sessions'}]
     ) }}
     {% endif %}
 
@@ -132,9 +126,9 @@
             {% endfor %}
         {% else %}
             {% if is_reviews_view %}
-            {{ empty_state(icon='clipboard-list', title='No reviews found', description='No ARB review items match the current filters', cta_text='New Review', cta_onclick="Platform.modal.open('create-arb-review')", cta_icon='plus') }}
+            {{ empty_state(icon='clipboard-list', title='No reviews found', description='No ARB review items match the current filters', cta_text='New review', cta_onclick="Platform.modal.open('create-arb-review')", cta_icon='plus', padding='py-8') }}
             {% else %}
-            {{ empty_state(icon='calendar', title='No sessions found', description='No ARB sessions match the current filters', cta_text='Schedule Session', cta_onclick="Platform.modal.open('create-arb-session')", cta_icon='plus') }}
+            {{ empty_state(icon='calendar', title='No sessions found', description='No ARB sessions match the current filters', cta_text='New session', cta_onclick="Platform.modal.open('create-arb-session')", cta_icon='plus', padding='py-8') }}
             {% endif %}
         {% endif %}
     </div>
