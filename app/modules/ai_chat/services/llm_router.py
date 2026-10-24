@@ -55,6 +55,7 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship  # dead-code-ok
 
 from app import db
+from app.modules.ai_chat.services.model_defaults import default_model_for as _default_model_for
 from app.services.llm_cache import get_cache as get_llm_cache
 from app.modules.ai_chat.services.llm_service_impl import LLMService as _LLMServiceImpl
 
@@ -373,7 +374,7 @@ class LLMRouter:
             LLMProvider.ANTHROPIC: "claude-haiku-4-5-20251001",
             LLMProvider.OPENAI: "gpt-4o-mini",
             LLMProvider.GEMINI: "gemini-2.0-flash",
-            LLMProvider.NVIDIA: "nvidia/nemotron-3-super-120b-a12b",
+            LLMProvider.NVIDIA: _default_model_for("nvidia"),
             LLMProvider.OPENROUTER: "google/gemma-4-31b-it:free",
             LLMProvider.AZURE: "gpt-4o",
             LLMProvider.HUGGINGFACE: "meta-llama/Llama-3.1-8B-Instruct",

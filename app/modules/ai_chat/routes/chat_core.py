@@ -12,6 +12,7 @@ from flask_login import current_user, login_required
 
 from app.decorators import audit_log
 from app.models.ai_service import AIPromptTemplate
+from app.modules.ai_chat.services.failure_messages import ASSISTANT_UNAVAILABLE
 from app.services.feature_flag_service import FeatureFlagService
 from app.services.rate_limiter import rate_limit
 from app.utils.validators import (
@@ -722,7 +723,7 @@ def send_message():
         return (
             jsonify(
                 {
-                    "error": "Unable to connect to AI service. Please check your API configuration in Admin > API Settings.",
+                    "error": ASSISTANT_UNAVAILABLE,
                     "error_type": "connection",
                 }
             ),
@@ -750,7 +751,7 @@ def send_message():
             return (
                 jsonify(
                     {
-                        "error": "AI service authentication failed. Please verify your API key in Admin > API Settings.",
+                        "error": ASSISTANT_UNAVAILABLE,
                         "error_type": "auth",
                     }
                 ),

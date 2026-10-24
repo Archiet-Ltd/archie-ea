@@ -59,7 +59,12 @@ def test_another_organisation_gets_no_answer_and_cannot_open_the_address(client,
     mine = _ask(client, QUESTION).get_json()
     assert mine["found"] is True
     login_as(client, outsider)
-    assert _ask(client, QUESTION).get_json() == {"success": True, "found": False}
+    theirs = _ask(client, QUESTION).get_json()
+    # The outsider's organisation has no such service: the chat says it cannot answer, with
+    # no stored answer, no connection from the owner's organisation and no record to open.
+    assert "page_url" not in theirs and "address" not in theirs
+    assert "data-answer-row" not in theirs.get("html", "") and "Payments service" not in theirs.get("html", "")
+    assert "data-catalogue-record" not in theirs.get("html", "")
     assert client.get(mine["page_url"]).status_code == 404
 
 

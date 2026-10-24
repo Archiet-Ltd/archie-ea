@@ -674,6 +674,17 @@ def overview():
         else "data"
     )
 
+    from app.models.organization import Organization
+    from app.modules.account.services import onboarding_service
+
+    # How far each source given at sign-up has got; empty when none was given.
+    org_for_sources = db.session.get(Organization, g.current_org_id) if g.current_org_id else None
+    signup_sources = (
+        [row for row in onboarding_service.sources(org_for_sources) if row["state"] != "not_given"]
+        if org_for_sources is not None else []
+    )
+    given_sources = bool(signup_sources)
+
     guided_steps = []
     first_actions = {"connect": False, "sample": False, "import_href": None}
     if dashboard_mode == "guided":
@@ -738,18 +749,21 @@ def overview():
             except Exception:
                 _can_load_sample = False
 
-            first_actions["sample"] = _can_load_sample
+            # Not offered to someone who already gave a source: their own data is on its way.
+            first_actions["sample"] = _can_load_sample and not given_sources
         # Same test the connector pages apply, so the link is only shown to
         # someone it opens for.
         try:
             from app.middleware.tenant_decorators import is_platform_admin
             from app.services.rbac_service import rbac_service
+            from app.utils.role_access import may_use_connections
 
             first_actions["connect"] = bool(
                 'm365_connector.github_connect' in current_app.view_functions
                 and (
                     is_platform_admin(current_user)
                     or rbac_service.is_org_admin(current_user, g.current_org_id)
+                    or may_use_connections(current_user)
                 )
             )
         except Exception:
@@ -824,6 +838,7 @@ def overview():
 
     return render_template(
         "dashboards/overview.html",
+        signup_sources=signup_sources,
         metrics=metrics,
         nav_stats=nav_stats,
         layer_breakdown=layer_breakdown,

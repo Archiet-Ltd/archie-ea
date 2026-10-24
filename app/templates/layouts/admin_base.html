@@ -99,7 +99,7 @@
        class="skip-link sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-50 focus:px-4 focus:py-2 focus:bg-background focus:text-foreground focus:rounded-md">
         Skip to sidebar navigation
     </a>
-    <a href="#search-modal-trigger"
+    <a href="#sidebar-search"
        class="skip-link sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-50 focus:px-4 focus:py-2 focus:bg-background focus:text-foreground focus:rounded-md">
         Skip to search
     </a>
@@ -189,7 +189,7 @@
                     {% if sample_company_restore_point_id %}
                     <div class="mb-4 flex items-center justify-between gap-3 rounded-md border border-border bg-card px-4 py-2 text-sm" data-testid="sample-company-indicator">
                         <p class="text-muted-foreground">You are looking at the sample company.</p>
-                        {% call dialog(trigger_text='Remove it', trigger_label='Remove the sample company', start_hidden=false, title='Remove the sample company?', description='The sample applications, capabilities and risks go away. Anything you added yourself stays.') %}
+                        {% call dialog(trigger_text='Remove it', trigger_label='Remove it', start_hidden=false, title='Remove the sample company?', description='The sample applications, capabilities and risks go away. Anything you added yourself stays.') %}
                         <form method="post" action="{{ url_for('architect_ui.remove_sample_company') }}" class="flex justify-end">
                             {{ input(type='hidden', name='csrf_token', value=csrf_token()) }}
                             {{ button(text='Remove the sample company', type='submit', variant='destructive', testid='sample-company-remove-confirm') }}
