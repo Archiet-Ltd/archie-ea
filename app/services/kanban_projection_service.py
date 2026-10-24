@@ -44,13 +44,13 @@ ADM_PHASES = [
     {"code": "PRELIM", "label": "Preliminary", "order": 0},
     {"code": "A", "label": "Architecture Vision", "order": 1},
     {"code": "B", "label": "Business Architecture", "order": 2},
-    {"code": "C", "label": "IS Architecture", "order": 3},
+    {"code": "C", "label": "Information Systems Architectures", "order": 3},
     {"code": "D", "label": "Technology Architecture", "order": 4},
-    {"code": "E", "label": "Opportunities & Solutions", "order": 5},
+    {"code": "E", "label": "Opportunities and Solutions", "order": 5},
     {"code": "F", "label": "Migration Planning", "order": 6},
-    {"code": "G", "label": "Impl. Governance", "order": 7},
-    {"code": "H", "label": "Change Management", "order": 8},
-    {"code": "REQ", "label": "Requirements Mgmt", "order": 9},
+    {"code": "G", "label": "Implementation Governance", "order": 7},
+    {"code": "H", "label": "Architecture Change Management", "order": 8},
+    {"code": "REQ", "label": "Requirements Management", "order": 9},
 ]
 
 for _phase in ADM_PHASES:
@@ -511,13 +511,24 @@ class KanbanProjectionService:
         except Exception as exc:
             self.logger.debug("Could not compute days_in_column for solution %s: %s", sol.id, exc)
 
-        # Link URL
+        # Link URL: only for a solution the signed-in person may open. The solution
+        # page refuses everyone else, and a link that lands on a refusal is worse
+        # than no link.
+        link_url = None
         try:
-            link_url = url_for(
-                "solution_design.view_solution", solution_id=sol.id
+            from app.modules.solutions_strategic.v2.routes.solution_design_routes import (
+                _check_solution_access,
             )
+
+            if _check_solution_access(sol):
+                try:
+                    link_url = url_for(
+                        "solution_design.view_solution", solution_id=sol.id
+                    )
+                except Exception:
+                    link_url = f"/solutions/{sol.id}"
         except Exception:
-            link_url = f"/solutions/{sol.id}"
+            self.logger.debug("Could not check access to solution %s", sol.id, exc_info=True)
 
         return {
             "id": f"solution:{sol.id}",
