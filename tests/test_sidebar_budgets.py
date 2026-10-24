@@ -112,8 +112,12 @@ def test_sidebar_link_budget_is_31():
     Agent Registry (R1-B56, 6 Oct 2026): raised 32 -> 33. One new
     platform_admin-only link (owner, charter and delegated limits per
     registered agent); no fold is available for the same reason as above.
+
+    Workspace (24 Oct 2026): raised 33 -> 35. "Connections" and "Billing" are two
+    new links, in the same place for every administrator; platform_admin renders
+    them like everyone else and no fold is available.
     """
-    assert SIDEBAR_LINK_BUDGET == 33
+    assert SIDEBAR_LINK_BUDGET == 35
 
 
 def test_every_role_is_defined():
@@ -466,8 +470,11 @@ def test_platform_admin_zone_link_total_is_pinned():
     My work — the one registry recording each agent's owner, charter version
     and delegated limits, closest existing persona to the brief's
     "Organisation Administrator".
+
+    30 -> 32: "Connections" and "Billing" join every role's new Workspace zone
+    (shown only to people who may open them), platform_admin included.
     """
-    assert len(_all_links(ROLE_PLATFORM_ADMIN)) == 30
+    assert len(_all_links(ROLE_PLATFORM_ADMIN)) == 32
 
 
 def test_platform_admin_collapsed_sidebar_icons_are_unambiguous():
@@ -477,16 +484,26 @@ def test_platform_admin_collapsed_sidebar_icons_are_unambiguous():
     assert duplicates == {}
 
 
+def _without_admin_only_links(zones):
+    """The zones a person who is not an administrator is shown: Workspace holds only
+    links to administrator pages, so for them it is present and empty."""
+    return [
+        {**z, "links": [link for link in z["links"] if link.get("requires") != "admin"]}
+        if z["zone"] == "workspace" else z
+        for z in zones
+    ]
+
+
 def test_get_sidebar_zones_resolves_role():
     user = _StubUser(ROLE_SOLUTION_ARCHITECT)
     zones = get_sidebar_zones(user)
-    assert zones == SIDEBAR_ZONES[ROLE_SOLUTION_ARCHITECT]
+    assert zones == _without_admin_only_links(SIDEBAR_ZONES[ROLE_SOLUTION_ARCHITECT])
 
 
 def test_get_sidebar_zones_defaults_for_unknown_role():
     user = _StubUser("not_a_real_role")
     zones = get_sidebar_zones(user)
-    assert zones == SIDEBAR_ZONES[ROLE_SOLUTION_ARCHITECT]
+    assert zones == _without_admin_only_links(SIDEBAR_ZONES[ROLE_SOLUTION_ARCHITECT])
 
 
 def test_get_sidebar_zones_never_raises_for_none_user():
@@ -543,3 +560,16 @@ def test_architect_collapsed_sidebar_icons_are_unambiguous(role):
     for link in _all_links(role):
         endpoints_by_icon.setdefault(link["icon"], set()).add(link["endpoint"])
     assert {i: sorted(e) for i, e in endpoints_by_icon.items() if len(e) > 1} == {}
+
+
+@pytest.mark.parametrize("role", sorted(SIDEBAR_ZONES))
+def test_workspace_holds_connections_and_billing_for_administrators_only(role):
+    """Both pages are administrator pages, so every role's Workspace zone lists them
+    for an administrator and for nobody else (a link that 403s is a dead end)."""
+    admin = next(z for z in get_sidebar_zones(_StubUser(role, is_platform_admin=True)) if z["zone"] == "workspace")
+    assert [(link["label"], link["endpoint"]) for link in admin["links"]] == [
+        ("Connections", "m365_connector.connectors_index"),
+        ("Billing", "billing.billing_index"),
+    ]
+    other = next(z for z in get_sidebar_zones(_StubUser(role)) if z["zone"] == "workspace")
+    assert other["links"] == []

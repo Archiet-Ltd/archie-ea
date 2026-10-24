@@ -421,6 +421,7 @@
     "components/breadcrumb_nav.html",
     "components/button.html",
     "components/card.html",
+    "components/checkbox.html",
     "components/confirmation_dialog.html",
     "components/data_card.html",
     "components/dense_table.html",
@@ -4707,6 +4708,7 @@
     "components/breadcrumb_nav.html",
     "components/button.html",
     "components/card.html",
+    "components/checkbox.html",
     "components/confirmation_dialog.html",
     "components/data_card.html",
     "components/dense_table.html",
@@ -4727,7 +4729,6 @@
     "components/skeleton.html",
     "components/status_badge.html",
     "components/tabs.html",
-    "macros/kanban_board.html",
     "macros/page_shell.html"
    ],
    "basis": "rule",
@@ -4738,11 +4739,14 @@
     "breadcrumb",
     "button",
     "card",
+    "checkbox",
     "dialog",
     "empty",
+    "input",
     "kanban-board",
     "page-header",
     "page-shell",
+    "select",
     "dropdown-menu"
    ],
    "controls": {
@@ -4759,6 +4763,12 @@
     "macros/kanban_board.html"
    ],
    "macros": [
+    "components/badge.html",
+    "components/button.html",
+    "components/checkbox.html",
+    "components/empty_state.html",
+    "components/input.html",
+    "components/select.html",
     "macros/kanban_board.html",
     "macros/page_shell.html"
    ],
