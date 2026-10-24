@@ -744,12 +744,14 @@ def overview():
         try:
             from app.middleware.tenant_decorators import is_platform_admin
             from app.services.rbac_service import rbac_service
+            from app.utils.role_access import may_use_connections
 
             first_actions["connect"] = bool(
                 'm365_connector.github_connect' in current_app.view_functions
                 and (
                     is_platform_admin(current_user)
                     or rbac_service.is_org_admin(current_user, g.current_org_id)
+                    or may_use_connections(current_user)
                 )
             )
         except Exception:
