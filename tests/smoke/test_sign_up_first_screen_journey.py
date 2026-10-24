@@ -59,6 +59,11 @@ def _assert_persona(email):
 def test_new_owner_lands_on_one_card_with_no_wizard(browser, live_server, name, viewport):
     context = browser.new_context(viewport=viewport)
     context.set_default_timeout(PAGE_TIMEOUT)
+    if os.environ.get("ONB_THEME") == "dark":
+        context.add_init_script(
+            "try { localStorage.setItem('theme', 'dark'); } catch (e) {} "
+            "document.documentElement.classList.add('dark');"
+        )
     page = context.new_page()
     try:
         email = _sign_up(page, live_server)
@@ -86,7 +91,7 @@ def test_new_owner_lands_on_one_card_with_no_wizard(browser, live_server, name, 
         assert message.locator('[data-testid="company-kind-selector"]').count() == 1
         if WALK:
             os.makedirs(WALK, exist_ok=True)
-            page.screenshot(path=os.path.join(WALK, "fold-%s.png" % name))
+            page.screenshot(path=os.path.join(WALK, "fold-%s-%s.png" % (name, os.environ.get("ONB_THEME", "light"))))
     finally:
         context.close()
 
