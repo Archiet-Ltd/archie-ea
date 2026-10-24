@@ -7,6 +7,7 @@
                strategic/*, governance/*, and all other authenticated pages.
    See also: public_base.html (unauthenticated), base.html (legacy, avoid).
 #}
+{% from 'components/button.html' import button %}
 <!DOCTYPE html>
 <html lang="en" class="h-full">
 <head>
@@ -469,7 +470,7 @@
              x-transition:leave="transition ease-in duration-150"
              x-transition:leave-start="opacity-100 translate-x-0"
              x-transition:leave-end="opacity-0 translate-x-4"
-             class="fixed bottom-20 right-6 z-30 w-80 rounded-xl border border-border bg-card"
+             class="fixed bottom-20 right-6 z-30 w-80 rounded-lg border border-border bg-card"
              @keydown.escape.window="exit()">
             <div class="flex items-center justify-between border-b border-border px-4 py-3">
                 <span class="text-sm font-semibold text-foreground">Guided Walkthrough</span>
@@ -488,7 +489,7 @@
                 </div>
             </div>
             <div class="flex items-center justify-between border-t border-border px-4 py-3">
-                <button type="button" @click="exit()" class="text-xs text-muted-foreground hover:text-foreground transition-colors">Exit</button>
+                {{ button(text='Exit', variant='ghost', size='sm', class='text-xs', on_click='exit()') }}
                 <button type="button" @click="next()"
                         class="rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:opacity-90 transition-opacity"
                         x-text="currentIndex === steps.length - 1 ? 'Done' : 'Next'">
