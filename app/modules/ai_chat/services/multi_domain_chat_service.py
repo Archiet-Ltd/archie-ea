@@ -324,6 +324,27 @@ PERSONA_CONFIGS = {
             "Map business needs to ArchiMate elements",
         ],
     },
+    "cto_founder": {
+        "name": "CTO / technical founder",
+        "icon": "rocket",
+        "color": "violet",
+        "description": "What breaks, who owns it, what it costs and what to fix first",
+        "expertise": [
+            "Delivery risk",
+            "Ownership gaps",
+            "Run cost",
+            "Fix-first ordering",
+        ],
+        "focus_areas": ["What breaks", "Who owns it", "What it costs", "What to fix first"],
+        "default_domain": "general",
+        "context_priority": ["applications", "risks", "costs", "owners"],
+        "sample_prompts": [
+            "What breaks if the payments service goes down?",
+            "Which applications have no owner?",
+            "What does each application cost to run?",
+            "What should we fix first?",
+        ],
+    },
     "cio": {
         "name": "CIO / IT Executive",
         "icon": "crown",
@@ -667,7 +688,7 @@ class MultiDomainChatService:
                     "capability_architect",
                 ],
                 "analysts": ["business_analyst", "product_analyst"],
-                "executives": ["cio"],
+                "executives": ["cto_founder", "cio"],
                 "governance": ["arb_member"],
                 "stewards": [
                     "portfolio_manager",
