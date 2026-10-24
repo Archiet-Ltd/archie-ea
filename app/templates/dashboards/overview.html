@@ -240,7 +240,7 @@
 
     {# Activity chart (shadcn dashboard-01 interactive area chart): records added per day, drawn on the server from created_at dates. #}
     {% macro activity_area(rows, label) %}
-    {% set W = 720 %}{% set H = 260 %}{% set top = 16 %}{% set bottom = 32 %}{% set left = 40 %}{% set right = 12 %}
+    {% set W = 720 %}{% set H = 260 %}{% set top = 16 %}{% set bottom = 32 %}{% set left = 44 %}{% set right = 12 %}
     {% set plot_w = W - left - right %}{% set plot_h = H - top - bottom %}
     {% set n = rows|length %}
     {% set peak = (rows | map(attribute='total') | max) or 1 %}
@@ -257,7 +257,7 @@
         {% for g in [0, 1, 2, 3] %}
         {% set gy = top + plot_h - (plot_h * g / 3) %}
         <line x1="{{ left }}" y1="{{ gy }}" x2="{{ W - right }}" y2="{{ gy }}" class="stroke-border" stroke-width="1" />
-        <text x="{{ left - 6 }}" y="{{ gy + 4 }}" text-anchor="end" class="fill-muted-foreground tabular-nums" font-size="11">{{ (peak * g / 3) | round | int }}</text>
+        <text x="{{ left - 6 }}" y="{{ gy + 4 }}" text-anchor="end" class="fill-muted-foreground tabular-nums" font-size="15">{{ (peak * g / 3) | round | int }}</text>
         {% endfor %}
         <path d="{{ ns.total_top }}L{{ left + plot_w }},{{ base }} L{{ left }},{{ base }} Z" class="fill-primary/25" />
         <path d="{{ ns.total_top }}" class="fill-none stroke-primary/60" stroke-width="1.5" />
@@ -266,7 +266,7 @@
         {% set step = ((n / 5) | round(0, 'ceil') | int) or 1 %}
         {% for r in rows if r.idx % step == 0 or r.idx == n - 1 %}
         {% set tx = left + (plot_w * r.idx / (n - 1)) %}
-        <text x="{{ tx }}" y="{{ H - 10 }}" text-anchor="{{ 'end' if r.idx == n - 1 else ('start' if r.idx == 0 else 'middle') }}" class="fill-muted-foreground" font-size="11">{{ r.label }}</text>
+        <text x="{{ tx }}" y="{{ H - 10 }}" text-anchor="{{ 'end' if r.idx == n - 1 else ('start' if r.idx == 0 else 'middle') }}" class="fill-muted-foreground" font-size="15">{{ r.label }}</text>
         {% endfor %}
     </svg>
     {% endmacro %}
@@ -283,7 +283,7 @@
         {% elif (series | sum(attribute='applications')) + (series | sum(attribute='elements')) == 0 %}
             {{ empty_state(icon='chart-area', title='Nothing added in the last 90 days', description='Applications and model elements appear here, day by day, as they are imported or created.', cta_text='Import applications', cta_href=_apps_href, padding='py-8') }}
         {% else %}
-            {% call tabs_list(class='mb-4') %}
+            {% call tabs_list(class='mb-4 h-auto w-fit max-w-full flex-wrap') %}
                 {% for key, text in [('90d', 'Last 3 months'), ('30d', 'Last 30 days'), ('7d', 'Last 7 days')] %}
                 {% call tabs_trigger(value='range-' ~ key, click="range = '" ~ key ~ "'", selected="range === '" ~ key ~ "'") %}{{ text }}{% endcall %}
                 {% endfor %}
@@ -325,15 +325,15 @@
         {% endcall %}
         {% call card_content(class='space-y-4') %}
         {% if ch %}
-            {% call tabs_list() %}
+            {% call tabs_list(class='h-auto w-fit max-w-full flex-wrap') %}
                 {% for key, text, count in [('all', 'All', ch|length), ('gap', 'Gaps', gap_count), ('partial', 'Partial', partial_count), ('covered', 'Covered', covered_count)] %}
                 {% call tabs_trigger(value='coverage-' ~ key, click="pick('" ~ key ~ "')", selected="tab === '" ~ key ~ "'") %}{{ text }} <span class="ml-1 tabular-nums text-muted-foreground">{{ count }}</span>{% endcall %}
                 {% endfor %}
             {% endcall %}
-            {% call dense_table(columns=[('Capability', ''), ('Applications', 'text-right'), ('Coverage', ''), ('', 'text-right')], rows=ch|length, caption='Capability coverage', max_height='none', flush=false) %}{% for cap in ch %}
+            {% call dense_table(columns=[('Capability', ''), ('Applications', 'hidden text-right sm:table-cell'), ('Coverage', ''), ('', 'text-right')], rows=ch|length, caption='Capability coverage', max_height='none', flush=false) %}{% for cap in ch %}
                 <tr class="group h-12 transition-colors hover:bg-muted/50" data-row data-status="{{ cap.coverage_status }}" data-testid="coverage-row"{% if loop.index > 10 %} hidden{% endif %}>
                     <td class="px-2 align-middle font-medium text-foreground">{{ cap.name }}</td>
-                    <td class="px-2 text-right align-middle tabular-nums text-muted-foreground">{{ cap.app_count }}</td>
+                    <td class="hidden px-2 text-right align-middle tabular-nums text-muted-foreground sm:table-cell">{{ cap.app_count }}</td>
                     <td class="px-2 align-middle">
                         {% if cap.coverage_status == 'covered' %}<span class="text-success-emphasis">Covered</span>
                         {% elif cap.coverage_status == 'partial' %}<span class="text-warning-emphasis">Partial</span>
