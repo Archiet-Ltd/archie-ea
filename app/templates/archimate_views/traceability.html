@@ -4,6 +4,7 @@
 {% from 'components/page_header.html' import page_header %}
 {% from 'components/button.html' import button %}
 {% from 'components/badge.html' import badge %}
+{% from 'components/dropdown_menu.html' import dropdown_menu %}
 {% from 'components/input.html' import input %}
 {% from 'components/progress.html' import progress %}
 {% from 'components/alert.html' import alert as notice %}
@@ -98,15 +99,21 @@
                       attrs_dict={'aria-current': 'true'} if direction == 'inverse' else {}) }}
         </div>
         {% if direction == 'forward' and pivot_types %}
-        <span class="text-sm font-medium text-muted-foreground" id="pivot-label">Pivot element:</span>
-        <div class="flex flex-wrap items-center gap-2" role="group" aria-labelledby="pivot-label">
-            {% for pt in pivot_types %}
-            {{ button(pt.type | plain_name(current_user) ~ ' (' ~ pt.layer | plain_layer(current_user) ~ ', ' ~ pt.count ~ ')',
-                      variant='default' if pt.type == current_pivot_type else 'outline', size='sm',
-                      href=url_for('architect_ui.traceability_matrix', direction=direction, pivot_type=pt.type, plateau=current_plateau, search=current_search or none, scope=current_scope or none),
-                      attrs_dict={'aria-current': 'true'} if pt.type == current_pivot_type else {}) }}
-            {% endfor %}
-        </div>
+        {% set pivot_items = [] %}
+        {% set ns_pivot = namespace(layer=none, label='Pivot element') %}
+        {% for pt in pivot_types %}
+        {% if pt.layer != ns_pivot.layer %}
+        {% set _ = pivot_items.append({'header': pt.layer | plain_layer(current_user)}) %}
+        {% set ns_pivot.layer = pt.layer %}
+        {% endif %}
+        {% set _ = pivot_items.append({
+            'text': pt.type | plain_name(current_user) ~ ' (' ~ pt.count ~ ')',
+            'href': url_for('architect_ui.traceability_matrix', direction=direction, pivot_type=pt.type, plateau=current_plateau, search=current_search or none, scope=current_scope or none),
+            'icon': 'check' if pt.type == current_pivot_type else none
+        }) %}
+        {% if pt.type == current_pivot_type %}{% set ns_pivot.label = 'Pivot element: ' ~ (pt.type | plain_name(current_user)) %}{% endif %}
+        {% endfor %}
+        {{ dropdown_menu(id='pivot-menu', trigger_text=ns_pivot.label, trigger_icon='layers', position='left', menu_width='w-72', items=pivot_items, trigger_class='h-8 px-3') }}
         {% endif %}
     </div>
     {% endcall %}

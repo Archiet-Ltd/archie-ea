@@ -87,6 +87,16 @@ def test_traceability_matrix_shows_chain_and_links_land_on_content(browser, live
         assert page.locator("select").count() == 0
         assert page.locator('[class*="-500"], [class*="-700"], [class*="-800"]').count() == 0
 
+        # Choosing another pivot element from the menu lands on a matrix led by that element.
+        page.goto(live_server + "/architecture/traceability?search=Tracer+Billing+Service+" + suffix,
+                  wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        page.locator("#pivot-menu > button").click()
+        page.locator('#pivot-menu a[href*="pivot_type=BusinessService"]').click()
+        page.wait_for_url(lambda url: "pivot_type=BusinessService" in url, timeout=PAGE_TIMEOUT)
+        expect(page.locator("#matrix-view")).to_contain_text("Tracer Billing Service %s" % suffix)
+        page.goto(live_server + "/architecture/traceability?search=Tracer+Ledger+" + suffix,
+                  wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+
         # The current direction and the current pivot are marked, and switching works.
         expect(page.get_by_role("link", name="Top-Down")).to_have_attribute("aria-current", "true")
         page.get_by_role("link", name="Bottom-Up").click()
