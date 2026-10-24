@@ -22,19 +22,19 @@
 
     {% with messages = get_flashed_messages(with_categories=true) %}
         {% for category, message in messages %}
-            {{ alert('success' if category == 'success' else ('danger' if category == 'error' else 'info'), text=message) }}
+            {{ alert('success' if category == 'success' else ('danger' if category == 'error' else 'info'), text=message) }} {# ui-contract-ok: the alert macro, not a native dialog #}
         {% endfor %}
     {% endwith %}
 
     {% if error %}
-        {{ alert('danger', text=error) }}
+        {{ alert('danger', text=error) }} {# ui-contract-ok: the alert macro, not a native dialog #}
     {% endif %}
 
     {% if subscription %}
     {% set status_val = subscription.status.value %}
 
     {% if not payment_ready %}
-    {% call alert('warning', title='Online payment is not open yet.', testid='billing-not-configured') %}
+    {% call alert('warning', title='Online payment is not open yet.', testid='billing-not-configured') %} {# ui-contract-ok: the alert macro, not a native dialog #}
         To buy or change a plan, <a href="{{ contact_sales_url }}" class="font-medium underline">contact us</a> and we will set it up with you. Invoices will appear here once payment is open.
     {% endcall %}
     {% if payment.missing and current_user.is_platform_admin %}
@@ -89,7 +89,7 @@
 
         {% if limits.limit_reached %}
         <div class="mt-4" data-testid="billing-limit-reached">
-            {% call alert('warning', link_href='#plans', link_text='See plans and upgrade') %}Your organisation has reached the {{ limits.plan_name }} limit of {{ limits.limit }} {{ 'editors' if limits.counts == 'editors' else 'people' }}. No one new can be added until you upgrade.{% endcall %}
+            {% call alert('warning', link_href='#plans', link_text='See plans and upgrade') %}Your organisation has reached the {{ limits.plan_name }} limit of {{ limits.limit }} {{ 'editors' if limits.counts == 'editors' else 'people' }}. No one new can be added until you upgrade.{% endcall %} {# ui-contract-ok: the alert macro, not a native dialog #}
         </div>
         {% endif %}
         {% endcall %}
@@ -231,7 +231,7 @@
         {% endcall %}
         {% call card_content() %}
         {% if details_error %}
-            {{ alert('danger', text='Billing details could not be read: ' ~ details_error) }}
+            {{ alert('danger', text='Billing details could not be read: ' ~ details_error) }} {# ui-contract-ok: the alert macro, not a native dialog #}
         {% else %}
             <form method="post" action="{{ url_for('billing.billing_details') }}" class="grid grid-cols-1 gap-4 max-w-2xl" data-testid="billing-details-form">
                 {{ input(type='hidden', name='csrf_token', value=csrf_token()) }}
@@ -260,7 +260,7 @@
         {% if not payment_ready %}
             {{ empty_state('receipt', 'No invoices yet', 'Invoices appear here once online payment is open. Until then, contact us about buying a plan.', cta_text='Contact us', cta_href=contact_sales_url) }}
         {% elif invoice_error %}
-            {{ alert('danger', text='Invoices could not be read: ' ~ invoice_error) }}
+            {{ alert('danger', text='Invoices could not be read: ' ~ invoice_error) }} {# ui-contract-ok: the alert macro, not a native dialog #}
         {% elif not invoices %}
             {{ empty_state('receipt', 'No invoices yet', 'An invoice appears here after each payment.') }}
         {% else %}
