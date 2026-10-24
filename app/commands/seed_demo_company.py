@@ -1303,8 +1303,8 @@ _SOLUTIONS = [
         "One platform for scheduling, performing and certifying field calibrations.",
         "B", "proposed", None,
         [
-            ("Calibration process model", "in_progress", "business_architecture"),
-            ("Stakeholder impact assessment", "planned", "assessment"),
+            ("Calibration process model", "in_progress", "business_architecture", "Business Architecture document"),
+            ("Stakeholder impact assessment", "planned", "assessment", None),
         ],
     ),
     (
@@ -1312,9 +1312,9 @@ _SOLUTIONS = [
         "A shared portal where suppliers confirm orders, deliveries and certificates.",
         "D", "in_progress", None,
         [
-            ("Integration architecture", "in_progress", "technology_architecture"),
-            ("Supplier onboarding runbook", "planned", "runbook"),
-            ("Security review", "planned", "assessment"),
+            ("Integration architecture", "in_progress", "technology_architecture", "Technology Architecture"),
+            ("Supplier onboarding runbook", "planned", "runbook", None),
+            ("Security review", "planned", "assessment", None),
         ],
     ),
     (
@@ -1322,8 +1322,8 @@ _SOLUTIONS = [
         "Replaces point-to-point feeds with one governed event backbone.",
         "F", "approved", "development",
         [
-            ("Migration roadmap", "completed", "implementation_plan"),
-            ("Cut-over plan", "in_progress", "implementation_plan"),
+            ("Migration roadmap", "completed", "implementation_plan", "Finalized Implementation Plan"),
+            ("Cut-over plan", "in_progress", "implementation_plan", None),
         ],
     ),
 ]
@@ -1377,6 +1377,7 @@ def _seed_boards(org_id, demo_user_id) -> dict:
     Idempotent. A work package that already carries a kind is left alone, so
     a card an architect has moved is not put back by a re-run.
     """
+    from app.models.adm_deliverable import ADMDeliverable
     from app.models.business_capabilities import BusinessCapability
     from app.models.implementation_migration import Deliverable
     from app.models.solution_architect_models import (
@@ -1387,6 +1388,7 @@ def _seed_boards(org_id, demo_user_id) -> dict:
         CapabilityValueStreamMapping, ValueStream, ValueStreamStage,
     )
     from app.modules.capabilities.services import value_stream_service
+    from app.services.adm_deliverable_service import seed_deliverables
     from app.services.element_profile_service import (
         read_profile, set_kind, set_kind_property, set_wsjf_components,
     )
@@ -1420,13 +1422,30 @@ def _seed_boards(org_id, demo_user_id) -> dict:
         stats["safe_kinds_set"] += 1
     db.session.flush()
 
-    # Solutions, each with deliverables
+    # Solutions, each with deliverables matched to the phase's TOGAF checklist
+    seed_deliverables()
+    templates = {
+        (t.phase, t.name): t.id for t in db.session.query(ADMDeliverable).filter_by(is_template=True)
+    }
     solutions = {
         s.name: s
         for s in db.session.query(Solution).filter(Solution.organization_id == org_id)
     }
     for name, desc, phase, gov, deploy, deliverables in _SOLUTIONS:
         if name in solutions:
+            # Seeded before deliverables carried a checklist item: match them now.
+            for d_name, _s, _t, d_template in deliverables:
+                if d_template is None:
+                    continue
+                for existing in (
+                    db.session.query(Deliverable)
+                    .join(solution_deliverables,
+                          solution_deliverables.c.deliverable_id == Deliverable.id)
+                    .filter(solution_deliverables.c.solution_id == solutions[name].id,
+                            Deliverable.name == d_name,
+                            Deliverable.adm_template_id.is_(None))
+                ):
+                    existing.adm_template_id = templates.get((phase, d_template))
             continue
         sol = Solution(
             name=name, description=desc, organization_id=org_id,
@@ -1438,10 +1457,11 @@ def _seed_boards(org_id, demo_user_id) -> dict:
         db.session.flush()
         solutions[name] = sol
         stats["solutions_created"] += 1
-        for d_name, d_status, d_type in deliverables:
+        for d_name, d_status, d_type, d_template in deliverables:
             deliverable = Deliverable(
                 name=d_name, organization_id=org_id,
                 delivery_status=d_status, deliverable_type=d_type,
+                adm_template_id=templates.get((phase, d_template)),
             )
             db.session.add(deliverable)
             db.session.flush()
