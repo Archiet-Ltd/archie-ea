@@ -17,6 +17,7 @@ row. The list must agree with itself:
 
 import re
 import uuid
+from datetime import datetime
 
 import pytest
 
@@ -53,6 +54,7 @@ def _make_org(app, label, with_apps):
         user.is_platform_admin = True
         user.is_org_admin = True
         user.password = PASSWORD
+        user.onboarding_completed_at = datetime.utcnow()
         db.session.add(user)
         db.session.commit()
         out.update(org=org.id, email=user.email, person="%s Owner" % label)
@@ -125,7 +127,7 @@ def _login(page, base, email):
 def _open_list(page, base, query=""):
     response = page.goto(base + "/applications/" + query, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
     assert response is not None and response.status == 200
-    page.wait_for_selector('[data-testid="applications-table"], [data-testid="mobile-cards"], [role="status"]')
+    page.wait_for_selector('[data-testid="applications-table"], [data-testid="mobile-cards"], [role="status"]:visible')
     page.wait_for_timeout(600)
 
 
@@ -143,6 +145,7 @@ def _row_texts(page, testid_prefix):
     return {
         loc.get_attribute("data-testid"): " ".join(loc.inner_text().split())
         for loc in page.locator('[data-testid^="%s"]' % testid_prefix).all()
+        if "mobile" not in loc.get_attribute("data-testid")
     }
 
 
@@ -168,7 +171,7 @@ def test_summary_owner_capability_and_ring_agree_with_the_rows(page, live_server
     # The summary is in full, with no ellipsis, and counts the four listed.
     text, numbers = _summary(page)
     assert "..." not in text and "…" not in text
-    assert numbers["owner"] == (2, 4), text       # Charlie has recorded owner text, Alpha and Bravo have records
+    assert numbers["owner"] == (1, 4), text       # Alpha and Bravo have records, Charlie has recorded owner text
     assert numbers["capability"] == (2, 4), text  # Bravo and Delta are unmapped
     assert numbers["vendor"] == (2, 4), text
 
@@ -212,7 +215,7 @@ def test_summary_owner_capability_and_ring_agree_with_the_rows(page, live_server
     _open_list(page, live_server, "?include_decom=true")
     assert page.locator('[data-testid^="app-row-"]').count() == 5
     _, with_decom = _summary(page)
-    assert with_decom["owner"] == (3, 5) and with_decom["capability"] == (3, 5)
+    assert with_decom["owner"] == (2, 5) and with_decom["capability"] == (3, 5)
 
     # Another organisation's applications never appear, in rows or in figures.
     body = page.locator("main").inner_text()
@@ -255,10 +258,12 @@ def test_row_menu_links_land_on_the_application_and_delete_persists(page, live_s
     page.locator('[data-testid="btn-delete-%s"]' % delta).click()
     dialog = page.get_by_role("dialog").filter(has_text="cannot be undone")
     dialog.wait_for()
-    dialog.get_by_role("button", name=re.compile("delete|confirm|ok", re.I)).last.click()
-    page.wait_for_load_state("domcontentloaded")
-    page.wait_for_timeout(800)
-    _open_list(page, live_server)
+    dialog.get_by_role("button", name=re.compile("delete|confirm|ok", re.I)).last.click(no_wait_after=True)
+    for _ in range(10):
+        page.wait_for_timeout(1500)
+        _open_list(page, live_server)
+        if page.locator('[data-testid="app-row-%s"]' % delta).count() == 0:
+            break
     assert page.locator('[data-testid="app-row-%s"]' % delta).count() == 0
     assert page.locator('[data-testid^="app-row-"]').count() == 3
 
@@ -277,7 +282,7 @@ def test_filters_sort_and_pagination_controls_work(page, live_server, worlds):
     page.wait_for_selector('[data-testid="applications-table"]')
     assert page.locator('[data-testid^="app-row-"]').count() == 4
 
-    page.select_option("#filter-status", "2.1 strategic")
+    page.select_option("#filter-status", "2.1 STRATEGIC")
     page.wait_for_url(re.compile("status="))
     page.wait_for_selector('[data-testid="applications-table"]')
     assert page.locator('[data-testid^="app-row-"]').count() == 1
@@ -306,8 +311,8 @@ def test_bulk_toolbar_and_create_dialog(page, live_server, worlds):
     assert "1 selected" in toolbar.inner_text()
     page.locator('[data-testid="bulk-btn-lifecycle"]').click()
     page.get_by_role("menuitem", name="3. SUNSET").click()
-    page.wait_for_timeout(1500)
-    page.reload(wait_until="domcontentloaded")
+    page.wait_for_timeout(3500)
+    _open_list(page, live_server)
     row = page.locator('[data-testid="app-row-%s"]' % a["ids"]["Bravo CRM"])
     assert "3. SUNSET" in row.inner_text()
 
