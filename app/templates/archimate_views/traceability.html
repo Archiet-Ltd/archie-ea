@@ -1,7 +1,17 @@
-﻿{# smoke-coverage-ok: plain-language filter wiring — el.type, pt.type, pt.layer, row.application.type now use |plain_name and |plain_layer filters #}
+{# smoke-coverage-ok: plain-language filter wiring — el.type, pt.type, pt.layer, row.application.type now use |plain_name and |plain_layer filters #}
+{# design-block: data-table #}
 {% extends "layouts/admin_base.html" %}
 {% from 'components/dense_table.html' import dense_table %}
 {% from 'components/page_header.html' import page_header %}
+{% from 'components/button.html' import button %}
+{% from 'components/badge.html' import badge %}
+{% from 'components/dropdown_menu.html' import dropdown_menu %}
+{% from 'components/input.html' import input %}
+{% from 'components/progress.html' import progress %}
+{% from 'components/alert.html' import alert as notice %}
+{% from 'components/empty_state.html' import empty_state %}
+{% from 'components/tabs.html' import tabs, tabs_list, tabs_trigger, tabs_content %}
+{% import 'components/card.html' as card %}
 
 {# DEF-032, Capgemini dry-run: the browser tab title said "Requirements
    Traceability" while the page's own H1 (page_header below) and
@@ -22,10 +32,6 @@
 {% block page_title %}Cross-Layer Traceability Matrix{% endblock %}
 
 {% block content %}
-<style>
-    #matrix-view tbody tr:hover td { background-color: hsl(var(--accent)); }
-    #matrix-view tbody tr:hover td .inline-flex { transform: scale(1.02); transition: transform 0.15s; }
-</style>
 {% set rel_abbrev = {
     'RealizationRelationship': 'Rlz',
     'ServingRelationship': 'Srv',
@@ -35,127 +41,130 @@
     'AssociationRelationship': 'Asc',
     'AccessRelationship': 'Acc'
 } %}
+
+{# One cell of the matrix: every element reached in a layer, as a badge whose
+   variant stands for the layer, with its type and the relationship that reaches it. #}
+{% macro layer_cell(elements, variant) %}
+<div class="flex flex-wrap gap-1.5">
+    {% for el in elements %}
+    {% set relationship_label = el.relationship_type | replace('Relationship', '') if el.relationship_type else none %}
+    {% call badge(variant, class='gap-1.5 font-medium' ~ (' cursor-help' if relationship_label else '')) %}
+        <span {% if relationship_label %}title="{{ relationship_label }}"{% endif %}>{{ el.name }}</span>
+        {% if el.type %}
+        <span class="text-muted-foreground">{{ el.type | plain_name(current_user) }}</span>
+        {% endif %}
+        {% if el.relationship_type %}
+        <span class="font-semibold uppercase tracking-wide">{{ rel_abbrev.get(el.relationship_type, el.relationship_type | replace('Relationship', '')) }}</span>
+        {% endif %}
+    {% endcall %}
+    {% endfor %}
+    {% if not elements %}
+    <span class="text-xs text-muted-foreground">—</span>
+    {% endif %}
+</div>
+{% endmacro %}
+
+{# ADR-0008: orphan ids are ArchiMateElement ids (this page reads the ArchiMate
+   backbone), so every orphan links to its element traceability view. #}
+{% set orphan_groups = [
+    ('Drivers', gap_analysis.orphaned_drivers | default([], true)),
+    ('Goals', gap_analysis.orphaned_goals | default([], true)),
+    ('Requirements', gap_analysis.orphaned_requirements | default([], true)),
+    ('Capabilities', gap_analysis.orphaned_capabilities | default([], true))
+] %}
+{% set total_orphans = (gap_analysis.orphaned_drivers | default([], true) | length)
+    + (gap_analysis.orphaned_goals | default([], true) | length)
+    + (gap_analysis.orphaned_requirements | default([], true) | length)
+    + (gap_analysis.orphaned_capabilities | default([], true) | length) %}
+{% set forward_pivot = current_pivot_type if direction == 'forward' else none %}
+{% set trace_url = url_for('architect_ui.traceability_matrix') %}
+
 <div class="space-y-6">
     {{ page_header(
         title="Cross-Layer Traceability Matrix",
         description="Shows how ApplicationComponent elements trace upward to Strategy/Business and downward to Technology layers"
     ) }}
 
-    {# ADR-0008: orphan ids are ArchiMateElement ids (this page reads the ArchiMate
-       backbone), so every orphan links to its element traceability view. #}
-    {% set orphan_groups = [
-        ('Drivers', gap_analysis.orphaned_drivers | default([], true)),
-        ('Goals', gap_analysis.orphaned_goals | default([], true)),
-        ('Requirements', gap_analysis.orphaned_requirements | default([], true)),
-        ('Capabilities', gap_analysis.orphaned_capabilities | default([], true))
-    ] %}
-    {% set total_orphans = (gap_analysis.orphaned_drivers | default([], true) | length)
-        + (gap_analysis.orphaned_goals | default([], true) | length)
-        + (gap_analysis.orphaned_requirements | default([], true) | length)
-        + (gap_analysis.orphaned_capabilities | default([], true) | length) %}
-
-    <div x-data="{ matrixSearch: '', gapOpen: false }">
+    <div x-data="{ gapOpen: false }" class="space-y-6">
 
     <!-- TRC-011: direction toggle / TRC-015: pivot type selector -->
-    <form method="get" action="{{ url_for('architect_ui.traceability_matrix') }}" class="rounded-lg border border-border bg-card p-3">
-        <div class="flex flex-wrap items-center gap-3">
-            <label for="direction" class="block text-sm font-medium text-muted-foreground mb-1">Direction:</label>
-            <select
-                id="direction"
-                name="direction"
-                class="h-9 rounded-md border border-input bg-background px-3 text-sm text-foreground"
-            >
-                <option value="forward" {% if direction == 'forward' %}selected{% endif %}>Top-Down</option>
-                <option value="inverse" {% if direction == 'inverse' %}selected{% endif %}>Bottom-Up</option>
-            </select>
-            {% if direction == 'forward' and pivot_types %}
-            <label for="pivot_type" class="block text-sm font-medium text-muted-foreground mb-1">Pivot element:</label>
-            <select
-                id="pivot_type"
-                name="pivot_type"
-                class="h-9 rounded-md border border-input bg-background px-3 text-sm text-foreground"
-            >
-                {% for pt in pivot_types %}
-                <option value="{{ pt.type }}" {% if pt.type == current_pivot_type %}selected{% endif %}>
-                    {{ pt.type | plain_name(current_user) }} ({{ pt.layer | plain_layer(current_user) }}, {{ pt.count }})
-                </option>
-                {% endfor %}
-            </select>
-            {% endif %}
-            <input type="hidden" name="plateau" value="{{ current_plateau or '' }}">
-            <button
-                type="submit"
-                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center"
-            >
-                Apply
-            </button>
+    {% call card.card(class='p-3') %}
+    <div class="flex flex-wrap items-center gap-3">
+        <span class="text-sm font-medium text-muted-foreground" id="direction-label">Direction:</span>
+        <div class="flex flex-wrap items-center gap-2" role="group" aria-labelledby="direction-label">
+            {{ button('Top-Down', variant='default' if direction == 'forward' else 'outline', size='sm',
+                      href=url_for('architect_ui.traceability_matrix', direction='forward', pivot_type=forward_pivot, plateau=current_plateau, search=current_search or none, scope=current_scope or none),
+                      attrs_dict={'aria-current': 'true'} if direction == 'forward' else {}) }}
+            {{ button('Bottom-Up', variant='default' if direction == 'inverse' else 'outline', size='sm',
+                      href=url_for('architect_ui.traceability_matrix', direction='inverse', plateau=current_plateau, search=current_search or none, scope=current_scope or none),
+                      attrs_dict={'aria-current': 'true'} if direction == 'inverse' else {}) }}
         </div>
-    </form>
+        {% if direction == 'forward' and pivot_types %}
+        {% set pivot_items = [] %}
+        {% set ns_pivot = namespace(layer=none, label='Pivot element') %}
+        {% for pt in pivot_types %}
+        {% if pt.layer != ns_pivot.layer %}
+        {% set _ = pivot_items.append({'header': pt.layer | plain_layer(current_user)}) %}
+        {% set ns_pivot.layer = pt.layer %}
+        {% endif %}
+        {% set _ = pivot_items.append({
+            'text': pt.type | plain_name(current_user) ~ ' (' ~ pt.count ~ ')',
+            'href': url_for('architect_ui.traceability_matrix', direction=direction, pivot_type=pt.type, plateau=current_plateau, search=current_search or none, scope=current_scope or none),
+            'icon': 'check' if pt.type == current_pivot_type else none
+        }) %}
+        {% if pt.type == current_pivot_type %}{% set ns_pivot.label = 'Pivot element: ' ~ (pt.type | plain_name(current_user)) %}{% endif %}
+        {% endfor %}
+        {{ dropdown_menu(id='pivot-menu', trigger_text=ns_pivot.label, trigger_icon='layers', position='left', menu_width='w-72', items=pivot_items, trigger_class='h-8 px-3') }}
+        {% endif %}
+    </div>
+    {% endcall %}
 
     <!-- TRC-017: server-side search + scope filter -->
-    <form method="get" action="{{ url_for('architect_ui.traceability_matrix') }}" class="flex items-center gap-3 justify-between flex-wrap">
-        <input type="hidden" name="direction" value="{{ direction }}">
-        <input type="hidden" name="pivot_type" value="{{ current_pivot_type }}">
-        <input type="hidden" name="plateau" value="{{ current_plateau or '' }}">
+    <form method="get" action="{{ trace_url }}" class="flex items-center gap-3 justify-between flex-wrap">
+        {{ input(name='direction', type='hidden', value=direction, class='hidden') }}
+        {{ input(name='pivot_type', type='hidden', value=current_pivot_type, class='hidden') }}
+        {{ input(name='plateau', type='hidden', value=current_plateau or '', class='hidden') }}
+        {{ input(name='scope', type='hidden', value=current_scope, class='hidden') }}
         <div class="relative flex-1 max-w-sm">
-            <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none"></i>
-            <input
-                type="text"
-                name="search"
-                value="{{ current_search }}"
-                placeholder="Search by element name…"
-                class="h-9 w-full rounded-md border border-input bg-background pl-9 pr-3 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-             aria-label="Search by element name…">
+            <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" aria-hidden="true"></i>
+            {{ input(id='search', name='search', placeholder='Search by element name…', value=current_search, aria_label='Search by element name…', class='pl-9') }}
         </div>
-        <select name="scope"
-                class="h-9 rounded-md border border-input bg-background px-3 text-sm text-foreground" aria-label="Filter by scope">
-            <option value="" {% if not current_scope %}selected{% endif %}>All scopes</option>
-            <option value="enterprise" {% if current_scope == 'enterprise' %}selected{% endif %}>Enterprise</option>
-            <option value="application" {% if current_scope == 'application' %}selected{% endif %}>Application</option>
-            <option value="cross-cutting" {% if current_scope == 'cross-cutting' %}selected{% endif %}>Cross-cutting</option>
-        </select>
-        <button type="submit"
-                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
-            Search
-        </button>
-        {% if current_search or current_scope %}
-        <a href="{{ url_for('architect_ui.traceability_matrix', direction=direction, pivot_type=current_pivot_type) }}"
-           class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
-            <i data-lucide="x" class="h-3.5 w-3.5"></i>
-            Clear
-        </a>
-        {% endif %}
-        <a href="/api/archimate/traceability/export"
-           class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
-            <i data-lucide="download" class="h-4 w-4"></i>
-            Export CSV
-        </a>
+        <div class="flex flex-wrap items-center gap-2" role="group" aria-label="Filter by scope">
+            {% for label, value in [('All scopes', ''), ('Enterprise', 'enterprise'), ('Application', 'application'), ('Cross-cutting', 'cross-cutting')] %}
+            {{ button(label, variant='default' if current_scope == value else 'outline', size='sm',
+                      href=url_for('architect_ui.traceability_matrix', direction=direction, pivot_type=current_pivot_type, plateau=current_plateau, search=current_search or none, scope=value or none),
+                      attrs_dict={'aria-current': 'true'} if current_scope == value else {}) }}
+            {% endfor %}
+        </div>
+        <div class="flex flex-wrap items-center gap-2">
+            {{ button('Search', type='submit') }}
+            {% if current_search or current_scope %}
+            {{ button('Clear', variant='outline', icon='x', href=url_for('architect_ui.traceability_matrix', direction=direction, pivot_type=current_pivot_type)) }}
+            {% endif %}
+            {{ button('Export CSV', variant='outline', icon='download', href='/api/archimate/traceability/export') }}
+        </div>
     </form>
 
     <!-- TRC-010: plateau filter -->
-    <div class="rounded-lg border border-border bg-card p-3">
-        <div class="flex flex-wrap items-center gap-2">
-            <span class="text-sm font-medium text-foreground">Plateau:</span>
-            {% for label, value in [('All', None), ('Baseline', 'Baseline'), ('Transition', 'Transition'), ('Target', 'Target')] %}
-            <a
-                href="{{ url_for('architect_ui.traceability_matrix', pivot_type=current_pivot_type, plateau=value, direction=direction) if value else url_for('architect_ui.traceability_matrix', pivot_type=current_pivot_type, direction=direction) }}"
-                class="inline-flex items-center rounded-md px-3 py-1.5 text-sm font-medium transition-colors {{ 'bg-primary text-primary-foreground ' if current_plateau == value or (not current_plateau and not value) else 'bg-muted text-muted-foreground hover:bg-accent hover:text-accent-foreground' }}"
-            >
-                {{ label }}
-            </a>
-            {% endfor %}
-        </div>
+    {% call card.card(class='p-3') %}
+    <div class="flex flex-wrap items-center gap-2">
+        <span class="text-sm font-medium text-foreground">Plateau:</span>
+        {% for label, value in [('All', None), ('Baseline', 'Baseline'), ('Transition', 'Transition'), ('Target', 'Target')] %}
+        {% set active = current_plateau == value or (not current_plateau and not value) %}
+        {{ button(label, variant='default' if active else 'secondary', size='sm',
+                  href=url_for('architect_ui.traceability_matrix', pivot_type=current_pivot_type, plateau=value, direction=direction, search=current_search or none, scope=current_scope or none),
+                  attrs_dict={'aria-current': 'true'} if active else {}) }}
+        {% endfor %}
     </div>
+    {% endcall %}
 
     <!-- TRC-008: gap/orphan analysis panel -->
-    <section class="rounded-lg border border-border bg-card p-4">
+    {% call card.card(class='p-4') %}
         <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div class="space-y-3 flex-1">
                 <div class="flex items-center gap-2">
                     <h2 class="text-sm font-semibold text-foreground">Coverage and gap analysis</h2>
-                    <span class="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
-                        {{ total_orphans }} orphaned
-                    </span>
+                    {% call badge('neutral') %}{{ total_orphans }} orphaned{% endcall %}
                 </div>
                 <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
                     {% for label, cov in [
@@ -165,35 +174,25 @@
                         ('Capabilities → Applications', gap_analysis.coverage.capabilities_with_apps)
                     ] %}
                     {% set percent = ((cov.count / cov.total) * 100) | round(0) if cov.total else 0 %}
-                    <div class="rounded-md border border-border/60 bg-background p-3">
+                    <div class="rounded-md border border-border bg-background p-3">
                         <div class="flex items-center justify-between gap-2">
                             <p class="text-xs font-medium uppercase tracking-wide text-muted-foreground">{{ label }}</p>
                             <span class="text-xs font-semibold text-foreground">{{ percent }}%</span>
                         </div>
-                        <div class="mt-2 h-2 rounded-full bg-muted overflow-hidden">
-                            <div class="h-full rounded-full bg-primary transition-all" :style="'width: {{ percent }}%;'"></div>
-                        </div>
+                        {{ progress(value=percent, max=100, class='mt-2 h-2') }}
                         <p class="mt-2 text-xs text-muted-foreground">{{ cov.count }} of {{ cov.total }} connected</p>
                     </div>
                     {% endfor %}
                 </div>
             </div>
-            <button
-                type="button"
-                @click="gapOpen = !gapOpen"
-                :aria-expanded="gapOpen.toString()"
-                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center"
-            >
-                <i data-lucide="list-tree" class="h-4 w-4"></i>
-                <span x-text="gapOpen ? 'Hide gap panel' : 'Show gap panel'"></span>
-            </button>
+            {% call button(variant='outline', icon='list-tree', on_click='gapOpen = !gapOpen', attrs_dict={':aria-expanded': 'gapOpen.toString()', 'aria-controls': 'gap-panel'}) %}<span x-text="gapOpen ? 'Hide gap panel' : 'Show gap panel'"></span>{% endcall %}
         </div>
 
-        <div x-show="gapOpen" x-cloak x-trap.noscroll="gapOpen" @keydown.escape.window="gapOpen = false" role="dialog" aria-modal="true" tabindex="-1" class="mt-4 border-t border-border pt-4">
+        <div id="gap-panel" x-show="gapOpen" x-cloak @keydown.escape.window="gapOpen = false" tabindex="-1" class="mt-4 border-t border-border pt-4">
             {% if total_orphans %}
             <div class="grid gap-4 lg:grid-cols-2">
                 {% for title, items in orphan_groups if items %}
-                <section class="rounded-md border border-border/60 bg-background p-3">
+                <section class="rounded-md border border-border bg-background p-3">
                     <div class="flex items-center justify-between gap-2">
                         <h3 class="text-sm font-semibold text-foreground">{{ title }}</h3>
                         <span class="text-xs text-muted-foreground">{{ items | length }} orphaned</span>
@@ -203,7 +202,7 @@
                         <li>
                             <a href="{{ url_for('architect_ui.element_traceability', element_id=item.id) }}"
                                class="inline-flex items-center gap-2 text-sm text-primary hover:underline">
-                                <i data-lucide="arrow-up-right" class="h-3.5 w-3.5"></i>
+                                <i data-lucide="arrow-up-right" class="h-3.5 w-3.5" aria-hidden="true"></i>
                                 <span>{{ item.name }}</span>
                             </a>
                         </li>
@@ -213,244 +212,75 @@
                 {% endfor %}
             </div>
             {% else %}
-            <div class="rounded-md border border-success/40 bg-success/10 px-4 py-2 text-sm text-success-emphasis">
-                All elements are connected across the current traceability chain.
-            </div>
+            {{ notice(kind='success', text='All elements are connected across the current traceability chain.') }}
             {% endif %}
         </div>
-    </section>
+    {% endcall %}
 
-    <!-- View toggle -->
     {# T-03 (2 Sep 2026 audit): this page defaulted to the Sankey DIAGRAM, with the
-       actual 43-row matrix TABLE hidden (style="display:none") until a user found
-       and clicked this "Matrix" toggle. At a narrow viewport a Sankey diagram — a
-       flow visualisation designed for a wide canvas — read as "hides its table and
-       shows an unreadable diagram instead", because the audited pass never found
-       the toggle. A table works at ANY width via horizontal scroll (T-01 restored
-       that); a Sankey diagram genuinely does not. Default to Matrix; Sankey stays
-       one click away for anyone who wants the flow view. #}
-    <div class="flex items-center gap-2">
-        <div class="inline-flex rounded-lg border border-border p-1 bg-muted/30" x-data="{ view: 'matrix' }">
-            <button type="button" @click="view = 'sankey'; document.getElementById('sankey-view').style.display = ''; document.getElementById('matrix-view').style.display = 'none'; if (window.createTraceabilitySankey) window.createTraceabilitySankey('#sankey-container', '/architecture/api/traceability/sankey?direction={{ direction }}&plateau={{ current_plateau or '' }}');"
-                    :class="view === 'sankey' ? 'bg-background text-foreground' : 'text-muted-foreground'"
-                    class="inline-flex items-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium transition-colors">
-                <i data-lucide="git-merge" class="h-4 w-4" aria-hidden="true"></i>
-                Sankey
-            </button>
-            <button type="button" @click="view = 'matrix'; document.getElementById('sankey-view').style.display = 'none'; document.getElementById('matrix-view').style.display = '';"
-                    :class="view === 'matrix' ? 'bg-background text-foreground' : 'text-muted-foreground'"
-                    class="inline-flex items-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium transition-colors">
-                <i data-lucide="table" class="h-4 w-4" aria-hidden="true"></i>
-                Matrix
-            </button>
+       actual 43-row matrix TABLE hidden until a user found and clicked the "Matrix"
+       toggle. A table works at ANY width via horizontal scroll; a Sankey diagram
+       does not. Default to Matrix; Sankey stays one click away for the flow view. #}
+    {% call tabs(id='traceability-views', default_value='matrix') %}
+        {% call tabs_list() %}
+            {% call tabs_trigger(value='sankey') %}<i data-lucide="git-merge" class="mr-2 h-4 w-4" aria-hidden="true"></i>Sankey{% endcall %}
+            {% call tabs_trigger(value='matrix') %}<i data-lucide="table" class="mr-2 h-4 w-4" aria-hidden="true"></i>Matrix{% endcall %}
+        {% endcall %}
+
+        {% call tabs_content(value='sankey', class='mt-4') %}
+        <div id="sankey-view" class="min-h-96 rounded-lg border border-border bg-card overflow-hidden">
+            <div id="sankey-container" class="w-full min-h-96" data-sankey-url="/architecture/api/traceability/sankey?direction={{ direction }}&plateau={{ current_plateau or '' }}"></div>
         </div>
-    </div>
+        {% endcall %}
 
-    <!-- Sankey view (hidden by default — see T-03 note above) -->
-    <div id="sankey-view" style="display: none; min-height: 500px;" class="rounded-lg border border-border bg-card overflow-hidden">
-        <div id="sankey-container" style="width: 100%; min-height: 500px;"></div>
-    </div>
-
-    <!-- Matrix table (visible by default) -->
-    <div id="matrix-view" class="rounded-lg border border-border bg-card overflow-hidden">
+        {% call tabs_content(value='matrix', class='mt-4') %}
+        <div id="matrix-view" class="rounded-lg border border-border bg-card overflow-hidden">
         {% if matrix %}
-{% set _dt_header_16428 %}
+{% set _dt_header %}
                         <th scope="col" class="h-10 px-2 align-middle text-left">{{ 'Technology Element' if direction == 'inverse' else 'Application Component' }}</th>
                         <th scope="col" class="h-10 px-2 align-middle text-left">
-                            <span class="inline-flex items-center gap-1.5">
-                                <span class="h-2.5 w-2.5 rounded-full bg-fuchsia-500"></span>  <!-- design-tokens-ok: ArchiMate traceability matrix legend, distinct hue per layer/column -->
-                                Motivation / Goals
-                            </span>
+                            <span class="inline-flex items-center gap-1.5"><span class="h-2.5 w-2.5 rounded-full bg-primary" aria-hidden="true"></span>Motivation / Goals</span>
                         </th>
                         <th scope="col" class="h-10 px-2 align-middle text-left">
-                            <span class="inline-flex items-center gap-1.5">
-                                <span class="h-2.5 w-2.5 rounded-full bg-layer-motivation-emphasis"></span>  <!-- design-tokens-ok: ArchiMate traceability matrix legend, distinct hue per layer/column -->
-                                Strategy Layer
-                            </span>
+                            <span class="inline-flex items-center gap-1.5"><span class="h-2.5 w-2.5 rounded-full bg-secondary-foreground" aria-hidden="true"></span>Strategy Layer</span>
                         </th>
                         <th scope="col" class="h-10 px-2 align-middle text-left">
-                            <span class="inline-flex items-center gap-1.5">
-                                <span class="h-2.5 w-2.5 rounded-full bg-layer-business-emphasis"></span>  <!-- design-tokens-ok: ArchiMate traceability matrix legend, distinct hue per layer/column -->
-                                Business Layer
-                            </span>
+                            <span class="inline-flex items-center gap-1.5"><span class="h-2.5 w-2.5 rounded-full bg-success" aria-hidden="true"></span>Business Layer</span>
                         </th>
                         <th scope="col" class="h-10 px-2 align-middle text-left">
-                            <span class="inline-flex items-center gap-1.5">
-                                <span class="h-2.5 w-2.5 rounded-full bg-layer-strategy-emphasis"></span>  <!-- design-tokens-ok: ArchiMate traceability matrix legend, distinct hue per layer/column -->
-                                {{ 'Impact Assessment' if direction == 'inverse' else 'Technology Layer' }}
-                            </span>
+                            <span class="inline-flex items-center gap-1.5"><span class="h-2.5 w-2.5 rounded-full bg-warning" aria-hidden="true"></span>{{ 'Impact Assessment' if direction == 'inverse' else 'Technology Layer' }}</span>
                         </th>
                         <th scope="col" class="h-10 px-2 align-middle text-left">
-                            <span class="inline-flex items-center gap-1.5">
-                                <span class="h-2.5 w-2.5 rounded-full bg-layer-implementation-emphasis"></span>  <!-- design-tokens-ok: ArchiMate traceability matrix legend, distinct hue per layer/column -->
-                                Data Objects
-                            </span>
+                            <span class="inline-flex items-center gap-1.5"><span class="h-2.5 w-2.5 rounded-full bg-muted-foreground" aria-hidden="true"></span>Data Objects</span>
                         </th>
-                    
 {% endset %}
-{% call dense_table(header=_dt_header_16428, flush=true) %}
+{% call dense_table(header=_dt_header, flush=true) %}
                     {% for row in matrix %}
-                    <tr class="hover:bg-muted/30 transition-colors">
-                        <!-- Application Component -->
+                    <tr class="transition-colors hover:bg-muted/30">
                         <td class="px-2">
                             <a href="{{ url_for('architect_ui.element_traceability', element_id=row.application.id) }}"
                                class="inline-flex items-center gap-1.5 font-medium text-foreground hover:text-primary transition-colors">
                                 <span>{{ row.application.name }}</span>
                                 {% if row.application.type %}
-                                <span class="inline-flex items-center rounded-full bg-primary/10 px-1.5 py-0.5 text-xs font-semibold text-info-emphasis ring-1 ring-inset ring-primary/20">
-                                    {{ row.application.type | plain_name(current_user) }}
-                                </span>
+                                {% call badge('info') %}{{ row.application.type | plain_name(current_user) }}{% endcall %}
                                 {% endif %}
                             </a>
                         </td>
-
-                        <!-- Motivation -->
-                        <td class="px-2">
-                            <div class="flex flex-wrap gap-1.5">
-                                {% for el in row.motivation | default([], true) %}
-                                {% set relationship_label = el.relationship_type | replace('Relationship', '') if el.relationship_type else none %}
-                                <span
-                                    {% if relationship_label %}title="{{ relationship_label }}"{% endif %}
-                                    class="inline-flex items-center gap-1.5 rounded-full bg-fuchsia-500/10 px-2.5 py-0.5 text-xs font-medium text-fuchsia-700 ring-1 ring-inset ring-fuchsia-500/20"  <!-- design-tokens-ok: ArchiMate traceability matrix legend, distinct hue per layer/column -->
-                                >
-                                    {{ el.name }}
-                                    {% if el.type %}
-                                    <span class="inline-flex items-center rounded-full bg-fuchsia-500/15 px-1.5 py-0.5 text-xs font-semibold text-fuchsia-800">  <!-- design-tokens-ok: ArchiMate traceability matrix legend, distinct hue per layer/column -->
-                                        {{ el.type | plain_name(current_user) }}
-                                    </span>
-                                    {% endif %}
-                                    {% if el.relationship_type %}
-                                    <span class="inline-flex items-center rounded-full bg-fuchsia-500/15 px-1.5 py-0.5 text-xs font-semibold uppercase tracking-wide text-fuchsia-800">  <!-- design-tokens-ok: ArchiMate traceability matrix legend, distinct hue per layer/column -->
-                                        {{ rel_abbrev.get(el.relationship_type, el.relationship_type | replace('Relationship', '')) }}
-                                    </span>
-                                    {% endif %}
-                                </span>
-                                {% endfor %}
-                                {% if not row.motivation | default([], true) %}
-                                <span class="text-xs text-muted-foreground">—</span>
-                                {% endif %}
-                            </div>
-                        </td>
-
-                        <!-- Strategy -->
-                        <td class="px-2">
-                            <div class="flex flex-wrap gap-1.5">
-                                {% for el in row.strategy %}
-                                {% set relationship_label = el.relationship_type | replace('Relationship', '') if el.relationship_type else none %}
-                                <span
-                                    {% if relationship_label %}title="{{ relationship_label }}"{% endif %}
-                                    class="inline-flex items-center gap-1.5 rounded-full bg-layer-motivation/10 px-2.5 py-0.5 text-xs font-medium text-layer-motivation-emphasis ring-1 ring-inset ring-violet-500/20"  <!-- design-tokens-ok: ArchiMate traceability matrix legend, distinct hue per layer/column -->
-                                >
-                                    {{ el.name }}
-                                    {% if el.type %}
-                                    <span class="inline-flex items-center rounded-full bg-layer-motivation/15 px-1.5 py-0.5 text-xs font-semibold text-layer-motivation-emphasis">  <!-- design-tokens-ok: ArchiMate traceability matrix legend, distinct hue per layer/column -->
-                                        {{ el.type | plain_name(current_user) }}
-                                    </span>
-                                    {% endif %}
-                                    {% if el.relationship_type %}
-                                    <span class="inline-flex items-center rounded-full bg-layer-motivation/15 px-1.5 py-0.5 text-xs font-semibold uppercase tracking-wide text-layer-motivation-emphasis">  <!-- design-tokens-ok: ArchiMate traceability matrix legend, distinct hue per layer/column -->
-                                        {{ rel_abbrev.get(el.relationship_type, el.relationship_type | replace('Relationship', '')) }}
-                                    </span>
-                                    {% endif %}
-                                </span>
-                                {% endfor %}
-                                {% if not row.strategy %}
-                                <span class="text-xs text-muted-foreground">—</span>
-                                {% endif %}
-                            </div>
-                        </td>
-
-                        <!-- Business -->
-                        <td class="px-2">
-                            <div class="flex flex-wrap gap-1.5">
-                                {% for el in row.business %}
-                                {% set relationship_label = el.relationship_type | replace('Relationship', '') if el.relationship_type else none %}
-                                <span
-                                    {% if relationship_label %}title="{{ relationship_label }}"{% endif %}
-                                    class="inline-flex items-center gap-1.5 rounded-full bg-layer-business/10 px-2.5 py-0.5 text-xs font-medium text-layer-business-emphasis ring-1 ring-inset ring-emerald-500/20"  <!-- design-tokens-ok: ArchiMate traceability matrix legend, distinct hue per layer/column -->
-                                >
-                                    {{ el.name }}
-                                    {% if el.type %}
-                                    <span class="inline-flex items-center rounded-full bg-layer-business/15 px-1.5 py-0.5 text-xs font-semibold text-layer-business-emphasis">  <!-- design-tokens-ok: ArchiMate traceability matrix legend, distinct hue per layer/column -->
-                                        {{ el.type | plain_name(current_user) }}
-                                    </span>
-                                    {% endif %}
-                                    {% if el.relationship_type %}
-                                    <span class="inline-flex items-center rounded-full bg-layer-business/15 px-1.5 py-0.5 text-xs font-semibold uppercase tracking-wide text-layer-business-emphasis">  <!-- design-tokens-ok: ArchiMate traceability matrix legend, distinct hue per layer/column -->
-                                        {{ rel_abbrev.get(el.relationship_type, el.relationship_type | replace('Relationship', '')) }}
-                                    </span>
-                                    {% endif %}
-                                </span>
-                                {% endfor %}
-                                {% if not row.business %}
-                                <span class="text-xs text-muted-foreground">—</span>
-                                {% endif %}
-                            </div>
-                        </td>
-
-                        <!-- Technology / impact -->
+                        <td class="px-2">{{ layer_cell(row.motivation | default([], true), 'info') }}</td>
+                        <td class="px-2">{{ layer_cell(row.strategy, 'secondary') }}</td>
+                        <td class="px-2">{{ layer_cell(row.business, 'success') }}</td>
                         <td class="px-2">
                             {% if direction == 'inverse' %}
                             <a href="{{ url_for('architect_ui.impact_analysis', element_id=row.application.id) }}"
                                class="inline-flex items-center gap-2 text-sm font-medium text-primary hover:underline">
-                                <i data-lucide="activity" class="h-4 w-4"></i>
+                                <i data-lucide="activity" class="h-4 w-4" aria-hidden="true"></i>
                                 Impact Assessment
                             </a>
                             {% else %}
-                            <div class="flex flex-wrap gap-1.5">
-                                {% for el in row.technology %}
-                                {% set relationship_label = el.relationship_type | replace('Relationship', '') if el.relationship_type else none %}
-                                <span
-                                    {% if relationship_label %}title="{{ relationship_label }}"{% endif %}
-                                    class="inline-flex items-center gap-1.5 rounded-full bg-layer-strategy/10 px-2.5 py-0.5 text-xs font-medium text-layer-strategy-emphasis ring-1 ring-inset ring-amber-500/20"  <!-- design-tokens-ok: ArchiMate traceability matrix legend, distinct hue per layer/column -->
-                                >
-                                   {{ el.name }}
-                                    {% if el.type %}
-                                    <span class="inline-flex items-center rounded-full bg-layer-strategy/15 px-1.5 py-0.5 text-xs font-semibold text-layer-strategy-emphasis">  <!-- design-tokens-ok: ArchiMate traceability matrix legend, distinct hue per layer/column -->
-                                        {{ el.type | plain_name(current_user) }}
-                                    </span>
-                                    {% endif %}
-                                    {% if el.relationship_type %}
-                                    <span class="inline-flex items-center rounded-full bg-layer-strategy/15 px-1.5 py-0.5 text-xs font-semibold uppercase tracking-wide text-layer-strategy-emphasis">  <!-- design-tokens-ok: ArchiMate traceability matrix legend, distinct hue per layer/column -->
-                                        {{ rel_abbrev.get(el.relationship_type, el.relationship_type | replace('Relationship', '')) }}
-                                    </span>
-                                    {% endif %}
-                                </span>
-                                {% endfor %}
-                                {% if not row.technology %}
-                                <span class="text-xs text-muted-foreground">—</span>
-                                {% endif %}
-                            </div>
+                            {{ layer_cell(row.technology, 'warning') }}
                             {% endif %}
                         </td>
-
-                        <!-- Data -->
-                        <td class="px-2">
-                            <div class="flex flex-wrap gap-1.5">
-                                {% for el in row.data | default([], true) %}
-                                {% set relationship_label = el.relationship_type | replace('Relationship', '') if el.relationship_type else none %}
-                                <span
-                                    {% if relationship_label %}title="{{ relationship_label }}"{% endif %}
-                                    class="inline-flex items-center gap-1.5 rounded-full bg-layer-implementation/10 px-2.5 py-0.5 text-xs font-medium text-layer-implementation-emphasis ring-1 ring-inset ring-sky-500/20"  <!-- design-tokens-ok: ArchiMate traceability matrix legend, distinct hue per layer/column -->
-                                >
-                                    {{ el.name }}
-                                    {% if el.type %}
-                                    <span class="inline-flex items-center rounded-full bg-layer-implementation/15 px-1.5 py-0.5 text-xs font-semibold text-layer-implementation-emphasis">  <!-- design-tokens-ok: ArchiMate traceability matrix legend, distinct hue per layer/column -->
-                                        {{ el.type | plain_name(current_user) }}
-                                    </span>
-                                    {% endif %}
-                                    {% if el.relationship_type %}
-                                    <span class="inline-flex items-center rounded-full bg-layer-implementation/15 px-1.5 py-0.5 text-xs font-semibold uppercase tracking-wide text-layer-implementation-emphasis">  <!-- design-tokens-ok: ArchiMate traceability matrix legend, distinct hue per layer/column -->
-                                        {{ rel_abbrev.get(el.relationship_type, el.relationship_type | replace('Relationship', '')) }}
-                                    </span>
-                                    {% endif %}
-                                </span>
-                                {% endfor %}
-                                {% if not row.data | default([], true) %}
-                                <span class="text-xs text-muted-foreground">—</span>
-                                {% endif %}
-                            </div>
-                        </td>
+                        <td class="px-2">{{ layer_cell(row.data | default([], true), 'neutral') }}</td>
                     </tr>
                     {% endfor %}
                 {% endcall %}
@@ -462,35 +292,16 @@
             {% endif %}
         {% endfor %}
         {% if ns.aligned == 0 %}
-        <div class="mx-4 mb-4 mt-2 rounded-md border border-warning/40 bg-warning/10 px-3 py-2">
-            <div class="flex items-start gap-3">
-                <i data-lucide="alert-triangle" class="h-5 w-5 text-warning flex-shrink-0 mt-0.5"></i>
-                <div class="flex-1 min-w-0">
-                    <p class="text-sm font-medium text-warning-emphasis">No cross-layer relationships modelled yet</p>
-                    <p class="text-sm text-warning-emphasis mt-1">
-                        All {{ matrix | length }} application components show no alignment because no ArchiMate relationships connect
-                        them to Strategy, Business, or Technology layers. Use the ArchiMate Composer to define cross-layer relationships.
-                    </p>
-                    <a href="{{ url_for('archimate.composer_page') }}"
-                       class="mt-3 inline-flex items-center gap-2 rounded-md bg-warning px-3 py-1.5 text-sm font-medium text-warning-foreground hover:bg-warning/90 transition-colors">
-                        <i data-lucide="git-merge" class="h-4 w-4"></i>
-                        Open ArchiMate Composer
-                    </a>
-                </div>
-            </div>
+        <div class="m-4">
+            {% call notice(kind='warning', title='No cross-layer relationships modelled yet', link_href=url_for('archimate.composer_page'), link_text='Open ArchiMate Composer', class='items-start') %}
+                All {{ matrix | length }} application components show no alignment because no ArchiMate relationships connect
+                them to Strategy, Business, or Technology layers. Use the ArchiMate Composer to define cross-layer relationships.
+            {% endcall %}
         </div>
         {% endif %}
         {% else %}
-        <div class="flex flex-col items-center justify-center py-16 text-center px-4">
-            <i data-lucide="git-merge" class="h-12 w-12 text-muted-foreground/40 mb-4"></i>
-            <p class="text-muted-foreground font-medium">No ApplicationComponent elements found.</p>
-            <p class="text-sm text-muted-foreground mt-1">Add ArchiMate elements to build the traceability matrix.</p>
-            <a href="{{ url_for('archimate_crud.dashboard') }}"
-               class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 mt-4 items-center">
-                <i data-lucide="plus" class="h-4 w-4"></i>
-                Add ArchiMate Elements
-            </a>
-        </div>
+        {{ empty_state(icon='git-merge', title='No ApplicationComponent elements found.', description='Add ArchiMate elements to build the traceability matrix.',
+                       cta_text='Add ArchiMate Elements', cta_href=url_for('archimate_crud.dashboard'), cta_icon='plus', padding='py-16') }}
         {% endif %}
         {# TRC-016: pagination controls #}
         {% if total_pages is defined and total_pages > 1 %}
@@ -500,33 +311,28 @@
             </p>
             <div class="flex items-center gap-1">
                 {% if current_page > 1 %}
-                <a href="{{ url_for('architect_ui.traceability_matrix', pivot_type=current_pivot_type, plateau=current_plateau or '', direction=direction, page=current_page - 1) }}"
-                   class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
-                    <i data-lucide="chevron-left" class="h-4 w-4"></i>
-                </a>
+                {{ button(variant='outline', icon='chevron-left', aria_label='Previous page', href=url_for('architect_ui.traceability_matrix', pivot_type=current_pivot_type, plateau=current_plateau or '', direction=direction, page=current_page - 1)) }}
                 {% endif %}
                 {% for p in range(1, total_pages + 1) %}
                 {% if p == current_page %}
-                <span class="inline-flex items-center rounded-md bg-primary px-2.5 py-1.5 text-sm font-medium text-primary-foreground">{{ p }}</span>
+                {{ button(p | string, variant='default', size='sm', attrs_dict={'aria-current': 'page'}) }}
                 {% elif p <= 3 or p >= total_pages - 2 or (p >= current_page - 1 and p <= current_page + 1) %}
-                <a href="{{ url_for('architect_ui.traceability_matrix', pivot_type=current_pivot_type, plateau=current_plateau or '', direction=direction, page=p) }}"
-                   class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">{{ p }}</a>
+                {{ button(p | string, variant='outline', size='sm', href=url_for('architect_ui.traceability_matrix', pivot_type=current_pivot_type, plateau=current_plateau or '', direction=direction, page=p)) }}
                 {% elif p == 4 or p == total_pages - 3 %}
                 <span class="px-1 text-muted-foreground">…</span>
                 {% endif %}
                 {% endfor %}
                 {% if current_page < total_pages %}
-                <a href="{{ url_for('architect_ui.traceability_matrix', pivot_type=current_pivot_type, plateau=current_plateau or '', direction=direction, page=current_page + 1) }}"
-                   class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
-                    <i data-lucide="chevron-right" class="h-4 w-4"></i>
-                </a>
+                {{ button(variant='outline', icon='chevron-right', aria_label='Next page', href=url_for('architect_ui.traceability_matrix', pivot_type=current_pivot_type, plateau=current_plateau or '', direction=direction, page=current_page + 1)) }}
                 {% endif %}
             </div>
         </div>
         {% endif %}
-    </div>
+        </div>
+        {% endcall %}
+    {% endcall %}
 
-    </div><!-- /x-data matrixSearch -->
+    </div><!-- /x-data gapOpen -->
 </div>
 {% endblock %}
 
@@ -536,9 +342,17 @@
 <script src="{{ url_for('static', filename='js/archimate_views/traceability_sankey.js') }}"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    if (window.createTraceabilitySankey) {
-        window.createTraceabilitySankey('#sankey-container', '/architecture/api/traceability/sankey?direction={{ direction }}&plateau={{ current_plateau or "" }}');
-    }
+    var container = document.getElementById('sankey-container');
+    var trigger = document.getElementById('tab-sankey');
+    if (!container || !trigger) { return; }
+    // Draw once the panel is on screen: a hidden panel has no width to draw into.
+    trigger.addEventListener('click', function() {
+        setTimeout(function() {
+            if (window.createTraceabilitySankey) {
+                window.createTraceabilitySankey('#sankey-container', container.dataset.sankeyUrl);
+            }
+        }, 0);
+    });
 });
 </script>
 {% endblock %}
