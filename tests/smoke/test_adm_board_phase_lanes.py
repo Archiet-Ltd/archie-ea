@@ -90,10 +90,13 @@ def _assert_signed_in_as_enterprise_architect(email):
 def _seed_board(org_id, architect_email):
     from app import create_app, db
     from app.models.adm_deliverable import ADMDeliverable, ADMDeliverableCheck
+    from app.models.adm_kanban import create_adm_phases
     from app.models.solution_models import Solution
     from app.models.user import User
 
     with create_app("testing").app_context():
+        # The ten ADM phases are reference data every deployment loads; tasks are created against them.
+        create_adm_phases()
         architect_id = User.query.filter_by(email=architect_email).one().id
         # The deliverable catalogue is shared by every organisation; start from a known set.
         ADMDeliverableCheck.query.delete()
@@ -172,6 +175,13 @@ def test_architect_reads_the_cycle_as_lanes_with_solutions_and_deliverables(
         body = page.locator("main").inner_text()
         assert "1 cards" not in body and "1 solutions" not in body
 
+        # The summary line, the status chips and the lanes tell one story.
+        summary = page.get_by_test_id("adm-status-summary").inner_text()
+        total = int(re.match(r"\s*(\d+) cards", summary).group(1))
+        assert total == page.locator('[data-testid="adm-card"]').count()
+        by_status = sum(int(n) for n in re.findall(r"(?:Proposed|Development|Review|Approved|Implementing|Done)\s+(\d+)", summary))
+        assert by_status == total, "status counts %s do not add up to %s cards: %r" % (by_status, total, summary)
+
         # No grid of dash cells: an empty lane says so once, with the next step.
         empty = _lane(page, "E")
         expect(empty.get_by_text("No solutions in this phase")).to_have_count(1)
@@ -225,6 +235,9 @@ def test_deliverables_filter_lists_the_deliverables_not_an_empty_board(browser, 
         for names in DELIVERABLES.values():
             for name in names:
                 expect(page.locator("main").get_by_text(name).first).to_be_visible(timeout=PAGE_TIMEOUT)
+        total = sum(len(names) for names in DELIVERABLES.values())
+        expect(page.get_by_test_id("adm-status-summary")).to_contain_text("%d deliverables" % total)
+        expect(page.get_by_test_id("adm-status-summary").get_by_text("Proposed")).to_be_hidden()
         text = page.locator("main").inner_text()
         assert "No solutions on the board" not in text
         assert "Create a solution to start tracking" not in text
@@ -281,5 +294,47 @@ def test_a_board_with_nothing_on_it_says_what_is_empty_and_what_to_do(browser, l
         link.click()
         page.wait_for_load_state("networkidle")
         assert "/architecture-journey" in page.url
+    finally:
+        context.close()
+
+
+def test_architect_creates_edits_and_deletes_a_task_in_a_phase(browser, live_server, seeded_board):
+    """The modal and drawer forms behind the lanes still write, and what they write survives a reload."""
+    email = _make_enterprise_architect(seeded_board)
+    _assert_signed_in_as_enterprise_architect(email)
+    context, page = _open(browser, live_server, email, 1440)
+    try:
+        title, renamed = "Lane Test Draft the transition plan", "Lane Test Draft the migration plan"
+
+        page.get_by_role("button", name="Add a task to Opportunities and Solutions").click()
+        form = page.get_by_role("dialog").filter(has_text="New Architecture Task")
+        form.locator("#ct-title").fill(title)
+        form.get_by_role("button", name="Create Task").click()
+        task = _lane(page, "E").locator('[data-testid="adm-card"]').filter(has_text=title)
+        expect(task).to_have_count(1, timeout=PAGE_TIMEOUT)
+        expect(_lane(page, "E")).to_contain_text("1 task")
+        page.reload(timeout=PAGE_TIMEOUT)
+        page.wait_for_load_state("networkidle")
+        task = _lane(page, "E").locator('[data-testid="adm-card"]').filter(has_text=title)
+        expect(task).to_have_count(1, timeout=PAGE_TIMEOUT)
+
+        task.get_by_role("button", name=title).click()
+        drawer = page.get_by_role("dialog").filter(has_text=title)
+        drawer.get_by_role("button", name="Edit", exact=True).click()
+        drawer.get_by_label("Task title").fill(renamed)
+        drawer.get_by_role("button", name="Save", exact=True).click()
+        page.reload(timeout=PAGE_TIMEOUT)
+        page.wait_for_load_state("networkidle")
+        task = _lane(page, "E").locator('[data-testid="adm-card"]').filter(has_text=renamed)
+        expect(task).to_have_count(1, timeout=PAGE_TIMEOUT)
+
+        task.get_by_role("button", name=renamed).click()
+        drawer = page.get_by_role("dialog").filter(has_text=renamed)
+        drawer.get_by_role("button", name="Delete", exact=True).click()
+        drawer.get_by_role("button", name="Yes", exact=True).click()
+        page.reload(timeout=PAGE_TIMEOUT)
+        page.wait_for_load_state("networkidle")
+        expect(_lane(page, "E").locator('[data-testid="adm-card"]').filter(has_text="Lane Test Draft")).to_have_count(0)
+        expect(_lane(page, "E").get_by_text("No solutions in this phase")).to_have_count(1)
     finally:
         context.close()

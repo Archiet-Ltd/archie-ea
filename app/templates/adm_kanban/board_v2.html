@@ -28,7 +28,7 @@
 
     {# -- Header --------------------------------------------------------- #}
     {% macro _ps_actions() %}
-    <div class="flex flex-wrap items-center gap-2" data-testid="adm-kanban-toolbar">
+    <div class="-mt-2 flex flex-wrap items-center gap-2" data-testid="adm-kanban-toolbar">
         {% call native_select(aria_label='Filter by assignee', size='xs', attrs_dict={'x-model': 'filters.assignee', '@change': 'reload()'}) %}
             <option value="all">All assignees</option>
             <option value="me">My cards</option>
@@ -52,7 +52,8 @@
         {{ button(text='Sprint Planning', variant='default', size='sm', icon='calendar-clock', aria_label='Open Sprint Planning panel', on_click="$dispatch('open-sprint-panel')", attrs_dict={'title': 'Sprint Planning — manage sprints and assign cards'}) }}
     </div>
     {% endmacro %}
-    {{ page_shell(title='ADM Kanban', breadcrumb=[('Home', '/'), ('ADM Kanban', none)], subtitle='Architecture work across the TOGAF ADM cycle', actions_caller=_ps_actions) }}
+    {{ page_shell(title='ADM Kanban', breadcrumb=[('Home', '/'), ('ADM Kanban', none)], subtitle='Architecture work across the TOGAF ADM cycle') }}
+    {{ _ps_actions() }}
 
     {# -- Loading / Error ------------------------------------------------ #}
     <div x-show="loading" x-cloak class="p-12 text-center">
@@ -85,17 +86,19 @@
     {# -- Status summary with work-in-progress limits ----------------------- #}
     <div x-show="!loading && !error && emptyKind() === 'board'" x-cloak
          class="flex flex-wrap items-center gap-2 text-xs text-muted-foreground" data-testid="adm-status-summary">
-        <span class="font-medium text-foreground" x-text="plural(visibleCards().length, 'card')"></span>
-        <template x-for="col in columns" :key="col.id">
-            {% call badge('neutral', class='gap-1') %}
-                <span x-text="col.label"></span>
-                <span x-text="wipCount(col.id) + (wipLimit(col.id) > 0 ? ' / ' + wipLimit(col.id) : '')"
-                      :class="wipAtLimit(col.id) ? 'text-destructive-emphasis' : ''"></span>
-                <i x-show="wipAtLimit(col.id)" x-cloak data-lucide="lock" class="h-3 w-3" aria-hidden="true"></i>
-                <span x-show="colSlaStatus(col.id) && colSlaStatus(col.id).overdue_count > 0" x-cloak class="text-destructive-emphasis"
-                      x-text="colSlaStatus(col.id) ? colSlaStatus(col.id).overdue_count + ' past ' + colSlaStatus(col.id).sla_days + '-day limit' : ''"></span>
-            {% endcall %}
-        </template>
+        <span class="font-medium text-foreground" x-text="plural(visibleCards().length, visibleNoun())"></span>
+        <div x-show="filters.card_type !== 'deliverable'" class="flex flex-wrap items-center gap-2">
+            <template x-for="col in columns" :key="col.id">
+                {% call badge('neutral', class='gap-1') %}
+                    <span x-text="col.label"></span>
+                    <span x-text="wipCount(col.id) + (wipLimit(col.id) > 0 ? ' / ' + wipLimit(col.id) : '')"
+                          :class="wipAtLimit(col.id) ? 'text-destructive-emphasis' : ''"></span>
+                    <i x-show="wipAtLimit(col.id)" x-cloak data-lucide="lock" class="h-3 w-3" aria-hidden="true"></i>
+                    <span x-show="colSlaStatus(col.id) && colSlaStatus(col.id).overdue_count > 0" x-cloak class="text-destructive-emphasis"
+                          x-text="colSlaStatus(col.id) ? colSlaStatus(col.id).overdue_count + ' past ' + colSlaStatus(col.id).sla_days + '-day limit' : ''"></span>
+                {% endcall %}
+            </template>
+        </div>
     </div>
 
     {# -- The ADM cycle as lanes ------------------------------------------- #}
@@ -136,7 +139,7 @@
                                          :class="isSelected(card.id) ? 'ring-2 ring-primary' : ''">
                                     <div class="flex items-start justify-between gap-2">
                                         <h3 class="min-w-0 text-sm font-semibold leading-snug text-foreground">
-                                            {% call button(variant='link', size='bare', class='h-auto p-0 text-left font-semibold text-foreground whitespace-normal', attrs_dict={'@click': 'openDetail(card)'}) %}<span x-text="card.title"></span>{% endcall %}
+                                            {% call button(variant='link', size='bare', class='h-auto max-w-full p-0 text-left font-semibold text-foreground', attrs_dict={'@click': 'openDetail(card)'}) %}<span class="block min-w-0 whitespace-normal break-words" x-text="card.title"></span>{% endcall %}
                                         </h3>
                                         <template x-if="card.card_type !== 'deliverable'">
                                             {{ checkbox(attrs_dict={'@change': 'selectCard(card.id, $event)', ':checked': 'isSelected(card.id)', ':aria-label': "'Select ' + card.title"}) }}
@@ -181,7 +184,7 @@
 
                                     <template x-if="card.card_type === 'solution'">
                                         <div class="mt-3 flex flex-wrap items-center gap-2 border-t border-border pt-2">
-                                            {% call button(variant='outline', size='xs', class='gap-1', attrs_dict={'data-testid': 'adm-deliverables-chip', '@click': 'openDeliverables(card.phase)', ':aria-label': "'Deliverables for ' + card.title"}) %}<i data-lucide="file-check" class="h-3 w-3" aria-hidden="true"></i><span x-text="plural(phaseDeliverableCards(card.phase).length, 'deliverable')"></span>{% endcall %}
+                                            {% call button(variant='outline', size='xs', class='gap-1', attrs_dict={'data-testid': 'adm-deliverables-chip', '@click': 'openDeliverables(card.phase)', ':aria-label': "'Deliverables for ' + card.title"}) %}<i data-lucide="file-check" class="h-3 w-3" aria-hidden="true"></i><span x-text="phaseDeliverableCards(card.phase).length ? plural(phaseDeliverableCards(card.phase).length, 'deliverable') : 'No deliverables'"></span>{% endcall %}
                                             <a x-show="card.link_url" :href="card.link_url" class="text-xs font-medium text-primary hover:underline" x-text="card.link_label || 'Open'"></a>
                                             <span x-show="!card.link_url" class="text-xs text-muted-foreground">Open to its owner and stakeholders</span>
                                         </div>
@@ -194,7 +197,7 @@
 
                                     <template x-if="card.card_type !== 'deliverable'">
                                         <div class="mt-2">
-                                            {% call native_select(size='xs', class='w-full', attrs_dict={':aria-label': "'Move ' + card.title + ' to another status'", '@change': 'moveStatus(card, $event.target.value)'}) %}
+                                            {% call native_select(size='xs', class='w-full text-xs', attrs_dict={':aria-label': "'Move ' + card.title + ' to another status'", '@change': 'moveStatus(card, $event.target.value)'}) %}
                                                 <template x-for="col in columns" :key="col.id">
                                                     <option :value="col.id" :selected="card.column === col.id" x-text="col.label"></option>
                                                 </template>

@@ -124,8 +124,9 @@
             wipLimit: function (colId) {
                 return this.wipLimits[colId] || 0;
             },
+            // Counted from the cards the board shows, so the summary and the lanes agree.
             wipCount: function (colId) {
-                return this.columnCounts[colId] || 0;
+                return this.cards.filter(function (c) { return c.card_type !== 'deliverable' && c.column === colId; }).length;
             },
             wipAtLimit: function (colId) {
                 let lim = this.wipLimit(colId);
@@ -232,6 +233,10 @@
                 return 'nothing';
             },
 
+            visibleNoun: function () {
+                return { solution: 'solution', task: 'task', deliverable: 'deliverable' }[this.filters.card_type] || 'card';
+            },
+
             clearFilters: function () {
                 this.filters.assignee = 'all';
                 this.filters.priority = '';
@@ -310,10 +315,6 @@
                 let self = this;
                 let prev = card.column;
                 card.column = toColumn;
-                self.columnCounts = Object.assign({}, self.columnCounts, {
-                    [prev]: Math.max(0, (self.columnCounts[prev] || 0) - 1),
-                    [toColumn]: (self.columnCounts[toColumn] || 0) + 1,
-                });
                 _fetch('/api/adm-kanban/v2/cards/' + card.id + '/move', {
                     method: 'POST',
                     body: { to_column: toColumn },
@@ -322,10 +323,6 @@
                     if (data && data.card) Object.assign(card, data.card);
                 }).catch(function (err) {
                     card.column = prev;
-                    self.columnCounts = Object.assign({}, self.columnCounts, {
-                        [prev]: (self.columnCounts[prev] || 0) + 1,
-                        [toColumn]: Math.max(0, (self.columnCounts[toColumn] || 0) - 1),
-                    });
                     let errData = err && err.data;
                     let msg = (errData && errData.error) || (err && err.message) || 'Move failed';
                     if (errData && errData.wip_exceeded) {
