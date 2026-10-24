@@ -28,9 +28,9 @@
                     </form>
                     {% else %}
                     <div role="alert" class="rounded-md border border-warning/40 bg-warning/10 p-3 text-sm text-foreground">
-                        E-mail is not available on this server, so no confirmation link can be sent to
-                        <span class="font-medium break-words">{{ current_user.email }}</span>.
-                        Ask your organisation's administrator for help.
+                        We cannot send a confirmation link to
+                        <span class="font-medium break-words">{{ current_user.email }}</span> right now.
+                        Ask your organisation's administrator to confirm your account.
                     </div>
                     {% endif %}
 
