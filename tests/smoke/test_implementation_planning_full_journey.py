@@ -129,11 +129,11 @@ def test_portfolio_manager_creates_views_and_finds_blocked_work_packages(browser
         expect(row).to_contain_text(first_programme)
         expect(row).to_contain_text(second_programme)
 
-        # Follow the linked blocker's programme name to the edit page.
-        link = row.get_by_role("link", name=blocker_name)
+        # Follow the link to the blocked work package's edit page.
+        link = row.get_by_role("link", name=blocked_name)
         expect(link).to_have_count(1)
         link.click()
-        page.wait_for_url(re.compile(r"/implementation/work-packages/%d/edit$" % blocker_id),
+        page.wait_for_url(re.compile(r"/implementation/work-packages/%d/edit$" % blocked_id),
                           timeout=PAGE_TIMEOUT)
         expect(page.get_by_role("heading", name="Edit Work Package").first).to_be_visible()
     finally:

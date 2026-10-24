@@ -1,11 +1,6 @@
 {% extends 'layouts/admin_base.html' %}
 {% from 'components/page_header.html' import page_header %}
-{% from 'components/button.html' import button %}
-{% from 'components/card.html' import card, card_content, card_header, card_title, card_description %}
-{% from 'components/badge.html' import badge %}
-{% from 'components/progress.html' import progress %}
-{% from 'components/status_badge.html' import status_badge_auto %}
-{% from 'components/input.html' import input, label %}
+{% from 'components/card.html' import card, card_content %}
 
 {% block title %}{{ work_package.name|default('Work package', true) }}{% endblock %}
 
@@ -21,33 +16,30 @@
     ) }}
 
     {% call card() %}
-        {% call card_header() %}
-            {% call card_title() %}Work Package Details{% endcall %}
-        {% endcall %}
         {% call card_content() %}
         <dl class="grid grid-cols-1 gap-4 sm:grid-cols-4 text-sm">
             <div>
                 <dt class="text-muted-foreground">Status</dt>
-                <dd class="font-medium mt-1" data-testid="wp-status">{{ status_badge_auto(work_package.status) if work_package.status else '—' }}</dd>
+                <dd class="font-medium" data-testid="wp-status">{{ (work_package.status or '—')|replace('_', ' ')|capitalize if work_package.status else '—' }}</dd>
             </div>
             <div>
                 <dt class="text-muted-foreground">Owner</dt>
-                <dd class="font-medium mt-1" data-testid="wp-owner">{{ owner_name or work_package.assigned_to or '—' }}</dd>
+                <dd class="font-medium" data-testid="wp-owner">{{ owner_name or work_package.assigned_to or '—' }}</dd>
             </div>
             <div>
                 <dt class="text-muted-foreground">Progress</dt>
-                <dd class="font-medium mt-1" data-testid="wp-progress">
+                <dd class="font-medium" data-testid="wp-progress">
                     {% if work_package.progress_percentage is none %}—{% else %}{{ work_package.progress_percentage|round|int }}%{% endif %}
                 </dd>
                 {% if work_package.progress_percentage is not none %}
-                <div class="mt-2">
-                    {{ progress(value=work_package.progress_percentage|round|int, max=100) }}
+                <div class="mt-1 h-2 w-full rounded-full bg-secondary overflow-hidden">
+                    <div class="h-full bg-primary" style="width: {{ [[work_package.progress_percentage, 0]|max, 100]|min }}%"></div>
                 </div>
                 {% endif %}
             </div>
             <div>
                 <dt class="text-muted-foreground">Dates</dt>
-                <dd class="font-medium mt-1" data-testid="wp-dates">
+                <dd class="font-medium" data-testid="wp-dates">
                     {{ work_package.start_date.date().isoformat() if work_package.start_date else '—' }}
                     to
                     {{ work_package.end_date.date().isoformat() if work_package.end_date else '—' }}
@@ -59,15 +51,13 @@
 
     {# Gaps this work package closes: the one link, read from either side. #}
     {% call card() %}
-        {% call card_header() %}
-            {% call card_title() %}Gaps this work package closes{% endcall %}
-        {% endcall %}
         {% call card_content() %}
         <div x-data="gapLinkPicker({{ {
                 'searchUrl': url_for('capability_map.api_roadmap_gaps_search'),
                 'linkBase': url_for('capability_map.api_roadmap_gap_link_work_package', gap_id=0, wp_id=work_package.id),
                 'unlinkBase': url_for('capability_map.api_roadmap_gap_unlink_work_package', gap_id=0, wp_id=work_package.id)
             }|tojson|forceescape }})">
+            <h2 class="text-base font-semibold text-foreground mb-3">Gaps this work package closes</h2>
             <ul class="divide-y divide-border" data-testid="wp-gaps">
                 {% for gap in gaps %}
                 <li class="flex items-center justify-between py-2 text-sm">
@@ -89,7 +79,7 @@
                 <ul x-show="results.length > 0" x-cloak class="absolute z-20 mt-1 w-full rounded-md border border-border bg-card" data-testid="gap-picker-results">
                     <template x-for="g in results" :key="g.id">
                         <li>
-{{ button('', variant='ghost', size='bare', type='button', class='block w-full px-3 py-2 text-left hover:bg-muted', on_click='link(g.id)', attrs_dict={'x-text': 'g.name', 'data-testid': 'gap-picker-option'}) }}
+                            {{ button('', variant='ghost', size='bare', type='button', class='block w-full px-3 py-2 text-left hover:bg-muted', on_click='link(g.id)', attrs_dict={'x-text': 'g.name', 'data-testid': 'gap-picker-option'}) }}
                         </li>
                     </template>
                 </ul>
@@ -102,10 +92,8 @@
 
     {% if plateaus %}
     {% call card() %}
-        {% call card_header() %}
-            {% call card_title() %}Plateaus it delivers{% endcall %}
-        {% endcall %}
         {% call card_content() %}
+        <h2 class="text-base font-semibold text-foreground mb-3">Plateaus it delivers</h2>
         <ul class="text-sm space-y-1" data-testid="wp-plateaus">
             {% for plateau in plateaus %}<li>{{ plateau.name|default('—', true) }}</li>{% endfor %}
         </ul>
