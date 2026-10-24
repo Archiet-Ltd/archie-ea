@@ -281,11 +281,18 @@ def test_worked_out_links_name_their_origin_once(page, live_server, two_organisa
     dialog = _open_why(page, live_server, ours, "mainframe", "portal", "derived")
     links = dialog.locator("[data-why-chain] [data-why-link]")
     expect(links).to_have_count(2)
-    first = re.sub(r"\s+", " ", links.nth(0).inner_text())
-    second = re.sub(r"\s+", " ", links.nth(1).inner_text())
-    assert "Imported from estate.xml" in first
-    assert "Drawn by Imported" not in first
-    assert "Drawn by Grace Hopper Ours" in second
+    # The drawer fills the chain from a request it makes when it opens, and the
+    # row's visible text settles a moment after that answer lands. Reading before
+    # it settles catches the row mid-render — the "Drawn by" label not yet hidden
+    # over an imported origin, the "no longer in the model" line still showing —
+    # which is what a person never sees. Read each link's settled text instead:
+    # to_contain_text with use_inner_text retries, visible text only, so the hidden
+    # x-show branches never count.
+    first, second = links.nth(0), links.nth(1)
+    expect(first).to_contain_text("Imported from estate.xml", use_inner_text=True)
+    expect(first).not_to_contain_text("no longer in the model", use_inner_text=True)
+    expect(first).not_to_contain_text("Drawn by Imported", use_inner_text=True)
+    expect(second).to_contain_text("Drawn by Grace Hopper Ours", use_inner_text=True)
 
 
 def test_owner_opens_the_relationship_list_with_their_links(page, live_server, two_organisations):
