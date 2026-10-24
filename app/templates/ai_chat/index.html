@@ -34,21 +34,9 @@
     }"
      x-init="$watch('railOpen', (v) => localStorage.setItem('archie_chat_rail', v ? 'open' : 'closed'))"
      @chat-tab.window="activeTab = $event.detail"
-     class="flex h-[calc(100dvh-10rem)] min-h-[28rem] flex-col bg-background -mx-4 -my-6">
+     id="chat-frame" class="flex h-[calc(100dvh-10rem)] min-h-[28rem] flex-col bg-background -mx-4 -my-6">
 {% if chat_bootstrap_error %}
 <div class="shrink-0 px-4 py-2">{{ alert('warning', text=chat_bootstrap_error) }}</div> {# ui-contract-ok: the alert macro, not a native dialog #}
-{% endif %}
-{% if not llm_configured %}
-{# The earliest and most visible place to say the model cannot answer, and what closes it.
-   The admin path is a literal, not url_for: the admin blueprint is selected at boot and a
-   missing endpoint would 500 this whole page. #}
-<div class="shrink-0 px-4 py-2">
-    {% if current_user.is_admin() %}
-    {% call alert('warning', title='AI model unavailable', link_href='/admin/api-settings', link_text='Open Admin → API Settings') %}No model is configured, so the assistant cannot write answers. Questions about your records are still answered from them.{% endcall %} {# ui-contract-ok: the alert macro, not a native dialog #}
-    {% else %}
-    {% call alert('warning', title='AI model unavailable') %}No model is configured, so the assistant cannot write answers. Ask an administrator to configure one. Questions about your records are still answered from them.{% endcall %} {# ui-contract-ok: the alert macro, not a native dialog #}
-    {% endif %}
-</div>
 {% endif %}
 
     <div class="relative flex min-h-0 flex-1 overflow-hidden">
@@ -102,10 +90,26 @@
                 {# The welcome. It goes once the first message is sent. #}
                 <div id="domain-welcome-grid" class="mx-auto flex w-full max-w-3xl flex-col items-center py-4 text-center">
                     <h1 class="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">How can I help you today?</h1>
-                    <p class="mt-3 max-w-xl text-muted-foreground">Ask about your company in plain words. A question that names one of your applications or services is answered from your own records, with where each fact came from.</p>
+                    <p class="mt-3 hidden max-w-xl text-muted-foreground sm:block">Ask about your company in plain words. A question that names one of your applications or services is answered from your own records, with where each fact came from.</p>
 
                     <div id="domain-welcome-suggestions" class="mt-8 w-full text-left">
                         {# Four questions from what this organisation's records flag now. panels.js fills it, including the failed and empty states. #}
+                        {% if startup_first_steps and startup_first_steps.show %}
+                        {# The empty-workspace next step for a startup. panels.js shows it when no application is recorded. #}
+                        <template id="startup-first-steps">
+                            <div class="flex flex-col items-center gap-3 sm:flex-row sm:justify-center" data-testid="startup-first-steps">
+                                {% if startup_first_steps.connect %}
+                                {{ button(text='Connect GitHub', href=url_for('m365_connector.github_connect'), testid='chat-first-connect') }}
+                                {% endif %}
+                                {% if startup_first_steps.sample %}
+                                <form method="post" action="{{ url_for('architect_ui.load_sample_company') }}">
+                                    {{ input(type='hidden', name='csrf_token', value=csrf_token()) }}
+                                    {{ button(text='See a sample company', type='submit', variant='outline' if startup_first_steps.connect else 'default', testid='chat-first-sample') }}
+                                </form>
+                                {% endif %}
+                            </div>
+                        </template>
+                        {% endif %}
                         <div id="portfolio-briefing" aria-live="polite" aria-busy="true" data-testid="first-questions">
                             <p class="flex items-center justify-center gap-2 text-xs text-muted-foreground">
                                 <i data-lucide="loader-2" class="h-3.5 w-3.5 animate-spin" aria-hidden="true"></i>Reading your portfolio…
@@ -117,6 +121,17 @@
 
             {# The composer. Enter sends, Shift+Enter starts a new line, Escape clears. The diagram-attach control stays out
                on purpose: the assistant has no vision handling, so an attached picture would be ignored while the answer read as if it had been used. #}
+{% if not llm_configured %}
+            {# One line above the composer, so the greeting and the questions keep the first screen. The admin path is a literal,
+               not url_for: the admin blueprint is selected at boot and a missing endpoint would 500 this whole page. #}
+            <div class="shrink-0 px-4 pb-2">
+                {% if current_user.is_admin() %}
+                {{ alert('warning', text='No AI model. Records still answer.', link_href='/admin/api-settings', link_text='API Settings', testid='model-unavailable-notice') }} {# ui-contract-ok: the alert macro, not a native dialog #}
+                {% else %}
+                {{ alert('warning', text='No AI model. Ask an administrator.', testid='model-unavailable-notice') }} {# ui-contract-ok: the alert macro, not a native dialog #}
+                {% endif %}
+            </div>
+            {% endif %}
             <div class="shrink-0 border-t border-border bg-background px-4 pb-4 pt-3">
                 <form id="chat-form" class="mx-auto w-full max-w-3xl space-y-2">
                     {{ input(type='hidden', id='selected-element-id', class='hidden', aria_label='Selected element') }}
@@ -135,7 +150,7 @@
                     </div>
                     <p class="text-xs text-muted-foreground" data-testid="chat-scope">
                         {% if active_organization_name %}Answering from the records of <span class="font-medium text-foreground">{{ active_organization_name }}</span>.{% else %}Answering from your organisation's records.{% endif %}
-                        Model: <span class="font-medium text-foreground">{{ provider_label if llm_configured else 'none configured' }}</span>.
+                        Model: <span id="chat-model-name" class="font-medium text-foreground">{{ provider_label if llm_configured else 'none configured' }}</span>.
                         Entelim can make mistakes — check important decisions against the cited records.
                     </p>
                 </form>
