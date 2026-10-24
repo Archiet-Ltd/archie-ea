@@ -18,7 +18,7 @@ Pages:
 
 import logging
 
-from flask import Blueprint, Response, current_app, flash, jsonify, redirect, render_template, request, url_for  # noqa: F401
+from flask import Blueprint, Response, current_app, flash, g, jsonify, redirect, render_template, request, url_for  # noqa: F401
 from flask_login import current_user, login_required
 
 from app import db
@@ -516,6 +516,24 @@ def load_sample_company():
         flash(error, "error")
         return redirect(url_for("dashboard.overview"))
 
+    # The elements alone count no applications and score no health; add the
+    # applications, owners, costs, capabilities and risks a real estate carries.
+    from app.services import sample_company_service
+
+    point = sample_company_service.find_restore_point(g.current_org_id)
+    if point is not None:
+        try:
+            sample_company_service.add_working_data(g.current_org_id, current_user, point)
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+            current_app.logger.exception("sample company working data not added")
+            error = "The sample company's elements loaded, but its applications could not be added."
+            if wants_json:
+                return jsonify({"success": False, "error": error}), 500
+            flash(error, "error")
+            return redirect(url_for("dashboard.overview"))
+
     # The first screen now shows the loaded sample: its counts, applications and the
     # "You are looking at the sample company" bar with the way to remove it.
     answer_url = url_for("dashboard.overview")
@@ -530,6 +548,25 @@ def load_sample_company():
 
     flash(f"Sample company loaded: {result.get('created', 0)} elements created.", "success")
     return redirect(answer_url)
+
+
+@architect_ui_bp.route("/architecture/sample-company/remove", methods=["POST"])
+@login_required
+@require_permission("create", "relationship")
+def remove_sample_company():
+    """Remove the sample company from the current organisation, then return to setup."""
+    from app.services import import_restore_service, sample_company_service
+
+    try:
+        result = sample_company_service.remove(g.current_org_id, current_user.id)
+    except import_restore_service.RestoreError as exc:
+        flash(str(exc), "error")
+        return redirect(url_for("dashboard.overview")), 303
+    if result is None:
+        flash("There is no sample company to remove.", "info")
+    else:
+        flash("Sample company removed.", "success")
+    return redirect(url_for("dashboard.overview")), 303
 
 
 @architect_ui_bp.route("/architecture/import/oef/restore-points", methods=["GET"])
