@@ -17,6 +17,9 @@
        cancel_text='Cancel',
        variant='destructive'
    ) }}
+
+   Optional: confirm_label / cancel_label (accessible names, default "Close"),
+   button_class (replaces the 32px icon-button classes so the visible text fits).
    
    Trigger from JavaScript:
    window.dispatchEvent(new CustomEvent('open-confirm-delete-app', { 
@@ -30,7 +33,10 @@
     message='This action cannot be undone.',
     confirm_text='Confirm',
     cancel_text='Cancel',
-    variant='destructive'
+    variant='destructive',
+    confirm_label=none,
+    cancel_label=none,
+    button_class=none
 ) %}
 <div id="confirm-dialog-{{ id }}" x-data="{ callback: null }" hidden
      @open-confirm-{{ id }}.window="callback = $event.detail?.callback; Platform.modal.open('confirm-dialog-{{ id }}')"
@@ -80,14 +86,14 @@
             <!-- Actions -->
             <div class="flex justify-end gap-3">
                 <button data-modal-close="confirm-dialog-{{ id }}" 
-                        class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                        type="button" aria-label="Close">
+                        class="{{ button_class if button_class else 'inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring' }}"
+                        type="button" aria-label="{{ cancel_label or 'Close' }}">
                     {{ cancel_text }}
                 </button>
                 
                 <button @click="if (callback) callback();" data-modal-close="confirm-dialog-{{ id }}" 
-                        class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                        type="button" aria-label="Close">
+                        class="{{ button_class if button_class else 'inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring' }}"
+                        type="button" aria-label="{{ confirm_label or 'Close' }}">
                     {{ confirm_text }}
                 </button>
             </div>
