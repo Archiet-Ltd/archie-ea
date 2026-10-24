@@ -183,6 +183,94 @@ def allowed_macros(design_map, entry):
     return sorted(set(block.get("allowed_macros", [])) | set(entry.get("extra_macros", [])))
 
 
+# ------------------------------------------------------------------ the tier checks
+
+# Checks of criteria v2 that need a rendered golden original or a browser. They are listed, not faked.
+PENDING_TIER_CHECKS = {
+    "A2-A5": "structure, class, computed-style and pixel match against the original's golden render (no render of "
+             "the site examples or preview cards yet)",
+    "B2": "the page frame equals the nearest original's frame (needs the golden render)",
+    "B4-B6": "every component node carries its pinned recipe and every other node is a layout or text element",
+    "B7": "regions below the header, stat cards and primary tables counted from the rendered DOM",
+    "B8": "frame pixel difference against the golden render",
+    "B9": "each chart's family, series, tooltip and legend read from the rendered page",
+    "X6-X10": "computed colours, fonts, accessibility findings and horizontal overflow in a browser",
+    "C": "the form-specific check of each Tier C form (the marked region and its geometry)",
+}
+TIER_CHECKS = {
+    "replace_in_use": "pages still using an in-house component the port map marks Replace",
+    "in_house_beyond_tier": "pages using an in-house component their tier does not allow (A: any Compose or Keep; B: Keep)",
+    "charts_over_two": "Tier A and B pages whose own template draws more than two charts",
+    "colour_literals": "pages whose own template holds a colour literal instead of a token (X1)",
+    "inline_style": "pages whose own template sets an inline style beyond the geometry properties (X2)",
+    "arbitrary_values": "pages whose own template uses an arbitrary-value class such as h-[250px] (X4)",
+}
+GEOMETRY_PROPERTIES = {"--x", "--y", "--w", "--h", "--col", "--row"}
+COLOUR_LITERAL_RE = re.compile(
+    r"(?:\b(?:rgba?|hsla?|oklch|oklab|lab|lch)\((?!\s*var\()|"
+    r"(?:fill|stroke|stop-color|color|background(?:-color)?|border(?:-[a-z]+)?-color)\s*[:=]\s*[\"']?#[0-9a-fA-F]{3,8}\b)")
+STYLE_ATTR_RE = re.compile(r"""\bstyle\s*=\s*(?:"([^"]*)"|'([^']*)')""")
+CLASS_ATTR_RE = re.compile(r"""\bclass\s*=\s*(?:"([^"]*)"|'([^']*)')""")
+ARBITRARY_RE = re.compile(r"(?<![\w-])[a-z0-9:!-]*-\[[^\]\s]+\]")
+CHART_CALL_RE = re.compile(r"new\s+Chart\s*\(")
+
+
+def style_properties(source):
+    """Every property name set in an inline style attribute that holds no template expression."""
+    names = set()
+    for match in STYLE_ATTR_RE.finditer(source):
+        value = match.group(1) if match.group(1) is not None else match.group(2)
+        if "{{" in value or "{%" in value:
+            value = re.sub(r"{{.*?}}|{%.*?%}", "", value)
+        names |= {part.split(":", 1)[0].strip().lower() for part in value.split(";") if ":" in part}
+    return names
+
+
+def charts_drawn(source):
+    return max(len(re.findall(r"<canvas\b", source)), len(CHART_CALL_RE.findall(source)))
+
+
+def tier_checks(design_map, pages, read=None):
+    """Each row measured against the checks of its tier that a template can answer today.
+
+    {check: {"count": pages failing, "by_tier": {tier: pages}, "pages": [templates]}}. The source checks read
+    the page's own template, so a macro it includes is not followed; they ratchet at today's count.
+    """
+    verdicts = inhouse_verdicts(design_map)
+    read = read or (lambda rel: (ROOT / rel).read_text(encoding="utf-8", errors="replace")
+                    if (ROOT / rel).is_file() else None)
+    found = {name: [] for name in TIER_CHECKS}
+    for rel in sorted(set(design_map["pages"]) & set(pages)):
+        entry, tier = design_map["pages"][rel], design_map["pages"][rel].get("tier")
+        used = {macro_name(m): verdicts.get(macro_name(m)) for m in pages[rel]["macros"]}
+        used = {name: verdict for name, verdict in used.items() if verdict}
+        if "Replace" in used.values():
+            found["replace_in_use"].append((rel, tier))
+        visible = {name: v for name, v in used.items() if name != "accessibility-helpers"}
+        beyond = {"A": {"Compose", "Keep"}, "B": {"Keep"}}.get(tier, set())
+        if beyond & set(visible.values()):
+            found["in_house_beyond_tier"].append((rel, tier))
+        source = read(rel)
+        if source is None:
+            continue
+        if tier in ("A", "B") and charts_drawn(source) > 2:
+            found["charts_over_two"].append((rel, tier))
+        if COLOUR_LITERAL_RE.search(source):
+            found["colour_literals"].append((rel, tier))
+        extra = style_properties(source) - (GEOMETRY_PROPERTIES if tier and tier.startswith("C") else set())
+        if extra:
+            found["inline_style"].append((rel, tier))
+        if any(ARBITRARY_RE.search(m.group(1) if m.group(1) is not None else m.group(2))
+               for m in CLASS_ATTR_RE.finditer(source)):
+            found["arbitrary_values"].append((rel, tier))
+    out = {}
+    for name, hits in found.items():
+        by_tier = Counter(tier for _rel, tier in hits)
+        out[name] = {"count": len(hits), "by_tier": {t: by_tier[t] for t in TIERS if by_tier[t]},
+                     "pages": [rel for rel, _tier in hits]}
+    return out
+
+
 # ------------------------------------------------------------------ the merge check
 
 def check_block(rel, source, design_map):
@@ -214,7 +302,10 @@ def check_block(rel, source, design_map):
         if macro not in allowed:
             problems.append(f"{rel}: uses {macro}, which the {block} block does not allow "
                             f"(allowed: {', '.join(sorted(allowed))})")
-    if entry.get("components"):
+    # The component list is the page as designed. Once the page is rebuilt to it, a macro outside it is a
+    # finding on the change; until then the page still holds today's macros and the outside-components
+    # ratchet in measure() counts the gap, so a branch that touches many unconverted pages is not refused.
+    if entry.get("components") and entry.get("status") in STATUSES[2:]:
         in_row = set(row_macros(design_map, entry))
         for macro in facts["macros"]:
             if macro in allowed and macro not in in_row:
@@ -298,6 +389,9 @@ def measure(design_map=None, pages=None):
         "unmarked_count": len(unmarked),
         "outside_components": outside_components,
         "outside_components_count": len(outside_components),
+        "tiers": dict(sorted(Counter(e.get("tier") for e in entries.values()).items())),
+        "tier_checks": tier_checks(design_map, pages),
+        "tier_checks_pending": PENDING_TIER_CHECKS,
     }
 
 

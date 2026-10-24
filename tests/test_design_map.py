@@ -129,11 +129,15 @@ def test_a_page_whose_macro_is_outside_its_rows_components_is_counted_and_named(
     narrowed = copy.deepcopy(design_map)
     rel = LIST_PAGE
     narrowed["pages"][rel]["components"] = ["page-header"]
+    narrowed["pages"][rel]["inhouse_components"] = []
     pages = {rel: {"extends": ["layouts/base.html"], "macros": ["components/data_table.html"],
                    "marker": narrowed["pages"][rel]["block"]}}
     result = tool.measure(narrowed, pages)
     assert [o["template"] for o in result["outside_components"]] == [rel]
     assert result["outside_components"][0]["components"] == ["table"]
+    assert tool.check_block(rel, _page("data-table", "components/data_table.html"), narrowed) == [], \
+        "a page not yet rebuilt to its list is counted by the ratchet, not refused on the change"
+    narrowed["pages"][rel]["status"] = "implemented"
     problems = tool.check_block(rel, _page("data-table", "components/data_table.html"), narrowed)
     assert len(problems) == 1 and "component list" in problems[0] and "'table'" in problems[0]
     assert tool.check_block(rel, _page("data-table", "components/data_table.html"), design_map) == []
@@ -189,3 +193,61 @@ def test_a_row_with_an_illegal_tier_or_confidence_or_no_reason_is_an_error(tool,
     assert any(rel in e and "tier 'D'" in e for e in errors)
     assert any(rel in e and "confidence 'maybe'" in e for e in errors)
     assert any(rel in e and "no reason" in e for e in errors)
+
+
+# ---- each page is measured against the checks of its tier
+
+def _tier_row(design_map, tier, inhouse=()):
+    import copy
+
+    broken = copy.deepcopy(design_map)
+    row = broken["pages"][LIST_PAGE]
+    row["tier"], row["inhouse_components"] = tier, list(inhouse)
+    return broken
+
+
+def _measure_source(tool, design_map, source, macros=()):
+    pages = {LIST_PAGE: {"extends": ["layouts/base.html"], "macros": list(macros),
+                         "marker": design_map["pages"][LIST_PAGE]["block"]}}
+    return tool.tier_checks(design_map, pages, read=lambda rel: source)
+
+
+def test_a_page_still_using_a_component_marked_replace_is_counted_by_tier(tool, design_map):
+    marked = _tier_row(design_map, "A", ["page-shell:Replace", "provenance:Compose"])
+    found = _measure_source(tool, marked, "<p>x</p>", ["macros/page_shell.html", "components/provenance.html"])
+    assert found["replace_in_use"]["by_tier"] == {"A": 1} and found["replace_in_use"]["pages"] == [LIST_PAGE]
+    assert found["in_house_beyond_tier"]["by_tier"] == {"A": 1}
+    composed = _tier_row(design_map, "B", ["provenance:Compose"])
+    found = _measure_source(tool, composed, "<p>x</p>", ["components/provenance.html"])
+    assert found["replace_in_use"]["count"] == 0 and found["in_house_beyond_tier"]["count"] == 0
+
+
+def test_a_template_with_a_colour_literal_an_inline_style_an_arbitrary_class_or_three_charts_is_counted(tool, design_map):
+    row = _tier_row(design_map, "B")
+    source = ('<div class="h-[250px] p-2" style="width: 40px">'
+              '<span style="color: #ff0000"></span><canvas></canvas><canvas></canvas><canvas></canvas></div>')
+    found = _measure_source(tool, row, source)
+    for check in ("colour_literals", "inline_style", "arbitrary_values", "charts_over_two"):
+        assert found[check]["by_tier"] == {"B": 1}, check
+    clean = '<div class="p-2" style="color: hsl(var(--muted-foreground))"><canvas></canvas></div>'
+    found = _measure_source(tool, row, clean)
+    assert found["colour_literals"]["count"] == 0 and found["arbitrary_values"]["count"] == 0
+    assert found["charts_over_two"]["count"] == 0
+
+
+def test_geometry_properties_are_allowed_on_a_tier_c_page_and_nowhere_else(tool, design_map):
+    source = '<div style="--x: 4; --w: 20"></div>'
+    assert _measure_source(tool, _tier_row(design_map, "C3"), source)["inline_style"]["count"] == 0
+    assert _measure_source(tool, _tier_row(design_map, "B"), source)["inline_style"]["count"] == 1
+
+
+def test_the_gate_reports_each_tier_and_holds_every_tier_check_at_its_baseline():
+    baseline = json.loads((ROOT / "verification_baseline.json").read_text(encoding="utf-8"))["ratchets"]
+    proc = subprocess.run([sys.executable, "scripts/check_design_map.py", "--json"],
+                          cwd=ROOT, capture_output=True, text=True, timeout=300)
+    data = json.loads(proc.stdout[proc.stdout.index("{"):])
+    assert data["tiers"] == TIER_TOTALS
+    assert set(data["tier_checks"]) == {k[len("design_map_tier_"):] for k in baseline if k.startswith("design_map_tier_")}
+    for check, found in data["tier_checks"].items():
+        assert found["count"] <= baseline["design_map_tier_" + check], check
+    assert "A2-A5" in data["tier_checks_pending"] and "B7" in data["tier_checks_pending"]
