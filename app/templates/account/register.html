@@ -2,6 +2,7 @@
 {% block title %}Create Account{% endblock %}
 {% import 'macros/form_macros.html' as f %}
 {% import 'macros/check_password.html' as check with context %}
+{% from 'components/card.html' import card, card_header, card_title, card_description, card_content with context %}
 
 {% block content %}
 {# layouts/public_base.html already renders the sole <main id="main-content">
@@ -11,12 +12,12 @@
 <div>
     <div class="flex justify-center">
         <div class="w-full max-w-md">
- <div class="rounded-lg border bg-card text-card-foreground">
-                <div class="flex flex-col space-y-1.5 p-6">
-                    <h1 class="text-2xl font-semibold leading-none tracking-tight">Create an account</h1>
-                    <p class="text-sm text-muted-foreground">Sign up to get started</p>
-                </div>
-                <div class="p-6 pt-0">
+            {% call card() %}
+                {% call card_header() %}
+                    {% call card_title() %}Create an account{% endcall %}
+                    {% call card_description() %}Sign up to get started{% endcall %}
+                {% endcall %}
+                {% call card_content() %}
                     {% set flashes = {
                         'error':   get_flashed_messages(category_filter=['form-error']),
                         'warning': get_flashed_messages(category_filter=['form-check-email']),
@@ -53,8 +54,8 @@
                         Already have an account?
                         <a href="{{ url_for('account.login', **(signin_args or {})) }}" class="text-primary font-medium hover:underline">Sign in</a>
                     </div>
-                </div>
-            </div>
+                {% endcall %}
+            {% endcall %}
         </div>
     </div>
     {{ check.password_check('password', 0) }}
