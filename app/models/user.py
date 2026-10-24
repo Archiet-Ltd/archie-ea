@@ -219,7 +219,7 @@ class User(UserMixin, db.Model):
     mfa_enabled = db.Column(
         db.Boolean, default=False, nullable=False, server_default=db.text("false")
     )
-    mfa_recovery_codes = db.Column(db.Text)  # JSON array of recovery codes
+    mfa_recovery_codes = db.Column(db.Text)  # JSON array of salted hashes of unused recovery codes
 
     # Onboarding fields
     role_archetype = db.Column(

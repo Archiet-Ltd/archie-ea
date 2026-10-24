@@ -158,9 +158,41 @@ def enroll(user, secret: str, code: str) -> list[str]:
     recovery_codes = generate_recovery_codes()
     import json
 
-    user.mfa_recovery_codes = json.dumps(recovery_codes)
+    from werkzeug.security import generate_password_hash
+
+    # Only salted hashes are stored; the plain codes exist for this one return.
+    user.mfa_recovery_codes = json.dumps([generate_password_hash(c) for c in recovery_codes])
     db.session.commit()
     return recovery_codes
+
+
+def _normalise_recovery_code(code: str) -> str:
+    return (code or "").replace("-", "").replace(" ", "").strip().upper()
+
+
+def use_recovery_code(user, code: str) -> bool:
+    """True if ``code`` is an unused recovery code of ``user``; the matching
+    code is removed so it works exactly once."""
+    import json
+
+    from werkzeug.security import check_password_hash
+
+    code = _normalise_recovery_code(code)
+    if not code or not getattr(user, "mfa_enabled", False) or not user.mfa_recovery_codes:
+        return False
+    try:
+        hashes = json.loads(user.mfa_recovery_codes)
+    except ValueError:
+        return False
+    for stored in hashes:
+        if check_password_hash(stored, code):
+            from app import db
+
+            hashes.remove(stored)
+            user.mfa_recovery_codes = json.dumps(hashes)
+            db.session.commit()
+            return True
+    return False
 
 
 def verify_login_code(user, code: str) -> bool:
