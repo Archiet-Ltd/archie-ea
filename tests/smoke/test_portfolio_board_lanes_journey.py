@@ -73,8 +73,8 @@ def test_architect_sees_lanes_and_compact_cards_with_names(browser, live_server,
             expect(card.get_by_role("button", name=re.compile(r"^Move .+ to a different column$"))).to_be_visible()
             expect(card.locator("[data-drag-handle]")).to_be_visible()
             # An epic is shown by name, never by its number.
-            lines = [l.strip() for l in card.inner_text().splitlines() if l.strip()]
-            assert not any(re.fullmatch(r"#?\d+", l) for l in lines), lines
+            lines = [ln.strip() for ln in card.inner_text().splitlines() if ln.strip()]
+            assert not any(re.fullmatch(r"#?\d+", ln) for ln in lines), lines
         # Menu opens, names every column, and moving from it persists.
         funnel_top = page.locator(".kanban-column[data-state='Funnel'] .kanban-card").first
         name = funnel_top.locator("h3").inner_text().strip()
