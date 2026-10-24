@@ -1,0 +1,8 @@
+{# A control the signed-in person cannot use: shown, disabled, with the reason and the next step. #}
+{% from 'components/button.html' import button %}
+{% macro disabled_action(label, reason, id, icon=none, variant='outline') %}
+<div class="inline-flex flex-col items-start gap-1" data-testid="disabled-action">
+  {{ button(text=label, variant=variant, disabled=true, icon=icon, attrs_dict={'aria-describedby': id, 'aria-disabled': 'true'}) }}
+  <p id="{{ id }}" class="max-w-xs text-xs text-muted-foreground">{{ reason }}</p>
+</div>
+{% endmacro %}

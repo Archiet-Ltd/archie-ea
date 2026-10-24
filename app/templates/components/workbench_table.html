@@ -52,6 +52,7 @@
      handleRowCheckboxClick(event, index), clearSelection(), selectionCount()
 #}
 
+{% from 'components/button.html' import button %}
 {% macro workbench_table(
     columns=[],
     filters=[],
@@ -116,17 +117,8 @@
          role="status" aria-live="polite">
         <span class="font-medium" x-text="selectionCount() + ' selected'"></span>
         <div class="h-4 w-px bg-border"></div>
-        <button type="button" @click="if (typeof confirmBulkDelete === 'function') { confirmBulkDelete(); } else if (window.Platform && Platform.toast) { Platform.toast.error('Bulk delete is not available on this page.'); }"
-                class="inline-flex items-center gap-1.5 text-destructive-emphasis hover:text-destructive-emphasis/80 font-medium transition-colors">
-            <i data-lucide="trash-2" class="h-4 w-4" aria-hidden="true"></i>
-            Delete selected
-        </button>
-        <button type="button" @click="clearSelection()"
-                class="ml-auto inline-flex items-center gap-1 text-muted-foreground hover:text-foreground transition-colors"
-                aria-label="Clear selection">
-            <i data-lucide="x" class="h-3.5 w-3.5" aria-hidden="true"></i>
-            Clear
-        </button>
+        {{ button(text='Delete selected', variant='destructive', size='sm', icon='trash-2', on_click="if (typeof confirmBulkDelete === 'function') { confirmBulkDelete(); } else if (window.Platform && Platform.toast) { Platform.toast.error('Bulk delete is not available on this page.'); }") }}
+        {{ button(text='Clear', variant='ghost', size='sm', icon='x', class='ml-auto', aria_label='Clear selection', on_click='clearSelection()') }}
     </div>
 
     {# Cross-page select-all banner #}

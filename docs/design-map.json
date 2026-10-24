@@ -2436,7 +2436,8 @@
     "components/tabs.html",
     "components/traceability_panel.html",
     "macros/form_macros.html",
-    "macros/page_shell.html"
+    "macros/page_shell.html",
+    "components/disabled_action.html"
    ],
    "basis": "rule",
    "block": "record-detail",
@@ -2458,7 +2459,8 @@
     "layouts/admin_base.html"
    ],
    "macros": [
-    "macros/page_shell.html"
+    "macros/page_shell.html",
+    "components/disabled_action.html"
    ],
    "persona": "application_manager",
    "reference": {
@@ -2472,7 +2474,10 @@
     }
    },
    "spec": null,
-   "status": "mapped"
+   "status": "mapped",
+   "extra_macros": [
+    "components/disabled_action.html"
+   ]
   },
   "app/modules/my_applications/templates/my_applications/app_form.html": {
    "allowed_macros": [
@@ -2729,7 +2734,8 @@
     "components/status_badge.html",
     "components/status_indicator.html",
     "components/tabs.html",
-    "macros/page_shell.html"
+    "macros/page_shell.html",
+    "components/disabled_action.html"
    ],
    "basis": "rule",
    "block": "dashboard",
@@ -2752,7 +2758,8 @@
     "layouts/admin_base.html"
    ],
    "macros": [
-    "macros/page_shell.html"
+    "macros/page_shell.html",
+    "components/disabled_action.html"
    ],
    "persona": "application_manager",
    "reference": {
@@ -2766,7 +2773,10 @@
     }
    },
    "spec": null,
-   "status": "mapped"
+   "status": "mapped",
+   "extra_macros": [
+    "components/disabled_action.html"
+   ]
   },
   "app/modules/my_applications/templates/my_applications/roadmap_impact.html": {
    "allowed_macros": [
@@ -8468,11 +8478,16 @@
     "badge",
     "breadcrumb",
     "button",
+    "card",
+    "dialog",
+    "dropdown-menu",
     "empty",
     "field",
     "input",
     "page-header",
-    "skeleton"
+    "select",
+    "skeleton",
+    "tabs"
    ],
    "controls": {
     "button": 53,
@@ -9301,7 +9316,9 @@
     "components/table.html",
     "components/tabs.html",
     "components/workbench_table.html",
-    "macros/page_shell.html"
+    "macros/page_shell.html",
+    "components/disabled_action.html",
+    "components/metrics_card.html"
    ],
    "basis": "rule",
    "block": "data-table",
@@ -9328,7 +9345,8 @@
    ],
    "macros": [
     "components/metrics_card.html",
-    "components/page_header.html"
+    "components/page_header.html",
+    "components/disabled_action.html"
    ],
    "persona": "application_manager",
    "reference": {
@@ -9342,7 +9360,11 @@
     }
    },
    "spec": null,
-   "status": "mapped"
+   "status": "mapped",
+   "extra_macros": [
+    "components/disabled_action.html",
+    "components/metrics_card.html"
+   ]
   },
   "app/templates/applications/create.html": {
    "allowed_macros": [
@@ -11710,7 +11732,8 @@
     "components/table.html",
     "components/tabs.html",
     "components/workbench_table.html",
-    "macros/page_shell.html"
+    "macros/page_shell.html",
+    "components/disabled_action.html"
    ],
    "basis": "rule",
    "block": "data-table",
@@ -11740,7 +11763,8 @@
     "layouts/admin_base.html"
    ],
    "macros": [
-    "macros/page_shell.html"
+    "macros/page_shell.html",
+    "components/disabled_action.html"
    ],
    "persona": "enterprise_architect",
    "reference": {
@@ -11754,7 +11778,10 @@
     }
    },
    "spec": null,
-   "status": "mapped"
+   "status": "mapped",
+   "extra_macros": [
+    "components/disabled_action.html"
+   ]
   },
   "app/templates/archimate_crud/detail.html": {
    "allowed_macros": [
@@ -11794,7 +11821,8 @@
     "components/traceability_panel.html",
     "macros/form_macros.html",
     "macros/page_shell.html",
-    "macros/shadcn_compat.html"
+    "macros/shadcn_compat.html",
+    "components/disabled_action.html"
    ],
    "basis": "reviewed",
    "block": "record-detail",
@@ -11825,7 +11853,8 @@
    ],
    "extra_macros": [
     "components/table.html",
-    "macros/shadcn_compat.html"
+    "macros/shadcn_compat.html",
+    "components/disabled_action.html"
    ],
    "macros": [
     "components/badge.html",
@@ -11834,7 +11863,8 @@
     "components/modal.html",
     "components/table.html",
     "macros/page_shell.html",
-    "macros/shadcn_compat.html"
+    "macros/shadcn_compat.html",
+    "components/disabled_action.html"
    ],
    "persona": "enterprise_architect",
    "reference": {
@@ -12514,7 +12544,8 @@
     "components/table.html",
     "components/tabs.html",
     "components/workbench_table.html",
-    "macros/page_shell.html"
+    "macros/page_shell.html",
+    "components/disabled_action.html"
    ],
    "basis": "rule",
    "block": "data-table",
@@ -12541,7 +12572,8 @@
     "layouts/admin_base.html"
    ],
    "macros": [
-    "components/page_header.html"
+    "components/page_header.html",
+    "components/disabled_action.html"
    ],
    "persona": "enterprise_architect",
    "reference": {
@@ -12555,7 +12587,10 @@
     }
    },
    "spec": null,
-   "status": "mapped"
+   "status": "mapped",
+   "extra_macros": [
+    "components/disabled_action.html"
+   ]
   },
   "app/templates/architecture/impact_graph.html": {
    "allowed_macros": [
@@ -14176,7 +14211,8 @@
     "components/table.html",
     "components/tabs.html",
     "components/workbench_table.html",
-    "macros/page_shell.html"
+    "macros/page_shell.html",
+    "components/card.html"
    ],
    "basis": "rule",
    "block": "data-table",
@@ -14222,7 +14258,10 @@
     }
    },
    "spec": null,
-   "status": "mapped"
+   "status": "mapped",
+   "extra_macros": [
+    "components/card.html"
+   ]
   },
   "app/templates/batch_import/dashboard.html": {
    "allowed_macros": [
@@ -14257,7 +14296,8 @@
     "components/status_badge.html",
     "components/status_indicator.html",
     "components/tabs.html",
-    "macros/page_shell.html"
+    "macros/page_shell.html",
+    "components/table.html"
    ],
    "basis": "rule",
    "block": "dashboard",
@@ -14305,7 +14345,10 @@
     }
    },
    "spec": null,
-   "status": "mapped"
+   "status": "mapped",
+   "extra_macros": [
+    "components/table.html"
+   ]
   },
   "app/templates/batch_import/job_detail.html": {
    "allowed_macros": [
@@ -15572,7 +15615,8 @@
     "components/button.html",
     "components/empty_state.html",
     "components/page_header.html",
-    "macros/page_shell.html"
+    "macros/page_shell.html",
+    "components/breadcrumb.html"
    ],
    "basis": "rule",
    "block": "empty-state",
@@ -15608,7 +15652,10 @@
     }
    },
    "spec": null,
-   "status": "mapped"
+   "status": "mapped",
+   "extra_macros": [
+    "components/breadcrumb.html"
+   ]
   },
   "app/templates/capability_map/hierarchy.html": {
    "allowed_macros": [
@@ -17218,7 +17265,8 @@
     "components/status_badge.html",
     "components/status_indicator.html",
     "components/tabs.html",
-    "macros/page_shell.html"
+    "macros/page_shell.html",
+    "components/disabled_action.html"
    ],
    "basis": "rule",
    "block": "dashboard",
@@ -17239,7 +17287,8 @@
     "layouts/admin_base.html"
    ],
    "macros": [
-    "components/page_header.html"
+    "components/page_header.html",
+    "components/disabled_action.html"
    ],
    "persona": "compliance",
    "reference": {
@@ -17253,7 +17302,10 @@
     }
    },
    "spec": null,
-   "status": "mapped"
+   "status": "mapped",
+   "extra_macros": [
+    "components/disabled_action.html"
+   ]
   },
   "app/templates/compliance/personal_data_trace.html": {
    "allowed_macros": [
@@ -19631,7 +19683,8 @@
     "components/status_badge.html",
     "components/status_indicator.html",
     "components/tabs.html",
-    "macros/page_shell.html"
+    "macros/page_shell.html",
+    "components/disabled_action.html"
    ],
    "basis": "rule",
    "block": "dashboard",
@@ -19661,7 +19714,8 @@
     "components/badge.html",
     "components/button.html",
     "components/card.html",
-    "macros/page_shell.html"
+    "macros/page_shell.html",
+    "components/disabled_action.html"
    ],
    "persona": "enterprise_architect",
    "reference": {
@@ -19675,7 +19729,10 @@
     }
    },
    "spec": null,
-   "status": "mapped"
+   "status": "mapped",
+   "extra_macros": [
+    "components/disabled_action.html"
+   ]
   },
   "app/templates/ea_workflows/definition_detail.html": {
    "allowed_macros": [
@@ -20757,7 +20814,8 @@
     "components/table.html",
     "components/tabs.html",
     "components/workbench_table.html",
-    "macros/page_shell.html"
+    "macros/page_shell.html",
+    "components/disabled_action.html"
    ],
    "basis": "rule",
    "block": "data-table",
@@ -20783,7 +20841,8 @@
    ],
    "macros": [
     "components/breadcrumb_nav.html",
-    "components/page_header.html"
+    "components/page_header.html",
+    "components/disabled_action.html"
    ],
    "persona": "enterprise_architect",
    "reference": {
@@ -20797,7 +20856,10 @@
     }
    },
    "spec": null,
-   "status": "mapped"
+   "status": "mapped",
+   "extra_macros": [
+    "components/disabled_action.html"
+   ]
   },
   "app/templates/enterprise/process_optimization.html": {
    "allowed_macros": [
@@ -26417,7 +26479,9 @@
     "components/tabs.html",
     "components/traceability_panel.html",
     "macros/form_macros.html",
-    "macros/page_shell.html"
+    "macros/page_shell.html",
+    "components/disabled_action.html",
+    "components/gantt_timeline.html"
    ],
    "basis": "rule",
    "block": "record-detail",
@@ -26445,7 +26509,8 @@
    ],
    "macros": [
     "components/gantt_timeline.html",
-    "macros/page_shell.html"
+    "macros/page_shell.html",
+    "components/disabled_action.html"
    ],
    "persona": "solution_architect",
    "reference": {
@@ -26459,7 +26524,11 @@
     }
    },
    "spec": null,
-   "status": "mapped"
+   "status": "mapped",
+   "extra_macros": [
+    "components/disabled_action.html",
+    "components/gantt_timeline.html"
+   ]
   },
   "app/templates/solutions/communication_log.html": {
    "allowed_macros": [
@@ -27015,7 +27084,9 @@
     "components/table.html",
     "components/tabs.html",
     "components/workbench_table.html",
-    "macros/page_shell.html"
+    "macros/page_shell.html",
+    "components/disabled_action.html",
+    "components/sol_confirm_modal.html"
    ],
    "basis": "rule",
    "block": "data-table",
@@ -27054,7 +27125,8 @@
     "components/modal.html",
     "components/sol_confirm_modal.html",
     "components/status_badge.html",
-    "macros/page_shell.html"
+    "macros/page_shell.html",
+    "components/disabled_action.html"
    ],
    "persona": "solution_architect",
    "reference": {
@@ -27068,7 +27140,11 @@
     }
    },
    "spec": null,
-   "status": "mapped"
+   "status": "mapped",
+   "extra_macros": [
+    "components/disabled_action.html",
+    "components/sol_confirm_modal.html"
+   ]
   },
   "app/templates/solutions/migration_roadmap.html": {
    "allowed_macros": [

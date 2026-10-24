@@ -7,6 +7,7 @@
   page reads, built in the view (element_page.py); this template does no counting of its own.
 #}
 {% extends 'layouts/admin_base.html' %}
+{% from 'components/disabled_action.html' import disabled_action %}
 {% from 'macros/page_shell.html' import page_shell, stat_card %}
 {% from 'macros/shadcn_compat.html' import shadcn_select %}
 {% from 'components/modal.html' import modal %}
@@ -63,9 +64,13 @@
                 <i data-lucide="git-fork" class="h-4 w-4" aria-hidden="true"></i>Impact graph
             {% endcall %}
             {% endif %}
+            {% if can_change_model() %}
             {% call button(variant='outline', href=edit_url, class='gap-2') %}
                 <i data-lucide="pencil" class="h-4 w-4" aria-hidden="true"></i>Edit
             {% endcall %}
+            {% else %}
+            {{ disabled_action('Edit', 'Only an architect can edit elements. Ask an administrator in Team settings.', 'edit-element-reason', icon='pencil') }}
+            {% endif %}
             {% call button(variant='outline', on_click='downloadDiagram()', aria_label='Export diagram as SVG', class='gap-2 col-span-2 sm:col-span-1') %}
                 <i data-lucide="download" class="h-4 w-4" aria-hidden="true"></i>Export diagram
             {% endcall %}
@@ -132,7 +137,7 @@
             {% endif %}
         </div>
         <div data-testid="kpi-status" class="flex [&>*]:w-full">
-            {% if k3_hint and k3_hint.startswith('Edit') %}
+            {% if k3_hint and k3_hint.startswith('Edit') and can_change_model() %}
                 {% set hint %}<a href="{{ edit_url }}" class="text-primary hover:underline">{{ k3_hint }}</a>{% endset %}
                 {{ stat_card(k3_label, k3_value, hint=hint) }}
             {% else %}
@@ -240,7 +245,7 @@
             <p class="max-w-[72ch] text-sm leading-relaxed text-foreground" data-testid="element-description">{{ page.description }}</p>
             {% else %}
             <p class="text-sm text-muted-foreground" data-testid="element-description">
-                No description yet. <a href="{{ edit_url }}" class="text-primary hover:underline">Edit to add one</a> so the next person knows what this is.
+                No description yet.{% if can_change_model() %} <a href="{{ edit_url }}" class="text-primary hover:underline">Edit to add one</a> so the next person knows what this is.{% else %} An architect can add one.{% endif %}
             </p>
             {% endif %}
 

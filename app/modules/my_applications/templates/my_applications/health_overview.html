@@ -1,4 +1,6 @@
+{# design-block: dashboard #}
 {% extends 'layouts/admin_base.html' %}
+{% from 'components/disabled_action.html' import disabled_action %}
 {% from 'macros/page_shell.html' import page_shell %}
 {% block title %}Health Overview{% endblock %}
 
@@ -157,10 +159,14 @@
                         </ul>
                     </div>
                     <p class="text-muted-foreground" x-text="result['{{ item.id }}'] && result['{{ item.id }}'].rationale"></p>
+                    {% if may_manage_owned_applications() %}
                     <a :href="'{{ url_for('my_applications.app_edit', app_id=item.id) }}?suggest_health=' + (result['{{ item.id }}'] ? result['{{ item.id }}'].suggested_health_status : '') + '&suggest_lifecycle=' + (result['{{ item.id }}'] ? result['{{ item.id }}'].suggested_lifecycle_status : '')"
                        class="inline-flex items-center gap-1.5 text-primary hover:underline">
                         <i data-lucide="arrow-right" class="w-4 h-4"></i> Apply suggestion in edit form
                     </a>
+                    {% else %}
+                    {{ disabled_action('Apply suggestion in edit form', 'Only the application manager who owns this application, or an administrator, can edit it. Ask an administrator in Team settings.', 'apply-suggestion-reason-' ~ item.id, icon='arrow-right', variant='ghost') }}
+                    {% endif %}
                 </div>
             </div>
             {% endfor %}
@@ -321,8 +327,12 @@
                             </span>
                             <a href="{{ url_for('my_applications.app_detail', app_id=item.id) }}"
                                class="text-primary hover:underline text-sm">View</a>
+                            {% if may_manage_owned_applications() %}
                             <a href="{{ url_for('my_applications.app_edit', app_id=item.id) }}#health_status"
                                class="text-primary hover:underline text-sm">Record health status<span class="sr-only"> for {{ item.name }}</span></a>
+                            {% else %}
+                            <span class="text-sm text-muted-foreground">Only the application manager or an administrator can record health status.</span>
+                            {% endif %}
                         </div>
                     </div>
                 </div>

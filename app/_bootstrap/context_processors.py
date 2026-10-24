@@ -648,6 +648,60 @@ def init_context_processors(app):
 
     app.jinja_env.globals["can"] = _template_can
 
+    from app.core.auth.permissions import can_change_model as _can_change_model
+
+    def _template_can_change_model():
+        return _can_change_model(_matrix_user)
+
+    def _template_is_platform_administrator():
+        from app.middleware.tenant_decorators import is_platform_admin
+
+        return bool(_matrix_user.is_authenticated and is_platform_admin(_matrix_user))
+
+    def _template_may_open_procurement():
+        from app.decorators.requires_role import may_open_procurement
+
+        return may_open_procurement(_matrix_user)
+
+    def _template_home_url():
+        """The signed-in person's own home: the administration home only for an administrator."""
+        from flask import url_for as _flask_url_for
+
+        if (
+            _matrix_user.is_authenticated
+            and _matrix_user.is_admin()
+            and "admin.dashboard" in app.view_functions
+        ):
+            return _flask_url_for("admin.dashboard")
+        return _flask_url_for("dashboard.overview")
+
+    def _template_may_manage_owned_applications():
+        from app.decorators.requires_role import may_manage_owned_applications
+
+        return may_manage_owned_applications(_matrix_user)
+
+    app.jinja_env.globals["may_manage_owned_applications"] = _template_may_manage_owned_applications
+    def _template_can_modify_solution(solution):
+        """Edit and export are for the person who made the solution and the organisation's administrator."""
+        from app.middleware.tenant_decorators import is_active_org_admin
+
+        return bool(
+            _matrix_user.is_authenticated
+            and (solution.created_by_id == _matrix_user.id or is_active_org_admin())
+        )
+
+    def _template_can_open_code_workbench(solution):
+        from app.modules.codegen.routes._helpers import _check_access
+
+        return bool(_matrix_user.is_authenticated and _check_access(solution))
+
+    app.jinja_env.globals["can_modify_solution"] = _template_can_modify_solution
+    app.jinja_env.globals["can_open_code_workbench"] = _template_can_open_code_workbench
+    app.jinja_env.globals["can_change_model"] = _template_can_change_model
+    app.jinja_env.globals["is_platform_administrator"] = _template_is_platform_administrator
+    app.jinja_env.globals["may_open_procurement"] = _template_may_open_procurement
+    app.jinja_env.globals["home_url"] = _template_home_url
+
     # NS-006: Register role-based access functions for persona navigation
     from app.utils.role_access import get_sidebar_zones, role_access_context_processor
     role_funcs = role_access_context_processor()

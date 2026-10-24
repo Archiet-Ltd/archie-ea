@@ -4,6 +4,7 @@
 {% set resolved_page_guide_context = page_guide_context | default({'enabled': false, 'supported': false}, true) %}
 {% from 'components/switch.html' import switch %}
 {% from 'components/button.html' import button %}
+{% from 'components/empty_state.html' import empty_state %}
 <header id="admin-header"
         class="sticky top-0 z-30 flex h-12 shrink-0 items-center justify-between pl-14 lg:pl-4 pr-4 bg-background border-b border-border">
     <div class="flex items-center gap-4">
@@ -123,13 +124,12 @@
                     </span>
                 </div>
                 <div id="notif-list" class="max-h-72 overflow-y-auto" role="none">
-                    <div class="px-4 py-6 text-center text-sm text-muted-foreground">
-                        <i data-lucide="bell-off" class="h-6 w-6 mx-auto mb-2 opacity-40"></i>
-                        No notifications
-                    </div>
+                    {{ empty_state(icon='bell-off', title='No notifications', description='Updates about your work will appear here.', padding='py-6') }}
                 </div>
             </div>
         </div>
+
+        <template id="notif-empty-template">{{ empty_state(icon='bell-off', title='No notifications', description='Updates about your work will appear here.', padding='py-6') }}</template>
 
         <!-- ── User Menu ─────────────────────────────────────────────── -->
         <div class="relative" id="user-menu-wrapper" data-dropdown-wrapper>
@@ -372,6 +372,12 @@
     document.addEventListener('keydown', function(e) {
         if (!_openDropdown) return;
         const panel = _openDropdown.panel;
+        // Escape and Tab close the panel even when it holds nothing to focus
+        // (an empty notifications panel has no menu items).
+        if (e.key === 'Escape' || e.key === 'Tab') {
+            closeDropdown(_openDropdown.btn, panel);
+            return;
+        }
         const items = Array.from(panel.querySelectorAll('[role="menuitem"]:not([disabled]):not(.cursor-not-allowed)'));
         if (!items.length) return;
         const focused = document.activeElement;
@@ -389,10 +395,6 @@
         } else if (e.key === 'End') {
             e.preventDefault();
             items[items.length - 1].focus();
-        } else if (e.key === 'Escape') {
-            closeDropdown(_openDropdown.btn, panel);
-        } else if (e.key === 'Tab') {
-            closeDropdown(_openDropdown.btn, panel);
         }
     });
 
@@ -416,10 +418,7 @@
 
     function renderNotifications() {
         if (notifItems.length === 0) {
-            notifList.innerHTML =
-                '<div class="px-4 py-6 text-center text-sm text-muted-foreground">' +
-                '<i data-lucide="bell-off" class="h-6 w-6 mx-auto mb-2 opacity-40"></i>' +
-                'No notifications</div>';
+            notifList.innerHTML = document.getElementById('notif-empty-template').innerHTML;
             if (typeof lucide !== 'undefined') lucide.createIcons();
             const wrapper = document.getElementById('notif-mark-read-btn-wrapper');
             if (wrapper) wrapper.classList.add('hidden');
