@@ -385,6 +385,10 @@ _ELEMENTS = [
     ("Quality Excellence Programme", "WorkPackage", "implementation"),
     ("Operational Resilience Programme", "WorkPackage", "implementation"),
     ("Sustainability Initiative", "WorkPackage", "implementation"),
+    ("Calibration Certificate Portal", "WorkPackage", "implementation"),
+    ("Engineer Scheduling Assistant", "WorkPackage", "implementation"),
+    ("Instrument History Timeline", "WorkPackage", "implementation"),
+    ("Shared Telemetry Pipeline", "WorkPackage", "implementation"),
     ("Digital Twin of Calibration Lab", "Deliverable", "implementation"),
     ("Mobile Field App", "Deliverable", "implementation"),
     ("Real-time Dashboard", "Deliverable", "implementation"),
@@ -1255,6 +1259,267 @@ def _resolve_users(org_id):
     return {r.email: r for r in rows}
 
 
+# ── SAFe kinds for the portfolio Kanban and the Kind filter ────────────────
+# (work package element, kanban state, business value, time criticality,
+#  risk reduction, job size). Twelve existing work packages become Epics spread
+# over the first four columns; Analyzing sits at its limit of three so the
+# limit shows. Scores differ so each column has a visible order.
+_SAFE_EPICS = [
+    ("Digital Transformation Programme", "Funnel", 8, 5, 5, 13),
+    ("Sustainability Initiative", "Funnel", 5, 3, 2, 8),
+    ("Inventory Accuracy Drive", "Funnel", 3, 5, 5, 5),
+    ("Quality Excellence Programme", "Reviewing", 8, 8, 5, 8),
+    ("Compliance System Upgrade", "Reviewing", 5, 13, 8, 5),
+    ("Supplier Consolidation Programme", "Reviewing", 5, 3, 3, 13),
+    ("Operational Resilience Programme", "Analyzing", 13, 8, 13, 13),
+    ("Predictive Maintenance Pilot", "Analyzing", 8, 5, 8, 8),
+    ("Field Tester Rollout", "Analyzing", 8, 8, 3, 5),
+    ("Event Backbone Migration", "Portfolio Backlog", 13, 8, 13, 8),
+    ("Calibration Automation Phase 1", "Portfolio Backlog", 13, 13, 5, 8),
+    ("Calibration Automation Phase 2", "Portfolio Backlog", 8, 5, 3, 13),
+]
+
+# (work package element, kind, business value, time criticality, risk
+#  reduction, job size)
+_SAFE_OTHER_KINDS = [
+    ("Calibration Certificate Portal", "Feature", 8, 5, 3, 5),
+    ("Engineer Scheduling Assistant", "Feature", 5, 3, 3, 8),
+    ("Instrument History Timeline", "Feature", 3, 2, 2, 3),
+    ("Shared Telemetry Pipeline", "Enabler", 5, 3, 8, 8),
+]
+
+# ── solutions on the ADM board ─────────────────────────────────────────────
+# (name, description, ADM phase, governance status, deployment status,
+#  deliverables as (name, delivery status, type))
+_SOLUTIONS = [
+    (
+        "Field Calibration Platform",
+        "One platform for scheduling, performing and certifying field calibrations.",
+        "B", "proposed", None,
+        [
+            ("Calibration process model", "in_progress", "business_architecture"),
+            ("Stakeholder impact assessment", "planned", "assessment"),
+        ],
+    ),
+    (
+        "Supplier Collaboration Hub",
+        "A shared portal where suppliers confirm orders, deliveries and certificates.",
+        "D", "in_progress", None,
+        [
+            ("Integration architecture", "in_progress", "technology_architecture"),
+            ("Supplier onboarding runbook", "planned", "runbook"),
+            ("Security review", "planned", "assessment"),
+        ],
+    ),
+    (
+        "Event-Driven Operations Backbone",
+        "Replaces point-to-point feeds with one governed event backbone.",
+        "F", "approved", "development",
+        [
+            ("Migration roadmap", "completed", "implementation_plan"),
+            ("Cut-over plan", "in_progress", "implementation_plan"),
+        ],
+    ),
+]
+
+# ── one value stream, four stages, each enabled by capabilities ────────────
+_VALUE_STREAM = (
+    "Calibration Request to Certificate", "LQ-VS-CALIBRATION",
+    "From a customer's calibration request to the certificate that closes it.",
+    [
+        ("Receive Request", ["Order Fulfilment"]),
+        ("Schedule Engineer", ["Field Service Management", "Workforce Planning"]),
+        ("Calibrate and Test", ["Sensor Calibration", "Quality Assurance"]),
+        ("Certify and Report", ["Regulatory Compliance", "Water Quality Monitoring"]),
+    ],
+)
+
+# ── requirements backlog: (name, description, status, MoSCoW, ADM phase,
+#    capability, solution) ──────────────────────────────────────────────────
+_BACKLOG_REQUIREMENTS = [
+    ("Record the as-found reading for every instrument",
+     "The engineer records the reading before any adjustment is made.",
+     "Draft", "MUST", "B", "Sensor Calibration", "Field Calibration Platform"),
+    ("Show a customer the status of an open request",
+     "A customer can see whether a request is received, scheduled or certified.",
+     "Draft", "SHOULD", "B", "Order Fulfilment", "Field Calibration Platform"),
+    ("Suggest the nearest qualified engineer",
+     "Scheduling proposes engineers by location and certification.",
+     "Refined", "SHOULD", "C", "Field Service Management", "Field Calibration Platform"),
+    ("Suppliers confirm delivery dates in the portal",
+     "A supplier confirms or proposes a new delivery date for each order line.",
+     "Refined", "MUST", "C", "Supplier Management", "Supplier Collaboration Hub"),
+    ("Reject certificates with a missing reference standard",
+     "A certificate cannot be issued without the reference standard used.",
+     "Approved", "MUST", "D", "Regulatory Compliance", "Supplier Collaboration Hub"),
+    ("Retry a failed event delivery three times",
+     "A failed delivery is retried and then raised to an operator.",
+     "Approved", "COULD", "D", "Event Processing", "Event-Driven Operations Backbone"),
+    ("Publish every instrument change as an event",
+     "Each change to an instrument is published once to the event backbone.",
+     "Implemented", "MUST", "E", "Event Processing", "Event-Driven Operations Backbone"),
+    ("Export certificates as signed documents",
+     "A certificate downloads as a signed document with its reference number.",
+     "Implemented", "SHOULD", "E", "Regulatory Compliance", "Field Calibration Platform"),
+]
+
+
+def _seed_boards(org_id, demo_user_id) -> dict:
+    """SAFe kinds, ADM-board solutions, a value stream and a requirements
+    backlog for the demonstration organisation.
+
+    Idempotent. A work package that already carries a kind is left alone, so
+    a card an architect has moved is not put back by a re-run.
+    """
+    from app.models import ArchiMateElement
+    from app.models.business_capabilities import BusinessCapability
+    from app.models.implementation_migration import Deliverable
+    from app.models.relationship_tables import value_stream_stage_capabilities
+    from app.models.solution_architect_models import (
+        RequirementType, SolutionRequirement,
+    )
+    from app.models.solution_models import Solution, solution_deliverables
+    from app.models.unified_capability import ValueStream, ValueStreamStage
+    from app.modules.capabilities.services import value_stream_service
+    from app.services.element_profile_service import (
+        read_profile, set_kind, set_kind_property, set_wsjf_components,
+    )
+
+    stats = {
+        "safe_kinds_set": 0,
+        "solutions_created": 0,
+        "solution_deliverables_created": 0,
+        "value_streams_created": 0,
+        "value_stream_stages_created": 0,
+        "stage_capabilities_linked": 0,
+        "backlog_requirements_created": 0,
+    }
+
+    # SAFe kinds
+    elements = _resolve_elements(org_id)
+    for name, state, bv, tc, rr, js in _SAFE_EPICS:
+        el = elements.get(name)
+        if el is None or read_profile(el).get("kind"):
+            continue
+        set_kind(el, "Epic", source="seed")
+        set_kind_property(el, "kanban_state", state, source="seed")
+        set_wsjf_components(el, bv, tc, rr, js, source="seed")
+        stats["safe_kinds_set"] += 1
+    for name, kind, bv, tc, rr, js in _SAFE_OTHER_KINDS:
+        el = elements.get(name)
+        if el is None or read_profile(el).get("kind"):
+            continue
+        set_kind(el, kind, source="seed")
+        set_wsjf_components(el, bv, tc, rr, js, source="seed")
+        stats["safe_kinds_set"] += 1
+    db.session.flush()
+
+    # Solutions, each with deliverables
+    solutions = {
+        s.name: s
+        for s in db.session.query(Solution).filter(Solution.organization_id == org_id)
+    }
+    for name, desc, phase, gov, deploy, deliverables in _SOLUTIONS:
+        if name in solutions:
+            continue
+        sol = Solution(
+            name=name, description=desc, organization_id=org_id,
+            adm_phase=phase, governance_status=gov, deployment_status=deploy,
+            complexity_level="medium", solution_owner="Ivo Reed",
+            created_by_id=demo_user_id,
+        )
+        db.session.add(sol)
+        db.session.flush()
+        solutions[name] = sol
+        stats["solutions_created"] += 1
+        for d_name, d_status, d_type in deliverables:
+            deliverable = Deliverable(
+                name=d_name, organization_id=org_id,
+                delivery_status=d_status, deliverable_type=d_type,
+            )
+            db.session.add(deliverable)
+            db.session.flush()
+            db.session.execute(
+                solution_deliverables.insert().values(
+                    solution_id=sol.id, deliverable_id=deliverable.id)
+            )
+            stats["solution_deliverables_created"] += 1
+    db.session.flush()
+
+    # Value stream with four stages mapped to capabilities
+    vs_name, vs_code, vs_desc, stages = _VALUE_STREAM
+    vs = (
+        db.session.query(ValueStream)
+        .filter(ValueStream.organization_id == org_id, ValueStream.code == vs_code)
+        .first()
+    )
+    if vs is None:
+        vs = value_stream_service.create_value_stream({
+            "name": vs_name, "code": vs_code, "description": vs_desc,
+            "value_stream_type": "customer_facing",
+        })
+        stats["value_streams_created"] += 1
+    vs_id = vs.id
+    caps = {
+        c.name: c
+        for c in db.session.query(BusinessCapability)
+        .filter(BusinessCapability.organization_id == org_id)
+    }
+    for order, (stage_name, cap_names) in enumerate(stages, start=1):
+        stage = (
+            db.session.query(ValueStreamStage)
+            .filter(ValueStreamStage.value_stream_id == vs_id,
+                    ValueStreamStage.name == stage_name)
+            .first()
+        )
+        if stage is None:
+            stage = value_stream_service.create_stage(
+                vs_id, {"name": stage_name, "stage_order": order})
+            stats["value_stream_stages_created"] += 1
+        linked = {
+            row.business_capability_id
+            for row in db.session.execute(
+                value_stream_stage_capabilities.select().where(
+                    value_stream_stage_capabilities.c.value_stream_stage_id == stage.id)
+            )
+        }
+        for cap_name in cap_names:
+            cap = caps.get(cap_name)
+            if cap is None or cap.id in linked:
+                continue
+            db.session.execute(
+                value_stream_stage_capabilities.insert().values(
+                    value_stream_stage_id=stage.id,
+                    business_capability_id=cap.id,
+                    capability_role="enabling",
+                    importance="high",
+                )
+            )
+            stats["stage_capabilities_linked"] += 1
+
+    # Requirements backlog
+    existing = {
+        r.name
+        for r in db.session.query(SolutionRequirement)
+        .filter(SolutionRequirement.organization_id == org_id)
+    }
+    for name, desc, status, moscow, phase, cap_name, sol_name in _BACKLOG_REQUIREMENTS:
+        if name in existing:
+            continue
+        cap = caps.get(cap_name)
+        sol = solutions.get(sol_name)
+        db.session.add(SolutionRequirement(
+            name=name, description=desc, status=status, moscow_priority=moscow,
+            togaf_phase=phase, requirement_type=RequirementType.FUNCTIONAL,
+            organization_id=org_id, owner="Ivo Reed",
+            capability_id=cap.id if cap else None,
+            solution_id=sol.id if sol else None,
+        ))
+        stats["backlog_requirements_created"] += 1
+    db.session.flush()
+    return stats
+
+
 def seed_demo_company() -> dict:
     """Create the Lantern Quay Systems demonstration organisation.
 
@@ -1991,6 +2256,10 @@ def seed_demo_company() -> dict:
                 work_package_service.link_gap(
                     wp_by_name[wp_name].id, gap.id, organization_id=org_id)
         db.session.flush()
+
+        demo_user = User.query.filter_by(
+            email=_DEMO_USER_EMAIL, organization_id=org_id).first()
+        stats.update(_seed_boards(org_id, demo_user.id if demo_user else None))
 
         db.session.commit()
 
