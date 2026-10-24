@@ -124,9 +124,10 @@
         <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
             {% for p in plans %}
             {% set is_current = p.key == plan.key %}
-            {% call card(class=('min-w-0 flex flex-col ' ~ ('border-2 border-primary' if selected_plan and selected_plan.key == p.key else ''))) %}
+            <div class="min-w-0 flex" data-testid="plan-card-{{ p.key }}">
+            {% call card(class=('w-full flex flex-col ' ~ ('border-2 border-primary' if selected_plan and selected_plan.key == p.key else ''))) %}
                 {% call card_header(class='pb-3') %}
-                    <div class="flex items-start justify-between gap-2" data-testid="plan-card-{{ p.key }}">
+                    <div class="flex items-start justify-between gap-2">
                         {% call card_title(class='text-base') %}{{ p.name }}{% endcall %}
                         {% if is_current %}{% call badge('neutral', class='shrink-0') %}Current plan{% endcall %}{% endif %}
                     </div>
@@ -152,6 +153,7 @@
                     {% endif %}
                 {% endcall %}
             {% endcall %}
+            </div>
             {% endfor %}
         </div>
     </section>
