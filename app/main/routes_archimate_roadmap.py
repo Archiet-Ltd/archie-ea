@@ -1,11 +1,9 @@
 """ArchiMate 3.2 Implementation & Migration Roadmap Routes - Option 2"""
 
 import logging
-from datetime import datetime  # dead-code-ok
 
-from flask import flash, g, jsonify, render_template, request  # dead-code-ok
+from flask import jsonify, request  # dead-code-ok
 from flask_login import current_user, login_required
-from sqlalchemy import text  # dead-code-ok
 
 from app import db
 from app.modules.genome.services.roadmap_links import redirect_to_roadmap
@@ -13,8 +11,6 @@ from app.modules.genome.services.roadmap_links import redirect_to_roadmap
 # Import main blueprint from views to avoid circular import
 from app.main.views import main
 from app.models.archimate_core import ArchiMateElement
-from app.models.implementation_migration import Gap, Plateau  # dead-code-ok
-from app.models.unified_application_capability_mapping import UnifiedApplicationCapabilityMapping
 from app.models.unified_capability import UnifiedCapability  # dead-code-ok
 from app.models.unified_work_package import UnifiedWorkPackage
 from app.services import work_package_service

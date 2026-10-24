@@ -5,7 +5,7 @@ import logging
 import re
 from datetime import datetime
 
-from flask import abort, current_app, g, jsonify, redirect, render_template, request, url_for
+from flask import abort, current_app, g, jsonify, render_template, request
 from flask_login import current_user, login_required
 from sqlalchemy import func
 

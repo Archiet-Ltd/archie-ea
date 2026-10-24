@@ -1,15 +1,12 @@
 """Strategic Roadmap Routes - Strategic Planning & Vision"""
 
-from datetime import datetime  # dead-code-ok
 
-from flask import current_app, flash, g, jsonify, render_template, request  # dead-code-ok
+from flask import jsonify, request  # dead-code-ok
 from flask_login import current_user, login_required
-from sqlalchemy import text  # dead-code-ok
 
 from app import db
 from app.modules.genome.services.roadmap_links import redirect_to_roadmap
 from app.main.views import main
-from app.models.unified_application_capability_mapping import UnifiedApplicationCapabilityMapping
 from app.models.unified_capability import UnifiedCapability  # dead-code-ok
 from app.models.unified_work_package import UnifiedWorkPackage
 from app.services import work_package_service
