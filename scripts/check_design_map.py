@@ -67,7 +67,13 @@ PATTERNS_PATH = ROOT / "design" / "patterns.json"
 MARKER_RE = re.compile(r"{#-?\s*design-block:\s*([a-z][a-z-]*)\s*-?#}")
 SHARED_PREFIXES = ("components/", "macros/")
 STATUSES = ("mapped", "specified", "implemented", "verified")
-DESIGNED_FIELDS = ("block", "basis", "spec", "status", "extra_macros", "note", "persona", "also_serves", "components")
+DESIGNED_FIELDS = ("block", "basis", "spec", "status", "extra_macros", "note", "persona", "also_serves", "components",
+                   "tier", "page_type", "type_changed", "original", "frame", "charts", "inhouse_components",
+                   "confidence", "reason")
+# The designers' port map: how close each page is to a shadcn original. A is the original verbatim,
+# B is composed inside the nearest original's frame, C1 to C5 are the five forms shadcn has no original for.
+TIERS = ("A", "B", "C1", "C2", "C3", "C4", "C5")
+CONFIDENCE = ("high", "low")
 
 # Shared macro file stem -> the shadcn component it is an instance of. A macro with no
 # shadcn counterpart is an app component named after its file (source "app").
@@ -141,10 +147,35 @@ def component_of(macro):
     return SHADCN_ALIASES.get(stem, stem.replace("_", "-"))
 
 
+def macro_name(macro):
+    """The name the port map gives an in-house component: its macro file stem, dashed."""
+    return Path(macro).stem.replace("_", "-")
+
+
+def inhouse_names(entry):
+    """{in-house component name: verdict} a row lists, e.g. {'page-shell': 'Replace'}."""
+    out = {}
+    for item in entry.get("inhouse_components", []):
+        name, _, verdict = item.rpartition(":")
+        out[name.replace("_", "-")] = verdict
+    return out
+
+
+def inhouse_verdicts(design_map):
+    """{in-house component name: verdict} over every row; the port map gives one verdict per component."""
+    out = {}
+    for entry in design_map["pages"].values():
+        out.update(inhouse_names(entry))
+    return out
+
+
 def row_macros(design_map, entry):
-    """The macro files a row's components stand for: every macro of the vocabulary whose component the row lists."""
-    wanted = set(entry.get("components", []))
-    return sorted(m for name in wanted for m in design_map.get("components", {}).get(name, {}).get("macros", []))
+    """The macro files a row stands for: those of the components it lists and of the in-house components it names."""
+    vocabulary = design_map.get("components", {})
+    macros = {m for name in entry.get("components", []) for m in vocabulary.get(name, {}).get("macros", [])}
+    named = set(inhouse_names(entry))
+    macros |= {m for slot in vocabulary.values() for m in slot.get("macros", []) if macro_name(m) in named}
+    return sorted(macros)
 
 
 def allowed_macros(design_map, entry):
@@ -233,6 +264,15 @@ def measure(design_map=None, pages=None):
         for other in entry.get("also_serves", []):
             if other not in personas:
                 errors.append(f"{rel}: also_serves {other!r} is not one of the personas in docs/design-map.json")
+        if entry.get("tier") not in TIERS:
+            errors.append(f"{rel}: tier {entry.get('tier')!r} is not one of {', '.join(TIERS)}")
+        if entry.get("confidence") not in CONFIDENCE:
+            errors.append(f"{rel}: confidence {entry.get('confidence')!r} is not one of {', '.join(CONFIDENCE)}")
+        for field in ("page_type", "original", "frame"):
+            if not entry.get(field):
+                errors.append(f"{rel}: no {field.replace('_', ' ')} from the port map")
+        if not (entry.get("reason") or "").strip():
+            errors.append(f"{rel}: no reason from the port map")
         listed = entry.get("components") or []
         if not listed:
             errors.append(f"{rel}: lists no components")
@@ -328,6 +368,10 @@ def build_vocabulary(design_map):
         name = component_of(m)
         slot = out.setdefault(name, {"source": "shadcn" if Path(m).stem in SHADCN_ALIASES else "app", "macros": []})
         slot["macros"].append(m)
+    # A pinned shadcn component the port map names has no in-house macro, but it is still a component.
+    for entry in design_map["pages"].values():
+        for name in entry.get("components", []):
+            out.setdefault(name, design_map.get("components", {}).get(name) or {"source": "shadcn", "macros": []})
     return dict(sorted(out.items()))
 
 
