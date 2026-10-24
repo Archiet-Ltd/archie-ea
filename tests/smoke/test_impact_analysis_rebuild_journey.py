@@ -77,14 +77,12 @@ def test_impact_analysis_rebuild_shows_analysis_and_links_land_on_content(
     stat cards, by-layer breakdown, and tables. Every link lands on a
     page with content. The signed-in role is enterprise_architect."""
     email = seeded["emails"]["enterprise_architect"]
-    suffix = linked_impact_data["suffix"]
     context = browser.new_context(ignore_https_errors=True, viewport={"width": 1440, "height": 900})
     try:
         page = context.new_page()
         _login(page, live_server, email)
 
         # Verify the signed-in user's role is enterprise_architect
-        enterprise_email = seeded["emails"]["enterprise_architect"]
         page.goto(live_server + "/account/profile", wait_until="domcontentloaded",
                   timeout=PAGE_TIMEOUT)
         profile_text = page.inner_text("body").lower()

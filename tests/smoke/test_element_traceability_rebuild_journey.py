@@ -83,7 +83,6 @@ def test_element_traceability_shows_chain_and_links_land_on_content(
     """As the enterprise architect, see the traceability chain and follow
     every link to a page with content."""
     email = seeded["emails"]["enterprise_architect"]
-    suffix = linked_trace_data["suffix"]
     context = browser.new_context(ignore_https_errors=True, viewport={"width": 1440, "height": 900})
     try:
         page = context.new_page()
@@ -148,7 +147,6 @@ def test_element_traceability_links_reach_their_own_chains(
     """As the enterprise architect, every linked element in the chain is a
     link that lands on that element's own traceability page with content."""
     email = seeded["emails"]["enterprise_architect"]
-    suffix = linked_trace_data["suffix"]
     context = browser.new_context(ignore_https_errors=True, viewport={"width": 1440, "height": 900})
     try:
         page = context.new_page()
@@ -186,7 +184,6 @@ def test_element_traceability_links_reach_their_own_chains(
         )
         expect(page.get_by_role("heading", name="Linked Elements")).to_be_visible(
             timeout=PAGE_TIMEOUT)
-        rows = page.locator('[data-slot="table"] tbody tr, table tbody tr')
         row_text = page.inner_text("body")
         assert linked_trace_data["tech_name"] in row_text, "technology element missing from the table"
         assert "foreign" not in row_text, "another organisation's element is listed"
