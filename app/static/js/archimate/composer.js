@@ -1076,7 +1076,7 @@ function composerApp() {
                     { name: 'dot', args: { color: '#dde1e6', thickness: 1 } },
                     { name: 'dot', args: { color: '#c8cdd3', thickness: 1, scaleFactor: 5 } },
                 ],
-                background: { color: '#fafbfc' },
+                background: { color: 'transparent' },
 
                 interactive: function(cellView) {
                     if (self.mode === 'view') return { elementMove: false, addLinkFromMagnet: false };

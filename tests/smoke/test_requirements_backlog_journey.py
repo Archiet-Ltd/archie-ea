@@ -1,4 +1,4 @@
-"""Requirements backlog: a business architect opens the backlog of an
+"""Requirements backlog: the demo enterprise architect opens the backlog of an
 organisation that has requirements linked to a capability, sees the same count
 in the header, chips and rows, follows the capability link to a page that names
 it, edits a requirement in the dialog, and the change is still there after a
@@ -40,6 +40,26 @@ def _open_backlog(page, base):
     )
 
 
+def _person(seeded, persona, platform_role="Viewer"):
+    """A signed-in person of ``persona`` whose PLATFORM role carries no write
+    permission, like the demo enterprise architect: what they may do comes from
+    the persona alone, not from the legacy Architect/Administrator role."""
+    from app import create_app, db
+    from app.models.user import Role, User
+
+    email = "req-%s-%s@example.com" % (persona.replace("_", "-"), uuid.uuid4().hex[:8])
+    app = create_app("testing")
+    with app.app_context():
+        user = User(email=email, first_name="Demo", last_name=persona[:12],
+                    organization_id=seeded["ids"]["org"], enterprise_role=persona,
+                    confirmed=True)
+        user.role = Role.query.filter_by(name=platform_role).one()
+        user.password = PASSWORD
+        db.session.add(user)
+        db.session.commit()
+    return email
+
+
 def _seed_requirements(seeded):
     """Two requirements in the standard organisation, one linked to a capability."""
     from app import create_app, db
@@ -76,7 +96,7 @@ def test_backlog_shows_linked_requirements_and_edits_persist(browser, live_serve
     ctx.set_default_timeout(PAGE_TIMEOUT)
     page = ctx.new_page()
     try:
-        _login(page, live_server, seeded["emails"]["business_architect"])
+        _login(page, live_server, _person(seeded, "enterprise_architect"))
         _open_backlog(page, live_server)
 
         # The list is the shared table, with a column for every cell the rows carry.
@@ -149,7 +169,7 @@ def test_backlog_filters_are_labelled_and_capabilities_are_the_organisations(bro
     ctx.set_default_timeout(PAGE_TIMEOUT)
     page = ctx.new_page()
     try:
-        _login(page, live_server, seeded["emails"]["business_architect"])
+        _login(page, live_server, _person(seeded, "enterprise_architect"))
         _open_backlog(page, live_server)
         for field, text in (("filter-status", "Status"), ("filter-moscow", "Priority"),
                             ("filter-capability", "Capability")):
@@ -171,7 +191,7 @@ def test_backlog_create_edit_score_and_delete_from_the_page(browser, live_server
     ctx.set_default_timeout(PAGE_TIMEOUT)
     page = ctx.new_page()
     try:
-        _login(page, live_server, seeded["emails"]["business_architect"])
+        _login(page, live_server, _person(seeded, "enterprise_architect"))
         _open_backlog(page, live_server)
         table = page.locator("[data-testid=requirements-table]")
         search = page.locator("input[aria-label='Search requirements']")
@@ -227,8 +247,13 @@ def test_backlog_create_edit_score_and_delete_from_the_page(browser, live_server
 
         # Delete: asks once more, then the row is gone and stays gone after a reload.
         detail.get_by_role("button", name="Delete requirement").click()
-        detail.get_by_role("button", name="Confirm delete").click()
+        confirm = page.locator("#confirm-dialog-delete-requirement [role=alertdialog]")
+        confirm.wait_for(state="visible")
+        assert "Delete this requirement?" in confirm.inner_text()
+        confirm.get_by_role("button", name="Delete requirement").click()
         detail.wait_for(state="hidden")
+        toast = page.get_by_text('Deleted "%s".' % renamed)
+        toast.wait_for(state="visible")
         search.fill(tag)
         assert table.locator("tbody tr", has_text=renamed).count() == 0
         _open_backlog(page, live_server)
@@ -243,7 +268,7 @@ def test_backlog_create_failure_is_a_sentence_in_the_dialog(browser, live_server
     ctx.set_default_timeout(PAGE_TIMEOUT)
     page = ctx.new_page()
     try:
-        _login(page, live_server, seeded["emails"]["business_architect"])
+        _login(page, live_server, _person(seeded, "enterprise_architect"))
         _open_backlog(page, live_server)
         page.route("**/api/enterprise/requirements", lambda route: route.fulfill(
             status=500, content_type="text/html", body="INTERNAL SERVER ERROR")
@@ -258,5 +283,62 @@ def test_backlog_create_failure_is_a_sentence_in_the_dialog(browser, live_server
         assert "could not be created" in alert.inner_text()
         assert "INTERNAL SERVER ERROR" not in page.inner_text("body")
         assert create.is_visible()
+    finally:
+        ctx.close()
+
+
+def test_backlog_reader_cannot_save_or_delete_and_is_told_why(browser, live_server, seeded):
+    data = _seed_requirements(seeded)
+    ctx = browser.new_context(viewport={"width": 1440, "height": 900})
+    ctx.set_default_timeout(PAGE_TIMEOUT)
+    page = ctx.new_page()
+    try:
+        _login(page, live_server, _person(seeded, "procurement"))
+        _open_backlog(page, live_server)
+        page.fill("input[aria-label='Search requirements']", data["linked"])
+        page.get_by_role("button", name="Edit requirement " + data["linked"]).click()
+        detail = page.locator("#req-detail-modal")
+        detail.wait_for(state="visible")
+        detail.locator("[id^=req-status-]").select_option("Approved")
+        detail.get_by_role("button", name="Save changes").click()
+        page.get_by_text("can read requirements but not change them").first.wait_for(state="visible")
+        assert "don't have access to this page" not in page.inner_text("body")
+        assert detail.is_visible()
+
+        detail.get_by_role("button", name="Delete requirement").click()
+        confirm = page.locator("#confirm-dialog-delete-requirement [role=alertdialog]")
+        confirm.wait_for(state="visible")
+        confirm.get_by_role("button", name="Delete requirement").click()
+        detail.get_by_role("alert").filter(has_text="not delete them").wait_for(state="visible")
+        detail.get_by_role("button", name="Close").first.click()
+        _open_backlog(page, live_server)
+        page.fill("input[aria-label='Search requirements']", data["linked"])
+        assert page.get_by_label("Status for " + data["linked"]).input_value() == "Draft"
+    finally:
+        ctx.close()
+
+
+def test_backlog_copy_is_singular_ownerless_rows_say_so_and_fields_share_a_height(browser, live_server, seeded):
+    data = _seed_requirements(seeded)
+    ctx = browser.new_context(viewport={"width": 1440, "height": 900})
+    ctx.set_default_timeout(PAGE_TIMEOUT)
+    page = ctx.new_page()
+    try:
+        _login(page, live_server, _person(seeded, "enterprise_architect"))
+        _open_backlog(page, live_server)
+        page.fill("input[aria-label='Search requirements']", data["linked"])
+        page.get_by_text("1 requirement", exact=True).wait_for(state="visible")
+        row = page.locator("[data-testid=requirements-table] tbody tr", has_text=data["linked"])
+        assert "No owner" in row.inner_text()
+        page.get_by_role("button", name="Edit requirement " + data["linked"]).click()
+        detail = page.locator("#req-detail-modal")
+        detail.wait_for(state="visible")
+        detail.locator("details summary").first.click()
+        assert "\u2728" not in detail.inner_text()
+        heights = detail.evaluate(
+            "m => [...m.querySelectorAll('input:not([type=checkbox]), select')]"
+            ".filter(e => e.offsetParent !== null && e.tagName !== 'TEXTAREA')"
+            ".map(e => Math.round(e.getBoundingClientRect().height))")
+        assert heights and set(heights) == {36}, heights
     finally:
         ctx.close()

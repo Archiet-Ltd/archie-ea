@@ -8836,6 +8836,9 @@
     "macros/page_shell.html"
    ],
    "basis": "rule",
+   "extra_macros": [
+    "components/checkbox.html"
+   ],
    "block": "board",
    "controls": {
     "button": 79,
