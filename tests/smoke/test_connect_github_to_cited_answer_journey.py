@@ -233,6 +233,9 @@ def test_1_connect_github_is_a_link_on_the_connectors_page_and_lands_on_content(
     expect(form.get_by_label("Read-only token")).to_be_visible()
     expect(form.get_by_role("button", name="Connect and read my repositories")).to_be_visible()
     expect(admin.get_by_text("Paste a read-only token.", exact=False)).to_be_visible()
+    # The two other ways to start are shown from the first moment, not only after a failure.
+    expect(admin.get_by_test_id("github-exit-import")).to_be_visible()
+    expect(admin.get_by_test_id("github-exit-sample")).to_be_visible()
     remember(world, admin)
     shoot(admin, "1-connect")
 
@@ -249,8 +252,13 @@ def test_2_the_administrator_pastes_a_token_and_submits(admin, world):
 
 def test_3_the_status_moves_to_done_with_counts(admin, world):
     line = admin.locator("#github-progress-line")
-    expect(line).to_have_text(re.compile(r"Read 16 repositories\. 22 proposals are ready for you to review\."), timeout=PAGE_TIMEOUT)
-    # Nothing is in the model until it is approved.
+    expect(line).to_have_text(
+        re.compile(r"Read 16 repositories, 8 services found\. 22 proposals are ready for you to review\."),
+        timeout=PAGE_TIMEOUT,
+    )
+    # The read named the services and the links it found; nothing is in the model until it is approved.
+    expect(admin.locator("#github-count-services")).to_have_text("8")
+    expect(admin.locator("#github-count-links")).to_have_text("5")
     expect(admin.locator("#github-count-applications")).to_have_text("0")
     remember(world, admin)
     shoot(admin, "3-status")

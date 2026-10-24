@@ -1414,6 +1414,57 @@ def pending_total(org_id) -> int:
     ).count()
 
 
+def connect_failure_message(raw: "str | None") -> str:
+    """The plain line the connect page shows when the first read fails, from the raw
+    reason the read recorded. A rejected or under-scoped token is the one a person can
+    fix themselves, so it names what the token needs; anything else is shown as it was
+    recorded (already safe to show: it carries no response body and no credential)."""
+    text = (raw or "").strip()
+    low = text.lower()
+    if "401" in low or "rejected the token" in low or (
+        "403" in low and "read access" in low
+    ) or "lack read access" in low:
+        return (
+            "GitHub did not accept that token. It needs read access to repositories. "
+            "Create a fine-grained token in GitHub under Settings, Developer settings, "
+            "Fine-grained tokens, with read-only access to repository contents and "
+            "metadata, then paste it here."
+        )
+    return text or "The read did not finish; try again."
+
+
+def found_summary(org_id) -> Dict[str, int]:
+    """What the read found, counted so the connect page can name it in plain words:
+    the repositories it read, the services among them (repositories it reads as a
+    deployable application or service), and the links it found between them.
+
+    A service is counted whether it is still waiting in the review queue (an
+    ``application`` classification proposal) or already approved into the model
+    (an ``Application`` element the connector wrote), so the number a person is
+    shown does not drop the moment they approve. The same holds for links.
+    """
+    from app.models.ai_chat_crud_approval import AIChatCRUDApproval, ApprovalStatus
+
+    proposals = _pending(org_id, OP_CLASSIFY)
+    pending_services = 0
+    for approval in proposals:
+        try:
+            payload = json.loads(approval.operation_payload or "{}")
+        except (TypeError, ValueError):
+            payload = {}
+        if payload.get("classification") == "application":
+            pending_services += 1
+    pending_links = AIChatCRUDApproval.query.filter_by(
+        organization_id=org_id, source_table=PROPOSAL_SOURCE, operation_type=OP_RELATE,
+        status=ApprovalStatus.PENDING,
+    ).count()
+    model = model_counts(org_id)
+    return {
+        "services": pending_services + model["applications"],
+        "links": pending_links + model["relationships"],
+    }
+
+
 def model_counts(org_id) -> Dict[str, int]:
     """What the connector has put in the organisation's model so far."""
     from app.models import ArchiMateElement, ArchiMateRelationship

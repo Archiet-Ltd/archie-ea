@@ -849,7 +849,21 @@ def _github_state(org_id: int) -> dict:
     result = (job.result or {}) if job else {}
     if state == "done" and result.get("success") is False:
         state = "failed"
-    counts = {"repositories": result.get("repositories", 0), "pending": gh.pending_total(org_id), **gh.model_counts(org_id)}
+    repositories = result.get("repositories", 0)
+    counts = {
+        "repositories": repositories,
+        "pending": gh.pending_total(org_id),
+        **gh.found_summary(org_id),
+        **gh.model_counts(org_id),
+    }
+    # A finished read that saw repositories but found no links between them is its
+    # own plain state, not an error: the model is real, it just has no dependencies
+    # yet. A read that saw no repositories at all is a second plain state.
+    if state == "done":
+        if repositories == 0:
+            state = "no_repositories"
+        elif counts["links"] == 0:
+            state = "no_links"
     return {
         "state": state,
         "organization": (cfg.config or {}).get("organization"),
@@ -859,7 +873,7 @@ def _github_state(org_id: int) -> dict:
             "id": job.id,
             "started_at": job.created_at.isoformat() if job.created_at else None,
             "finished_at": job.finished_at.isoformat() if job.finished_at else None,
-            "error": (result.get("error") or job.error or "The read did not finish; try again.") if state == "failed" else None,
+            "error": gh.connect_failure_message(result.get("error") or job.error) if state == "failed" else None,
         } if job else None,
     }
 
