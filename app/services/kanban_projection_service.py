@@ -420,10 +420,16 @@ class KanbanProjectionService:
             query = query.filter(Solution.created_by_id == assignee_id)
 
         solutions = query.order_by(Solution.updated_at.desc()).all()
+        from app.services.adm_requirement_service import requirements_for_solutions
+
+        reqs = requirements_for_solutions([s.id for s in solutions])
         cards = []
         for sol in solutions:
             try:
-                cards.append(self._project_one_solution(sol))
+                card = self._project_one_solution(sol)
+                card["requirements"] = reqs.get(sol.id, [])
+                card["requirement_total"] = len(card["requirements"])
+                cards.append(card)
             except Exception:
                 self.logger.warning(
                     f"Failed to project solution {sol.id}", exc_info=True
