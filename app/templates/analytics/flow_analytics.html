@@ -42,8 +42,7 @@
             title='Avg Cycle Time',
             value_alpine="cycleData ? cycleData.average_cycle_time_days + 'd' : '\u2014'",
             value_class='text-primary',
-            description='P85: ',
-            description_alpine="cycleData ? cycleData.percentile_85 + 'd' : '\u2014'",
+            description_alpine="'P85: ' + (cycleData ? cycleData.percentile_85 + 'd' : '\u2014')",
             icon='clock'
         ) }}
         {{ metrics_card(
