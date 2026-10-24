@@ -181,6 +181,16 @@
                        and never reaches a screenshot or an export, so an empty page
                        needs a persistent marker that its data failed to load. #}
                     {% include 'partials/_data_load_error.html' %}
+                    {# Sample company indicator: shows when the sample is loaded #}
+                    {% if sample_company_restore_point_id %}
+                    <div class="mb-4 flex items-center justify-between gap-3 rounded-md border border-border bg-card px-4 py-2 text-sm" data-testid="sample-company-indicator">
+                        <p class="text-muted-foreground">
+                            You are looking at the sample company.
+                            <a href="{{ url_for('architect_ui.import_restore_point_detail', log_id=sample_company_restore_point_id) }}"
+                               class="text-info hover:underline">Remove it when you are ready</a>.
+                        </p>
+                    </div>
+                    {% endif %}
                     {# Inline page hints — templates fill this block with the inline_hint macro #}
                     {% block page_hint %}{% endblock %}
                     {% block content %}{% endblock %}

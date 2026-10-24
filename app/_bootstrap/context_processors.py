@@ -791,3 +791,39 @@ def init_context_processors(app):
     def inject_posthog_key():
         import os
         return {"posthog_key": os.environ.get("POSTHOG_API_KEY", "")}
+
+    @app.context_processor
+    def inject_sample_company_indicator():
+        """Sample company restore point ID for the removal link.
+
+        When the sample company is loaded (detected by the Payments service
+        marker), finds its restore point so the indicator can link to it.
+        """
+        from flask import g, has_request_context
+
+        if not has_request_context():
+            return {"sample_company_restore_point_id": None}
+
+        org_id = getattr(g, "current_org_id", None)
+        if not org_id:
+            return {"sample_company_restore_point_id": None}
+
+        try:
+            from app.models.archimate_core import ArchiMateElement
+            sample_marker = ArchiMateElement.query.filter(
+                ArchiMateElement.name == "Payments service",
+                ArchiMateElement.type == "ApplicationComponent"
+            ).first()
+
+            if not sample_marker:
+                return {"sample_company_restore_point_id": None}
+
+            # Find the most recent restore point (sample was the most recent import)
+            from app.services import import_snapshot_service
+            points = import_snapshot_service.restore_points(org_id)
+            if points and len(points) > 0:
+                return {"sample_company_restore_point_id": points[0].id}
+
+            return {"sample_company_restore_point_id": None}
+        except Exception:
+            return {"sample_company_restore_point_id": None}
