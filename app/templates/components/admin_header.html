@@ -140,7 +140,7 @@
                     aria-label="User menu">
                 <!-- Avatar: coloured circle derived from display name -->
                 <div id="user-avatar"
-                     class="w-8 h-8 rounded-full flex items-center justify-center shrink-0 text-primary-foreground font-semibold text-sm select-none"
+                     class="w-8 h-8 rounded-full flex items-center justify-center shrink-0 font-semibold text-sm select-none"
                      aria-hidden="true">
                     {% if current_user.is_authenticated %}
                         {% set _display = (current_user.first_name or current_user.full_name() or current_user.email or 'A') %}
@@ -294,19 +294,22 @@
         const avatar = document.getElementById('user-avatar');
         if (!avatar) return;
         const text = avatar.textContent.trim();
-        // The 700 shade of each hue: every one keeps the light initial above
-        // 4.5:1. The 600 shades left amber, green and cyan near 3.5:1.
-        const COLOURS = [
-            '#1d4ed8','#6d28d9','#be185d','#b91c1c',
-            '#b45309','#047857','#0e7490','#7e22ce',
+        // A tint of each ArchiMate layer hue with that layer's readable-text
+        // token, so the initial keeps its contrast in light and dark. The class
+        // names are written out whole so the stylesheet build keeps them.
+        const CLASSES = [
+            'bg-layer-motivation/10 text-layer-motivation-emphasis',
+            'bg-layer-strategy/10 text-layer-strategy-emphasis',
+            'bg-layer-business/10 text-layer-business-emphasis',
+            'bg-layer-application/10 text-layer-application-emphasis',
+            'bg-layer-technology/10 text-layer-technology-emphasis',
+            'bg-layer-implementation/10 text-layer-implementation-emphasis',
+            'bg-layer-risk/10 text-layer-risk-emphasis',
         ];
         let hash = 0;
         const name = avatar.dataset.name || text;
         for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
-        avatar.style.backgroundColor = COLOURS[Math.abs(hash) % COLOURS.length];
-        // Pinned rather than text-primary-foreground: that token turns navy in
-        // the dark theme, while this background does not change with it.
-        avatar.style.color = '#f8fafc';
+        avatar.classList.add(...CLASSES[Math.abs(hash) % CLASSES.length].split(' '));
     })();
 
     /* ── Role badge colour ───────────────────────────────────────────────── */

@@ -46,7 +46,7 @@
 .rdm-gantt-timeline-cell{padding:.625rem 1rem;overflow-x:auto;display:flex;align-items:center;min-width:0}
 .rdm-gantt-track{position:relative;height:28px;display:flex}
 .rdm-gantt-cell{flex:0 0 120px;height:100%;border-right:1px solid var(--border)}
-.rdm-gantt-legend-ip{background:#5B91F5}.rdm-gantt-legend-done{background:#22C55E}.rdm-gantt-legend-hold{background:#F59E0B}.rdm-gantt-legend-plan{background:#94A3B8}
+.rdm-gantt-legend-ip{background:#2563EB}.rdm-gantt-legend-done{background:#15803D}.rdm-gantt-legend-hold{background:#B45309}.rdm-gantt-legend-plan{background:#64748B}
 .rdm-gantt-bar{position:absolute;height:24px;top:2px;border-radius:.375rem;display:flex;align-items:center;padding:0 .5rem;font-size:.7rem;font-weight:500;color:#fff;white-space:nowrap;overflow:hidden;cursor:default;transition:filter .15s}
 .rdm-gantt-bar:hover{filter:brightness(1.12)}
 </style>
@@ -745,7 +745,7 @@
       priorityClass(priority) {
         switch ((priority || '').toLowerCase()) {
           case 'critical': return 'border-destructive/30 bg-destructive/10 text-destructive';
-          case 'high': return 'border-warning/30 bg-warning/10 text-warning-foreground';
+          case 'high': return 'border-warning/30 bg-warning/10 text-warning-emphasis';
           case 'medium': return 'border-border bg-muted/50 text-muted-foreground';
           default: return 'border-border bg-muted text-muted-foreground';
         }
@@ -753,9 +753,9 @@
 
       statusClass(status) {
         switch ((status || '').toLowerCase()) {
-          case 'completed': return 'border-success/30 bg-success/10 text-success-foreground';
-          case 'in_progress': return 'border-primary/30 bg-primary/10 text-primary';
-          case 'on_hold': return 'border-warning/30 bg-warning/10 text-warning-foreground';
+          case 'completed': return 'border-success/30 bg-success/10 text-success-emphasis';
+          case 'in_progress': return 'border-primary/30 bg-primary/10 text-info-emphasis';
+          case 'on_hold': return 'border-warning/30 bg-warning/10 text-warning-emphasis';
           case 'cancelled': return 'border-destructive/30 bg-destructive/10 text-destructive';
           default: return 'border-border bg-muted text-muted-foreground';
         }
@@ -764,8 +764,8 @@
       gapTypeClass(type) {
         switch ((type || '').toLowerCase()) {
           case 'retirement': return 'border-destructive/30 bg-destructive/10 text-destructive';
-          case 'modernization': return 'border-primary/30 bg-primary/10 text-primary';
-          case 'quality': return 'border-warning/30 bg-warning/10 text-warning-foreground';
+          case 'modernization': return 'border-primary/30 bg-primary/10 text-info-emphasis';
+          case 'quality': return 'border-warning/30 bg-warning/10 text-warning-emphasis';
           case 'coverage': return 'border-border bg-muted text-muted-foreground';
           default: return 'border-secondary/30 bg-secondary/10 text-secondary-foreground';
         }
@@ -1028,7 +1028,7 @@
       priorityClass(priority) {
         switch ((priority || '').toLowerCase()) {
           case 'critical': return 'border-destructive/30 bg-destructive/10 text-destructive';
-          case 'high': return 'border-warning/30 bg-warning/10 text-warning-foreground';
+          case 'high': return 'border-warning/30 bg-warning/10 text-warning-emphasis';
           case 'medium': return 'border-border bg-muted/50 text-muted-foreground';
           default: return 'border-border bg-muted text-muted-foreground';
         }
@@ -1046,13 +1046,13 @@
   /* --- colour map by status --- */
   /* token-migration-ok: chart-specific colours not in token map */
   const STATUS_COLOUR = {
-    completed:   '#22C55E',
-    in_progress: '#5B91F5',
-    on_hold:     '#F59E0B',
+    completed:   '#15803D',
+    in_progress: '#2563EB',
+    on_hold:     '#B45309',
     cancelled:   '#EF4444',
   };
   function barColour(status) {
-    return STATUS_COLOUR[(status || '').toLowerCase()] || '#94A3B8';
+    return STATUS_COLOUR[(status || '').toLowerCase()] || '#64748B';
   }
 
   /* --- timeline helpers (identical logic to docs/layout.html reference) --- */
