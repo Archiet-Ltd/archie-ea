@@ -1,6 +1,9 @@
 {% extends 'layouts/admin_base.html' %}
 {% from 'components/page_header.html' import page_header %}
 {% from 'components/card.html' import card, card_content %}
+{% from 'components/progress.html' import progress %}
+{% from 'components/button.html' import button %}
+{% from 'components/input.html' import input, label %}
 
 {% block title %}{{ work_package.name|default('Work package', true) }}{% endblock %}
 
@@ -32,8 +35,8 @@
                     {% if work_package.progress_percentage is none %}—{% else %}{{ work_package.progress_percentage|round|int }}%{% endif %}
                 </dd>
                 {% if work_package.progress_percentage is not none %}
-                <div class="mt-1 h-2 w-full rounded-full bg-secondary overflow-hidden">
-                    <div class="h-full bg-primary" style="width: {{ [[work_package.progress_percentage, 0]|max, 100]|min }}%"></div>
+                <div class="mt-1">
+                    {{ progress(value=work_package.progress_percentage|round|int if work_package.progress_percentage else 0, max=100) }}
                 </div>
                 {% endif %}
             </div>
