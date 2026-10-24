@@ -13470,7 +13470,10 @@
    "page_type": "form",
    "reason": "Import a diagram file.",
    "tier": "B",
-   "type_changed": false
+   "type_changed": false,
+   "extra_macros": [
+    "components/table.html"
+   ]
   },
   "app/templates/archimate/import_review.html": {
    "allowed_macros": [
