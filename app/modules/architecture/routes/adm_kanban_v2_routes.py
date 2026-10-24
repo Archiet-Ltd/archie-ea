@@ -629,54 +629,46 @@ def push_to_gantt(card_ref):
                     "gantt_url": "/roadmap-builder"}), 201
 
 
-@adm_kanban_v2_bp.route("/phases/<phase>/deliverables", methods=["GET"])
+@adm_kanban_v2_bp.route("/solutions/<int:solution_id>/deliverables", methods=["GET"])
 @login_required
-def get_phase_deliverables(phase):
+def get_solution_deliverables(solution_id):
     """
-    List TOGAF standard deliverables for an ADM phase with checked state.
+    A solution's own deliverables against the TOGAF template of its phase.
 
-    Query params: board_id (optional int)
-    Response: { success, phase, deliverables: [...], total, checked }
+    Response: { success, solution_id, phase, checklist: [...], also_produced: [...],
+                total, complete }
     """
+    from app.models.solution_models import Solution
     from app.services.adm_deliverable_service import (
-        get_phase_deliverables as _get,
         seed_deliverables,
+        solution_checklist,
     )
 
-    board_id = request.args.get("board_id", type=int)
+    solution = Solution.query.filter_by(id=solution_id).first()
+    if solution is None:
+        return jsonify({"success": False, "error": "Solution not found"}), 404
     seed_deliverables()  # idempotent — no-op if already seeded
-    items = _get(phase.upper(), board_id=board_id)
-    checked_count = sum(1 for i in items if i["checked"])
-    return jsonify(
-        {
-            "success": True,
-            "phase": phase.upper(),
-            "deliverables": items,
-            "total": len(items),
-            "checked": checked_count,
-        }
-    )
+    return jsonify({"success": True, "solution_id": solution.id, **solution_checklist(solution)})
 
 
-@adm_kanban_v2_bp.route("/deliverables/<int:deliverable_id>/check", methods=["PATCH"])
+@adm_kanban_v2_bp.route("/deliverables/<int:deliverable_id>/complete", methods=["PATCH"])
 @login_required
-def check_deliverable(deliverable_id):
+@audit_log("kanban_deliverable_complete")
+def complete_deliverable(deliverable_id):
     """
-    Toggle deliverable checked state for a board.
+    Mark a solution deliverable complete (or back in progress).
 
-    Body: { "board_id": int|null, "checked": bool }
-    Returns: { "success": true, "check": {...} }
+    Body: { "complete": bool }
+    Returns: { "success": true, "deliverable": {...} }
     """
-    from app.services.adm_deliverable_service import toggle_deliverable
+    from app.services.adm_deliverable_service import set_complete
 
     data = request.get_json() or {}
-    checked = bool(data.get("checked", False))
-    board_id = data.get("board_id") or None
     try:
-        check = toggle_deliverable(deliverable_id, board_id, checked)
+        item = set_complete(deliverable_id, bool(data.get("complete", False)))
     except ValueError as e:
         return jsonify({"success": False, "error": str(e)}), 404
-    return jsonify({"success": True, "check": check})
+    return jsonify({"success": True, "deliverable": item})
 
 
 @adm_kanban_v2_bp.route("/metrics", methods=["GET"])
