@@ -35,6 +35,9 @@ def jira_webhook():
         logger.exception("[TPM-008] Unhandled error in jira_webhook")
         return jsonify({"error": "internal error"}), 500
 
+    if not result.get("configured", True):
+        return jsonify({"error": "webhook not configured"}), 503
+
     if not result.get("verified", True):
         return jsonify({"error": "invalid signature"}), 401
 
