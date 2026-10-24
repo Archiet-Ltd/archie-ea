@@ -1403,6 +1403,63 @@ def run_first_sync(org_id, connector_id) -> Dict[str, Any]:
     }
 
 
+class ConnectRefused(ValueError):
+    """The connection was not saved; the message says why, in words a person can act on."""
+
+
+def connect_and_start(org_id, organization, token, *, task=None, extra=None) -> int:
+    """Store the read-only token in the organisation's vault, save the connection and queue the
+    first read. Returns the connector id. The one place a GitHub connection is made, for the
+    connectors page and for sign-up. ``task`` and ``extra`` let sign-up queue the read together
+    with approving what it finds; the token goes to the vault and nowhere else."""
+    from app.modules.codegen.services.credential_vault import OrgCredentialVault
+    from app.services.connector_framework import (
+        CONNECTOR_ACTION_CREATE,
+        CONNECTOR_ACTION_UPDATE,
+        _load_org_connector,
+        apply_connector_change,
+    )
+    from app.services.job_queue_service import get_job_queue_service
+
+    organization = (organization or "").strip()
+    token = (token or "").strip()
+    existing = _load_org_connector(org_id, connector_type="github")
+    has_token = OrgCredentialVault().get_masked(org_id, "github", "api_token") is not None
+    if not is_valid_organization(organization):
+        raise ConnectRefused("Enter your GitHub organisation name exactly as it appears in github.com/<name>.")
+    if not token and not has_token:
+        raise ConnectRefused("Paste a read-only GitHub token to connect.")
+    if token and (len(token) > 255 or any(ch.isspace() for ch in token)):
+        raise ConnectRefused("That does not look like a GitHub token.")
+
+    config = dict((existing.config or {}) if existing else {})
+    config["organization"] = organization
+    payload = {
+        "connector_type": "github",
+        "connector_id": existing.id if existing else None,
+        "name": "GitHub",
+        "config": config,
+        "status": "active",
+        "credential_provided": bool(token),
+    }
+    cfg = apply_connector_change(
+        org_id=org_id,
+        action=CONNECTOR_ACTION_UPDATE if existing else CONNECTOR_ACTION_CREATE,
+        payload=payload,
+        delegated=True,
+    )
+    if token:
+        OrgCredentialVault().store(org_id=org_id, connector_type="github", credential_type="api_token", value=token)
+    db.session.commit()
+    get_job_queue_service().create_job(
+        "GitHub: read repositories",
+        task or FIRST_SYNC_TASK,
+        {"connector_id": cfg.id, **(extra or {})},
+        organization_id=org_id,
+    )
+    return cfg.id
+
+
 def pending_total(org_id) -> int:
     from app.models.ai_chat_crud_approval import AIChatCRUDApproval, ApprovalStatus
 

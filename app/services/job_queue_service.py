@@ -224,6 +224,8 @@ class JobQueueService:
             return self._execute_model_health_scan(payload, job_id)
         elif task == "github_first_sync":
             return self._execute_github_first_sync(payload, job_id)
+        elif task in ("onboarding_github_import", "onboarding_jira_import"):
+            return self._execute_onboarding_import(task, payload)
         else:
             raise ValueError(f"Unknown task type: {task}")
 
@@ -265,6 +267,20 @@ class JobQueueService:
         from app.connectors.github import run_first_sync
 
         return run_first_sync(org_id, connector_id)
+
+    def _execute_onboarding_import(self, task: str, payload: Dict[str, Any]) -> Dict[str, Any]:
+        """Read one source the person gave during sign-up. The job carries the organisation, the
+        connector id and who gave it; never a credential."""
+        org_id = payload.get("organization_id")
+        connector_id = payload.get("connector_id")
+        if org_id is None or not connector_id:
+            raise ValueError("%s job requires organization_id and connector_id in payload" % task)
+
+        from app.modules.account.services import onboarding_service as onboarding
+
+        if task == onboarding.GITHUB_TASK:
+            return onboarding.run_github_import(org_id, connector_id, payload.get("approver_id"))
+        return onboarding.run_jira_import(org_id, connector_id)
 
     def _execute_model_health_scan(self, payload: Dict[str, Any], job_id: int) -> Dict[str, Any]:
         """Execute a model-health drift scan for one organisation."""
