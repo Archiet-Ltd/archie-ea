@@ -126,9 +126,8 @@ def test_screenshot_roadmap(page, live_server, seeded):
     page.wait_for_timeout(500)
     page.screenshot(path=os.path.join(SCREENSHOT_DIR, "roadmap-390-light.png"), full_page=True)
 
-    # 1440 dark
-    page.emulate_media(color_scheme="dark")
-    page.set_viewport_size({"width": 1440, "height": 900})
+    # 1440 dark — add .dark class (Tailwind class strategy)
+    page.evaluate('document.documentElement.classList.add("dark")')
     page.wait_for_timeout(500)
     page.screenshot(path=os.path.join(SCREENSHOT_DIR, "roadmap-1440-dark.png"), full_page=True)
 
@@ -136,3 +135,6 @@ def test_screenshot_roadmap(page, live_server, seeded):
     page.set_viewport_size({"width": 390, "height": 844})
     page.wait_for_timeout(500)
     page.screenshot(path=os.path.join(SCREENSHOT_DIR, "roadmap-390-dark.png"), full_page=True)
+
+    # Clean up: remove dark class so later tests are unaffected
+    page.evaluate('document.documentElement.classList.remove("dark")')
