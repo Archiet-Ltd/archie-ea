@@ -230,7 +230,7 @@ _NOT_RENDERED = {
     "architect_ui.roadmap_builder": "302 -> Roadmaps",
 }
 
-_ZONE_ORDER = ["home", "my_work", "library", "governance", "admin"]
+_ZONE_ORDER = ["home", "my_work", "library", "workspace", "governance", "admin"]
 
 # Separate preference order used ONLY to break a same-endpoint tie across two
 # different zone buckets (e.g. arb.dashboard living in both a persona's
@@ -241,7 +241,7 @@ _ZONE_ORDER = ["home", "my_work", "library", "governance", "admin"]
 # every persona's zones) and would otherwise win over the shared,
 # canonical "governance" placement - which is exactly the bug that dropped
 # "ARB Dashboard" off the Governance section entirely.
-_TIE_BREAK_ZONE_ORDER = ["home", "governance", "library", "my_work", "admin"]
+_TIE_BREAK_ZONE_ORDER = ["home", "governance", "library", "my_work", "workspace", "admin"]
 
 
 def all_module_links():
