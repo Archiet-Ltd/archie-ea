@@ -40,7 +40,7 @@ HERO_WORDS = {
     "data-architects": "data",
     "cto-and-cio": "CIO",
     "it-portfolio-managers": "portfolio",
-    "scale-up-cto-and-vp-engineering": "spreadsheet",
+    "scale-up-cto-and-vp-engineering": "GitHub",
 }
 
 
@@ -193,5 +193,41 @@ def test_roles_hub_links_every_role_that_has_a_page_and_no_link_is_a_404(browser
         catalogue = page.locator("[data-role-catalogue]")
         assert catalogue.locator("li", has_text="Chief Financial Officer").count() == 1
         assert catalogue.get_by_role("link", name="Chief Financial Officer").count() == 0
+    finally:
+        context.close()
+
+
+def test_scale_up_cto_page_leads_with_connecting_github_or_jira_then_the_spreadsheet(browser, base_url):
+    context = browser.new_context(viewport=DESKTOP)
+    page = context.new_page()
+    try:
+        page.goto(base_url + "/roles/scale-up-cto-and-vp-engineering", wait_until="domcontentloaded")
+        hero = page.locator('[data-testid="landing-hero"]')
+        top = (hero.locator("h1").inner_text() + " " + hero.locator("p").first.inner_text())
+        assert "GitHub" in top and "Jira" in top, top
+        assert top.index("GitHub") < top.lower().index("spreadsheet"), top
+        body = page.locator("main").inner_text()
+        assert "Connect GitHub" in body and "Connect Jira" in body
+        assert body.index("Connect GitHub") < body.index("Import, on the Applications screen") or \
+            body.index("Connect GitHub") < body.index("Import")
+        assert "second route" in body and "spreadsheet" in body
+    finally:
+        context.close()
+
+
+def test_scale_up_cto_page_shows_a_phone_sized_capture_on_a_phone(browser, base_url):
+    context = browser.new_context(viewport=PHONE, is_mobile=True, has_touch=True, device_scale_factor=1)
+    page = context.new_page()
+    try:
+        page.goto(base_url + "/roles/scale-up-cto-and-vp-engineering", wait_until="load")
+        img = page.locator('[data-testid="landing-hero-figure"] img')
+        img.wait_for(state="visible")
+        page.wait_for_function("(el) => el.complete && el.naturalWidth > 0", arg=img.element_handle())
+        src = img.evaluate("el => el.currentSrc")
+        natural = img.evaluate("el => el.naturalWidth")
+        shown = img.bounding_box()["width"]
+        assert "mobile" in src, f"a phone is given the desktop image: {src}"
+        assert natural <= 3 * 390, f"the capture is {natural}px wide, not a phone capture"
+        assert shown <= 390
     finally:
         context.close()

@@ -4,7 +4,7 @@ role_group: technology-leadership
 state: on_main
 capture_status: live
 cta: plans
-description: "Entelim for scale-up CTOs and VPs of Engineering: import your application spreadsheet, record who owns what, and ask what breaks if a system fails. Start free."
+description: "Entelim for scale-up CTOs and VPs of Engineering: connect GitHub or Jira, or import the spreadsheet you already keep, record who owns what, and ask what breaks if a system fails. Start free."
 source: app/modules/applications/routes/import_export_routes.py (application_import, preview-excel),
   app/templates/application_mgmt/application_import_modal.html, app/modules/applications (list data-quality strip),
   app/modules/intelligence (Ask), app/utils/role_access.py, app/modules/dashboard/v2/routes/dashboard_views.py
@@ -12,13 +12,14 @@ source: app/modules/applications/routes/import_export_routes.py (application_imp
   read 18 October 2026 against the running product, signed up as a new account
 ---
 
-# Know what you run, who owns it and what breaks if it fails — starting from a spreadsheet
+# Know what you run, who owns it and what breaks if it fails — starting from GitHub or Jira
 
 A company of fifty to five hundred people runs on more systems than anyone can list from memory, and the
-list that does exist is a spreadsheet. Entelim starts there. Sign up free, import the sheet, and the
-applications land in one portfolio with the person who owns each one recorded against it; then ask what
-breaks if a system fails and read the answer from the model. A CTO or VP of Engineering can start on the
-free Community plan, with no sales call first.
+list that does exist is a spreadsheet. Entelim starts from the tools your engineers already use. Sign up
+free and connect GitHub or Jira: Entelim reads them and proposes your applications, who owns them and what
+depends on what, and nothing enters the model until a person approves it. If your list lives in a
+spreadsheet instead, import that beside it. Then ask what breaks if a system fails and read the answer
+from the model. A CTO or VP of Engineering can start on the free Community plan, with no sales call first.
 
 **[Start free](/register)** or **[see pricing](/pricing)**.
 
@@ -30,7 +31,8 @@ we actually run, who owns each piece, and what else stops if this one does. They
 a customer's security questionnaire, from an acquirer's diligence list, or from your own on-call rota, and
 the usual answer is a spreadsheet that is out of date the day it is shared. A [CTO or CIO](/roles/cto-and-cio)
 at a larger company reads scorecards built over a long-running model; at this size the first job is simply
-getting the estate recorded once, in one place, with an owner on every line.
+getting the estate recorded once, in one place, with an owner on every line, and the quickest way there is
+to read it from the tools that already hold it.
 
 ## The questions you get asked
 
@@ -39,7 +41,12 @@ getting the estate recorded once, in one place, with an owner on every line.
 
 ## The screens you will use
 
-- **Import**, on the Applications screen, which takes an Excel, CSV or JSON file, shows its first rows,
+- **Connect GitHub**, in the admin connectors. Paste a read-only token and Entelim reads your repositories
+  and proposes a first model: your applications, their parts, who owns them and how they depend on each
+  other. The proposals wait for a person's approval.
+- **Connect Jira**, in the same place, which brings your backlog in as requirements and sends review board
+  decisions back to Jira as epics.
+- **Import**, on the Applications screen, the second route for a spreadsheet you already keep. It takes an Excel, CSV or JSON file, shows its first rows,
   lets you choose which field each column belongs to, and offers a template to start from. Choose
   *Merge* to update applications that already exist or *Duplicate* to add them as new ones.
 - **Applications**, the portfolio the import fills, with a count of how many applications have a named owner
@@ -56,14 +63,15 @@ getting the estate recorded once, in one place, with an owner on every line.
 ## A first sitting with Entelim
 
 1. [Sign up](/register) with your name, an email address and a password.
-2. On Applications, choose Import and upload the spreadsheet you already keep.
-3. Match each column to a field (application name, owner, description) and import.
+2. In the admin connectors, connect GitHub with a read-only token, or Jira with your instance details.
+3. Approve the applications and owners it proposes. Prefer a spreadsheet? On Applications, choose Import,
+   upload it and match each column to a field (application name, owner, description).
 4. Check the portfolio's owner count: every application with a named owner is counted.
 5. Open Ask, pick *What breaks if*, and name the system you worry about most.
 
 ## What you hand over
 
-A portfolio of every application in the spreadsheet, each with the owner it named. A first answer, from Ask,
+A portfolio of every application GitHub, Jira or your spreadsheet named, each with its owner. A first answer, from Ask,
 to what a given system connects to. A starting point for the rest: relationships, capabilities and review
 decisions can be added to the same model as the company grows.
 
@@ -89,6 +97,11 @@ any of them.
 No. Import and Ask work from a plain spreadsheet and a plain question. The ArchiMate 3.2 model underneath
 is there for the architects you hire later; you do not have to learn it to get the first answer.
 
+### Do I have to connect GitHub or Jira?
+
+No. They are the quickest start because the information is already there, but the spreadsheet import works
+on its own. Both can feed the same portfolio.
+
 ### What file can I import?
 
 An Excel (.xlsx or .xls), CSV or JSON file. The import shows the first ten rows and lets you match each
@@ -112,6 +125,6 @@ application data, with a written report and a read-out call.
 
 ## Start free
 
-[Start free](/register) on the Community plan for one organisation of up to three people, import your
-spreadsheet, and ask the question you have been getting asked. Growing teams move to Team, priced per
+[Start free](/register) on the Community plan for one organisation of up to three people, connect GitHub or Jira,
+or import your spreadsheet, and ask the question you have been getting asked. Growing teams move to Team, priced per
 editor. [See full pricing](/pricing).
