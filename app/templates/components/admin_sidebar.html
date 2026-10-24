@@ -1,287 +1,276 @@
 {#
 ===============================================================================
-STANDARD SIDEBAR COMPONENT - OFFICIAL PATTERN
+SIDEBAR (navigation v3) - the one signed-in sidebar
 ===============================================================================
 
-MANDATORY USE FOR ALL LLM AGENTS
-
-This is the OFFICIAL standard sidebar pattern for the Flask-Base application.
-ALL LLM agents MUST use this sidebar pattern and MUST NOT create duplicates,
-replacements, or alternative sidebar implementations.
-
-USAGE:
     {% include 'components/admin_sidebar.html' %}
 
-Persona-first rewrite (shell-overhaul Wave 1, Task 3): renders
-`app.utils.role_access.get_sidebar_zones(current_user)` only — no
-hand-maintained parallel section list, no client-side dimming. A link absent
-for a role is absent from the DOM, not merely opacity-40'd. Budget: 25 visible
-links per role, enforced by `scripts/check_sidebar_links.py` /
-`verify.py --gate sidebar-links`. See docs/superpowers/specs/2026-08-12-shell-overhaul-design.md.
+Renders `sidebar_navigation()` only, which reads the one navigation registry
+(app/navigation/registry.py): the same registry the search box and the breadcrumb
+trail read. No link is written into this template; adding a page to the sidebar is a
+registry change.
 
-DEPENDENCIES:
-    - Alpine.js (x-data, x-show)
-    - Tailwind CSS (shadcn/ui classes)
-    - Lucide icons (data-lucide)
-    - Flask context (url_for, current_user, config)
+The shadcn sidebar pattern, two levels at most:
+    organisation switcher (top)
+    one search box: "Search or ask..." (Ctrl/Cmd+K)
+    main group: Home, AI chat, Systems, Impact, Changes, Spend, Compliance
+    Architecture group (enterprise and solution architects, review board members)
+    the connect card, until the organisation has connected a source
+    secondary group (bottom): Integrations, Reports, Help
+    user menu (footer): Account, Billing, Team, Settings, Platform admin, Sign out
+
+Budget: scripts/check_sidebar_links.py renders this per role and counts its links.
 ===============================================================================
 #}
-{% from 'components/sidebar_nav.html' import sidebar_group, sidebar_item, sidebar_collapsible, sidebar_subitem %}
+{% from 'components/sidebar_nav.html' import sidebar_group, sidebar_item, sidebar_subitem %}
+{% from 'components/dropdown_menu.html' import dropdown_menu %}
+{% from 'components/input.html' import input %}
+{% from 'components/button.html' import button %}
+{% import 'components/card.html' as card %}
+{% set nav = sidebar_navigation(current_user) if current_user.is_authenticated else {'main': [], 'architecture': [], 'secondary': [], 'user_menu': [], 'connected': none, 'connect_url': none} %}
 <aside
     id="admin-sidebar"
     data-testid="sidebar"
+    aria-label="Sidebar"
     x-cloak
     {#
-      Single source of truth: $store.sidebar.open drives both this transform
-      AND the mobile scrim's x-show (admin_base.html / composer_base.html).
-      Both translate-x-0 and -translate-x-full are always present as keys in
-      this object map, so Alpine's class binding unconditionally adds one and
-      removes the other on every reactive run — it does not depend on
-      remembering what it added last time. Previously this same pair of
-      classes also sat in the static `class` string below (permanently
-      carrying `-translate-x-full`), which only Alpine's binding-diff
-      mechanism is responsible for tearing down; on that array-ternary form
-      the model diffs against its own last-computed value, not the live DOM,
-      so anything that touches the DOM after the very first render without
-      going through this directive's normal diff cycle (a stale server
-      fragment being reinserted, a remount) leaves the static
-      `-translate-x-full` behind forever, and the drawer never opens even
-      though the scrim (which had no such static class to fight) opens fine.
-      The object-map form below removes that class every time it recomputes,
-      not only when it thinks it changed something.
+      $store.sidebar.open drives this transform and the mobile scrim (admin_base.html,
+      composer_base.html). Both translate classes are keys of this object map, so
+      Alpine adds one and removes the other on every run, whatever touched the DOM.
     #}
     :class="{
         'translate-x-0': $store.sidebar.open,
         '-translate-x-full': !$store.sidebar.open,
-        'sidebar-collapsed': $store.sidebar.collapsed
+        'sidebar-collapsed': $store.sidebar.collapsed,
+        'w-16': $store.sidebar.collapsed,
+        'w-64': !$store.sidebar.collapsed
     }"
-    :style="{ width: $store.sidebar.collapsed ? '4rem' : '15rem' }"
-    {#
-      Written as a guarded assignment, not `isDesktop ? null : $store.sidebar.open = false`.
-      That parses as `(isDesktop ? null : $store.sidebar.open) = false` -- an
-      assignment to a conditional expression, which is a SyntaxError in any
-      JavaScript engine. It ran only because this platform's CSP-safe evaluator
-      is more forgiving than the language, so the codebase carried an expression
-      that stock Alpine would have refused. Depending on that leniency is how a
-      handler nobody could have tested in a normal engine stayed live.
-    #}
     @click.away="!isDesktop && ($store.sidebar.open = false)"
-    class="fixed inset-y-0 left-0 z-50 bg-card border-r border-border lg:translate-x-0 lg:static flex flex-col h-screen transition-all duration-200 ease-in-out"
+    class="fixed inset-y-0 left-0 z-50 flex h-screen w-64 flex-shrink-0 flex-col border-r border-border bg-card transition-all duration-200 ease-in-out lg:static lg:translate-x-0"
 >
-    <!-- Sidebar Header -->
-    <div class="flex items-center justify-between h-12 px-3 border-b border-border flex-shrink-0">
-        {# title: the app-name span beside this icon carries sidebar-app-name,
-           which the collapse CSS hides, so collapsed this is a bare glyph.
-           The real icon mark (not a lucide glyph) is already visually distinct
-           from the Dashboard Overview link's own icon, so it doesn't need the
-           same disambiguation the old hexagon placeholder did. #}
-        <a href="{{ url_for('dashboard.overview') }}" title="{{ config.APP_NAME }} home"
-           class="flex items-center space-x-2">
-            <div class="w-8 h-8 flex items-center justify-center">
-                <img src="{{ url_for('static', filename='favicon.svg') }}" alt="" class="w-8 h-8">
-            </div>
-            <span class="text-15 font-semibold tracking-[-0.01em] text-foreground sidebar-app-name">{{ config.APP_NAME }}</span>
+    {# ── Organisation switcher (SidebarHeader) ─────────────────────────────── #}
+    <div class="flex flex-shrink-0 items-center gap-1 border-b border-border p-2" data-slot="sidebar-header">
+        {% if current_user.is_authenticated %}
+        {% set org_items = [] %}
+        {% for org in organization_memberships|default([]) %}
+            {% set _ = org_items.append({
+                'text': org.name,
+                'icon': 'building-2',
+                'post': url_for('account.switch_organization'),
+                'fields': {'organization_id': org.id},
+                'current': active_organization and org.id == active_organization.id,
+                'testid': 'org-switch-' ~ org.id,
+            }) %}
+        {% endfor %}
+        {% set _ = org_items.append({'divider': true}) %}
+        {% set _ = org_items.append({'text': 'Manage organisations', 'icon': 'settings', 'href': url_for('account.manage'), 'testid': 'org-manage'}) %}
+        {% call dropdown_menu(
+            id='org-switcher',
+            items=org_items,
+            trigger_bare=true,
+            trigger_class='min-w-0 flex-1 gap-2 px-2 py-1.5 hover:bg-accent',
+            trigger_aria_label='Switch organisation',
+            trigger_testid='org-switcher',
+            menu_width='w-60',
+            panel_class='left-0 top-full mt-1',
+            class='min-w-0 flex-1'
+        ) %}
+            <span class="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md border border-border bg-background">
+                <img src="{{ url_for('static', filename='favicon.svg') }}" alt="" class="h-5 w-5">
+            </span>
+            <span class="sidebar-app-name grid min-w-0 flex-1 text-left leading-tight">
+                <span class="truncate text-sm font-semibold text-foreground" data-testid="active-organization-chip"
+                      title="{{ active_organization_name or config.APP_NAME }}">{{ active_organization_name or config.APP_NAME }}</span>
+                <span class="truncate text-xs text-muted-foreground">{{ config.APP_NAME or 'Entelim' }}</span>
+            </span>
+            <span class="sidebar-app-name inline-flex flex-shrink-0 text-muted-foreground" aria-hidden="true"><i data-lucide="chevrons-up-down" class="h-4 w-4"></i></span>
+        {% endcall %}
+        {% else %}
+        <a href="{{ url_for('main.index') }}" class="flex min-w-0 flex-1 items-center gap-2 px-2 py-1.5">
+            <img src="{{ url_for('static', filename='favicon.svg') }}" alt="" class="h-8 w-8">
+            <span class="sidebar-app-name truncate text-sm font-semibold text-foreground">{{ config.APP_NAME }}</span>
         </a>
-        <button type="button" @click="$store.sidebar.open = false"
-                class="lg:hidden inline-flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
-                aria-label="Close navigation">
-            <i data-lucide="x" class="w-5 h-5"></i>
-        </button>
+        {% endif %}
+        {{ button(variant='ghost', size='icon-sm', icon='x', class='lg:hidden', aria_label='Close navigation', on_click='$store.sidebar.open = false') }}
     </div>
 
-    <!-- Navigation -->
-    {# ARCH-113: the scrollbar was hidden entirely ([scrollbar-width:none] /
-       zero-width ::-webkit-scrollbar), so hundreds of px of nav items below
-       the fold had no affordance telling a user more existed. The native
-       scrollbar is the affordance — restored rather than replaced with
-       custom chrome, since the sidebar's own :hover/:focus-within styling
-       already handles when it should be visually quiet. #}
-    <script src="{{ url_for('static', filename='js/sidebar/module_search.js') }}"></script>
-    {# sidebar_collapsible (components/sidebar_nav.html) needs this component once per page. #}
+    {# sidebar_collapsible needs this component once per page; the search box needs its two. #}
     <script src="{{ url_for('static', filename='js/sidebar/collapsible.js') }}"></script>
-    {# #sidebar-nav's own box height is the full flex-1 space available to it regardless of what
-       scrolls inside -- clientHeight measures the box, not its scrolled content. The search box is
-       `sticky top-0` (not a sibling outside nav) so it stays on screen while the list scrolls beneath it,
-       without taking height away from nav's own measured size the way a true sibling would. -#}
-    <nav id="sidebar-nav" class="flex-1 px-2 py-2 space-y-2 overflow-y-auto min-h-0"
-         x-data="{
-             searchQuery: '',
-             searchFocused: false,
-             moduleSearch: { query: '', results: [], loading: false, error: false },
-             clearSearch() {
-                 this.searchQuery = '';
-                 this.$refs.searchInput.focus();
-             },
-             init() {
-                 // Link-level, zone-labelled, spelling-blind results from /api/sidebar/search --
-                 // see app/static/js/sidebar/module_search.js. Replaces the old whole-zone client filter
-                 // (matchesSearch), which showed every link in a zone on one hit and had no spelling
-                 // tolerance.
-                 if (!window.SidebarModuleSearch) return;
-                 const finder = window.SidebarModuleSearch.create({
-                     fetchJson: (q) => Platform.fetch.get('/api/sidebar/search', { q: q }, { silent: true }),
-                     onChange: (state) => { this.moduleSearch = state; }
-                 });
-                 this.$watch('searchQuery', (q) => finder.search(q));
-             },
-             // >= 2, matching module_search.js's own MIN_LENGTH: below that, finder.search()
-             // publishes an empty result set without asking the server (the endpoint 400s under 2
-             // characters). A literal double-quote is not safe in this comment: the whole x-data
-             // value below is itself inside a double-quoted HTML attribute, so a quote character
-             // here -- even inside a JS comment -- ends the attribute early and truncates the
-             // object literal (the earlier wording of this comment did exactly that: it broke this
-             // predicate for every keystroke, not just under 2 characters). Before this fix, this
-             // predicate returning true on any keystroke hid every zone and showed a false no-match
-             // message on the very first character -- a not-asked state rendered as a real miss,
-             // wiping the whole sidebar navigation down to one link.
-             searching() { return this.searchQuery.trim().length >= 2; }
-         }">
+    <script src="{{ url_for('static', filename='js/sidebar/module_search.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/sidebar/search.js') }}"></script>
 
-        <!-- Search Box: sticky, stays on screen while the list below scrolls -->
-        <div class="sticky top-0 z-10 -mx-2 -mt-2 mb-2 bg-card px-5 pt-2 pb-3 border-b border-border sidebar-search-wrap">
-            <div class="relative">
-                <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none"></i>
-                <input
-                    type="text"
-                    x-ref="searchInput"
-                    name="sidebar-nav-search"
-                    autocomplete="off"
-                    data-1p-ignore data-lpignore="true"
-                    x-model="searchQuery"
-                    @focus="searchFocused = true"
-                    @blur="searchFocused = false"
-                    placeholder="Search navigation..."
-                    class="w-full h-9 pl-8 pr-8 rounded-md border border-input bg-background text-13 placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent transition-all"
-                 aria-label="Search navigation..."/>
-                <button type="button"
-                    x-cloak x-show="searchQuery"
-                    @click="clearSearch()"
-                    class="absolute right-2 top-1/2 -translate-y-1/2 h-5 w-5 rounded-sm hover:bg-accent flex items-center justify-center transition-colors"
-                    title="Clear search"
-                >
-                    <i data-lucide="x" class="h-3 w-3 text-muted-foreground"></i>
-                </button>
-            </div>
-            <div class="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground">
-                <kbd class="px-1.5 py-0.5 rounded bg-muted border border-border font-mono text-xs text-foreground">Ctrl+K</kbd>
-                <span>for global search</span>
-            </div>
+    {# ── The one search box: pages by any name, records, and asking ─────────── #}
+    {% if current_user.is_authenticated %}
+    <div class="sidebar-search-wrap relative flex-shrink-0 px-3 pb-2 pt-3"
+         x-data="sidebarSearch('{{ url_for('unified_ai_chat.index') }}')"
+         @click.away="highlighted = -1">
+        <div class="relative">
+            <i data-lucide="search" class="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true"></i>
+            {{ input(
+                id='sidebar-search',
+                name='sidebar-search',
+                type='search',
+                placeholder='Search or ask…',
+                aria_label='Search pages or ask a question',
+                size='sm',
+                class='pl-8 pr-16',
+                attrs_dict={
+                    'x-ref': 'input',
+                    'x-model': 'query',
+                    'autocomplete': 'off',
+                    'spellcheck': 'false',
+                    'data-1p-ignore': 'true',
+                    'data-lpignore': 'true',
+                    'data-testid': 'sidebar-search',
+                    'role': 'combobox',
+                    'aria-autocomplete': 'list',
+                    'aria-controls': 'sidebar-search-results',
+                    ':aria-expanded': "searching() ? 'true' : 'false'",
+                    '@keydown.enter.prevent': 'submit()',
+                    '@keydown.arrow-down.prevent': 'move(1)',
+                    '@keydown.arrow-up.prevent': 'move(-1)',
+                    '@keydown.escape': 'clear()'
+                }
+            ) }}
+            <kbd class="pointer-events-none absolute right-2 top-1/2 inline-flex h-5 -translate-y-1/2 select-none items-center rounded border border-border bg-muted px-1.5 font-mono text-2xs font-medium text-muted-foreground" x-text="kbd" aria-hidden="true">Ctrl K</kbd>
         </div>
 
-        {# ── Search results: link-level, zone-labelled, replaces the zone-grouped nav while searching ── #}
-        <div x-cloak x-show="searching()" data-testid="sidebar-search-results">
-            <p x-show="moduleSearch.loading" class="px-3 py-2 text-xs text-muted-foreground">Searching&hellip;</p>
-            <div x-show="!moduleSearch.loading && !moduleSearch.error && moduleSearch.results.length" class="space-y-1">
-                <template x-for="hit in moduleSearch.results" :key="hit.url">
-                    <a :href="hit.url" :title="hit.name"
-                       class="flex items-center justify-between gap-2 rounded-lg px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground">
-                        <span class="flex-1 truncate" x-text="hit.name"></span>
-                        <span class="shrink-0 text-xs text-muted-foreground/70" x-text="hit.zone"></span>
-                    </a>
-                </template>
-            </div>
-            {# <template>, not a plain div: its content (including the "Browse all modules" <a>) does not
-               exist in the DOM until Alpine instantiates it, so it never counts against the sidebar's
-               rendered link budget (scripts/check_sidebar_links.py, tests/test_sidebar_render.py) while a
-               search is not in this empty state. #}
-            <template x-if="!moduleSearch.loading && !moduleSearch.error && moduleSearch.results.length === 0">
-                <div class="px-3 py-4 text-center">
-                    <p class="text-sm text-muted-foreground" x-text="`No pages match &quot;${searchQuery}&quot;`"></p>
-                    <div class="mt-3 flex flex-col items-center gap-2">
-                        <button type="button" @click="window.openSearchModal && window.openSearchModal(searchQuery)"
-                                class="inline-flex items-center gap-1.5 rounded-md border border-input bg-background px-3 py-1.5 text-xs font-medium hover:bg-accent transition-colors">
-                            Search everywhere (Ctrl+K)
-                        </button>
-                        {% if 'modules_directory.index' in flask.current_app.view_functions %}
-                        <a href="{{ url_for('modules_directory.index') }}" class="text-xs text-primary hover:underline">Browse all modules</a>
-                        {% endif %}
-                    </div>
+        <div id="sidebar-search-results" role="listbox" aria-label="Search results"
+             x-cloak x-show="searching()"
+             class="absolute left-3 right-3 top-full z-30 mt-1 max-h-96 overflow-y-auto rounded-md border border-border bg-popover p-1 text-popover-foreground"
+             data-testid="sidebar-search-results">
+            <p x-show="loading" class="px-2 py-1.5 text-xs text-muted-foreground">Searching…</p>
+            <template x-if="error">
+                <p role="alert" class="px-2 py-1.5 text-xs text-destructive-emphasis">Search is unavailable. Try again, or ask the AI chat below.</p>
+            </template>
+            <template x-if="!loading && pages.length">
+                <div>
+                    <p class="px-2 pb-1 pt-1.5 text-xs font-medium text-muted-foreground">Pages</p>
+                    <template x-for="(hit, i) in pages" :key="hit.url">
+                        <a :href="hit.url" role="option" :aria-selected="highlighted === i ? 'true' : 'false'"
+                           :class="highlighted === i ? 'bg-accent text-accent-foreground' : 'text-foreground'"
+                           class="flex items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent"
+                           data-testid="sidebar-search-page">
+                            <span class="min-w-0 flex-1 truncate" x-text="hit.name"></span>
+                            <span class="shrink-0 text-xs text-muted-foreground" x-text="hit.zone"></span>
+                        </a>
+                    </template>
                 </div>
             </template>
-            <template x-if="moduleSearch.error"><p role="alert" class="px-3 py-2 text-xs text-destructive">Search is unavailable. Try again.</p></template>
+            <template x-if="!loading && records.length">
+                <div>
+                    <p class="px-2 pb-1 pt-1.5 text-xs font-medium text-muted-foreground">Records</p>
+                    <template x-for="(hit, i) in records" :key="hit.url + hit.name">
+                        <a :href="hit.url" role="option" :aria-selected="highlighted === recordIndex(i) ? 'true' : 'false'"
+                           :class="highlighted === recordIndex(i) ? 'bg-accent text-accent-foreground' : 'text-foreground'"
+                           class="flex items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent"
+                           data-testid="sidebar-search-record">
+                            <span class="min-w-0 flex-1 truncate" x-text="hit.name"></span>
+                            <span class="shrink-0 text-xs capitalize text-muted-foreground" x-text="hit.type"></span>
+                        </a>
+                    </template>
+                </div>
+            </template>
+            <template x-if="!loading && !error && !pages.length && !records.length">
+                <p class="px-2 py-1.5 text-xs text-muted-foreground">No page matches. Press Enter to ask the AI chat.</p>
+            </template>
+            <div class="my-1 h-px bg-border" role="separator"></div>
+            <a href="{{ url_for('unified_ai_chat.index') }}" :href="askUrl()" role="option"
+               :aria-selected="highlighted === askIndex() ? 'true' : 'false'"
+               :class="highlighted === askIndex() ? 'bg-accent text-accent-foreground' : 'text-foreground'"
+               class="flex items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent"
+               data-testid="sidebar-search-ask">
+                <i data-lucide="message-square" class="h-4 w-4 flex-shrink-0 text-muted-foreground" aria-hidden="true"></i>
+                <span class="min-w-0 flex-1 truncate">Ask the AI chat: <span class="font-medium" x-text="query"></span></span>
+            </a>
         </div>
-
-        <div x-show="!searching()">
-
-        {% set ns = namespace(has_all_modules=false) %}
-        {% for zone in get_sidebar_zones(current_user) %}
-        {# A zone whose every link's endpoint is unregistered (guardrail flag
-           off, blueprint import failed, endpoint string drifted) must not
-           print an empty heading — that reads as "you have Governance access
-           but zero Governance links" instead of "you have no Governance
-           access here". Compute the surviving links once and gate the whole
-           zone, heading included, on that list being non-empty. #}
-        {% set visible_links = zone.links | selectattr('endpoint', 'in', flask.current_app.view_functions) | list %}
-        {% if visible_links %}
-        {# One sidebar markup: components/sidebar_nav.html (design/patterns.json:
-           sidebar-group). Zones are groups; links are level-1 items; a zone
-           that needs sub-menus calls sidebar_collapsible there, not here. #}
-        {% call sidebar_group(zone.title) %}
-            {% for link in visible_links %}
-            {% if link.endpoint == 'modules_directory.index' %}{% set ns.has_all_modules = true %}{% endif %}
-            {{ sidebar_item(url_for(link.endpoint, **(link.query_params or {})), link.label,
-                            icon=link.icon, active=request.endpoint == link.endpoint) }}
-            {% endfor %}
-        {% endcall %}
-        {% endif %}
-        {% endfor %}
-        </div>
-    </nav>
-
-    <!-- Sidebar Footer -->
-    <!-- All-modules fallback: rendered here only for a role whose SIDEBAR_ZONES
-         didn't already include it (currently just platform_admin — see
-         app/utils/role_access.py's _LIBRARY_LINKS_WITH_DIRECTORY comment) so
-         the directory stays reachable from every role's sidebar regardless of
-         which zone has room for it. -->
-    {% if not ns.has_all_modules and 'modules_directory.index' in flask.current_app.view_functions %}
-    <div class="px-4 py-2 border-t border-border">
-        <a href="{{ url_for('modules_directory.index') }}"
-           title="All modules"
-           class="w-full flex items-center gap-2 rounded-md px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-accent transition-colors {% if request.endpoint == 'modules_directory.index' %}text-foreground font-medium{% endif %}">
-            <i data-lucide="grid" class="h-3.5 w-3.5 flex-shrink-0"></i>
-            {# sidebar-footer-text, because this link sits OUTSIDE <nav> and the
-               collapse rule is scoped to `.sidebar-collapsed nav span`. Without
-               it the label was not hidden but CLIPPED, rendering as "All mo..."
-               in the 4rem rail. #}
-            <span class="sidebar-footer-text">All modules</span>
-        </a>
     </div>
     {% endif %}
-    {# The "Collapse sidebar (Ctrl+B)" row that lived here duplicated the header's own collapse
-       toggle (app/templates/components/admin_header.html), which already carries the same Ctrl+B hint in
-       its `:title`/`:aria-label` bindings -- removing it reclaims height for #sidebar-nav's own scroll
-       area without losing the control or the hint. #}
-    <div class="border-t border-border p-4">
-        {% if current_user.is_authenticated %}
-        <div class="flex items-center gap-3">
-            <div class="w-8 h-8 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
-                <span class="text-sm font-medium sidebar-footer-text">{{ current_user.first_name[0] if current_user.first_name }}</span>
-            </div>
-            <div class="flex-1 min-w-0 sidebar-footer-text">
-                <p class="text-sm font-medium truncate" title="{{ current_user.full_name() }}">{{ current_user.full_name() }}</p>
-                <p class="text-xs text-muted-foreground truncate" title="{{ current_user.email }}">{{ current_user.email }}</p>
-            </div>
-            <a href="{{ url_for('account.logout') }}"
-               class="inline-flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground transition-colors sidebar-footer-text"
-               aria-label="Log out">
-                <i data-lucide="log-out" class="h-4 w-4"></i>
-            </a>
-        </div>
-        {% else %}
-        <div class="flex items-center gap-3">
-            <div class="flex-1 min-w-0 sidebar-footer-text">
-                <p class="text-sm font-medium truncate">Not signed in</p>
-            </div>
-            <a href="{{ url_for('account.login') }}"
-               class="inline-flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground transition-colors sidebar-footer-text"
-               aria-label="Log in">
-                <i data-lucide="log-in" class="h-4 w-4"></i>
-            </a>
+
+    {# ── Navigation (SidebarContent) ───────────────────────────────────────── #}
+    <nav id="sidebar-nav" aria-label="Main navigation" class="flex min-h-0 flex-1 flex-col overflow-y-auto pb-2">
+        {% if nav.main %}
+        <div data-testid="nav-main">
+        {% call sidebar_group() %}
+            {% for item in nav.main %}
+            {{ sidebar_item(item.href, item.label, icon=item.icon, active=item.active, key=item.key) }}
+            {% for child in item.children %}
+            {{ sidebar_subitem(child.href, child.label, active=child.active, key=child.key) }}
+            {% endfor %}
+            {% endfor %}
+        {% endcall %}
         </div>
         {% endif %}
-        {% if build_id %}
-        <p class="mt-2 text-xs text-muted-foreground truncate sidebar-footer-text" title="Build identifier (ARCH-062)">Build {{ build_id }}</p>
+
+        {% if nav.architecture %}
+        <div data-testid="nav-architecture">
+        {% call sidebar_group('Architecture') %}
+            {% for item in nav.architecture %}
+            {{ sidebar_item(item.href, item.label, icon=item.icon, active=item.active, key=item.key) }}
+            {% endfor %}
+        {% endcall %}
+        </div>
+        {% endif %}
+
+        {# Stage awareness: until the organisation has connected a source. #}
+        {% if nav.connected is sameas false and nav.connect_url %}
+        <div class="sidebar-connect-card mt-auto px-2 pt-4" data-slot="sidebar-group" data-testid="connect-source-card">
+            {% call card.card(class='bg-background') %}
+                {% call card.card_header(class='space-y-1 p-4') %}
+                    {% call card.card_title(class='text-sm') %}Connect GitHub or Jira to build your model{% endcall %}
+                    {% call card.card_description(class='text-xs') %}Entelim reads your repositories or projects and drafts your systems for you to approve.{% endcall %}
+                {% endcall %}
+                {% call card.card_content(class='p-4 pt-0') %}
+                    {{ button(text='Connect a source', href=nav.connect_url, size='sm', class='w-full', testid='connect-source-button') }}
+                {% endcall %}
+            {% endcall %}
+        </div>
+        {% endif %}
+
+        {% if nav.secondary %}
+        <div class="{{ '' if (nav.connected is sameas false and nav.connect_url) else 'mt-auto' }} pt-2" data-testid="nav-secondary">
+        {% call sidebar_group() %}
+            {% for item in nav.secondary %}
+            {{ sidebar_item(item.href, item.label, icon=item.icon, active=item.active, key=item.key) }}
+            {% endfor %}
+        {% endcall %}
+        </div>
+        {% endif %}
+    </nav>
+
+    {# ── User menu (SidebarFooter) ─────────────────────────────────────────── #}
+    <div class="flex-shrink-0 border-t border-border p-2" data-slot="sidebar-footer">
+        {% if current_user.is_authenticated %}
+        {% set menu_items = [] %}
+        {% for item in nav.user_menu %}
+            {% if item.key == 'platform_admin' %}{% set _ = menu_items.append({'divider': true}) %}{% endif %}
+            {% set _ = menu_items.append({'text': item.label, 'icon': item.icon, 'href': item.href, 'testid': 'user-menu-' ~ item.key}) %}
+        {% endfor %}
+        {% set _ = menu_items.append({'divider': true}) %}
+        {% set _ = menu_items.append({'checkbox': true, 'text': 'Dark theme', 'icon': 'moon', 'checked': '$store.theme.dark', 'onclick': '$store.theme.toggle()', 'testid': 'user-menu-theme'}) %}
+        {% set _ = menu_items.append({'divider': true}) %}
+        {% set _ = menu_items.append({'text': 'Sign out', 'icon': 'log-out', 'href': url_for('account.logout'), 'variant': 'destructive', 'testid': 'user-menu-sign-out'}) %}
+        {% set _display = (current_user.first_name or current_user.full_name() or current_user.email or 'A') %}
+        {% call dropdown_menu(
+            id='user-menu',
+            items=menu_items,
+            trigger_bare=true,
+            trigger_class='w-full gap-2 px-2 py-1.5 hover:bg-accent',
+            trigger_aria_label='Account menu',
+            trigger_testid='user-menu',
+            trigger_attrs_dict={'id': 'user-menu-btn'},
+            menu_width='w-60',
+            panel_class='bottom-full left-0 mb-2'
+        ) %}
+            <span class="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md bg-muted text-sm font-medium text-foreground" aria-hidden="true">{{ _display[0]|upper }}</span>
+            <span class="sidebar-footer-text grid min-w-0 flex-1 text-left leading-tight">
+                <span class="truncate text-sm font-medium text-foreground" title="{{ current_user.full_name() or current_user.email }}">{{ current_user.full_name() or current_user.email }}</span>
+                <span class="truncate text-xs text-muted-foreground" title="{{ current_user.email }}">{{ current_user.email }}</span>
+            </span>
+            <span class="sidebar-footer-text inline-flex flex-shrink-0 text-muted-foreground" aria-hidden="true"><i data-lucide="chevrons-up-down" class="h-4 w-4"></i></span>
+        {% endcall %}
+        {% else %}
+        {{ button(text='Sign in', href=url_for('account.login'), variant='outline', size='sm', class='w-full', icon='log-in') }}
         {% endif %}
     </div>
 </aside>
@@ -289,20 +278,10 @@ DEPENDENCIES:
 <script>
     if (typeof lucide !== 'undefined') {
         lucide.createIcons();
-
-        // Re-initialize icons when zones expand/collapse (kept for future use)
-        document.addEventListener('alpine:updated', () => {
-            lucide.createIcons();
-        });
     }
 
-    // Sidebar scroll-fade affordance (evidence review): #sidebar-nav's
-    // native scrollbar is hidden by design (see shadcn-sidebar.css), so a
-    // role whose zones overflow the viewport — platform_admin worst-case,
-    // Governance + Admin push well past the fold — had nothing indicating
-    // more nav existed below. Drop the CSS fade (see shadcn-sidebar.css)
-    // once the nav is scrolled to its end, or if it was never scrollable in
-    // the first place, so the fade never implies content that isn't there.
+    // Scroll-fade affordance: #sidebar-nav fades at its foot while there is more below,
+    // and stops fading once scrolled to its end (styles/shadcn-sidebar.css).
     (function initSidebarScrollFade() {
         const nav = document.getElementById('sidebar-nav');
         if (!nav) return;
@@ -313,6 +292,5 @@ DEPENDENCIES:
         update();
         nav.addEventListener('scroll', update, { passive: true });
         window.addEventListener('resize', update);
-        document.addEventListener('alpine:updated', update);
     })();
 </script>

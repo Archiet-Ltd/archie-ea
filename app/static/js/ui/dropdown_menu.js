@@ -15,7 +15,7 @@
     'use strict';
 
     var doc = global.document;
-    var ITEMS = '[role="menuitem"]:not([disabled]):not([aria-disabled="true"])';
+    var ITEMS = '[role="menuitem"]:not([disabled]):not([aria-disabled="true"]), [role="menuitemcheckbox"]:not([disabled])';
     var typed = '';
     var typedAt = 0;
 

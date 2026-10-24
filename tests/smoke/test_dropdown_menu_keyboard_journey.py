@@ -143,13 +143,14 @@ def test_user_menu_by_keyboard(browser, live_server, seeded):
         page.keyboard.press("Enter")
         expect(trigger).to_have_attribute("aria-expanded", "true")
         page.wait_for_function("() => document.activeElement.getAttribute('role') === 'menuitem'")
-        assert _focused_name(page) == "Profile"
+        # Navigation v3: the user menu sits in the sidebar footer.
+        assert _focused_name(page) == "Account"
         page.keyboard.press("ArrowDown")
-        assert _focused_name(page) == "Settings"
+        assert _focused_name(page).startswith("Dark theme")
         page.keyboard.press("End")
-        assert _focused_name(page) == "Log out"
-        page.keyboard.press("p")
-        assert _focused_name(page) == "Profile"
+        assert _focused_name(page) == "Sign out"
+        page.keyboard.press("a")
+        assert _focused_name(page) == "Account"
         page.keyboard.press("Escape")
         expect(trigger).to_have_attribute("aria-expanded", "false")
         assert page.evaluate("() => document.activeElement.id") == "user-menu-btn"
