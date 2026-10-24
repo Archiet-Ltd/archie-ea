@@ -99,7 +99,7 @@ def test_streamed_chat_request_is_scrubbed_too(captured, monkeypatch):
     monkeypatch.setattr(_FakeCompletions, "create", lambda self, **kw: (self._sink.append(kw), _Stream())[1])
     AgentRunner(user_id=1)._call_llm(
         "nvidia",
-        "nvidia/nemotron-3-super-120b-a12b",
+        "nvidia/nemotron-3-ultra-550b-a55b",
         "key",
         "system",
         [{"role": "user", "content": SENSITIVE_QUESTION}],
@@ -120,7 +120,7 @@ def test_openrouter_requests_exclude_endpoints_that_train_or_log(captured):
 
 def test_nvidia_requests_go_to_nvidia_with_no_openrouter_setting(captured):
     AgentRunner(user_id=1)._call_llm(
-        "nvidia", "nvidia/nemotron-3-super-120b-a12b", "key", "s",
+        "nvidia", "nvidia/nemotron-3-ultra-550b-a55b", "key", "s",
         [{"role": "user", "content": "hi"}], [], base_url="https://integrate.api.nvidia.com/v1",
     )
     assert _sent(captured).get("extra_body") is None
@@ -226,7 +226,7 @@ def _runner_with_routes(monkeypatch, outcomes):
     monkeypatch.setattr(
         LLMService, "_get_configured_provider",
         staticmethod(lambda exclude_providers=None, user_id=None: next(
-            (p, m) for p, m in [("openrouter", "google/gemma-4-31b-it:free"), ("nvidia", "nvidia/nemotron-3-super-120b-a12b")]
+            (p, m) for p, m in [("openrouter", "google/gemma-4-31b-it:free"), ("nvidia", "nvidia/nemotron-3-ultra-550b-a55b")]
             if p not in (exclude_providers or [])
         )),
     )
@@ -255,3 +255,15 @@ def test_chat_reports_the_failure_when_every_free_route_is_out_of_quota(app, mon
     assert calls == ["openrouter", "nvidia"]
     assert "LLM call failed" in str(result.get("error"))
     assert "busy" in str(result.get("response"))
+
+
+def test_nvidia_default_is_a_model_the_service_serves():
+    """The earlier default is listed by NVIDIA but answers 404, so every fallback turn failed."""
+    assert default_model_for("nvidia") == "nvidia/nemotron-3-ultra-550b-a55b"
+    for path in (
+        "app/modules/ai_chat/services/llm_router.py",
+        "app/modules/admin/routes/admin_routes.py",
+        "app/modules/admin/v2/routes/admin_routes.py",
+        "app/modules/ai_chat/services/model_defaults.py",
+    ):
+        assert '"nvidia/nemotron-3-super-120b-a12b"' not in (ROOT / path).read_text(), path
