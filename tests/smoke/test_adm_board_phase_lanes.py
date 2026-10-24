@@ -2,7 +2,7 @@
 
 The goal: "see where each of my solutions sits in the ADM cycle, what is due to
 be produced for it, and open any of it". The board is the TOGAF cycle laid out
-as lanes (Preliminary, A to H, Requirements Management) with the solutions in
+as lanes (Preliminary, A to H; Requirements Management is the panel beside them) with the solutions in
 the lane a practitioner expects, grouped by status inside the lane.
 
 Each journey signs in as an Enterprise Architect on the Viewer platform role
@@ -30,7 +30,6 @@ LANE_NAMES = [
     "Migration Planning",
     "Implementation Governance",
     "Architecture Change Management",
-    "Requirements Management",
 ]
 
 # Each solution's own deliverables, and the TOGAF checklist item (if any) it fulfils.
@@ -162,8 +161,8 @@ def test_architect_reads_the_cycle_as_lanes_with_solutions_and_deliverables(
     context, page = _open(browser, live_server, email, width)
     try:
         lanes = page.locator('[data-testid="adm-lane"]')
-        expect(lanes).to_have_count(10, timeout=PAGE_TIMEOUT)
-        names = [lanes.nth(i).get_by_role("heading").first.inner_text() for i in range(10)]
+        expect(lanes).to_have_count(9, timeout=PAGE_TIMEOUT)
+        names = [lanes.nth(i).get_by_role("heading").first.inner_text() for i in range(9)]
         for expected, actual in zip(LANE_NAMES, names):
             assert expected in actual, "lane %r reads %r" % (expected, actual)
 
