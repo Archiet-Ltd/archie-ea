@@ -441,7 +441,7 @@ def render_html(report: Dict[str, Any]) -> str:
 
     # Straight from the template environment: the report is written outside any request,
     # so no signed-in user or request context is needed or wanted.
-    template = current_app.jinja_env.get_template("health_check/report.html")
+    template = current_app.jinja_env.get_template("layouts/health_check_document.html")
     return template.render(report=report, stylesheet=_stylesheet())
 
 
