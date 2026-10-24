@@ -795,6 +795,7 @@ def create_deliverable():
             name=data["name"],
             description=data.get("description", ""),
             delivery_status=data.get("status", "planned"),
+            adm_template_id=data.get("adm_template_id"),
             target_date=datetime.fromisoformat(data["due_date"]) if data.get("due_date") else None,
         )
 

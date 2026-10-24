@@ -5920,6 +5920,9 @@
    },
    "spec": null,
    "status": "mapped",
+   "extra_macros": [
+    "components/table.html"
+   ],
    "charts": [],
    "confidence": "high",
    "frame": "dashboard-01",
@@ -10039,7 +10042,10 @@
    "page_type": "chat",
    "reason": "AI chat on the startup path; sources-chat with the evidence footer as the source part, held at B until the preview-03 render exists (G-12), then A.",
    "tier": "B",
-   "type_changed": false
+   "type_changed": false,
+   "extra_macros": [
+    "components/drawer.html"
+   ]
   },
   "app/templates/ai_chat/run_records/detail.html": {
    "allowed_macros": [

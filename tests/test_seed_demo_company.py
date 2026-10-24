@@ -423,6 +423,29 @@ def test_demo_user_has_viewer_role(app, db_session, make_org):
     assert user.role.permissions == 0
 
 
+def test_demo_has_exactly_one_business_architect_and_a_rerun_keeps_it(app, db_session, make_org):
+    """The demonstration carries one business architect, on the read-only platform
+    role, and a second run neither adds another nor changes their persona."""
+    os.environ["DEMO_USER_PASSWORD"] = "test-password"
+    try:
+        seed_demo_company()
+        seed_demo_company()
+    finally:
+        del os.environ["DEMO_USER_PASSWORD"]
+
+    from app.models.user import User
+
+    org_id = _get_lantern_org_id()
+    people = (
+        db_session.query(User)
+        .filter(User.organization_id == org_id, User.enterprise_role == "business_architect")
+        .all()
+    )
+    assert [p.email for p in people] == ["bryn.businessarch@lantern-quay.example.com"]
+    assert people[0].role.name == "Viewer"
+    assert not people[0].is_org_admin
+
+
 # ── AC4: GET /demo/lantern-quay returns 200 ────────────────────────────────
 
 
