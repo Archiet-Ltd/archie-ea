@@ -1,5 +1,5 @@
 """Application architects model a component landscape in the ArchiMate Composer,
-and a solution architect asks Ask why two things are connected.
+and a solution architect asks the AI chat why two things are connected.
 
 Composer: a fresh organisation. Elements are added through the Components
 palette (drag onto the canvas, then name a new one or pick an existing one
@@ -20,6 +20,7 @@ import uuid
 import pytest
 from playwright.sync_api import expect
 
+from .chat_ask import ask, role_of
 from .conftest import PAGE_TIMEOUT
 from .fresh_org import api, create_fresh_org, sign_in
 
@@ -226,6 +227,7 @@ def test_solution_architect_asks_why_two_things_are_connected(browser, live_serv
 
     org1 = create_fresh_org("solution_architect")
     org2 = create_fresh_org("solution_architect")
+    assert role_of(org1["emails"]["solution_architect"]) == "solution_architect"
     context, page = _new_page(browser)
     sign_in(page, base, org1["emails"]["solution_architect"])
 
@@ -239,24 +241,16 @@ def test_solution_architect_asks_why_two_things_are_connected(browser, live_serv
     _pick_type(page, _connect(page, checkout, portal), "serving")
     expect(page.locator(".joint-link")).to_have_count(2, timeout=PAGE_TIMEOUT)
 
-    # Ask about the Ledger through its own picker; the old twin map address now goes to the
-    # Composer, and the Why? explanation of a worked-out connection lives on Ask.
-    page.goto(base + "/intelligence/ask", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
-    page.locator("#ask-question-impact").click()
-    picker_input = page.locator("#ask-picker-input")
-    expect(picker_input).to_be_focused(timeout=PAGE_TIMEOUT)
-    picker_input.press_sequentially(ledger, delay=15)
-    option = page.locator("#ask-picker-listbox [role=option]", has_text=ledger)
-    expect(option).to_be_visible(timeout=PAGE_TIMEOUT)
-    option.click()
-    page.wait_for_function(
-        "() => { const el = document.querySelector('[x-data^=\"askSurface\"]');"
-        " return !!(el && Alpine.$data(el).centreId); }", timeout=PAGE_TIMEOUT)
-    ledger_id = int(page.evaluate(
-        "() => Alpine.$data(document.querySelector('[x-data^=\"askSurface\"]')).centreId"))
+    # Ask the chat what breaks if the Ledger fails; the Why? explanation of a worked-out
+    # connection is on its card.
+    status, found = api(page, "GET", "/archimate/api/elements/search?limit=10&q=" + ledger.replace(" ", "%20"))
+    assert status == 200, found
+    ledger_id = next(row["id"] for row in found["data"] if row["name"] == ledger)
+    question = "What breaks if %s fails" % ledger
+    answer = ask(page, base, question)
 
     # Nothing worked out yet in a new organisation: the answer says so and offers to.
-    recompute = page.locator("[data-not-computed-notice] [data-recompute-button]")
+    recompute = answer.get_by_role("button", name="Work them out now")
     expect(recompute).to_be_visible(timeout=PAGE_TIMEOUT)
     with page.expect_response(
         lambda r: "/api/v1/intelligence/derivation/recompute" in r.url, timeout=PAGE_TIMEOUT,
@@ -264,30 +258,37 @@ def test_solution_architect_asks_why_two_things_are_connected(browser, live_serv
         recompute.click()
     assert resp.value.status < 400, resp.value.text()[:300]
 
-    derived_row = page.locator("[data-ask-row][data-kind=derived]")
-    expect(derived_row).to_have_count(1, timeout=PAGE_TIMEOUT)
-    expect(derived_row).to_contain_text(portal)
+    def _derived_row(card):
+        return card.locator("[data-slot='card']").filter(
+            has=page.locator("[data-answer-row][data-kind=derived]")
+        ).filter(has=page.get_by_role("link", name=portal, exact=True))
 
-    def _explain_and_check():
-        derived_row.get_by_role("button", name="Why?").click()
-        dialog = page.locator("#drawer-provenance [role=dialog]")
-        expect(dialog).to_be_visible(timeout=PAGE_TIMEOUT)
-        plain = page.locator("#drawer-provenance [data-plain-terms]")
-        expect(plain).to_contain_text(portal)
-        expect(plain).to_contain_text(ledger)
-        dialog.locator("[data-full-detail-toggle]").click()
-        chain = dialog.locator("ol[aria-label='Chain'] li > span[x-text='link']")
-        expect(chain).to_have_text([ledger, checkout, portal], timeout=PAGE_TIMEOUT)
-        derived_id = int(dialog.locator("[data-full-detail-region] dd").last.inner_text().strip())
-        page.keyboard.press("Escape")
-        expect(dialog).to_be_hidden(timeout=PAGE_TIMEOUT)
-        return derived_id
+    answer = page.get_by_test_id("estate-answer").nth(0)
+    expect(_derived_row(answer)).to_have_count(1, timeout=PAGE_TIMEOUT)
 
-    derived_id = _explain_and_check()
+    def _explain_and_check(card):
+        row = _derived_row(card)
+        expect(row).to_have_count(1, timeout=PAGE_TIMEOUT)
+        expect(row.locator("[data-why-rule]")).to_contain_text("serving link followed by a serving link")
+        chain = row.locator("[data-why-link]")
+        expect(chain).to_have_count(2, timeout=PAGE_TIMEOUT)
+        expect(chain.nth(0)).to_contain_text(ledger)
+        expect(chain.nth(0)).to_contain_text(checkout)
+        expect(chain.nth(1)).to_contain_text(checkout)
+        expect(chain.nth(1)).to_contain_text(portal)
 
-    page.reload(wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
-    expect(derived_row).to_have_count(1, timeout=PAGE_TIMEOUT)
-    assert _explain_and_check() == derived_id
+    _explain_and_check(answer)
+    status, impact = api(page, "GET", "/api/v1/intelligence/impact/%d?include_derived=true" % ledger_id)
+    assert status == 200, impact
+    derived_ids = {
+        r["relation"]["derived_id"] for r in (impact.get("data") or impact)["rows"]
+        if r["relation"]["kind"] == "derived"
+    }
+    assert len(derived_ids) == 1
+    derived_id = derived_ids.pop()
+
+    # Asking again in a freshly opened chat gives the same explanation.
+    _explain_and_check(ask(page, base, question))
     context.close()
 
     # A second organisation reaches neither the connection nor its explanation.

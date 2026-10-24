@@ -32954,9 +32954,13 @@
     "breadcrumb",
     "button",
     "card",
+    "dialog",
     "empty",
+    "field",
+    "input",
     "page-header",
     "progress",
+    "select",
     "table",
     "tooltip"
    ],
@@ -32991,6 +32995,21 @@
    },
    "spec": null,
    "status": "mapped",
+"extra_macros": [
+    "components/form_field.html",
+    "components/input.html",
+    "components/select.html",
+    "components/table.html"
+   ],
+   "charts": [],
+   "confidence": "high",
+   "frame": "dashboard-01",
+   "inhouse_components": [
+    "page-header:Replace"
+   ],
+   "original": "gap:G-4",
+   "page_type": "matrix-map",
+   "reason": "Risk heat map; a second copy of the same view, merge with risk_heat_map.",
    "tier": "C2",
    "type_changed": true
   },

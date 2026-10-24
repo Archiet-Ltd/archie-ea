@@ -131,23 +131,17 @@ AUDIT = [
     ("business_architect", "/capability-map/"),
     ("cto", "/dashboard/overview"),
     ("enterprise_architect", "/ai-chat"),
-    # Ask joins the list at zero accepted violations. It is never baselined: a
-    # violation on it is fixed, not recorded. Its states with data and with the
-    # provenance drawer open are audited separately, below. The old Twin map
-    # address redirects to the Composer, which draws the same view.
-    ("solution_architect", "/intelligence/ask"),
+    # The chat, where every question is asked, is audited at zero accepted
+    # violations above. Its answer states are audited separately, below. The old
+    # Ask and Twin map addresses redirect to the chat and the Composer.
 ]
 
-# The states of Ask that a plain page load cannot reach: the answer and the
-# provenance drawer open (with "Full detail" expanded, because that is where the
-# technical detail lives).
+# The states of the chat that a plain page load cannot reach: an answer drawn as cards, and the
+# same for a model whose worked-out connection has gone out of date (the notice and its button,
+# the marked card and badge).
 INTELLIGENCE_STATES = [
-    ("solution_architect", "Ask, with an answer", "ask"),
-    ("solution_architect", "Ask, provenance drawer open", "ask-drawer"),
-    # The same again for a model whose worked-out connection has gone out of date: the
-    # notice and its button, the marked rows and badge, and the drawer over a stale row.
-    ("solution_architect", "Ask, out-of-date model", "ask-stale"),
-    ("solution_architect", "Ask, out-of-date model, provenance drawer open", "ask-stale-drawer"),
+    ("solution_architect", "Chat, with an answer", "ask"),
+    ("solution_architect", "Chat, out-of-date model", "ask-stale"),
 ]
 
 # An impact level at which a violation is not negotiable: these block a user
@@ -352,43 +346,18 @@ def audited(axe_module, axe_engine, browser, live_server, seeded):
     return results
 
 
-def _wait_for_component(page, factory):
-    page.wait_for_function(
-        "(f) => { const el = document.querySelector('[x-data=\"' + f + '()\"]');"
-        " return !!(el && el._x_dataStack); }",
-        arg=factory,
-    )
-
-
-def _open_question(page):
-    page.click("#ask-question-impact")
-    expect(page.locator("#ask-picker-input")).to_be_focused()
-
-
 def _reach_intelligence_state(page, base, graph, kind):
-    page.goto(base + "/intelligence/ask", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
-    _wait_for_component(page, "askSurface")
-    _open_question(page)
-    page.press("#ask-picker-input", "Control+a")
-    page.locator("#ask-picker-input").press_sequentially(graph["noun"], delay=15)
-    page.wait_for_selector("#ask-picker-listbox [role=option]")
-    page.locator("#ask-picker-listbox [role=option]",
-                 has_text=graph["names"]["service"]).click()
-    page.wait_for_selector("[data-ask-row]")
-    opener = page.locator("[data-ask-row][data-kind=derived]").get_by_role("button", name="Why?")
-    if kind.endswith("-drawer"):
-        opener.click()
-        dialog = page.locator("#drawer-provenance [role=dialog]")
-        dialog.wait_for(state="visible")
-        dialog.locator("[data-full-detail-toggle]").click()
-        dialog.locator("[data-full-detail-region]").wait_for(state="visible")
+    from .chat_ask import ask
+
+    answer = ask(page, base, "What breaks if %s fails" % graph["names"]["service"])
+    assert answer.locator("[data-answer-row]").count() >= 1
     # Let transitions settle so contrast is read from the final colours.
     page.wait_for_timeout(600)
 
 
 @pytest.fixture(scope="module")
 def audited_intelligence_states(axe_module, axe_engine, browser, live_server, seeded):
-    """Run axe on the states of Ask that need data or a click to reach."""
+    """Run axe on the states of the chat's answer that need data to reach."""
     _require_rule_set(axe_engine)
     graph = seed_impact_graph(seeded["ids"]["org"], "Auditpay")
     stale_graph = seed_impact_graph(seeded["ids"]["org"], "Auditstale")
@@ -420,7 +389,7 @@ def audited_intelligence_states(axe_module, axe_engine, browser, live_server, se
 # The two canvas pages, each at 1280px and 360px, for an empty tenant (no
 # record has been filled in yet, so every box renders its empty hint rather
 # than content). Baselined like every other page in AUDIT above (a ratchet,
-# not a hard zero) rather than joining Ask's never-baselined page,
+# not a hard zero) rather than joining the chat's never-baselined page,
 # because these pages' existing macros (page_header, card, the meta panel)
 # are shared with pages already carrying accepted findings and a first run
 # here may find the same ones, not a new defect this change introduced.
@@ -985,21 +954,20 @@ def test_the_audit_actually_ran(audited, axe_engine):
             "nothing about it" % (rule, ", ".join(unevaluated)))
 
 
-def test_ask_is_audited_and_carries_no_accepted_violations(audited):
-    """The page is in the audited list, were audited, and hold nothing in the
-    baseline: they start at zero and stay there."""
+def test_the_chat_is_audited_and_carries_no_accepted_violations(audited):
+    """The page is in the audited list, was audited, and holds nothing in the
+    baseline: it starts at zero and stays there."""
     accepted = _load_baseline()
-    for path in ("/intelligence/ask",):
+    for path in ("/ai-chat",):
         assert path in {p for _a, p in AUDIT}, "%s is missing from the audited list" % path
         assert path in audited, "%s was not audited" % path
-        assert path not in accepted, "%s must never be baselined" % path
+        assert not accepted.get(path), "%s must never be baselined" % path
         assert audited[path] == {}, "%s has violations: %r" % (path, audited[path])
 
 
-def test_the_states_of_ask_have_no_violations(audited_intelligence_states):
-    """The answer on Ask and the provenance drawer open with
-    "Full detail" expanded over it: zero violations under the audit's tag set, and
-    the 2.2 target-size rule was evaluated on every one. Never baselined."""
+def test_the_states_of_the_chat_answer_have_no_violations(audited_intelligence_states):
+    """The answer drawn as cards, current and out of date: zero violations under the
+    audit's tag set, and the 2.2 target-size rule was evaluated on every one. Never baselined."""
     states = audited_intelligence_states
     assert set(states) == {label for _a, label, _k in INTELLIGENCE_STATES}
     accepted = _load_baseline()
@@ -1021,7 +989,7 @@ def test_write_baseline_when_asked(audited, audited_canvas_pages):
     and_a_reason fails until someone says when it was accepted and why.
 
     Includes the canvas pages (audited_canvas_pages) — they are baselined
-    the same way as every page in AUDIT, unlike Ask's
+    the same way as every page in AUDIT, unlike the chat's
     never-baselined page.
     """
     if os.environ.get("SMOKE_A11Y_UPDATE_BASELINE") != "1":

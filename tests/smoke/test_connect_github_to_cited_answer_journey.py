@@ -21,6 +21,7 @@ import uuid
 import pytest
 from playwright.sync_api import expect
 
+from tests.smoke.chat_ask import ask, role_of
 from tests.smoke.conftest import PAGE_TIMEOUT, boot_live_server
 from tests.smoke.fresh_org import create_fresh_org, sign_in
 
@@ -342,22 +343,16 @@ def test_6_the_applications_are_listed_and_payments_service_shows_its_parts_and_
 
 
 def ask_what_breaks_if_payments_service_fails(page, base):
-    """On the Ask page, the way a person does: choose the question, type the name, pick it."""
-    page.goto(base + "/intelligence/ask", wait_until="domcontentloaded")
-    page.wait_for_function(
-        "() => { const el = document.querySelector('[x-data=\"askSurface()\"]'); return !!(el && el._x_dataStack); }"
-    )
-    page.locator("#ask-question-impact").click()
-    box = page.locator("#ask-picker-input")
-    expect(box).to_be_focused()
-    box.press_sequentially("Payments Service", delay=15)
-    page.locator("#ask-picker-listbox [role=option]", has_text="Payments Service").first.click()
-    rows = page.locator("[data-ask-row]")
-    expect(rows.first).to_be_visible()
-    return rows
+    """In the AI chat, the way a person does: type the question and press Enter. Returns the
+    connection cards of the answer."""
+    answer = ask(page, base, "What breaks if Payments Service fails")
+    cards = answer.locator("[data-slot='card']").filter(has=page.locator("[data-answer-row]"))
+    expect(cards.first).to_be_visible()
+    return cards
 
 
 def test_7_asking_what_breaks_names_the_dependents(admin, world):
+    assert role_of(world["one"]["emails"]["solution_architect"]) == "solution_architect"  # the persona, not an administrator
     rows = ask_what_breaks_if_payments_service_fails(admin, world["base"])
     for name in ("Billing Api", "Customer Portal", "Payments Worker"):
         expect(rows.filter(has_text=name).first).to_be_visible()
@@ -404,11 +399,12 @@ def shoot_on_a_phone(browser, world, name):
     page = context.new_page()
     try:
         sign_in(page, world["base"], world["one"]["emails"]["solution_architect"])
-        ask_what_breaks_if_payments_service_fails(page, world["base"])
-        page.wait_for_timeout(1200)  # the smooth scroll to the answer's heading has settled
-        heading = page.locator("#ask-results-heading").bounding_box()
-        bar = page.evaluate("(() => { const b = document.querySelector('header'); return b ? b.getBoundingClientRect().bottom : 0; })()")
-        assert heading and heading["y"] >= bar - 1, "the answer's heading sits under the top bar: heading %s, bar bottom %s" % (heading, bar)
+        cards = ask_what_breaks_if_payments_service_fails(page, world["base"])
+        page.wait_for_timeout(1200)  # the smooth scroll to the answer has settled
+        box = cards.first.bounding_box()
+        assert box and box["x"] >= 0 and box["x"] + box["width"] <= 390, "the answer overflows a phone: %s" % box
+        composer = page.locator("#user-input").bounding_box()
+        assert composer and composer["y"] + composer["height"] <= 844, "the question box is off screen: %s" % composer
         if SHOTS:
             os.makedirs(SHOTS, exist_ok=True)
             shoot_whole_answer(page, os.path.join(SHOTS, "%s-390.png" % name))
@@ -433,9 +429,6 @@ def test_7b_each_dependent_is_cited_with_its_repository_and_file(admin, world, b
             continue
         assert owner in row_text, "review showed %r as the owner of %s, the answer shows: %s" % (owner, name, row_text)
         assert "Owner\nNot recorded" not in row_text, row_text
-    # The question line sits inside the card's padding, not flush with its edge.
-    padding = admin.evaluate("parseFloat(getComputedStyle(document.querySelector('#ask-results .question-line')).paddingLeft)")
-    assert padding >= 12, "the question line has %spx of padding" % padding
     if SHOTS:
         os.makedirs(SHOTS, exist_ok=True)
         shoot_whole_answer(admin, os.path.join(SHOTS, "7b-answer-cited-1440.png"))
@@ -456,7 +449,7 @@ def test_7c_a_citation_link_opens_on_content(admin, world):
     short = re.search(r"@ ([0-9a-f]{7})", rows.filter(has_text="Billing Api").first.inner_text()).group(1)
     assert "/blob/" + short in href
     # Inside the product, the same row leads to the element in the Composer, which draws it.
-    inside = rows.filter(has_text="Billing Api").first.get_by_role("link", name="Open in the Composer")
+    inside = rows.filter(has_text="Billing Api").first.get_by_role("link", name="Billing Api", exact=True)
     inside.click()
     admin.wait_for_load_state("domcontentloaded")
     assert "/archimate/composer?element=" in admin.url
