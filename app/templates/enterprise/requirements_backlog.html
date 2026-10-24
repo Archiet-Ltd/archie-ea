@@ -653,7 +653,7 @@
 
                     <!-- Actions -->
                     <p x-show="deleteError" x-cloak role="alert" class="mt-4 text-sm text-destructive-emphasis" x-text="deleteError"></p>
-                    <div class="flex justify-end gap-3 mt-6">
+                    <div class="flex flex-wrap justify-end gap-3 mt-6">
                         {% call button(variant='destructive', class='justify-center mr-auto', attrs_dict={'@click': 'askDelete()', ':disabled': 'deleting'}) %}Delete requirement{% endcall %}
                         {% call button(variant='outline', class='justify-center', attrs_dict={'@click': 'activeReq = null'}) %}Cancel{% endcall %}
                         {% call button(variant='default', class='justify-center', attrs_dict={'@click': 'saveDetail()', ':disabled': 'saving'}) %}
