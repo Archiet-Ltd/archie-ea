@@ -92,10 +92,7 @@
             <span x-show="busy && mode === 'commit'" x-cloak>{{ button(text='Importing…', variant='primary', disabled=true) }}</span>
             <span x-show="error" x-cloak class="text-sm text-destructive-emphasis" x-text="error"></span>
             <template x-if="committed && report && report.composer_url">
-                <a :href="report.composer_url"
-                   class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4">
-                    <i data-lucide="external-link" class="h-4 w-4"></i> Open in composer
-                </a>
+                {{ button(text='Open in composer', icon='external-link', variant='primary', attrs_dict={':href': 'report.composer_url'}) }}
             </template>
             <span x-show="committed" x-cloak class="text-sm text-foreground">
                 Imported. <a href="/archimate/import-review" class="underline">Review what was guessed →</a>
