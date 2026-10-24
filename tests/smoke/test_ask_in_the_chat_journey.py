@@ -46,7 +46,7 @@ def _role_of(live_server, email):
 
 def _load_sample(page, base):
     page.goto(base + "/dashboard/overview", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
-    page.get_by_role("button", name="Load sample").first.click()
+    page.get_by_test_id("first-action-sample").click()
     expect(page.locator('[data-testid="sample-company-indicator"]')).to_be_visible(timeout=PAGE_TIMEOUT * 2)
 
 
@@ -115,7 +115,7 @@ def test_the_fresh_owner_asks_in_the_chat_and_reads_cited_cards(browser, live_se
         page.goto(live_server + href, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
         assert page.locator("main, #main-content, body").first.inner_text().strip()
         page.go_back(wait_until="domcontentloaded")
-        # The conversation is not kept across a reload; ask again to open the stored answer.
+        # Ask again to open the stored answer from the newest answer card.
         page.locator("#user-input").fill(QUESTION)
         page.locator("#user-input").press("Enter")
         opened = page.get_by_test_id("estate-answer").last.get_by_test_id("answer-open")
@@ -178,6 +178,56 @@ def test_a_failed_answer_reads_as_an_error_and_retry_gets_it(browser, live_serve
         expect(page.get_by_text("We could not answer that just now.")).to_have_count(0)
     finally:
         context.close()
+
+
+def test_the_answer_is_kept_in_the_conversation_history(browser, live_server, seeded):
+    """The fresh owner asks, reloads, and finds the question and its answer in the conversation
+    (and in the Chats list), with a link that opens the stored answer; another person's chat
+    list does not hold it."""
+    email, org_id = _empty_organisation_user(live_server)
+    assert _role_of(live_server, email) == "enterprise_architect"  # the persona, not an administrator
+    context = browser.new_context(viewport={"width": 1440, "height": 900})
+    context.set_default_timeout(PAGE_TIMEOUT)
+    page = context.new_page()
+    try:
+        context.add_init_script("localStorage.setItem('archie_onboarding_ts', '1')")
+        _login(page, live_server, email)
+        _load_sample(page, live_server)
+        page.goto(live_server + "/ai-chat", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        page.locator("#user-input").fill(QUESTION)
+        page.locator("#user-input").press("Enter")
+        expect(page.get_by_test_id("estate-answer")).to_be_visible(timeout=PAGE_TIMEOUT)
+        count = page.get_by_test_id("estate-answer").locator("[data-answer-row]").count()
+
+        # A reload brings the conversation back: the question, the saved answer line, its link.
+        page.reload(wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        messages = page.locator("#messages-container")
+        expect(messages).to_contain_text(QUESTION, timeout=PAGE_TIMEOUT)
+        expect(messages).to_contain_text("%d connections" % count)
+        _shot(page, "chat-history", 1440)
+        page.get_by_role("tab", name="Chats").click()
+        expect(page.locator("#session-list")).to_contain_text("What breaks if Payments service", timeout=PAGE_TIMEOUT)
+
+        # The kept answer opens the stored answer, with the same number of rows.
+        messages.get_by_role("link", name="Open this answer").click()
+        page.wait_for_url(re.compile(r"/intelligence/answers/[0-9a-f]{32}"), timeout=PAGE_TIMEOUT)
+        assert page.locator("[data-answer-rows] tbody tr").count() == count
+    finally:
+        context.close()
+
+    # Someone else, in another organisation, has no such conversation.
+    other_email, _other_org = _empty_organisation_user(live_server)
+    other = browser.new_context(viewport={"width": 1440, "height": 900})
+    other.set_default_timeout(PAGE_TIMEOUT)
+    other_page = other.new_page()
+    try:
+        other.add_init_script("localStorage.setItem('archie_onboarding_ts', '1')")
+        _login(other_page, live_server, other_email)
+        other_page.goto(live_server + "/ai-chat", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        other_page.get_by_role("tab", name="Chats").click()
+        expect(other_page.locator("#session-list")).not_to_contain_text("What breaks if Payments service")
+    finally:
+        other.close()
 
 
 @pytest.fixture(scope="module")

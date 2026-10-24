@@ -171,6 +171,44 @@ def risks_linked_to(entity_type, entity_id):
     return Risk.query.filter(Risk.id.in_(risk_ids)).order_by(Risk.id).all()
 
 
+def solution_risk_sources(solution_id):
+    """Every risk a solution lists, as ``(canonical, legacy)``.
+
+    ``canonical`` are the register's Risk rows linked to the solution;
+    ``legacy`` are the superseded solution_risks rows the merge backfill has
+    not yet retired (a retired row is excluded: its replacement is already in
+    ``canonical``). The solution's risk list and its heat map both read this,
+    so they cannot disagree about which risks the solution has.
+    """
+    from app.models.solution_lifecycle_models import SolutionRisk
+
+    canonical = risks_linked_to("solution", solution_id)
+    legacy = (
+        SolutionRisk.query.filter_by(solution_id=solution_id)
+        .filter(SolutionRisk.retired_into_risk_id.is_(None))
+        .all()
+    )
+    return canonical, legacy
+
+
+# Score bands for a probability x impact cell. Same thresholds as
+# Risk.risk_level, so a cell and the badge on a risk in it use one scale.
+RISK_BANDS = (
+    ("critical", "Critical", 15),
+    ("high", "High", 9),
+    ("medium", "Medium", 5),
+    ("low", "Low", 1),
+)
+
+
+def risk_band(score):
+    """The band key for a probability x impact score."""
+    for key, _label, floor in RISK_BANDS:
+        if score >= floor:
+            return key
+    return "low"
+
+
 def links_for_entity(entity_type, entity_id):
     """Risks linked to one Application/Solution/Programme -- the parent-side
     read for "Linked risks" sections on those entities' own detail pages."""
