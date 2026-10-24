@@ -1078,6 +1078,13 @@ Would you like me to provide more details about the extracted elements or help y
         const contextType = urlParams.get('context_type');
         const deepLinkDomain = urlParams.get('domain');
 
+        // A question typed on the dashboard arrives in ?q= and waits in the box to be sent.
+        const incomingQuestion = urlParams.get('q');
+        if (incomingQuestion && userInput && !userInput.value) {
+            userInput.value = incomingQuestion.slice(0, 2000);
+            userInput.focus();
+        }
+
         if (deepLinkContext === 'application' && deepLinkId && !isNaN(parseInt(deepLinkId))) {
             const appId = parseInt(deepLinkId);
             selectedElementIdInput.value = appId;
