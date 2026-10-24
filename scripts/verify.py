@@ -1895,6 +1895,18 @@ def gate_count_checker(name: str, script: str, baseline: int) -> Result:
     return Result(name, PASS if count <= baseline else FAIL, detail, count, baseline)
 
 
+def gate_brand_raw_colour(baseline: int) -> Result:
+    """The old brand blues written out anywhere but the token file and the logo."""
+    proc = _run([sys.executable, "scripts/check_brand_tokens.py", "--raw"])
+    try:
+        count = int(proc.stdout.strip().splitlines()[-1])
+    except (ValueError, IndexError):
+        return Result("brand-raw-colour", FAIL,
+                      f"could not parse count: {proc.stdout!r} {proc.stderr[:300]}")
+    detail = "" if count <= baseline else "run scripts/check_brand_tokens.py --raw to list them"
+    return Result("brand-raw-colour", PASS if count <= baseline else FAIL, detail, count, baseline)
+
+
 # ---------------------------------------------------------------- registry
 
 
@@ -1931,6 +1943,22 @@ def build_gates(baseline: dict) -> list[Gate]:
         Gate("design-tokens", "No new raw Tailwind colours (DESIGN.md)", "ratchet",
              lambda: gate_design_tokens(baseline["design_tokens"]),
              remediation="use semantic tokens; see the table in DESIGN.md",
+             tags=["static", "ui"]),
+        Gate("brand-contrast",
+             "brand tokens keep their contrast (label on primary, control borders, chart ramp) and the logo is --primary",
+             "zero",
+             lambda: gate_count_checker(
+                 "brand-contrast", "scripts/check_brand_tokens.py", 0,
+             ),
+             remediation="run scripts/check_brand_tokens.py --report; change the value in "
+                         "app/static/css/shadcn_tokens.css, not the threshold",
+             tags=["static", "ui"]),
+        Gate("brand-raw-colour",
+             "no hard-coded old or logo brand blue outside the token file and the logo",
+             "ratchet",
+             lambda: gate_brand_raw_colour(baseline.get("brand_raw_colour", 53)),
+             remediation="use bg-primary / text-primary / the --primary token; "
+                         "scripts/check_brand_tokens.py --raw lists them",
              tags=["static", "ui"]),
         Gate("composer-url-params",
              "No composer link carrying a parameter the composer doesn't read",
