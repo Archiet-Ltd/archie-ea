@@ -872,6 +872,7 @@ class AgentRunner:
                     context=context,
                     persona=persona,
                     model_used=model,
+                    provider_used=provider,
                 )
 
             # Text before a tool call is a preface, not an answer: it is never
@@ -977,6 +978,7 @@ class AgentRunner:
             context=context,
             persona=persona,
             model_used=model,
+            provider_used=provider,
         )
 
     # ------------------------------------------------------------------ #
@@ -1832,9 +1834,16 @@ class AgentRunner:
         context: Optional[dict],
         persona: Optional[str],
         model_used: Optional[str] = None,
+        provider_used: Optional[str] = None,
     ) -> dict:
-        """Apply the citation gate, record the run and return the result dict."""
+        """Apply the citation gate, record the run and return the result dict.
+
+        ``answered_by`` names the provider and model that produced the reply,
+        read from the entry that answered (``model_used``), never the first one
+        tried. A refused or failed turn carries none, so no model is named."""
         self._apply_citation_gate(result)
+        if model_used and not result.get("error"):
+            result["answered_by"] = {"provider": provider_used, "model": model_used}
         record_error = self._record_run(
             persona=persona,
             domain=domain,

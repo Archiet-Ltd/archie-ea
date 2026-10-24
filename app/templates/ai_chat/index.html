@@ -135,7 +135,7 @@
                     </div>
                     <p class="text-xs text-muted-foreground" data-testid="chat-scope">
                         {% if active_organization_name %}Answering from the records of <span class="font-medium text-foreground">{{ active_organization_name }}</span>.{% else %}Answering from your organisation's records.{% endif %}
-                        Model: <span class="font-medium text-foreground">{{ provider_label if llm_configured else 'none configured' }}</span>.
+                        Model: <span id="chat-model-name" class="font-medium text-foreground">{{ provider_label if llm_configured else 'none configured' }}</span>.
                         Entelim can make mistakes — check important decisions against the cited records.
                     </p>
                 </form>

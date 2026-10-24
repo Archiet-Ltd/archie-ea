@@ -612,8 +612,11 @@
                        same way the streamed path does rather than as an
                        ordinary answer that happens to mention Admin
                        -> API Settings. */
+                    answeredBy: data.answered_by || null,
                     error: data.agent_error || null
                 });
+
+                showAnsweredBy({ answeredBy: data.answered_by, error: data.agent_error });
 
                 // Genome extraction — fires after every AI response when ?mode=genome
                 if (window._genomePanelInstance) {
@@ -624,6 +627,20 @@
         } catch (error) {
             { const _l = document.getElementById(loadingId); if (_l) _l.remove(); }
             appendError('The assistant could not answer just now. Your question is saved; try again in a moment.', () => _retryTurn(message, timestamp));
+        }
+    }
+
+    // The line under the composer names the provider and model that answered
+    // this turn; a turn nobody answered names none.
+    function showAnsweredBy(meta) {
+        const el = document.getElementById('chat-model-name');
+        if (!el) return;
+        const by = meta && !meta.error ? meta.answeredBy : null;
+        if (by && by.model) {
+            const provider = by.provider ? String(by.provider).replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()) + ' · ' : '';
+            el.textContent = provider + by.model;
+        } else {
+            el.textContent = 'no model answered';
         }
     }
 
@@ -694,6 +711,7 @@
                         trail: _trail,
                         actions: result.actions || [],
                         pendingApprovals: result.pendingApprovals || [],
+                        answeredBy: result.answeredBy || null,
                         // No tool ran, but the domain snapshot was in the prompt:
                         // that is "context only", not "ungrounded".
                         contextUsed: _trail.length === 0,
@@ -704,6 +722,7 @@
                         error: result.error || null
                     };
                     state.chatHistory.push({ role: 'ai', content: result.text, timestamp, metadata: meta });
+                    showAnsweredBy(meta);
                     finaliseStreamedMessage(wrap, result.text, meta);
                     wrap = null;   // finalised in place; nothing left to drop
                     // Genome panel extraction is an optional side-panel enrichment;
