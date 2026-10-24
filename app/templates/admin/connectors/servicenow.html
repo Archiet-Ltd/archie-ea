@@ -8,7 +8,7 @@
         title='ServiceNow CMDB Connector',
         description='Configure bidirectional sync: CMDB CIs → ApplicationComponent inventory, ARB decisions → ServiceNow Change Requests.',
         breadcrumbs=[
-            {'label': 'Admin', 'href': url_for('admin.index')},
+            ({'label': 'Admin', 'href': url_for('admin.index')} if current_user.is_admin() else {'label': 'Workspace'}),
             {'label': 'ServiceNow Connector'}
         ]
     ) }}
@@ -163,7 +163,7 @@
                 class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                 Save Configuration
             </button>
-            <a href="{{ url_for('admin.index') }}"
+            <a href="{{ url_for('m365_connector.connectors_index') }}"
                 class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
                 Cancel
             </a>

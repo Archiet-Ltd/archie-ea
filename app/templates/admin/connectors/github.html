@@ -9,7 +9,7 @@
         title='Connect GitHub',
         description='Paste a read-only token. Entelim reads your repositories and proposes a first model of your company: its applications, their parts, who owns them and how they depend on each other.',
         breadcrumbs=[
-            {'label': 'Admin', 'href': url_for('admin.index')},
+            ({'label': 'Admin', 'href': url_for('admin.index')} if current_user.is_admin() else {'label': 'Workspace'}),
             {'label': 'Connectors', 'href': url_for('m365_connector.connectors_index')},
             {'label': 'GitHub'}
         ]

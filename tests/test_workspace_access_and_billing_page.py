@@ -119,6 +119,26 @@ def test_architect_reads_only_their_own_organisations_connectors(app, db_session
     assert "Their private repository" not in html
 
 
+@pytest.mark.parametrize("path", ["/admin/connectors", "/admin/connectors/github", "/admin/connectors/github/review",
+                                  "/admin/connectors/jira", "/admin/connectors/m365", "/admin/connectors/servicenow"])
+def test_connectors_pages_offer_an_architect_no_link_to_the_administrators_page(
+        app, db_session, client, login_as, path):
+    """Every link on the page lands somewhere the architect may open: the
+    Admin breadcrumb, which would answer 403, is not offered to them."""
+    org = _org(db_session, "crumbs")
+    architect = _person(db_session, org, "solution_architect")
+    db_session.commit()
+    with app.app_context():
+        login_as(client, architect)
+        response = client.get(path)
+        assert response.status_code == 200
+        html = response.get_data(as_text=True)
+        with app.test_request_context("/"):
+            from flask import url_for
+            admin_home = url_for("admin.index")
+    assert 'href="%s"' % admin_home not in html
+
+
 # --- the Billing page -------------------------------------------------------
 
 

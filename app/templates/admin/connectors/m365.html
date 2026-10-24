@@ -8,7 +8,7 @@
         title='Microsoft 365 Integration',
         description='Configure SharePoint blueprint export and Teams ARB notifications via Microsoft Graph API.',
         breadcrumbs=[
-            {'label': 'Admin', 'href': url_for('admin.index')},
+            ({'label': 'Admin', 'href': url_for('admin.index')} if current_user.is_admin() else {'label': 'Workspace'}),
             {'label': 'M365 Integration'}
         ]
     ) }}
