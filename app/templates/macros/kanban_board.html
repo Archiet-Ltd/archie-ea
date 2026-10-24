@@ -47,12 +47,15 @@
                       stage_group=None, show_wip=True, show_move=True,
                       card_width='w-64', region_label='Kanban board, scrolls horizontally',
                       columns='server', inner_class='flex gap-4 min-w-max lg:min-w-0',
-                      plain_headers=False) %}
+                      plain_headers=False, lane=False) %}
 {#
   Two column-rendering modes share one shell:
     columns='server'  the macro renders each column from the Jinja `states`
                       list (the portfolio board). The caller supplies only the
                       card body via {{ caller(state) }}.
+    lane              True puts each column in a bordered lane container on the muted
+                      surface, as the gallery kanban does; default False leaves the
+                      column bare so every other caller renders unchanged.
     plain_headers     True puts the column header on the plain surface (no box, no
                       stage dot) so colour is carried by the cards; default False
                       keeps the boxed header every other caller renders.
@@ -76,7 +79,7 @@
             {% for state in states %}
             {% set label = (labels.get(state) if labels else None) or state %}
             {% set group = (stage_group.get(state) if stage_group else None) %}
-            <div class="kanban-column {{ card_width }} shrink-0 lg:w-auto lg:flex-1 lg:min-w-[10rem]"
+            <div class="kanban-column {{ card_width }} shrink-0 lg:w-auto lg:flex-1 lg:min-w-[10rem]{% if lane %} rounded-lg border border-border bg-muted/40 p-2{% endif %}"
                  data-state="{{ state }}"
                  {% if group %}data-stage-group="{{ group }}"{% endif %}
                  {% if can_write %}@dragover.prevent="onDragOver($event, '{{ state }}')"
