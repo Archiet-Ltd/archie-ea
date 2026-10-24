@@ -3,6 +3,7 @@
 {% from 'components/button.html' import button %}
 {% from 'components/radio_group.html' import radio_group %}
 {% from 'components/checkbox.html' import checkbox %}
+{% from 'components/file_upload.html' import file_upload %}
 {% from 'macros/page_shell.html' import page_shell %}
 
 {% block title %}Import ArchiMate Model (OEF){% endblock %}
@@ -141,18 +142,18 @@
                 <div class="rounded-lg border border-border bg-card p-6 space-y-4" x-data="oefImport()">
                     <h2 class="text-lg font-semibold">Upload OEF XML File</h2>
                     <form method="POST" action="{{ url_for('architect_ui.import_oef') }}" enctype="multipart/form-data" class="space-y-4"
-                          x-ref="importForm" @change="syncStrategy($event)">
+                          x-ref="importForm" @change="syncStrategy($event)" @file-selected="fileChosen($event)">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                        <div
-                            class="flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-border p-8 text-center hover:border-primary/50 transition-colors cursor-pointer"
-                            @click="$refs.oefFile.click()">
-                            <i data-lucide="upload-cloud" class="h-10 w-10 text-muted-foreground mb-3" aria-hidden="true"></i>
-                            <p class="text-sm font-medium">Click to select or drag &amp; drop</p>
-                            <p class="text-xs text-muted-foreground mt-1">ArchiMate OEF XML files (.xml), up to 10 MB</p>
-                            <p class="text-xs text-primary mt-2" x-text="fileName"></p>
-                            <input x-ref="oefFile" id="oef_file" name="oef_file" type="file" accept=".xml,application/xml,text/xml" class="sr-only"
-                                @change="fileChosen($event)" aria-label="OEF XML file">
-                        </div>
+                        {{ file_upload(
+                            id='oef_file',
+                            name='oef_file',
+                            label='OEF XML file',
+                            accept='.xml,application/xml,text/xml',
+                            description='ArchiMate OEF XML files (.xml), up to 10 MB',
+                            max_size='10MB',
+                            max_files=1,
+                            show_preview=true
+                        ) }}
 
                         {{ radio_group(
                             name='strategy', label='When an element is already stored (same name and type)',
@@ -263,7 +264,9 @@ document.addEventListener('alpine:init', function () {
             preview: null,
 
             fileChosen(event) {
-                const file = event.target.files[0];
+                const files = (event.detail && event.detail.files)
+                    || (event.target && event.target.files ? Array.from(event.target.files) : []);
+                const file = files[0];
                 this.fileName = file ? file.name : '';
                 this.preview = null;
                 this.previewError = '';
