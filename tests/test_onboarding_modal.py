@@ -1,20 +1,9 @@
-"""The onboarding modal must not interrogate a user who already has a role.
+"""No role wizard or feature tour is drawn over the first screen.
 
-Found by driving a real browser: signing in as the SG Tadley business architect
-put a "Welcome to Entelim — What's your role?" modal over the dashboard.
-Three things were wrong with that, in ascending order of severity:
-
-  1. It blocks the first screen of the product for a user who is not onboarding.
-  2. Its list of eight roles did not include ``business_architect`` — the role
-     that user actually holds. Production carries nine.
-  3. Completing it POSTs ``enterprise_role`` to
-     /dashboard/api/onboarding-complete, so answering the question **overwrites
-     the real role**, silently re-scoping the sidebar and permissions. A user
-     whose role is missing from the list cannot answer correctly, so the only
-     available outcomes were "wrong role" or "dismiss".
-
-The modal is now gated on the user having no ``enterprise_role`` at all, and
-``business_architect`` is a first-class option for those who genuinely need it.
+A new owner used to meet a "Welcome ... What's your role?" modal with eleven roles and a second
+"Key features for you" screen before anything else. The persona now defaults at sign-up
+(``User.DEFAULT_PERSONA_LENS``) and is changed later, so the shell renders no such modal for anyone,
+whatever role they hold and whether or not the workspace is empty.
 """
 
 import re
@@ -72,31 +61,8 @@ def make_user(db_session, make_org):
     return _make
 
 
-def test_the_users_current_role_is_preselected(app, make_user):
-    """Completing the modal POSTs enterprise_role, so the default must be the truth.
-
-    Preselection is what makes the write harmless for a user who already has a
-    role: they confirm what they are rather than picking something else. It only
-    works if the role is actually in the list — before this change a business
-    architect was preselected to a value the picker could not render, so the
-    first radio they touched would have changed their role.
-    """
-    user = make_user("business_architect")
-    html = _render_base(app, user)
-
-    assert "selectedRole: 'business_architect'" in html, (
-        "the modal did not preselect the user's real enterprise_role, so "
-        "completing it would overwrite that role"
-    )
 
 
-def test_modal_is_still_shown_to_a_genuinely_new_user(app, make_user):
-    """The feature still works for whom it was built."""
-    html = _render_base(app, make_user(None))
-
-    assert MODAL_MARKER in html or MODAL_MARKER_RAW in html, (
-        "a user with no enterprise_role should still be onboarded"
-    )
 
 
 # The enterprise roles the product actually assigns — one seeded user per role
@@ -114,74 +80,26 @@ ASSIGNABLE_ROLES = (
 )
 
 
-def test_every_assignable_role_is_offered_by_the_picker(app, make_user):
-    """A role the product assigns must be answerable in the picker.
-
-    business_architect was assignable but absent from roleLabels, so a business
-    architect's only options were a role that was not theirs, or dismissal —
-    and picking one would have overwritten the real value.
-    """
-    html = _render_base(app, make_user(None))
-    offered = set(re.findall(r"^\s*(\w+): '[^']+',\s*$", html, re.M))
-
-    missing = [r for r in ASSIGNABLE_ROLES if r not in offered]
-    assert not missing, (
-        f"assignable but not offered by the onboarding role picker: {missing}"
-    )
 
 
 
-def test_onboarding_overlay_is_hidden_once_the_workspace_has_data(make_user, app):
-    """ARCH-107: the overlay must NOT render over an instance that already
-    holds data. It addressed an established user as a first-run visitor, and
-    its @click.away dismissal consumed their first click on every page — the
-    real cause of the "Add Application is inert" report (ARCH-040)."""
-    user = make_user(role="business_architect")
-    html = _render_base(app, user, nav_counts={"applications": 3})
-
-    assert MODAL_MARKER not in html and MODAL_MARKER_RAW not in html, (
-        "the first-run overlay rendered over a populated workspace, where it "
-        "will silently swallow the user's first click"
-    )
 
 
 # ── T-UI-1: app shell overlay fixes ────────────────────────────────────────
 
 
-def test_onboarding_panel_has_scroll_and_max_height_classes(app, make_user):
-    """The onboarding panel must carry max-h and overflow-y-auto so it fits
-    the viewport at 390x844 and scrolls when the role list overflows."""
-    html = _render_base(app, make_user(None))
-
-    # The panel (the card inside the fixed overlay) must be scrollable
-    assert "max-h-[calc(100dvh-2rem)]" in html, (
-        "onboarding panel missing max-h constraint; will be clipped at small viewports"
-    )
-    assert "overflow-y-auto" in html, (
-        "onboarding panel missing overflow-y-auto; content below the fold is unreachable"
-    )
 
 
-def test_onboarding_step_3_persists_before_showing(app, make_user):
-    """Entering step 3 must call persistOnboarding() before showing the
-    'You're all set!' screen, so the modal does not reappear after navigation
-    even if the user never clicks a button on step 3."""
-    html = _render_base(app, make_user(None))
 
-    # The step 2 Continue button must call persistOnboarding().then(...) before
-    # setting step = 3, so the server persist happens on entry to step 3.
-    # Match the @click attribute specifically, not the method definition.
-    assert re.search(r'@click="persistOnboarding\(\)\.then\(', html), (
-        "step 2 Continue button must call persistOnboarding().then(...) in its @click attribute"
-    )
-    # Step 3's CTA must use dismissOnboarding (not completeOnboarding) since
-    # persistence already happened on entry.
-    assert 'dismissOnboarding()' in html, (
-        "step 3 buttons must use dismissOnboarding(), not completeOnboarding()"
-    )
-    assert "You're all set!" in html or "You&#39;re all set!" in html, (
-        "step 3 copy must be present"
-    )
+
+@pytest.mark.parametrize("role", [None, "business_architect", "cto", "platform_admin"])
+@pytest.mark.parametrize("counts", [{}, {"applications": 3}])
+def test_no_role_wizard_is_rendered(app, make_user, role, counts):
+    """Whoever signs in, to an empty or a populated workspace, no role question is drawn."""
+    html = _render_base(app, make_user(role), nav_counts=counts)
+
+    for phrase in (MODAL_MARKER, MODAL_MARKER_RAW, "Key features for you", "showOnboarding", "roleLabels"):
+        assert phrase not in html, phrase
 
 
 def test_phone_opener_z_index_below_backdrop(app, make_user):

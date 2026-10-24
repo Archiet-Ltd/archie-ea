@@ -142,7 +142,8 @@ def test_populated_workspace_opens_on_question_and_cited_answer(browser, live_se
 
 @pytest.mark.parametrize("viewport", [FOLD, PHONE], ids=["1440", "390"])
 def test_empty_workspace_fold_holds_only_the_one_message(browser, live_server, seeded, viewport):
-    """Signed in as a new architect: the welcome line and the company-kind block wait below the fold."""
+    """Signed in as a new architect: the welcome line and the setup list wait below the fold, and the one
+    onboarding question sits inside the message card."""
     email, _ = _empty_organisation_user(live_server)
     _assert_persona(email)
     context, page = _page(browser, viewport)
@@ -150,13 +151,12 @@ def test_empty_workspace_fold_holds_only_the_one_message(browser, live_server, s
         _login(page, live_server, email)
         page.goto(live_server + "/dashboard/overview", wait_until="networkidle", timeout=PAGE_TIMEOUT)
         expect(page.locator('[data-testid="first-message"]')).to_be_in_viewport()
-        for testid in ("welcome-banner", "guided-setup", "company-kind-selector"):
+        for testid in ("welcome-banner", "guided-setup"):
             target = page.locator('[data-testid="%s"]' % testid)
             if target.count():
                 assert _top(page, '[data-testid="%s"]' % testid) >= viewport["height"], testid
-        # the company-kind choice is still there, one scroll down, and works
-        page.locator('[data-testid="company-kind-selector"]').scroll_into_view_if_needed()
-        expect(page.locator('[data-testid="company-kind-selector"]')).to_be_visible()
+        # the company-kind choice is inside the same card, not a section of its own
+        expect(page.locator('[data-testid="first-message"] [data-testid="company-kind-selector"]')).to_be_visible()
     finally:
         context.close()
 
