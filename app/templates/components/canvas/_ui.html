@@ -45,7 +45,7 @@
 </span>
 {% endmacro %}
 
-{% macro hover_card(side_class='left-0 top-full mt-1') %}{% set inner = caller() %}<div class="relative min-w-0" x-data="{ open: false }" @mouseenter="open = true" @mouseleave="open = false" @focusin="open = true" @focusout="open = false" @keydown.escape="open = false">{{ inner }}</div>{% endmacro %}
-{% macro hover_card_content(class='') %}{% set inner = caller() %}<div x-show="open" x-cloak class="absolute left-0 top-full z-50 mt-1 w-64 rounded-md border bg-popover p-3 text-popover-foreground {{ class }}">{{ inner }}</div>{% endmacro %}
+{% macro hover_card(side_class='left-0 top-full mt-1') %}{% set inner = caller() %}<div class="min-w-0 flex-1" x-data="{ open: false }" @mouseenter="open = true" @mouseleave="open = false" @focusin="open = true" @focusout="open = false" @keydown.escape="open = false">{{ inner }}</div>{% endmacro %}
+{% macro hover_card_content(class='') %}{% set inner = caller() %}<div x-show="open" x-cloak class="absolute inset-x-2 z-50 mt-1 rounded-md border bg-popover p-3 text-popover-foreground {{ class }}">{{ inner }}</div>{% endmacro %}
 
-{% macro empty(title, description, icon='inbox', cta_text=none, cta_onclick=none, cta_href=none) %}{{ es.empty_state(icon=icon, title=title, description=description, cta_text=cta_text, cta_onclick=cta_onclick, cta_href=cta_href, cta_icon=('plus' if cta_onclick else none)) }}{% endmacro %}
+{% macro empty(title, description, icon='inbox', cta_text=none, cta_onclick=none, cta_href=none) %}{{ es.empty_state(icon=icon, title=title, description=description, cta_text=cta_text, cta_onclick=cta_onclick, cta_href=cta_href, cta_icon=('plus' if cta_onclick else none), compact=true, padding='py-2') }}{% endmacro %}

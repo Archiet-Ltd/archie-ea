@@ -273,22 +273,31 @@ def test_architect_reads_what_each_box_wants_from_its_band_and_empty_state(brows
         first.locator("[data-note-text]").hover()
         expect(first).to_contain_text("Type")
         expect(first).to_contain_text("Business Actor")
+        preview = first.locator("[data-note-text]").locator("xpath=ancestor::div[1]/div[contains(@class, 'absolute')]")
+        inside = preview.evaluate(
+            "(e, c) => { const a = e.getBoundingClientRect(), b = document.querySelector(c).getBoundingClientRect();"
+            " return a.left >= b.left - 1 && a.right <= b.right + 1; }",
+            '[data-slot=card]:has([data-canvas-notes="key-partners"])',
+        )
+        assert inside, "the entry preview is cut off by its box"
         href = first.locator("a").get_attribute("href")
         assert context.request.get(live_server + href).status == 200
 
         # An empty canvas: the empty box says what is missing and its button opens the add dialog.
         page.goto(f"{live_server}/business-model/{empty_id}", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
         segments = page.locator('[data-canvas-empty="customer-segments"]')
-        expect(segments).to_contain_text("No customer segments yet")
+        expect(segments).to_contain_text("No segments yet")
         expect(segments).to_contain_text("Add who you create value for")
         segments.get_by_role("button", name="Add to Customer Segments").click()
         expect(page.get_by_test_id("bmc-name-customer_segments")).to_be_visible()
 
-        # On the Value Proposition Canvas of the empty canvas, an empty box points back to where it is filled, and that page has content.
+        # On the Value Proposition Canvas of the empty canvas, an empty box says what is missing and where to add it,
+        # and the way back to the business model canvas lands on a page with content.
         page.goto(f"{live_server}/business-model/{empty_id}/value-proposition", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
         gains = page.locator('[data-canvas-empty="gain-creators"]')
-        expect(gains).to_contain_text("No gain creators yet")
-        gains.get_by_role("link", name="Open the business model canvas").click()
+        expect(gains).to_contain_text("No value recorded yet")
+        expect(gains).to_contain_text("Add it on the business model canvas under Value Propositions")
+        page.locator(f'main a[href$="/business-model/{empty_id}"]').first.click()
         page.wait_for_url(re.compile(rf"/business-model/{empty_id}$"), timeout=PAGE_TIMEOUT)
         expect(page.locator('[data-canvas-empty="customer-segments"]')).to_be_visible()
     finally:

@@ -81,10 +81,10 @@
     {% call ui.hover_card_content() %}
       <div class="flex flex-col gap-2 text-sm">
         <p class="font-medium">{{ text }}</p>
-        <dl class="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs">
+        <dl class="grid min-w-0 grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs">
           <dt class="text-muted-foreground">Type</dt><dd>{{ element }}</dd>
           <dt class="text-muted-foreground">Box</dt><dd>{{ box_title }}</dd>
-          <dt class="text-muted-foreground">Used in</dt><dd>{{ canvas_name }}</dd>
+          <dt class="text-muted-foreground">Used in</dt><dd class="min-w-0 break-words">{{ canvas_name }}</dd>
         </dl>
         {% if n is mapping and n.href %}<p class="text-xs text-muted-foreground">Select the name to open it.</p>{% endif %}
       </div>
@@ -101,17 +101,19 @@
 {%- endmacro %}
 
 {#- The notes of one box (or sub-area): one note card per entry, or the empty state when there is none.
-    empty says what is missing; editable boxes offer the add dialog, a box filled from elsewhere offers its link (empty_href). -#}
-{% macro notes(canvas_id, key, items, title, element='Note', canvas_name='', empty='', add=false, empty_href='', empty_link='') -%}
+    empty says what is missing and what to do; an editable box also offers its add dialog. -#}
+{% macro notes(canvas_id, key, items, title, element='Note', canvas_name='', empty='', add=false) -%}
 {% if items %}
 <ul class="flex flex-col gap-2" data-canvas-notes="{{ key }}" data-title="{{ title }}" aria-label="{{ title }} notes">
   {% for n in items %}{{ note_card(canvas_id, title, element, n, canvas_name) }}{% endfor %}
 </ul>
 {% else %}
+{%- set sentences = (empty if empty.startswith('No ') else 'No ' ~ title|lower ~ ' yet. ' ~ empty).split('. ', 1) -%}
+{%- set headline = sentences[0]|trim('.') -%}
+{%- set detail = sentences[1] if sentences|length > 1 else '' -%}
 <div data-canvas-empty="{{ key }}">
-  {%- if add %}{{ ui.empty('No ' ~ title|lower ~ ' yet', empty, cta_text='Add to ' ~ title, cta_onclick="Platform.modal.open('add-" ~ key ~ "')") }}
-  {%- elif empty_href %}{{ ui.empty('No ' ~ title|lower ~ ' yet', empty, cta_text=empty_link, cta_href=empty_href) }}
-  {%- else %}{{ ui.empty('No ' ~ title|lower ~ ' yet', empty) }}{% endif -%}
+  {%- if add %}{{ ui.empty(headline, detail, cta_text='Add to ' ~ title, cta_onclick="Platform.modal.open('add-" ~ key ~ "')") }}
+  {%- else %}{{ ui.empty(headline, detail) }}{% endif -%}
 </div>
 {% endif %}
 {%- endmacro %}
@@ -129,9 +131,9 @@
 {#- The header band of a box: the zone tint with its label, the entry count, the "i" popover and the add button, then the icon,
     title and the framework's question in the foreground colour at 70 percent (4.5:1 or better on every tint). b needs key, title, question, icon, number. -#}
 {% macro band(canvas_id, b, m, items, add=false) -%}
-  <div class="flex flex-col gap-1 border-b px-4 py-3 {{ ZONES[m.zone] }}" data-canvas-band="{{ m.zone }}">
-    <div class="flex items-center justify-between gap-2">
-      <span class="min-w-0 truncate text-xs font-medium text-foreground/70">{{ m.zone_label }}</span>
+  <div class="flex flex-col gap-1 rounded-t-lg border-b px-4 py-3 {{ ZONES[m.zone] }}" data-canvas-band="{{ m.zone }}">
+    <div class="flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
+      <span class="min-w-0 text-xs font-medium text-foreground/70">{{ m.zone_label }}</span>
       <span class="flex shrink-0 items-center gap-1">
         {{ ui.badge(text=items|length, variant='secondary') }}
         {{ info(b.title, m.guidance, m.example) }}
@@ -150,15 +152,15 @@
 {#- One box: a Card whose header band carries the zone tint, the icon, the title, the entry count, the "i" popover and the add
     button, with the framework's question under it; the body is one note card per entry.
     b = {'key', 'title', 'question', 'icon', 'area' (grid placement classes), 'number' (fill-in order), 'empty', 'readonly', 'subs': [{'key', 'title', 'question'}]} -#}
-{% macro box(canvas_id, b, boxes, editable=false, canvas_name='', empty_href='', empty_link='') -%}
+{% macro box(canvas_id, b, boxes, editable=false, canvas_name='', scroll=false) -%}
 {%- set m = canvas_box_meta(canvas_id, b.key) -%}
 {%- set canvas_name = canvas_name or m.canvas -%}
 {%- set add = editable and not b.readonly -%}
 <div id="box-{{ b.key }}" class="contents"></div>
-{% call ui.card(size='sm', class=b.area ~ ' ' ~ (b.class or '') ~ ' gap-0 overflow-hidden py-0') %}
+{% call ui.card(size='sm', class=b.area ~ ' ' ~ (b.class or '') ~ ' relative gap-0 py-0') %}
   {{ band(canvas_id, b, m, boxes.get(b.key) or [], add=add) }}
-  {% call ui.card_content(class='flex flex-1 flex-col gap-3 py-3') %}
-    {{ notes(canvas_id, b.key, boxes.get(b.key) or [], b.title, m.element, canvas_name, b.empty or b.question, add, empty_href, empty_link) }}
+  {% call ui.card_content(class='flex min-h-0 flex-1 flex-col gap-3 py-3' ~ (' overflow-y-auto' if scroll else '')) %}
+    {{ notes(canvas_id, b.key, boxes.get(b.key) or [], b.title, m.element, canvas_name, b.empty or b.question, add) }}
     {% for s in (b.subs or []) %}
     {%- set sm = canvas_box_meta(canvas_id, s.key) -%}
     {{ ui.separator() }}
@@ -184,7 +186,7 @@
 {%- endfor -%}
 {% call frame(id, spec.form, spec.name, data, rows, spec.hint, credit=spec.credit, width=spec.width or 'min-w-240') %}
   <div class="grid gap-2 rounded-lg border bg-muted/30 p-2 {{ spec.grid }}">
-    {% for b in spec.boxes %}{{ box(id, b, boxes, data.editable, empty_href=data.empty_href, empty_link=data.empty_link) }}{% endfor %}
+    {% for b in spec.boxes %}{{ box(id, b, boxes, data.editable) }}{% endfor %}
   </div>
 {% endcall %}
 {%- endmacro %}

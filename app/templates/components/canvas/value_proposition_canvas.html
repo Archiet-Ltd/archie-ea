@@ -43,7 +43,7 @@
           <path d="M45 1 V99 M45 50 H99" class="stroke-border" stroke-width="1.5" vector-effect="non-scaling-stroke"/>
         </svg>
         <div class="absolute inset-0 grid grid-cols-20 grid-rows-20 gap-1">
-          {% for b in MAP %}{{ f.box(id, b, boxes, empty_href=data.empty_href, empty_link=data.empty_link) }}{% endfor %}
+          {% for b in MAP %}{{ f.box(id, b, boxes, scroll=true) }}{% endfor %}
         </div>
       </div>
     </div>
@@ -68,7 +68,7 @@
           <path d="M1 50 H62 M62 2.5 V97.5" class="stroke-border" stroke-width="1.5" vector-effect="non-scaling-stroke"/>
         </svg>
         <div class="absolute inset-0 grid grid-cols-20 grid-rows-20 gap-1">
-          {% for b in PROFILE %}{{ f.box(id, b, boxes, empty_href=data.empty_href, empty_link=data.empty_link) }}{% endfor %}
+          {% for b in PROFILE %}{{ f.box(id, b, boxes, scroll=true) }}{% endfor %}
         </div>
       </div>
     </div>

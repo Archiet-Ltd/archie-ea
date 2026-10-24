@@ -40,9 +40,9 @@ def _rgb(hsl):
 def _oklch_to_rgb(lightness, chroma, hue):
     a, b = chroma * math.cos(math.radians(hue)), chroma * math.sin(math.radians(hue))
     l_, m_, s_ = lightness + 0.3963377774 * a + 0.2158037573 * b, lightness - 0.1055613458 * a - 0.0638541728 * b, lightness - 0.0894841775 * a - 1.2914855480 * b
-    l, m, s = l_ ** 3, m_ ** 3, s_ ** 3
-    lin = (4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s, -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s,
-           -0.0041960863 * l - 0.7034186147 * m + 1.7076147010 * s)
+    cone_l, cone_m, cone_s = l_ ** 3, m_ ** 3, s_ ** 3
+    lin = (4.0767416621 * cone_l - 3.3077115913 * cone_m + 0.2309699292 * cone_s, -1.2684380046 * cone_l + 2.6097574011 * cone_m - 0.3413193965 * cone_s,
+           -0.0041960863 * cone_l - 0.7034186147 * cone_m + 1.7076147010 * cone_s)
     return tuple(min(1, max(0, 12.92 * v if v <= 0.0031308 else 1.055 * v ** (1 / 2.4) - 0.055)) for v in lin)
 
 
