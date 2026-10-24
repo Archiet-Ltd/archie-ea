@@ -131,7 +131,7 @@ def test_the_removal_dialog_closes_by_its_name(browser, live_server, seeded):
         page.goto(live_server + "/dashboard/overview", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
         page.get_by_test_id("first-action-sample").click()
         expect(page.locator('[data-testid="sample-company-indicator"]')).to_be_visible(timeout=PAGE_TIMEOUT * 2)
-        page.get_by_role("button", name="Remove the sample company").first.click()
+        page.get_by_role("button", name="Remove it", exact=True).first.click()
         dialog = page.get_by_test_id("sample-company-indicator").get_by_role("dialog")
         expect(dialog).to_be_visible(timeout=PAGE_TIMEOUT)
         _shot(page, "dialog", 1440)

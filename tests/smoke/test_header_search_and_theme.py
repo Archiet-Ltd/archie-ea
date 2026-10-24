@@ -1,4 +1,4 @@
-"""Behavioural tests for the header search trigger and dark-theme toggle.
+"""Behavioural tests for the one search box (Ctrl+K) and the dark-theme toggle in the user menu.
 
 These drive a real browser against a live server because string-matching
 the rendered HTML cannot prove the event object is not passed as the search
@@ -47,24 +47,19 @@ def test_dark_theme_toggle_applies_and_removes_dark_class(page, live_server, see
     assert has_dark is False, "expected <html> to NOT have class 'dark' after second click"
 
 
-def test_search_trigger_does_not_pass_event_as_query(page, live_server, seeded):
-    """Clicking the desktop search trigger must open the search modal with an
-    empty input, not ``[object PointerEvent]``."""
+def test_ctrl_k_focuses_the_one_search_box_empty(page, live_server, seeded):
+    """Navigation v3: Ctrl+K focuses the sidebar's one search box ("Search or ask..."),
+    empty, not filled with ``[object KeyboardEvent]``; there is no second search."""
     _login(page, live_server, seeded["emails"]["enterprise_architect"])
     _visit(page, live_server, "/dashboard/overview")
 
-    # Click the desktop search trigger
-    search_trigger = page.locator("#search-modal-trigger")
-    search_trigger.click()
-    page.wait_for_timeout(600)
-
-    # The search modal should be visible and its input empty
-    search_input = page.locator("#search-modal-input")
-    assert search_input.is_visible(), "search modal input not visible after clicking trigger"
-    value = search_input.input_value()
-    assert value == "", (
-        f"search input value must be empty after trigger click, got {value!r}"
-    )
+    assert page.locator("#search-modal-trigger").count() == 0
+    page.keyboard.press("Control+k")
+    page.wait_for_timeout(400)
+    search_input = page.locator("#sidebar-search")
+    assert search_input.is_visible()
+    assert page.evaluate("() => document.activeElement && document.activeElement.id") == "sidebar-search"
+    assert search_input.input_value() == ""
 
 
 def test_dark_theme_toggle_via_enter_key_toggles_exactly_once(page, live_server, seeded):
@@ -127,12 +122,12 @@ def test_user_menu_profile_contrast_in_dark_mode(page, live_server, seeded):
     user_btn.click()
     page.wait_for_timeout(400)
 
-    # Get the Profile link — the first <a role="menuitem"> in the dropdown
-    profile_link = page.locator('#user-dropdown a[role="menuitem"]').first
+    # Get the Account link — the first <a role="menuitem"> in the user menu
+    profile_link = page.locator('#user-menu [role="menu"] a[role="menuitem"]').first
     assert profile_link.is_visible(), "Profile link not visible in user menu"
 
     # Get the user dropdown (popover) element
-    dropdown = page.locator("#user-dropdown")
+    dropdown = page.locator('#user-menu [role="menu"]')
 
     # Read computed colours
     text_color = profile_link.evaluate("el => window.getComputedStyle(el).color")
@@ -171,7 +166,7 @@ def _switch_track_knob_contrast(page, theme_label):
     """Return (track_bg, knob_bg, ratio) for the unchecked switch in the user menu."""
     # Ensure the user menu is open
     user_btn = page.locator("#user-menu-btn")
-    dropdown = page.locator("#user-dropdown")
+    dropdown = page.locator('#user-menu [role="menu"]')
     if not dropdown.is_visible():
         user_btn.click()
         page.wait_for_timeout(400)

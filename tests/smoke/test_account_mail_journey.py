@@ -203,7 +203,7 @@ def test_an_invited_teammate_joins_the_inviters_organisation(browser, mail_serve
     try:
         _sign_in(page, mail_server, owner["email"])
         page.locator("#user-menu-btn").click()
-        page.get_by_role("menuitem", name="Invite your team").click()
+        page.get_by_role("menuitem", name="Team").click()
         page.wait_for_url("**/admin/team", timeout=PAGE_TIMEOUT)
 
         page.fill("#email", invitee)
