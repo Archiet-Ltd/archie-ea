@@ -1,5 +1,5 @@
 """L6, "what could hurt <element>, and what does it touch": the risk
-question on the Ask page, in a real browser.
+question in the AI chat, in a real browser.
 
     Ledger Service --serves--> Ledger Gateway
     (a Risk seeded directly on Ledger Service)
@@ -13,7 +13,7 @@ import uuid
 import pytest
 from playwright.sync_api import expect
 
-from .conftest import PAGE_TIMEOUT, PASSWORD, type_and_wait
+from .chat_ask import ask, sign_in_as
 
 pytestmark = [pytest.mark.smoke, pytest.mark.journey]
 
@@ -59,47 +59,16 @@ def risk_graph(seeded, live_server):
     return _seed_risk_graph(seeded["ids"]["org"])
 
 
-def _login(page, base, email):
-    page.goto(base + "/account/login", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
-    page.fill("#email", email)
-    page.fill("#password", PASSWORD)
-    try:
-        page.click("#submit", no_wait_after=True)
-    except TypeError:
-        page.locator("#submit").click()
-    try:
-        page.wait_for_url(lambda url: "/account/login" not in url, timeout=PAGE_TIMEOUT)
-    except Exception:
-        pass
-    assert "/account/login" not in page.url, "could not sign in as %s" % email
-
-
-def _ready(page, factory):
-    page.wait_for_function(
-        "(f) => { const el = document.querySelector('[x-data=\"' + f + '()\"]');"
-        " return !!(el && el._x_dataStack); }",
-        arg=factory,
-    )
-
-
-def _pick_by_click(page, prefix, name):
-    page.locator("#%s-picker-listbox [role=option]" % prefix, has_text=name).click()
+def _question(name):
+    return "What could hurt %s and what does it touch" % name
 
 
 def test_the_risk_question_shows_the_seeded_risk_with_its_blast_radius(
     page, live_server, seeded, risk_graph
 ):
-    _login(page, live_server, seeded["emails"]["solution_architect"])
-    page.goto(live_server + "/intelligence/ask", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
-    _ready(page, "askSurface")
-
-    page.locator("#ask-question-risk").click()
-    expect(page.locator("#ask-picker-input")).to_be_focused()
-    type_and_wait(page, "ask", risk_graph["noun"])
-    _pick_by_click(page, "ask", risk_graph["service_name"])
-
-    page.wait_for_selector("[data-ask-risk-row]")
-    row = page.locator("[data-ask-risk-row]")
+    sign_in_as(page, live_server, seeded, "solution_architect")
+    row = ask(page, live_server, _question(risk_graph["service_name"])).locator("[data-lens-row]")
+    expect(row).to_have_count(1)
     expect(row).to_contain_text("single vendor dependency")
     expect(row).to_contain_text("platform-team")
     expect(row).to_contain_text("Dual-source by Q3")
@@ -112,40 +81,21 @@ def test_the_risk_question_shows_the_seeded_risk_with_its_blast_radius(
 def test_an_element_with_no_risk_reads_as_an_honest_empty_state(
     page, live_server, seeded, risk_graph
 ):
-    _login(page, live_server, seeded["emails"]["solution_architect"])
-    page.goto(live_server + "/intelligence/ask", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
-    _ready(page, "askSurface")
-
-    page.locator("#ask-question-risk").click()
-    expect(page.locator("#ask-picker-input")).to_be_focused()
-    type_and_wait(page, "ask", risk_graph["noun"])
+    sign_in_as(page, live_server, seeded, "solution_architect")
     # Gateway has no risk seeded on it, only Service does.
-    page.locator("#ask-picker-listbox [role=option]", has_text="Gateway").click()
-
-    expect(page.get_by_text("No risks recorded against this element.")).to_be_visible()
-    assert page.locator("[data-ask-risk-row]").count() == 0
+    card = ask(page, live_server, _question("%s Gateway" % risk_graph["noun"]))
+    expect(card.get_by_text("No risks recorded against this element")).to_be_visible()
+    assert card.locator("[data-lens-row]").count() == 0
 
 
 def test_switching_between_impact_and_risk_keeps_each_questions_own_answer_separate(
     page, live_server, seeded, risk_graph
 ):
-    """Regression guard: both questions now share one picker component
-    (see ask.js's openKey dispatch) -- opening one must not show or clobber
-    the other's already-answered results."""
-    _login(page, live_server, seeded["emails"]["solution_architect"])
-    page.goto(live_server + "/intelligence/ask", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
-    _ready(page, "askSurface")
-
-    page.locator("#ask-question-impact").click()
-    type_and_wait(page, "ask", risk_graph["noun"])
-    _pick_by_click(page, "ask", risk_graph["service_name"])
-    page.wait_for_selector("[data-ask-row]")
-    expect(page.locator("#ask-results")).to_be_visible()
-    expect(page.locator("#ask-risk-results")).to_be_hidden()
-
-    page.locator("#ask-question-risk").click()
-    type_and_wait(page, "ask", risk_graph["noun"])
-    _pick_by_click(page, "ask", risk_graph["service_name"])
-    page.wait_for_selector("[data-ask-risk-row]")
-    expect(page.locator("#ask-risk-results")).to_be_visible()
-    expect(page.locator("#ask-results")).to_be_hidden()
+    sign_in_as(page, live_server, seeded, "solution_architect")
+    impact = ask(page, live_server, "What breaks if %s fails" % risk_graph["service_name"])
+    assert impact.locator("[data-answer-row]").count() >= 1
+    risk = ask(page, live_server, _question(risk_graph["service_name"]), fresh=False)
+    assert risk.locator("[data-lens-row]").count() == 1
+    assert risk.locator("[data-answer-row]").count() == 0
+    assert impact.locator("[data-answer-row]").count() >= 1
+    assert impact.locator("[data-lens-row]").count() == 0
