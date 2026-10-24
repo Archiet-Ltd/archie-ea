@@ -20,6 +20,7 @@ from app.modules.ai_chat.services import agent_runner as ar
 from app.modules.ai_chat.services.agent_runner import AgentRunner, is_retryable_llm_error
 from app.modules.ai_chat.services.llm_service_impl import LLMService
 
+REAL_CHAIN = ar.build_provider_chain
 SECRET = "sk-or-v1-very-secret-key-value"
 NVIDIA_MODEL = "nvidia/nemotron-3-ultra-550b-a55b"
 CHAIN = [
@@ -157,3 +158,65 @@ def test_chain_order_is_a_setting(db_session, make_org, tenant_ctx, monkeypatch)
     with tenant_ctx(org.id):
         chain = ar.build_provider_chain("nvidia", NVIDIA_MODEL)
     assert [e[0] for e in chain] == ["openrouter", "nvidia"]
+
+
+def test_an_organisation_with_its_own_paid_key_is_asked_before_any_free_model(
+    db_session, make_org, tenant_ctx, monkeypatch
+):
+    _no_env_keys(monkeypatch)
+    monkeypatch.setenv("NVIDIA_API_KEY", "shared-nv")
+    monkeypatch.setenv("OPENROUTER_API_KEY", "shared-or")
+    org = make_org("own")
+    _settings(db_session, org, "anthropic", "claude-own", "own-anthropic-key")
+    with tenant_ctx(org.id):
+        # the caller's default is a free route, as when nothing was chosen
+        chain = ar.build_provider_chain("openrouter", "model-a:free")
+    assert chain[0][:3] == ("anthropic", "claude-own", "own-anthropic-key")
+    # when that key fails the chain moves to the free models, NVIDIA first
+    assert [e[0] for e in chain] == ["anthropic", "nvidia", "openrouter"]
+
+
+def test_a_working_own_key_never_reaches_the_free_models(
+    runner, db_session, make_org, tenant_ctx, monkeypatch
+):
+    _no_env_keys(monkeypatch)
+    monkeypatch.setenv("NVIDIA_API_KEY", "shared-nv")
+    monkeypatch.setenv("OPENROUTER_API_KEY", "shared-or")
+    monkeypatch.setattr(ar, "build_provider_chain", REAL_CHAIN)
+    org = make_org("own")
+    _settings(db_session, org, "anthropic", "claude-own", "own-key")
+    monkeypatch.setattr(LLMService, "_get_all_api_keys", staticmethod(lambda p: ["own-key"]))
+    calls = _script(monkeypatch, runner, ["Answered with the organisation's key."])
+    with tenant_ctx(org.id):
+        result = runner.run("How many applications do we run?")
+    assert result["response"] == "Answered with the organisation's key."
+    assert [c[0] for c in calls] == ["anthropic"]
+
+
+def test_when_the_own_key_fails_the_free_models_answer_nvidia_first(
+    runner, db_session, make_org, tenant_ctx, monkeypatch
+):
+    _no_env_keys(monkeypatch)
+    monkeypatch.setenv("NVIDIA_API_KEY", "shared-nv")
+    monkeypatch.setenv("OPENROUTER_API_KEY", "shared-or")
+    monkeypatch.setattr(ar, "build_provider_chain", REAL_CHAIN)
+    org = make_org("own")
+    _settings(db_session, org, "anthropic", "claude-own", "own-key")
+    monkeypatch.setattr(LLMService, "_get_all_api_keys", staticmethod(lambda p: ["own-key"]))
+    calls = _script(monkeypatch, runner, [_rate_limit(), "Answered by NVIDIA."])
+    with tenant_ctx(org.id):
+        result = runner.run("How many applications do we run?")
+    assert result["response"] == "Answered by NVIDIA."
+    assert [c[0] for c in calls] == ["anthropic", "nvidia"]
+
+
+def test_one_organisations_key_is_never_used_for_another(db_session, make_org, tenant_ctx, monkeypatch):
+    _no_env_keys(monkeypatch)
+    org_a, org_b = make_org("a"), make_org("b")
+    _settings(db_session, org_a, "anthropic", "claude-a", "key-of-a")
+    with tenant_ctx(org_a.id):
+        assert [e[2] for e in ar.build_provider_chain("anthropic", "claude-a")] == ["key-of-a"]
+    db_session.expire_all()
+    with tenant_ctx(org_b.id):
+        chain_b = ar.build_provider_chain("anthropic", "claude-a")
+    assert "key-of-a" not in {e[2] for e in chain_b}
