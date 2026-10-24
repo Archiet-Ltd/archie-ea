@@ -242,9 +242,7 @@
                     <h3 class="text-sm font-semibold text-foreground">Set Disposition</h3>
                 </div>
                 <p class="text-xs text-muted-foreground">Decide how this change should be handled in the ADM.</p>
-                {% set disposition_options = [('', 'Select disposition\u2026')] + [(d, d | replace('_', ' ') | title) for d in valid_dispositions] %}
-                <div class="mb-3">
-                {{ native_select(id='select-disposition', aria_label='Select disposition', options=disposition_options, selected=cr.disposition, attrs_dict={'x-model': 'selectedDisposition'}) }}
+{{ native_select(id='select-disposition', aria_label='Select disposition', options=disposition_options, selected=cr.disposition, attrs_dict={'x-model': 'selectedDisposition'}) }}
                 </div>
                 {{ button(text='Set Disposition', type='button', variant='secondary', class='w-full', attrs_dict={'@click': 'setDisposition()', ':disabled': 'dispositionLoading', 'id': 'btn-set-disposition'}) }}
             </div>

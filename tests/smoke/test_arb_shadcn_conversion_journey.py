@@ -313,6 +313,7 @@ def test_session_detail_uses_shadcn_components(browser, live_server, seeded):
             status="scheduled",
             chair_id=chair.id,
             secretary_id=chair.id,
+            organization_id=org_id,
         )
         db.session.add(arb_session)
         db.session.commit()
@@ -402,12 +403,14 @@ def test_change_request_detail_uses_shadcn_components(browser, live_server, seed
     suffix = uuid.uuid4().hex[:8]
     cr_id = None
     with app.app_context():
+        org_id = seeded["ids"]["org"]
         cr = ArchitectureChangeRequest(
             acr_reference="ACR-TEST-%s" % suffix,
             title="Smoke change request %s" % suffix,
             description="Created by smoke test for detail page screenshot.",
             trigger_type="reactive",
             status="open",
+            organization_id=org_id,
         )
         db.session.add(cr)
         db.session.commit()

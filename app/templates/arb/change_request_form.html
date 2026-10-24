@@ -73,8 +73,7 @@
             {{ form_field(id='cr-description', label='Description', name='description', input_type='textarea', required=true, rows=5, placeholder='Describe the change, its rationale, and expected impact') }}
 
             {% call form_group(id='cr-trigger-type', label='Trigger Type', required=true) %}
-            {% set trigger_options = [('', 'Select trigger type\u2026')] + [(tt, tt | replace('_', ' ') | title) for tt in trigger_types] %}
-            {{ native_select(id='cr-trigger-type', name='trigger_type', aria_label='Trigger Type', required=true, options=trigger_options, attrs_dict={'x-model': 'trigger_type'}) }}
+            {{ native_select(id='cr-trigger-type', name='trigger_type', aria_label='Trigger Type', options=trigger_options, attrs_dict={'x-model': 'trigger_type', 'required': 'required'}) }}
             {% endcall %}
 
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
