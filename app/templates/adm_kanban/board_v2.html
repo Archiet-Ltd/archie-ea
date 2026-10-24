@@ -2,14 +2,20 @@
 {% extends "layouts/admin_base.html" %}
 {% from 'macros/page_shell.html' import page_shell %}
 {% from 'macros/kanban_board.html' import kanban_board %}
+{% from 'components/button.html' import button %}
+{% from 'components/badge.html' import badge %}
+{% from 'components/checkbox.html' import checkbox %}
+{% from 'components/empty_state.html' import empty_state %}
+{% from 'components/input.html' import input, textarea %}
+{% from 'components/select.html' import native_select %}
 
 {% block title %}ADM Kanban — Architect's Operating View{% endblock %}
 
 {% block extra_css %}
 <style>
 @keyframes kanban-land {
-  0% { transform: scale(1.03); box-shadow: 0 4px 16px rgba(0,0,0,0.12); }
-  100% { transform: scale(1); box-shadow: none; }
+  0% { transform: scale(1.03); }
+  100% { transform: scale(1); }
 }
 .kanban-card-landed {
   animation: kanban-land 250ms ease-out;
@@ -22,601 +28,250 @@
 
     {# -- Header --------------------------------------------------------- #}
     {% macro _ps_actions() %}
-<div class="flex items-center gap-2" data-testid="adm-kanban-toolbar">
-            <select x-model="filters.assignee" @change="reload()"
-                    class="h-8 px-2 text-xs bg-background border border-border rounded text-foreground" aria-label="Filter by Type">
-                <option value="all">All Assignees</option>
-                <option value="me">My Cards</option>
-            </select>
-            <select x-model="filters.card_type" @change="reload()"
-                    class="h-8 px-2 text-xs bg-background border border-border rounded text-foreground" aria-label="Filter by Type">
-                <option value="">All Types</option>
-                <option value="solution">Solutions</option>
-                <option value="deliverable">Deliverables</option>
-                <option value="task">Tasks</option>
-            </select>
-            <select x-model="filters.priority" @change="reload()"
-                    class="h-8 px-2 text-xs bg-background border border-border rounded text-foreground" aria-label="Filter by Priority">
-                <option value="">All Priorities</option>
-                <option value="critical">Critical</option>
-                <option value="high">High</option>
-                <option value="medium">Medium</option>
-                <option value="low">Low</option>
-            </select>
-            {# Analysis views #}
-            <a href="{{ url_for('adm_kanban_view.gap_analysis') }}"
-               class="px-2.5 py-1.5 text-xs font-medium bg-muted text-muted-foreground hover:bg-muted/80 rounded border border-border transition-colors"
-               title="Gap Analysis — ArchiMate Gaps and closing WorkPackages">
-                Gap Analysis
-            </a>
-            <a href="{{ url_for('adm_kanban_view.plateau_roadmap') }}"
-               class="px-2.5 py-1.5 text-xs font-medium bg-muted text-muted-foreground hover:bg-muted/80 rounded border border-border transition-colors"
-               title="Plateau Roadmap — Architecture transition states">
-                Plateau Roadmap
-            </a>
-            <a href="{{ url_for('adm_kanban_view.adm_roadmap_timeline') }}"
-               class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-8 px-2.5 items-center">
-                <i data-lucide="calendar-range" class="h-3.5 w-3.5"></i> Roadmap
-            </a>
-            {# View mode toggle: flat columns vs swimlane rows #}
-            <div class="flex items-center gap-0.5 rounded-md border border-border p-0.5">
-                <button type="button" @click="viewMode = 'flat'"
-                        :class="viewMode === 'flat' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'"
-                        class="px-2 py-1 rounded text-xs font-medium transition-colors"
-                        title="Flat Kanban columns">
-                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
-                    </svg>
-                </button>
-                <button type="button" @click="viewMode = 'swimlane'"
-                        :class="viewMode === 'swimlane' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'"
-                        class="px-2 py-1 rounded text-xs font-medium transition-colors"
-                        title="Swimlane: ADM phases as rows">
-                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 10h16M4 14h16M4 18h16"/>
-                    </svg>
-                </button>
-            </div>
-            {# Sprint Planning button #}
-            <button type="button" @click="$dispatch('open-sprint-panel')"
-                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center"
-                    aria-label="Open Sprint Planning panel"
-                    title="Sprint Planning — manage sprints and assign cards">
-                <i data-lucide="calendar-clock" class="h-3.5 w-3.5"></i> Sprint Planning
-            </button>
-        </div>
-    {% endmacro %}
-    {{ page_shell(title='ADM Kanban', breadcrumb=[('Home', '/'), ('ADM Kanban', none)], subtitle='Architecture work across all TOGAF ADM phases', actions_caller=_ps_actions) }}
-
-    {# -- Phase Tabs (flat mode only) ------------------------------------ #}
-    <div x-show="viewMode === 'flat'" x-cloak class="flex flex-wrap gap-1 border-b border-border pb-2">
-        <button type="button" @click="filters.phase = 'all'; reload()"
-                :class="filters.phase === 'all'
- ? 'bg-primary text-primary-foreground'
- : 'bg-muted text-muted-foreground hover:bg-muted/80'"
-                class="px-2.5 py-1 text-xs font-medium rounded-md transition-colors">
-            All
-            <span class="ml-1 opacity-70" x-text="'(' + totalCardCount + ')'"></span>
-        </button>
-        <template x-for="phase in phases" :key="phase.code">
-            <button type="button" @click="filters.phase = phase.code; reload()"
-                    :class="filters.phase === phase.code
- ? 'bg-primary text-primary-foreground'
- : 'bg-muted text-muted-foreground hover:bg-muted/80'"
-                    class="px-2.5 py-1 text-xs font-medium rounded-md transition-colors">
-                <span x-text="phase.code === 'PRELIM' ? 'Prelim' : phase.code === 'REQ' ? 'Req Mgmt' : phase.label"></span>
-                <template x-if="phase.activate_stage">
-                    <span class="ml-1 opacity-70" x-text="'Activate: ' + phase.activate_stage"
-                          title="SAP Activate stage (Capgemini SAP S/4HANA Assessment, Stage 1 enablement)"></span>
-                </template>
-                <span class="ml-1 opacity-70"
-                      x-text="'(' + (phaseCounts[phase.code] || 0) + ')'"></span>
-                <template x-if="phaseDeliverables[phase.code] && phaseDeliverables[phase.code].total > 0">
-                    <span class="ml-1 text-2xs font-semibold opacity-80"
-                          x-text="'✓' + phaseDeliverables[phase.code].checked + '/' + phaseDeliverables[phase.code].total"></span>
-                </template>
-            </button>
-        </template>
+    <div class="flex flex-wrap items-center gap-2" data-testid="adm-kanban-toolbar">
+        {% call native_select(aria_label='Filter by assignee', size='xs', attrs_dict={'x-model': 'filters.assignee', '@change': 'reload()'}) %}
+            <option value="all">All assignees</option>
+            <option value="me">My cards</option>
+        {% endcall %}
+        {% call native_select(aria_label='Filter by type', size='xs', attrs_dict={'x-model': 'filters.card_type', '@change': 'reload()'}) %}
+            <option value="">Solutions and tasks</option>
+            <option value="solution">Solutions</option>
+            <option value="deliverable">Deliverables</option>
+            <option value="task">Tasks</option>
+        {% endcall %}
+        {% call native_select(aria_label='Filter by priority', size='xs', attrs_dict={'x-model': 'filters.priority', '@change': 'reload()'}) %}
+            <option value="">All priorities</option>
+            <option value="critical">Critical</option>
+            <option value="high">High</option>
+            <option value="medium">Medium</option>
+            <option value="low">Low</option>
+        {% endcall %}
+        {{ button(text='Gap Analysis', variant='outline', size='sm', href=url_for('adm_kanban_view.gap_analysis'), attrs_dict={'title': 'Gap Analysis — ArchiMate Gaps and closing WorkPackages'}) }}
+        {{ button(text='Plateau Roadmap', variant='outline', size='sm', href=url_for('adm_kanban_view.plateau_roadmap'), attrs_dict={'title': 'Plateau Roadmap — Architecture transition states'}) }}
+        {{ button(text='Roadmap', variant='outline', size='sm', icon='calendar-range', href=url_for('adm_kanban_view.adm_roadmap_timeline')) }}
+        {{ button(text='Sprint Planning', variant='default', size='sm', icon='calendar-clock', aria_label='Open Sprint Planning panel', on_click="$dispatch('open-sprint-panel')", attrs_dict={'title': 'Sprint Planning — manage sprints and assign cards'}) }}
     </div>
+    {% endmacro %}
+    {{ page_shell(title='ADM Kanban', breadcrumb=[('Home', '/'), ('ADM Kanban', none)], subtitle='Architecture work across the TOGAF ADM cycle', actions_caller=_ps_actions) }}
 
     {# -- Loading / Error ------------------------------------------------ #}
     <div x-show="loading" x-cloak class="p-12 text-center">
         <div class="inline-block w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
         <p class="mt-2 text-sm text-muted-foreground">Loading board...</p>
     </div>
-    <div x-show="error && !loading" x-cloak class="p-8 text-center">
+    <div x-show="error && !loading" x-cloak class="p-8 text-center" role="alert">
         <p class="text-sm text-destructive-emphasis" x-text="error"></p>
-        <button type="button" @click="reload()" class="mt-2 text-xs text-primary hover:underline">Retry</button>
+        {{ button(text='Retry', variant='outline', size='sm', class='mt-2', on_click='reload()') }}
     </div>
 
-    {# -- Empty State ---------------------------------------------------- #}
-    <div x-show="!loading && !error && cards.length === 0" x-cloak class="flex flex-col items-center justify-center py-16 text-center">
-        <i data-lucide="kanban" class="h-12 w-12 text-muted-foreground/30 mb-4"></i>
-        <h3 class="text-lg font-semibold text-foreground mb-1">No solutions on the board</h3>  <!-- frontend-quality-ok -->
-        <p class="text-sm text-muted-foreground mb-4">Create a solution to start tracking ADM phases</p>
-        <a href="/architecture-journey/" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
-            <i data-lucide="plus" class="h-4 w-4"></i> Create First Solution
-        </a>
+    {# -- Empty states: only when what is being shown is truly empty ------- #}
+    <div x-show="!loading && !error && emptyKind() === 'nothing'" x-cloak>
+        {{ empty_state(icon='kanban', title='No solutions or tasks yet',
+                       description='Solutions and tasks appear here, in the ADM phase they are in.',
+                       cta_text='Start a solution', cta_href='/architecture-journey/', cta_icon='plus',
+                       secondary_cta_text='Add a task', secondary_cta_onclick="openCreateTask(null, 'proposed')", secondary_cta_icon='plus') }}
+    </div>
+    <div x-show="!loading && !error && emptyKind() === 'no-deliverables'" x-cloak>
+        {{ empty_state(icon='file-text', title='No deliverables recorded yet',
+                       description='Deliverables are listed here once a phase has its deliverable checklist. Solutions and tasks are still on the board.',
+                       cta_text='Show solutions and tasks', cta_onclick="filters.card_type = ''; reload()") }}
+    </div>
+    <div x-show="!loading && !error && emptyKind() === 'filtered'" x-cloak>
+        {{ empty_state(icon='filter-x', title='No cards match these filters',
+                       description='Clear the filters to see every card on the board.',
+                       cta_text='Clear filters', cta_onclick="clearFilters()") }}
     </div>
 
-    {# -- Pipeline Analytics Strip ---------------------------------------- #}
-    <div x-show="!loading && !error && cards.length > 0" x-cloak
-         class="flex items-center gap-6 px-4 py-2 mb-4 rounded-lg bg-muted/50 text-xs text-muted-foreground">
-        <span>Pipeline: <strong class="text-foreground" x-text="cards.length + ' cards'"></strong> <span x-show="solutionCount() !== cards.length" x-cloak x-text="'(' + solutionCount() + ' solutions)'"></span></span>
-        <span>Active: <strong class="text-foreground" x-text="cards.filter(c => c.column === 'under_development' || c.column === 'review').length"></strong></span>
-        <span x-show="phases.length > 0" x-cloak>Top phase: <strong class="text-foreground" x-text="(() => { let counts = {}; cards.forEach(c => { let p = c.phase || 'A'; counts[p] = (counts[p]||0)+1; }); let best = 'A'; Object.keys(counts).forEach(k => { if (counts[k] > (counts[best]||0)) best = k; }); return best; })()"></strong></span>
-    </div>
-
-    {# -- Flat Kanban Columns (flat mode only) --------------------------- #}
-    {# The one shared board shell (macros/kanban_board.html). The ADM board
-       renders its own columns from server data via Alpine's x-for, so it uses
-       the macro's client-columns mode: the macro owns the kanban-board
-       container and the sideways-scroll region, this template owns the column
-       and card markup its architects know. #}
-    <div x-show="!loading && !error && cards.length > 0 && viewMode === 'flat'" x-cloak>
-    {% call kanban_board(columns='client', can_write=True,
-                         inner_class='grid grid-cols-6 gap-3 min-h-[60vh]',
-                         region_label='ADM architecture Kanban board, scrolls horizontally') %}
-
+    {# -- Status summary with work-in-progress limits ----------------------- #}
+    <div x-show="!loading && !error && emptyKind() === 'board'" x-cloak
+         class="flex flex-wrap items-center gap-2 text-xs text-muted-foreground" data-testid="adm-status-summary">
+        <span class="font-medium text-foreground" x-text="plural(visibleCards().length, 'card')"></span>
         <template x-for="col in columns" :key="col.id">
-            <div class="kanban-column flex flex-col min-w-0"
-                 :data-lane-id="col.id"
-                  @dragover.prevent="onDragOver($event, col.id)"
-                  @dragleave="onDragLeave($event)"
-                  @drop.prevent="onDrop($event, col.id)">
+            {% call badge('neutral', class='gap-1') %}
+                <span x-text="col.label"></span>
+                <span x-text="wipCount(col.id) + (wipLimit(col.id) > 0 ? ' / ' + wipLimit(col.id) : '')"
+                      :class="wipAtLimit(col.id) ? 'text-destructive-emphasis' : ''"></span>
+                <i x-show="wipAtLimit(col.id)" x-cloak data-lucide="lock" class="h-3 w-3" aria-hidden="true"></i>
+                <span x-show="colSlaStatus(col.id) && colSlaStatus(col.id).overdue_count > 0" x-cloak class="text-destructive-emphasis"
+                      x-text="colSlaStatus(col.id) ? colSlaStatus(col.id).overdue_count + ' past ' + colSlaStatus(col.id).sla_days + '-day limit' : ''"></span>
+            {% endcall %}
+        </template>
+    </div>
 
-                {# Column header #}
-                <div class="flex items-center justify-between px-2 py-1.5 mb-2 rounded-md"
-                     :class="wipAtLimit(col.id) ? 'bg-destructive/10 ring-1 ring-destructive/30' : 'bg-muted'">
-                    <span class="text-xs font-semibold text-foreground" x-text="col.label"></span>
-                    <span class="flex items-center gap-1 text-xs">
-                        <template x-if="colSlaStatus(col.id) && colSlaStatus(col.id).overdue_count > 0">
-                            <span class="px-1 py-0.5 rounded bg-destructive/10 text-destructive-emphasis font-semibold"
-                                  :title="colSlaStatus(col.id).overdue_count + ' card(s) past ' + colSlaStatus(col.id).sla_days + '-day SLA'"
-                                  x-text="'⚠ ' + colSlaStatus(col.id).overdue_count + ' SLA'"></span>
-                        </template>
-                        <span :class="wipAtLimit(col.id) ? 'text-destructive-emphasis font-semibold' : wipNearLimit(col.id) ? 'text-warning-emphasis font-medium' : 'text-muted-foreground'"
-                              class="flex items-center gap-0.5">
-                            <span x-text="wipCount(col.id)"></span>
-                            <template x-if="wipLimit(col.id) > 0">
-                                <span x-text="'/' + wipLimit(col.id)"></span>
-                            </template>
-                            <template x-if="wipAtLimit(col.id)">
-                                <span title="WIP limit reached"><i data-lucide="lock" class="h-3 w-3 inline"></i></span>
-                            </template>
-                        </span>
-                    </span>
+    {# -- The ADM cycle as lanes ------------------------------------------- #}
+    {# The one shared board shell (macros/kanban_board.html). Each lane is an ADM
+       phase; inside a lane the cards are grouped by status. The shell owns the
+       sideways-scroll region so the lanes keep their shape at 390. #}
+    <div x-show="!loading && !error && emptyKind() === 'board'" x-cloak>
+    {% call kanban_board(columns='client', can_write=True,
+                         inner_class='flex gap-4 min-w-max',
+                         region_label='ADM cycle board, scrolls horizontally') %}
+        <template x-for="phase in phases" :key="phase.code">
+            <section class="kanban-column w-72 shrink-0 flex flex-col rounded-lg border border-border bg-muted/30"
+                     data-testid="adm-lane" :data-phase="phase.code">
+                <div class="flex items-start justify-between gap-2 border-b border-border px-3 py-2.5">
+                    <div class="min-w-0">
+                        <p class="text-xs text-muted-foreground" x-text="phaseKicker(phase.code)"></p>
+                        <h2 class="text-sm font-semibold text-foreground" x-text="phase.label"></h2>
+                    </div>
+                    <span class="shrink-0 text-xs text-muted-foreground" x-text="laneCountText(phase.code)"></span>
+                </div>
+                <div class="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-border px-3 py-1.5 text-xs text-muted-foreground">
+                    <a :href="viewpointUrl(phase.code)" class="inline-flex items-center gap-1 font-medium text-primary hover:underline"
+                       :title="'ArchiMate viewpoint for ' + phase.label">
+                        <i data-lucide="eye" class="h-3 w-3" aria-hidden="true"></i>Viewpoint
+                    </a>
+                    <span x-show="phase.activate_stage" x-cloak x-text="'Activate: ' + phase.activate_stage"
+                          title="SAP Activate stage"></span>
+                    <span x-show="phaseCycleAvg(phase.code) != null" x-cloak x-text="'Average cycle ' + plural(phaseCycleAvg(phase.code), 'day')"></span>
                 </div>
 
-                {# Card list #}
-                <div class="flex-1 space-y-2 min-h-[200px] p-1 rounded-md transition-colors"
-                     :class="dragOverColumn === col.id ? 'bg-primary/5 ring-1 ring-primary/20' : ''">
-                    <template x-for="card in columnCards(col.id)" :key="card.id">
-                        <div draggable="true"
-                             class="kanban-card group relative bg-card border border-border rounded-lg p-3 cursor-grab active:cursor-grabbing hover:border-primary/30 transition-all"
-                             :data-card-id="card.id"
-                              @dragstart="onDragStart($event, card)"
-                              @dragend="onDragEnd()"
-                              @click="openDetail(card)"
-                              :class="{
- 'opacity-40 rotate-1 scale-[0.98]': draggingCard && draggingCard.id === card.id,
- 'ring-2 ring-primary': isSelected(card.id)
- }">
-
-                            {# Bulk select checkbox #}
-                            <div class="absolute -top-1 -left-1 z-10"
-                                 :class="selectedCardIds.length > 0 ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'"
-                                 @click.stop="selectCard(card.id, $event)">
-                                <div class="w-4 h-4 rounded border-2 flex items-center justify-center cursor-pointer transition-colors"
-                                     :class="isSelected(card.id) ? 'bg-primary border-primary' : 'bg-background border-border hover:border-primary'">
-                                    <svg x-show="isSelected(card.id)" x-cloak class="w-2.5 h-2.5 text-primary-foreground" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
-                                </div>
-                            </div>
-
-                            {# Card header: phase badge + priority #}
-                            <div class="flex items-center justify-between mb-1.5">
-                                <span class="px-1.5 py-0.5 text-xs font-semibold rounded"
-                                      :class="phaseClass(card.phase)"
-                                      x-text="phaseLabel(card.phase)"></span>
-                                <span class="px-1.5 py-0.5 text-xs font-medium rounded"
-                                      :class="priorityClass(card.priority)"
-                                      x-text="card.priority"></span>
-                            </div>
-
-                            {# ARB governance badge #}
-                            <template x-if="card.requires_arb_signoff">
-                              <span class="inline-flex items-center gap-1 rounded-full bg-warning/10 px-2 py-0.5 text-xs font-medium text-warning-emphasis border border-warning/30"
-                                    title="Requires ARB Sign-off">
-                                <i data-lucide="shield-alert" class="w-3 h-3" aria-hidden="true"></i>
-                                ARB
-                              </span>
-                            </template>
-
-                            {# Title + subtitle #}
-                            <h2 class="text-xs font-semibold text-foreground leading-tight mb-0.5"
-                                x-text="card.title"></h2>
-                            <p class="text-xs text-muted-foreground leading-snug line-clamp-2 mb-2"
-                               x-text="card.subtitle"></p>
-
-                            {# Solution-specific: ADM stepper #}
-                            <template x-if="card.card_type === 'solution' && card.meta">
-                                <div class="mb-2">
-                                    <div class="flex items-center gap-0.5">
-                                        <template x-for="p in phases.filter(function(ph){ return 'ABCDEFGH'.indexOf(ph.code) !== -1; })" :key="p.code">
-                                            <div class="flex items-center">
-                                                <div class="w-3 h-3 rounded-full text-2xs font-bold flex items-center justify-center"
-                                                     :class="card.meta.adm_completed.includes(p.code)
- ? 'bg-primary text-primary-foreground'
- : card.meta.adm_current === p.code
- ? 'bg-primary/20 text-primary border border-primary'
- : 'bg-muted text-muted-foreground'"
-                                                     :title="p.label"
-                                                     x-text="p.code"></div>
-                                                <template x-if="p.code !== 'H'">
-                                                    <div class="w-1.5 h-px"
-                                                         :class="card.meta.adm_completed.includes(p.code)
- ? 'bg-primary' : 'bg-border'"></div>
-                                                </template>
-                                            </div>
+                <div class="flex-1 space-y-3 p-2">
+                    <template x-for="group in laneGroups(phase.code)" :key="group.id">
+                        <div class="space-y-2">
+                            <p class="px-1 text-xs font-medium text-muted-foreground" x-text="group.label + ' (' + group.cards.length + ')'"></p>
+                            <template x-for="card in group.cards" :key="card.id">
+                                <article class="kanban-card group relative rounded-lg border border-border bg-card p-3 text-card-foreground"
+                                         data-testid="adm-card" :data-card-id="card.id"
+                                         :class="isSelected(card.id) ? 'ring-2 ring-primary' : ''">
+                                    <div class="flex items-start justify-between gap-2">
+                                        <h3 class="min-w-0 text-sm font-semibold leading-snug text-foreground">
+                                            {% call button(variant='link', size='bare', class='h-auto p-0 text-left font-semibold text-foreground whitespace-normal', attrs_dict={'@click': 'openDetail(card)'}) %}<span x-text="card.title"></span>{% endcall %}
+                                        </h3>
+                                        <template x-if="card.card_type !== 'deliverable'">
+                                            {{ checkbox(attrs_dict={'@change': 'selectCard(card.id, $event)', ':checked': 'isSelected(card.id)', ':aria-label': "'Select ' + card.title"}) }}
                                         </template>
                                     </div>
-                                </div>
-                            </template>
+                                    <p class="mt-1 line-clamp-2 text-xs text-muted-foreground" x-show="card.subtitle" x-text="card.subtitle"></p>
 
-                            {# Solution-specific: readiness + budget #}
-                            <template x-if="card.card_type === 'solution' && card.meta">
-                                <div class="flex items-center gap-2 text-xs text-muted-foreground mb-2">
-                                    <span x-show="card.meta.readiness_total > 0" x-cloak
-                                          :class="card.meta.readiness_score === card.meta.readiness_total
- ? 'text-success-emphasis' : ''"
-                                          x-text="'Readiness: ' + card.meta.readiness_score + '/' + card.meta.readiness_total"></span>
-                                    <span x-show="card.meta.budget_range" x-cloak
-                                          x-text="card.meta.budget_range"></span>
-                                </div>
-                            </template>
+                                    <div class="mt-2 flex flex-wrap items-center gap-1.5">
+                                        <template x-if="card.card_type !== 'deliverable'">
+                                            {% call badge('info') %}<span data-testid="adm-status" x-text="columnLabel(card.column)"></span>{% endcall %}
+                                        </template>
+                                        <template x-if="card.card_type === 'deliverable'">
+                                            {% call badge('neutral') %}Deliverable{% endcall %}
+                                        </template>
+                                        <template x-if="card.card_type === 'task'">
+                                            {% call badge('neutral') %}Task{% endcall %}
+                                        </template>
+                                        <template x-if="card.card_type !== 'deliverable'">
+                                            {% call badge('neutral', class='capitalize') %}<span x-text="card.priority"></span>{% endcall %}
+                                        </template>
+                                        <template x-if="card.requires_arb_signoff">
+                                            {% call badge('warning', class='gap-1') %}<i data-lucide="shield-alert" class="h-3 w-3" aria-hidden="true"></i>ARB sign-off{% endcall %}
+                                        </template>
+                                        <template x-if="card.blocker_count > 0">
+                                            {% call badge('danger') %}<span x-text="'Blocked by ' + plural(card.blocker_count, 'item')"></span>{% endcall %}
+                                        </template>
+                                    </div>
 
-                            {# Entity coverage alert — amber when linked entities are sparse #}
-                            <template x-if="card.card_type === 'solution' && card.meta && (card.meta.app_count || 0) + (card.meta.artifact_total || 0) < 5">
-                                <div class="flex items-center gap-1 text-xs text-warning-emphasis mb-1">
-                                    <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>
-                                    <span>Low coverage</span>
-                                </div>
-                            </template>
-
-                            <template x-if="card.card_type === 'solution' && card.meta">
-                                <div class="flex items-center gap-2 text-xs text-muted-foreground mb-2">
-                                    <span x-show="card.meta.app_count > 0" x-cloak
-                                          x-text="card.meta.app_count + ' apps'"></span>
-                                    <span x-show="card.meta.artifact_total > 0" x-cloak
-                                          class="inline-flex items-center px-1.5 py-0.5 rounded bg-info/10 text-info-emphasis border border-info/30 font-medium"
-                                          x-text="card.meta.artifact_total + ' artifacts'"></span>
-                                    <template x-if="card.meta.phase_gate">
-                                        <span :class="card.meta.phase_gate.valid
- ? 'text-success-emphasis' : 'text-destructive-emphasis'"
-                                              :title="card.meta.phase_gate.valid
-                                                  ? 'Phase gate passed'
-                                                  : (card.meta.phase_gate.errors || []).join('; ')">
-                                            <svg x-show="card.meta.phase_gate.valid" x-cloak class="w-3 h-3 inline" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
-                                            <svg x-show="!card.meta.phase_gate.valid" x-cloak class="w-3 h-3 inline" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                                        </span>
+                                    <template x-if="card.card_type === 'solution' && card.meta">
+                                        <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                                            <span x-show="card.meta.readiness_total > 0" x-text="'Readiness ' + card.meta.readiness_score + '/' + card.meta.readiness_total"></span>
+                                            <span x-show="card.meta.app_count > 0" x-text="plural(card.meta.app_count, 'application')"></span>
+                                            <span x-show="card.meta.artifact_total > 0" x-text="plural(card.meta.artifact_total, 'artifact')"></span>
+                                            <span x-show="card.meta.budget_range" x-text="card.meta.budget_range"></span>
+                                        </div>
                                     </template>
-                                </div>
-                            </template>
 
-                            {# Deliverable-specific: viewpoint + elements #}
-                            <template x-if="card.card_type === 'deliverable' && card.meta">
-                                <div class="mb-2 space-y-1.5">
-                                    <div class="flex items-center gap-1 flex-wrap">
-                                        <span class="inline-flex items-center px-1.5 py-0.5 text-xs font-medium rounded bg-info/10 text-primary border border-info/30">
-                                            <svg class="w-2.5 h-2.5 mr-0.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-                                            <span x-text="card.meta.deliverable_type_label"></span>
-                                        </span>
-                                        <span class="inline-flex items-center px-1.5 py-0.5 text-xs font-medium rounded bg-info/10 text-info-emphasis border border-info/30"
-                                              x-text="card.meta.archimate_viewpoint"></span>
+                                    <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground" x-show="card.owner || card.due_date">
+                                        <span x-show="card.owner" x-text="card.owner"></span>
+                                        <span x-show="card.due_date" :class="isOverdue(card.due_date) ? 'text-destructive-emphasis font-medium' : ''" x-text="'Due ' + formatDate(card.due_date)"></span>
                                     </div>
-                                    <div class="flex items-center gap-2 text-xs text-muted-foreground">
-                                        <span :class="{
- 'text-warning-emphasis': card.meta.document_status === 'draft',
- 'text-info-emphasis': card.meta.document_status === 'in_progress',
- 'text-primary': card.meta.document_status === 'review',
- 'text-success-emphasis': card.meta.document_status === 'approved',
- 'text-warning-emphasis': card.meta.document_status === 'implementing',
- 'text-primary': card.meta.document_status === 'published'
- }" x-text="card.meta.document_status"></span>
-                                        <span x-text="card.meta.element_count + ' elements'"></span>
-                                        <span x-text="'v' + card.meta.document_version"></span>
-                                    </div>
-                                </div>
-                            </template>
 
-                            {# Footer: blocker badge + owner + due date + link #}
-                            <template x-if="card.blocker_count > 0">
-                                <div class="flex items-center gap-1 mb-1.5">
-                                    <span class="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-xs font-semibold rounded bg-destructive/10 text-destructive-emphasis border border-destructive/30"
-                                          :title="'Blocked by ' + card.blocker_count + ' unresolved dependencies'">
-                                        <svg class="w-2.5 h-2.5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>
-                                        <span x-text="'Blocked ' + card.blocker_count"></span>
-                                    </span>
-                                </div>
-                            </template>
+                                    <template x-if="card.card_type === 'solution'">
+                                        <div class="mt-3 flex flex-wrap items-center gap-2 border-t border-border pt-2">
+                                            {% call button(variant='outline', size='xs', class='gap-1', attrs_dict={'data-testid': 'adm-deliverables-chip', '@click': 'openDeliverables(card.phase)', ':aria-label': "'Deliverables for ' + card.title"}) %}<i data-lucide="file-check" class="h-3 w-3" aria-hidden="true"></i><span x-text="plural(phaseDeliverableCards(card.phase).length, 'deliverable')"></span>{% endcall %}
+                                            <a x-show="card.link_url" :href="card.link_url" class="text-xs font-medium text-primary hover:underline" x-text="card.link_label || 'Open'"></a>
+                                            <span x-show="!card.link_url" class="text-xs text-muted-foreground">Open to its owner and stakeholders</span>
+                                        </div>
+                                    </template>
+                                    <template x-if="card.card_type === 'task' && card.link_url">
+                                        <div class="mt-3 border-t border-border pt-2">
+                                            <a :href="card.link_url" class="text-xs font-medium text-primary hover:underline" x-text="card.link_label || 'Open'"></a>
+                                        </div>
+                                    </template>
 
-                            {# Footer: avatar + meta row + due/link row #}
-                            <div class="pt-1.5 border-t border-border space-y-1">
-                                {# Row 1: avatar + owner name + app count #}
-                                <div class="flex items-center justify-between">
-                                    <div class="flex items-center gap-1.5 min-w-0">
-                                        <span class="flex-shrink-0 w-5 h-5 rounded-full bg-primary/10 text-info-emphasis text-2xs font-bold flex items-center justify-center"
-                                              x-text="(() => { const o = (card.owner || 'U'); const parts = o.split('@')[0].split(/[\s._-]/); return (parts[0] || '').charAt(0).toUpperCase() + (parts[1] || '').charAt(0).toUpperCase(); })()"></span>
-                                        <span class="text-xs text-muted-foreground truncate"
-                                              x-text="(card.owner || 'Unassigned').split('@')[0].replace(/[._-]/g, ' ').replace(/\b\w/g, function(c){ return c.toUpperCase(); })"></span>
-                                    </div>
-                                    <span x-show="card.meta && card.meta.app_count > 0" x-cloak
-                                          class="flex-shrink-0 inline-flex items-center gap-0.5 text-2xs text-muted-foreground"
-                                          :title="card.meta.app_count + ' linked applications'">
-                                        <svg class="w-2.5 h-2.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2z"/></svg>
-                                        <span x-text="card.meta.app_count"></span>
-                                    </span>
-                                </div>
-                                {# Row 2: due date + days-in-column + link #}
-                                <div class="flex items-center justify-between">
-                                    <div class="flex items-center gap-2">
-                                        <span x-show="card.due_date" x-cloak
-                                              class="inline-flex items-center gap-0.5 text-2xs"
-                                              :class="isOverdue(card.due_date)
- ? 'text-destructive-emphasis font-semibold'
- : 'text-muted-foreground'">
-                                            <svg class="w-2.5 h-2.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-                                            <span x-text="formatDate(card.due_date)"></span>
-                                        </span>
-                                        <span x-show="card.meta && card.meta.days_in_column != null" x-cloak
-                                              class="inline-flex items-center gap-0.5 text-2xs"
-                                              :class="(card.meta?.days_in_column || 0) > 14
- ? 'text-destructive'
- : (card.meta?.days_in_column || 0) > 7
- ? 'text-warning-emphasis'
- : 'text-muted-foreground'"
-                                              :title="(card.meta?.days_in_column || 0) + ' days in this column'">
-                                            <svg class="w-2.5 h-2.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                                            <span x-text="(card.meta?.days_in_column || 0) + 'd'"></span>
-                                        </span>
-                                    </div>
-                                    <a :href="card.link_url" class="text-2xs text-primary hover:underline"
-                                       x-text="card.link_label || 'Open'" @click.stop></a>
-                                </div>
-                            </div>
+                                    <template x-if="card.card_type !== 'deliverable'">
+                                        <div class="mt-2">
+                                            {% call native_select(size='xs', class='w-full', attrs_dict={':aria-label': "'Move ' + card.title + ' to another status'", '@change': 'moveStatus(card, $event.target.value)'}) %}
+                                                <template x-for="col in columns" :key="col.id">
+                                                    <option :value="col.id" :selected="card.column === col.id" x-text="col.label"></option>
+                                                </template>
+                                            {% endcall %}
+                                        </div>
+                                    </template>
+                                </article>
+                            </template>
                         </div>
                     </template>
+
+                    <div x-show="laneCards(phase.code).length === 0" x-cloak
+                         class="rounded-lg border border-dashed border-border p-4 text-center" data-testid="adm-lane-empty">
+                        <p class="text-sm font-medium text-foreground" x-text="laneEmptyText()"></p>
+                        <p class="mt-1 text-xs text-muted-foreground" x-show="filters.card_type === '' || filters.card_type === 'solution'">
+                            <a href="/architecture-journey/" class="font-medium text-primary hover:underline">Start a solution</a>
+                            and set its ADM phase to place it here.
+                        </p>
+                    </div>
                 </div>
-                {# Flat-mode column add button #}
-                <button type="button" @click="openCreateTask(null, col.id)"
-                        class="mt-1 w-full py-1.5 text-xs text-muted-foreground/40 hover:text-primary hover:bg-primary/5 rounded transition-colors flex items-center justify-center gap-1">
-                    <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/>
-                    </svg>
-                    Add card
-                </button>
-            </div>
+
+                <div class="border-t border-border p-2">
+                    {{ button(text='Add task', variant='ghost', size='xs', icon='plus', class='w-full', attrs_dict={'@click': "openCreateTask(phase.code, 'proposed')", ':aria-label': "'Add a task to ' + phase.label"}) }}
+                </div>
+            </section>
         </template>
     {% endcall %}
     </div>
 
-    {# -- Swimlane Layout (swimlane mode only) --------------------------- #}
-    <div x-show="!loading && !error && cards.length > 0 && viewMode === 'swimlane'" x-cloak
-         class="overflow-x-auto">
-
-        {# Sticky column headers row #}
-        <div class="flex gap-2 mb-2 sticky top-0 z-10 bg-background pb-2 border-b border-border">
-            <div class="w-52 shrink-0"></div>
-            <template x-for="col in columns" :key="col.id">
-                <div class="flex-1 min-w-[140px]">
-                    <div class="flex items-center justify-between px-2 py-1.5 rounded-md"
-                         :class="wipAtLimit(col.id) ? 'bg-destructive/10 ring-1 ring-destructive/30' : 'bg-muted'">
-                        <span class="text-xs font-semibold text-foreground" x-text="col.label"></span>
-                        <span class="flex items-center gap-0.5 text-xs">
-                            <template x-if="colSlaStatus(col.id) && colSlaStatus(col.id).overdue_count > 0">
-                                <span class="px-1 py-0.5 rounded bg-destructive/10 text-destructive-emphasis font-semibold"
-                                      :title="colSlaStatus(col.id).overdue_count + ' card(s) past SLA'"
-                                      x-text="'⚠ ' + colSlaStatus(col.id).overdue_count"></span>
-                            </template>
-                            <span :class="wipAtLimit(col.id) ? 'text-destructive-emphasis font-semibold' : wipNearLimit(col.id) ? 'text-warning-emphasis font-medium' : 'text-muted-foreground'"
-                                  class="flex items-center gap-0.5">
-                                <span x-text="wipCount(col.id)"></span>
-                                <template x-if="wipLimit(col.id) > 0">
-                                    <span x-text="'/' + wipLimit(col.id)"></span>
-                                </template>
-                                <template x-if="wipAtLimit(col.id)">
-                                    <span title="WIP limit reached"><i data-lucide="lock" class="h-3 w-3 inline"></i></span>
-                                </template>
-                            </span>
-                        </span>
-                    </div>
-                </div>
-            </template>
-        </div>
-
-        {# Phase swimlane rows #}
-        <template x-for="phase in phases" :key="phase.code">
-            <div class="mb-2">
-
-                {# Phase row header — click to collapse/expand #}
-                <div class="flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer select-none border border-border mb-1 hover:bg-muted/50 transition-colors"
-                     :class="phaseClass(phase.code)"
-                     @click="togglePhase(phase.code)">
-                    <svg class="w-3 h-3 shrink-0 transition-transform duration-150"
-                         :class="isPhaseCollapsed(phase.code) ? '' : 'rotate-90'"
-                         fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/>
-                    </svg>
-                    <span class="text-xs font-bold w-9 shrink-0 opacity-60"
-                          x-text="phase.code"></span>
-                    <span class="text-xs font-semibold flex-1 min-w-0 truncate"
-                          x-text="phase.label"></span>
-                    <template x-if="phase.activate_stage">
-                        <span class="text-2xs font-medium shrink-0 px-1.5 py-0.5 rounded bg-secondary/10 text-secondary-foreground border border-secondary/20"
-                              title="SAP Activate stage (Capgemini SAP S/4HANA Assessment, Stage 1 enablement)"
-                              x-text="'Activate: ' + phase.activate_stage"></span>
-                    </template>
-                    <span class="text-xs text-muted-foreground ml-auto shrink-0"
-                          x-text="phaseTotal(phase.code) + ' cards'"></span>
-                    <template x-if="phaseCycleAvg(phase.code) !== null">
-                        <span class="text-xs ml-1 shrink-0 px-1.5 py-0.5 rounded bg-primary/5 text-primary"
-                              :title="'Avg cycle time: ' + phaseCycleAvg(phase.code) + ' days'"
-                              x-text="'⏱ ' + phaseCycleAvg(phase.code) + 'd'"></span>
-                    </template>
-                    {# Deliverable checklist badge #}
-                    <button type="button" @click.stop="toggleDeliverableDropdown($event, phase.code)"
-                            @mouseenter="loadPhaseDeliverables(phase.code)"
-                            class="ml-1 shrink-0 inline-flex items-center px-1.5 py-0.5 rounded text-xs font-semibold transition-colors"
-                            :class="deliverableBadgeClass(phase.code)"
-                            title="TOGAF deliverable checklist"
-                            x-text="deliverableBadgeText(phase.code)">
-                    </button>
-                    {# SA-003: ArchiMate element count badge #}
-                    <span @mouseenter="loadPhaseElements(phase.code)"
-                          class="ml-1 shrink-0 inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-info/10 text-info-emphasis border border-info/20"
-                          :title="'Suggested ArchiMate elements for Phase ' + phase.code"
-                          x-text="phaseElementBadgeText(phase.code)"
-                          x-show="phaseElementBadgeText(phase.code)" x-cloak
-                          x-cloak
-                          data-testid="phase-element-badge">
-                    </span>
-                    {# Viewpoint link — maps ADM phase to ArchiMate viewpoint #}
-                    <a @click.stop
-                       :href="'/archimate/viewpoints?active=' + ({A:'stakeholder',B:'business_process',C:'application_cooperation',D:'technology',E:'implementation_deployment',F:'migration',G:'motivation',H:'motivation'}[phase.code] || 'basic')"
-                       class="ml-1 shrink-0 inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-xs font-medium bg-primary/10 text-info-emphasis border border-primary/20 hover:bg-primary/20 transition-colors"
-                       title="Open ArchiMate viewpoint for this phase">
-                        <i data-lucide="eye" class="w-2.5 h-2.5"></i>
-                        VP
-                    </a>
-                </div>
-
-                {# Deliverable checklist dropdown #}
-                <template x-if="expandedDeliverablePhase === phase.code">
-                    <div class="mb-2 mx-1 p-3 rounded-md border border-border bg-card text-xs"
-                         @click.stop>
-                        <p class="font-semibold text-foreground mb-2 text-2xs">
-                            TOGAF Deliverables — Phase <span x-text="phase.code"></span>
-                        </p>
-                        <template x-if="phaseDeliverables[phase.code] && phaseDeliverables[phase.code].loading">
-                            <p class="text-muted-foreground text-xs">Loading…</p>
-                        </template>
-                        <template x-if="phaseDeliverables[phase.code] && !phaseDeliverables[phase.code].loading">
-                            <div class="space-y-1.5">
-                                <template x-for="item in phaseDeliverables[phase.code].deliverables" :key="item.id">
-                                    <label class="flex items-start gap-2 cursor-pointer group">
-                                        <input type="checkbox"
-                                               :checked="item.checked"
-                                               @change="toggleDeliverable(item.id, phase.code, $event.target.checked)"
-                                               class="mt-0.5 shrink-0 accent-primary">
-                                        <span class="text-2xs leading-snug"
-                                              :class="item.checked ? 'line-through text-muted-foreground' : 'text-foreground'"
-                                              x-text="item.name"></span>
-                                    </label>
-                                </template>
-                                <p class="pt-1 text-xs text-muted-foreground border-t border-border mt-2"
-                                   x-text="phaseDeliverables[phase.code].checked + ' of ' + phaseDeliverables[phase.code].total + ' complete'"></p>
-                            </div>
-                        </template>
-                    </div>
-                </template>
-
-                {# Phase cells grid — hidden when collapsed #}
-                <template x-if="!isPhaseCollapsed(phase.code)">
-                    <div class="flex gap-2">
-                        <div class="w-52 shrink-0"></div>
-                        <template x-for="col in columns" :key="col.id">
-                            <div class="kanban-column flex-1 min-w-[140px] min-h-[60px] space-y-1.5 p-1 rounded-md border border-dashed transition-colors group/cell"
-                                 :data-lane-id="phase.code + '-' + col.id"
-                                  :class="dragOverColumn === col.id ? 'bg-primary/5 ring-1 ring-primary/20 border-primary/30' : 'border-border bg-muted/10'"
-                                  @dragover.prevent="onDragOver($event, col.id)"
-                                  @dragleave="onDragLeave($event)"
-                                  @drop.prevent="onDrop($event, col.id)">
-
-                                <template x-for="card in swimlaneCards(phase.code, col.id)" :key="card.id">
-                                    <div draggable="true"
-                                         class="kanban-card bg-card border border-border rounded p-2 cursor-grab active:cursor-grabbing hover:border-primary/30 transition-all"
-                                         :data-card-id="card.id"
-                                          @dragstart="onDragStart($event, card)"
-                                          @dragend="onDragEnd()"
-                                          @click="openDetail(card)"
-                                          :class="draggingCard && draggingCard.id === card.id ? 'opacity-40 rotate-1 scale-[0.98]' : ''">
-                                        <div class="flex items-center justify-between mb-1">
-                                            <span class="inline-flex items-center px-1.5 py-0.5 text-xs font-medium rounded bg-muted text-muted-foreground"
-                                                  x-text="card.card_type"></span>
-                                            <span class="px-1.5 py-0.5 text-xs font-medium rounded"
-                                                  :class="priorityClass(card.priority)"
-                                                  x-text="card.priority"></span>
-                                        </div>
-                                        {# ARB governance badge #}
-                                        <template x-if="card.requires_arb_signoff">
-                                          <span class="inline-flex items-center gap-1 rounded-full bg-warning/10 px-2 py-0.5 text-xs font-medium text-warning-emphasis border border-warning/30"
-                                                title="Requires ARB Sign-off">
-                                            <i data-lucide="shield-alert" class="w-3 h-3" aria-hidden="true"></i>
-                                            ARB
-                                          </span>
-                                        </template>
-                                        <p class="text-2xs font-semibold text-foreground leading-tight line-clamp-2"
-                                           x-text="card.title"></p>
-                                        <p x-show="card.owner" x-cloak
-                                           class="text-xs text-muted-foreground mt-1 truncate"
-                                           x-text="card.owner"></p>
-                                    </div>
-                                </template>
-
-                                {# Inline add — visible in all cells, reveals on hover #}
-                                <button type="button" @click="openCreateTask(phase.code, col.id)"
-                                        class="w-full py-1.5 text-xs text-muted-foreground/40 group-hover/cell:text-primary group-hover/cell:bg-primary/5 rounded transition-colors flex items-center justify-center gap-1">
-                                    <svg class="w-3 h-3 opacity-0 group-hover/cell:opacity-100 transition-opacity" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/>
-                                    </svg>
-                                    <span class="group-hover/cell:hidden">—</span>
-                                    <span class="hidden group-hover/cell:inline">Add card</span>
-                                </button>
-
-                            </div>
-                        </template>
-                    </div>
-                </template>
-
-            </div>
-        </template>
-
-    </div>
-
     {# Bulk actions floating toolbar #}
     <div x-show="selectedCardIds.length >= 2" x-cloak
-         x-transition:enter="transition ease-out duration-150"
-         x-transition:enter-start="translate-y-4 opacity-0"
-         x-transition:enter-end="translate-y-0 opacity-100"
-         x-transition:leave="transition ease-in duration-100"
-         x-transition:leave-start="translate-y-0 opacity-100"
-         x-transition:leave-end="translate-y-4 opacity-0"
-         class="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 bg-card border border-border rounded-lg px-4 py-2.5 flex items-center gap-3"
+         class="fixed bottom-6 left-1/2 z-40 flex -translate-x-1/2 flex-wrap items-center gap-3 rounded-lg border border-border bg-card px-4 py-2.5"
          @keydown.escape.window="clearSelection()">
         <span class="text-xs font-medium text-foreground" x-text="selectedCardIds.length + ' selected'"></span>
-        <div class="h-4 w-px bg-border"></div>
-        <div class="flex items-center gap-1.5">
-            <label class="text-xs text-muted-foreground">Move to:</label>
-            <select x-model="bulkMoveTarget"
-                    class="h-7 px-2 text-xs bg-background border border-border rounded text-foreground" aria-label="Move to">
-                <option value="">Choose...</option>
-                <template x-for="col in columns" :key="col.id">
-                    <option :value="col.id" x-text="col.label"></option>
-                </template>
-            </select>
-            <button type="button" @click="bulkMove()" :disabled="!bulkMoveTarget"
-                    class="h-7 px-3 text-xs font-medium bg-primary text-primary-foreground rounded hover:bg-primary/90 transition-colors disabled:opacity-50">
-                Move
-            </button>
-        </div>
-        <div class="h-4 w-px bg-border"></div>
-        <button type="button" @click="clearSelection()"
-                class="h-7 px-2 text-xs text-muted-foreground hover:text-foreground transition-colors">
-            Cancel
-        </button>
+        {% call native_select(aria_label='Move selected cards to', size='xs', attrs_dict={'x-model': 'bulkMoveTarget'}) %}
+            <option value="">Move to status…</option>
+            <template x-for="col in columns" :key="col.id">
+                <option :value="col.id" x-text="col.label"></option>
+            </template>
+        {% endcall %}
+        {{ button(text='Move', variant='default', size='xs', attrs_dict={'@click': 'bulkMove()', ':disabled': '!bulkMoveTarget'}) }}
+        {{ button(text='Cancel', variant='ghost', size='xs', on_click='clearSelection()') }}
     </div>
 
+    {# Deliverables of a phase: opened from the count chip on a solution #}
+    <div x-show="deliverablePhase" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4"
+         @keydown.escape.window="deliverablePhase = null">
+        <div class="fixed inset-0 bg-overlay/50" @click="deliverablePhase = null"></div>
+        <div class="relative w-full max-w-md rounded-lg border border-border bg-card p-6" role="dialog" aria-modal="true"
+             aria-labelledby="adm-deliverables-title" @click.stop>
+            <div class="flex items-start justify-between gap-4">
+                <div class="min-w-0">
+                    <h2 id="adm-deliverables-title" class="text-base font-semibold text-foreground" x-text="'Deliverables — ' + phaseLabel(deliverablePhase)"></h2>
+                    <p class="mt-1 text-sm text-muted-foreground" x-text="plural(phaseDeliverableCards(deliverablePhase).length, 'deliverable') + ' produced in this phase'"></p>
+                </div>
+                {{ button(variant='ghost', size='icon-sm', icon='x', aria_label='Close deliverables', on_click='deliverablePhase = null') }}
+            </div>
+            <ul class="mt-4 max-h-[60vh] space-y-3 overflow-y-auto">
+                <template x-for="item in phaseDeliverableItems(deliverablePhase)" :key="item.id">
+                    <li class="flex items-start gap-3 rounded-md border border-border p-3">
+                        {{ checkbox(attrs_dict={':checked': 'item.checked', ':disabled': '!item.ready', '@change': 'toggleDeliverable(item.entityId, deliverablePhase, $event.target.checked)', ':aria-label': "'Mark ' + item.title + ' complete'"}) }}
+                        <div class="min-w-0">
+                            <p class="text-sm font-medium text-foreground" :class="item.checked ? 'line-through text-muted-foreground' : ''" x-text="item.title"></p>
+                            <p class="mt-1 text-xs text-muted-foreground" x-show="item.subtitle" x-text="item.subtitle"></p>
+                        </div>
+                    </li>
+                </template>
+            </ul>
+            <p class="mt-4 text-sm text-muted-foreground" x-show="phaseDeliverableCards(deliverablePhase).length === 0">
+                No deliverables are listed for this phase yet.
+            </p>
+            <p class="mt-4 border-t border-border pt-3 text-xs text-muted-foreground" x-show="phaseDeliverableCards(deliverablePhase).length > 0"
+               x-text="phaseDeliverableItems(deliverablePhase).filter(function (i) { return i.checked; }).length + ' of ' + phaseDeliverableCards(deliverablePhase).length + ' complete'"></p>
+        </div>
     </div>
+
+</div>
 
 <script src="{{ url_for('static', filename='js/adm_kanban/board_v2.js') }}"></script>
 {% endblock %}
@@ -635,13 +290,11 @@
              @click.stop>
             <div class="flex items-center justify-between px-5 py-4 border-b border-border">
                 <h2 id="create-task-title" class="text-sm font-semibold text-foreground">New Architecture Task</h2>
-                <button type="button" @click="show = false"
-                        class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                        aria-label="Close">
+                {% call button(variant='bare', size='bare', class='inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring', aria_label='Close', attrs_dict={'@click': 'show = false'}) %}
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
                     </svg>
-                </button>
+                {% endcall %}
             </div>
             <div class="px-5 py-4 max-h-[60vh] overflow-y-auto space-y-1">
                 <div x-show="error" x-cloak
@@ -650,55 +303,47 @@
 
                 {# Section 1: Identity #}
                 <div x-data="{ expanded: true }">
-                    <button type="button" @click="expanded = !expanded"
-                            class="flex w-full items-center justify-between py-2 text-sm font-semibold text-foreground border-b border-border mb-3">
+                    {% call button(variant='bare', size='bare', class='flex w-full items-center justify-between py-2 text-sm font-semibold text-foreground border-b border-border mb-3', attrs_dict={'@click': 'expanded = !expanded'}) %}
                         <span>Identity</span>
                         <svg :class="expanded ? 'rotate-180' : ''" class="w-4 h-4 transition-transform" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/>
                         </svg>
-                    </button>
+                    {% endcall %}
                     <div x-show="expanded" x-cloak class="space-y-3 mb-2">
                         <div class="space-y-1">
                             <label class="text-xs font-medium text-foreground" for="ct-title">Title <span class="text-destructive-emphasis">*</span></label>
-                            <input id="ct-title" type="text" x-model="form.title" required
-                                   placeholder="Task title..."
-                                   class="w-full h-8 px-3 text-sm bg-background border border-border rounded text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary">
+                            {{ input(id='ct-title', placeholder='Task title...', size='xs', attrs_dict={'x-model': 'form.title', 'required': true}) }}
                         </div>
                         <div class="space-y-1">
                             <label class="text-xs font-medium text-foreground" for="ct-issue-type">Issue Type</label>
-                            <select id="ct-issue-type" x-model="form.issue_type"
-                                    class="w-full h-8 px-2 text-xs bg-background border border-border rounded text-foreground focus:outline-none focus:ring-1 focus:ring-primary">
+                            {% call native_select(id='ct-issue-type', size='xs', class='w-full', attrs_dict={'x-model': 'form.issue_type'}) %}
                                 <option value="Epic">Epic</option>
                                 <option value="Story">Story</option>
                                 <option value="Task">Task</option>
                                 <option value="Spike">Spike</option>
                                 <option value="ADR">ADR</option>
                                 <option value="Risk">Risk</option>
-                            </select>
+                            {% endcall %}
                         </div>
                         <div class="space-y-1">
                             <label class="text-xs font-medium text-foreground" for="ct-desc">Description</label>
-                            <textarea id="ct-desc" x-model="form.description" rows="3"
-                                      class="w-full px-3 py-2 text-sm bg-background border border-border rounded text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary resize-none"></textarea>
+                            {% call textarea(id='ct-desc', rows=3, attrs_dict={'x-model': 'form.description'}) %}{% endcall %}
                         </div>
                         <div class="space-y-1">
                             <label class="text-xs font-medium text-foreground" for="ct-acceptance-criteria">Acceptance Criteria</label>
-                            <textarea id="ct-acceptance-criteria" x-model="form.acceptance_criteria" rows="2"
-                                      placeholder="Definition of done..."
-                                      class="w-full px-3 py-2 text-sm bg-background border border-border rounded text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary resize-none"></textarea>
+                            {% call textarea(id='ct-acceptance-criteria', placeholder='Definition of done...', rows=2, attrs_dict={'x-model': 'form.acceptance_criteria'}) %}{% endcall %}
                         </div>
                     </div>
                 </div>
 
                 {# Section 2: TOGAF Classification #}
                 <div x-data="{ expanded: true }">
-                    <button type="button" @click="expanded = !expanded"
-                            class="flex w-full items-center justify-between py-2 text-sm font-semibold text-foreground border-b border-border mb-3">
+                    {% call button(variant='bare', size='bare', class='flex w-full items-center justify-between py-2 text-sm font-semibold text-foreground border-b border-border mb-3', attrs_dict={'@click': 'expanded = !expanded'}) %}
                         <span>TOGAF Classification</span>
                         <svg :class="expanded ? 'rotate-180' : ''" class="w-4 h-4 transition-transform" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/>
                         </svg>
-                    </button>
+                    {% endcall %}
                     <div x-show="expanded" x-cloak class="space-y-3 mb-2">
                         <div class="space-y-1">
                             <label class="text-xs font-medium text-foreground">ADM Phase</label>
@@ -707,29 +352,21 @@
                                       x-text="(phases.find(function(p){ return p.code === lockedPhase; }) || {label: lockedPhase}).label"></span>
                                 <span class="text-xs text-muted-foreground">pre-selected</span>
                             </div>
-                            <select x-show="!lockedPhase" x-cloak
-                                    id="ct-phase"
-                                    x-model="form.phase"
-                                    @change="onPhaseChange()"
-                                    class="w-full h-8 px-2 text-xs bg-background border border-border rounded text-foreground focus:outline-none focus:ring-1 focus:ring-primary" aria-label="Phase">
+                            {% call native_select(id='ct-phase', aria_label='Phase', size='xs', class='w-full', attrs_dict={'x-show': '!lockedPhase', 'x-cloak': true, 'x-model': 'form.phase', '@change': 'onPhaseChange()'}) %}
                                 <template x-for="p in phases" :key="p.code">
                                     <option :value="p.code" x-text="p.label"></option>
                                 </template>
-                            </select>
+                            {% endcall %}
                         </div>
                         <div class="space-y-1">
                             <label class="text-xs font-medium text-foreground" for="ct-arch-domain">Architecture Domain</label>
-                            <select id="ct-arch-domain"
-                                    x-model="form.arch_domain"
-                                    @change="onDomainChange()"
-                                    name="arch_domain"
-                                    class="w-full h-8 px-2 text-xs bg-background border border-border rounded text-foreground focus:outline-none focus:ring-1 focus:ring-primary">
+                            {% call native_select(id='ct-arch-domain', name='arch_domain', size='xs', class='w-full', attrs_dict={'x-model': 'form.arch_domain', '@change': 'onDomainChange()'}) %}
                                 <option value="Business">Business Architecture</option>
                                 <option value="Data">Data Architecture</option>
                                 <option value="Application">Application Architecture</option>
                                 <option value="Technology">Technology Architecture</option>
                                 <option value="Cross-cutting">Cross-cutting</option>
-                            </select>
+                            {% endcall %}
                             <p class="text-xs mt-0.5 text-muted-foreground inline-flex items-center gap-1" x-show="!domainOverridden" x-cloak>
                                 <i data-lucide="check" class="h-3 w-3 text-success"></i><span class="text-success-emphasis">Recommended</span>
                                 for <span x-text="'Phase ' + form.phase"></span>
@@ -741,36 +378,29 @@
                         </div>
                         <div class="space-y-1">
                             <label class="text-xs font-medium text-foreground" for="ct-arch-layer">Architecture Layer</label>
-                            <select id="ct-arch-layer" x-model="form.arch_layer"
-                                    class="w-full h-8 px-2 text-xs bg-background border border-border rounded text-foreground focus:outline-none focus:ring-1 focus:ring-primary">
+                            {% call native_select(id='ct-arch-layer', size='xs', class='w-full', attrs_dict={'x-model': 'form.arch_layer'}) %}
                                 <option value="">— Select —</option>
                                 <option value="Strategic">Strategic</option>
                                 <option value="Segment">Segment</option>
                                 <option value="Capability">Capability</option>
                                 <option value="Solution">Solution</option>
-                            </select>
+                            {% endcall %}
                         </div>
                         <div class="space-y-1">
                             <label class="text-xs font-medium text-foreground" for="ct-arch-element-type">ArchiMate Element Type</label>
-                            <select id="ct-arch-element-type"
-                                    x-model="form.arch_element_type"
-                                    name="arch_element_type"
-                                    class="w-full h-8 px-2 text-xs bg-background border border-border rounded text-foreground focus:outline-none focus:ring-1 focus:ring-primary">
+                            {% call native_select(id='ct-arch-element-type', name='arch_element_type', size='xs', class='w-full', attrs_dict={'x-model': 'form.arch_element_type'}) %}
                                 <option value="WorkPackage">WorkPackage — bounded set of actions toward an objective</option>
                                 <option value="Plateau">Plateau — stable state the enterprise transitions toward</option>
                                 <option value="Gap">Gap — difference between current and target Plateau</option>
                                 <option value="ImplementationEvent">ImplementationEvent — state change during implementation</option>
                                 <option value="Deliverable">Deliverable — formally reviewed TOGAF output</option>
-                            </select>
+                            {% endcall %}
                         </div>
                         <div class="space-y-1" x-show="form.arch_element_type === 'Deliverable'" x-cloak>
                             <label class="text-xs font-medium text-foreground" for="ct-togaf-deliverable">
                                 TOGAF Deliverable Type <span class="text-muted-foreground">(optional)</span>
                             </label>
-                            <select id="ct-togaf-deliverable"
-                                    x-model="form.togaf_deliverable"
-                                    name="togaf_deliverable"
-                                    class="w-full h-8 px-2 text-xs bg-background border border-border rounded text-foreground focus:outline-none focus:ring-1 focus:ring-primary">
+                            {% call native_select(id='ct-togaf-deliverable', name='togaf_deliverable', size='xs', class='w-full', attrs_dict={'x-model': 'form.togaf_deliverable'}) %}
                                 <option value="">— None —</option>
                                 <option value="Architecture Vision">Architecture Vision</option>
                                 <option value="Architecture Definition Document">Architecture Definition Document</option>
@@ -779,103 +409,87 @@
                                 <option value="Compliance Assessment">Compliance Assessment</option>
                                 <option value="Transition Architecture">Transition Architecture</option>
                                 <option value="Implementation Plan">Implementation Plan</option>
-                            </select>
+                            {% endcall %}
                         </div>
                     </div>
                 </div>
 
                 {# Section 3: Planning & Gantt #}
                 <div x-data="{ expanded: false }">
-                    <button type="button" @click="expanded = !expanded"
-                            class="flex w-full items-center justify-between py-2 text-sm font-semibold text-foreground border-b border-border mb-3">
+                    {% call button(variant='bare', size='bare', class='flex w-full items-center justify-between py-2 text-sm font-semibold text-foreground border-b border-border mb-3', attrs_dict={'@click': 'expanded = !expanded'}) %}
                         <span>Planning &amp; Gantt</span>
                         <svg :class="expanded ? 'rotate-180' : ''" class="w-4 h-4 transition-transform" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/>
                         </svg>
-                    </button>
+                    {% endcall %}
                     <div x-show="expanded" x-cloak class="space-y-3 mb-2">
                         <div class="grid grid-cols-2 gap-3">
                             <div class="space-y-1">
                                 <label class="text-xs font-medium text-foreground" for="ct-start-date">Target Start Date</label>
-                                <input id="ct-start-date" type="date" x-model="form.target_start_date"
-                                       class="w-full h-8 px-2 text-xs bg-background border border-border rounded text-foreground focus:outline-none focus:ring-1 focus:ring-primary">
+                                {{ input(id='ct-start-date', type='date', size='xs', attrs_dict={'x-model': 'form.target_start_date'}) }}
                             </div>
                             <div class="space-y-1">
                                 <label class="text-xs font-medium text-foreground" for="ct-end-date">Target End Date</label>
-                                <input id="ct-end-date" type="date" x-model="form.target_end_date"
-                                       class="w-full h-8 px-2 text-xs bg-background border border-border rounded text-foreground focus:outline-none focus:ring-1 focus:ring-primary">
+                                {{ input(id='ct-end-date', type='date', size='xs', attrs_dict={'x-model': 'form.target_end_date'}) }}
                             </div>
                         </div>
                         <div class="space-y-1">
                             <label class="text-xs font-medium text-foreground" for="ct-story-points">Story Points</label>
-                            <input id="ct-story-points" type="number" x-model.number="form.story_points" min="0" max="100"
-                                   class="w-full h-8 px-3 text-sm bg-background border border-border rounded text-foreground focus:outline-none focus:ring-1 focus:ring-primary">
+                            {{ input(id='ct-story-points', type='number', size='xs', attrs_dict={'x-model.number': 'form.story_points', 'min': '0', 'max': '100'}) }}
                         </div>
                         <div class="space-y-1">
                             <div class="flex items-center justify-between mb-1">
                                 <label class="text-xs font-medium text-foreground" for="ct-progress">Progress %</label>
                                 <span class="text-xs text-muted-foreground" x-text="form.progress_pct + '%'"></span>
                             </div>
-                            <input id="ct-progress" type="range" x-model.number="form.progress_pct" min="0" max="100"
-                                   class="w-full">
+                            {{ input(id='ct-progress', type='range', size='default', attrs_dict={'x-model.number': 'form.progress_pct', 'min': '0', 'max': '100'}) }}
                         </div>
                     </div>
                 </div>
 
                 {# Section 4: Assignment & Governance #}
                 <div x-data="{ expanded: false }">
-                    <button type="button" @click="expanded = !expanded"
-                            class="flex w-full items-center justify-between py-2 text-sm font-semibold text-foreground border-b border-border mb-3">
+                    {% call button(variant='bare', size='bare', class='flex w-full items-center justify-between py-2 text-sm font-semibold text-foreground border-b border-border mb-3', attrs_dict={'@click': 'expanded = !expanded'}) %}
                         <span>Assignment &amp; Governance</span>
                         <svg :class="expanded ? 'rotate-180' : ''" class="w-4 h-4 transition-transform" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/>
                         </svg>
-                    </button>
+                    {% endcall %}
                     <div x-show="expanded" x-cloak class="space-y-3 mb-2">
                         <div class="space-y-1">
                             <label class="text-xs font-medium text-foreground" for="ct-assignee">Assignee</label>
                             <div class="relative">
-                                <input id="ct-assignee" type="text" x-model="assigneeSearch"
-                                       @input.debounce.200ms="searchUsers()"
-                                       @focus="searchUsers()"
-                                       :placeholder="form.assignee_label || 'Search users...'"
-                                       autocomplete="off"
-                                       class="w-full h-8 px-3 text-sm bg-background border border-border rounded text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary">
+                                {{ input(id='ct-assignee', size='xs', attrs_dict={'x-model': 'assigneeSearch', '@input.debounce.200ms': 'searchUsers()', '@focus': 'searchUsers()', ':placeholder': 'form.assignee_label || \'Search users...\'', 'autocomplete': 'off'}) }}
                                 <div x-show="userResults.length > 0" x-cloak
                                      class="absolute z-50 mt-1 w-full bg-background border border-border rounded max-h-48 overflow-y-auto">
                                     <template x-for="u in userResults" :key="u.id">
-                                        <button type="button" @click="selectUser(u)"
-                                                class="w-full text-left px-3 py-2 text-sm hover:bg-muted flex items-center gap-2">
+                                        {% call button(variant='bare', size='bare', class='w-full text-left px-3 py-2 text-sm hover:bg-muted flex items-center gap-2', attrs_dict={'@click': 'selectUser(u)'}) %}
                                             <span class="w-6 h-6 rounded-full bg-primary/20 text-primary text-xs flex items-center justify-center font-medium"
                                                   x-text="u.label.charAt(0).toUpperCase()"></span>
                                             <span>
                                                 <span class="font-medium text-foreground" x-text="u.label"></span>
                                                 <span class="text-muted-foreground text-xs ml-1" x-text="'<' + u.email + '>'"></span>
                                             </span>
-                                        </button>
+                                        {% endcall %}
                                     </template>
                                 </div>
                             </div>
                             <p x-show="form.assignee_label" x-cloak class="text-xs text-muted-foreground mt-0.5">
                                 Assigned to: <span class="font-medium text-foreground" x-text="form.assignee_label"></span>
-                                <button type="button" @click="form.assignee=null; form.assignee_label=''; assigneeSearch=''" class="ml-1 text-muted-foreground hover:text-destructive-emphasis">×</button>
+                                {% call button(variant='bare', size='bare', class='ml-1 text-muted-foreground hover:text-destructive-emphasis', attrs_dict={'@click': 'form.assignee=null; form.assignee_label=\'\'; assigneeSearch=\'\''}) %}×{% endcall %}
                             </p>
                         </div>
                         <div class="space-y-1">
                             <label class="text-xs font-medium text-foreground" for="ct-priority">Priority</label>
-                            <select id="ct-priority"
-                                    x-model="form.priority"
-                                    class="w-full h-8 px-2 text-xs bg-background border border-border rounded text-foreground focus:outline-none focus:ring-1 focus:ring-primary">
+                            {% call native_select(id='ct-priority', size='xs', class='w-full', attrs_dict={'x-model': 'form.priority'}) %}
                                 <option value="low">Low</option>
                                 <option value="medium">Medium</option>
                                 <option value="high">High</option>
                                 <option value="critical">Critical</option>
-                            </select>
+                            {% endcall %}
                         </div>
                         <div class="flex items-center gap-3">
-                            <input type="checkbox" id="ct-requires-arb-signoff"
-                                   x-model="form.requires_arb_signoff"
-                                   class="h-4 w-4 rounded border-input">
+                            {{ checkbox(id='ct-requires-arb-signoff', attrs_dict={'x-model': 'form.requires_arb_signoff'}) }}
                             <label for="ct-requires-arb-signoff" class="text-xs font-medium text-foreground">
                                 Requires ARB Sign-off
                                 <span class="text-xs text-muted-foreground ml-1">(Architecture Review Board approval needed before closing)</span>
@@ -886,13 +500,12 @@
 
                 {# Section 5: Traceability (ArchiMate 3.2) #}
                 <div x-data="{ expanded: false }">
-                    <button type="button" @click="expanded = !expanded"
-                            class="flex w-full items-center justify-between py-2 text-sm font-semibold text-foreground border-b border-border mb-3">
+                    {% call button(variant='bare', size='bare', class='flex w-full items-center justify-between py-2 text-sm font-semibold text-foreground border-b border-border mb-3', attrs_dict={'@click': 'expanded = !expanded'}) %}
                         <span>Traceability (ArchiMate 3.2)</span>
                         <svg :class="expanded ? 'rotate-180' : ''" class="w-4 h-4 transition-transform" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/>
                         </svg>
-                    </button>
+                    {% endcall %}
                     <div x-show="expanded" x-cloak class="space-y-3 mb-2">
                         {# Requirements #}
                         <div>
@@ -904,19 +517,17 @@
                                 <template x-for="item in form.requirement_ids" :key="item.id">
                                     <span class="inline-flex items-center gap-1 px-2 py-0.5 bg-primary/10 text-primary/90 rounded text-xs">
                                         <span x-text="item.ref + ': ' + item.label"></span>
-                                        <button type="button" @click="removeRequirement(item)" class="hover:text-destructive-emphasis">×</button>
+                                        {% call button(variant='bare', size='bare', class='hover:text-destructive-emphasis', attrs_dict={'@click': 'removeRequirement(item)'}) %}×{% endcall %}
                                     </span>
                                 </template>
                             </div>
-                            <input type="text" x-model="requirementSearch" @input.debounce.300ms="searchRequirements()" @focus="searchRequirements()"
-                                   placeholder="Search requirements..."
-                                   class="w-full text-sm border border-border rounded px-3 py-1.5 bg-background text-foreground" aria-label="Search requirements...">
+                            {{ input(placeholder='Search requirements...', aria_label='Search requirements...', size='default', attrs_dict={'x-model': 'requirementSearch', '@input.debounce.300ms': 'searchRequirements()', '@focus': 'searchRequirements()'}) }}
                             <div x-show="requirementResults.length > 0" x-cloak class="mt-1 border border-border rounded bg-background max-h-40 overflow-y-auto z-50">
                                 <template x-for="r in requirementResults" :key="r.id">
-                                    <button type="button" @click="addRequirement(r)" class="w-full text-left px-3 py-1.5 text-sm hover:bg-muted">
+                                    {% call button(variant='bare', size='bare', class='w-full text-left px-3 py-1.5 text-sm hover:bg-muted', attrs_dict={'@click': 'addRequirement(r)'}) %}
                                         <span class="font-mono text-xs text-muted-foreground mr-2" x-text="r.ref"></span>
                                         <span x-text="r.label"></span>
-                                    </button>
+                                    {% endcall %}
                                 </template>
                             </div>
                         </div>
@@ -930,19 +541,17 @@
                                 <template x-for="item in form.goal_ids" :key="item.id">
                                     <span class="inline-flex items-center gap-1 px-2 py-0.5 bg-success/10 text-success-emphasis rounded text-xs">
                                         <span x-text="item.ref + ': ' + item.label"></span>
-                                        <button type="button" @click="removeGoal(item)" class="hover:text-destructive-emphasis">×</button>
+                                        {% call button(variant='bare', size='bare', class='hover:text-destructive-emphasis', attrs_dict={'@click': 'removeGoal(item)'}) %}×{% endcall %}
                                     </span>
                                 </template>
                             </div>
-                            <input type="text" x-model="goalSearch" @input.debounce.300ms="searchGoals()" @focus="searchGoals()"
-                                   placeholder="Search goals..."
-                                   class="w-full text-sm border border-border rounded px-3 py-1.5 bg-background text-foreground" aria-label="Search goals...">
+                            {{ input(placeholder='Search goals...', aria_label='Search goals...', size='default', attrs_dict={'x-model': 'goalSearch', '@input.debounce.300ms': 'searchGoals()', '@focus': 'searchGoals()'}) }}
                             <div x-show="goalResults.length > 0" x-cloak class="mt-1 border border-border rounded bg-background max-h-40 overflow-y-auto z-50">
                                 <template x-for="r in goalResults" :key="r.id">
-                                    <button type="button" @click="addGoal(r)" class="w-full text-left px-3 py-1.5 text-sm hover:bg-muted">
+                                    {% call button(variant='bare', size='bare', class='w-full text-left px-3 py-1.5 text-sm hover:bg-muted', attrs_dict={'@click': 'addGoal(r)'}) %}
                                         <span class="font-mono text-xs text-muted-foreground mr-2" x-text="r.ref"></span>
                                         <span x-text="r.label"></span>
-                                    </button>
+                                    {% endcall %}
                                 </template>
                             </div>
                         </div>
@@ -956,19 +565,17 @@
                                 <template x-for="item in form.driver_ids" :key="item.id">
                                     <span class="inline-flex items-center gap-1 px-2 py-0.5 bg-warning/10 text-warning-emphasis rounded text-xs">
                                         <span x-text="item.ref + ': ' + item.label"></span>
-                                        <button type="button" @click="removeDriver(item)" class="hover:text-destructive-emphasis">×</button>
+                                        {% call button(variant='bare', size='bare', class='hover:text-destructive-emphasis', attrs_dict={'@click': 'removeDriver(item)'}) %}×{% endcall %}
                                     </span>
                                 </template>
                             </div>
-                            <input type="text" x-model="driverSearch" @input.debounce.300ms="searchDrivers()" @focus="searchDrivers()"
-                                   placeholder="Search drivers..."
-                                   class="w-full text-sm border border-border rounded px-3 py-1.5 bg-background text-foreground" aria-label="Search drivers...">
+                            {{ input(placeholder='Search drivers...', aria_label='Search drivers...', size='default', attrs_dict={'x-model': 'driverSearch', '@input.debounce.300ms': 'searchDrivers()', '@focus': 'searchDrivers()'}) }}
                             <div x-show="driverResults.length > 0" x-cloak class="mt-1 border border-border rounded bg-background max-h-40 overflow-y-auto z-50">
                                 <template x-for="r in driverResults" :key="r.id">
-                                    <button type="button" @click="addDriver(r)" class="w-full text-left px-3 py-1.5 text-sm hover:bg-muted">
+                                    {% call button(variant='bare', size='bare', class='w-full text-left px-3 py-1.5 text-sm hover:bg-muted', attrs_dict={'@click': 'addDriver(r)'}) %}
                                         <span class="font-mono text-xs text-muted-foreground mr-2" x-text="r.ref"></span>
                                         <span x-text="r.label"></span>
-                                    </button>
+                                    {% endcall %}
                                 </template>
                             </div>
                         </div>
@@ -982,19 +589,17 @@
                                 <template x-for="item in form.principle_ids" :key="item.id">
                                     <span class="inline-flex items-center gap-1 px-2 py-0.5 bg-info/10 text-info-emphasis rounded text-xs">
                                         <span x-text="item.ref + ': ' + item.label"></span>
-                                        <button type="button" @click="removePrinciple(item)" class="hover:text-destructive-emphasis">×</button>
+                                        {% call button(variant='bare', size='bare', class='hover:text-destructive-emphasis', attrs_dict={'@click': 'removePrinciple(item)'}) %}×{% endcall %}
                                     </span>
                                 </template>
                             </div>
-                            <input type="text" x-model="principleSearch" @input.debounce.300ms="searchPrinciples()" @focus="searchPrinciples()"
-                                   placeholder="Search principles..."
-                                   class="w-full text-sm border border-border rounded px-3 py-1.5 bg-background text-foreground" aria-label="Search principles...">
+                            {{ input(placeholder='Search principles...', aria_label='Search principles...', size='default', attrs_dict={'x-model': 'principleSearch', '@input.debounce.300ms': 'searchPrinciples()', '@focus': 'searchPrinciples()'}) }}
                             <div x-show="principleResults.length > 0" x-cloak class="mt-1 border border-border rounded bg-background max-h-40 overflow-y-auto z-50">
                                 <template x-for="r in principleResults" :key="r.id">
-                                    <button type="button" @click="addPrinciple(r)" class="w-full text-left px-3 py-1.5 text-sm hover:bg-muted">
+                                    {% call button(variant='bare', size='bare', class='w-full text-left px-3 py-1.5 text-sm hover:bg-muted', attrs_dict={'@click': 'addPrinciple(r)'}) %}
                                         <span class="font-mono text-xs text-muted-foreground mr-2" x-text="r.ref"></span>
                                         <span x-text="r.label"></span>
-                                    </button>
+                                    {% endcall %}
                                 </template>
                             </div>
                         </div>
@@ -1002,16 +607,13 @@
                 </div>
             </div>
             <div class="flex items-center justify-end gap-2 px-5 py-4 border-t border-border">
-                <button type="button" @click="show = false"
-                        class="h-8 px-3 text-xs font-medium bg-muted text-muted-foreground rounded hover:bg-muted/80 transition-colors">
+                {% call button(variant='bare', size='bare', class='h-8 px-3 text-xs font-medium bg-muted text-muted-foreground rounded hover:bg-muted/80 transition-colors', attrs_dict={'@click': 'show = false'}) %}
                     Cancel
-                </button>
-                <button type="button" @click="submit()"
-                        :disabled="loading"
-                        class="h-8 px-3 text-xs font-medium bg-primary text-primary-foreground rounded hover:bg-primary/90 transition-colors disabled:opacity-50">
+                {% endcall %}
+                {% call button(variant='default', size='xs', attrs_dict={'@click': 'submit()', ':disabled': 'loading'}) %}
                     <span x-show="!loading" x-cloak>Create Task</span>
                     <span x-show="loading" x-cloak>Creating…</span>
-                </button>
+                {% endcall %}
             </div>
         </div>
     </div>
@@ -1051,10 +653,9 @@
                         <p class="text-sm text-muted-foreground mt-1" x-show="card && card.description" x-cloak
                            x-text="card ? card.description : ''"></p>
                     </div>
-                    <button aria-label="Close card details" type="button" @click="card = null"
-                            class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring mt-0.5 shrink-0">
+                    {% call button(variant='bare', size='bare', class='inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring mt-0.5 shrink-0', aria_label='Close card details', attrs_dict={'@click': 'card = null'}) %}
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
-                    </button>
+                    {% endcall %}
                 </div>
             </div>
 
@@ -1065,17 +666,14 @@
                    Section 1: Core Details (title, description, phase, status)
                    ══════════════════════════════════════════════════════════════ #}
                 <div class="border-b border-border">
-                    <button type="button" @click="section1Open = !section1Open"
-                            class="w-full px-6 py-3 flex items-center justify-between text-left hover:bg-muted/30 transition-colors"
-                            aria-expanded="true"
-                            :aria-expanded="section1Open">
+                    {% call button(variant='bare', size='bare', class='w-full px-6 py-3 flex items-center justify-between text-left hover:bg-muted/30 transition-colors', attrs_dict={'@click': 'section1Open = !section1Open', 'aria-expanded': 'true', ':aria-expanded': 'section1Open'}) %}
                         <span class="text-sm font-semibold text-foreground">Core Details</span>
                         <svg class="w-4 h-4 text-muted-foreground transition-transform duration-200"
                              :class="section1Open ? 'rotate-180' : ''"
                              fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/>
                         </svg>
-                    </button>
+                    {% endcall %}
                     <div x-show="section1Open" x-cloak
                          x-transition:enter="transition ease-out duration-200"
                          x-transition:enter-start="opacity-0 -translate-y-1"
@@ -1090,13 +688,7 @@
                                     <div class="w-32 shrink-0 px-3 py-2.5 text-muted-foreground bg-muted/40">Status</div>
                                     <div class="flex-1 px-3 py-2.5 flex flex-wrap gap-1.5">
                                         <template x-for="col in columns" :key="col.id">
-                                            <button type="button" @click="moveCard(col.id)"
-                                                    class="px-2 py-0.5 text-xs rounded border transition-colors"
-                                                    :class="card && card.column === col.id
- ? 'bg-foreground text-background border-foreground font-medium'
- : 'border-border text-muted-foreground hover:text-foreground hover:border-foreground/30'"
-                                                    :disabled="card && card.column === col.id"
-                                                    x-text="col.label"></button>
+                                            {% call button(variant='bare', size='bare', class='px-2 py-0.5 text-xs rounded border transition-colors', attrs_dict={'@click': 'moveCard(col.id)', ':class': 'card && card.column === col.id ? \'bg-foreground text-background border-foreground font-medium\' : \'border-border text-muted-foreground hover:text-foreground hover:border-foreground/30\'', ':disabled': 'card && card.column === col.id', 'x-text': 'col.label'}) %}{% endcall %}
                                         </template>
                                     </div>
                                 </div>
@@ -1188,16 +780,14 @@
                    Section 2: Architecture Context (ArchiMate, layer, element type)
                    ══════════════════════════════════════════════════════════════ #}
                 <div class="border-b border-border">
-                    <button type="button" @click="section2Open = !section2Open"
-                            class="w-full px-6 py-3 flex items-center justify-between text-left hover:bg-muted/30 transition-colors"
-                            :aria-expanded="section2Open">
+                    {% call button(variant='bare', size='bare', class='w-full px-6 py-3 flex items-center justify-between text-left hover:bg-muted/30 transition-colors', attrs_dict={'@click': 'section2Open = !section2Open', ':aria-expanded': 'section2Open'}) %}
                         <span class="text-sm font-semibold text-foreground">Architecture Context</span>
                         <svg class="w-4 h-4 text-muted-foreground transition-transform duration-200"
                              :class="section2Open ? 'rotate-180' : ''"
                              fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/>
                         </svg>
-                    </button>
+                    {% endcall %}
                     <div x-show="section2Open" x-cloak
                          x-transition:enter="transition ease-out duration-200"
                          x-transition:enter-start="opacity-0 -translate-y-1"
@@ -1288,9 +878,7 @@
                    Section 3: Requirements & Motivation (typeahead pickers)
                    ══════════════════════════════════════════════════════════════ #}
                 <div class="border-b border-border">
-                    <button type="button" @click="section3Open = !section3Open"
-                            class="w-full px-6 py-3 flex items-center justify-between text-left hover:bg-muted/30 transition-colors"
-                            :aria-expanded="section3Open">
+                    {% call button(variant='bare', size='bare', class='w-full px-6 py-3 flex items-center justify-between text-left hover:bg-muted/30 transition-colors', attrs_dict={'@click': 'section3Open = !section3Open', ':aria-expanded': 'section3Open'}) %}
                         <div class="flex items-center gap-2">
                             <span class="text-sm font-semibold text-foreground">Requirements & Motivation</span>
                             <span x-show="card && ((card.requirement_ids && card.requirement_ids.length) || (card.goal_ids && card.goal_ids.length) || (card.driver_ids && card.driver_ids.length) || (card.principle_ids && card.principle_ids.length))" x-cloak
@@ -1302,7 +890,7 @@
                              fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/>
                         </svg>
-                    </button>
+                    {% endcall %}
                     <div x-show="section3Open" x-cloak
                          x-transition:enter="transition ease-out duration-200"
                          x-transition:enter-start="opacity-0 -translate-y-1"
@@ -1339,22 +927,16 @@
                             <div x-show="card && card.card_type === 'task'" x-cloak>
                                 <label class="text-xs text-muted-foreground">Add Requirement</label>
                                 <div class="relative mt-1">
-                                    <input type="text" x-model="detailRequirementSearch"
-                                           @input.debounce.200ms="searchDetailRequirements()"
-                                           @focus="searchDetailRequirements()"
-                                           placeholder="Search requirements..."
-                                           autocomplete="off"
-                                           class="w-full px-3 py-2 text-sm border border-border rounded-md bg-background focus:outline-none focus:ring-1 focus:ring-ring" aria-label="Search requirements..."/>
+                                    {{ input(placeholder='Search requirements...', aria_label='Search requirements...', size='default', attrs_dict={'x-model': 'detailRequirementSearch', '@input.debounce.200ms': 'searchDetailRequirements()', '@focus': 'searchDetailRequirements()', 'autocomplete': 'off'}) }}
                                     <div x-show="typeaheadError.requirements" x-cloak
                                          class="absolute z-50 mt-1 w-full bg-background border border-border rounded-md px-3 py-2 text-sm text-destructive-emphasis"
                                          x-text="typeaheadError.requirements"></div>
                                     <div x-show="!typeaheadError.requirements && detailRequirementResults.length > 0" x-cloak
                                          class="absolute z-50 mt-1 w-full bg-background border border-border rounded-md max-h-40 overflow-y-auto">
                                         <template x-for="item in detailRequirementResults" :key="item.id">
-                                            <button type="button" @click="addDetailRequirement(item)"
-                                                    class="w-full text-left px-3 py-2 text-sm hover:bg-muted">
+                                            {% call button(variant='bare', size='bare', class='w-full text-left px-3 py-2 text-sm hover:bg-muted', attrs_dict={'@click': 'addDetailRequirement(item)'}) %}
                                                 <span class="font-medium" x-text="item.label"></span>
-                                            </button>
+                                            {% endcall %}
                                         </template>
                                     </div>
                                 </div>
@@ -1364,22 +946,16 @@
                             <div x-show="card && card.card_type === 'task'" x-cloak>
                                 <label class="text-xs text-muted-foreground">Add Goal</label>
                                 <div class="relative mt-1">
-                                    <input type="text" x-model="detailGoalSearch"
-                                           @input.debounce.200ms="searchDetailGoals()"
-                                           @focus="searchDetailGoals()"
-                                           placeholder="Search goals..."
-                                           autocomplete="off"
-                                           class="w-full px-3 py-2 text-sm border border-border rounded-md bg-background focus:outline-none focus:ring-1 focus:ring-ring" aria-label="Search goals..."/>
+                                    {{ input(placeholder='Search goals...', aria_label='Search goals...', size='default', attrs_dict={'x-model': 'detailGoalSearch', '@input.debounce.200ms': 'searchDetailGoals()', '@focus': 'searchDetailGoals()', 'autocomplete': 'off'}) }}
                                     <div x-show="typeaheadError.goals" x-cloak
                                          class="absolute z-50 mt-1 w-full bg-background border border-border rounded-md px-3 py-2 text-sm text-destructive-emphasis"
                                          x-text="typeaheadError.goals"></div>
                                     <div x-show="!typeaheadError.goals && detailGoalResults.length > 0" x-cloak
                                          class="absolute z-50 mt-1 w-full bg-background border border-border rounded-md max-h-40 overflow-y-auto">
                                         <template x-for="item in detailGoalResults" :key="item.id">
-                                            <button type="button" @click="addDetailGoal(item)"
-                                                    class="w-full text-left px-3 py-2 text-sm hover:bg-muted">
+                                            {% call button(variant='bare', size='bare', class='w-full text-left px-3 py-2 text-sm hover:bg-muted', attrs_dict={'@click': 'addDetailGoal(item)'}) %}
                                                 <span class="font-medium" x-text="item.label"></span>
-                                            </button>
+                                            {% endcall %}
                                         </template>
                                     </div>
                                 </div>
@@ -1389,22 +965,16 @@
                             <div x-show="card && card.card_type === 'task'" x-cloak>
                                 <label class="text-xs text-muted-foreground">Add Driver</label>
                                 <div class="relative mt-1">
-                                    <input type="text" x-model="detailDriverSearch"
-                                           @input.debounce.200ms="searchDetailDrivers()"
-                                           @focus="searchDetailDrivers()"
-                                           placeholder="Search drivers..."
-                                           autocomplete="off"
-                                           class="w-full px-3 py-2 text-sm border border-border rounded-md bg-background focus:outline-none focus:ring-1 focus:ring-ring" aria-label="Search drivers..."/>
+                                    {{ input(placeholder='Search drivers...', aria_label='Search drivers...', size='default', attrs_dict={'x-model': 'detailDriverSearch', '@input.debounce.200ms': 'searchDetailDrivers()', '@focus': 'searchDetailDrivers()', 'autocomplete': 'off'}) }}
                                     <div x-show="typeaheadError.drivers" x-cloak
                                          class="absolute z-50 mt-1 w-full bg-background border border-border rounded-md px-3 py-2 text-sm text-destructive-emphasis"
                                          x-text="typeaheadError.drivers"></div>
                                     <div x-show="!typeaheadError.drivers && detailDriverResults.length > 0" x-cloak
                                          class="absolute z-50 mt-1 w-full bg-background border border-border rounded-md max-h-40 overflow-y-auto">
                                         <template x-for="item in detailDriverResults" :key="item.id">
-                                            <button type="button" @click="addDetailDriver(item)"
-                                                    class="w-full text-left px-3 py-2 text-sm hover:bg-muted">
+                                            {% call button(variant='bare', size='bare', class='w-full text-left px-3 py-2 text-sm hover:bg-muted', attrs_dict={'@click': 'addDetailDriver(item)'}) %}
                                                 <span class="font-medium" x-text="item.label"></span>
-                                            </button>
+                                            {% endcall %}
                                         </template>
                                     </div>
                                 </div>
@@ -1414,22 +984,16 @@
                             <div x-show="card && card.card_type === 'task'" x-cloak>
                                 <label class="text-xs text-muted-foreground">Add Principle</label>
                                 <div class="relative mt-1">
-                                    <input type="text" x-model="detailPrincipleSearch"
-                                           @input.debounce.200ms="searchDetailPrinciples()"
-                                           @focus="searchDetailPrinciples()"
-                                           placeholder="Search principles..."
-                                           autocomplete="off"
-                                           class="w-full px-3 py-2 text-sm border border-border rounded-md bg-background focus:outline-none focus:ring-1 focus:ring-ring" aria-label="Search principles..."/>
+                                    {{ input(placeholder='Search principles...', aria_label='Search principles...', size='default', attrs_dict={'x-model': 'detailPrincipleSearch', '@input.debounce.200ms': 'searchDetailPrinciples()', '@focus': 'searchDetailPrinciples()', 'autocomplete': 'off'}) }}
                                     <div x-show="typeaheadError.principles" x-cloak
                                          class="absolute z-50 mt-1 w-full bg-background border border-border rounded-md px-3 py-2 text-sm text-destructive-emphasis"
                                          x-text="typeaheadError.principles"></div>
                                     <div x-show="!typeaheadError.principles && detailPrincipleResults.length > 0" x-cloak
                                          class="absolute z-50 mt-1 w-full bg-background border border-border rounded-md max-h-40 overflow-y-auto">
                                         <template x-for="item in detailPrincipleResults" :key="item.id">
-                                            <button type="button" @click="addDetailPrinciple(item)"
-                                                    class="w-full text-left px-3 py-2 text-sm hover:bg-muted">
+                                            {% call button(variant='bare', size='bare', class='w-full text-left px-3 py-2 text-sm hover:bg-muted', attrs_dict={'@click': 'addDetailPrinciple(item)'}) %}
                                                 <span class="font-medium" x-text="item.label"></span>
-                                            </button>
+                                            {% endcall %}
                                         </template>
                                     </div>
                                 </div>
@@ -1446,16 +1010,14 @@
                    Section 4: Planning & Tracking (dates, points, assignee, labels)
                    ══════════════════════════════════════════════════════════════ #}
                 <div class="border-b border-border">
-                    <button type="button" @click="section4Open = !section4Open"
-                            class="w-full px-6 py-3 flex items-center justify-between text-left hover:bg-muted/30 transition-colors"
-                            :aria-expanded="section4Open">
+                    {% call button(variant='bare', size='bare', class='w-full px-6 py-3 flex items-center justify-between text-left hover:bg-muted/30 transition-colors', attrs_dict={'@click': 'section4Open = !section4Open', ':aria-expanded': 'section4Open'}) %}
                         <span class="text-sm font-semibold text-foreground">Planning & Tracking</span>
                         <svg class="w-4 h-4 text-muted-foreground transition-transform duration-200"
                              :class="section4Open ? 'rotate-180' : ''"
                              fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/>
                         </svg>
-                    </button>
+                    {% endcall %}
                     <div x-show="section4Open" x-cloak
                          x-transition:enter="transition ease-out duration-200"
                          x-transition:enter-start="opacity-0 -translate-y-1"
@@ -1508,9 +1070,7 @@
                    Section 5: Governance (acceptance criteria, ARB, phase gate, solution meta)
                    ══════════════════════════════════════════════════════════════ #}
                 <div class="border-b border-border">
-                    <button type="button" @click="section5Open = !section5Open"
-                            class="w-full px-6 py-3 flex items-center justify-between text-left hover:bg-muted/30 transition-colors"
-                            :aria-expanded="section5Open">
+                    {% call button(variant='bare', size='bare', class='w-full px-6 py-3 flex items-center justify-between text-left hover:bg-muted/30 transition-colors', attrs_dict={'@click': 'section5Open = !section5Open', ':aria-expanded': 'section5Open'}) %}
                         <div class="flex items-center gap-2">
                             <span class="text-sm font-semibold text-foreground">Governance</span>
                             <span x-show="card && card.requires_arb_signoff" x-cloak
@@ -1521,7 +1081,7 @@
                              fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/>
                         </svg>
-                    </button>
+                    {% endcall %}
                     <div x-show="section5Open" x-cloak
                          x-transition:enter="transition ease-out duration-200"
                          x-transition:enter-start="opacity-0 -translate-y-1"
@@ -1621,114 +1181,97 @@
                     <div class="px-6 py-5 space-y-3">
                         <div>
                             <label class="text-xs text-muted-foreground">Task title</label>
-                            <input x-model="editFields.title" type="text"
-                                   class="w-full mt-1 px-3 py-2 text-sm border border-border rounded-md bg-background focus:outline-none focus:ring-1 focus:ring-ring" aria-label="Task title"/>
+                            {{ input(aria_label='Task title', size='default', attrs_dict={'x-model': 'editFields.title'}) }}
                         </div>
                         <div>
                             <label class="text-xs text-muted-foreground">Description</label>
-                            <textarea x-model="editFields.description" rows="3"
-                                      class="w-full mt-1 px-3 py-2 text-sm border border-border rounded-md bg-background focus:outline-none focus:ring-1 focus:ring-ring resize-none" aria-label="Description"></textarea>
+                            {% call textarea(aria_label='Description', rows=3, attrs_dict={'x-model': 'editFields.description'}) %}{% endcall %}
                         </div>
                         <div class="grid grid-cols-2 gap-3">
                             <div>
                                 <label class="text-xs text-muted-foreground">Priority</label>
-                                <select x-model="editFields.priority"
-                                        class="w-full mt-1 px-3 py-2 text-sm border border-border rounded-md bg-background focus:outline-none focus:ring-1 focus:ring-ring" aria-label="Priority">
+                                {% call native_select(aria_label='Priority', size='default', class='w-full', attrs_dict={'x-model': 'editFields.priority'}) %}
                                     <option value="critical">Critical</option>
                                     <option value="high">High</option>
                                     <option value="medium">Medium</option>
                                     <option value="low">Low</option>
-                                </select>
+                                {% endcall %}
                             </div>
                             <div>
                                 <label class="text-xs text-muted-foreground">Phase</label>
-                                <select x-model="editFields.phase" @change="onEditPhaseChange()"
-                                        class="w-full mt-1 px-3 py-2 text-sm border border-border rounded-md bg-background focus:outline-none focus:ring-1 focus:ring-ring" aria-label="Phase">
+                                {% call native_select(aria_label='Phase', size='default', class='w-full', attrs_dict={'x-model': 'editFields.phase', '@change': 'onEditPhaseChange()'}) %}
                                     <template x-for="ph in phases" :key="ph.code">
                                         <option :value="ph.code" x-text="ph.label"></option>
                                     </template>
-                                </select>
+                                {% endcall %}
                             </div>
                         </div>
                         <div class="grid grid-cols-2 gap-3">
                             <div>
                                 <label class="text-xs text-muted-foreground">Domain</label>
-                                <select x-model="editFields.arch_domain"
-                                        class="w-full mt-1 px-3 py-2 text-sm border border-border rounded-md bg-background focus:outline-none focus:ring-1 focus:ring-ring" aria-label="Domain">
+                                {% call native_select(aria_label='Domain', size='default', class='w-full', attrs_dict={'x-model': 'editFields.arch_domain'}) %}
                                     <option value="Business">Business</option>
                                     <option value="Data">Data</option>
                                     <option value="Application">Application</option>
                                     <option value="Technology">Technology</option>
                                     <option value="Cross-cutting">Cross-cutting</option>
-                                </select>
+                                {% endcall %}
                             </div>
                             <div>
                                 <label class="text-xs text-muted-foreground">Issue Type</label>
-                                <select x-model="editFields.issue_type"
-                                        class="w-full mt-1 px-3 py-2 text-sm border border-border rounded-md bg-background focus:outline-none focus:ring-1 focus:ring-ring" aria-label="Issue Type">
+                                {% call native_select(aria_label='Issue Type', size='default', class='w-full', attrs_dict={'x-model': 'editFields.issue_type'}) %}
                                     <option value="Epic">Epic</option>
                                     <option value="Story">Story</option>
                                     <option value="Task">Task</option>
                                     <option value="Spike">Spike</option>
                                     <option value="ADR">ADR</option>
                                     <option value="Risk">Risk</option>
-                                </select>
+                                {% endcall %}
                             </div>
                         </div>
                         <div>
                             <label class="text-xs text-muted-foreground">Assignee</label>
                             <div class="relative mt-1">
-                                <input type="text" x-model="editAssigneeSearch"
-                                       @input.debounce.200ms="searchEditUsers()"
-                                       @focus="searchEditUsers()"
-                                       :placeholder="editFields.assignee_label || 'Search users...'"
-                                       autocomplete="off"
-                                       class="w-full px-3 py-2 text-sm border border-border rounded-md bg-background focus:outline-none focus:ring-1 focus:ring-ring" aria-label="Edit Assignee Search"/>
+                                {{ input(aria_label='Edit Assignee Search', size='default', attrs_dict={'x-model': 'editAssigneeSearch', '@input.debounce.200ms': 'searchEditUsers()', '@focus': 'searchEditUsers()', ':placeholder': 'editFields.assignee_label || \'Search users...\'', 'autocomplete': 'off'}) }}
                                 <div x-show="editUserResults.length > 0" x-cloak
                                      class="absolute z-50 mt-1 w-full bg-background border border-border rounded-md max-h-40 overflow-y-auto">
                                     <template x-for="u in editUserResults" :key="u.id">
-                                        <button type="button" @click="selectEditUser(u)"
-                                                class="w-full text-left px-3 py-2 text-sm hover:bg-muted">
+                                        {% call button(variant='bare', size='bare', class='w-full text-left px-3 py-2 text-sm hover:bg-muted', attrs_dict={'@click': 'selectEditUser(u)'}) %}
                                             <span class="font-medium" x-text="u.label"></span>
                                             <span class="text-muted-foreground text-xs ml-1" x-text="u.email"></span>
-                                        </button>
+                                        {% endcall %}
                                     </template>
                                 </div>
                             </div>
                             <p x-show="editFields.assignee_label" x-cloak class="text-xs text-muted-foreground mt-1">
                                 <span x-text="editFields.assignee_label"></span>
-                                <button type="button" @click="editFields.assignee=null; editFields.assignee_label=''; editAssigneeSearch=''" class="ml-1 text-destructive-emphasis hover:underline text-xs">clear</button>
+                                {% call button(variant='bare', size='bare', class='ml-1 text-destructive-emphasis hover:underline text-xs', attrs_dict={'@click': 'editFields.assignee=null; editFields.assignee_label=\'\'; editAssigneeSearch=\'\''}) %}clear{% endcall %}
                             </p>
                         </div>
                         <div class="grid grid-cols-3 gap-3">
                             <div>
                                 <label class="text-xs text-muted-foreground">Points</label>
-                                <input x-model.number="editFields.story_points" type="number" min="0" max="100"
-                                       class="w-full mt-1 px-3 py-2 text-sm border border-border rounded-md bg-background focus:outline-none focus:ring-1 focus:ring-ring" aria-label="Points"/>
+                                {{ input(aria_label='Points', type='number', size='default', attrs_dict={'x-model.number': 'editFields.story_points', 'min': '0', 'max': '100'}) }}
                             </div>
                             <div>
                                 <label class="text-xs text-muted-foreground">Start</label>
-                                <input x-model="editFields.target_start_date" type="date"
-                                       class="w-full mt-1 px-3 py-2 text-sm border border-border rounded-md bg-background focus:outline-none focus:ring-1 focus:ring-ring" aria-label="Start"/>
+                                {{ input(aria_label='Start', type='date', size='default', attrs_dict={'x-model': 'editFields.target_start_date'}) }}
                             </div>
                             <div>
                                 <label class="text-xs text-muted-foreground">Due</label>
-                                <input x-model="editFields.target_end_date" type="date"
-                                       class="w-full mt-1 px-3 py-2 text-sm border border-border rounded-md bg-background focus:outline-none focus:ring-1 focus:ring-ring" aria-label="Due"/>
+                                {{ input(aria_label='Due', type='date', size='default', attrs_dict={'x-model': 'editFields.target_end_date'}) }}
                             </div>
                         </div>
                         <div>
                             <label class="text-xs text-muted-foreground">Acceptance Criteria</label>
-                            <textarea x-model="editFields.acceptance_criteria" rows="2" placeholder="Definition of done..."
-                                      class="w-full mt-1 px-3 py-2 text-sm border border-border rounded-md bg-background focus:outline-none focus:ring-1 focus:ring-ring resize-none" aria-label="Acceptance Criteria"></textarea>
+                            {% call textarea(placeholder='Definition of done...', aria_label='Acceptance Criteria', rows=2, attrs_dict={'x-model': 'editFields.acceptance_criteria'}) %}{% endcall %}
                         </div>
                         <div>
                             <div class="flex items-center justify-between">
                                 <label class="text-xs text-muted-foreground">Progress</label>
                                 <span class="text-xs tabular-nums text-muted-foreground" x-text="editFields.progress_pct + '%'"></span>
                             </div>
-                            <input x-model.number="editFields.progress_pct" type="range" min="0" max="100"
-                                   class="w-full mt-1 accent-primary" aria-label="Progress"/>
+                            {{ input(aria_label='Progress', type='range', size='default', attrs_dict={'x-model.number': 'editFields.progress_pct', 'min': '0', 'max': '100'}) }}
                         </div>
                     </div>
                 </template>
@@ -1745,14 +1288,11 @@
                     {# Delete (task cards) #}
                     <template x-if="card && card.card_type === 'task' && !editMode">
                         <div class="flex items-center gap-2">
-                            <button type="button" @click="confirmDelete = true" x-show="!confirmDelete" x-cloak
-                                    class="text-sm text-muted-foreground hover:text-destructive-emphasis transition-colors">Delete</button>
+                            {% call button(variant='bare', size='bare', class='text-sm text-muted-foreground hover:text-destructive-emphasis transition-colors', attrs_dict={'@click': 'confirmDelete = true', 'x-show': '!confirmDelete', 'x-cloak': true}) %}Delete{% endcall %}
                             <div x-show="confirmDelete" x-cloak class="flex items-center gap-2">
                                 <span class="text-xs text-destructive-emphasis">Delete?</span>
-                                <button type="button" @click="deleteCard()"
-                                        class="px-2 py-1 text-xs rounded bg-destructive text-destructive-foreground hover:bg-destructive/90">Yes</button>
-                                <button type="button" @click="confirmDelete = false"
-                                        class="px-2 py-1 text-xs rounded border border-border hover:bg-muted">No</button>
+                                {% call button(variant='bare', size='bare', class='px-2 py-1 text-xs rounded bg-destructive text-destructive-foreground hover:bg-destructive/90', attrs_dict={'@click': 'deleteCard()'}) %}Yes{% endcall %}
+                                {% call button(variant='bare', size='bare', class='px-2 py-1 text-xs rounded border border-border hover:bg-muted', attrs_dict={'@click': 'confirmDelete = false'}) %}No{% endcall %}
                             </div>
                         </div>
                     </template>
@@ -1760,27 +1300,20 @@
                 <div class="flex items-center gap-2">
                     <template x-if="card && card.card_type === 'task' && editMode">
                         <div class="flex items-center gap-2">
-                            <button type="button" @click="editMode = false"
-                                    class="px-3 py-1.5 text-sm rounded-md border border-border hover:bg-muted transition-colors">Cancel</button>
-                            <button type="button" @click="saveEdit()"
-                                    class="px-3 py-1.5 text-sm rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors">Save</button>
+                            {% call button(variant='bare', size='bare', class='px-3 py-1.5 text-sm rounded-md border border-border hover:bg-muted transition-colors', attrs_dict={'@click': 'editMode = false'}) %}Cancel{% endcall %}
+                            {% call button(variant='default', size='default', attrs_dict={'@click': 'saveEdit()'}) %}Save{% endcall %}
                         </div>
                     </template>
                     <template x-if="card && card.card_type === 'task' && !editMode">
                         <div class="flex items-center gap-2">
-                            <button type="button" @click="pushToGantt()"
-                                    :disabled="ganttPushLoading"
-                                    class="px-3 py-1.5 text-sm rounded-md border border-border hover:bg-muted transition-colors"
-                                    :class="ganttPushLoading ? 'opacity-50 cursor-wait' : ''">
+                            {% call button(variant='bare', size='bare', class='px-3 py-1.5 text-sm rounded-md border border-border hover:bg-muted transition-colors', attrs_dict={'@click': 'pushToGantt()', ':disabled': 'ganttPushLoading', ':class': 'ganttPushLoading ? \'opacity-50 cursor-wait\' : \'\''}) %}
                                 <span x-show="!ganttPushLoading" x-cloak>Push to Gantt</span>
                                 <span x-show="ganttPushLoading" x-cloak>Pushing…</span>
-                            </button>
-                            <button type="button" @click="startEdit()"
-                                    class="px-3 py-1.5 text-sm rounded-md border border-border hover:bg-muted transition-colors">Edit</button>
+                            {% endcall %}
+                            {% call button(variant='bare', size='bare', class='px-3 py-1.5 text-sm rounded-md border border-border hover:bg-muted transition-colors', attrs_dict={'@click': 'startEdit()'}) %}Edit{% endcall %}
                         </div>
                     </template>
-                    <button type="button" @click="card = null"
-                            class="px-3 py-1.5 text-sm rounded-md border border-border hover:bg-muted transition-colors">Close</button>
+                    {% call button(variant='bare', size='bare', class='px-3 py-1.5 text-sm rounded-md border border-border hover:bg-muted transition-colors', attrs_dict={'@click': 'card = null'}) %}Close{% endcall %}
                 </div>
             </div>
         </div>
@@ -2130,13 +1663,11 @@
         {# Panel header #}
         <div class="flex items-center justify-between px-4 py-3 border-b border-border">
             <h2 class="text-sm font-semibold text-foreground">Sprint Planning</h2>
-            <button type="button" @click="open = false; $store.modal.close('sprint-planning-panel')"
-                    class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                    aria-label="Close Sprint Planning panel">
+            {% call button(variant='bare', size='bare', class='inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring', aria_label='Close Sprint Planning panel', attrs_dict={'@click': 'open = false; $store.modal.close(\'sprint-planning-panel\')'}) %}
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
                 </svg>
-            </button>
+            {% endcall %}
         </div>
 
         {# Panel body #}
@@ -2189,23 +1720,18 @@
                 <div class="space-y-1">
                     <p class="text-xs font-semibold text-muted-foreground uppercase tracking-wide">All Sprints</p>
                     <template x-for="sprint in sprints" :key="sprint.id">
-                        <button type="button" @click="activeSprint = sprint"
-                                class="w-full text-left px-3 py-2 rounded-md border text-xs transition-colors"
-                                :class="activeSprint && activeSprint.id === sprint.id
- ? 'border-primary bg-primary/5 text-foreground'
- : 'border-border hover:bg-muted text-muted-foreground'">
+                        {% call button(variant='bare', size='bare', class='w-full text-left px-3 py-2 rounded-md border text-xs transition-colors', attrs_dict={'@click': 'activeSprint = sprint', ':class': 'activeSprint && activeSprint.id === sprint.id ? \'border-primary bg-primary/5 text-foreground\' : \'border-border hover:bg-muted text-muted-foreground\''}) %}
                             <span class="font-medium" x-text="sprint.name"></span>
                             <span class="ml-1.5 opacity-60" x-text="'[' + sprint.status + ']'"></span>
-                        </button>
+                        {% endcall %}
                     </template>
                 </div>
             </template>
 
             {# Create sprint toggle #}
-            <button type="button" @click="showCreateForm = !showCreateForm"
-                    class="w-full px-3 py-2 text-xs font-medium rounded-md border border-dashed border-border text-muted-foreground hover:bg-muted hover:text-foreground transition-colors">
+            {% call button(variant='bare', size='bare', class='w-full px-3 py-2 text-xs font-medium rounded-md border border-dashed border-border text-muted-foreground hover:bg-muted hover:text-foreground transition-colors', attrs_dict={'@click': 'showCreateForm = !showCreateForm'}) %}
                 <span x-text="showCreateForm ? '− Cancel' : '+ Create Sprint'"></span>
-            </button>
+            {% endcall %}
 
             {# Create sprint form #}
             <template x-if="showCreateForm">
@@ -2213,43 +1739,25 @@
                       class="space-y-3 p-3 rounded-md border border-border bg-muted/30">
                     <div>
                         <label class="block text-sm font-medium text-muted-foreground mb-1" for="sprint-name">Sprint Name *</label>
-                        <input id="sprint-name"
-                               x-model="newSprint.name"
-                               type="text"
-                               required
-                               placeholder="e.g. Sprint 1"
-                               class="h-9 w-full px-2.5 text-xs border border-border rounded-md bg-background focus:outline-none focus:ring-1 focus:ring-primary"/>
+                        {{ input(id='sprint-name', placeholder='e.g. Sprint 1', size='sm', attrs_dict={'x-model': 'newSprint.name', 'required': true}) }}
                     </div>
                     <div class="grid grid-cols-1 gap-2">
                         <div>
                             <label class="block text-sm font-medium text-muted-foreground mb-1" for="sprint-start">Start Date</label>
-                            <input id="sprint-start"
-                                   x-model="newSprint.startDate"
-                                   type="date"
-                                   class="h-9 w-full px-2 text-xs border border-border rounded-md bg-background focus:outline-none focus:ring-1 focus:ring-primary"/>
+                            {{ input(id='sprint-start', type='date', size='sm', attrs_dict={'x-model': 'newSprint.startDate'}) }}
                         </div>
                         <div>
                             <label class="block text-sm font-medium text-muted-foreground mb-1" for="sprint-end">End Date</label>
-                            <input id="sprint-end"
-                                   x-model="newSprint.endDate"
-                                   type="date"
-                                   class="h-9 w-full px-2 text-xs border border-border rounded-md bg-background focus:outline-none focus:ring-1 focus:ring-primary"/>
+                            {{ input(id='sprint-end', type='date', size='sm', attrs_dict={'x-model': 'newSprint.endDate'}) }}
                         </div>
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-muted-foreground mb-1" for="sprint-capacity">Capacity Points</label>
-                        <input id="sprint-capacity"
-                               x-model.number="newSprint.capacityPoints"
-                               type="number"
-                               min="0"
-                               placeholder="0"
-                               class="h-9 w-full px-2.5 text-xs border border-border rounded-md bg-background focus:outline-none focus:ring-1 focus:ring-primary"/>
+                        {{ input(id='sprint-capacity', placeholder='0', type='number', size='sm', attrs_dict={'x-model.number': 'newSprint.capacityPoints', 'min': '0'}) }}
                     </div>
-                    <button type="submit"
-                            :disabled="!newSprint.name"
-                            class="w-full px-3 py-1.5 text-xs font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+                    {% call button(variant='default', size='default', type='submit', attrs_dict={':disabled': '!newSprint.name'}) %}
                         Create Sprint
-                    </button>
+                    {% endcall %}
                 </form>
             </template>
 
