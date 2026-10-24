@@ -378,7 +378,7 @@
             closeDropdown(_openDropdown.btn, panel);
             return;
         }
-        const items = Array.from(panel.querySelectorAll('[role="menuitem"]:not([disabled]):not(.cursor-not-allowed)'));
+        const items = Array.from(panel.querySelectorAll('[role^="menuitem"]:not([disabled]):not(.cursor-not-allowed)'));
         if (!items.length) return;
         const focused = document.activeElement;
         const idx = items.indexOf(focused);
@@ -395,6 +395,15 @@
         } else if (e.key === 'End') {
             e.preventDefault();
             items[items.length - 1].focus();
+        } else if (e.key === ' ' && idx >= 0) {
+            e.preventDefault();
+            items[idx].click();
+        } else if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+            // Typing a letter jumps to the next item that starts with it.
+            const letter = e.key.toLowerCase();
+            const order = items.slice(idx + 1).concat(items.slice(0, idx + 1));
+            const hit = order.find(function(el) { return el.textContent.trim().toLowerCase().indexOf(letter) === 0; });
+            if (hit) { e.preventDefault(); hit.focus(); }
         }
     });
 

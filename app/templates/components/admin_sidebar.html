@@ -198,7 +198,7 @@ DEPENDENCIES:
                     </div>
                 </div>
             </template>
-            <p x-show="moduleSearch.error" role="alert" class="px-3 py-2 text-xs text-destructive">Search is unavailable. Try again.</p>
+            <template x-if="moduleSearch.error"><p role="alert" class="px-3 py-2 text-xs text-destructive">Search is unavailable. Try again.</p></template>
         </div>
 
         <div x-show="!searching()">

@@ -44,6 +44,11 @@
        ]
    ) }}
    
+   Keyboard: ui/dropdown_menu.js gives every menu the arrow-key model. Pass
+   subject_attr='data-card-id' where choosing an item moves the thing the menu
+   belongs to (a board card): focus then lands on that subject, found again by
+   that attribute, instead of on the trigger.
+
    4. Icon-Only Trigger:
    {{ dropdown_menu(
        trigger_icon='more-vertical',
@@ -66,7 +71,9 @@
     trigger_size='default',
     trigger_testid=none,
     trigger_aria_label=none,
-    trigger_title=none
+    trigger_title=none,
+    trigger_attrs_dict={},
+    subject_attr=none
 ) %}
 {% set unique_id = id or 'dropdown-' ~ range(1000, 9999) | random %}
 
@@ -81,12 +88,14 @@
 {% set positions = {
     'left': 'left-0',
     'right': 'right-0',
-    'center': 'left-1/2 transform -translate-x-1/2'
+    'center': 'left-1/2 transform -translate-x-1/2',
+    'board': 'left-0 [.kanban-column:last-child_&]:left-auto [.kanban-column:last-child_&]:right-0'
 } %}
 
 <div 
     id="{{ unique_id }}"
     class="relative {{ class }}"
+    data-dropdown-menu{% if subject_attr %} data-menu-subject="{{ subject_attr }}"{% endif %}
     x-data="{ menuOpen: false }"
     @click.away="menuOpen = false"
     @keydown.escape.window="menuOpen = false"
@@ -94,11 +103,12 @@
     {# Trigger Button #}
     <button
         type="button"
+        data-menu-trigger
         @click="menuOpen = !menuOpen"
         :aria-expanded="menuOpen"
-        aria-haspopup="true"
+        aria-haspopup="menu"
         class="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 {{ 'h-8' if trigger_size == 'sm' else ('h-9' if trigger_size == 'md' else 'h-10') }} {{ ('w-8' if trigger_size == 'sm' else ('w-9' if trigger_size == 'md' else 'w-10')) if trigger_icon_only else ('px-3' if trigger_size in ('sm', 'md') else 'px-4 py-2') }} {{ trigger_variants.get(trigger_variant, trigger_variants['default']) }} {{ trigger_class }}"
-     aria-label="{{ trigger_aria_label or 'Open' }}"{% if trigger_testid %} data-testid="{{ trigger_testid }}"{% endif %}{% if trigger_title %} title="{{ trigger_title }}"{% endif %}>
+     aria-label="{{ trigger_aria_label or 'Open' }}"{% if trigger_testid %} data-testid="{{ trigger_testid }}"{% endif %}{% if trigger_title %} title="{{ trigger_title }}"{% endif %}{% for attr_name, attr_value in trigger_attrs_dict.items() %} {{ attr_name }}="{{ attr_value }}"{% endfor %}>
         {% if trigger_icon %}
         <i data-lucide="{{ trigger_icon }}" class="{% if not trigger_icon_only %}mr-2{% endif %} w-4 h-4" aria-hidden="true"></i>
         {% endif %}
@@ -116,7 +126,7 @@
 
     {# Dropdown Menu #}
     <div 
-        x-show="menuOpen" x-cloak @keydown.escape.window="menuOpen = false" role="dialog" aria-modal="true"
+        x-show="menuOpen" x-cloak @keydown.escape.window="menuOpen = false"
         x-transition:enter="transition ease-out duration-100"
         x-transition:enter-start="transform opacity-0 scale-95"
         x-transition:enter-end="transform opacity-100 scale-100"
@@ -182,7 +192,7 @@
                             role="menuitem"
                             {% if item.testid %}data-testid="{{ item.testid }}"{% endif %} {% if item.title %}title="{{ item.title }}"{% endif %}
                             {% if item.disabled %}disabled class="opacity-50 cursor-not-allowed"{% endif %}
-                         aria-label="{{ item.aria_label or 'Open' }}">
+                         aria-label="{{ item.aria_label or item.text }}">
                             {% if item.icon %}
                             <i data-lucide="{{ item.icon }}" class="w-4 h-4" aria-hidden="true"></i>
                             {% endif %}

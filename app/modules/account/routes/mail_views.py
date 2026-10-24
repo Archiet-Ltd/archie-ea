@@ -79,8 +79,8 @@ def register_view():
             )
             return redirect(url_for("account.unconfirmed"))
         flash(
-            "Account created. Welcome to {}! E-mail is not available on this "
-            "server, so no confirmation message was sent.".format(current_app.config['APP_NAME']),
+            "Account created. Welcome to {}! Your account is ready to use, "
+            "with no confirmation message to wait for.".format(current_app.config['APP_NAME']),
             "info",
         )
         if chosen is not None:
@@ -156,11 +156,14 @@ def confirm_request_view():
         return redirect(url_for("main.index"))
     if request.method != "POST":
         return redirect(url_for("account.unconfirmed"))
-    delivered, error = AccountService.send_confirmation_email(current_user)
+    delivered, _error = AccountService.send_confirmation_email(current_user)
     if delivered:
         flash("A new confirmation link has been sent to {}.".format(current_user.email), "success")
     else:
-        flash("No message was sent: {}".format(error), "error")
+        flash(
+            "We could not send a confirmation link just now. Please try again in a few minutes.",
+            "error",
+        )
     return redirect(url_for("account.unconfirmed"))
 
 

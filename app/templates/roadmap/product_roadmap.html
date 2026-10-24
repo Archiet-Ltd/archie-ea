@@ -54,7 +54,7 @@
         </template>
       </div>
       <template x-for="card in columnCards('{{ state }}')" :key="card.id">
-        {% call kanban_card(horizon_states, horizon_labels, title='card.title') %}
+        {% call kanban_card(horizon_states, horizon_labels, title='card.title', can_write=can_write) %}
           <div class="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
             <span x-text="card.stories_count + ' stories'"></span>
             <span aria-hidden="true">·</span>

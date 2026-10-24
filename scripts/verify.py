@@ -1118,7 +1118,8 @@ def gate_raw_html_escaping(baseline: int) -> Result:
                   detail, count, baseline)
 
 
-def gate_design_map(outside_baseline: int, unmarked_baseline: int, components_baseline: int = 0) -> Result:
+def gate_design_map(outside_baseline: int, unmarked_baseline: int, components_baseline: int = 0,
+                    tier_baselines: dict | None = None) -> Result:
     """Every page template is in docs/design-map.json and follows its block.
 
     406 page templates were each styled for the task that built them, so the
@@ -1133,8 +1134,18 @@ def gate_design_map(outside_baseline: int, unmarked_baseline: int, components_ba
     component outside its row is a finding. The pages already outside their
     block, the pages with no marker yet and the pages outside their row's
     components are ratcheted, so the counts only fall.
+
+    Each row also carries the designers' port-map tier (A verbatim, B composed,
+    C1 to C5 the forms shadcn has no original for). The checks of those tiers
+    that a template can answer today are ratcheted per check and reported per
+    tier: an in-house component the port map marks Replace still in use, an
+    in-house component the tier does not allow, more than two charts drawn,
+    a colour literal, an inline style and an arbitrary-value class. The checks
+    that need a golden render or a browser (A2 to A5, B2, B4 to B9, X6 to X10,
+    the Tier C forms) are listed as pending in the detail, not counted.
     """
     name = "design-map"
+    tier_baselines = tier_baselines or {}
     proc = _run([sys.executable, "scripts/check_design_map.py", "--json", "--changed"])
     try:
         data = json.loads(proc.stdout)
@@ -1150,10 +1161,22 @@ def gate_design_map(outside_baseline: int, unmarked_baseline: int, components_ba
     if components > components_baseline:
         problems.append(f"{components} pages use a component outside their row's component list "
                         f"(baseline {components_baseline})")
+    tier_extra = {}
+    for check, found in data["tier_checks"].items():
+        key = f"design_map_tier_{check}"
+        tier_extra[key] = found["count"]
+        limit = tier_baselines.get(key, 0)
+        if found["count"] > limit:
+            by_tier = ", ".join(f"{t} {n}" for t, n in found["by_tier"].items())
+            problems.append(f"{found['count']} pages: {check.replace('_', ' ')} ({by_tier}) (baseline {limit})")
     detail = "; ".join(problems)[:1800] + ("; run python scripts/check_design_map.py" if problems else "")
+    if not problems:
+        tiers = ", ".join(f"{t} {n}" for t, n in data["tiers"].items())
+        detail = (f"tiers {tiers}; tier checks pending a golden render or browser: "
+                  + ", ".join(data["tier_checks_pending"]))
     return Result(name, FAIL if problems else PASS, detail, outside, outside_baseline,
                   extra={"design_map_outside_block": outside, "design_map_unmarked": unmarked,
-                         "design_map_outside_components": components})
+                         "design_map_outside_components": components, **tier_extra})
 
 
 def gate_smoke_coverage_on_change() -> Result:
@@ -1872,6 +1895,18 @@ def gate_count_checker(name: str, script: str, baseline: int) -> Result:
     return Result(name, PASS if count <= baseline else FAIL, detail, count, baseline)
 
 
+def gate_brand_raw_colour(baseline: int) -> Result:
+    """The old brand blues written out anywhere but the token file and the logo."""
+    proc = _run([sys.executable, "scripts/check_brand_tokens.py", "--raw"])
+    try:
+        count = int(proc.stdout.strip().splitlines()[-1])
+    except (ValueError, IndexError):
+        return Result("brand-raw-colour", FAIL,
+                      f"could not parse count: {proc.stdout!r} {proc.stderr[:300]}")
+    detail = "" if count <= baseline else "run scripts/check_brand_tokens.py --raw to list them"
+    return Result("brand-raw-colour", PASS if count <= baseline else FAIL, detail, count, baseline)
+
+
 # ---------------------------------------------------------------- registry
 
 
@@ -1908,6 +1943,22 @@ def build_gates(baseline: dict) -> list[Gate]:
         Gate("design-tokens", "No new raw Tailwind colours (DESIGN.md)", "ratchet",
              lambda: gate_design_tokens(baseline["design_tokens"]),
              remediation="use semantic tokens; see the table in DESIGN.md",
+             tags=["static", "ui"]),
+        Gate("brand-contrast",
+             "brand tokens keep their contrast (label on primary, control borders, chart ramp) and the logo is --primary",
+             "zero",
+             lambda: gate_count_checker(
+                 "brand-contrast", "scripts/check_brand_tokens.py", 0,
+             ),
+             remediation="run scripts/check_brand_tokens.py --report; change the value in "
+                         "app/static/css/shadcn_tokens.css, not the threshold",
+             tags=["static", "ui"]),
+        Gate("brand-raw-colour",
+             "no hard-coded old or logo brand blue outside the token file and the logo",
+             "ratchet",
+             lambda: gate_brand_raw_colour(baseline.get("brand_raw_colour", 53)),
+             remediation="use bg-primary / text-primary / the --primary token; "
+                         "scripts/check_brand_tokens.py --raw lists them",
              tags=["static", "ui"]),
         Gate("composer-url-params",
              "No composer link carrying a parameter the composer doesn't read",
@@ -2259,7 +2310,8 @@ def build_gates(baseline: dict) -> list[Gate]:
              "ratchet",
              lambda: gate_design_map(baseline.get("design_map_outside_block", 0),
                                      baseline.get("design_map_unmarked", 0),
-                                     baseline.get("design_map_outside_components", 0)),
+                                     baseline.get("design_map_outside_components", 0),
+                                     {k: v for k, v in baseline.items() if k.startswith("design_map_tier_")}),
              remediation="run python scripts/check_design_map.py; use only the macros the page's block "
                          "allows, add {# design-block: <block> #} to a changed page, and run --write "
                          "for a new page",

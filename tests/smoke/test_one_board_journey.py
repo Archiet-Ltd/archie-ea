@@ -124,7 +124,7 @@ def test_architect_prioritises_requirements_by_drag_keyboard_and_menu(browser, l
         assert moved.value.status == 200
         # Menu: second requirement to Should have.
         with page.expect_response(_is_patch("/moscow")) as moved:
-            _move_by_menu(page.locator(".kanban-card").filter(has_text=titles[1]), "Should have")
+            _move_by_menu(page.locator(".kanban-card").filter(has_text=titles[1]), titles[1], "Should have")
         assert moved.value.status == 200
         # Keyboard: third requirement picked up with Space, moved right with the arrow key, dropped with Space.
         third = page.locator(".kanban-card").filter(has_text=titles[2])
@@ -167,7 +167,7 @@ def test_backlog_board_works_on_a_phone_with_the_menu(browser, live_server, own_
         scroller = page.locator("[data-kanban-scroll]").first
         assert scroller.evaluate("el => el.scrollWidth > el.clientWidth"), "board does not scroll sideways at 390"
         with page.expect_response(_is_patch("/moscow")) as moved:
-            _move_by_menu(page.locator(".kanban-card").filter(has_text=title), "Could have")
+            _move_by_menu(page.locator(".kanban-card").filter(has_text=title), title, "Could have")
         assert moved.value.status == 200
         _reload(page)
         assert _column_of(page, title) == "COULD"
@@ -268,7 +268,7 @@ def test_solution_architect_schedules_epics_by_drag_keyboard_and_menu(browser, l
             _drag_card(page, page.locator(".kanban-card").filter(has_text=a), "now")
         assert moved.value.status == 200
         with page.expect_response(_is_patch("/horizon")) as moved:
-            _move_by_menu(page.locator(".kanban-card").filter(has_text=b), "Later")
+            _move_by_menu(page.locator(".kanban-card").filter(has_text=b), b, "Later")
         assert moved.value.status == 200
         card_c = page.locator(".kanban-card").filter(has_text=c)
         card_c.focus()
@@ -287,7 +287,7 @@ def test_solution_architect_schedules_epics_by_drag_keyboard_and_menu(browser, l
 
         # Put one back to unscheduled: the server clears the horizon.
         with page.expect_response(_is_patch("/horizon")) as moved:
-            _move_by_menu(page.locator(".kanban-card").filter(has_text=a), "Unscheduled")
+            _move_by_menu(page.locator(".kanban-card").filter(has_text=a), a, "Unscheduled")
         assert moved.value.status == 200
         _reload(page)
         assert _column_of(page, a) == "unscheduled"
@@ -305,7 +305,7 @@ def test_roadmap_works_on_a_phone_and_a_viewer_is_read_only(browser, live_server
         _wait_cards(page)
         assert page.locator("[data-kanban-scroll]").first.evaluate("el => el.scrollWidth > el.clientWidth")
         with page.expect_response(_is_patch("/horizon")) as moved:
-            _move_by_menu(page.locator(".kanban-card").filter(has_text=title), "Next")
+            _move_by_menu(page.locator(".kanban-card").filter(has_text=title), title, "Next")
         assert moved.value.status == 200
         _reload(page)
         assert _column_of(page, title) == "next"

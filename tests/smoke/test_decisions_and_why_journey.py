@@ -1,5 +1,5 @@
 """An architect records a decision against the elements it affects, finds it from
-those elements, and asks why a worked-out connection exists: in a real browser.
+those elements, and asks the AI chat why a worked-out connection exists: in a real browser.
 
 Two organisations, each with the same shape of model:
 
@@ -22,6 +22,7 @@ import pytest
 
 from playwright.sync_api import expect
 
+from .chat_ask import ask, role_of
 from .conftest import PAGE_TIMEOUT, PASSWORD
 
 pytestmark = [pytest.mark.smoke, pytest.mark.journey]
@@ -186,21 +187,14 @@ def test_an_architect_records_a_decision_finds_it_from_the_element_and_asks_why(
     expect(decisions.get_by_role("link", name=title)).to_be_visible()
     assert two_organisations["other_title"] not in decisions.inner_text()
 
-    # Ask about the Mainframe and open Why? on the connection nobody drew.
-    page.goto(live_server + "/intelligence/ask", wait_until="domcontentloaded")
-    _ready(page, "askSurface")
-    page.locator("#ask-question-impact").click()
-    box = page.locator("#ask-picker-input")
-    expect(box).to_be_focused()
-    box.press_sequentially(ours["noun"] + " Mainframe", delay=15)
-    page.locator("#ask-picker-listbox [role=option]", has_text=names["mainframe"]).click()
-    derived = page.locator('[data-ask-row][data-kind="derived"]')
+    # Ask the chat about the Mainframe and read why on the connection nobody drew.
+    assert role_of(ours["email"]) == "enterprise_architect"  # the persona, not an administrator
+    answer = ask(page, live_server, "What breaks if %s fails" % names["mainframe"])
+    derived = answer.locator('[data-slot="card"]').filter(
+        has=page.locator('[data-answer-row][data-kind="derived"]'))
     expect(derived).to_have_count(1)
-    derived.get_by_role("button", name="Why?").click()
-    dialog = page.locator("#drawer-provenance [role=dialog]")
-    dialog.wait_for(state="visible")
 
-    why = dialog.locator("[data-why-chain]")
+    why = derived.locator("[data-why]")
     expect(why.locator("[data-why-rule]")).to_have_text(
         "A serving link followed by a serving link gives a serving link, by the ArchiMate derivation table."
     )
@@ -211,8 +205,8 @@ def test_an_architect_records_a_decision_finds_it_from_the_element_and_asks_why(
     expect(links.nth(1)).to_contain_text("%s depends on %s." % (names["portal"], names["gateway"]))
     expect(links.nth(1)).to_contain_text("Not recorded")
     expect(why.locator("[data-why-decisions]").get_by_role("link", name=title)).to_be_visible()
-    assert two_organisations["other_title"] not in dialog.inner_text()
-    assert "Other Org" not in dialog.inner_text()
+    assert two_organisations["other_title"] not in derived.inner_text()
+    assert "Other Org" not in derived.inner_text()
 
     # Each name in the explanation opens the record it names.
     links.nth(1).get_by_role("link", name=names["gateway"]).click()

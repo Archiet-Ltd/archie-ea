@@ -10842,7 +10842,7 @@ def api_get_viewpoint_elements(solution_id, section_id):
             "description": elem.description or "",
             "scope": elem.scope,
             "building_block_type": getattr(elem, "building_block_type", None),
-            "plateau": elem.plateau,
+            "plateau": elem.togaf_plateau,
             "status": "linked",
             # Contextual intelligence fields (empty for non-app elements)
             "lifecycle": ctx.get("lifecycle", ""),
@@ -10901,7 +10901,7 @@ def api_get_viewpoint_elements(solution_id, section_id):
                 "description": getattr(elem, "description", "") or "",
                 "scope": getattr(elem, "scope", None),
                 "building_block_type": getattr(elem, "building_block_type", None),
-                "plateau": getattr(elem, "plateau", None),
+                "plateau": getattr(elem, "togaf_plateau", None),
                 "status": "context",
                 "lifecycle": "",
                 "other_solutions": 0,

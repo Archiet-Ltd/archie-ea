@@ -215,11 +215,8 @@
    "app/services/rationalization_scoring_service.py": 1,
    "app/services/strategic_recommendation_engine.py": 1
   },
-  "kanban-board/board-drag-hooks": {
-   "app/templates/adm_kanban/board_v2.html": 4
-  },
   "kanban-board/kanban-column-markup": {
-   "app/templates/adm_kanban/board_v2.html": 2
+   "app/templates/adm_kanban/board_v2.html": 1
   },
   "name-matching/duplicate-lookup": {
    "app/application_mgmt/consolidation_routes.py": 1,

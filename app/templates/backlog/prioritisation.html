@@ -64,7 +64,7 @@
               'WONT': {'why': 'Nothing is ruled out for now.', 'next_write': 'Move a requirement here to record that it will not be built this time.', 'next_read': ''}
             }) %}
         <template x-for="card in columnCards('{{ state }}')" :key="card.id">
-          {% call kanban_card(move_states, moscow_labels) %}
+          {% call kanban_card(move_states, moscow_labels, can_write=can_write) %}
             <p class="mt-1 text-xs text-muted-foreground" x-text="card.wsjf_score == null ? 'Not scored yet' : `WSJF ${Number(card.wsjf_score).toFixed(2)}`"></p>
           {% endcall %}
         </template>
