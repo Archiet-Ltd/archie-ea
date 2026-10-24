@@ -31,7 +31,7 @@ import uuid
 import pytest
 from playwright.sync_api import expect
 
-from .conftest import type_and_wait
+from .chat_ask import ask
 
 pytestmark = [pytest.mark.smoke, pytest.mark.journey]
 
@@ -173,12 +173,12 @@ def _dismiss_welcome(j):
 
 
 def _open_ask(j):
-    """Go to Ask the way the dashboard offers it."""
+    """Go to the AI chat the way the dashboard offers it."""
     page = j.page
-    if "/intelligence/ask" in page.url:
+    if "/ai-chat" in page.url:
         return
     page.locator("main").get_by_role("link", name="Ask a question").first.click()
-    page.wait_for_url(re.compile(r".*/intelligence/ask.*"), timeout=30000)
+    page.wait_for_url(re.compile(r".*/ai-chat.*"), timeout=30000)
 
 
 def _go_home(j):
@@ -363,11 +363,8 @@ def asked(journey):
     if not hasattr(j, "answer"):
         page.goto(j.base + "/dashboard/overview", wait_until="domcontentloaded")
         _open_ask(j)
-        type_and_wait(page, "ask", ASKED)
-        page.locator("#ask-picker-listbox [role=option]").first.click()
-        page.locator("#ask-question-impact").click()
-        page.wait_for_timeout(4000)
-        j.answer = j.main_text()
+        card = ask(page, j.base, "What breaks if %s fails" % ASKED, fresh=False)
+        j.answer = card.inner_text()
         j.saw("Answer to: what breaks if %s fails" % ASKED)
         j.shot("first-answer")
     return j
@@ -400,7 +397,7 @@ def test_13_the_answer_gives_a_sentence_a_cto_could_forward(asked):
 @pytest.mark.xfail(strict=True, reason=SNAG_06_07)
 def test_14_clicking_a_listed_system_lands_on_a_page_with_content_for_it(asked):
     j, page = asked, asked.page
-    link = page.locator("main").get_by_role("link", name=re.compile("Open in the Composer", re.I)).first
+    link = page.get_by_test_id("estate-answer").last.get_by_role("link", name=re.compile("|".join(DEPENDANTS))).first
     expect(link).to_be_visible(timeout=SHORT)
     ask_url = page.url
     link.click()
