@@ -176,3 +176,33 @@
     {% endif %}
 </section>
 {% endmacro %}
+
+
+{% macro explained_value(text, action_text='', action_onclick='', action_href='') %}
+{# A missing value with its plain-language explanation and optional next step.
+
+   Used where a field is empty but the absence has a clear reason and remedy:
+   "Not set" with "Assign owner", "Not mapped" with no action when the mapping
+   dialog lives elsewhere, "None recorded" with "Add vendor". The text is muted
+   so it reads as descriptive, not as data; the action (if given) is a link or
+   button that opens the relevant picker or dialog.
+
+   Arguments:
+     text          str     The explanation ("Not set", "Not mapped", "None recorded")
+     action_text   str     Optional action label ("Assign owner", "Add vendor")
+     action_onclick str    Optional Alpine/JS click handler (use OR href, not both)
+     action_href    str    Optional link target (use OR onclick, not both)
+#}
+<span class="text-xs text-muted-foreground">
+  {{ text }}
+  {% if action_text %}
+    {% if action_href %}
+      <a href="{{ action_href }}" class="text-info hover:underline">{{ action_text }}</a>
+    {% elif action_onclick %}
+      <button type="button" @click="{{ action_onclick }}" class="text-info hover:underline">{{ action_text }}</button>
+    {% else %}
+      {{ action_text }}
+    {% endif %}
+  {% endif %}
+</span>
+{% endmacro %}

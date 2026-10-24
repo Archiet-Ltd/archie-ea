@@ -1,0 +1,41 @@
+{# Completeness ring — a circular progress indicator showing how complete a record is.
+
+   Extracted from fact_sheet.html lines 47-62 into a shared macro so both the
+   fact sheet and the applications list can show the same ring without copying
+   the markup.
+
+   Arguments:
+     percentage  int|float  The completeness percentage (0-100)
+     size        str        'small' (list row) or 'large' (fact sheet)
+     label       str        Accessible label (e.g., "Record 42% complete")
+     href        str        Optional link target (to fact sheet's missing list)
+#}
+
+{% macro completeness_ring(percentage, size='small', label='', href='') %}
+{%- set ring_class = 'text-success' if percentage >= 75 else 'text-warning' if percentage >= 40 else 'text-destructive' -%}
+{%- set width = '32px' if size == 'small' else '76px' -%}
+{%- set stroke_width = '2.5' if size == 'small' else '3' -%}
+{%- set font_size = 'text-xs' if size == 'small' else 'text-lg' -%}
+{%- set font_weight = 'font-semibold' if size == 'small' else 'font-bold' -%}
+
+{%- if href -%}
+<a href="{{ href }}" class="inline-block" aria-label="{{ label }}">
+{%- else -%}
+<div class="inline-block" {% if label %}aria-label="{{ label }}"{% endif %}>
+{%- endif -%}
+  <div class="relative" style="width:{{ width }};height:{{ width }}"> {# inline-style-ok: fixed ring geometry #}
+    <svg viewBox="0 0 36 36" class="w-full h-full -rotate-90">
+      <circle cx="18" cy="18" r="15.9" fill="none" stroke="currentColor" class="text-muted/40" stroke-width="{{ stroke_width }}"></circle>
+      <circle cx="18" cy="18" r="15.9" fill="none" stroke="currentColor" class="{{ ring_class }}" stroke-width="{{ stroke_width }}"
+              stroke-linecap="round" stroke-dasharray="{{ percentage }} 100"></circle>
+    </svg>
+    <div class="absolute inset-0 flex items-center justify-center">
+      <span class="{{ font_size }} {{ font_weight }} tabular-nums text-foreground">{{ percentage }}<span class="text-[0.6em]">%</span></span>
+    </div>
+  </div>
+{%- if href -%}
+</a>
+{%- else -%}
+</div>
+{%- endif -%}
+{% endmacro %}
