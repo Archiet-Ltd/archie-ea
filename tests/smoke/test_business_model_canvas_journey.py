@@ -205,3 +205,91 @@ def test_canvas_keeps_its_nine_boxes_at_phone_width(browser, live_server, seeded
         assert len({round(t) for t in tops.values()}) == 1, tops
     finally:
         context.close()
+
+
+_BAND_READING = """
+band => {
+  const num = s => s.match(/[\\d.]+/g).map(Number);
+  const blend = (top, under) => { const a = top.length > 3 ? top[3] : 1; return [0, 1, 2].map(i => top[i] * a + under[i] * (1 - a)); };
+  const lum = c => { const f = v => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); }; return 0.2126 * f(c[0]) + 0.7152 * f(c[1]) + 0.0722 * f(c[2]); };
+  const ratio = (x, y) => { const [h, l] = [lum(x), lum(y)].sort((p, q) => q - p); return (h + 0.05) / (l + 0.05); };
+  const card = num(getComputedStyle(band.closest('[data-slot=card]')).backgroundColor);
+  const tint = blend(num(getComputedStyle(band).backgroundColor), card);
+  const labels = [...band.querySelectorAll('span.truncate, [data-slot=card-description]')].map(e => {
+    const c = num(getComputedStyle(e).color);
+    return ratio(blend(c, tint), tint);
+  });
+  return { tint, spread: Math.max(...tint) - Math.min(...tint), worst: Math.min(...labels) };
+}
+"""
+
+
+@pytest.mark.smoke
+@pytest.mark.journey
+def test_architect_reads_what_each_box_wants_from_its_band_and_empty_state(browser, live_server, seeded):
+    """A business architect opening the canvas sees what each box is for without being told: a tinted zone band
+    with the entry count, the framework's question, an "i" popover with guidance, a preview on each entry, and in
+    an empty box what is missing and a button that opens the add dialog."""
+    email = seeded["emails"]["business_architect"]
+    _assert_persona(email)
+    filled_id, empty_id = _seed_canvases(seeded["ids"]["org"])
+    context = browser.new_context(ignore_https_errors=True, viewport={"width": 1440, "height": 900})
+    page = context.new_page()
+    try:
+        _login(page, live_server, email)
+        page.goto(f"{live_server}/business-model/{filled_id}", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+
+        # Each box has a coloured zone band (not grey) whose count is the number of entries drawn beneath it,
+        # with text readable on the tint in light and in dark.
+        for dark in (False, True):
+            page.evaluate(f"document.documentElement.classList.toggle('dark', {str(dark).lower()})")
+            for box in BOXES:
+                card = page.locator(f'[data-slot=card]:has([data-canvas-notes="{box}"])')
+                band = card.locator("[data-canvas-band]")
+                reading = band.evaluate(_BAND_READING)
+                assert reading["spread"] > 6, f"{box} band is grey in {'dark' if dark else 'light'}: {reading['tint']}"
+                assert reading["worst"] >= 4.5, f"{box} band text is {reading['worst']:.2f}:1"
+        page.evaluate("document.documentElement.classList.remove('dark')")
+        zones = {box: page.locator(f'[data-slot=card]:has([data-canvas-notes="{box}"]) [data-canvas-band]').get_attribute("data-canvas-band")
+                 for box in BOXES}
+        assert len(set(zones.values())) >= 3, zones
+        for box in BOXES:
+            card = page.locator(f'[data-slot=card]:has([data-canvas-notes="{box}"])')
+            shown = card.locator(f'[data-canvas-notes="{box}"] > li').count()
+            count = int(card.locator("[data-canvas-band]").get_by_text(re.compile(r"^\s*\d+\s*$")).first.inner_text())
+            assert count == shown >= 1, (box, count, shown)
+
+        # The question is on the page, and the "i" button opens the fuller guidance.
+        partners = page.locator('[data-slot=card]:has([data-canvas-notes="key-partners"])')
+        expect(partners).to_contain_text("Who helps you?")
+        partners.get_by_role("button", name="About Key Partners").click()
+        popover = partners.get_by_role("dialog", name="Key Partners")
+        expect(popover).to_contain_text("suppliers, alliances and outsourcers")
+        page.keyboard.press("Escape")
+        expect(popover).to_be_hidden()
+
+        # Hovering an entry previews the element: its type and box, and the entry itself opens the element.
+        first = partners.locator('[data-canvas-notes="key-partners"] > li').first
+        first.locator("[data-note-text]").hover()
+        expect(first).to_contain_text("Type")
+        expect(first).to_contain_text("Business Actor")
+        href = first.locator("a").get_attribute("href")
+        assert context.request.get(live_server + href).status == 200
+
+        # An empty canvas: the empty box says what is missing and its button opens the add dialog.
+        page.goto(f"{live_server}/business-model/{empty_id}", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        segments = page.locator('[data-canvas-empty="customer-segments"]')
+        expect(segments).to_contain_text("No customer segments yet")
+        expect(segments).to_contain_text("Add who you create value for")
+        segments.get_by_role("button", name="Add to Customer Segments").click()
+        expect(page.get_by_test_id("bmc-name-customer_segments")).to_be_visible()
+
+        # On the Value Proposition Canvas of the empty canvas, an empty box points back to where it is filled, and that page has content.
+        page.goto(f"{live_server}/business-model/{empty_id}/value-proposition", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        gains = page.locator('[data-canvas-empty="gain-creators"]')
+        expect(gains).to_contain_text("No gain creators yet")
+        gains.get_by_role("link", name="Open the business model canvas").click()
+        page.wait_for_url(re.compile(rf"/business-model/{empty_id}$"), timeout=PAGE_TIMEOUT)
+        expect(page.locator('[data-canvas-empty="customer-segments"]')).to_be_visible()
+    finally:
+        context.close()
