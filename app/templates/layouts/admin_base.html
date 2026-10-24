@@ -10,6 +10,7 @@
 {% from 'components/button.html' import button %}
 {% from 'components/dialog.html' import dialog %}
 {% from 'components/input.html' import input %}
+{% from 'components/ui_sidebar.html' import sidebar_wrapper, sidebar_inset %}
 <!DOCTYPE html>
 <html lang="en" class="h-full">
 <head>
@@ -30,8 +31,9 @@
     </script>
     
     <!-- Accessibility CSS: loaded once via partials/_head.html (asset_url filter) — do not re-include here (ARCH-061) -->
-    <!-- Sidebar collapsed mode CSS -->
     <link rel="stylesheet" href="{{ url_for('static', filename='styles/shadcn-sidebar.css') }}">
+    <!-- Sidebar shell: the library's sidebar-07 rules (components/ui_sidebar.html) -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles/sidebar-shell.css') }}">
     <!-- Global component normalization (tables, badges, skeletons) -->
     <link rel="stylesheet" href="{{ url_for('static', filename='styles/shadcn-components.css') }}">
     <!-- Card pattern normalization (bg-background legacy, .card, alerts, list-groups) -->
@@ -47,16 +49,6 @@
       body { background: white !important; color: black !important; font-size: 12pt; }
       table { border-collapse: collapse; width: 100%; }
       th, td { border: 1px solid hsl(var(--border)); padding: 4px; }
-    }
-
-    /* Below lg breakpoint the sticky header must not intercept pointer
-       events in its left padding area, where the mobile sidebar opener
-       sits. The header itself is pointer-events:none; every direct child
-       restores pointer-events:auto so search, notifications and the user
-       menu remain interactive. */
-    @media (max-width: 1023px) {
-      #admin-header { pointer-events: none; }
-      #admin-header > * { pointer-events: auto; }
     }
     </style>
     
@@ -104,66 +96,12 @@
         Skip to search
     </a>
     
-    <!-- Global mobile sidebar opener (works even when pages override the header block) -->
-    {#
-      .stop is load-bearing, not tidiness. This button sits OUTSIDE the
-      sidebar element, so without it the same click both opens the sidebar
-      here and reaches the sidebar's own @click.away, which closes it again
-      in the same tick. Instrumenting the event path showed exactly that:
-      ["btn:true", "doc:false"], final state false. Below 1024px the sidebar
-      could never be opened, and the only way to reach another page was to
-      type a URL -- the application was effectively desktop-only.
-      aria-expanded is bound so assistive technology is told the state too.
-
-      Rendered OUTSIDE the overflow-hidden layout container so it is never
-      trapped in a stacking context below the sticky header. Carries its own
-      isDesktop so it does not depend on the container's x-data scope.
-    #}
-    <button type="button"
-            x-data="{ isDesktop: window.innerWidth >= 1024 }"
-            x-init="window.addEventListener('resize', () => { isDesktop = window.innerWidth >= 1024; if (isDesktop) { $store.sidebar.open = false; } })"
-            x-show="!isDesktop && !$store.sidebar.open" x-cloak
-            @click.stop="$store.sidebar.open = true"
-            :aria-expanded="$store.sidebar.open ? 'true' : 'false'"
-            class="fixed top-4 left-4 z-40 lg:hidden inline-flex h-10 w-10 items-center justify-center rounded-lg border border-input bg-background text-foreground hover:bg-accent transition-colors"
-            aria-controls="admin-sidebar"
-            aria-label="Open sidebar">
-        <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16"></path>
-        </svg>
-    </button>
-
-    <div class="relative flex h-screen overflow-hidden"
-         @keydown.ctrl.b.window.prevent="$store.sidebar.toggle()"
-         x-data="{
-            isDesktop: window.innerWidth >= 1024,
-            init() {
-                this.isDesktop = window.innerWidth >= 1024;
-                window.addEventListener('resize', () => {
-                    this.isDesktop = window.innerWidth >= 1024;
-                    if (this.isDesktop) {
-                        $store.sidebar.open = false;
-                    }
-                });
-            }
-         }">
-        <!-- Mobile sidebar backdrop -->
-        <div x-show="$store.sidebar.open && !isDesktop" x-cloak
-             @click="$store.sidebar.open = false"
-             x-transition:enter="transition-opacity ease-out duration-200"
-             x-transition:enter-start="opacity-0"
-             x-transition:enter-end="opacity-100"
-             x-transition:leave="transition-opacity ease-in duration-150"
-             x-transition:leave-start="opacity-100"
-             x-transition:leave-end="opacity-0"
-             class="fixed inset-0 z-40 lg:hidden bg-overlay/50" aria-hidden="true"
-             x-cloak></div>
-
-        <!-- Sidebar -->
+    {% call sidebar_wrapper(class='h-svh overflow-hidden') %}
+        <!-- Sidebar: the library's sidebar-07 shell; below 768px it is the drawer the trigger opens -->
         {% include 'components/admin_sidebar.html' %}
 
         <!-- Main Content -->
-        <div class="relative flex-1 flex flex-col overflow-x-hidden overflow-y-auto">
+        {% call sidebar_inset(class='overflow-x-hidden overflow-y-auto') %}
             <!-- Header -->
             {% block header %}
             {% include 'components/admin_header.html' %}
@@ -215,8 +153,8 @@
                     {% endif %}
                 </div>
             </main>
-        </div>
-    </div>
+        {% endcall %}
+    {% endcall %}
 
     {# Modal portal — renders OUTSIDE the overflow-hidden layout so fixed modals are clickable #}
     {% block modals %}{% endblock %}
@@ -332,15 +270,6 @@
     <script>
         window.pageGuideContext = {{ resolved_page_guide_context | tojson }};
         document.addEventListener('alpine:init', () => {
-            Alpine.store('sidebar', {
-                open: false,
-                collapsed: localStorage.getItem('archie_sidebar_collapsed') === '1',
-                toggle() {
-                    this.collapsed = !this.collapsed;
-                    localStorage.setItem('archie_sidebar_collapsed', this.collapsed ? '1' : '0');
-                }
-            });
-
             Alpine.store('loading', {
                 active: false,
                 count: 0,

@@ -167,8 +167,9 @@ def can_navigate_on_a_phone(browser, persona, email):
     -256px, 0 of 25 nav links reachable. The application was desktop-only and
     nothing in the suite looked below 1024px.
 
-    Asserts the store, the geometry AND that links are actually reachable --
-    a sidebar that is "open" but rendered off-screen is still unusable.
+    Asserts the drawer's geometry AND that links are actually reachable --
+    a sidebar that is "open" but rendered off-screen is still unusable. Below 768px the
+    library's sidebar is a drawer the header trigger opens.
     """
     ctx = browser.new_context(viewport=MOBILE)
     page = ctx.new_page()
@@ -186,16 +187,16 @@ def can_navigate_on_a_phone(browser, persona, email):
         page.goto(BASE + "/applications/", wait_until="networkidle")
         page.wait_for_timeout(600)
 
-        toggle = page.locator("button[aria-label='Open sidebar']")
+        toggle = page.locator("button[data-slot='sidebar-trigger']")
         if not toggle.count():
             note(persona, "phone: open the menu", "BROKEN",
-                 "no sidebar toggle rendered below 1024px")
+                 "no sidebar trigger rendered below 768px")
             return
         toggle.first.click()
         page.wait_for_timeout(700)
 
         geometry = page.evaluate("""() => {
-            const el = document.getElementById('admin-sidebar');
+            const el = document.querySelector('[data-fb-sidebar-mobile] [data-slot="sheet-content"]');
             if (!el) return {found: false, reachable: 0, left: null};
             const r = el.getBoundingClientRect();
             const links = [...el.querySelectorAll('a[href]')].filter(a => {

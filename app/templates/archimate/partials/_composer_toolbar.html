@@ -4,7 +4,7 @@
     <div class="composer-toolbar">
 
         {# ── CMP-067: Navigation drawer hamburger menu ─────── #}
-        <button type="button" class="toolbar-btn toolbar-btn-sm" @click="$store.sidebar.open = true" title="Navigation menu">
+        <button type="button" class="toolbar-btn toolbar-btn-sm" @click="window.dispatchEvent(new CustomEvent('sidebar:open'))" title="Navigation menu">
             <i data-lucide="menu" class="w-4 h-4"></i>
         </button>
 

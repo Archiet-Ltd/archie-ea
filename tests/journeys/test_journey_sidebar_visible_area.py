@@ -67,7 +67,7 @@ def browser():
         chromium.close()
 
 
-def _open(browser, client, document, path, width=1440, height=900):
+def _open(browser, client, document, path, width=1440, height=900, drawer=False):
     pg = browser.new_page(viewport={"width": width, "height": height})
 
     def handle(route):
@@ -84,6 +84,10 @@ def _open(browser, client, document, path, width=1440, height=900):
 
     pg.route("http://app.test/**", handle)
     pg.goto("http://app.test" + path)
+    if drawer:
+        # Below 768px the sidebar is a drawer; the header trigger opens it.
+        pg.wait_for_selector('[data-slot="sidebar-trigger"]')
+        pg.click('[data-slot="sidebar-trigger"]')
     pg.wait_for_selector("#sidebar-nav")
     return pg
 
@@ -148,7 +152,7 @@ def test_a_long_label_wraps_instead_of_being_cut(app, client, browser):
     document = client.get(path).get_data(as_text=True)
     pg = _open(browser, client, document, path)
     try:
-        link = pg.locator('#sidebar-nav a[title="Composer"] span.flex-1')
+        link = pg.locator('#sidebar-nav a[data-nav-key="composer"] > span:last-child')
         link.wait_for(state="visible", timeout=10000)
         info = link.evaluate("""el => ({
             wraps: getComputedStyle(el).whiteSpace !== 'nowrap',
@@ -196,25 +200,27 @@ def test_collapse_still_works_from_the_header_toggle_and_ctrl_b(app, client, bro
     document = client.get(path).get_data(as_text=True)
     pg = _open(browser, client, document, path)
     try:
-        assert "sidebar-collapsed" not in pg.eval_on_selector('[data-testid="sidebar"]', "el => el.className")
-        pg.click('button[title*="Collapse sidebar (Ctrl+B)"]')
+        def state():
+            return pg.eval_on_selector('[data-testid="sidebar"]', "el => el.getAttribute('data-state')")
+
+        assert state() == "expanded"
+        pg.click('button[title*="Toggle sidebar (Ctrl+B)"]')
         pg.wait_for_timeout(200)
-        assert "sidebar-collapsed" in pg.eval_on_selector('[data-testid="sidebar"]', "el => el.className")
+        assert state() == "collapsed"
 
         pg.keyboard.press("Control+b")
         pg.wait_for_timeout(200)
-        assert "sidebar-collapsed" not in pg.eval_on_selector('[data-testid="sidebar"]', "el => el.className")
+        assert state() == "expanded"
     finally:
         pg.close()
 
 
 def test_the_duplicated_collapse_row_is_gone(app, client, browser):
-    """The sidebar's own "Collapse sidebar (Ctrl+B)" row duplicated the header toggle; removed to reclaim
-    height. Exactly one occurrence of the hint text remains, in the header's own `:title` binding
-    (`'Collapse sidebar (Ctrl+B)'`, present as raw source even though the value is applied by Alpine)."""
+    """The sidebar's own collapse row duplicated the header toggle; removed to reclaim
+    height. Exactly one trigger carries the Ctrl+B hint, in the header."""
     login(client, _persona(app, "solution_architect"))
     document = client.get("/dashboard/overview").get_data(as_text=True)
-    assert document.count("Collapse sidebar (Ctrl+B)") == 1
+    assert document.count("Toggle sidebar (Ctrl+B)") == 1
     assert "sidebar-show-all-btn" not in document
 
 
@@ -223,9 +229,9 @@ def test_a_long_label_wraps_in_the_mobile_drawer_too(app, client, browser):
     login(client, _persona(app, "enterprise_architect"))
     path = "/dashboard/overview"
     document = client.get(path).get_data(as_text=True)
-    pg = _open(browser, client, document, path, width=390, height=844)
+    pg = _open(browser, client, document, path, width=390, height=844, drawer=True)
     try:
-        link = pg.locator('#sidebar-nav a[title="Composer"] span.flex-1')
+        link = pg.locator('#sidebar-nav a[data-nav-key="composer"] > span:last-child')
         link.wait_for(state="attached", timeout=10000)
         info = link.evaluate("""el => ({
             wraps: getComputedStyle(el).whiteSpace !== 'nowrap',
@@ -274,7 +280,10 @@ def test_no_zone_link_or_label_changed_for_any_persona(app, client, role):
     document = client.get("/dashboard/overview").get_data(as_text=True)
     nav = document[document.index('id="sidebar-nav"'):]
     nav = nav[:nav.index("</nav>")]
-    rendered_labels = [html_module.unescape(label) for _, label in re.findall(r'href="([^"]+)"\s+title="([^"]+)"', nav)]
+    rendered_labels = [
+        html_module.unescape(re.sub(r"<[^>]+>", "", inner)).strip()
+        for inner in re.findall(r'<a\b[^>]*data-slot="sidebar-menu(?:-sub)?-button"[^>]*>(.*?)</a>', nav, re.S)
+    ]
     rendered_labels = [label for label in rendered_labels if label != "Connect a source"]
 
     with app.test_request_context("/dashboard/overview"):

@@ -60,12 +60,13 @@ class Walk:
         self.page.screenshot(path=os.path.join(self.dir, "%02d-%s.png" % (self.n, name)), full_page=False)
 
     def sidebar(self):
-        """The sidebar, opened first on a phone (one tap on its trigger)."""
+        """The sidebar; on a phone the drawer, opened first with one tap on the trigger."""
         if self.phone:
-            opener = self.page.get_by_role("button", name="Open sidebar")
-            if opener.is_visible():
-                opener.click()
-                self.page.wait_for_timeout(300)
+            drawer = self.page.get_by_role("dialog", name="Navigation")
+            if not drawer.is_visible():
+                self.page.get_by_test_id("sidebar-trigger").click()
+            expect(drawer).to_be_visible()
+            return drawer
         side = self.page.get_by_test_id("sidebar")
         expect(side).to_be_visible()
         return side
@@ -172,7 +173,7 @@ def test_06_each_job_is_one_click_away(walk, entry, address, words):
     page = walk.page
     page.goto(walk.base + "/dashboard/overview", wait_until="domcontentloaded")
     _dismiss_first_run_dialog(page)
-    walk.sidebar().locator('a[data-slot="sidebar-item"]', has_text=re.compile(r"^\s*%s\s*$" % re.escape(entry))).click()
+    walk.sidebar().locator('a[data-slot="sidebar-menu-button"]', has_text=re.compile(r"^\s*%s\s*$" % re.escape(entry))).click()
     page.wait_for_url(re.compile(r".*%s.*" % address))
     main = page.locator("main").first
     expect(main).not_to_be_empty()
@@ -181,7 +182,7 @@ def test_06_each_job_is_one_click_away(walk, entry, address, words):
         expect(main).to_contain_text(words)
     assert "Internal Server Error" not in page.content()
     if entry != "Help":  # the documentation page is a public page, outside the signed-in shell
-        current = walk.sidebar().locator('a[data-slot="sidebar-item"][aria-current="page"]')
+        current = walk.sidebar().locator('a[data-slot="sidebar-menu-button"][aria-current="page"]')
         expect(current).to_have_count(1)
         expect(current).to_contain_text(entry)
     walk.shot("job-%s" % entry.lower().replace(" ", "-"))

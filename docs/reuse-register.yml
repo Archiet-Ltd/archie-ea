@@ -792,3 +792,24 @@ entries:
     known_exceptions:
       - path: app/services/site_registry.py
         reason: the canonical reader
+
+  - id: app-shell-sidebar
+    concept: The signed-in shell's sidebar (the library's sidebar-07 parts, its icon rail, its drawer on a phone)
+    status: active
+    canonical:
+      path: app/templates/components/ui_sidebar.html
+      symbols: [sidebar_wrapper, sidebar, sidebar_menu_button, sidebar_menu_sub_button, sidebar_inset, sidebar_trigger]
+    reuse: >
+      Build the sidebar from these parts only: components/admin_sidebar.html is the one call (its entries come
+      from app/navigation/registry.py), and the layouts wrap the page in sidebar_wrapper and sidebar_inset.
+      Collapse, Ctrl+B, the cookie and the drawer are js/sidebar/sidebar_shell.js; the rules behind the cn-sidebar-*
+      classes are styles/sidebar-shell.css. Do not write a second sidebar element, a second collapse store or a
+      second drawer.
+    must_not_create:
+      - id: second-sidebar-parts
+        regex: '\{%-?\s*macro\s+sidebar_(group|item|subitem|collapsible|menu_button|wrapper)\b'
+        scope: [app/templates]
+        suffixes: [.html]
+    known_exceptions:
+      - path: app/templates/components/ui_sidebar.html
+        reason: the canonical parts

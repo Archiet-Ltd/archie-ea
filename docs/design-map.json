@@ -1198,7 +1198,9 @@
   },
   "sidebar": {
    "source": "shadcn",
-   "macros": []
+   "macros": [
+    "components/ui_sidebar.html"
+   ]
   },
   "textarea": {
    "source": "shadcn",
