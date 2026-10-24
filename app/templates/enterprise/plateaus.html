@@ -1,4 +1,6 @@
+{# design-block: data-table #}
 {% extends 'layouts/admin_base.html' %}
+{% from 'components/disabled_action.html' import disabled_action %}
 {% from 'components/page_header.html' import page_header %}
 
 {% block title %}Implementation Plateaus{% endblock %}
@@ -22,11 +24,15 @@
     ) }}
         {# The ArchiMate CRUD workflow operates on this same Plateau model
            (MODEL_REGISTRY['Plateau']), so create and detail are real destinations. #}
+        {% if can_change_model() %}
         <a href="{{ url_for('archimate_crud.create_element', layer='implementation', element_type='Plateau') }}"
            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center"
            data-testid="btn-new-plateau">
             <i data-lucide="plus" class="h-4 w-4" aria-hidden="true"></i> New Plateau
         </a>
+        {% else %}
+        {{ disabled_action('New Plateau', 'Only an architect can create plateaus. Ask an administrator in Team settings.', 'new-plateau-reason', icon='plus', variant='default') }}
+        {% endif %}
     </div>
 
     <!-- Plateaus Grid -->

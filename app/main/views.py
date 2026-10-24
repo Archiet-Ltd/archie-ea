@@ -715,6 +715,12 @@ def public_module(slug):
     if merge_target:
         return redirect(merge_target, code=301)
 
+    # The product menu's "Digital twin" entry opens the working screen for a
+    # signed-in person; the public feature page is for visitors.
+    if slug == "digital-twin":
+        if current_user.is_authenticated:
+            return redirect(url_for("intelligence_ui.twin_map"), code=302)
+
     page = load_page("module", slug=slug)
     if page is None:
         from flask import abort

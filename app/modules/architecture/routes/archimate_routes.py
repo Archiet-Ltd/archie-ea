@@ -1198,6 +1198,9 @@ def composer_page():
             belongs to another organisation. Ignored when viewpoint_id is set.
         depth (int): Hops for focus mode, clamped to 1-5, default 3.
         derived (0|1): Include worked-out connections in focus mode, default 1.
+        most_connected (1): The element was chosen because it is the most
+            connected in the organisation (the bare twin-map address); the
+            banner says so.
     """
     from app.services.archimate_viewpoint_service import get_available_viewpoints, get_viewpoint_counts
 
@@ -1224,6 +1227,7 @@ def composer_page():
             "name": centre.name or f"Element #{centre.id}",
             "depth": focus_depth,
             "derived": focus_derived,
+            "most_connected": request.args.get("most_connected") == "1",
         }
 
     solution_name = None

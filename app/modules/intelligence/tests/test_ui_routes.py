@@ -175,6 +175,37 @@ def test_twin_map_address_without_an_element_opens_the_composer(
     assert response.headers["Location"].endswith("/archimate/composer")
 
 
+def _connect(db_session, org_id, hub_name, spokes):
+    from app.models.archimate_core import ArchiMateElement, ArchiMateRelationship
+
+    hub = ArchiMateElement(name=hub_name, type="ApplicationComponent", layer="application", organization_id=org_id)
+    db_session.add(hub)
+    db_session.flush()
+    for n in range(spokes):
+        spoke = ArchiMateElement(name=f"{hub_name} spoke {n}", type="Node", layer="technology", organization_id=org_id)
+        db_session.add(spoke)
+        db_session.flush()
+        db_session.add(ArchiMateRelationship(type="Serving", source_id=hub.id, target_id=spoke.id, organization_id=org_id))
+    db_session.flush()
+    return hub.id
+
+
+def test_twin_map_address_without_an_element_opens_the_most_connected_one_of_this_organisation(
+    app, db_session, make_org, client, login_as
+):
+    mine = make_org("ui-hub-mine")
+    theirs = make_org("ui-hub-theirs")
+    small = _connect(db_session, mine.id, "Small hub", 1)
+    big = _connect(db_session, mine.id, "Big hub", 3)
+    rival = _connect(db_session, theirs.id, "Rival hub", 8)
+    login_as(client, _user(db_session, mine.id))
+    response = client.get("/intelligence/twin-map")
+    assert response.status_code == 302
+    location = response.headers["Location"]
+    assert f"element={big}" in location and "most_connected=1" in location
+    assert f"element={small}" not in location and f"element={rival}" not in location
+
+
 @pytest.mark.parametrize("value", ["abc", "", "4 2", "1e3", "-"])
 def test_twin_map_address_ignores_an_element_that_is_not_a_whole_number(
     app, db_session, make_org, client, login_as, value

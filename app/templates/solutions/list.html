@@ -1,5 +1,7 @@
+{# design-block: data-table #}
 {# smoke-coverage-ok: label-only change — plain-language rename, no functional change #}
 {% extends "layouts/admin_base.html" %}
+{% from 'components/disabled_action.html' import disabled_action %}
 {% from "components/filter_bar.html" import filter_bar %}
 {% from 'components/status_badge.html' import status_badge, status_badge_auto %}
 {% from "components/sol_confirm_modal.html" import sol_confirm_modal %}
@@ -344,11 +346,18 @@
                                            title="Risk Heatmap">
                                             <i data-lucide="flame" class="w-3.5 h-3.5" aria-hidden="true"></i>
                                         </a>
+                                        {% if can_modify_solution(solution) %}
                                         <a href="{{ url_for('solution_design.edit_solution', solution_id=solution.id) }}"
                                            class="inline-flex items-center justify-center w-8 h-8 rounded-lg border border-border/50 bg-card hover:bg-accent transition-colors"
                                            title="Edit">
                                             <i data-lucide="pencil" class="w-3.5 h-3.5" aria-hidden="true"></i>
                                         </a>
+                                        {% else %}
+                                        <span class="inline-flex items-center justify-center w-8 h-8 rounded-lg border border-border/50 bg-card text-muted-foreground opacity-50 cursor-not-allowed"
+                                              aria-disabled="true" role="img" aria-label="Edit is not available: only the person who made this solution or an administrator can edit it" title="Only the person who made this solution or an administrator can edit it. Ask an administrator in Team settings.">
+                                            <i data-lucide="pencil" class="w-3.5 h-3.5" aria-hidden="true"></i>
+                                        </span>
+                                        {% endif %}
                                     </div>
                                     <div class="flex items-center gap-1.5">
                                         <button type="button" @click="toggleCompare({{ solution.id }})"

@@ -160,6 +160,12 @@
                 this._persistMove(card, toState, selectEl);
             },
 
+            // Move from a menu item that already names its column.
+            moveCardTo: function (card, toState) {
+                if (!toState || toState === card.state || this.moving === card.id) return;
+                return this._persistMove(card, toState);
+            },
+
             // Arrow keys on a focused card move it one column left or right,
             // so the board can be worked without a pointer.
             onCardKey: function (event, card) {

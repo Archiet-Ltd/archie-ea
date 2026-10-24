@@ -18,7 +18,7 @@
 <header class="sticky top-0 z-40 h-16 border-b border-border bg-background" data-site-nav>
   <div class="mx-auto flex h-full max-w-7xl items-center justify-between gap-4 px-4 sm:px-6">
     <a href="{{ url_for('main.index') }}" class="flex shrink-0 items-center rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="{{ brand_name|default(config.APP_NAME) }} home">
-      <img src="{{ url_for('static', filename='brand/entelim-logo.svg') }}" alt="{{ brand_name|default(config.APP_NAME) }}" class="h-8">
+      {% with logo_class='h-8', logo_label= brand_name|default(config.APP_NAME)  %}{% include 'partials/_brand_logo.html' %}{% endwith %}
     </a>
 
     {# Below lg: the one action that never hides, then the Menu button. #}

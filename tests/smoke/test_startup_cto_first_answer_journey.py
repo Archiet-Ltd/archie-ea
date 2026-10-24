@@ -213,7 +213,6 @@ def test_01_a_new_person_signs_up_from_the_landing_page(journey):
     assert "/dashboard" in page.url, "signing up should land the person in their new workspace"
 
 
-@pytest.mark.xfail(strict=True, reason=SNAG_01)
 def test_02_sign_up_ends_on_one_next_action_not_a_job_title_question(journey):
     j, page = journey, journey.page
     dialog = page.locator("[x-show='showOnboarding']").first
@@ -228,7 +227,6 @@ def test_02_sign_up_ends_on_one_next_action_not_a_job_title_question(journey):
     )
 
 
-@pytest.mark.xfail(strict=True, reason=SNAG_02)
 def test_03_the_dashboard_offers_to_connect_github(journey):
     j, page = journey, journey.page
     j.saw("Dashboard checklist")
