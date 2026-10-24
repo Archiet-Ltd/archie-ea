@@ -1,241 +1,175 @@
 {% extends "layouts/admin_base.html" %}
 {% from "components/page_header.html" import page_header %}
+{% from "components/button.html" import button %}
+{% from "components/badge.html" import badge %}
+{% from "components/modal.html" import modal %}
+{% from "components/input.html" import input, textarea %}
+{% from "components/select.html" import native_select %}
+{% from "components/form_field.html" import form_group %}
+{% from "components/empty_state.html" import empty_state %}
+{% import "components/card.html" as card %}
+{% import "components/table.html" as tbl %}
 
 {% block title %}Risk Heat Map — {{ solution.name }}{% endblock %}
 
+{% set band_cell = {
+    'low': 'bg-success/10 border-success/30',
+    'medium': 'bg-warning/10 border-warning/30',
+    'high': 'bg-warning/30 border-warning/50',
+    'critical': 'bg-destructive/20 border-destructive/50'
+} %}
+{% set band_badge = {'low': 'success', 'medium': 'warning', 'high': 'warning', 'critical': 'danger'} %}
+{% set band_label = {'low': 'Low', 'medium': 'Medium', 'high': 'High', 'critical': 'Critical'} %}
+
 {% block content %}
-<!-- modal-a11y-ok -->
-<div
-    class="p-6 space-y-6 mx-auto max-w-6xl"
-    x-data='riskHeatmap({{ risks_data | tojson }})'
->
+<div class="p-6 space-y-6 mx-auto max-w-6xl" x-data='riskHeatmap({{ risks | tojson }})'>
     {{ page_header(
-        title='Risk Heat Map',
-        description='5×5 Probability × Impact matrix showing all solution risks.',
+        title='Risk heat map',
+        description='Every risk of ' ~ solution.name ~ ', placed by probability and impact.',
         breadcrumbs=[
             {'label': 'Dashboard', 'href': url_for('main.index')},
             {'label': 'Solutions', 'href': url_for('solution_design.list_solutions')},
             {'label': solution.name, 'href': url_for('solution_design.view_solution', solution_id=solution.id)},
-            {'label': 'Risk Heat Map'}
+            {'label': 'Risk heat map'}
+        ],
+        actions=[
+            {'text': 'Back to solution', 'icon': 'arrow-left', 'href': url_for('solution_design.view_solution', solution_id=solution.id), 'variant': 'outline'}
         ]
     ) }}
 
-    {# ── Heat Map Grid ── #}
-    <div class="overflow-x-auto rounded-lg border border-border bg-card p-4 mt-6">
+    {% if total == 0 %}
+    {% call card.card() %}
+        {% call card.card_content(class='pt-6') %}
+            {{ empty_state(
+                icon='shield-check',
+                title='No risks recorded for this solution',
+                description='Risks added to this solution are placed on this grid by their probability and impact.',
+                cta_text='Add a risk on the solution',
+                cta_href=url_for('solution_design.view_solution', solution_id=solution.id)
+            ) }}
+        {% endcall %}
+    {% endcall %}
+    {% else %}
 
-        <div class="flex gap-2">
-            {# Y-axis label + tick marks #}
-            <div class="flex flex-col items-end justify-between py-1 pr-2 shrink-0" style="width:56px;">
-                <span class="text-xs font-semibold text-muted-foreground">5</span>
-                <span class="text-xs font-semibold text-muted-foreground">4</span>
-                <span class="text-xs font-semibold text-muted-foreground">3</span>
-                <span class="text-xs font-semibold text-muted-foreground">2</span>
-                <span class="text-xs font-semibold text-muted-foreground">1</span>
-            </div>
-
-            <div class="flex-1">
-                {# 5×5 grid — outer loop: impact rows 5→1; inner: probability cols 1→5 #}
-                <div
-                    class="grid grid-cols-5 gap-1"
-                    id="risk-grid"
-                    role="grid"
-                    aria-label="Risk heat map grid"
-                >
-                    <template x-for="impact in [5,4,3,2,1]" :key="'row-' + impact">
-                        <template x-for="prob in [1,2,3,4,5]" :key="'cell-' + prob + '-' + impact">
-                            <div
-                                class="min-h-[80px] rounded border p-1"
-                                :class="cellColor(prob, impact)"
-                                :data-prob="prob"
-                                :data-impact="impact"
-                                :data-testid="'cell-' + prob + '-' + impact"
-                                role="gridcell"
-                                :aria-label="'Probability ' + prob + ', Impact ' + impact"
-                            >
-                                <template x-for="risk in risksAt(prob, impact)" :key="risk.id">
-                                    <button
-                                        type="button"
-                                        class="w-full text-left mb-1 rounded-full px-2 py-0.5 text-xs font-medium
- bg-overlay/50 border border-border 
- transition-shadow cursor-pointer truncate
- focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring"
-                                        :title="risk.title + (risk.description ? ': ' + risk.description : '')"
-                                        :data-testid="'risk-chip-' + risk.id"
-                                        @click="openEdit(risk)"
-                                        :aria-label="risk.title"
-                                    >
-                                        <span x-text="risk.title.length > 22 ? risk.title.substring(0, 22) + '…' : risk.title"></span>
-                                    </button>
-                                </template>
-                            </div>
-                        </template>
-                    </template>
-                </div>
-
-                {# X-axis tick marks #}
-                <div class="grid grid-cols-5 gap-1 mt-1">
-                    <template x-for="prob in [1,2,3,4,5]" :key="prob">
-                        <div class="text-center text-xs font-semibold text-muted-foreground" x-text="prob"></div>
-                    </template>
-                </div>
-            </div>
-        </div>
-
-        {# Axis labels #}
-        <div class="flex mt-3">
-            <div style="width:56px;" class="pr-2 text-right">
-                <span
-                    class="text-xs font-semibold text-muted-foreground [writing-mode:vertical-rl] rotate-180 inline-block"
-                >Impact ↑</span>
-            </div>
-            <div class="flex-1 text-center text-xs font-semibold text-muted-foreground">← Probability →</div>
-        </div>
+    <div class="flex flex-wrap items-center gap-3" aria-label="Risks by band" data-testid="band-summary">
+        <span class="text-sm font-medium text-foreground" data-testid="plotted-total">{{ total }} risk{{ '' if total == 1 else 's' }} plotted</span>
+        {% for b in bands %}
+        {% call badge(band_badge[b.key]) %}{{ b.label }} {{ b.count }}{% endcall %}
+        {% endfor %}
     </div>
 
-    {# Legend #}
-    <div class="mt-4 flex flex-wrap gap-3" aria-label="Risk level legend">
-        <div class="flex items-center gap-1.5">
-            <span class="inline-block h-4 w-4 rounded border border-green-300 bg-emerald-500/10"></span><!-- design-tokens-ok: 4-tier risk-score RAG legend (Low/Medium/High/Critical), matches cellColor() in risk_heatmap.js — collapsing onto success/warning/destructive would merge the Medium/High distinction the grid depends on -->
-            <span class="text-xs text-muted-foreground">Low (score 1–3)</span>
-        </div>
-        <div class="flex items-center gap-1.5">
-            <span class="inline-block h-4 w-4 rounded border border-yellow-300 bg-amber-500/10"></span><!-- design-tokens-ok: 4-tier risk-score RAG legend, see Low entry above -->
-            <span class="text-xs text-muted-foreground">Medium (score 4–8)</span>
-        </div>
-        <div class="flex items-center gap-1.5">
-            <span class="inline-block h-4 w-4 rounded border border-orange-300 bg-orange-100"></span><!-- design-tokens-ok: 4-tier risk-score RAG legend, see Low entry above -->
-            <span class="text-xs text-muted-foreground">High (score 9–15)</span>
-        </div>
-        <div class="flex items-center gap-1.5">
-            <span class="inline-block h-4 w-4 rounded border border-destructive/30 bg-destructive/10"></span>
-            <span class="text-xs text-muted-foreground">Critical (score 16–25)</span>
-        </div>
-    </div>
-
-    {# ── Edit Modal ── #}
-    <div
-        x-show="editOpen" x-cloak
-        x-transition
-        class="fixed inset-0 z-50 flex items-center justify-center bg-overlay/50"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="edit-risk-title"
-        @keydown.escape.window="editOpen = false"
-        style="display:none"
-    >
-        <div
-            class="relative w-full max-w-md rounded-lg border border-border bg-card p-6"
-            @click.stop
-        >
-            <button
-                type="button"
-                class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring absolute right-3 top-3"
-                @click="editOpen = false"
-                aria-label="Close edit risk modal"
-            >
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-            </button>
-
-            <h2 id="edit-risk-title" class="text-base font-semibold text-foreground mb-4">Edit Risk</h2>
-
-            <template x-if="editOpen">
-                <div class="space-y-3">
-                    <div>
-                        <label for="edit-risk-desc" class="block text-sm font-medium text-foreground mb-1">Description</label>
-                        <textarea
-                            id="edit-risk-desc"
-                            x-model="editRisk.description"
-                            rows="3"
-                            class="w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                        ></textarea>
-                    </div>
-
-                    <div class="grid grid-cols-2 gap-3">
-                        <div>
-                            <label for="edit-probability" class="block text-sm font-medium text-foreground mb-1">Probability (1–5)</label>
-                            <input
-                                id="edit-probability"
-                                type="number"
-                                min="1"
-                                max="5"
-                                x-model.number="editRisk.probability"
-                                class="w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                            />
+    {% call card.card() %}
+        {% call card.card_header() %}
+            {% call card.card_title() %}Probability × impact{% endcall %}
+            {% call card.card_description() %}Probability rises to the right, impact rises upward. Open a cell to list its risks.{% endcall %}
+        {% endcall %}
+        {% call card.card_content() %}
+        <div class="overflow-x-auto">
+            <div class="flex gap-2 min-w-[22rem]">
+                <div class="grid gap-1 shrink-0 w-16 text-right text-xs font-medium leading-tight text-muted-foreground" aria-hidden="true">
+                    {% for n, name in levels|reverse %}<span class="h-16 flex items-center justify-end">{{ n }} {{ name }}</span>{% endfor %}
+                </div>
+                <div class="flex-1">
+                    <div class="grid grid-cols-5 gap-1" role="grid" aria-label="Risk heat map, probability across and impact upward" data-testid="risk-grid">
+                        {% for row in grid %}
+                        {% for cell in row %}
+                        {% set n = cell.risks|length %}
+                        {% set cell_label = 'Probability ' ~ cell.probability ~ ', impact ' ~ cell.impact ~ ', score ' ~ cell.score ~ ', ' ~ band_label[cell.band] ~ ': ' ~ n ~ (' risk' if n == 1 else ' risks') %}
+                        {% if n %}
+                        {% call button(variant='bare', size='bare', class='h-16 w-full flex-col gap-0.5 rounded-md border ' ~ band_cell[cell.band] ~ ' hover:opacity-80', aria_label=cell_label, testid='cell-' ~ cell.probability ~ '-' ~ cell.impact, attrs_dict={'data-modal-open': 'cell-' ~ cell.probability ~ '-' ~ cell.impact, 'data-probability': cell.probability, 'data-impact': cell.impact, 'data-band': cell.band, 'data-count': n, 'role': 'gridcell'}) %}
+                            <span class="text-lg font-semibold text-foreground">{{ n }}</span>
+                            <span class="text-xs text-muted-foreground">score {{ cell.score }}</span>
+                        {% endcall %}
+                        {% else %}
+                        <div class="h-16 w-full flex flex-col items-center justify-center rounded-md border {{ band_cell[cell.band] }}" role="gridcell" aria-label="{{ cell_label }}" data-testid="cell-{{ cell.probability }}-{{ cell.impact }}" data-probability="{{ cell.probability }}" data-impact="{{ cell.impact }}" data-band="{{ cell.band }}" data-count="0">
+                            <span class="text-xs text-muted-foreground">score {{ cell.score }}</span>
                         </div>
-                        <div>
-                            <label for="edit-impact" class="block text-sm font-medium text-foreground mb-1">Impact (1–5)</label>
-                            <input
-                                id="edit-impact"
-                                type="number"
-                                min="1"
-                                max="5"
-                                x-model.number="editRisk.impact"
-                                class="w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                            />
-                        </div>
+                        {% endif %}
+                        {% endfor %}
+                        {% endfor %}
                     </div>
-
-                    <div>
-                        <label for="edit-status" class="block text-sm font-medium text-foreground mb-1">Status</label>
-                        <select
-                            id="edit-status"
-                            x-model="editRisk.status"
-                            class="w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                        >
-                            <option value="open">Open</option>
-                            <option value="mitigated">Mitigated</option>
-                            <option value="accepted">Accepted</option>
-                            <option value="closed">Closed</option>
-                        </select>
+                    <div class="grid grid-cols-5 gap-1 mt-1 text-center text-xs font-medium text-muted-foreground" aria-hidden="true">
+                        {% for n, name in levels %}<span>{{ n }} {{ name }}</span>{% endfor %}
                     </div>
-
-                    <div>
-                        <label for="edit-owner" class="block text-sm font-medium text-foreground mb-1">Owner</label>
-                        <input
-                            id="edit-owner"
-                            type="text"
-                            x-model="editRisk.owner"
-                            class="w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                            placeholder="Optional owner"
-                        />
-                    </div>
-
-                    <div>
-                        <label for="edit-mitigation" class="block text-sm font-medium text-foreground mb-1">Mitigation</label>
-                        <textarea
-                            id="edit-mitigation"
-                            x-model="editRisk.mitigation"
-                            rows="2"
-                            class="w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                        ></textarea>
-                    </div>
-
-                    <p
-                        x-show="saveError" x-cloak
-                        x-text="saveError"
-                        class="text-sm text-destructive-emphasis"
-                        role="alert"
-                    ></p>
-
-                    <div class="flex justify-end gap-2 pt-1">
-                        <button
-                            type="button"
-                            class="rounded-md border border-input px-3 py-1.5 text-sm font-medium hover:bg-muted"
-                            @click="editOpen = false"
-                        >Cancel</button>
-                        <button
-                            type="button"
-                            class="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:pointer-events-none"
-                            :disabled="saving"
-                            @click="saveEdit()"
-                        ><span x-text="saving ? 'Saving…' : 'Save'"></span></button>
-                    </div>
+                    <p class="mt-2 text-center text-xs font-semibold text-muted-foreground">Probability →</p>
                 </div>
-            </template>
+            </div>
+            <p class="mt-1 text-xs font-semibold text-muted-foreground">↑ Impact</p>
         </div>
-    </div>
+        {% endcall %}
+        {% call card.card_footer() %}
+            <div class="flex flex-wrap gap-2" aria-label="Risk band legend">
+                {% call badge('success') %}Low · score 1–4{% endcall %}
+                {% call badge('warning') %}Medium · 5–8{% endcall %}
+                {% call badge('warning') %}High · 9–14{% endcall %}
+                {% call badge('danger') %}Critical · 15–25{% endcall %}
+            </div>
+        {% endcall %}
+    {% endcall %}
+
+    {% for row in grid %}{% for cell in row %}{% if cell.risks %}
+    {% call modal(id='cell-' ~ cell.probability ~ '-' ~ cell.impact, title='Probability ' ~ cell.probability ~ ' × impact ' ~ cell.impact ~ ' · ' ~ band_label[cell.band] ~ ' (score ' ~ cell.score ~ ')', description=cell.risks|length ~ (' risk' if cell.risks|length == 1 else ' risks') ~ ' in this cell', size='lg') %}
+        {% call tbl.table() %}
+            {% call tbl.table_header() %}{% call tbl.table_row() %}
+                {% call tbl.table_head() %}Risk{% endcall %}
+                {% call tbl.table_head() %}Status{% endcall %}
+                {% call tbl.table_head() %}Owner{% endcall %}
+                {% call tbl.table_head() %}{% endcall %}
+            {% endcall %}{% endcall %}
+            {% call tbl.table_body() %}
+            {% for r in cell.risks %}
+            {% call tbl.table_row(attrs_dict={'data-testid': 'risk-row-' ~ r.id}) %}
+                {% call tbl.table_cell() %}
+                    {% if r.legacy %}<span class="font-medium text-foreground">{{ r.title }}</span>
+                    {% else %}<a class="font-medium text-foreground hover:underline" href="{{ url_for('risk.risk_page', risk_id=r.id) }}">{{ r.title }}</a>{% endif %}
+                {% endcall %}
+                {% call tbl.table_cell() %}{{ r.status|capitalize }}{% endcall %}
+                {% call tbl.table_cell() %}{{ r.owner or '—' }}{% endcall %}
+                {% call tbl.table_cell() %}
+                    {% if not r.legacy %}{{ button(text='Edit', variant='outline', size='sm', aria_label='Edit ' ~ r.title, attrs_dict={'@click': 'edit(' ~ r.id ~ ', false)'}) }}{% endif %}
+                {% endcall %}
+            {% endcall %}
+            {% endfor %}
+            {% endcall %}
+        {% endcall %}
+    {% endcall %}
+    {% endif %}{% endfor %}{% endfor %}
+
+    {% call modal(id='risk-edit', title='Edit risk', description='Moving a risk to another probability or impact moves it on the grid.') %}
+        <div class="space-y-4" data-testid="risk-edit-form">
+            {% call form_group(id='edit-risk-title', label='Risk') %}
+                {{ input(id='edit-risk-title', attrs_dict={'x-model': 'form.title', 'readonly': 'readonly'}) }}
+            {% endcall %}
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {% call form_group(id='edit-probability', label='Probability') %}
+                    {{ native_select(id='edit-probability', class='w-full', options=levels, attrs_dict={'x-model.number': 'form.probability'}) }}
+                {% endcall %}
+                {% call form_group(id='edit-impact', label='Impact') %}
+                    {{ native_select(id='edit-impact', class='w-full', options=levels, attrs_dict={'x-model.number': 'form.impact'}) }}
+                {% endcall %}
+            </div>
+            {% call form_group(id='edit-status', label='Status') %}
+                {% call native_select(id='edit-status', class='w-full', attrs_dict={'x-model': 'form.status'}) %}
+                    <option value="open">Open</option>
+                    <option value="mitigated">Mitigated</option>
+                    <option value="accepted">Accepted</option>
+                    <option value="closed">Closed</option>
+                {% endcall %}
+            {% endcall %}
+            {% call form_group(id='edit-owner', label='Owner') %}
+                {{ input(id='edit-owner', attrs_dict={'x-model': 'form.owner'}) }}
+            {% endcall %}
+            {% call form_group(id='edit-mitigation', label='Mitigation') %}
+                {{ textarea(id='edit-mitigation', rows=3, attrs_dict={'x-model': 'form.mitigation'}) }}
+            {% endcall %}
+            <p x-show="error" x-cloak x-text="error" class="text-sm text-destructive-emphasis" role="alert"></p>
+            <div class="flex justify-end gap-2">
+                {{ button(text='Cancel', variant='outline', attrs_dict={'data-modal-close': 'risk-edit'}) }}
+                {{ button(text='Save risk', testid='risk-save', attrs_dict={'@click': 'save()', ':disabled': 'saving'}) }}
+            </div>
+        </div>
+    {% endcall %}
+    {% endif %}
 </div>
 {% endblock %}
 
