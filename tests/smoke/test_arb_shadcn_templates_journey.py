@@ -4,8 +4,12 @@ The two Tier B templates at arb/change_requests.html and arb/standard_detail.htm
 are rebuilt from the component library. Each journey signs in as arb_member
 (the persona the page serves), navigates to the page, and asserts the content
 a person doing their job would need to see.
+
+Screenshots are captured at 1440 and 390, light and dark, for both pages.
 """
 
+import os
+import pathlib
 import uuid
 from datetime import date
 
@@ -14,6 +18,53 @@ import pytest
 from .conftest import PAGE_TIMEOUT, PASSWORD
 
 pytestmark = [pytest.mark.smoke, pytest.mark.journey]
+
+# Walk directory for screenshots
+WALK_DIR = os.environ.get(
+    "SMOKE_SCREENSHOT_DIR",
+    "/home/ubuntu/verify/seats/mg3arbb030b/walk",
+)
+
+
+def _shot(page, name, theme, width):
+    """Save a screenshot to the walk directory."""
+    pathlib.Path(WALK_DIR).mkdir(parents=True, exist_ok=True)
+    path = pathlib.Path(WALK_DIR) / f"{name}-{theme}-{width}.png"
+    page.screenshot(path=str(path), full_page=True)
+    assert path.exists() and path.stat().st_size > 0
+    print(f"[screenshot] {path}")
+    return path
+
+
+def _assert_role(live_server, email):
+    """Assert the signed-in user is arb_member and NOT an administrator."""
+    from app import create_app, db
+    from app.models.user import User
+
+    with create_app("testing").app_context():
+        user = User.query.filter_by(email=email).one()
+        assert user.enterprise_role == "arb_member", (
+            f"Expected enterprise_role=arb_member, got {user.enterprise_role!r}"
+        )
+        assert not user.is_admin(), (
+            "Signed-in user is an administrator, not the expected persona arb_member"
+        )
+        assert user.role.name != "Administrator", (
+            f"Expected platform role != Administrator, got {user.role.name}"
+        )
+
+
+def _enable_dark_mode(page):
+    """Add the 'dark' class after page navigation (init scripts are stripped by the app's JS)."""
+    page.evaluate("document.documentElement.classList.add('dark');")
+
+
+def _login(page, base, email):
+    page.goto(base + "/account/login", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    page.fill("#email", email)
+    page.fill("#password", PASSWORD)
+    page.locator("#submit").click()
+    page.wait_for_url(lambda url: "/account/login" not in url, timeout=PAGE_TIMEOUT)
 
 
 @pytest.fixture(scope="module")
@@ -105,17 +156,18 @@ def arb_change_requests(seeded):
                 db.session.commit()
 
 
-def _login(page, base, email):
-    page.goto(base + "/account/login", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
-    page.fill("#email", email)
-    page.fill("#password", PASSWORD)
-    page.locator("#submit").click()
-    page.wait_for_url(lambda url: "/account/login" not in url, timeout=PAGE_TIMEOUT)
+def test_arb_member_role_lookup(live_server, seeded):
+    """Verify the seeded arb_member user has the correct role before any page tests.
+
+    This test stands apart from the page journeys so the role assertion runs
+    whether or not Playwright is available.
+    """
+    _assert_role(live_server, seeded["emails"]["arb_member"])
 
 
 def test_arb_member_sees_change_requests(browser, live_server, seeded, arb_change_requests):
     """An ARB member lands on the change requests page and sees the requests."""
-    context = browser.new_context()
+    context = browser.new_context(viewport={"width": 1440, "height": 900})
     page = context.new_page()
     try:
         _login(page, live_server, seeded["emails"]["arb_member"])
@@ -125,11 +177,62 @@ def test_arb_member_sees_change_requests(browser, live_server, seeded, arb_chang
 
         # The page title confirms we are on the right page
         body_text = page.text_content("body")
-        assert "change request" in body_text.lower(), f"Expected change request in body text"
+        assert "change request" in body_text.lower(), "Expected change request in body text"
 
         # The stat cards show summary counts
         stat_cards = page.locator("[data-slot=card]").all()
         assert len(stat_cards) >= 4, f"Expected at least 4 stat cards, got {len(stat_cards)}"
+
+        # Light mode screenshot at 1440
+        page.wait_for_timeout(600)
+        _shot(page, "change-requests", "light", 1440)
+    finally:
+        page.close()
+        context.close()
+
+
+def test_arb_member_sees_change_requests_mobile_light(browser, live_server, seeded, arb_change_requests):
+    """Light mode screenshot of change requests at 390 viewport."""
+    context = browser.new_context(viewport={"width": 390, "height": 844})
+    page = context.new_page()
+    try:
+        _login(page, live_server, seeded["emails"]["arb_member"])
+        page.goto(live_server + "/arb/change-requests", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        page.wait_for_load_state("networkidle", timeout=PAGE_TIMEOUT)
+        page.wait_for_timeout(600)
+        _shot(page, "change-requests", "light", 390)
+    finally:
+        page.close()
+        context.close()
+
+
+def test_arb_member_sees_change_requests_dark(browser, live_server, seeded, arb_change_requests):
+    """Dark mode screenshot of change requests at 1440."""
+    context = browser.new_context(viewport={"width": 1440, "height": 900})
+    page = context.new_page()
+    try:
+        _login(page, live_server, seeded["emails"]["arb_member"])
+        page.goto(live_server + "/arb/change-requests", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        page.wait_for_load_state("networkidle", timeout=PAGE_TIMEOUT)
+        _enable_dark_mode(page)
+        page.wait_for_timeout(600)
+        _shot(page, "change-requests", "dark", 1440)
+    finally:
+        page.close()
+        context.close()
+
+
+def test_arb_member_sees_change_requests_mobile_dark(browser, live_server, seeded, arb_change_requests):
+    """Dark mode screenshot of change requests at 390."""
+    context = browser.new_context(viewport={"width": 390, "height": 844})
+    page = context.new_page()
+    try:
+        _login(page, live_server, seeded["emails"]["arb_member"])
+        page.goto(live_server + "/arb/change-requests", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        page.wait_for_load_state("networkidle", timeout=PAGE_TIMEOUT)
+        _enable_dark_mode(page)
+        page.wait_for_timeout(600)
+        _shot(page, "change-requests", "dark", 390)
     finally:
         page.close()
         context.close()
@@ -137,7 +240,7 @@ def test_arb_member_sees_change_requests(browser, live_server, seeded, arb_chang
 
 def test_arb_member_sees_standards_and_detail(browser, live_server, seeded, arb_standards):
     """An ARB member navigates to a standard detail page and sees its content."""
-    context = browser.new_context()
+    context = browser.new_context(viewport={"width": 1440, "height": 900})
     page = context.new_page()
     try:
         _login(page, live_server, seeded["emails"]["arb_member"])
@@ -158,6 +261,60 @@ def test_arb_member_sees_standards_and_detail(browser, live_server, seeded, arb_
         breadcrumb_texts = [t.strip() for t in breadcrumb.inner_text().splitlines() if t.strip()]
         assert any("ARB" in t for t in breadcrumb_texts), f"Expected ARB breadcrumb, got {breadcrumb_texts}"
         assert any("Standard" in t for t in breadcrumb_texts), f"Expected Standards breadcrumb, got {breadcrumb_texts}"
+
+        # Light mode screenshot at 1440
+        page.wait_for_timeout(600)
+        _shot(page, "standard-detail", "light", 1440)
+    finally:
+        page.close()
+        context.close()
+
+
+def test_arb_member_sees_standards_and_detail_mobile_light(browser, live_server, seeded, arb_standards):
+    """Light mode screenshot of standard detail at 390 viewport."""
+    context = browser.new_context(viewport={"width": 390, "height": 844})
+    page = context.new_page()
+    try:
+        _login(page, live_server, seeded["emails"]["arb_member"])
+        standard_id = arb_standards
+        page.goto(live_server + f"/arb/standards/{standard_id}", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        page.wait_for_load_state("networkidle", timeout=PAGE_TIMEOUT)
+        page.wait_for_timeout(600)
+        _shot(page, "standard-detail", "light", 390)
+    finally:
+        page.close()
+        context.close()
+
+
+def test_arb_member_sees_standards_and_detail_dark(browser, live_server, seeded, arb_standards):
+    """Dark mode screenshot of standard detail at 1440."""
+    context = browser.new_context(viewport={"width": 1440, "height": 900})
+    page = context.new_page()
+    try:
+        _login(page, live_server, seeded["emails"]["arb_member"])
+        standard_id = arb_standards
+        page.goto(live_server + f"/arb/standards/{standard_id}", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        page.wait_for_load_state("networkidle", timeout=PAGE_TIMEOUT)
+        _enable_dark_mode(page)
+        page.wait_for_timeout(600)
+        _shot(page, "standard-detail", "dark", 1440)
+    finally:
+        page.close()
+        context.close()
+
+
+def test_arb_member_sees_standards_and_detail_mobile_dark(browser, live_server, seeded, arb_standards):
+    """Dark mode screenshot of standard detail at 390."""
+    context = browser.new_context(viewport={"width": 390, "height": 844})
+    page = context.new_page()
+    try:
+        _login(page, live_server, seeded["emails"]["arb_member"])
+        standard_id = arb_standards
+        page.goto(live_server + f"/arb/standards/{standard_id}", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        page.wait_for_load_state("networkidle", timeout=PAGE_TIMEOUT)
+        _enable_dark_mode(page)
+        page.wait_for_timeout(600)
+        _shot(page, "standard-detail", "dark", 390)
     finally:
         page.close()
         context.close()
