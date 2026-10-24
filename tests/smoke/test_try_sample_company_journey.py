@@ -97,7 +97,7 @@ def test_try_sample_company_loads_and_removes_cleanly(browser, live_server, seed
         assert seeded_count_before > 0, "Seeded org should have elements"
 
         # Click "Load sample" and wait for redirect to Ask
-        sample_link = page.get_by_role("link", name="Load sample").first
+        sample_link = page.get_by_role("button", name="Load sample").first
         sample_link.click()
         page.wait_for_url("**/ai-chat**", timeout=PAGE_TIMEOUT * 2)
 
@@ -174,7 +174,7 @@ def test_load_sample_twice_is_idempotent(browser, live_server, seeded):
         page.goto(live_server + "/dashboard/overview", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
 
         # First load
-        sample_link = page.get_by_role("link", name="Load sample").first
+        sample_link = page.get_by_role("button", name="Load sample").first
         sample_link.click()
         page.wait_for_url("**/ai-chat**", timeout=PAGE_TIMEOUT * 2)
 
@@ -245,7 +245,7 @@ def test_viewer_sees_explanation_not_button(browser, live_server, seeded):
 
         # Sees explanation, not "Load sample"
         expect(page.get_by_text("An architect or administrator can load the sample")).to_be_visible(timeout=PAGE_TIMEOUT)
-        expect(page.get_by_role("link", name="Load sample")).not_to_be_visible()
+        expect(page.get_by_role("button", name="Load sample")).not_to_be_visible()
 
     finally:
         context.close()

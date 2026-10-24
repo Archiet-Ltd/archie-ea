@@ -698,6 +698,7 @@ def overview():
                     "description": "See a working answer in under a minute, without connecting anything yet.",
                     "href": safe_url_for_with_fallback("architect_ui.load_sample_company", FALLBACK_HREF),
                     "cta": "Load sample",
+                    "post": True,
                     "done": False,
                 }
             else:
