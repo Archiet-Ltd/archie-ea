@@ -90,3 +90,7 @@
     <p id="{{ id }}-error" class="text-sm text-destructive-emphasis mt-1" role="alert">{{ error }}</p>
     {% endif %}
 {% endmacro %}
+
+{% macro hidden_input(name, value='', id='') %}
+    <input{% if id %} id="{{ id }}"{% endif %} type="hidden" name="{{ name }}" value="{{ value }}">
+{% endmacro %}
