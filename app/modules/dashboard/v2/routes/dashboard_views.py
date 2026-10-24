@@ -732,7 +732,11 @@ def overview():
     first_actions = {"connect": False, "sample": False, "import_href": None}
     if dashboard_mode == "guided":
         from app.template_helpers import safe_url_for_with_fallback
-        from app.utils.role_access import can_edit_capabilities
+        from app.utils.role_access import (
+            can_edit_capabilities,
+            may_connect_github,
+            may_load_sample_company,
+        )
 
         # A blueprint that failed to register leaves its step pointing here
         # rather than raising BuildError and taking the dashboard down.
@@ -785,32 +789,13 @@ def overview():
 
         # The sample company is offered once, inside the first card (first_actions), not again as a checklist step
         if not sample_loaded and applications_count == 0:
-            try:
-                _can_load_sample = bool(current_user.enterprise_role in (
-                    "enterprise_architect", "solution_architect", "platform_admin"
-                )) or bool(current_user.is_admin())
-            except Exception:
-                _can_load_sample = False
+            _can_load_sample = may_load_sample_company(current_user)
 
             # Not offered to someone who already gave a source: their own data is on its way.
             first_actions["sample"] = _can_load_sample and not given_sources
         # Same test the connector pages apply, so the link is only shown to
         # someone it opens for.
-        try:
-            from app.middleware.tenant_decorators import is_platform_admin
-            from app.services.rbac_service import rbac_service
-            from app.utils.role_access import may_use_connections
-
-            first_actions["connect"] = bool(
-                'm365_connector.github_connect' in current_app.view_functions
-                and (
-                    is_platform_admin(current_user)
-                    or rbac_service.is_org_admin(current_user, g.current_org_id)
-                    or may_use_connections(current_user)
-                )
-            )
-        except Exception:
-            first_actions["connect"] = False
+        first_actions["connect"] = may_connect_github(current_user, g.current_org_id)
         first_actions["import_href"] = safe_url_for_with_fallback(
             "unified_applications.application_list", FALLBACK_HREF, **{"import": 1}
         )
