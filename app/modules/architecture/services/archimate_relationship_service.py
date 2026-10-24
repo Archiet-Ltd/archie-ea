@@ -325,22 +325,41 @@ class ArchiMateRelationshipService:
     # -----------------------------------------------------------------
 
     @classmethod
-    def get_pending_suggestions(cls, limit: int = 50, min_confidence: float = 0.3):
+    def get_pending_suggestions(cls, limit: int = 50, min_confidence: float = 0.3,
+                                organization_id: int = None):
         """Return pending relationship suggestions above confidence threshold.
+
+        When *organization_id* is provided, only suggestions whose source AND
+        target elements belong to that organisation are returned.
 
         Args:
             limit: Maximum number of suggestions to return.
             min_confidence: Minimum confidence score (0.0-1.0).
+            organization_id: If set, scope to this organisation.
 
         Returns:
             List of RelationshipSuggestion records ordered by confidence desc.
         """
-        from app.models.archimate_core import RelationshipSuggestion
+        from app import db
+        from app.models.archimate_core import ArchiMateElement, RelationshipSuggestion
 
-        return (
+        query = (
             RelationshipSuggestion.query
             .filter_by(status="pending")
             .filter(RelationshipSuggestion.confidence >= min_confidence)
+        )
+        if organization_id is not None:
+            src_alias = db.aliased(ArchiMateElement)
+            tgt_alias = db.aliased(ArchiMateElement)
+            query = (
+                query
+                .join(src_alias, src_alias.id == RelationshipSuggestion.source_element_id)
+                .join(tgt_alias, tgt_alias.id == RelationshipSuggestion.target_element_id)
+                .filter(src_alias.organization_id == organization_id)
+                .filter(tgt_alias.organization_id == organization_id)
+            )
+        return (
+            query
             .order_by(RelationshipSuggestion.confidence.desc())
             .limit(limit)
             .all()
@@ -427,18 +446,21 @@ class ArchiMateRelationshipService:
         )
 
     @classmethod
-    def bulk_accept(cls, min_confidence: float, user_id: int) -> int:
+    def bulk_accept(cls, min_confidence: float, user_id: int,
+                    organization_id: int = None) -> int:
         """Accept all pending suggestions above a confidence threshold.
 
         Args:
             min_confidence: Minimum confidence score (0.0-1.0).
             user_id: The EA user accepting.
+            organization_id: If set, scope bulk-accept to this organisation.
 
         Returns:
             Number of suggestions accepted.
         """
         suggestions = cls.get_pending_suggestions(
-            limit=100, min_confidence=min_confidence
+            limit=100, min_confidence=min_confidence,
+            organization_id=organization_id,
         )
         count = 0
         for s in suggestions:

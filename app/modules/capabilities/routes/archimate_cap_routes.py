@@ -835,43 +835,43 @@ def api_relationship_suggestions():
         status = request.args.get("status", "pending")
         min_confidence = float(request.args.get("min_confidence", 0.3))
         limit = min(safe_int_arg('limit', 50, minimum=1, maximum=500), 100)
+        org_id = current_user.organization_id
 
-        query = RelationshipSuggestion.query.filter_by(status=status)
+        # Only return suggestions where BOTH source and target elements exist
+        # in the current user's organisation.  Join to archimate_elements twice
+        # and skip any suggestion whose referenced element vanished or belongs
+        # to a different org.
+        src_alias = db.aliased(ArchiMateElement)
+        tgt_alias = db.aliased(ArchiMateElement)
+
+        query = (
+            RelationshipSuggestion.query
+            .join(src_alias, src_alias.id == RelationshipSuggestion.source_element_id)
+            .join(tgt_alias, tgt_alias.id == RelationshipSuggestion.target_element_id)
+            .filter(src_alias.organization_id == org_id)
+            .filter(tgt_alias.organization_id == org_id)
+            .filter(RelationshipSuggestion.status == status)
+        )
         if status == "pending":
             query = query.filter(RelationshipSuggestion.confidence >= min_confidence)
         query = query.order_by(RelationshipSuggestion.confidence.desc())
         suggestions = query.limit(limit).all()
 
-        # Build response with element details
-        element_ids = set()
-        for s in suggestions:
-            element_ids.add(s.source_element_id)
-            element_ids.add(s.target_element_id)
-
-        elements_by_id = {}
-        if element_ids:
-            elements = ArchiMateElement.query.filter(
-                ArchiMateElement.id.in_(element_ids)
-            ).all()
-            elements_by_id = {e.id: e for e in elements}
-
         result = []
         for s in suggestions:
-            src = elements_by_id.get(s.source_element_id)
-            tgt = elements_by_id.get(s.target_element_id)
             result.append({
                 "id": s.id,
                 "source_element": {
                     "id": s.source_element_id,
-                    "name": src.name if src else "Unknown element",
-                    "type": src.type if src else "Unknown",
-                    "layer": src.layer if src else None,
+                    "name": s.source_element.name,
+                    "type": s.source_element.type,
+                    "layer": s.source_element.layer,
                 },
                 "target_element": {
                     "id": s.target_element_id,
-                    "name": tgt.name if tgt else "Unknown element",
-                    "type": tgt.type if tgt else "Unknown",
-                    "layer": tgt.layer if tgt else None,
+                    "name": s.target_element.name,
+                    "type": s.target_element.type,
+                    "layer": s.target_element.layer,
                 },
                 "relationship_type": s.relationship_type,
                 "confidence": s.confidence,
@@ -975,7 +975,7 @@ def api_bulk_accept_suggestions():
         min_confidence = float(data.get("min_confidence", 0.8))
 
         accepted_count = ArchiMateRelationshipService.bulk_accept(
-            min_confidence, current_user.id
+            min_confidence, current_user.id, current_user.organization_id
         )
         return jsonify({
             "success": True,
