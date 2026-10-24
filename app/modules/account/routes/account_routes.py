@@ -14,6 +14,7 @@ Endpoints:
 - /join-from-invite/<user_id>/<token>
 - /unconfirmed
 """
+import json
 import logging
 
 from flask import (
@@ -227,6 +228,11 @@ def mfa_challenge():
     app; one not yet enrolled is shown a fresh secret to scan and must prove
     they captured it correctly before MFA (and the login) is considered
     satisfied.
+
+    Enrollment is a three-step flow on one page:
+    1. Scan the QR code / copy the secret
+    2. Enter the 6-digit code from the authenticator app
+    3. Save the recovery codes and confirm
     """
     user = _mfa_pending_user()
     if user is None:
@@ -234,31 +240,77 @@ def mfa_challenge():
         return redirect(url_for("account.login"))
 
     from app.services import mfa_service
+    import qrcode
+    import io
+    import base64
 
     if not user.mfa_enabled:
         secret = session.get("_mfa_enroll_secret")
         if not secret:
             secret = mfa_service.generate_secret()
             session["_mfa_enroll_secret"] = secret
+
+        provisioning_uri = mfa_service.provisioning_uri(user, secret)
+        # Generate QR code as data URI for air-gap compliance
+        qr = qrcode.QRCode(version=1, box_size=10, border=4)
+        qr.add_data(provisioning_uri)
+        qr.make(fit=True)
+        img = qr.make_image(fill_color="black", back_color="white")
+        buf = io.BytesIO()
+        img.save(buf, format="PNG")
+        qr_data_uri = "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode()
+
+        step = request.form.get("step", "1")  # "1" = scan, "2" = verify, "3" = recovery
+
         if request.method == "POST":
-            code = request.form.get("code", "")
-            try:
-                mfa_service.enroll(user, secret, code)
-            except mfa_service.MFAError as exc:
-                flash(str(exc), "form-error")
+            if step == "2":
+                # Step 2: verify the TOTP code
+                code = request.form.get("code", "")
+                try:
+                    recovery_codes = mfa_service.enroll(user, secret, code)
+                except mfa_service.MFAError as exc:
+                    flash(str(exc), "form-error")
+                    return render_template(
+                        "account/mfa_enroll.html",
+                        secret=secret,
+                        provisioning_uri=provisioning_uri,
+                        step="1",
+                    )
+                session.pop("_mfa_enroll_secret", None)
+                # Step 3: show recovery codes
                 return render_template(
                     "account/mfa_enroll.html",
                     secret=secret,
-                    provisioning_uri=mfa_service.provisioning_uri(user, secret),
+                    provisioning_uri=provisioning_uri,
+                    qr_data_uri=qr_data_uri,
+                    recovery_codes=recovery_codes,
+                    step="3",
                 )
-            session.pop("_mfa_enroll_secret", None)
-            return _complete_login_after_mfa(user)
+            elif step == "3":
+                # Step 3: user confirms they saved recovery codes
+                if request.form.get("recovery_confirmed"):
+                    return _complete_login_after_mfa(user)
+                flash("Please confirm you have saved the recovery codes.", "form-error")
+                # Re-render step 3 with the same recovery codes
+                return render_template(
+                    "account/mfa_enroll.html",
+                    secret=secret,
+                    provisioning_uri=provisioning_uri,
+                    qr_data_uri=qr_data_uri,
+                    recovery_codes=json.loads(user.mfa_recovery_codes) if user.mfa_recovery_codes else [],
+                    step="3",
+                )
+
+        # GET or step 1: show QR code and secret
         return render_template(
             "account/mfa_enroll.html",
             secret=secret,
-            provisioning_uri=mfa_service.provisioning_uri(user, secret),
+            provisioning_uri=provisioning_uri,
+            qr_data_uri=qr_data_uri,
+            step="1",
         )
 
+    # Already enrolled: regular MFA challenge
     if request.method == "POST":
         code = request.form.get("code", "")
         if mfa_service.verify_login_code(user, code):
