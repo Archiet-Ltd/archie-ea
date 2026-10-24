@@ -298,6 +298,13 @@
                 return prefix + name + ', ' + this.plural(n, 'card');
             },
 
+            cycleTip: '',
+
+            cycleName: function (code) {
+                let p = this.phases.find(function (x) { return x.code === code; });
+                return (code === 'PRELIM' ? '' : code + ': ') + (p ? p.label : code);
+            },
+
             chooseCycle: function (code) {
                 this.phaseFilter = this.phaseFilter === code ? '' : code;
             },
