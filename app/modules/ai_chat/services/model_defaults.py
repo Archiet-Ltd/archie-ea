@@ -47,10 +47,10 @@ DEFAULT_MODELS = {
     "anthropic": "claude-opus-5",
     "openai": "gpt-4o",
     "gemini": "gemini-2.0-flash",
-    "deepseek": "deepseek-chat",
     "azure": "gpt-4o",
     "huggingface": "meta-llama/Llama-2-7b-chat-hf",
     "openrouter": "google/gemma-4-31b-it:free",
+    "nvidia": "nvidia/nemotron-3-super-120b-a12b",
 }
 
 # A cheaper model for high-volume, low-judgement work (classification, routing,
