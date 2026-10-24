@@ -48,7 +48,7 @@ except ImportError:
         pass
 
 
-NOT_CONFIGURED = "Online payment is not set up on this installation."
+NOT_CONFIGURED = "Online payment is not open yet. Contact us to buy a plan."
 PROVIDER_REFUSED = "The payment provider did not accept the request. Nothing was changed."
 
 # Provider subscription status -> stored status. A status not listed here
@@ -209,7 +209,7 @@ class BillingService:
         if not price_id:
             raise BillingNotConfigured(
                 f"The {plan.name} {'annual' if interval == 'year' else 'monthly'} price is "
-                "not set up on this installation."
+                "not available yet. Contact us to buy a plan."
             )
         return plan, price_id
 
