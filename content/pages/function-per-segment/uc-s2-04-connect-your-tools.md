@@ -13,12 +13,9 @@ icon: github
 
 **For scale-up CTOs and VPs of Engineering who already track their systems somewhere else.**
 
-Entelim pulls your application list straight out of ServiceNow's CMDB, so the systems you already
-keep current there do not need typing in a second time. Connect your ServiceNow instance from the
-ServiceNow Connector screen in Admin, click Sync Now, and each item becomes an application record
-with its name, a technology type and a business owner. You can connect Jira from the same area too;
-today that saves your credentials and checks the connection, and issues are not yet pulled into the
-model from there.
+Connect GitHub. Entelim reads your repositories, proposes the services, dependencies and owners it finds, and you
+approve them in one step. Every fact links back to the repository and file it came from. If your list lives in
+ServiceNow instead, you can pull it from there too.
 
 ## The situation
 
@@ -35,6 +32,25 @@ A CTO or VP of Engineering at a fifty-to-500-person company, setting up Entelim 
 and deciding whether the application list has to be re-typed or can be read from where it already
 lives. The same question comes from whoever owns the CMDB or Jira instance and gets asked to "just
 export a list" for the third time that quarter.
+
+## How to build the model from GitHub
+
+1. Sign up free and, on the "Bring in your company" step, enter your **GitHub organisation** and a **read-only
+   token**. The token is stored encrypted for your organisation and never shown again. Choose **Connect GitHub**.
+2. Carry on. The import runs in the background, so nothing waits on it.
+3. Entelim proposes an application for each deployable repository, the parts that belong to it, who owns each one
+   from the code-owners file and the teams, and the links the code states between repositories: a dependency
+   manifest, a docker-compose service or a deploy workflow.
+4. Open the review page. It lists what GitHub showed, each with why it was proposed and the file it was read from.
+   Choose **Approve all**, or skip the ones that stay out of the model. Nothing enters the model until a person
+   approves it.
+5. Open the **AI chat** and ask what breaks if a service fails. Each connection in the answer shows the
+   repository, the file and the commit it was read at, with a link to the file on GitHub.
+
+A repository that is later archived or disappears from your organisation is flagged on its application, never
+deleted. A later read proposes only what is new.
+
+You can connect Jira on the same step, and Entelim reads your issues into the model.
 
 ## How to pull your application list from ServiceNow
 
@@ -53,10 +69,6 @@ export a list" for the third time that quarter.
 6. Open the **Applications** module to see the result: each CI becomes an application record,
    matched to an existing one by name where the names agree, or created as a new one where they
    do not.
-
-Jira credentials — instance URL, account email, API token and a default project key — save on the
-**Jira Connector** screen in the same Admin area. Its **Test Connection** button calls your Jira
-account directly and confirms who Entelim connected as.
 
 ## What the pull brings across
 
@@ -79,30 +91,23 @@ connector removes.
 The ServiceNow pull is one-way: it reads the `cmdb_ci_appl` table and writes nothing back to
 ServiceNow. It does not bring across servers, databases, incidents or changes, only Application CIs.
 
-Each sync runs when an admin clicks Sync Now; nothing here runs on a schedule yet.
+Each ServiceNow sync runs when an admin clicks Sync Now.
 
 Incoming CIs are matched to existing applications by name. A CI whose name does not match an
 existing application creates a new one rather than merging into a close variant, so keep names
 consistent on the ServiceNow side to avoid near-duplicate entries.
 
-Jira connects for credential storage and a live connection test today; it does not pull issues or
-projects into the model from this screen. If your systems live in Jira rather than ServiceNow, add
-them to the Applications module by hand or bring them in as a CSV or Excel export instead.
-
 ## Frequently asked questions
 
-### Does Entelim read my ServiceNow CMDB automatically?
+### Does Entelim read my ServiceNow CMDB on its own?
 
-No. Each pull runs when an admin clicks Sync Now on the ServiceNow Connector screen; nothing syncs
-on a timer. The sync fetches Application CIs from your CMDB's `cmdb_ci_appl` table and adds or
+You choose when. A ServiceNow pull runs when an admin clicks Sync Now on the ServiceNow Connector screen. The sync fetches Application CIs from your CMDB's `cmdb_ci_appl` table and adds or
 updates the matching application record in Entelim, matched by name.
 
 ### Can I connect Jira to Entelim as well?
 
-Yes. Save your Jira instance URL, account email, API token and default project key on the same
-connector screen, and use Test Connection to confirm Entelim can reach your Jira account. Jira
-issues are not pulled into the model from this screen yet; add those systems by hand or by CSV
-import instead.
+Yes. Enter your Jira site address, your email and an API token on the "Bring in your company" step, and
+Entelim reads your issues into the model.
 
 ### Do I need a ServiceNow administrator to set this up?
 
@@ -119,7 +124,7 @@ Connector Status panel shows Disabled until you turn it back on and save.
 ## Related questions and modules
 
 - [Applications](/modules/applications), the module that holds the result of every sync.
-- [Integrations](/modules/integrations), for every connector Entelim supports in one place.
+- [Connectors](/connectors), for every way to bring systems in, GitHub first.
 - [What breaks if this service or platform fails, and who gets called?](/use-cases/what-breaks-and-who-gets-called)
 - [Show me what I own and what depends on it, so I know what I am on the hook for](/use-cases/what-i-own)
 - [Import our existing Archi or Open Exchange model](/use-cases/import-archimate-model), another way to bring systems in without typing them.
