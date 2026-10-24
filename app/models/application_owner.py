@@ -123,7 +123,7 @@ class ApplicationOwner(db.Model):
     # Element types this record may own via element_type/element_id.
     # Capability is the first; a later element type is added here, not as a
     # new owner table.
-    ELEMENT_TYPES = ["capability", "data_entity", "ai_system"]
+    ELEMENT_TYPES = ["capability", "data_entity", "ai_system", "business_process"]
 
     @property
     def is_primary(self):
@@ -219,6 +219,7 @@ class ApplicationOwner(db.Model):
                     (row.ownership_type or "").capitalize(),
                 ),
                 "assigned_at": row.assigned_at.isoformat() if row.assigned_at else None,
+                "assigned_label": row.assigned_at.strftime("%d %b %Y, %H:%M") if row.assigned_at else None,
                 "assigned_by": row.assigned_by,
             })
         return display_rows

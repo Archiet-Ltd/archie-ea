@@ -131,7 +131,7 @@
       @drop="dropEpic($event, 'later')"
     >
       <div class="px-4 py-3 bg-muted/30 border-b border-border rounded-t-xl flex items-center gap-2">
-        <span class="w-2.5 h-2.5 rounded-full bg-muted/70"></span>
+        <span class="w-2.5 h-2.5 rounded-full bg-muted-foreground"></span>
         <h2 class="text-sm font-bold text-foreground uppercase tracking-wide">Later</h2>
         <span class="ml-auto text-xs text-muted-foreground" x-text="horizons.later.epics.length + ' epics'"></span>
       </div>
@@ -156,7 +156,7 @@
             </div>
             <div class="w-full bg-muted rounded-full h-1.5">
               <div
-                class="h-1.5 rounded-full bg-muted/70 transition-all"
+                class="h-1.5 rounded-full bg-muted-foreground transition-all"
                 :style="'width:' + epic.pct_done + '%'"
               ></div>
             </div>
@@ -319,3 +319,4 @@ function productRoadmap() {
 }
 </script>
 {% endblock %}
+{# design-block: dashboard #}

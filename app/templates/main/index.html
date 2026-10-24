@@ -1,9 +1,9 @@
-{% extends 'layouts/public_base.html' %}{% from 'components/badge.html' import badge %}{% from 'components/public_faq.html' import faq_chevron %}{# smoke-coverage-ok: public landing page; visual layout verified by unit tests and Playwright screenshots under .task/ #}
-{% block full_title %}Entelim — The Company Brain for every enterprise{% endblock %}
+{% extends 'layouts/public_base.html' %}{% from 'components/badge.html' import badge %}{% from 'components/table.html' import table %}{% from 'components/button.html' import button %}{% from 'components/public_faq.html' import faq_chevron %}{# smoke-coverage-ok: public landing page; visual layout verified by unit tests and Playwright screenshots under .task/ #}
+{% block full_title %}Entelim — See what breaks before you change it{% endblock %}
 {% block meta_description %}
 <link rel="canonical" href="https://entelim.org/">
 <meta name="description" content="Entelim is the company brain: one living, explainable model of your enterprise that your people and your AI agents can both query and trust. Enterprise Intelligence Management, open source, self-host free under AGPL-3.0.">
-<meta property="og:title" content="Entelim — The Company Brain for every enterprise">
+<meta property="og:title" content="Entelim — See what breaks before you change it">
 <meta property="og:description" content="One living, explainable model of your enterprise, queryable by your people and your AI agents. Open source, self-host free, forever.">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://entelim.org/">
@@ -11,7 +11,7 @@
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="Entelim — The Company Brain for every enterprise">
+<meta name="twitter:title" content="Entelim — See what breaks before you change it">
 <meta name="twitter:description" content="One living, explainable model of your enterprise, queryable by your people and your AI agents. Open source, self-host free, forever.">
 <meta name="twitter:image" content="{{ url_for('static', filename='brand/entelim-share.png', _external=True) }}">
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "Organization", "name": "Entelim", "url": "https://entelim.org/", "description": "Entelim is the company brain: Enterprise Intelligence Management, the open-source enterprise architecture and intelligence platform."}</script>
@@ -35,50 +35,41 @@
 <!-- Hero: category name first, product-in-search-terms second. One centred column, then the real
      product window (the applications portfolio) in a browser frame. The captures are 2x and shown 1:1
      (scripts/capture_proof_assets.py). -->
-<section class="home-hero" data-testid="home-hero">
+<section class="home-hero home-hero--fold" data-testid="home-hero">
   <div class="mx-auto max-w-5xl px-4 text-center">
-    {% call badge(size='pill') %}
-      <span class="sm:hidden">Open source &middot; Self-host free</span>
-      <span class="hidden sm:inline">Open source under AGPL-3.0 &middot; Self-host free, forever</span>
-    {% endcall %}
-
     <h1 class="home-display">
-      The company brain for every enterprise.
+      See what breaks before you change it.
     </h1>
 
     <p class="home-lead">
-      One living, explainable model of your enterprise: its strategy, systems, data, people, money, risk,
-      suppliers and AI, kept current and turned into cited answers &mdash; built so that when your AI agents
-      need to know how your company actually works, there is a governed source to ask, not a guess. Entelim is
-      an open-source enterprise architecture and intelligence platform built on ArchiMate 3.2. Import your
-      model and get a free, cited answer to what breaks if a system fails, in minutes.
+      Connect GitHub and Entelim maps your services, owners and dependencies, then answers in plain words,
+      citing the file and commit behind every fact.
     </p>
 
-    <div class="mt-9 flex flex-col gap-3 sm:flex-row sm:justify-center">
-      <a href="{{ url_for('account.register') }}" class="public-btn public-btn--lg public-btn--primary">Start free</a>
-      <a href="/pricing" class="public-btn public-btn--lg public-btn--outline">See pricing</a>
+    <div class="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-center">
+      {{ button(text='Start free', href=url_for('account.register'), size='lg', testid='home-hero-start') }}
+      {{ button(text='See pricing', href='/pricing', variant='outline', size='lg', testid='home-hero-pricing') }}
     </div>
   </div>
 
-  <div class="home-hero__stage mt-16">
+  <div class="home-hero__stage mt-6">
     <figure class="home-hero__figure" data-testid="home-hero-figure">
       <div class="home-frame">
         <div class="home-frame__bar" aria-hidden="true">
           <span class="home-frame__dot"></span><span class="home-frame__dot"></span><span class="home-frame__dot"></span>
-          <span class="home-frame__url">Applications</span>
+          <span class="home-frame__url">Ask</span>
         </div>
-        {# The desktop capture is 1280 CSS px wide and is shown at that width; the phone-width capture
-           of the same screen is shown below 740px. #}
+        {# A real answer from the demonstration company, captured by scripts/capture_proof_assets.py. #}
         <picture>
-          <source media="(max-width: 739px)" srcset="{{ url_for('static', filename='img/home/product-portfolio-mobile.webp') }}"
-                  width="358" height="640">
-          <img src="{{ url_for('static', filename='img/home/product-portfolio.webp') }}"
-               alt="The Entelim application portfolio for a demonstration company: every application with its owner, lifecycle status and the business capability it serves."
-               width="1280" height="800" decoding="async" fetchpriority="high" class="home-frame__img">
+          <source media="(max-width: 739px)" srcset="{{ url_for('static', filename='img/home/impact-answer-mobile.webp') }}"
+                  width="342" height="242">
+          <img src="{{ url_for('static', filename='img/home/impact-answer.webp') }}"
+               alt="An answer in Entelim for a demonstration company: What breaks if Alert Manager fails or is under-resourced? Alert Manager is asked about, and the answer lists what depends on it, with the owner of each shown or marked as not recorded."
+               width="842" height="311" decoding="async" fetchpriority="high" class="home-frame__img" data-testid="home-hero-proof">
         </picture>
       </div>
       <figcaption class="public-card-body mt-3 text-center">
-        The application portfolio of the demonstration company, as Entelim shows it.
+        A real answer from the demonstration company: what depends on one system, and who owns each part.
       </figcaption>
     </figure>
   </div>
@@ -343,7 +334,7 @@
     </div>
 
     <div class="mt-6 overflow-x-auto rounded-2xl border border-border public-table-scroll" tabindex="0" role="region" aria-label="Pricing plans table, scrollable">
-      <table class="public-table">
+      {% call table(class='public-table') %}
         <thead>
           <tr>
             <th scope="col">Plan</th>
@@ -359,7 +350,7 @@
             <td><strong>Free</strong></td>
             <td>No trial clock.</td>
             <td>For evaluation, one-person companies and self-hosters.</td>
-            <td>One organisation, three people. Every question, the Business Model Canvas, the twin map. File import. Community support.</td>
+            <td>One organisation, three people. Every question, the Business Model Canvas, the ArchiMate Composer. File import. Community support.</td>
           </tr>
           <tr>
             <td>Startup</td>
@@ -383,7 +374,7 @@
             <td>Unlimited editors, SAML, audit export, own key by default, supported self-hosting, named contact.</td>
           </tr>
         </tbody>
-      </table>
+      {% endcall %}
     </div>
 
     <div class="mt-6 grid gap-6 sm:grid-cols-2">
@@ -429,7 +420,7 @@
           Licensed under AGPL-3.0.
         </h2>
         <p class="public-card-body mb-6">
-          Every question, the Business Model Canvas and the twin map run on software licensed under AGPL-3.0. Run it
+          Every question, the Business Model Canvas and the ArchiMate Composer run on software licensed under AGPL-3.0. Run it
           on your own servers at any size, free, for as long as you like. Pay us when you want us to run it for you,
           support it under contract, or connect it to your systems.
         </p>
@@ -501,7 +492,7 @@
     <p class="home-cta-eyebrow">Start today</p>
     <h2 class="home-h2 mx-auto max-w-3xl">Import your model. Get a cited answer in minutes.</h2>
     <p class="home-section-lead">Free for up to three people, with no trial clock. Self-host it free under AGPL-3.0, at any size.</p>
-    <div class="mt-9 flex flex-col gap-3 sm:flex-row sm:justify-center">
+    <div class="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-center">
       <a href="{{ url_for('account.register') }}" class="public-btn public-btn--lg public-btn--primary">Start free</a>
       <a href="/contact" class="public-btn public-btn--lg public-btn--outline">Get in touch</a>
     </div>
@@ -512,3 +503,4 @@
 {% include 'components/public_footer.html' %}
 
 {% endblock %}
+{# design-block: public #}

@@ -500,7 +500,7 @@ def test_approval_modal_is_a_reviewer_queue_with_requester_attribution():
     assert 'data-testid="approval-queue-unavailable"' in template
     assert 'data-testid="approval-queue-loading"' in template
     assert 'data-testid="approval-queue-empty"' in template
-    assert 'aria-label="Retry approval queue"' in template
+    assert "aria_label='Retry approval queue'" in template
     assert (
         "$store.approvals.hasLoaded && !$store.approvals.loading"
         " && !$store.approvals.error && $store.approvals.approvals.length === 0"

@@ -147,6 +147,19 @@ def requires_admin(f):
     return requires_role([ROLE_PLATFORM_ADMIN])(f)
 
 
+def may_open_procurement(user):
+    """True when ``user`` may open the procurement pages: the roles
+    ``requires_procurement`` admits, and platform authority."""
+    from app.middleware.tenant_decorators import is_platform_admin
+
+    if not getattr(user, "is_authenticated", False):
+        return False
+    return bool(is_platform_admin(user)) or get_user_role(user) in (
+        "procurement",
+        "portfolio_manager",
+    )
+
+
 def requires_procurement(f):
     """
     Shorthand decorator for procurement routes.
@@ -172,6 +185,20 @@ def requires_application_owner(f):
     Shorthand decorator for application manager routes.
     """
     return requires_role(["application_manager"])(f)
+
+
+def may_manage_owned_applications(user):
+    """True when ``user`` may open the My Applications edit pages: exactly the
+    people ``requires_application_owner_or_org_admin`` admits."""
+    from app.middleware.tenant_decorators import is_active_org_admin, is_platform_admin
+
+    if not getattr(user, "is_authenticated", False):
+        return False
+    return bool(
+        is_active_org_admin()
+        or is_platform_admin(user)
+        or get_user_role(user) == "application_manager"
+    )
 
 
 def requires_application_owner_or_org_admin(f):

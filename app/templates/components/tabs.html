@@ -11,11 +11,13 @@
 </div>
 {% endmacro %}
 
-{% macro tabs_trigger(value='', class='') %}
+{# click / selected: for a tab strip whose state the page owns (Alpine expressions), instead
+   of the activeTab the tabs() wrapper keeps. #}
+{% macro tabs_trigger(value='', class='', click=none, selected=none) %}
 <button
-    @click="activeTab = '{{ value }}'"
-    :class="activeTab === '{{ value }}' ? 'bg-background text-foreground ' : ''"
-    :aria-selected="activeTab === '{{ value }}'"
+    @click="{{ click or ("activeTab = '" ~ value ~ "'") }}"
+    :class="{{ selected or ("activeTab === '" ~ value ~ "'") }} ? 'bg-background text-foreground ' : ''"
+    :aria-selected="{{ selected or ("activeTab === '" ~ value ~ "'") }}"
     role="tab"
     id="tab-{{ value }}"
     aria-controls="panel-{{ value }}"

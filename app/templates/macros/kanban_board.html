@@ -1,0 +1,165 @@
+{#
+  Shared Kanban board shell.
+
+  One board markup for the whole product: every Kanban (the SAFe portfolio
+  board, the ADM architecture board) renders this macro so the platform holds
+  exactly one board implementation. The reuse-register `kanban-board` entry
+  refuses a second `class="kanban-board"` anywhere outside this file.
+
+  The shell owns: the board container, the sideways-scroll region that keeps
+  the columns in one row at every width (section 26 of the recognisable-form
+  reference — the board never stacks into one column on a phone), the column
+  headers with their count and WIP limit, and the empty-column hint. The per
+  card body is the caller's: the macro yields inside each column's card list
+  via {{ caller(state) }}, so each board keeps the card its users know while
+  sharing the shape, the move affordance and the WIP treatment.
+
+  The board is driven by a sibling Alpine component (kanbanBoard() for the
+  portfolio board, admKanbanV2() for the ADM board); both expose the same
+  method names the shell binds to: columnCards, columnCount, wipLimit,
+  wipCount, wipAtLimit, wipNearLimit, onDragStart, onDragEnd, onDragOver,
+  onDragLeave, onDrop, moveCard, and the `canWrite` / `moving` flags.
+
+  Arguments:
+    states        ordered list of column state keys (strings) the board shows.
+    labels        optional {state: label}; falls back to the state key.
+    empty_hints   optional {state: {why, next_write, next_read}} shown when a
+                  column is empty, so an empty column names the next step
+                  instead of a grey block.
+    can_write     whether to render the drag handles and the "Move to" select.
+    stage_group   optional {state: group} where group is one of
+                  'discovery' | 'execution' | 'done'; the header is tinted with
+                  a CSS custom property per group so a SAFe user recognises the
+                  discovery / execution / done bands. The ADM board passes none
+                  and keeps its own header colours.
+    show_wip      whether to render the WIP count / limit in the header.
+    show_move     whether to render the keyboard "Move to" select on each card.
+    card_width    Tailwind width utility for a column at phone width (the
+                  columns stay side by side and the region scrolls sideways).
+
+  Usage (caller supplies the card body):
+    {% call(state) kanban_board(states=states, ...) %}
+      <template x-for="card in columnCards('{{ state }}')" :key="card.id"> ... </template>
+    {% endcall %}
+#}
+
+{% macro kanban_board(states=None, labels=None, empty_hints=None, can_write=False,
+                      stage_group=None, show_wip=True, show_move=True,
+                      card_width='w-64', region_label='Kanban board, scrolls horizontally',
+                      columns='server', inner_class='flex gap-4 min-w-max lg:min-w-0',
+                      plain_headers=False, lane=False) %}
+{#
+  Two column-rendering modes share one shell:
+    columns='server'  the macro renders each column from the Jinja `states`
+                      list (the portfolio board). The caller supplies only the
+                      card body via {{ caller(state) }}.
+    lane              True puts each column in a bordered lane container on the muted
+                      surface, as the gallery kanban does; default False leaves the
+                      column bare so every other caller renders unchanged.
+    plain_headers     True puts the column header on the plain surface (no box, no
+                      stage dot) so colour is carried by the cards; default False
+                      keeps the boxed header every other caller renders.
+    columns='client'  the board's columns are rendered by the caller's own
+                      Alpine `x-for` (the ADM board, whose columns come from the
+                      server as data, not as a fixed template list). The macro
+                      provides the `kanban-board` container and the sideways
+                      scroll region, then yields once via {{ caller() }} for the
+                      whole column loop. Both keep one board shell.
+#}
+<div class="kanban-board">
+    <div class="overflow-x-auto pb-4"
+         data-kanban-scroll
+         role="region"
+         aria-label="{{ region_label }}"
+         tabindex="0">
+        <div class="{{ inner_class }}">
+            {% if columns == 'client' %}
+            {{ caller() }}
+            {% else %}
+            {% for state in states %}
+            {% set label = (labels.get(state) if labels else None) or state %}
+            {% set group = (stage_group.get(state) if stage_group else None) %}
+            <div class="kanban-column {{ card_width }} shrink-0 lg:w-auto lg:flex-1 lg:min-w-[10rem]{% if lane %} rounded-lg border border-border bg-muted/40 p-1.5{% endif %}"
+                 data-state="{{ state }}"
+                 {% if group %}data-stage-group="{{ group }}"{% endif %}
+                 {% if can_write %}@dragover.prevent="onDragOver($event, '{{ state }}')"
+                 @dragleave="onDragLeave($event)"
+                 @drop.prevent="onDrop($event, '{{ state }}')"{% endif %}>
+
+                <div class="kanban-column-header {% if plain_headers %}rounded-lg px-1 py-2 mb-2{% else %}border rounded-lg p-3 mb-3{% endif %} flex items-center justify-between gap-2"
+                     {% if group and not plain_headers %}data-stage-group="{{ group }}"{% endif %}
+                     :class="wipAtLimit('{{ state }}') ? 'border border-destructive bg-destructive/10' : '{{ '' if plain_headers else 'border-border' }}'">
+                    <div class="flex items-start gap-2 min-w-0">
+                        {% if group and not plain_headers %}
+                        <span class="shrink-0 h-2 w-2 rounded-full mt-1.5
+                            {% if group == 'discovery' %}bg-info
+                            {% elif group == 'execution' %}bg-success
+                            {% elif group == 'done' %}bg-muted-foreground
+                            {% endif %}"
+                            aria-hidden="true"></span>
+                        {% endif %}
+                        <div class="min-w-0">
+                            <h2 class="text-sm font-medium text-foreground truncate">{{ label }}</h2>
+                            <span class="text-xs text-muted-foreground"
+                                  x-text="`${columnCount('{{ state }}')} epic${columnCount('{{ state }}') !== 1 ? 's' : ''}`"></span>
+                        </div>
+                    </div>
+                    {% if show_wip %}
+                    <template x-if="wipLimit('{{ state }}') > 0">
+                        <span class="shrink-0 inline-flex items-center gap-1 text-xs font-medium"
+                              :class="wipAtLimit('{{ state }}') ? 'text-destructive-emphasis' : wipNearLimit('{{ state }}') ? 'text-warning-emphasis' : 'text-muted-foreground'">
+                            <span x-text="`${wipCount('{{ state }}')} / ${wipLimit('{{ state }}')}`"></span>
+                            <template x-if="wipAtLimit('{{ state }}')">
+                                <span class="inline-flex items-center gap-0.5" title="WIP limit reached">
+                                    <i data-lucide="lock" class="h-3 w-3" aria-hidden="true"></i>
+                                    <span>at limit</span>
+                                </span>
+                            </template>
+                        </span>
+                    </template>
+                    {% endif %}
+                </div>
+
+                <div class="kanban-column-cards space-y-3 min-h-[3rem] rounded-md transition-colors"
+                     {% if can_write %}:class="dragOverColumn === '{{ state }}' ? 'bg-primary/5 ring-1 ring-primary/20' : ''"{% endif %}>
+                    {{ caller(state) }}
+
+                    <div x-show="columnCount('{{ state }}') === 0"
+                         data-empty-state
+                         class="bg-muted/10 border border-dashed border-border rounded-lg p-3">
+                        {% set hint = empty_hints.get(state) if empty_hints else None %}
+                        <p class="text-xs text-muted-foreground">
+                            {% if hint %}{{ hint.why }} {{ hint.next_write if can_write else hint.next_read }}{% else %}Nothing here.{% endif %}
+                        </p>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endmacro %}
+
+
+{#
+  The keyboard "Move to" select for one card. Rendered inside a card body so a
+  person who cannot drag can still move a card, and the move survives a reload.
+  Binds to the component's moveCard(card, selectEl) method.
+#}
+{% macro kanban_move_select(states, labels=None) %}
+<div x-show="canWrite" class="border-t border-border pt-2 mt-2">
+    <select
+        :id="`move-${card.id}`"
+        :aria-label="`Move ${card.name || card.title} to a different column`"
+        @change="moveCard(card, $event.target)"
+        class="w-full text-xs border-input bg-background text-foreground rounded-md px-2 py-1.5 border focus:ring-2 focus:ring-ring focus:border-input"
+        :disabled="moving === card.id">
+        <option value="">Move to...</option>
+        {% for state in states %}
+        {% set label = (labels.get(state) if labels else None) or state %}
+        <option value="{{ state }}" :selected="card.state === '{{ state }}'">{{ label }}</option>
+        {% endfor %}
+    </select>
+</div>
+{% endmacro %}

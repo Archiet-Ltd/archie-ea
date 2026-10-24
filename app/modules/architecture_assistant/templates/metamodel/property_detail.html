@@ -36,7 +36,7 @@
                 <span class="font-medium text-foreground">{{ element.name }}</span>
                 <span class="flex items-center gap-3">
                     <a href="{{ url_for('intelligence_ui.traceability', element=element.id) }}" class="text-primary hover:underline">Check traceability</a>
-                    <a href="{{ url_for('intelligence_ui.twin_map', element=element.id) }}" class="text-primary hover:underline">Open in Twin map</a>
+                    <a href="{{ url_for('archimate.composer_page', element=element.id) }}" class="text-primary hover:underline">Open in the Composer</a>
                 </span>
             </li>
             {% endfor %}
@@ -47,3 +47,4 @@
     {% endcall %}
 </div>
 {% endblock %}
+{# design-block: record-detail #}

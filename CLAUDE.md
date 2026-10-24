@@ -507,7 +507,7 @@ counts only the families in `BANNED_FAMILIES` (`scripts/check_design_tokens.py`)
 `orange` or `cyan` class is right per DESIGN.md but moves this number by zero, and a
 line carrying a `token-migration-ok` marker is already excluded from the count.
 
-**All 73 gates, in registry order (`scripts/verify.py`, `build_gates`) — this table
+**All 83 gates, in registry order (`scripts/verify.py`, `build_gates`) — this table
 is a snapshot, not generated. Run `grep -oE '^\s*Gate\("[a-z-]+"' scripts/verify.py`
 to reconfirm the count before trusting it:**
 
@@ -519,11 +519,20 @@ to reconfirm the count before trusting it:**
 | `redefinitions` | shadowed definitions (ruff F811) | ratchet @ 0 |
 | `lint-core` | correctness lint (ruff `F,E4,E7,E9`) | ratchet @ 0 |
 | `design-tokens` | raw Tailwind colours (DESIGN.md rule) | ratchet @ 0 |
+| `brand-contrast` | a brand token pair (label on primary, control borders, chart ramp) below its contrast threshold, or the logo's `--brand` differing from `--primary` | must be 0 |
+| `brand-raw-colour` | a hard-coded `#2563eb` / `#135fbc` outside the token file and the logo | ratchet @ 53 |
 | `composer-url-params` | a literal composer link carrying a param the composer doesn't read | ratchet @ 0 |
 | `crosswalk-writer-gated` | a write to `external_identity_crosswalk` with no allowlist gate on its call path | must be 0 |
+| `public-shell` | the public navbar, menus and footer reading one registry, tokens and Lucide icons only, no literal links, accessible disclosure menus | must be 0 |
 | `raw-fetch-sites` | `fetch()` bypassing `Platform.fetch` | ratchet @ 0 |
 | `design-tokens-extended` | raw colours outside the core banned families | ratchet @ 0 |
 | `shell-conformance` | a page off the platform shell (header macro/width) | ratchet @ 3 |
+| `shell-layout` | a page that does not reach an approved layout (admin, public or composer) through its `extends` chain | ratchet @ 16 |
+| `shell-chrome` | a page drawing its own sidebar, top bar, navigation or breadcrumb outside the shell macros | ratchet @ 53 |
+| `shell-escapes` | a `shell-ok:` escape hatch (every exception is counted) | ratchet @ 1 |
+| `dialog-title` | a dialog, sheet or drawer with no title | ratchet @ 65 |
+| `empty-state-macro` | a hand-written "No ... yet" block instead of the `empty_state` macro | ratchet @ 166 |
+| `form-field-macro` | a form control inside a form that is not in `form_field`/`form_group` | ratchet @ 583 |
 | `nav-coverage` | business-architecture output missing from every sidebar | ratchet @ 0 |
 | `air-gap` | a UI asset loaded from a public CDN | ratchet @ 0 |
 | `raw-sql-tenancy` | raw SQL on a tenant table with no `organization_id` predicate | ratchet @ 0 |
@@ -564,6 +573,7 @@ to reconfirm the count before trusting it:**
 | `raw-repr-in-template` | a Python object repr (raw dict/list `str()`) reaching a rendered page | must be 0 |
 | `duplicate-breadcrumb` | a page rendering two independent breadcrumb trails at once | ratchet @ 17 |
 | `raw-html-escaping` | unescaped interpolation into hand-built (non-Jinja) HTML | ratchet @ 0 |
+| `design-map` | a page template missing from `docs/design-map.json`, a changed page with no `design-block` marker, or a page using a macro its designed block does not allow | ratchet @ 52 outside their block, 406 unmarked; both only fall |
 | `smoke-coverage-on-change` | a template/JS change with no `tests/smoke/` touch in the same diff | must be 0 |
 | `stale-models` | a retired LLM model id (404s in prod) in shipped code | must be 0 |
 | `deployed-deps` | installed packages below the pinned floors | must be 0 (boot-health job only) |

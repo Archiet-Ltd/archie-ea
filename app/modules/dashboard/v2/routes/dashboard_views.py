@@ -13,6 +13,7 @@ The dashboard_api blueprint (9 routes) is nested inside this blueprint.
 URL prefix /dashboard applied via register() in v2/__init__.py — route decorators must not repeat it.
 """
 
+import datetime as _dt
 import logging
 
 from flask import Blueprint, current_app, g, jsonify, redirect, render_template, request, session, url_for
@@ -48,6 +49,7 @@ def overview():
     from app.models.vendor.vendor_organization import VendorOrganization
     from app.modules.dashboard.v2.services.executive_dashboard_service import (
         format_health_score,
+        health_score_arithmetic,
     )
 
     metrics = {
@@ -523,19 +525,60 @@ def overview():
     # cannot tell them apart.
     health_score = None
     health_components = {}
+    health_unavailable = []
+    health_sum = None
     try:
         # The executive-summary API uses this same tenant-scoped computation.
         # Do not derive an identically labelled score from different measures
         # (maturity_current, risk-documentation coverage, or ARB/solution counts).
         from app.modules.dashboard.v2.services.executive_dashboard_service import ExecutiveDashboardService
+        from datetime import datetime
         health = ExecutiveDashboardService()._get_health_score()
         components = health["components"]
         health_score = health["composite_score"]
+        health_unavailable = health.get("unavailable_components", [])
+
+        # Enrich each component with basis, source, as_of per brief council-07
+        as_of = datetime.utcnow().strftime("%d %b %Y")
+        arithmetic = health_score_arithmetic(components)
+        health_sum = arithmetic["sum"]
         health_components = {
-            "phase_maturity": components["phase_maturity"],
-            "risk_health": components["risk_posture"],
-            "capability_coverage": components["capability_coverage"],
-            "governance": components["governance"],
+            "phase_maturity": {
+                "key": "phase_maturity",
+                "weight": arithmetic["weights"]["phase_maturity"],
+                "label": "Phase Maturity",
+                "value": components["phase_maturity"],
+                "basis": "Share of solutions with a recorded ADM phase that are in phase C or later" if components["phase_maturity"] is not None else "No solutions with recorded ADM phases yet",
+                "source": "Solution pipeline",
+                "as_of": as_of,
+            },
+            "risk_health": {
+                "key": "risk_health",
+                "weight": arithmetic["weights"]["risk_posture"],
+                "label": "Risk Posture",
+                "value": components["risk_posture"],
+                "basis": "Inverse of high/critical risk ratio" if components["risk_posture"] is not None else "No risks recorded yet. Record a risk in the register to measure this.",
+                "source": "Risk register",
+                "as_of": as_of,
+            },
+            "capability_coverage": {
+                "key": "capability_coverage",
+                "weight": arithmetic["weights"]["capability_coverage"],
+                "label": "Capability Coverage",
+                "value": components["capability_coverage"],
+                "basis": "Percentage of L1 capabilities with at least one mapped application" if components["capability_coverage"] is not None else "No capability mappings yet. Map an application to a capability to measure this.",
+                "source": "Capability map",
+                "as_of": as_of,
+            },
+            "governance": {
+                "key": "governance",
+                "weight": arithmetic["weights"]["governance"],
+                "label": "Governance",
+                "value": components["governance"],
+                "basis": "ARB presence, timeliness and approval rate" if components["governance"] is not None else "No ARB activity yet. Submit an item for review to measure this.",
+                "source": "ARB pipeline",
+                "as_of": as_of,
+            },
         }
     except Exception as exc:
         logger.warning("ENH-002: health score computation failed: %s", exc)
@@ -543,6 +586,8 @@ def overview():
         # score of 0, which reads as a measured verdict on the estate.
         health_score = None
         health_components = {}
+        health_unavailable = []
+        health_sum = None
 
     # Data Coverage strip — real per-field coverage of the application portfolio.
     # Single aggregate query; percentages match DATA_REALITY.md definitions.
@@ -630,6 +675,7 @@ def overview():
     )
 
     guided_steps = []
+    first_actions = {"connect": False, "sample": False, "import_href": None}
     if dashboard_mode == "guided":
         from app.template_helpers import safe_url_for_with_fallback
         from app.utils.role_access import can_edit_capabilities
@@ -652,6 +698,16 @@ def overview():
                 "href": safe_url_for_with_fallback("unified_low_priority.capability_map_capabilities", FALLBACK_HREF),
                 "cta": "View capabilities",
             }
+        # Check if sample company is loaded
+        from app.models.archimate_core import ArchiMateElement
+        try:
+            sample_loaded = ArchiMateElement.query.filter(
+                ArchiMateElement.name == "Payments service",
+                ArchiMateElement.type == "ApplicationComponent"
+            ).first() is not None
+        except Exception:
+            sample_loaded = False
+
         guided_steps = [
             {
                 "title": "Import applications",
@@ -672,6 +728,37 @@ def overview():
                 **capability_step,
             },
         ]
+
+        # The sample company is offered once, inside the first card (first_actions), not again as a checklist step
+        if not sample_loaded and applications_count == 0:
+            try:
+                _can_load_sample = bool(current_user.enterprise_role in (
+                    "enterprise_architect", "solution_architect", "platform_admin"
+                )) or bool(current_user.is_admin())
+            except Exception:
+                _can_load_sample = False
+
+            first_actions["sample"] = _can_load_sample
+        # Same test the connector pages apply, so the link is only shown to
+        # someone it opens for.
+        try:
+            from app.middleware.tenant_decorators import is_platform_admin
+            from app.services.rbac_service import rbac_service
+            from app.utils.role_access import may_use_connections
+
+            first_actions["connect"] = bool(
+                'm365_connector.github_connect' in current_app.view_functions
+                and (
+                    is_platform_admin(current_user)
+                    or rbac_service.is_org_admin(current_user, g.current_org_id)
+                    or may_use_connections(current_user)
+                )
+            )
+        except Exception:
+            first_actions["connect"] = False
+        first_actions["import_href"] = safe_url_for_with_fallback(
+            "unified_applications.application_list", FALLBACK_HREF, **{"import": 1}
+        )
         try:
             _can_invite = bool(current_user.is_admin())
         except Exception:
@@ -697,6 +784,15 @@ def overview():
                 }
             )
 
+    # Council-07: Priority actions list
+    priority_actions = {"rows": [], "total": 0, "rule": ""}
+    try:
+        from app.services.priority_action_service import prioritised_actions, limit_for
+        limit = limit_for(request.args)
+        priority_actions = prioritised_actions(g.current_org_id, limit=limit)
+    except Exception as exc:
+        logger.warning("priority actions unavailable: %s", exc)
+
     # PROG-019: AI-governance alerts — cheap read of the latest EA briefing only
     # (never re-runs the expensive stewardship review on a dashboard load).
     governance_alerts = None
@@ -717,6 +813,17 @@ def overview():
     except Exception as _ga_exc:  # noqa: BLE001 — alerts are advisory
         logger.debug("governance alerts unavailable: %s", _ga_exc)
 
+    # T-onb-03: Read company kind from organization settings
+    company_kind = None
+    try:
+        from app.models.organization import Organization
+        org = Organization.query.get(g.current_org_id)
+        if org and org.settings:
+            company_context = org.settings.get("company_context") or {}
+            company_kind = company_context.get("kind")
+    except Exception as _ck_exc:
+        logger.debug("company kind unavailable: %s", _ck_exc)
+
     return render_template(
         "dashboards/overview.html",
         metrics=metrics,
@@ -730,12 +837,18 @@ def overview():
         health_score=health_score,
         health_score_text=format_health_score(health_score),
         health_components=health_components,
+        health_sum=health_sum,
+        health_unavailable=health_unavailable,
         enterprise_role=enterprise_role,
         data_coverage=data_coverage,
         governance_alerts=governance_alerts,
         dashboard_mode=dashboard_mode,
         guided_steps=guided_steps,
+        first_actions=first_actions,
         capability_mapping_count=capability_mapping_count,
+        company_kind=company_kind,
+        priority_actions=priority_actions,
+        as_of_date=_dt.datetime.utcnow().strftime("%d %b %Y"),
     )
 
 
@@ -803,6 +916,55 @@ def api_welcome_dismiss():
             logger.error("welcome-dismiss failed: %s", exc)
             return jsonify({"success": False, "error": str(exc)}), 500
     return jsonify({"success": True})
+
+
+@dashboard_bp_v2.route("/api/company-kind", methods=["POST"])
+@timed_route
+@login_required
+def api_save_company_kind():
+    """T-onb-03: Save the organisation's company kind (Startup, Scale-up, Enterprise).
+
+    Stores in Organization.settings["company_context"]["kind"]. The kind decides
+    which canvas and suggestions the guided steps use. Choosing nothing leaves
+    'startup' as the default.
+    """
+    from app.models.organization import Organization
+
+    data = request.get_json(silent=True) or {}
+    kind = data.get("kind")
+
+    # Valid kinds: startup, scaleup, enterprise, or null/"" for "Not now"
+    if kind and kind not in ("startup", "scaleup", "enterprise"):
+        return jsonify({"success": False, "error": "Invalid company kind"}), 400
+
+    try:
+        org = Organization.query.get(g.current_org_id)
+        if not org:
+            return jsonify({"success": False, "error": "Organization not found"}), 404
+
+        # Initialize settings if needed
+        if org.settings is None:
+            org.settings = {}
+
+        # Initialize company_context if needed
+        if "company_context" not in org.settings:
+            org.settings["company_context"] = {}
+
+        # Save the kind (or None for "Not now")
+        org.settings["company_context"]["kind"] = kind if kind else "startup"
+
+        # Mark as modified so SQLAlchemy knows to update the JSON column
+        from sqlalchemy.orm.attributes import flag_modified
+        flag_modified(org, "settings")
+
+        db.session.commit()
+        logger.info("T-onb-03: company kind set to %s for org %s", kind or "startup", g.current_org_id)
+    except Exception as exc:
+        db.session.rollback()
+        logger.error("T-onb-03: save company kind failed: %s", exc)
+        return jsonify({"success": False, "error": str(exc)}), 500
+
+    return jsonify({"success": True, "kind": org.settings["company_context"]["kind"]})
 
 
 @dashboard_bp_v2.route("/api/overview/table")

@@ -30,6 +30,13 @@ module.exports = {
         '28': '28px',
       },
       colors: {
+        chart: {
+          1: "hsl(var(--chart-1) / <alpha-value>)",
+          2: "hsl(var(--chart-2) / <alpha-value>)",
+          3: "hsl(var(--chart-3) / <alpha-value>)",
+          4: "hsl(var(--chart-4) / <alpha-value>)",
+          5: "hsl(var(--chart-5) / <alpha-value>)",
+        },
         border: "hsl(var(--border) / <alpha-value>)",
         input: "hsl(var(--input) / <alpha-value>)",
         ring: "hsl(var(--ring) / <alpha-value>)",
@@ -114,6 +121,27 @@ module.exports = {
           },
         },
       },
+      // Text role of the status tokens. --destructive, --success and --warning are FILL colours (a dark red,
+      // a mid green, an amber): as text they score 1.4 to 3.3 against the page in one theme or the other.
+      // Their -emphasis twin is the text colour, tuned per theme, so `text-destructive`, `text-success` and
+      // `text-warning` resolve to it. bg-*, border-* and ring-* keep the fill value.
+      textColor: {
+        destructive: {
+          DEFAULT: "hsl(var(--destructive-emphasis) / <alpha-value>)",
+          foreground: "hsl(var(--destructive-foreground) / <alpha-value>)",
+          emphasis: "hsl(var(--destructive-emphasis) / <alpha-value>)",
+        },
+        success: {
+          DEFAULT: "hsl(var(--success-emphasis) / <alpha-value>)",
+          foreground: "hsl(var(--success-foreground) / <alpha-value>)",
+          emphasis: "hsl(var(--success-emphasis) / <alpha-value>)",
+        },
+        warning: {
+          DEFAULT: "hsl(var(--warning-emphasis) / <alpha-value>)",
+          foreground: "hsl(var(--warning-foreground) / <alpha-value>)",
+          emphasis: "hsl(var(--warning-emphasis) / <alpha-value>)",
+        },
+      },
       borderRadius: {
         lg: "var(--radius)",
         md: "calc(var(--radius) - 2px)",
@@ -190,5 +218,5 @@ module.exports = {
   },
   // Bundled in the standalone CLI at scripts/bin/tailwindcss[.exe] — resolves
   // with no npm install and no network, so the air-gap posture is unaffected.
-  plugins: [require('@tailwindcss/typography')],
+  plugins: [require('@tailwindcss/typography'), require('@tailwindcss/container-queries')],
 }

@@ -2,6 +2,8 @@
 {% extends 'layouts/admin_base.html' %}
 {% block title %}Account Settings{% endblock %}
 {% from 'components/page_header.html' import page_header %}
+{% from 'components/company_kind.html' import company_kind_picker %}
+{% block extra_head_js %}<script src="{{ url_for('static', filename='js/dashboard/company_kind.js') }}"></script>{% endblock %}
 {% import 'macros/form_macros.html' as f %}
 {% import 'macros/check_password.html' as check with context %}
 
@@ -102,6 +104,15 @@
         </div>
     </div>
 
+    {# T-onb-03: Company Kind Setting #}
+    <div class="rounded-lg border border-border bg-card text-card-foreground mt-6" data-testid="company-kind-card">
+        <div class="p-6">
+            <h3 class="text-sm font-semibold mb-1">Company Type</h3>
+            <p class="text-xs text-muted-foreground mb-5">This helps us tailor canvas suggestions and guidance to your organisation's stage.</p>
+            {{ company_kind_picker(kind=(user.organization.settings or {}).get('company_context', {}).get('kind', 'startup')) }}
+        </div>
+    </div>
+
     {# Security Information — Last Login #}
     <div class="rounded-lg border border-border bg-card text-card-foreground mt-6">
         <div class="p-6">
@@ -188,11 +199,11 @@
                                             const inp = document.getElementById('pref_{{ pref_key }}');
                                             if (inp) inp.checked = !checked;
                                             btn.classList.toggle('bg-primary', !checked);
-                                            btn.classList.toggle('bg-muted', checked);
+                                            btn.classList.toggle('bg-muted-foreground', checked);
                                             btn.querySelector('span').classList.toggle('translate-x-5', !checked);
                                             btn.querySelector('span').classList.toggle('translate-x-0', checked);
                                         "
-                                        class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 {{ 'bg-primary' if is_enabled else 'bg-muted' }}">
+                                        class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 {{ 'bg-primary' if is_enabled else 'bg-muted-foreground' }}">
                                     <span class="inline-block h-4 w-4 transform rounded-full bg-background transition-transform {{ 'translate-x-5' if is_enabled else 'translate-x-0' }} ml-0.5"></span>
                                 </button>
                                 <input type="checkbox"
@@ -243,11 +254,11 @@
                                         const inp = document.getElementById('pref_show_archimate');
                                         if (inp) inp.checked = !checked;
                                         btn.classList.toggle('bg-primary', !checked);
-                                        btn.classList.toggle('bg-muted', checked);
+                                        btn.classList.toggle('bg-muted-foreground', checked);
                                         btn.querySelector('span').classList.toggle('translate-x-5', !checked);
                                         btn.querySelector('span').classList.toggle('translate-x-0', checked);
                                     "
-                                    class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 {{ 'bg-primary' if show_archimate else 'bg-muted' }}">
+                                    class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 {{ 'bg-primary' if show_archimate else 'bg-muted-foreground' }}">
                                 <span class="inline-block h-4 w-4 transform rounded-full bg-background transition-transform {{ 'translate-x-5' if show_archimate else 'translate-x-0' }} ml-0.5"></span>
                             </button>
                             <input type="checkbox"
@@ -295,3 +306,4 @@
     </div>
     {{ check.password_check('new_password', 0) }}
 {% endblock %}
+{# design-block: settings #}

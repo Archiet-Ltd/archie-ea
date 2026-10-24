@@ -5,6 +5,28 @@
    token (white text on it in light, navy in dark); --info is the accent-as-text
    token (links, active nav), lighter in dark so it reads on slate-900. */
 @layer base {
+  /* Native controls (select lists, date pickers, scrollbars) follow the theme. Without this a <select> with no
+     background class painted light grey (239,239,239) under near-white text in dark mode. */
+  :root { color-scheme: light; }
+  .dark { color-scheme: dark; }
+  /* Every native select, text input and textarea reads the surface and foreground tokens, so a control with no
+     background class is the page colour in both themes (it was the browser's pale grey under light text in dark).
+     Layered, so any bg-*/text-* utility on the control still wins. */
+  select,
+  textarea,
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="file"]):not([type="button"]):not([type="submit"]):not([type="reset"]):not([type="image"]):not([type="hidden"]) {
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
+  }
+  select option,
+  select optgroup {
+    background-color: hsl(var(--popover));
+    color: hsl(var(--popover-foreground));
+  }
+  input::placeholder,
+  textarea::placeholder {
+    color: hsl(var(--muted-foreground));
+  }
   :root {
     --background: 0 0% 100%;
     --foreground: 222.2 47.4% 11.2%;
@@ -12,12 +34,12 @@
     --card-foreground: 222.2 47.4% 11.2%;
     --popover: 0 0% 100%;
     --popover-foreground: 222.2 47.4% 11.2%;
-    --primary: 243.4 75.4% 58.6%;
+    --primary: 213.2 81.3% 40.7%;  /* the logo's blue, oklch(0.497 0.163 257); white label 5.93:1 */
     --primary-foreground: 0 0% 100%;
     --secondary: 210 40% 96.1%;
     --secondary-foreground: 215.3 25% 26.7%;
     --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 45%; /* 4.51:1 on bg-muted (46.9% was 4.34, a WCAG AA fail on every bg-muted chip) */
+    --muted-foreground: 215.4 16.3% 42%; /* 4.9:1 on a bg-primary/10 tint, 5.5:1 on bg-muted (45% was 4.41 on the tint) */
     --accent: 210 40% 96.1%;
     --accent-foreground: 222.2 47.4% 11.2%;
     --destructive: 0 84.2% 60.2%;
@@ -30,19 +52,31 @@
     --success: 142.1 76.2% 36.3%;
     --success-foreground: 0 0% 100%;
     --success-emphasis: 142.1 76.2% 28%;  /* 4.63 on bg-success/10; base is 2.95 */
-    --warning: 37.7 92.1% 50.2%;
+    /* Fill and indicator: 4.1:1 on white, 3.8:1 on slate-100 (50.2% lightness was 2.15:1), black text on it 5.1:1 */
+    --warning: 32 95% 38%;
     --warning-foreground: 0 0% 0%;
     /* 5.62 on bg-warning/10. --warning-foreground is pure black in BOTH themes,
        which is 19.43 here but 1.19 in dark mode, where bg-warning/10 composites
        to near-black — the AI degraded-mode and provider-health banners were
        unreadable for dark-theme users. */
     --warning-emphasis: 32 95% 30%;
-    --info: 243.4 75.4% 58.6%;
+    --info: 213.2 81.3% 40.7%;
     --info-foreground: 0 0% 100%;
-    --info-emphasis: 244.5 57.9% 50.6%;
+    --info-emphasis: 213.2 81.3% 40.7%;
     --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 243.4 75.4% 58.6%;
+    --input: 0 0% 56.1%;  /* oklch(0.65 0 0): control boundary 3.23:1 on white (R10) */
+    --ring: 213.2 81.3% 40.7%;
+    /* Chart ramp, five steps of the brand blue; each at least 3.2:1 on the card. */
+    --chart-1: 213.2 100% 29.4%;
+    --chart-2: 213.7 75.1% 39.4%;
+    --chart-3: 214.5 61.1% 48.4%;
+    --chart-4: 214.7 66% 54.7%;
+    --chart-5: 214.8 77.6% 61%;
+    /* The logo: --brand is --primary's value held apart so the public marketing palette (which re-points
+       --primary to near-black) cannot recolour the mark. */
+    --brand: 213.2 81.3% 40.7%;
+    --brand-mid: 209 63.5% 62.4%;
+    --brand-accent: 178.3 99.1% 42.2%;
     /* Dialog backdrop: navy in both themes, used at 50% (bg-overlay/50). */
     --overlay: 222.2 47.4% 11.2%;
     --radius: 0.5rem;
@@ -60,7 +94,7 @@
        relationship as --info / --info-emphasis. */
     --layer-motivation-emphasis: 263 70% 40%;
     --layer-strategy-emphasis: 38 92% 28%;
-    --layer-business-emphasis: 160 84% 26%;
+    --layer-business-emphasis: 160 84% 23%;
     --layer-application-emphasis: 221 83% 42%;
     --layer-technology-emphasis: 142 71% 26%;
     --layer-implementation-emphasis: 199 89% 30%;
@@ -74,7 +108,7 @@
     --card-foreground: 210 40% 98%;
     --popover: 217.2 32.6% 17.5%;
     --popover-foreground: 210 40% 98%;
-    --primary: 234.5 89.5% 73.9%;
+    --primary: 215 86.8% 67.2%;  /* oklch(0.70 0.14 257); navy label 6.68:1 */
     --primary-foreground: 222.2 47.4% 11.2%;
     --secondary: 217.2 32.6% 17.5%;
     --secondary-foreground: 210 40% 98%;
@@ -82,8 +116,9 @@
     --muted-foreground: 215 20.2% 65.1%;
     --accent: 217.2 32.6% 17.5%;
     --accent-foreground: 210 40% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
+    /* Fill AND indicator: a dot or bar in this red must reach 3:1 on the slate-800 card (was 1.5:1) with white text on it at 4.5:1 */
+    --destructive: 0 74% 52%;
+    --destructive-foreground: 0 0% 100%;
     --destructive-emphasis: 0 91% 71%;
     --success: 142.1 70.6% 45.3%;
     --success-foreground: 0 0% 0%;
@@ -91,16 +126,22 @@
     --warning: 45.4 93.4% 47.5%;
     --warning-foreground: 0 0% 0%;
     --warning-emphasis: 45 93% 65%;   /* 11.81 on bg-warning/10 */
-    --info: 234.5 89.5% 73.9%;
+    --info: 215 86.8% 67.2%;
     --info-foreground: 222.2 47.4% 11.2%;
     /* --info-emphasis was declared in :root only, so text-info-emphasis
        resolved to an invalid declaration in dark mode and fell back to the
        inherited colour — affecting admin_overview.html and
        _capability_heatmap.html. 9.88 on bg-info/10. */
-    --info-emphasis: 228 96.5% 88.8%;
+    --info-emphasis: 213 100% 87%;
     --border: 215.3 25% 26.7%;
-    --input: 215.3 25% 26.7%;
-    --ring: 234.5 89.5% 73.9%;
+    --input: 0 0% 45.2%;  /* oklch(0.556 0 0): 3.79:1 on the dark card, 4.18:1 on the dark page */
+    --ring: 215 86.8% 67.2%;
+    --brand: 215 86.8% 67.2%;
+    --chart-1: 214.7 66% 54.7%;
+    --chart-2: 214.9 83.4% 63.6%;
+    --chart-3: 213.5 100% 70.8%;
+    --chart-4: 209.3 100% 74.4%;
+    --chart-5: 203.6 100% 78.1%;
     --overlay: 222.2 47.4% 11.2%;
 
     /* ArchiMate layer semantic colors (dark mode) */
@@ -111,7 +152,7 @@
     --layer-technology: 142 71% 55%;
     --layer-implementation: 199 89% 58%;
     --layer-risk: 0 84% 65%;
-    --layer-motivation-emphasis: 263 70% 75%;
+    --layer-motivation-emphasis: 263 70% 80%;
     --layer-strategy-emphasis: 38 92% 68%;
     --layer-business-emphasis: 160 84% 62%;
     --layer-application-emphasis: 221 83% 74%;
@@ -259,3 +300,8 @@ body {
    token so pages stop reaching for arbitrary text-[Npx]. Enforced by the
    ui-contract gate (arbitrary pixel type is banned; this named utility is not). */
 .text-2xs { font-size: 11px; line-height: 1rem; }
+
+/* The logo is drawn from the brand tokens, so it follows the theme. */
+.brand-logo-main { fill: hsl(var(--brand)); }
+.brand-logo-mid { fill: hsl(var(--brand-mid)); }
+.brand-logo-accent { fill: hsl(var(--brand-accent)); }

@@ -715,6 +715,12 @@ def public_module(slug):
     if merge_target:
         return redirect(merge_target, code=301)
 
+    # The product menu's "Digital twin" entry opens the working screen for a
+    # signed-in person; the public feature page is for visitors.
+    if slug == "digital-twin":
+        if current_user.is_authenticated:
+            return redirect(url_for("intelligence_ui.twin_map"), code=302)
+
     page = load_page("module", slug=slug)
     if page is None:
         from flask import abort
@@ -788,12 +794,20 @@ def _render_family_hub(family: str, path: str, fallback_title: str, extra_entrie
             if p.url not in seen:
                 seen.add(p.url)
                 listed.append(p)
+    role_catalogue = None
+    if family == "role":
+        # Every role in the Roles menu has a place here: a role with a page
+        # links to it, the rest are listed so the menu never lands on a blank.
+        from app.services.site_registry import site_registry
+
+        role_catalogue = site_registry()["roles"]
     return render_template(
         "public/hub_index.html",
         title=title,
         canonical_url=f"https://entelim.org{path}",
         description=description,
         intro_html=intro.body_html if live_intro else None,
+        role_catalogue=role_catalogue,
         groups=groups,
         extra_groups=extra_groups,
         show_descriptions=True,
@@ -819,9 +833,11 @@ def public_role(slug):
     from app.services.public_pages import (
         MERGED_PAGES,
         build_jsonld,
+        build_landing,
         get_page_screenshot,
         load_page,
         role_siblings,
+        get_role_more_screens,
     )
 
     merge_target = MERGED_PAGES.get(f"/roles/{slug}")
@@ -835,6 +851,8 @@ def public_role(slug):
     return render_template(
         "public/page.html", page=page, jsonld=build_jsonld(page),
         screenshot=get_page_screenshot(page), siblings=role_siblings(page),
+        more_screens=get_role_more_screens(page),
+        landing=build_landing(page),
     )
 
 
@@ -987,6 +1005,33 @@ def public_dogfood():
         from flask import abort
         abort(404)
     return render_template("public/page.html", page=page, jsonld=build_jsonld(page))
+
+
+@main.route("/architecture-health-check/sample")
+def architecture_health_check_sample():
+    """The health-check report for the sample company, so a buyer sees what they would receive."""
+    from app.services.health_check_report_service import load_sample_report
+
+    report = load_sample_report()
+    if report is None:
+        from flask import abort
+        abort(404)
+    return render_template("public/health_check_sample.html", report=report)
+
+
+@main.route("/architecture-health-check/sample.pdf")
+def architecture_health_check_sample_pdf():
+    """The sample report as the PDF a client receives."""
+    from pathlib import Path
+
+    from flask import abort, current_app, send_file
+
+    from app.services.health_check_report_service import REPORT_BASENAME, SAMPLE_DIR
+
+    path = Path(current_app.root_path).parent / SAMPLE_DIR / (REPORT_BASENAME + ".pdf")
+    if not path.is_file():
+        abort(404)
+    return send_file(path, mimetype="application/pdf", download_name="sample-architecture-health-check.pdf")
 
 
 @main.route(

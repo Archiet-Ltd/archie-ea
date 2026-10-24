@@ -128,6 +128,7 @@ let ComposerSearch = (function() {
                 self.relCount = relationships.length;
                 self.viewpointLoading = false;
                 self.statusText = self.activeViewpointName + ' — ' + elements.length + ' elements, ' + relationships.length + ' relationships';
+                if (data.omitted_note) self.statusText += ' (' + data.omitted_note + ' of ' + data.store_total + ' in your model)';
 
                 UndoStack.resume();
                 UndoStack.clear();
@@ -402,13 +403,13 @@ let ComposerSearch = (function() {
 
             let newName = oldName.replace(re, self.srReplaceText);
             cell.set('elName', newName);
-            cell.attr('label/text', newName);
+            cell.attr('nameLabel/text', newName);
 
             /* Push undo */
             if (typeof UndoStack !== 'undefined' && UndoStack.push) {
                 UndoStack.push({
-                    undo: function() { cell.set('elName', oldName); cell.attr('label/text', oldName); },
-                    redo: function() { cell.set('elName', newName); cell.attr('label/text', newName); },
+                    undo: function() { cell.set('elName', oldName); cell.attr('nameLabel/text', oldName); },
+                    redo: function() { cell.set('elName', newName); cell.attr('nameLabel/text', newName); },
                 });
             }
 
@@ -444,19 +445,19 @@ let ComposerSearch = (function() {
                 let oldName = cell.get('elName') || '';
                 let newName = oldName.replace(re, self.srReplaceText);
                 cell.set('elName', newName);
-                cell.attr('label/text', newName);
+                cell.attr('nameLabel/text', newName);
             });
 
             /* Push single undo for bulk replace */
             if (typeof UndoStack !== 'undefined' && UndoStack.push) {
                 UndoStack.push({
                     undo: function() {
-                        oldNames.forEach(function(o) { o.cell.set('elName', o.name); o.cell.attr('label/text', o.name); });
+                        oldNames.forEach(function(o) { o.cell.set('elName', o.name); o.cell.attr('nameLabel/text', o.name); });
                     },
                     redo: function() {
                         oldNames.forEach(function(o) {
                             let n = o.name.replace(re, self.srReplaceText);
-                            o.cell.set('elName', n); o.cell.attr('label/text', n);
+                            o.cell.set('elName', n); o.cell.attr('nameLabel/text', n);
                         });
                     },
                 });

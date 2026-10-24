@@ -132,19 +132,11 @@ _MORE_TOOLS_REQUIRES = {
 }
 
 _MORE_TOOLS = [
-    # A-20 (readiness table 5.1, 2026-09-22): Ask already has a real sidebar
-    # link in every persona's My-work zone (role_access.py's _ASK_LINK), so
-    # it needs no entry here -- the directory already unions every zone's
-    # links. Twin map deliberately has no sidebar link of its own (its own
-    # code comment: reached from an Ask result, kept out of the sidebar
-    # budget) -- this is its one findable home. "network" matches the icon
-    # already used for the Twin map button inside ask.html.
-    ("Twin Map", "intelligence_ui.twin_map", "network"),
-    # Reached from a Twin map element or an Element properties missing-value
+    # Reached from a Composer element or an Element properties missing-value
     # row as well; this is its findable home, outside the sidebar budget.
     ("Traceability Check", "intelligence_ui.traceability", "route"),
     # An organisation's governed element properties and the elements missing
-    # them; kept out of the sidebar budget like Twin map.
+    # them; kept out of the sidebar budget.
     ("Element Properties", "metamodel_properties.index", "sliders-horizontal"),
     ("Stakeholder Map", "stakeholder_map.stakeholder_map_page", "users"),
     ("Capability Health", "strategic.capability_health", "heart-pulse"),
@@ -238,7 +230,7 @@ _NOT_RENDERED = {
     "architect_ui.roadmap_builder": "302 -> Roadmaps",
 }
 
-_ZONE_ORDER = ["home", "my_work", "library", "governance", "admin"]
+_ZONE_ORDER = ["home", "my_work", "library", "workspace", "governance", "admin"]
 
 # Separate preference order used ONLY to break a same-endpoint tie across two
 # different zone buckets (e.g. arb.dashboard living in both a persona's
@@ -249,7 +241,7 @@ _ZONE_ORDER = ["home", "my_work", "library", "governance", "admin"]
 # every persona's zones) and would otherwise win over the shared,
 # canonical "governance" placement - which is exactly the bug that dropped
 # "ARB Dashboard" off the Governance section entirely.
-_TIE_BREAK_ZONE_ORDER = ["home", "governance", "library", "my_work", "admin"]
+_TIE_BREAK_ZONE_ORDER = ["home", "governance", "library", "my_work", "workspace", "admin"]
 
 
 def all_module_links():

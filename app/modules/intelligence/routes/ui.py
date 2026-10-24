@@ -1,21 +1,22 @@
-"""Ask, Twin map, Value streams at risk and Traceability: the pages of the
-intelligence module's user interface.
+"""Value streams at risk and Traceability: the pages of the intelligence
+module's user interface. The old Ask address redirects into the AI chat.
 
-Ask, Twin map and Value streams at risk only render a page shell. Their data
-is fetched in the browser from endpoints that already exist: element search
-from the ArchiMate picker endpoint, the impact answer and the
-value-streams-at-risk answer from the intelligence API, so those pages carry
-no query of their own and no way to read another tenant's rows. Traceability
+Value streams at risk only renders a page shell. Its data
+is fetched in the browser from endpoints that already exist: the
+value-streams-at-risk answer from the intelligence API, so that page carries
+no query of its own and no way to read another tenant's rows. Traceability
 renders its answer on the server from the traceability check service, which
 reads the same tenant-fenced walk as the impact answer.
 
-The provenance drawer is not a route. It opens over either page.
+The provenance drawer is not a route. It opens over those pages.
 """
 
 from __future__ import annotations
 
-from flask import Blueprint, current_app, g, render_template, request
+from flask import Blueprint, current_app, g, redirect, render_template, request, url_for
 from flask_login import login_required
+
+from app.extensions import db
 
 intelligence_ui = Blueprint(
     "intelligence_ui",
@@ -71,52 +72,70 @@ def _workspace_is_empty() -> bool | None:
     ) == 0
 
 
-def _derivation_status():
-    """The tenant's worked-out connection state for the Ask page, or ``None``
-    when it could not be read (the page then says so rather than showing
-    counts of zero)."""
-    org_id = getattr(g, "current_org_id", None)
-    if org_id is None:
-        return None
-    try:
-        from app.modules.intelligence.services.derived_facts import derivation_status
-
-        return derivation_status(int(org_id))
-    except Exception:
-        current_app.logger.warning("[MODULE] intelligence: derivation status unavailable")
-        return None
-
-
 @intelligence_ui.route("/ask", methods=["GET"])
 @login_required
 def ask():
-    """Ask a plain business question about what depends on a chosen element."""
-    workspace_is_empty = _workspace_is_empty()
-    return render_template(
-        "intelligence/ask.html",
-        workspace_counts_available=workspace_is_empty is not None,
-        workspace_is_empty=workspace_is_empty,
-        derivation_status=_derivation_status(),
-    )
+    """Old address of the Ask page; questions are asked in the AI chat.
+
+    Bookmarks and old links keep working: ``q`` (optional) goes across to the
+    chat's question box, so the person lands where they can ask it.
+    """
+    question = (request.args.get("q") or "").strip()[:2000]
+    if question:
+        return redirect(url_for("unified_ai_chat.index", q=question), code=302)
+    return redirect(url_for("unified_ai_chat.index"), code=302)
+
+
+def _most_connected_element_id():
+    """The id of the element with the most relationships in the signed-in
+    organisation (lowest id on a tie), or None when nothing is connected.
+
+    Both queries run through the tenant fence, so another organisation's
+    elements and links are never counted.
+    """
+    from sqlalchemy import func, union_all  # noqa: PLC0415
+
+    from app.models import ArchiMateElement, ArchiMateRelationship  # noqa: PLC0415
+
+    ends = union_all(
+        db.select(ArchiMateRelationship.source_id.label("element_id")),
+        db.select(ArchiMateRelationship.target_id.label("element_id")),
+    ).subquery()
+    row = db.session.execute(
+        db.select(ArchiMateElement.id, func.count().label("links"))
+        .join(ends, ends.c.element_id == ArchiMateElement.id)
+        .group_by(ArchiMateElement.id)
+        .order_by(func.count().desc(), ArchiMateElement.id)
+        .limit(1)
+    ).first()
+    return row[0] if row else None
 
 
 @intelligence_ui.route("/twin-map", methods=["GET"])
 @login_required
 def twin_map():
-    """Show what a chosen element connects to, banded by architecture layer.
+    """Old address of the twin map; the ArchiMate Composer now draws it.
 
-    ``element`` (optional) is the id of the element to centre the map on, so a
-    row on the Ask page can hand its element straight across. A value that is
-    not a whole number is ignored and the page opens on its picker.
+    The twin map drew what one element connects to, which is the Composer's
+    focus mode. Bookmarks and old links keep working: ``element`` (optional)
+    goes across to ``/archimate/composer?element=<id>``. With none, the
+    Composer opens on the organisation's most connected element, and says so
+    (``most_connected=1``); an organisation with nothing connected gets the
+    Composer's own start page. A value that is not a whole number is ignored.
+    The Composer applies the organisation fence, so another organisation's
+    element answers 404 there.
     """
-    initial_element_id = request.args.get("element", type=int)
-    workspace_is_empty = _workspace_is_empty()
-    return render_template(
-        "intelligence/twin_map.html",
-        initial_element_id=initial_element_id,
-        workspace_counts_available=workspace_is_empty is not None,
-        workspace_is_empty=workspace_is_empty,
-    )
+    element_id = request.args.get("element", type=int)
+    if element_id is not None:
+        return redirect(url_for("archimate.composer_page", element=element_id), code=302)
+    try:
+        element_id = _most_connected_element_id()
+    except Exception:
+        current_app.logger.warning("[MODULE] intelligence: most connected element unavailable")
+        element_id = None
+    if element_id is None:
+        return redirect(url_for("archimate.composer_page"), code=302)
+    return redirect(url_for("archimate.composer_page", element=element_id, most_connected=1), code=302)
 
 
 # The maturity threshold the value-streams-at-risk answer is asked for. The

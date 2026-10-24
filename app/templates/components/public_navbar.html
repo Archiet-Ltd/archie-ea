@@ -1,97 +1,146 @@
-{# Simple public navbar without sidebar toggle
-   smoke-coverage-ok: brand_name variable with default fallback; backward-compatible, no visual change for existing pages.
+{# Public navbar for entelim.org. Every link and label comes from site_registry()
+   (app/services/site_registry.py reading content/site/registry.yml); this file holds
+   no link list. The footer reads the same registry, so the two cannot disagree.
+
+   One sticky 64px header. At lg and up: wordmark, Product / Solutions / Roles /
+   Compare / Pricing / Resources, then Sign in, Talk to us and Start free. Below lg:
+   wordmark, Start free and a Menu button that opens one panel under the header with
+   the same menus as accordions. Menus are disclosure panels (button with aria-expanded
+   and aria-controls, the panel follows its trigger in the DOM); behaviour lives in
+   static/js/public/site_nav.js.
+   smoke-coverage-ok: covered by tests/test_public_nav_journey.py and tests/test_public_site_registry.py.
 #}
-<header class="flex items-center justify-between h-16 px-6 bg-background border-b border-border">
-    <div class="flex items-center gap-8">
-        <!-- Logo/Brand -->
-        <a href="{{ url_for('main.index') }}" class="flex items-center hover:opacity-90 transition-opacity" aria-label="{{ brand_name|default(config.APP_NAME) }} home">
-            <img src="{{ url_for('static', filename='brand/entelim-logo.svg') }}" alt="{{ brand_name|default(config.APP_NAME) }}" class="h-8">
-        </a>
+{% from 'components/public_menu.html' import menu_row, menu_group, soon_group, text_link, see_all, group_heading %}
+{% from 'components/button.html' import button %}
+{% set reg = site_registry() %}
+{% set trigger_class = 'flex h-11 w-full items-center justify-between rounded-md px-3 text-sm font-medium text-foreground hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring lg:h-9 lg:w-auto lg:justify-start lg:gap-1 lg:text-muted-foreground lg:hover:text-foreground' %}
+{% set panel_class = 'lg:absolute lg:inset-x-0 lg:top-full lg:border-b lg:border-border lg:bg-popover' %}
+<header class="sticky top-0 z-40 h-16 border-b border-border bg-background" data-site-nav>
+  <div class="mx-auto flex h-full max-w-7xl items-center justify-between gap-4 px-4 sm:px-6">
+    <a href="{{ url_for('main.index') }}" class="flex shrink-0 items-center rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="{{ brand_name|default(config.APP_NAME) }} home">
+      {% with logo_class='h-8', logo_label= brand_name|default(config.APP_NAME)  %}{% include 'partials/_brand_logo.html' %}{% endwith %}
+    </a>
 
-        <!-- Primary public nav: hidden on narrow screens, the footer carries these links there -->
-        <nav aria-label="Primary" class="hidden md:flex items-center gap-6">
-            <a href="/features" class="text-sm text-muted-foreground hover:text-foreground transition-colors">Features</a>
-            <a href="/use-cases" class="text-sm text-muted-foreground hover:text-foreground transition-colors">Use cases</a>
-            <a href="/roles" class="text-sm text-muted-foreground hover:text-foreground transition-colors">Roles</a>
-            <a href="/vs" class="text-sm text-muted-foreground hover:text-foreground transition-colors">Compare</a>
-            <a href="/pricing" class="text-sm text-muted-foreground hover:text-foreground transition-colors">Pricing</a>
-            <a href="/about" class="text-sm text-muted-foreground hover:text-foreground transition-colors">About</a>
-            <a href="/docs" class="text-sm text-muted-foreground hover:text-foreground transition-colors">Docs</a>
-        </nav>
+    {# Below lg: the one action that never hides, then the Menu button. #}
+    <div class="ml-auto flex items-center gap-2 lg:hidden">
+      {% if not current_user.is_authenticated %}
+      {{ button(text='Start free', href=url_for('account.register'), variant='primary', attrs_dict={'data-site-cta': ''}) }}
+      {% endif %}
+      <button type="button" class="inline-flex h-11 w-11 items-center justify-center rounded-md text-foreground hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              aria-label="Menu" aria-expanded="false" aria-controls="site-nav-panel" data-sheet-trigger>
+        <i data-lucide="menu" class="h-5 w-5" aria-hidden="true" data-sheet-icon="closed"></i>
+        <i data-lucide="x" class="hidden h-5 w-5" aria-hidden="true" data-sheet-icon="open"></i>
+      </button>
     </div>
 
-    <div class="flex items-center gap-6">
-        {% if current_user.is_authenticated %}
-            <!-- Authenticated User Menu -->
-            <div class="relative" id="userMenuContainer">
-                <button type="button" 
-                    id="userMenuBtn"
-                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-8 px-2.5 items-center"
-                 aria-label="Action">
-                    <div class="w-8 h-8 rounded-full bg-muted flex items-center justify-center">
-                        <span class="text-sm font-medium">{{ current_user.first_name[0] if current_user.first_name else 'U' }}</span>
-                    </div>
-                    <svg data-lucide="chevron-down" class="h-4 w-4 text-muted-foreground"></svg>
-                </button>
-
-                <!-- Dropdown -->
-                <div 
-                    id="userMenuDropdown"
-                    class="absolute right-0 mt-2 w-56 rounded-md border border-border bg-popover z-50 hidden"
-                >
-                    <div class="p-2">
-                        <div class="px-2 py-1.5 text-sm text-muted-foreground">{{ current_user.email }}</div>
-                        <div class="h-px bg-border my-1"></div>
-                        <a href="{{ url_for('account.manage') }}" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-8 px-2.5 items-center">
-                            <svg data-lucide="user" class="h-4 w-4"></svg>
-                            Profile
-                        </a>
-                        <a href="{{ url_for('admin.index') }}" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-8 px-2.5 items-center">
-                            <svg data-lucide="layout-dashboard" class="h-4 w-4"></svg>
-                            Dashboard
-                        </a>
-                        <div class="h-px bg-border my-1"></div>
-                        <a href="{{ url_for('account.logout') }}" class="flex items-center gap-2 rounded-sm px-2 py-1.5 text-sm text-destructive-emphasis hover:bg-destructive/10 transition-colors">
-                            <svg data-lucide="log-out" class="h-4 w-4"></svg>
-                            Log out
-                        </a>
-                    </div>
+    <div id="site-nav-panel" hidden
+         class="absolute inset-x-0 top-full max-h-screen overflow-y-auto border-b border-border bg-background px-4 pb-20 pt-2 sm:px-6 lg:static lg:ml-0 lg:flex lg:max-h-none lg:flex-1 lg:items-center lg:justify-between lg:overflow-visible lg:border-0 lg:bg-transparent lg:p-0">
+      <nav aria-label="Primary">
+        <ul class="flex flex-col gap-1 lg:flex-row lg:items-center">
+          {% for entry in reg.nav %}
+          {% if entry.kind == 'link' %}
+          <li>
+            <a href="{{ entry.href }}" class="flex h-11 items-center rounded-md px-3 text-sm font-medium text-foreground hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring lg:h-9 lg:text-muted-foreground lg:hover:text-foreground" data-nav-top data-label="{{ entry.label }}">{{ entry.label }}</a>
+          </li>
+          {% else %}
+          <li>
+            <button type="button" class="{{ trigger_class }}" aria-expanded="false" aria-controls="menu-{{ entry.id }}" data-menu-trigger data-nav-top>
+              {{ entry.label }}<i data-lucide="chevron-down" class="h-4 w-4 transition-transform" aria-hidden="true" data-chevron></i>
+            </button>
+            <div id="menu-{{ entry.id }}" hidden data-menu-panel class="{{ panel_class }}">
+              <div class="mx-auto max-w-7xl px-3 pb-3 pt-2 lg:px-6 lg:py-6">
+                {% if entry.id == 'product' %}
+                <div class="grid gap-6 lg:grid-cols-3 xl:grid-cols-5">
+                  {% for column in reg.product.columns %}
+                  <div class="space-y-6">
+                    {% for group in column %}{{ menu_group(group, 'p') }}{% endfor %}
+                  </div>
+                  {% endfor %}
+                  {{ soon_group(reg.product.coming_soon.label, reg.product.coming_soon['items'], 'p', reg.product.coming_soon.all_link) }}
                 </div>
+                {{ see_all(reg.product.all_link.href, reg.product.all_link.label) }}
+
+                {% elif entry.id == 'solutions' %}
+                <div class="grid gap-6 lg:grid-cols-3">
+                  <div class="lg:col-span-2">
+                    {{ group_heading('s-solutions', reg.solutions.label) }}
+                    <ul class="mt-2 grid gap-1 lg:grid-cols-2" aria-labelledby="s-solutions">
+                      {% for item in reg.solutions['items'] %}{{ menu_row(item) }}{% endfor %}
+                    </ul>
+                  </div>
+                  {{ soon_group(reg.solutions.coming_soon.label, reg.solutions.coming_soon['items'], 's') }}
+                </div>
+
+                {% elif entry.id == 'roles' %}
+                <div class="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+                  {% for family in reg.roles.families %}
+                  <div>
+                    <p class="px-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                      <a href="{{ family.href }}" class="rounded-md hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" data-menu-item data-label="{{ family.label }}">{{ family.label }}</a>
+                    </p>
+                    <ul class="mt-2">
+                      {% for role in family.shown %}{{ text_link(role.href, role.label) }}{% endfor %}
+                      {% if family.more %}{{ text_link(family.href, '+ ' ~ family.more ~ ' more', 'text-primary') }}{% endif %}
+                    </ul>
+                  </div>
+                  {% endfor %}
+                </div>
+                {{ see_all(reg.roles.all_link.href, reg.roles.all_link.label) }}
+
+                {% elif entry.id == 'compare' %}
+                {{ group_heading('c-compare', reg.compare.label) }}
+                <ul class="mt-2 grid gap-x-6 sm:grid-cols-2 lg:grid-cols-3" aria-labelledby="c-compare">
+                  {% for item in reg.compare['items'] %}{{ text_link(item.href, item.label) }}{% endfor %}
+                </ul>
+                {{ see_all(reg.compare.all_link.href, reg.compare.all_link.label) }}
+
+                {% elif entry.id == 'resources' %}
+                <div class="grid gap-6 lg:grid-cols-3">
+                  {% for group in reg.resources.groups %}
+                  <div>
+                    {{ group_heading('r-' ~ group.id, group.label) }}
+                    <ul class="mt-2" aria-labelledby="r-{{ group.id }}">
+                      {% for item in group['items'] %}{{ text_link(item.href, item.label) }}{% endfor %}
+                    </ul>
+                  </div>
+                  {% endfor %}
+                </div>
+                {% endif %}
+              </div>
             </div>
+          </li>
+          {% endif %}
+          {% endfor %}
+        </ul>
+      </nav>
+
+      <div class="mt-2 flex flex-col gap-2 border-t border-border pt-4 lg:mt-0 lg:flex-row lg:items-center lg:border-0 lg:pt-0">
+        {% if current_user.is_authenticated %}
+        <div class="lg:relative">
+          <button type="button" class="{{ trigger_class }}" aria-expanded="false" aria-controls="menu-account" aria-label="Account menu" data-menu-trigger>
+            <span class="flex h-8 w-8 items-center justify-center rounded-full bg-muted text-sm font-medium text-foreground">{{ current_user.first_name[0] if current_user.first_name else 'U' }}</span>
+            <i data-lucide="chevron-down" class="h-4 w-4" aria-hidden="true" data-chevron></i>
+          </button>
+          <div id="menu-account" hidden data-menu-panel class="rounded-md border border-border bg-popover p-2 lg:absolute lg:right-0 lg:top-full lg:mt-2 lg:w-56">
+            <p class="px-3 py-1.5 text-sm text-muted-foreground">{{ current_user.email }}</p>
+            <ul>
+              {{ text_link(url_for('account.manage'), 'Profile') }}
+              {{ text_link(url_for('admin.index'), 'Dashboard') }}
+              {{ text_link(url_for('account.logout'), 'Log out') }}
+            </ul>
+          </div>
+        </div>
         {% else %}
-            <!-- Unauthenticated User Links -->
-            <a href="{{ url_for('account.login') }}" class="text-sm font-medium text-foreground hover:text-primary transition-colors">
-                Sign In
-            </a>
-            <a href="{{ url_for('account.register') }}" class="public-btn bg-primary text-primary-foreground hover:bg-primary/90 transition-colors">
-                Sign Up
-            </a>
+        {% for action in reg.actions %}
+        {% if action.id == 'start-free' %}
+        <span class="hidden lg:inline-flex">{{ button(text=action.label, href=action.href, variant=action.variant, attrs_dict={'data-site-cta': ''}) }}</span>
+        {% else %}
+        {{ button(text=action.label, href=action.href, variant=action.variant, class='w-full lg:w-auto') }}
         {% endif %}
+        {% endfor %}
+        {% endif %}
+      </div>
     </div>
+  </div>
 </header>
-
-<script>
-    // Simple vanilla JS dropdown for user menu
-    {% if current_user.is_authenticated %}
-    const userMenuBtn = document.getElementById('userMenuBtn');
-    const userMenuDropdown = document.getElementById('userMenuDropdown');
-    
-    if (userMenuBtn && userMenuDropdown) {
-        userMenuBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            userMenuDropdown.classList.toggle('hidden');
-        });
-        
-        document.addEventListener('click', (e) => {
-            if (!userMenuBtn.contains(e.target) && !userMenuDropdown.contains(e.target)) {
-                userMenuDropdown.classList.add('hidden');
-            }
-        });
-    }
-    {% endif %}
-
-    // Initialize Lucide icons
-    if (typeof lucide !== 'undefined') {
-        lucide.createIcons();
-    }
-</script>
+<script src="{{ url_for('static', filename='js/public/site_nav.js') }}" defer></script>

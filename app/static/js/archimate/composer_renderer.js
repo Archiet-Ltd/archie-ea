@@ -1244,6 +1244,37 @@ let ComposerRenderer = (function() {
             }
         }
 
+    /* Slide each connection label along its own line until no two labels on the
+     * screen overlap. Connections that share a stretch of route (a fan of lines
+     * leaving one element) all put their word at the middle of the line, so the
+     * words land in one row; this moves a word to the nearest clear point on its
+     * own line and leaves it at the middle when the middle is already clear.
+     * Measured on the rendered labels, so call it once the drawing is on screen. */
+    function separateLabels(paper, graph) {
+        let placed = [];
+        let tries = [0.5, 0.42, 0.58, 0.34, 0.66, 0.26, 0.74, 0.18, 0.82, 0.12, 0.88];
+        let hits = function(a, b) {
+            return a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top;
+        };
+        graph.getLinks().forEach(function(link) {
+            let view = paper.findViewByModel(link);
+            let count = link.labels().length;
+            if (!view || !count) return;
+            for (let i = 0; i < count; i++) {
+                let box = null;
+                for (let k = 0; k < tries.length; k++) {
+                    link.prop('labels/' + i + '/position/distance', tries[k]);
+                    let node = view.el.querySelectorAll('.labels > .label')[i];
+                    if (!node) break;
+                    let r = node.getBoundingClientRect();
+                    box = { left: r.left - 2, right: r.right + 2, top: r.top - 2, bottom: r.bottom + 2 };
+                    if (!placed.some(function(o) { return hits(box, o); })) break;
+                }
+                if (box) placed.push(box);
+            }
+        });
+    }
+
     /* ── Plain connection style (opt-in: create(el, {connectionStyle:'plain'})) ──
      *  Pure geometry for routing one connection around the nodes of a drawing.
      *  Rectangles are {id, x, y, w, h} in drawing pixels. Band zones are never
@@ -2069,6 +2100,7 @@ let ComposerRenderer = (function() {
         createNode: createNode,
         createLink: createLink,
         decorateEdge: decorateEdge,
+        separateLabels: separateLabels,
         createContainerNode: createContainerNode,
         applyImportedElementPresentation: applyImportedElementPresentation,
         createSpecialNode: createSpecialNode,

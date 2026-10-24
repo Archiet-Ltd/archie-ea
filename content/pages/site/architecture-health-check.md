@@ -13,6 +13,8 @@ description: "A fixed-price enterprise architecture assessment: $4,500, a writte
 
 The architecture health check is a fixed-price enterprise architecture assessment of your application landscape. For $4,500 we import your own data into Entelim, run its analysis over it, and deliver a written report within two weeks of kickoff. The report covers what is in your landscape, what breaks if each critical system fails and who owns it, what you pay for twice, which applications have no owner, and which contracts renew next.
 
+[See a sample report](/architecture-health-check/sample), written for a fictional company from the same analyses.
+
 ## Who it is for
 
 Buy the health check when someone is about to ask you a question about your systems and you cannot answer it from a list.

@@ -133,6 +133,18 @@ def _check_solution_access(solution, user=None) -> bool:
             )
     if getattr(user, "is_platform_admin", False):
         return True
+    # A persona the permission matrix lets read every solution (an architect,
+    # the reviewer, the CTO, a viewer) opens the solutions of their own
+    # organisation, the same answer the solutions list is drawn from.
+    org_id = getattr(solution, "organization_id", None)
+    if org_id is not None and getattr(user, "organization_id", None) == org_id:
+        try:
+            from app.core.auth.permissions import can
+
+            if can(user, "view_all", "solution", org_id):
+                return True
+        except Exception:  # noqa: BLE001 - an unreadable grant is no ability
+            logger.exception("view_all check failed in _check_solution_access")
     _stakeholder_emails = [
         solution.solution_owner,
         solution.business_sponsor,
@@ -4524,7 +4536,8 @@ def export_archimate_oef(solution_id):
     from app.services.archimate_oef_export_service import archimate_oef_export_service
 
     solution = Solution.query.get_or_404(solution_id)
-    if solution.created_by_id != current_user.id and not is_active_org_admin():
+    # Exporting reads what the person may already open.
+    if not _check_solution_access(solution):
         abort(403)
 
     try:
@@ -10829,7 +10842,7 @@ def api_get_viewpoint_elements(solution_id, section_id):
             "description": elem.description or "",
             "scope": elem.scope,
             "building_block_type": getattr(elem, "building_block_type", None),
-            "plateau": elem.plateau,
+            "plateau": elem.togaf_plateau,
             "status": "linked",
             # Contextual intelligence fields (empty for non-app elements)
             "lifecycle": ctx.get("lifecycle", ""),
@@ -10888,7 +10901,7 @@ def api_get_viewpoint_elements(solution_id, section_id):
                 "description": getattr(elem, "description", "") or "",
                 "scope": getattr(elem, "scope", None),
                 "building_block_type": getattr(elem, "building_block_type", None),
-                "plateau": getattr(elem, "plateau", None),
+                "plateau": getattr(elem, "togaf_plateau", None),
                 "status": "context",
                 "lifecycle": "",
                 "other_solutions": 0,

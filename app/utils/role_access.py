@@ -346,6 +346,25 @@ CAPABILITY_EDITOR_ROLES: Set[str] = {
 }
 
 
+# The architects who bring a source in. Not platform_admin: that is the stored
+# default persona of legacy accounts and grants nothing by itself (see
+# role_required), so administrators come in through is_admin() instead.
+CONNECTION_ARCHITECT_ROLES: Set[str] = CAPABILITY_EDITOR_ROLES - {ROLE_PLATFORM_ADMIN}
+
+
+def may_use_connections(user) -> bool:
+    """True when the user is one of the architects who bring a source in, by
+    their assigned persona. Administrators are answered by ``is_admin()``."""
+    if not user:
+        return False
+    try:
+        # The stored persona, not get_user_role(): that falls back to the
+        # solution architect for a person with none, which must grant nothing.
+        return getattr(user, "enterprise_role", None) in CONNECTION_ARCHITECT_ROLES
+    except Exception:  # noqa: BLE001 - a nav gate must not be able to 500 a page
+        return False
+
+
 def can_edit_capabilities(user) -> bool:
     """True when the user's enterprise_role owns the capability model.
 
@@ -510,12 +529,21 @@ def get_all_roles_with_access(section: str) -> List[str]:
 # agent) is a new, genuinely needed platform_admin-only screen, not a
 # duplicate of anything already in the Admin zone. No fold is available for
 # the same reason as above; taking the budget 32 -> 33.
-SIDEBAR_LINK_BUDGET = 33
+# Workspace (24 Oct 2026): Connections and Billing, one lasting place for the two
+# setup pages an administrator needs from any screen; taking the budget 33 -> 35.
+# Navigation v3 (24 Oct 2026): the sidebar renders app/navigation/registry.py, not the
+# zones below: seven main entries, the Architecture group for the architecture roles,
+# Spend's procurement sub-items, three secondary entries and the user menu. The ceiling
+# falls 35 -> 25 (navigation standard rule 4); scripts/check_sidebar_links.py measures it.
+# The zones below are no longer a sidebar: they are each role's page catalogue, which the
+# All-modules directory and the search index read.
+SIDEBAR_LINK_BUDGET = 25
 
 _ZONE_TITLES = {
     "home": "Home",
     "my_work": "My work",
     "library": "Library",
+    "workspace": "Workspace",
     "governance": "Governance",
     "admin": "Admin",
 }
@@ -554,10 +582,11 @@ def _link(label, endpoint, icon, requires=None, query_params=None):
     return d
 
 
-# The way in to the Ask page, first in every persona's My work so it sits in the
-# same place for everyone. One shared definition: the label, endpoint and icon
-# cannot drift apart between personas.
-_ASK_LINK = _link("Ask a question", "intelligence_ui.ask", "search")
+# The way in to asking a question, first in every persona's My work so it sits in
+# the same place for everyone. Questions are asked in the AI chat, so this opens
+# the chat. One shared definition: the label, endpoint and icon cannot drift apart
+# between personas.
+_ASK_LINK = _link("Ask a question", "unified_ai_chat.index", "message-square")
 
 # Approval Inbox — one queue for every pending change proposal.
 # Shared definition so the label, endpoint and icon cannot drift apart between
@@ -566,6 +595,15 @@ _ASK_LINK = _link("Ask a question", "intelligence_ui.ask", "search")
 _APPROVAL_INBOX_LINK = _link(
     "Approval Inbox", "unified_ai_chat.approval_inbox", "inbox", requires="general"
 )
+
+# Workspace: the organisation's own setup, in the same place for everyone who may use
+# it. Billing is @admin_required, so its link carries requires="admin". Connections is
+# open to the architects who bring a source in (requires="connections"), and a person
+# the route would refuse never sees either link.
+_WORKSPACE_LINKS = [
+    _link("Connections", "m365_connector.connectors_index", "plug", requires="connections"),
+    _link("Billing", "billing.billing_index", "credit-card", requires="admin"),
+]
 
 _HOME_LINKS = [
     _link("Dashboard Overview", "dashboard.overview", "layout-dashboard"),
@@ -628,7 +666,10 @@ _ADMIN_LINKS = [
     # looked fine, and the handler behind the name was dead code. Found by the
     # nav-verified gate: no test had ever exercised that endpoint, and none
     # could. The link now names the handler that actually runs.
-    _link("AI Prompts", "admin.solution_prompts_page", "sparkles"),
+    # The prompts are the platform's own, shared by every organisation, and the
+    # route is @platform_admin_required, so only platform administrators are
+    # shown the link (an organisation administrator got a 403 behind it).
+    _link("AI Prompts", "admin.solution_prompts_page", "sparkles", requires="platform_admin"),
     _link("Governance Gates", "admin.governance_gates", "badge-check", requires="admin"),
     # The organisation's audit trail (query, export in full, verify). It takes
     # Seed Management's place in this zone to hold the link budget; Seed
@@ -665,7 +706,6 @@ _MY_WORK_LINKS = {
         _link("Architecture Journey", "architecture_journey.index", "compass"),
         _APPROVAL_INBOX_LINK,
         _link("Solutions", "solution_design.list_solutions", "wrench"),
-        _link("AI Chat", "unified_ai_chat.index", "message-square"),
         _link("ADM Kanban", "adm_kanban_view.index", "kanban"),
         # Fix round: Programmes was reachable from nowhere in the sidebar.
         # A solution architect whose job is to take designs through
@@ -1055,6 +1095,8 @@ def _build_zones(role: str) -> List[Dict]:
     zones = [
         _zone("home", home_links),
         _zone("my_work", [_ASK_LINK] + _MY_WORK_LINKS[role]),
+        # Above Library, so the group is on screen without scrolling the sidebar.
+        _zone("workspace", _WORKSPACE_LINKS),
         _zone("library", library_links),
     ]
     if role in _BOARD_ROLES:
@@ -1161,10 +1203,21 @@ def link_requires_satisfied(user, requires):
             return bool(user.is_admin())
         except Exception:  # anonymous / unexpected user object
             return False
+    if requires == "connections":
+        # Whoever may bring a source in: the architects who author the model,
+        # and administrators. The same predicate as the Connections routes.
+        try:
+            return may_use_connections(user) or bool(user.is_admin())
+        except Exception:  # anonymous / unexpected user object
+            return False
     if requires == "org_admin":
         return bool(getattr(user, "is_org_admin", False))
     if requires == "platform_admin":
-        return bool(getattr(user, "is_platform_admin", False))
+        # The same predicate @platform_admin_required applies, so a link and
+        # the route behind it cannot disagree about who is a platform admin.
+        from app.middleware.tenant_decorators import is_platform_admin
+
+        return bool(is_platform_admin(user))
     if requires == "data_subject_requests":
         try:
             from app.decorators.requires_role import may_handle_data_subject_requests
@@ -1177,6 +1230,30 @@ def link_requires_satisfied(user, requires):
             from app.models.user import Permission
 
             return bool(user.can(Permission.GENERAL))
+        except Exception:  # anonymous / unexpected user object
+            return False
+    if requires.startswith("section:"):
+        # A route guarded by can_access_section (the agent registry's _guard).
+        return can_access_section(user, requires.split(":", 1)[1])
+    if requires in ("procurement", "procurement_or_finance"):
+        # The guards on the procurement pages (requires_procurement and
+        # requires_procurement_or_finance), through the one predicate the
+        # templates already use for them.
+        try:
+            from app.decorators.requires_role import may_open_procurement
+
+            if may_open_procurement(user):
+                return True
+            return requires == "procurement_or_finance" and get_user_role(user) == ROLE_FINANCE
+        except Exception:  # anonymous / unexpected user object
+            return False
+    if requires == "org_or_platform_admin":
+        # require_org_or_platform_admin (the Team page): a platform administrator, or an
+        # administrator of the organisation the request is acting as.
+        try:
+            from app.middleware.tenant_decorators import is_active_org_admin
+
+            return bool(is_active_org_admin(user))
         except Exception:  # anonymous / unexpected user object
             return False
     if requires == "cto_or_portfolio_manager":

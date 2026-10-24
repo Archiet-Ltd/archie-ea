@@ -129,7 +129,7 @@
             {% endcall %}
             {% call card.card_content() %}
                 <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                    {% set risk_colors = {'critical': 'text-destructive', 'high': 'text-orange-500', 'medium': 'text-amber-500', 'low': 'text-success'} %}{# design-tokens-ok: 4-tier severity scale (critical/high/medium/low) beyond the 3-tier RAG semantic set — kept raw so each tier stays visually distinct #}
+                    {% set risk_colors = {'critical': 'text-destructive', 'high': 'text-warning-emphasis', 'medium': 'text-layer-strategy-emphasis', 'low': 'text-success'} %}{# design-tokens-ok: 4-tier severity scale (critical/high/medium/low) beyond the 3-tier RAG semantic set — kept raw so each tier stays visually distinct #}
                     {% for level in ['critical', 'high', 'medium', 'low'] %}
                     <div class="rounded-lg border border-border bg-background p-4 text-center">
                         <p class="text-xs text-muted-foreground capitalize mb-1">{{ level }}</p>
@@ -195,7 +195,7 @@
                 {% endcall %}
             {% endcall %}
             {% call card.card_content() %}
-                {% set layer_colors = {'motivation': 'bg-violet-100', 'strategy': 'bg-primary/10', 'business': 'bg-amber-500/10', 'application': 'bg-emerald-500/10', 'technology': 'bg-cyan-100', 'implementation': 'bg-orange-100', 'other': 'bg-muted'} %}{# design-tokens-ok: 6-tier ArchiMate layer legend needs one distinct hue per layer; only 4 semantic tokens exist, so mapping any two layers onto the same token would collapse the legend — kept raw per the layer colours in DESIGN.md's ArchiMate Layer Colors table #}
+                {% set layer_colors = {'motivation': 'bg-layer-motivation/10 text-layer-motivation-emphasis', 'strategy': 'bg-layer-strategy/10 text-layer-strategy-emphasis', 'business': 'bg-layer-business/10 text-layer-business-emphasis', 'application': 'bg-layer-application/10 text-layer-application-emphasis', 'technology': 'bg-layer-technology/10 text-layer-technology-emphasis', 'implementation': 'bg-layer-implementation/10 text-layer-implementation-emphasis', 'other': 'bg-muted text-foreground'} %}{# ArchiMate layer tokens: tint plus the layer's own emphasis text, both theme-aware #}
                 <div class="rounded-lg border border-border overflow-hidden">
                     <table class="dense-table w-full text-sm">
                         <thead class="bg-muted/50">
@@ -322,3 +322,4 @@ function execBriefingPanel() {
 }
 </script>
 {% endblock %}
+{# design-block: dashboard #}

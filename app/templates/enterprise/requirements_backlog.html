@@ -1,5 +1,14 @@
 {% extends 'layouts/admin_base.html' %}
 {% from 'components/page_header.html' import page_header %}
+{% from 'components/button.html' import button %}
+{% from 'components/input.html' import input, textarea %}
+{% from 'components/select.html' import native_select %}
+{% from 'components/checkbox.html' import checkbox %}
+{% from 'components/modal.html' import modal %}
+{% from 'components/confirmation_dialog.html' import confirmation_dialog %}
+{% from 'components/dense_table.html' import dense_table %}
+{% from 'components/badge.html' import badge %}
+{% from 'components/form_field.html' import form_group %}
 
 {% block title %}Requirements Backlog{% endblock %}
 
@@ -16,6 +25,7 @@
 <div class="flex flex-col space-y-6 animate-in fade-in duration-500"
      x-data="requirementsBacklog()"
      x-init="init()"
+     @modal:close.document="onModalClose($event.detail && $event.detail.id)"
      x-cloak>
 
     {{ page_header(
@@ -25,73 +35,47 @@
 
     <!-- Filters bar -->
     <div data-slot="card" class="rounded-lg border border-border bg-card p-4">
-        <div class="flex flex-wrap gap-3 items-center">
-            <input
-                type="search"
-                placeholder="Search requirements…"
-                class="flex h-9 rounded-md border border-input bg-background px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring w-60"
-                x-model="filters.search"
-                @input.debounce.300ms="applyFilters()"
-                aria-label="Search requirements"
-            >
-            <select
-                class="flex h-9 rounded-md border border-input bg-background px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                x-model="filters.status"
-                @change="applyFilters()"
-                aria-label="Filter by status"
-            >
+        <div class="flex flex-wrap gap-3 items-end">
+            {% call form_group(id='filter-search', label='Search') %}{{ input(type='search', id='filter-search', placeholder='Search requirements…', aria_label='Search requirements', size='sm', class='w-60', attrs_dict={'x-model': 'filters.search', '@input.debounce.300ms': 'applyFilters()'}) }}{% endcall %}
+            {% call form_group(id='filter-status', label='Status') %}
+            {% call native_select(id='filter-status', size='sm', aria_label='Filter by status', attrs_dict={'x-model': 'filters.status', '@change': 'applyFilters()'}) %}
                 <option value="">All statuses</option>
                 <option value="Draft">Draft</option>
                 <option value="Refined">Refined</option>
                 <option value="Approved">Approved</option>
                 <option value="Implemented">Implemented</option>
-            </select>
-            <select
-                class="flex h-9 rounded-md border border-input bg-background px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                x-model="filters.moscow"
-                @change="applyFilters()"
-                aria-label="Filter by MoSCoW priority"
-            >
+            {% endcall %}
+            {% endcall %}
+            {% call form_group(id='filter-moscow', label='Priority') %}
+            {% call native_select(id='filter-moscow', size='sm', aria_label='Filter by MoSCoW priority', attrs_dict={'x-model': 'filters.moscow', '@change': 'applyFilters()'}) %}
                 <option value="">All priorities</option>
                 <option value="MUST">MUST</option>
                 <option value="SHOULD">SHOULD</option>
                 <option value="COULD">COULD</option>
                 <option value="WONT">WONT</option>
-            </select>
-            <select
-                class="flex h-9 rounded-md border border-input bg-background px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                x-model="filters.capability_id"
-                @change="applyFilters()"
-                aria-label="Filter by capability"
-            >
+            {% endcall %}
+            {% endcall %}
+            {% call form_group(id='filter-capability', label='Capability') %}
+            {% call native_select(id='filter-capability', size='sm', aria_label='Filter by capability', attrs_dict={'x-model': 'filters.capability_id', '@change': 'applyFilters()'}) %}
                 <option value="">All capabilities</option>
                 {% for cap in capabilities %}
                 <option value="{{ cap.id }}">{{ cap.name }}</option>
                 {% endfor %}
-            </select>
-            <span class="ml-auto text-sm text-muted-foreground" x-text="filtered.length + ' requirements'"></span>
-            <button type="button"
-                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center"
-                @click="showCreateModal = true"
-                aria-label="Add requirement"
-            >
+            {% endcall %}
+            {% endcall %}
+            <span class="ml-auto text-sm text-muted-foreground" x-text="filtered.length + (filtered.length === 1 ? ' requirement' : ' requirements')"></span>
+            {% call button(variant='default', class='gap-2 justify-center', aria_label='Add requirement', attrs_dict={'@click': "createError = ''; showCreateModal = true"}) %}
                 <i data-lucide="plus" class="h-4 w-4" aria-hidden="true"></i>
                 Add Requirement
-            </button>
-            <button type="button"
-                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center"
-                @click="window.location.href='/api/enterprise/requirements/export'"
-                aria-label="Export requirements as CSV"
-            >
+            {% endcall %}
+            {% call button(variant='outline', class='gap-2 justify-center', aria_label='Export requirements as CSV', attrs_dict={'@click': "window.location.href='/api/enterprise/requirements/export'"}) %}
                 <i data-lucide="download" class="h-4 w-4" aria-hidden="true"></i>
                 Export CSV
-            </button>
-            <button type="button" @click="showEpicTree=!showEpicTree; if(showEpicTree) loadEpics()"
-                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center"
-                    :aria-pressed="showEpicTree.toString()">
+            {% endcall %}
+            {% call button(variant='outline', class='gap-2 justify-center', attrs_dict={'@click': 'showEpicTree=!showEpicTree; if(showEpicTree) loadEpics()', ':aria-pressed': 'showEpicTree.toString()'}) %}
                 <i data-lucide="git-branch" class="h-4 w-4" aria-hidden="true"></i>
                 Epic View
-            </button>
+            {% endcall %}
         </div>
     </div>
 
@@ -125,34 +109,16 @@
     <!-- Status summary chips -->
     <div class="flex gap-3 flex-wrap">
         <template x-for="s in ['Draft','Refined','Approved','Implemented']" :key="s">
-            <button type="button"
-                class="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium border transition-colors"
-                :class="filters.status === s ? 'bg-primary text-primary-foreground border-primary' : 'bg-muted text-muted-foreground border-transparent hover:border-border'"
-                @click="filters.status = filters.status === s ? '' : s; applyFilters()"
-                :aria-pressed="filters.status === s"
-                x-text="s + ' (' + countByStatus(s) + ')'"
-            ></button>
+            {% call button(variant='outline', size='sm', attrs_dict={':class': "filters.status === s ? 'bg-primary text-primary-foreground border-primary' : 'bg-muted text-muted-foreground border-transparent hover:border-border'", '@click': "filters.status = filters.status === s ? '' : s; applyFilters()", ':aria-pressed': 'filters.status === s', 'x-text': "s + ' (' + countByStatus(s) + ')'"}) %}{% endcall %}
         </template>
     </div>
 
     <!-- Requirements table -->
-    <div data-slot="card" class="rounded-lg border border-border bg-card overflow-hidden">
-        <div class="overflow-x-auto">
-            <table class="dense-table w-full text-sm">
-                <thead>
-                    <tr class="border-b bg-muted/50 text-muted-foreground">
-                        <th class="px-4 py-3 text-left font-medium">Requirement</th>
-                        <th class="px-4 py-3 text-left font-medium">Capability</th>
-                        <th class="px-4 py-3 text-left font-medium">MoSCoW</th>
-                        <th class="px-4 py-3 text-left font-medium">Status</th>
-                        <th class="px-4 py-3 text-left font-medium">Owner</th>
-                        <th class="px-4 py-3 text-left font-medium w-20">Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
+    {% call dense_table(columns=[('Requirement', ''), ('Capability', ''), ('Solution', ''), ('MoSCoW', ''), ('Status', ''), ('Owner', ''), ('Definition of Done', ''), ('', 'text-right')],
+                        caption='Requirements', testid='requirements-table', flush=false) %}
                     <template x-if="loading">
                         <tr>
-                            <td colspan="6" class="px-4 py-12 text-center text-muted-foreground">
+                            <td colspan="8" class="px-4 py-12 text-center text-muted-foreground">
                                 <div class="flex items-center justify-center gap-2">
                                     <i data-lucide="loader-2" class="h-4 w-4 animate-spin" aria-hidden="true"></i>
                                     Loading requirements…
@@ -162,17 +128,17 @@
                     </template>
                     <template x-if="!loading && loadError">
                         <tr>
-                            <td colspan="6" class="px-4 py-12 text-center text-destructive-emphasis">
+                            <td colspan="8" class="px-4 py-12 text-center text-destructive-emphasis">
                                 <i data-lucide="alert-triangle" class="h-10 w-10 mx-auto mb-3" aria-hidden="true"></i>
                                 <p x-text="loadError"></p>
                                 <p class="mt-1 text-muted-foreground">The backlog could not be read — this is not an empty backlog.</p>
-                                <button type="button" class="mt-3 text-primary underline" @click="load()">Retry</button>
+                                {% call button(variant='link', class='mt-3', attrs_dict={'@click': 'load()'}) %}Retry{% endcall %}
                             </td>
                         </tr>
                     </template>
                     <template x-if="!loading && !loadError && filtered.length === 0">
                         <tr>
-                            <td colspan="6" class="px-4 py-12 text-center text-muted-foreground">
+                            <td colspan="8" class="px-4 py-12 text-center text-muted-foreground">
                                 <i data-lucide="inbox" class="h-10 w-10 mx-auto mb-3 opacity-40" aria-hidden="true"></i>
                                 <p>No requirements found. Generate them from the <a href="/enterprise/capabilities" class="text-primary underline">Capability Map</a>.</p>
                             </td>
@@ -197,13 +163,27 @@
                             </td>
                             <td class="px-4 py-3 text-xs">
                                 <template x-if="req.capability_name">
-                                    <a :href="'/enterprise/capabilities/' + req.capability_id"
+                                    <a :href="'/enterprise/capabilities/' + req.capability_id + '/fact-sheet'"
                                        class="text-primary hover:underline font-medium"
                                        @click.stop
                                        x-text="req.capability_name"></a>
                                 </template>
                                 <template x-if="!req.capability_name">
                                     <span class="text-muted-foreground italic">Not linked</span>
+                                </template>
+                            </td>
+                            <td class="px-4 py-3 text-xs">
+                                <template x-if="req.solution_name && !req.solution_openable">
+                                    <span class="font-medium" x-text="req.solution_name"></span>
+                                </template>
+                                <template x-if="req.solution_name && req.solution_openable">
+                                    <a :href="'/solutions/' + req.solution_id"
+                                       class="text-primary hover:underline font-medium"
+                                       @click.stop
+                                       x-text="req.solution_name"></a>
+                                </template>
+                                <template x-if="!req.solution_name">
+                                    <span class="text-muted-foreground italic">No solution</span>
                                 </template>
                             </td>
                             <td class="px-4 py-3">
@@ -217,20 +197,14 @@
                                     x-text="req.moscow_priority || 'N/A'"></span>
                             </td>
                             <td class="px-4 py-3">
-                                <select
-                                    class="flex h-7 rounded border border-input bg-background px-2 text-xs"
-                                    x-model="req.status"
-                                    @click.stop
-                                    @change="patchStatus(req, $event.target.value)"
-                                    :aria-label="'Status for ' + req.name"
-                                >
+                                {% call native_select(size='xs', attrs_dict={'x-model': 'req.status', '@click.stop': '', '@change': 'patchStatus(req, $event.target.value)', ':aria-label': "'Status for ' + req.name"}) %}
                                     <option value="Draft">Draft</option>
                                     <option value="Refined">Refined</option>
                                     <option value="Approved">Approved</option>
                                     <option value="Implemented">Implemented</option>
-                                </select>
+                                {% endcall %}
                             </td>
-                            <td class="px-4 py-3 text-xs text-muted-foreground" x-text="req.owner || '—'"></td>
+                            <td class="px-4 py-3 text-xs text-muted-foreground" x-text="req.owner || 'No owner'"></td>
                             <td class="px-4 py-3">
                                 <span x-show="req.dod_checklist && req.dod_checklist.length > 0" x-cloak
                                       x-cloak
@@ -238,60 +212,28 @@
                                       :class="req.dod_complete ? 'text-success' : 'text-muted-foreground'"
                                       x-text="req.dod_complete ? '✓ DoD' : (req.dod_checklist.filter(i=>i.checked).length + '/' + req.dod_checklist.length + ' DoD')">
                                 </span>
+                                <span x-show="!(req.dod_checklist && req.dod_checklist.length > 0)" x-cloak class="text-xs text-muted-foreground">No checklist</span>
                             </td>
                             <td class="px-4 py-3">
-                                <button type="button"
-                                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-8 px-2.5 items-center justify-center"
-                                    @click.stop="openDetail(req)"
-                                    :aria-label="'Edit requirement ' + req.name"
-                                    title="Edit"
-                                >
+                                {% call button(variant='ghost', size='sm', class='justify-center', attrs_dict={'@click.stop': 'openDetail(req)', ':aria-label': "'Edit requirement ' + req.name", 'title': 'Edit'}) %}
                                     <i data-lucide="pencil" class="h-3.5 w-3.5" aria-hidden="true"></i>
-                                </button>
+                                {% endcall %}
                             </td>
                         </tr>
                     </template>
-                </tbody>
-            </table>
-        </div>
-    </div>
+    {% endcall %}
 
     <!-- Create requirement modal -->
-    <div
-        x-cloak
-        x-show="showCreateModal" x-cloak
-        x-trap="showCreateModal"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="create-req-modal-title"
-        class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-overlay/50"
-        @keydown.escape.window="showCreateModal = false"
-    >
-        <div
-            data-slot="card"
-            class="rounded-lg border border-border bg-card w-full max-w-lg max-h-[90vh] overflow-y-auto p-6"
-            @click.stop
-        >
-            <div class="flex items-start justify-between mb-5">
-                <h2 id="create-req-modal-title" class="text-base font-semibold text-foreground text-foreground">Add Requirement</h2>
-                <button type="button"
-                    class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                    @click="showCreateModal = false"
-                    aria-label="Close modal"
-                ><i data-lucide="x" class="h-4 w-4" aria-hidden="true"></i></button>
-            </div>
-
+    {% call modal(id='create-req-modal', title='Add Requirement', size='default') %}
             <div class="space-y-4">
                 <!-- RRT-003: Template picker trigger -->
                 <div class="mb-3 flex items-center gap-2">
-                  <button type="button"
-                          @click="pickerStep = 1; loadTemplateLayers()"
-                          class="text-xs px-3 py-1.5 rounded border border-primary/30 text-primary hover:bg-primary/5 flex items-center gap-1">
+                  {% call button(variant='outline', size='sm', attrs_dict={'@click': 'pickerStep = 1; loadTemplateLayers()'}) %}
                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
                     </svg>
                     Use Template
-                  </button>
+                  {% endcall %}
                   <span x-show="pickerTemplate" x-cloak class="text-xs text-muted-foreground" x-text="'Template: ' + (pickerTemplate?.name || '')"></span>
                 </div>
 
@@ -300,14 +242,11 @@
                   <p class="text-xs font-medium text-muted-foreground mb-2">Select Architecture Layer:</p>
                   <div class="grid grid-cols-2 gap-2">
                     <template x-for="lyr in pickerLayers" :key="lyr">
-                      <button type="button"
-                              @click="loadTemplatesForLayer(lyr)"
-                              class="p-2 text-xs rounded border hover:bg-primary/5 hover:border-primary/40 text-left capitalize"
-                              x-text="lyr">
-                      </button>
+                      {% call button(variant='outline', size='sm', class='text-left capitalize', attrs_dict={'@click': 'loadTemplatesForLayer(lyr)', 'x-text': 'lyr'}) %}
+                      {% endcall %}
                     </template>
                   </div>
-                  <button type="button" @click="pickerStep = 0" class="mt-2 text-xs text-muted-foreground/60 hover:text-muted-foreground">Cancel</button>
+                  {% call button(variant='ghost', size='sm', class='mt-2', attrs_dict={'@click': 'pickerStep = 0'}) %}Cancel{% endcall %}
                 </div>
 
                 <!-- Step 2: Template list for selected layer -->
@@ -315,270 +254,158 @@
                   <p class="text-xs font-medium text-muted-foreground mb-2" x-text="'Templates — ' + pickerLayer + ':'"></p>
                   <div class="space-y-1 max-h-40 overflow-y-auto">
                     <template x-for="tpl in pickerTemplates" :key="tpl.id">
-                      <button type="button"
-                              @click="applyTemplate(tpl)"
-                              class="w-full p-2 text-xs rounded border hover:bg-primary/5 hover:border-primary/40 text-left">
+                      {% call button(variant='outline', size='sm', class='text-left', attrs_dict={'@click': 'applyTemplate(tpl)'}) %}
                         <div class="font-medium" x-text="tpl.name"></div>
                         <div class="text-muted-foreground truncate" x-text="tpl.description"></div>
-                      </button>
+                      {% endcall %}
                     </template>
                   </div>
-                  <button type="button" @click="pickerStep = 1" class="mt-2 text-xs text-muted-foreground/60 hover:text-muted-foreground">← Back</button>
+                  {% call button(variant='ghost', size='sm', class='mt-2', attrs_dict={'@click': 'pickerStep = 1'}) %}← Back{% endcall %}
                 </div>
 
-                <input type="hidden" x-model="newReq.layer" name="layer">
-                <input type="hidden" x-model="newReq.template_id" name="template_id">
+                {{ input(type='hidden', name='layer', attrs_dict={'x-model': 'newReq.layer'}) }}
+                {{ input(type='hidden', name='template_id', attrs_dict={'x-model': 'newReq.template_id'}) }}
 
                 <div>
                     <label class="block text-sm font-medium mb-1.5" for="new-req-name">Requirement Name <span class="text-destructive-emphasis">*</span></label>
-                    <input
-                        id="new-req-name"
-                        type="text"
-                        x-model="newReq.requirement_name"
-                        placeholder="As a user, I need…"
-                        class="w-full flex h-9 rounded-md border border-input bg-background px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                    >
+                    {{ input(type='text', id='new-req-name', placeholder='As a user, I need…', size='sm', attrs_dict={'x-model': 'newReq.name'}) }}
                 </div>
                 <div>
                     <label class="block text-sm font-medium mb-1.5" for="new-req-desc">Description</label>
-                    <textarea
-                        id="new-req-desc"
-                        x-model="newReq.description"
-                        rows="2"
-                        placeholder="Optional details…"
-                        class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring resize-none"
-                    ></textarea>
+                    {{ textarea(id='new-req-desc', placeholder='Optional details…', rows=2, attrs_dict={'x-model': 'newReq.description'}) }}
                 </div>
                 <div class="grid grid-cols-2 gap-4">
                     <div>
                         <label class="block text-sm font-medium mb-1.5" for="new-req-type">Type</label>
-                        <select
-                            id="new-req-type"
-                            x-model="newReq.requirement_type"
-                            class="w-full flex h-9 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                        >
+                        {% call native_select(id='new-req-type', size='sm', class='w-full', attrs_dict={'x-model': 'newReq.requirement_type'}) %}
                             <option value="functional">Functional</option>
-                            <option value="non-functional">Non-functional</option>
+                            <option value="quality">Non-functional (quality)</option>
                             <option value="constraint">Constraint</option>
-                        </select>
+                        {% endcall %}
                     </div>
                     <div>
                         <label class="block text-sm font-medium mb-1.5" for="new-req-moscow">MoSCoW Priority</label>
-                        <select
-                            id="new-req-moscow"
-                            x-model="newReq.moscow_priority"
-                            class="w-full flex h-9 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                        >
+                        {% call native_select(id='new-req-moscow', size='sm', class='w-full', attrs_dict={'x-model': 'newReq.moscow_priority'}) %}
                             <option value="MUST">MUST</option>
                             <option value="SHOULD">SHOULD</option>
                             <option value="COULD">COULD</option>
                             <option value="WONT">WONT</option>
-                        </select>
+                        {% endcall %}
                     </div>
                 </div>
                 <div>
                     <label class="block text-sm font-medium mb-1.5" for="new-req-priority">Priority</label>
-                    <select
-                        id="new-req-priority"
-                        x-model="newReq.priority"
-                        class="w-full flex h-9 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                    >
-                        <option value="high">High</option>
-                        <option value="medium">Medium</option>
-                        <option value="low">Low</option>
-                    </select>
+                    {% call native_select(id='new-req-priority', size='sm', class='w-full', attrs_dict={'x-model': 'newReq.priority'}) %}
+                        <option value="2">High</option>
+                        <option value="3">Medium</option>
+                        <option value="4">Low</option>
+                    {% endcall %}
                 </div>
                 <div class="grid grid-cols-2 gap-4">
                     <div>
                         <label class="block text-sm font-medium mb-1.5" for="new-req-sp">Story Points <span class="text-muted-foreground font-normal text-xs">(Fibonacci)</span></label>
-                        <input
-                            id="new-req-sp"
-                            type="number"
-                            min="1"
-                            max="89"
-                            x-model.number="newReq.story_points"
-                            placeholder="e.g. 3"
-                            class="w-full flex h-9 rounded-md border border-input bg-background px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                        >
+                        {{ input(type='number', id='new-req-sp', placeholder='e.g. 3', size='sm', attrs_dict={'min': '1', 'max': '89', 'x-model.number': 'newReq.story_points'}) }}
                     </div>
                     <div>
                         <label class="block text-sm font-medium mb-1.5" for="new-req-epic">Parent Epic ID <span class="text-muted-foreground font-normal text-xs">(optional)</span></label>
-                        <input
-                            id="new-req-epic"
-                            type="number"
-                            x-model.number="newReq.epic_parent_id"
-                            placeholder="Parent Epic ID (optional)"
-                            class="w-full flex h-9 rounded-md border border-input bg-background px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                        >
+                        {{ input(type='number', id='new-req-epic', placeholder='Parent Epic ID (optional)', size='sm', attrs_dict={'x-model.number': 'newReq.epic_parent_id'}) }}
                     </div>
                 </div>
             </div>
 
+            <p x-show="createError" x-cloak role="alert" class="mt-4 text-sm text-destructive-emphasis" x-text="createError"></p>
             <div class="flex justify-end gap-3 mt-6">
-                <button type="button"
-                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center"
-                    @click="showCreateModal = false"
-                >Cancel</button>
-                <button type="button"
-                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center"
-                    @click="createRequirement()"
-                    :disabled="creating || !newReq.requirement_name.trim()"
-                >
+                {% call button(variant='outline', class='justify-center', attrs_dict={'@click': 'showCreateModal = false'}) %}Cancel{% endcall %}
+                {% call button(variant='default', class='justify-center', attrs_dict={'@click': 'createRequirement()', ':disabled': 'creating || !newReq.name.trim()'}) %}
                     <template x-if="creating">
                         <i data-lucide="loader-2" class="h-3.5 w-3.5 mr-2 animate-spin" aria-hidden="true"></i>
                     </template>
                     Add Requirement
-                </button>
+                {% endcall %}
             </div>
-        </div>
-    </div>
+    {% endcall %}
 
     <!-- Detail/edit modal -->
-    <div
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="req-modal-title"
-        x-cloak
-        x-show="!!activeReq" x-cloak
-        x-trap="!!activeReq"
-        class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-overlay/50"
-        @keydown.escape.window="activeReq = null"
-    >
-        <div
-            data-slot="card"
-            class="rounded-lg border border-border bg-card w-full max-w-2xl max-h-[90vh] overflow-y-auto p-6"
-            @click.stop
-        >
+    {% call modal(id='req-detail-modal', title='Edit Requirement', size='lg') %}
             <template x-if="activeReq">
                 <div>
-                    <div class="flex items-start justify-between mb-5">
-                        <div>
-                            <span class="inline-flex items-center rounded bg-muted border border-border px-2 py-0.5 font-mono text-xs font-semibold text-muted-foreground tracking-wide mb-1" x-text="activeReq.reference_id"></span>
-                            <h2 id="req-modal-title" class="text-base font-semibold text-foreground text-foreground">Edit Requirement</h2>
-                        </div>
-                        <button type="button"
-                            class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                            @click="activeReq = null"
-                            aria-label="Close modal"
-                        ><i data-lucide="x" class="h-4 w-4" aria-hidden="true"></i></button>
-                    </div>
+                    <span class="inline-flex items-center rounded bg-muted border border-border px-2 py-0.5 font-mono text-xs font-semibold text-muted-foreground tracking-wide mb-3" x-text="activeReq.reference_id"></span>
 
                     <div class="space-y-4">
                         <!-- EARS name -->
                         <div>
                             <label class="block text-sm font-medium mb-1.5" :for="'req-name-' + activeReq.id">Requirement (EARS format)</label>
-                            <textarea
-                                :id="'req-name-' + activeReq.id"
-                                x-model="activeReq.name"
-                                rows="2"
-                                class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring resize-none"
-                             aria-label="Name"></textarea>
+                            {{ textarea(rows=2, aria_label='Name', attrs_dict={':id': "'req-name-' + activeReq.id", 'x-model': 'activeReq.name'}) }}
                         </div>
 
                         <!-- Description -->
                         <div>
                             <label class="block text-sm font-medium mb-1.5" :for="'req-desc-' + activeReq.id">Description</label>
-                            <textarea
-                                :id="'req-desc-' + activeReq.id"
-                                x-model="activeReq.description"
-                                rows="3"
-                                class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring resize-none"
-                             aria-label="Description"></textarea>
+                            {{ textarea(rows=3, aria_label='Description', attrs_dict={':id': "'req-desc-' + activeReq.id", 'x-model': 'activeReq.description'}) }}
                         </div>
 
                         <!-- MoSCoW + Status row -->
                         <div class="grid grid-cols-2 gap-4">
                             <div>
                                 <label class="block text-sm font-medium mb-1.5" :for="'req-moscow-' + activeReq.id">MoSCoW Priority</label>
-                                <select
-                                    :id="'req-moscow-' + activeReq.id"
-                                    x-model="activeReq.moscow_priority"
-                                    class="w-full flex h-9 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                                 aria-label="select">
+                                {% call native_select(size='sm', class='w-full', aria_label='select', attrs_dict={':id': "'req-moscow-' + activeReq.id", 'x-model': 'activeReq.moscow_priority'}) %}
                                     <option value="">— select —</option>
                                     <option value="MUST">MUST</option>
                                     <option value="SHOULD">SHOULD</option>
                                     <option value="COULD">COULD</option>
                                     <option value="WONT">WONT</option>
-                                </select>
+                                {% endcall %}
                             </div>
                             <div>
                                 <label class="block text-sm font-medium mb-1.5" :for="'req-status-' + activeReq.id">Lifecycle Status</label>
-                                <select
-                                    :id="'req-status-' + activeReq.id"
-                                    x-model="activeReq.status"
-                                    class="w-full flex h-9 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                                 aria-label="Status">
+                                {% call native_select(size='sm', class='w-full', aria_label='Status', attrs_dict={':id': "'req-status-' + activeReq.id", 'x-model': 'activeReq.status'}) %}
                                     <option value="Draft">Draft</option>
                                     <option value="Refined">Refined</option>
                                     <option value="Approved">Approved</option>
                                     <option value="Implemented">Implemented</option>
-                                </select>
+                                {% endcall %}
                             </div>
                         </div>
 
                         <!-- Owner (user picker from /api/users per DOMAIN.md) -->
                         <div>
                             <label class="block text-sm font-medium mb-1.5" :for="'req-owner-' + activeReq.id">Owner</label>
-                            <select
-                                :id="'req-owner-' + activeReq.id"
-                                x-model="activeReq.owner"
-                                class="w-full flex h-9 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                                aria-label="Requirement owner"
-                            >
-                                <option value="">— no owner —</option>
+                            {% call native_select(size='sm', class='w-full', aria_label='Requirement owner', attrs_dict={':id': "'req-owner-' + activeReq.id", 'x-model': 'activeReq.owner'}) %}
+                                <option value="">No owner</option>
                                 <template x-for="u in usersList" :key="u.id">
                                     <option :value="u.name" x-text="u.name"></option>
                                 </template>
-                            </select>
+                            {% endcall %}
                         </div>
 
                         <!-- Acceptance criteria -->
                         <div>
                             <div class="flex items-center justify-between mb-1.5">
                                 <label class="block text-sm font-medium" :for="'req-ac-' + activeReq.id">Acceptance Criteria</label>
-                                <button
-                                    type="button"
-                                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center"
-                                    @click="generateAC()"
-                                    :disabled="acGenerating"
-                                    title="Auto-generate BDD acceptance criteria with AI"
-                                >
+                                {% call button(variant='outline', class='justify-center', attrs_dict={'@click': 'generateAC()', ':disabled': 'acGenerating', 'title': 'Auto-generate BDD acceptance criteria with AI'}) %}
                                     <template x-if="!acGenerating">
-                                        <span>✨ Generate AC</span>
+                                        <span class="flex items-center gap-1"><i data-lucide="sparkles" class="h-3.5 w-3.5" aria-hidden="true"></i> Generate AC</span>
                                     </template>
                                     <template x-if="acGenerating">
                                         <span class="flex items-center gap-1"><i data-lucide="loader-2" class="h-3 w-3 animate-spin" aria-hidden="true"></i> Generating…</span>
                                     </template>
-                                </button>
+                                {% endcall %}
                             </div>
-                            <textarea
-                                :id="'req-ac-' + activeReq.id"
-                                x-model="activeReq.acceptance_criteria"
-                                rows="3"
-                                placeholder="Given… When… Then…"
-                                class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring resize-none"
-                             aria-label="Given… When… Then…"></textarea>
+                            {{ textarea(placeholder='Given… When… Then…', rows=3, aria_label='Given… When… Then…', attrs_dict={':id': "'req-ac-' + activeReq.id", 'x-model': 'activeReq.acceptance_criteria'}) }}
                         </div>
 
                         <!-- Generate Test Cases -->
                         <div x-show="!!activeReq.acceptance_criteria" x-cloak>
                             <div class="flex items-center justify-between mb-1.5">
                                 <label class="block text-sm font-medium">BDD Test Cases</label>
-                                <button
-                                    type="button"
-                                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center"
-                                    @click="generateTestCases()"
-                                    :disabled="tcGenerating"
-                                    title="Generate BDD test cases from acceptance criteria"
-                                >
+                                {% call button(variant='outline', class='justify-center', attrs_dict={'@click': 'generateTestCases()', ':disabled': 'tcGenerating', 'title': 'Generate BDD test cases from acceptance criteria'}) %}
                                     <template x-if="!tcGenerating">
                                         <span>Generate Test Cases</span>
                                     </template>
                                     <template x-if="tcGenerating">
                                         <span class="flex items-center gap-1"><i data-lucide="loader-2" class="h-3 w-3 animate-spin" aria-hidden="true"></i> Generating…</span>
                                     </template>
-                                </button>
+                                {% endcall %}
                             </div>
                             <pre
                                 x-show="!!tcResult" x-cloak
@@ -591,25 +418,13 @@
                         <!-- Assumptions -->
                         <div>
                             <label class="block text-sm font-medium mb-1.5" :for="'req-assumptions-' + activeReq.id">Assumptions</label>
-                            <textarea
-                                :id="'req-assumptions-' + activeReq.id"
-                                x-model="activeReq.assumptions"
-                                rows="2"
-                                placeholder="Key assumptions this requirement depends on…"
-                                class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring resize-none"
-                             aria-label="Key assumptions this requirement depends on…"></textarea>
+                            {{ textarea(placeholder='Key assumptions this requirement depends on…', rows=2, aria_label='Key assumptions this requirement depends on…', attrs_dict={':id': "'req-assumptions-' + activeReq.id", 'x-model': 'activeReq.assumptions'}) }}
                         </div>
 
                         <!-- Dependencies -->
                         <div>
                             <label class="block text-sm font-medium mb-1.5" :for="'req-deps-' + activeReq.id">Dependencies</label>
-                            <textarea
-                                :id="'req-deps-' + activeReq.id"
-                                x-model="activeReq.dependencies_text"
-                                rows="2"
-                                placeholder="Other requirements or systems this depends on…"
-                                class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring resize-none"
-                             aria-label="Other requirements or systems this depends on…"></textarea>
+                            {{ textarea(placeholder='Other requirements or systems this depends on…', rows=2, aria_label='Other requirements or systems this depends on…', attrs_dict={':id': "'req-deps-' + activeReq.id", 'x-model': 'activeReq.dependencies_text'}) }}
                         </div>
 
                         <!-- Traceability info (read-only) -->
@@ -632,64 +447,51 @@
                             <div class="grid grid-cols-1 gap-3">
                                 <div>
                                     <label class="block text-xs font-medium mb-1" :for="'req-driver-' + activeReq.id">Driver <span class="text-muted-foreground font-normal">(what's forcing this)</span></label>
-                                    <select
-                                        :id="'req-driver-' + activeReq.id"
-                                        x-model="activeReq.driver_id"
-                                        class="w-full flex h-8 rounded-md border border-input bg-background px-3 text-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                                     aria-label="Driver id">
+                                    {% call native_select(size='sm', class='w-full', aria_label='Driver id', attrs_dict={':id': "'req-driver-' + activeReq.id", 'x-model': 'activeReq.driver_id'}) %}
                                         <option :value="null">— no driver linked —</option>
                                         <template x-for="d in motivationData.drivers" :key="d.id">
                                             <option :value="d.id" x-text="d.name"></option>
                                         </template>
-                                    </select>
+                                    {% endcall %}
                                 </div>
                                 <div>
                                     <label class="block text-xs font-medium mb-1" :for="'req-goal-' + activeReq.id">Goal <span class="text-muted-foreground font-normal">(what outcome this achieves)</span></label>
-                                    <select
-                                        :id="'req-goal-' + activeReq.id"
-                                        x-model="activeReq.goal_id"
-                                        class="w-full flex h-8 rounded-md border border-input bg-background px-3 text-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                                     aria-label="Goal id">
+                                    {% call native_select(size='sm', class='w-full', aria_label='Goal id', attrs_dict={':id': "'req-goal-' + activeReq.id", 'x-model': 'activeReq.goal_id'}) %}
                                         <option :value="null">— no goal linked —</option>
                                         <template x-for="g in motivationData.goals" :key="g.id">
                                             <option :value="g.id" x-text="g.name"></option>
                                         </template>
-                                    </select>
+                                    {% endcall %}
                                 </div>
                                 <div>
                                     <label class="block text-xs font-medium mb-1" :for="'req-stakeholder-' + activeReq.id">Stakeholder <span class="text-muted-foreground font-normal">(who owns this need)</span></label>
-                                    <select
-                                        :id="'req-stakeholder-' + activeReq.id"
-                                        x-model="activeReq.stakeholder_id"
-                                        class="w-full flex h-8 rounded-md border border-input bg-background px-3 text-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                                     aria-label="Stakeholder id">
+                                    {% call native_select(size='sm', class='w-full', aria_label='Stakeholder id', attrs_dict={':id': "'req-stakeholder-' + activeReq.id", 'x-model': 'activeReq.stakeholder_id'}) %}
                                         <option :value="null">— no stakeholder linked —</option>
                                         <template x-for="s in motivationData.stakeholders" :key="s.id">
                                             <option :value="s.id" x-text="s.name"></option>
                                         </template>
-                                    </select>
+                                    {% endcall %}
                                 </div>
                             </div>
                                 <!-- ArchiMate Requirement picker (TPM-007) -->
                                 <div>
                                     <label class="block text-xs font-medium mb-1" :for="'req-archimate-req-' + activeReq.id">ArchiMate Requirement <span class="text-muted-foreground font-normal">(formal requirement element)</span></label>
                                     <div class="relative">
-                                        <input type="text" :id="'req-archimate-req-' + activeReq.id" x-model="archiReqSearch" @input.debounce.300ms="searchArchiReqs()" @focus="archiReqDropdownOpen = true" :placeholder="activeReq.archimate_requirement_name || 'Search ArchiMate requirements…'" class="w-full flex h-8 rounded-md border border-input bg-background px-3 text-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" aria-label="Search ArchiMate requirements">
+                                        {{ input(type='text', aria_label='Search ArchiMate requirements', size='sm', attrs_dict={':id': "'req-archimate-req-' + activeReq.id", 'x-model': 'archiReqSearch', '@input.debounce.300ms': 'searchArchiReqs()', '@focus': 'archiReqDropdownOpen = true', ':placeholder': "activeReq.archimate_name || 'Search ArchiMate requirements…'"}) }}
                                         <div x-show="archiReqDropdownOpen && archiReqError" x-cloak class="absolute z-50 w-full mt-1 rounded-md border border-border bg-popover px-3 py-1.5 text-xs text-destructive-emphasis" x-text="archiReqError" @click.outside="archiReqDropdownOpen = false"></div>
                                         <div x-show="archiReqDropdownOpen && !archiReqError && archiReqResults.length > 0" x-cloak class="absolute z-50 w-full mt-1 max-h-40 overflow-y-auto rounded-md border bg-popover" @click.outside="archiReqDropdownOpen = false">
                                             <template x-for="elem in archiReqResults" :key="elem.id">
-                                                <button type="button" class="w-full text-left px-3 py-1.5 text-xs hover:bg-accent transition-colors" @click="activeReq.archimate_requirement_id = elem.id; activeReq.archimate_requirement_name = elem.title; archiReqSearch = elem.title; archiReqDropdownOpen = false" x-text="elem.title"></button>
+                                                {% call button(variant='ghost', size='sm', class='text-left', attrs_dict={'@click': 'activeReq.archimate_requirement_id = elem.id; activeReq.archimate_name = elem.title; archiReqSearch = elem.title; archiReqDropdownOpen = false', 'x-text': 'elem.title'}) %}{% endcall %}
                                             </template>
                                         </div>
                                     </div>
                                     <template x-if="activeReq.archimate_requirement_id">
                                         <div class="flex items-center gap-2 mt-1">
-                                            <span class="text-2xs text-muted-foreground" x-text="'Linked: ' + (activeReq.archimate_requirement_name || 'ID #' + activeReq.archimate_requirement_id)"></span>
-                                            <button type="button" class="text-2xs text-destructive-emphasis hover:underline" @click="activeReq.archimate_requirement_id = null; activeReq.archimate_requirement_name = null; archiReqSearch = ''">Unlink</button>
+                                            <span class="text-2xs text-muted-foreground" x-text="'Linked: ' + (activeReq.archimate_name || 'ID #' + activeReq.archimate_requirement_id)"></span>
+                                            {% call button(variant='link', attrs_dict={'@click': "activeReq.archimate_requirement_id = null; activeReq.archimate_name = null; archiReqSearch = ''"}) %}Unlink{% endcall %}
                                         </div>
                                     </template>
                                 </div>
-                            </div>
                             <template x-if="!activeReq.driver_id && !activeReq.goal_id && !activeReq.stakeholder_id">
                                 <p class="text-2xs text-muted-foreground italic">Link to motivation elements to achieve full ArchiMate 3.2 traceability.</p>
                             </template>
@@ -709,24 +511,9 @@
                                 </template>
                             </p>
                             <div class="flex items-center gap-2">
-                                <input
-                                    type="number"
-                                    min="1"
-                                    placeholder="Work package ID"
-                                    x-model.number="activeReq.work_package_id"
-                                    class="flex h-8 w-40 rounded-md border border-input bg-background px-3 py-1 text-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                                    :id="'req-wp-' + activeReq.id"
-                                    aria-label="Work package ID"
-                                >
-                                <button type="button"
-                                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center"
-                                    @click="linkWorkPackage(activeReq)"
-                                >Link</button>
-                                <button type="button"
-                                    x-show="activeReq.work_package_id"
-                                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center"
-                                    @click="activeReq.work_package_id = null; linkWorkPackage(activeReq)"
-                                >Unlink</button>
+                                {{ input(type='number', placeholder='Work package ID', aria_label='Work package ID', size='sm', class='w-40', attrs_dict={'min': '1', 'x-model.number': 'activeReq.work_package_id', ':id': "'req-wp-' + activeReq.id"}) }}
+                                {% call button(variant='outline', class='justify-center', attrs_dict={'@click': 'linkWorkPackage(activeReq)'}) %}Link{% endcall %}
+                                {% call button(variant='outline', class='justify-center', attrs_dict={'x-show': 'activeReq.work_package_id', '@click': 'activeReq.work_package_id = null; linkWorkPackage(activeReq)'}) %}Unlink{% endcall %}
                             </div>
                         </div>
                     </div>
@@ -740,35 +527,15 @@
                         <div class="grid grid-cols-2 gap-4">
                             <div>
                                 <label class="block text-xs font-medium mb-1" :for="'req-sp-' + activeReq.id">Story Points <span class="text-muted-foreground font-normal">(Fibonacci)</span></label>
-                                <input
-                                    :id="'req-sp-' + activeReq.id"
-                                    type="number"
-                                    min="1"
-                                    max="89"
-                                    x-model.number="activeReq.story_points"
-                                    placeholder="e.g. 3"
-                                    class="w-full flex h-8 rounded-md border border-input bg-background px-3 py-1 text-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                                >
+                                {{ input(type='number', placeholder='e.g. 3', size='sm', attrs_dict={':id': "'req-sp-' + activeReq.id", 'min': '1', 'max': '89', 'x-model.number': 'activeReq.story_points'}) }}
                             </div>
                             <div>
                                 <label class="block text-xs font-medium mb-1" :for="'req-epic-' + activeReq.id">Parent Epic ID</label>
-                                <input
-                                    :id="'req-epic-' + activeReq.id"
-                                    type="number"
-                                    x-model.number="activeReq.epic_parent_id"
-                                    placeholder="Parent Epic ID (optional)"
-                                    class="w-full flex h-8 rounded-md border border-input bg-background px-3 py-1 text-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                                 aria-label="Parent Epic ID (optional)">
+                                {{ input(type='number', placeholder='Parent Epic ID (optional)', aria_label='Parent Epic ID (optional)', size='sm', attrs_dict={':id': "'req-epic-' + activeReq.id", 'x-model.number': 'activeReq.epic_parent_id'}) }}
                             </div>
                         </div>
                         <div class="flex items-center gap-3">
-                            <input
-                                type="checkbox"
-                                :id="'req-dod-' + activeReq.id"
-                                x-model="activeReq.dod_complete"
-                                @change="saveDodComplete()"
-                                class="h-4 w-4 rounded border-input"
-                            >
+                            {{ checkbox(attrs_dict={':id': "'req-dod-' + activeReq.id", 'x-model': 'activeReq.dod_complete', '@change': 'saveDodComplete()'}) }}
                             <label :for="'req-dod-' + activeReq.id" class="text-xs font-medium">Definition of Done complete</label>
                         </div>
                         <div class="mt-3">
@@ -781,21 +548,16 @@
                             <div class="space-y-1 mb-2">
                                 <template x-for="(item, idx) in (activeReq.dod_checklist || [])" :key="idx">
                                     <label class="flex items-center gap-2 text-sm cursor-pointer">
-                                        <input type="checkbox" :checked="item.checked"
-                                               @change="item.checked = $event.target.checked; saveDod()"
-                                               class="rounded">
+                                        {{ checkbox(attrs_dict={':checked': 'item.checked', '@change': 'item.checked = $event.target.checked; saveDod()'}) }}
                                         <span x-text="item.item"></span>
                                     </label>
                                 </template>
                             </div>
                             <div class="flex gap-2">
-                                <input type="text" x-model="newDodItem" placeholder="Add DoD item..."
-                                       class="flex-1 rounded-md border border-input bg-background px-2 py-1 text-sm"
-                                       @keydown.enter.prevent="addDodItem()" aria-label="Add DoD item...">
-                                <button type="button" @click="addDodItem()"
-                                        class="rounded-md px-2 py-1 text-sm font-medium border border-input bg-background hover:bg-accent">
+                                {{ input(type='text', placeholder='Add DoD item...', aria_label='Add DoD item...', size='sm', class='flex-1 flex-1', attrs_dict={'x-model': 'newDodItem', '@keydown.enter.prevent': 'addDodItem()'}) }}
+                                {% call button(variant='outline', attrs_dict={'@click': 'addDodItem()'}) %}
                                     Add
-                                </button>
+                                {% endcall %}
                             </div>
                         </div>
                     </div>
@@ -810,21 +572,18 @@
                             <!-- MoSCoW -->
                             <div>
                                 <label class="text-xs font-medium text-muted-foreground">MoSCoW</label>
-                                <select x-model="activeReq.moscow_priority"
-                                        class="mt-1 w-full rounded-md border border-input bg-background px-2 py-1 text-sm" aria-label="MoSCoW">
+                                {% call native_select(size='sm', class='w-full', aria_label='MoSCoW', attrs_dict={'x-model': 'activeReq.moscow_priority'}) %}
                                     <option value="">— unset —</option>
-                                    <option value="Must">Must Have</option>
-                                    <option value="Should">Should Have</option>
-                                    <option value="Could">Could Have</option>
-                                    <option value="Wont">Won't Have</option>
-                                </select>
+                                    <option value="MUST">Must Have</option>
+                                    <option value="SHOULD">Should Have</option>
+                                    <option value="COULD">Could Have</option>
+                                    <option value="WONT">Won't Have</option>
+                                {% endcall %}
                             </div>
                             <!-- Story Points -->
                             <div>
                                 <label class="text-xs font-medium text-muted-foreground">Story Points</label>
-                                <input type="number" x-model.number="activeReq.story_points" min="1" max="89"
-                                       class="mt-1 w-full rounded-md border border-input bg-background px-2 py-1 text-sm"
-                                       placeholder="Fibonacci: 1,2,3,5,8..." aria-label="Story Points">
+                                {{ input(type='number', placeholder='Fibonacci: 1,2,3,5,8...', aria_label='Story Points', size='sm', class='mt-1', attrs_dict={'x-model.number': 'activeReq.story_points', 'min': '1', 'max': '89'}) }}
                             </div>
                             <!-- RICE -->
                             <div class="col-span-2">
@@ -832,23 +591,19 @@
                                 <div class="grid grid-cols-4 gap-1">
                                     <div>
                                         <label class="text-xs text-muted-foreground">Reach</label>
-                                        <input type="number" x-model.number="activeReq.rice_reach" placeholder="500"
-                                               class="w-full rounded border border-input bg-background px-1 py-0.5 text-xs" aria-label="Reach">
+                                        {{ input(type='number', placeholder='500', aria_label='Reach', size='sm', attrs_dict={'x-model.number': 'activeReq.rice_reach'}) }}
                                     </div>
                                     <div>
                                         <label class="text-xs text-muted-foreground">Impact</label>
-                                        <input type="number" x-model.number="activeReq.rice_impact" placeholder="2"
-                                               class="w-full rounded border border-input bg-background px-1 py-0.5 text-xs" aria-label="Impact">
+                                        {{ input(type='number', placeholder='2', aria_label='Impact', size='sm', attrs_dict={'x-model.number': 'activeReq.rice_impact'}) }}
                                     </div>
                                     <div>
                                         <label class="text-xs text-muted-foreground">Confidence%</label>
-                                        <input type="number" x-model.number="activeReq.rice_confidence" placeholder="80"
-                                               class="w-full rounded border border-input bg-background px-1 py-0.5 text-xs" aria-label="Confidence%">
+                                        {{ input(type='number', placeholder='80', aria_label='Confidence%', size='sm', attrs_dict={'x-model.number': 'activeReq.rice_confidence'}) }}
                                     </div>
                                     <div>
                                         <label class="text-xs text-muted-foreground">Effort</label>
-                                        <input type="number" x-model.number="activeReq.rice_effort" placeholder="10"
-                                               class="w-full rounded border border-input bg-background px-1 py-0.5 text-xs" aria-label="Effort">
+                                        {{ input(type='number', placeholder='10', aria_label='Effort', size='sm', attrs_dict={'x-model.number': 'activeReq.rice_effort'}) }}
                                     </div>
                                 </div>
                             </div>
@@ -858,24 +613,18 @@
                                 <div class="grid grid-cols-2 gap-1">
                                     <div>
                                         <label class="text-xs text-muted-foreground">Cost of Delay (1-21)</label>
-                                        <input type="number" x-model.number="activeReq.wsjf_cost_of_delay" placeholder="8"
-                                               min="1" max="21"
-                                               class="w-full rounded border border-input bg-background px-1 py-0.5 text-xs" aria-label="Cost of Delay (1-21)">
+                                        {{ input(type='number', placeholder='8', aria_label='Cost of Delay (1-21)', size='sm', attrs_dict={'x-model.number': 'activeReq.wsjf_cost_of_delay', 'min': '1', 'max': '21'}) }}
                                     </div>
                                     <div>
                                         <label class="text-xs text-muted-foreground">Job Duration (1-21)</label>
-                                        <input type="number" x-model.number="activeReq.wsjf_job_duration" placeholder="5"
-                                               min="1" max="21"
-                                               class="w-full rounded border border-input bg-background px-1 py-0.5 text-xs" aria-label="Job Duration (1-21)">
+                                        {{ input(type='number', placeholder='5', aria_label='Job Duration (1-21)', size='sm', attrs_dict={'x-model.number': 'activeReq.wsjf_job_duration', 'min': '1', 'max': '21'}) }}
                                     </div>
                                 </div>
                             </div>
                         </div>
-                        <button @click="saveScore()"
-                                type="button"
-                                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 mt-2 items-center">
+                        {% call button(variant='default', class='justify-center mt-2', attrs_dict={'@click': 'saveScore()'}) %}
                             Save Scores
-                        </button>
+                        {% endcall %}
                     </details>
 
                     <!-- JIRA Integration -->
@@ -897,19 +646,8 @@
                             </p>
                         </template>
                         <div class="flex flex-wrap items-center gap-2">
-                            <button
-                                type="button"
-                                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center"
-                                :disabled="jiraPushing"
-                                @click="pushToJira()"
-                                x-text="activeReq.jira_push_status === 'pushed' ? 'Re-push to JIRA' : 'Push to JIRA'"
-                            ></button>
-                            <button
-                                type="button"
-                                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center"
-                                :disabled="jiraSyncing"
-                                @click="syncFromJira()"
-                            >Sync from JIRA</button>
+                            {% call button(variant='outline', class='justify-center', attrs_dict={':disabled': 'jiraPushing', '@click': 'pushToJira()', 'x-text': "activeReq.jira_push_status === 'pushed' ? 'Re-push to JIRA' : 'Push to JIRA'"}) %}{% endcall %}
+                            {% call button(variant='outline', class='justify-center', attrs_dict={':disabled': 'jiraSyncing', '@click': 'syncFromJira()'}) %}Sync from JIRA{% endcall %}
                         </div>
                         <template x-if="activeReq.jira_push_status && activeReq.jira_push_status.startsWith('synced:')">
                             <p class="text-xs text-muted-foreground" x-text="'Status: ' + activeReq.jira_push_status.replace('synced:', '')"></p>
@@ -928,27 +666,26 @@
                     </div>
 
                     <!-- Actions -->
-                    <div class="flex justify-end gap-3 mt-6">
-                        <button type="button"
-                            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center"
-                            @click="activeReq = null"
-                        >Cancel</button>
-                        <button type="button"
-                            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center"
-                            @click="saveDetail()"
-                            :disabled="saving"
-                        >
+                    <p x-show="deleteError" x-cloak role="alert" class="mt-4 text-sm text-destructive-emphasis" x-text="deleteError"></p>
+                    <div class="flex flex-wrap justify-end gap-3 mt-6">
+                        {% call button(variant='destructive', class='justify-center mr-auto', attrs_dict={'@click': 'askDelete()', ':disabled': 'deleting'}) %}Delete requirement{% endcall %}
+                        {% call button(variant='outline', class='justify-center', attrs_dict={'@click': 'activeReq = null'}) %}Cancel{% endcall %}
+                        {% call button(variant='default', class='justify-center', attrs_dict={'@click': 'saveDetail()', ':disabled': 'saving'}) %}
                             <template x-if="saving">
                                 <i data-lucide="loader-2" class="h-3.5 w-3.5 mr-2 animate-spin" aria-hidden="true"></i>
                             </template>
                             Save changes
-                        </button>
+                        {% endcall %}
                     </div>
                 </div>
             </template>
-        </div>
-    </div>
-
+    {% endcall %}
+    {{ confirmation_dialog(id='delete-requirement', title='Delete this requirement?',
+        message='It leaves the backlog for everyone in your organisation. Its history is kept.',
+        confirm_text='Delete requirement', cancel_text='Keep it',
+        confirm_label='Delete requirement', cancel_label='Keep it', stop_clicks=false,
+        button_class='inline-flex h-9 items-center justify-center rounded-md border border-input bg-background px-4 text-sm font-medium text-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring') }}
+</div>
 {% endblock %}
 
 {% block scripts %}
@@ -974,7 +711,10 @@ function requirementsBacklog() {
         usersList: [],
         showCreateModal: false,
         creating: false,
-        newReq: { requirement_name: '', description: '', requirement_type: 'functional', moscow_priority: 'MUST', priority: 'high', solution_id: null, capability_id: null, story_points: null, epic_parent_id: null, layer: '', template_id: null },
+        createError: '',
+        deleting: false,
+        deleteError: '',
+        newReq: { name: '', description: '', requirement_type: 'functional', moscow_priority: 'MUST', priority: 3, solution_id: null, capability_id: null, story_points: null, epic_parent_id: null, layer: '', template_id: null },
         // Template picker state (added for RRT-003)
         pickerStep: 0,
         pickerLayers: [],
@@ -993,8 +733,50 @@ function requirementsBacklog() {
         solutionId: new URLSearchParams(window.location.search).get('solution_id'),
 
         async init() {
+            // The dialogs are the shared modal; these keep the page state and the dialog in step.
+            this.$watch('showCreateModal', (open) => this.syncModal('create-req-modal', open));
+            this.$watch('!!activeReq', (open) => this.syncModal('req-detail-modal', open));
             await Promise.all([this.load(), this.loadMotivationData(), this.loadUsers()]);
             lucide.createIcons();
+        },
+
+        syncModal(id, open) {
+            if (open) Platform.modal.open(id);
+            else Platform.modal.close(id);
+        },
+
+        askDelete() {
+            if (!this.activeReq || this.deleting) return;
+            this.deleteError = '';
+            window.dispatchEvent(new CustomEvent('open-confirm-delete-requirement', {
+                detail: { callback: () => this.deleteRequirement() },
+            }));
+        },
+
+        async deleteRequirement() {
+            if (!this.activeReq || this.deleting) return;
+            this.deleting = true;
+            this.deleteError = '';
+            const req = this.activeReq;
+            try {
+                const d = await Platform.fetch(`/api/enterprise/requirements/${req.id}`, { method: 'DELETE', silent: true });
+                if (!d.success) throw new Error(d.error || 'The requirement could not be deleted.');
+                this.all = this.all.filter(x => x.id !== req.id);
+                this.applyFilters();
+                if (this.showEpicTree) this.loadEpics();
+                this.activeReq = null;
+                Platform.toast.success('Deleted "' + req.name + '".');
+            } catch (e) {
+                this.deleteError = e.message || 'The requirement could not be deleted.';
+                Platform.toast.error(this.deleteError);
+            } finally {
+                this.deleting = false;
+            }
+        },
+
+        onModalClose(id) {
+            if (id === 'create-req-modal') this.showCreateModal = false;
+            if (id === 'req-detail-modal') this.activeReq = null;
         },
 
         async loadTemplateLayers() {
@@ -1025,7 +807,7 @@ function requirementsBacklog() {
 
         applyTemplate(tpl) {
             this.pickerTemplate = tpl;
-            this.newReq.requirement_name = tpl.name;
+            this.newReq.name = tpl.name;
             this.newReq.description = tpl.description || '';
             this.newReq.layer = tpl.layer;
             this.newReq.template_id = tpl.id;
@@ -1148,11 +930,12 @@ function requirementsBacklog() {
         },
 
         openDetail(req) {
+            this.deleteError = '';
             this.activeReq = { ...req };
             this.acGenerating = false;
             this.tcGenerating = false;
             this.tcResult = '';
-            this.archiReqSearch = req.archimate_requirement_name || '';
+            this.archiReqSearch = req.archimate_name || '';
             this.archiReqResults = [];
             this.archiReqDropdownOpen = false;
             this.$nextTick(() => lucide.createIcons());
@@ -1278,15 +1061,16 @@ function requirementsBacklog() {
         },
 
         async createRequirement() {
-            if (!this.newReq.requirement_name.trim() || this.creating) return;
+            if (!this.newReq.name.trim() || this.creating) return;
             this.creating = true;
+            this.createError = '';
             try {
-                const d = await Platform.fetch.post('/api/enterprise/requirements', this.newReq, { silent: true });
+                const d = await Platform.fetch.post('/api/enterprise/requirements', { ...this.newReq, priority: Number(this.newReq.priority) }, { silent: true });
                 if (d.success) {
                     const req = d.requirement;
                     this.applyRequirementUpdate({
                         id: req.id,
-                        name: req.requirement_name,
+                        name: req.name,
                         description: req.description,
                         requirement_type: req.requirement_type,
                         moscow_priority: req.moscow_priority,
@@ -1301,16 +1085,18 @@ function requirementsBacklog() {
                         dod_checklist: [],
                         dod_complete: false,
                     });
-                    this.newReq = { requirement_name: '', description: '', requirement_type: 'functional', moscow_priority: 'MUST', priority: 'high', solution_id: null, capability_id: null, story_points: null, epic_parent_id: null, layer: '', template_id: null };
+                    this.newReq = { name: '', description: '', requirement_type: 'functional', moscow_priority: 'MUST', priority: 3, solution_id: null, capability_id: null, story_points: null, epic_parent_id: null, layer: '', template_id: null };
                     this.pickerStep = 0;
                     this.pickerTemplate = null;
                     this.showCreateModal = false;
                     if (this.showEpicTree) this.loadEpics();
                 } else {
-                    Platform.toast.error(d.error || 'Could not create the requirement.');
+                    this.createError = d.error || 'The requirement could not be created. Check the fields and try again.';
                 }
             } catch (e) {
-                Platform.toast.error(e.message || 'Could not create the requirement.');
+                // Shown in the dialog, in a sentence; a generic transport status is not a message.
+                const m = (e && e.message) || '';
+                this.createError = (m && !/^(internal server error|bad request|\d+)/i.test(m)) ? m : 'The requirement could not be created. Check the fields and try again.';
             } finally {
                 this.creating = false;
             }
@@ -1360,6 +1146,7 @@ function requirementsBacklog() {
                     Platform.toast.error(d2.error || 'Could not save changes.');
                     return;
                 }
+                Platform.toast.success('Saved "' + this.activeReq.name + '".');
                 this.activeReq = null;
             } catch (e) {
                 Platform.toast.error(e.message || 'Could not save changes.');
@@ -1455,3 +1242,4 @@ function requirementsBacklog() {
 }
 </script>
 {% endblock %}
+{# design-block: data-table #}

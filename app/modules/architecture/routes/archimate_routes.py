@@ -1046,8 +1046,7 @@ def api_composer_extract_from_image():
             "success": False,
             "error": "No vision-capable AI provider is configured, so a diagram "
                      "image cannot be read. Add an Anthropic, OpenAI or Gemini "
-                     "key in Admin → API Settings. A text-only provider such as "
-                     "DeepSeek cannot do this.",
+                     "key in Admin → API Settings. A text-only provider cannot do this.",
             "error_type": "no_vision_provider",
         }), 503
 
@@ -1198,6 +1197,9 @@ def composer_page():
             belongs to another organisation. Ignored when viewpoint_id is set.
         depth (int): Hops for focus mode, clamped to 1-5, default 3.
         derived (0|1): Include worked-out connections in focus mode, default 1.
+        most_connected (1): The element was chosen because it is the most
+            connected in the organisation (the bare twin-map address); the
+            banner says so.
     """
     from app.services.archimate_viewpoint_service import get_available_viewpoints, get_viewpoint_counts
 
@@ -1224,6 +1226,7 @@ def composer_page():
             "name": centre.name or f"Element #{centre.id}",
             "depth": focus_depth,
             "derived": focus_derived,
+            "most_connected": request.args.get("most_connected") == "1",
         }
 
     solution_name = None
@@ -1257,7 +1260,15 @@ def composer_page():
         initial_viewpoint=viewpoint,
         initial_layer=initial_layer,
         focus=focus,
+        workspace_is_empty=_composer_workspace_is_empty() if focus is None else False,
     )
+
+
+def _composer_workspace_is_empty():
+    """True when the organisation has nothing modelled, ``None`` when that
+    cannot be read (an unreadable count is never shown as an empty workspace)."""
+    from app.modules.intelligence.routes.ui import _workspace_is_empty  # noqa: PLC0415
+    return _workspace_is_empty()
 
 
 @archimate_bp.route("/api/elements/materialize", methods=["POST"])

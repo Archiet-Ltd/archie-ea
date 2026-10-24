@@ -1,0 +1,190 @@
+{# design-block: chat #}
+{% from 'components/card.html' import card, card_header, card_title, card_description, card_content, card_footer %}
+{% from 'components/badge.html' import badge %}
+{% from 'components/button.html' import button %}
+{% from 'components/empty_state.html' import empty_state %}
+{# One stored answer drawn as cards in the chat: a card for the answer, then one card per
+   connection with where it was read from, its health and its owner. Names come from the
+   stored answer's own element map. The card for a connection opens that element in the
+   Composer; the answer card opens the answer at its permanent address. #}
+{% set kind = answer.question_kind %}
+{% set shown_limit = shown_limit | default(25) %}
+{% macro name_of(element_id) -%}
+{%- set known = answer.elements.get(element_id | string) -%}{{ known.name if known else '—' }}
+{%- endmacro %}
+{% macro source_text(row) -%}
+{%- set relation = row.relation or {} -%}
+{%- if relation.kind == 'derived' -%}Worked out from the model
+{%- elif relation.origins and relation.origins.values() | list | selectattr('repository') | list -%}
+{%- set o = (relation.origins.values() | list | selectattr('repository') | list)[0] -%}{{ o.repository }}{% if o.file %} · {{ o.file }}{% endif %}{% if o.commit %} @ {{ o.commit[:7] }}{% endif %}
+{%- elif relation.provenance and relation.provenance.text and relation.provenance.text != 'origin not recorded' -%}{{ relation.provenance.text[:1] | upper }}{{ relation.provenance.text[1:] }}
+{%- else -%}Source not recorded{%- endif -%}
+{%- endmacro %}
+{% if kind == 'risk_propagation' %}
+    {% set heading = 'Risks that reach ' ~ name_of(answer.params.element_id) %}
+{% elif kind == 'set_impact' %}
+    {% set heading = 'What breaks if these fail together' %}
+{% else %}
+    {% set heading = 'What breaks if ' ~ name_of(answer.params.element_id) ~ ' fails' %}
+{% endif %}
+{% set total = answer.summary.total %}
+<div class="space-y-3" data-answer-cards data-question="{{ question }}" data-answer-address="{{ answer.address }}" data-answer-kind="{{ kind }}">
+    {% call card() %}
+        {% call card_header() %}
+            {% call card_title(class='text-base') %}{{ heading }}{% endcall %}
+            {% call card_description() %}
+                {% if total %}{{ total }} connection{{ '' if total == 1 else 's' }} in your records,
+                {% if answer.truth_class == 'derived' %}some worked out from recorded links{% else %}all recorded by people{% endif %}.
+                {% else %}Nothing is recorded as connected to this yet.{% endif %}
+            {% endcall %}
+        {% endcall %}
+        {% set freshness = answer.freshness or {} %}
+        {% if freshness.derivation_state in ('not_computed', 'stale') or freshness.stale_rows %}
+        {% call card_content() %}
+            {% if freshness.derivation_state == 'not_computed' %}
+            <p class="text-sm text-muted-foreground" role="status" data-not-computed-notice>We haven't worked out the indirect connections for your model yet, so only the recorded ones are listed.</p>
+            <div>{{ button(text='Work them out now', variant='outline', size='sm', attrs_dict={'data-recompute-button': ''}) }}</div>
+            {% endif %}
+            {% if freshness.derivation_state == 'stale' and not freshness.stale_rows %}
+            <p class="text-sm text-muted-foreground" role="status" data-stale-notice>The connections we worked out are out of date, so they are left out of this list until they are worked out again.</p>
+            <div>{{ button(text='Work them out now', variant='outline', size='sm', attrs_dict={'data-recompute-button': ''}) }}</div>
+            {% endif %}
+            {% if freshness.stale_rows %}
+            <p class="text-sm text-muted-foreground" role="status" data-stale-notice>The connections we worked out may be out of date: {{ freshness.stale_rows }} {{ 'was' if freshness.stale_rows == 1 else 'were' }} worked out before the model last changed.</p>
+            <div>{{ button(text='Work them out now', variant='outline', size='sm', attrs_dict={'data-recompute-button': ''}) }}</div>
+            {% endif %}
+        {% endcall %}
+        {% endif %}
+        {% call card_footer(class='flex-wrap gap-2') %}
+            {{ button(text='Open this answer', variant='outline', size='sm', href=answer.page_url, icon='external-link', testid='answer-open') }}
+        {% endcall %}
+    {% endcall %}
+
+    {% if not answer.rows %}
+        {{ empty_state(icon='search', title='Nothing is recorded as depending on this yet', description='No connections lead from here. Nothing is missing: there is simply nothing recorded.', padding='py-6') }}
+    {% endif %}
+
+    {% for row in answer.rows[:shown_limit] %}
+    {% set relation = row.relation or {} %}
+    {% set element = answer.elements.get(row.element_id | string) or {} %}
+    {% set owner_names = (row.owners or []) | map(attribute='name') | select | unique | list %}
+    {% call card(class='p-4') %}
+        <div class="flex flex-wrap items-center justify-between gap-2" data-answer-row data-kind="{{ relation.kind }}">
+            <a class="min-w-0 break-words text-sm font-semibold text-foreground underline-offset-4 hover:underline"
+               href="{{ composer_url }}?element={{ row.element_id }}">{{ name_of(row.element_id) }}</a>
+            <div class="flex flex-wrap items-center gap-2">
+                {% if element.type %}{% call badge('neutral') %}{{ element.type }}{% endcall %}{% endif %}
+                {% if row.health %}
+                    {% call badge('success' if row.health == 'Healthy' else ('warning' if row.health == 'Warning' else 'danger')) %}<span aria-label="Health: {{ row.health }}">{{ row.health }}</span>{% endcall %}
+                {% else %}
+                    {% call badge('neutral') %}Health not recorded{% endcall %}
+                {% endif %}
+                {% if relation.stale %}{% call badge('warning') %}May be out of date{% endcall %}{% endif %}
+            </div>
+        </div>
+        <dl class="mt-2 grid gap-1 text-xs text-muted-foreground">
+            <div class="flex gap-1"><dt>Owner:</dt><dd class="text-foreground"{% if owner_names %} aria-label="Owner: {{ owner_names | join(', ') }}"{% endif %}>{{ owner_names | join(', ') or 'No owner recorded' }}</dd></div>
+            <div class="flex gap-1"><dt>Source:</dt><dd class="text-foreground" data-citation>{{ source_text(row) }}
+            {% set located = (relation.origins.values() | list | selectattr('repository') | list) if relation.origins else [] %}
+            {% if located and located[0].url %}<a class="ml-2 underline underline-offset-4" href="{{ located[0].url }}" target="_blank" rel="noopener noreferrer">View file on GitHub</a>{% endif %}
+            </dd></div>
+        </dl>
+        {# Why the connection is here: the origin and date of a recorded link, or the links a
+           worked-out one was worked out from. #}
+        <div class="mt-2 space-y-1 border-t border-border pt-2 text-xs text-muted-foreground" data-why>
+        {% if relation.kind == 'derived' %}
+            {% set why = explanations.get(relation.derived_id) %}
+            <p class="font-medium text-foreground">The links behind this</p>
+            {% if why %}
+                <p class="text-foreground" data-why-sentence>{{ why.plain or 'How these are connected is not recorded.' }}</p>
+                <details class="group">
+                    <summary class="cursor-pointer text-xs font-medium text-muted-foreground underline underline-offset-4 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" data-why-toggle>How this was worked out</summary>
+                    <div class="mt-1 space-y-1" data-why-detail>
+                        <p data-why-rule>{{ why.rule or 'How it was worked out is not recorded.' }}</p>
+                <ol class="space-y-1" aria-label="Links, in order">
+                {% for link in why.links %}
+                    <li data-why-link>
+                    {% if link.resolved %}
+                        <span class="text-foreground">{{ link.sentence or (link.source.name ~ ' and ' ~ link.target.name ~ ' are linked.') }}</span>
+                        <a class="text-foreground underline underline-offset-4" href="{{ link.source.href }}">{{ link.source.name or '—' }}</a>
+                        <span aria-hidden="true">→</span>
+                        <a class="text-foreground underline underline-offset-4" href="{{ link.target.href }}">{{ link.target.name or '—' }}</a>
+                        · {% if link.drawn_by %}{{ '' if link.drawn_by.startswith(('Imported from', 'Drawn by')) else 'Drawn by ' }}{{ link.drawn_by }}{% else %}Drawn by: Not recorded{% endif %} · {{ recorded_text(link.drawn_at) or 'Date not recorded' }}
+                    {% else %}This link is no longer in the model{% endif %}
+                    </li>
+                {% else %}
+                    <li>The links it was worked out from are not recorded.</li>
+                {% endfor %}
+                </ol>
+                    </div>
+                </details>
+                <p class="font-medium text-foreground">Decisions about these things</p>
+                {% for decision in why.decisions %}
+                {% if loop.first %}<ul class="space-y-1" data-why-decisions>{% endif %}
+                    <li><a class="text-foreground underline underline-offset-4" href="{{ decision.href }}">{{ decision.title }}</a></li>
+                {% if loop.last %}</ul>{% endif %}
+                {% else %}
+                <p>No decision is recorded against them.</p>
+                {% endfor %}
+            {% else %}
+                <p>The links behind this could not be read just now.</p>
+            {% endif %}
+        {% else %}
+            {% set origin = relation.provenance or {} %}
+            <p class="font-medium text-foreground">Where this link came from</p>
+            <p data-provenance-text>{{ (origin.text or 'origin not recorded')[:1] | upper }}{{ (origin.text or 'origin not recorded')[1:] }}</p>
+            <p data-provenance-date>{% if recorded_text(origin.recorded_at) %}Recorded {{ recorded_text(origin.recorded_at) }}{% else %}Date not recorded{% endif %}</p>
+            {% if origin.relationship_id %}
+            <p><a class="text-foreground underline underline-offset-4" data-relationship-link href="/architecture/relationships#relationship-{{ origin.relationship_id }}">Open relationship record</a></p>
+            {% endif %}
+        {% endif %}
+        </div>
+    {% endcall %}
+    {% endfor %}
+
+    {# Read-only: when the indirect connections were last worked out, what each recent run
+       found, and how many are now out of date and why. A figure never measured reads as a dash. #}
+    {% set stale_reason_words = {
+        'relationship_created': 'a relationship was added',
+        'relationship_updated': 'a relationship was changed',
+        'relationship_deleted': 'a relationship was removed',
+        'element_deleted': 'an element was removed',
+        'bulk_operation': 'several records were changed at once',
+    } %}
+    {% call card(class='p-4') %}
+        <section data-derivation-status aria-labelledby="derivation-status-heading">
+            <h3 id="derivation-status-heading" class="text-sm font-semibold text-foreground">Indirect connections</h3>
+            {% if derivation is none %}
+            <p class="mt-1 text-xs text-muted-foreground" data-derivation-status-unavailable>We could not read when these were last worked out.</p>
+            {% else %}
+            {% set last = derivation.last_run %}
+            <dl class="mt-2 grid grid-cols-1 gap-x-6 gap-y-1 text-xs sm:grid-cols-3">
+                <div><dt class="text-muted-foreground">Last worked out</dt><dd class="text-foreground" data-derivation-last-run>{{ last.finished_at | format_datetime if last and last.finished_at else '—' }}</dd></div>
+                <div><dt class="text-muted-foreground">Current</dt><dd class="text-foreground" data-derivation-current>{{ derivation.current_count if last else '—' }}</dd></div>
+                <div><dt class="text-muted-foreground">May be out of date</dt><dd class="text-foreground" data-derivation-stale>{{ derivation.stale_count if last else '—' }}</dd></div>
+            </dl>
+            {% for reason, count in derivation.stale_reasons %}
+            {% if loop.first %}<ul class="mt-2 space-y-1 text-xs text-foreground" data-derivation-stale-reasons>{% endif %}
+                <li>{{ count }} out of date because {{ stale_reason_words.get(reason, 'the model changed') }}</li>
+            {% if loop.last %}</ul>{% endif %}
+            {% endfor %}
+            {% if derivation.runs %}
+            <ol class="mt-2 space-y-1 text-xs text-muted-foreground" aria-label="Recent runs">
+                {% for run in derivation.runs %}
+                <li data-derivation-run>{{ run.finished_at | format_datetime if run.finished_at else '—' }} · {{ run.explicit_count if run.explicit_count is not none else '—' }} relationships read · {{ run.derived_count if run.derived_count is not none else '—' }} connections found</li>
+                {% endfor %}
+            </ol>
+            {% else %}
+            <p class="mt-2 text-xs text-muted-foreground" data-derivation-never-run>Not worked out yet.</p>
+            {% endif %}
+            {% endif %}
+        </section>
+    {% endcall %}
+
+    {% if answer.rows | length > shown_limit %}
+    <p class="text-sm text-muted-foreground" data-answer-more>
+        Showing {{ shown_limit }} of {{ answer.rows | length }}.
+        <a class="underline underline-offset-4" href="{{ answer.page_url }}">See every connection</a>
+    </p>
+    {% endif %}
+</div>

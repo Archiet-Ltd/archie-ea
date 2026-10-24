@@ -15,9 +15,24 @@ offending line or the line above, for the rare legitimate case):
   button-no-type  a <button> with no type= (defaults to submit inside a form)
   arbitrary-type  an arbitrary text-[Npx] size off the type scale
 
+Three further rules, from shadcn's own agent rules, are counted separately
+(each its own ratchet in verify.py, not part of the total above) and run with
+``--rule``. They read page and component templates outside the macro
+definitions, so the canonical macros are never counted against themselves:
+
+  dialog-title  a dialog, sheet or drawer with no title: a modal/dialog/drawer
+                call with no title argument, or an element with role="dialog"
+                whose aria-labelledby names no element in the template;
+  empty-state   a hand-written "No ... yet" block with its own icon, instead
+                of the empty_state macro;
+  form-field    a form control inside a <form> that is not rendered by
+                form_field or placed inside a form_group call (label, control,
+                description and error together).
+
 Usage:
     python scripts/check_ui_contract.py            # list violations by rule
     python scripts/check_ui_contract.py --count    # print only the total (gate)
+    python scripts/check_ui_contract.py --rule dialog-title|empty-state|form-field [--count|--list]
 """
 from __future__ import annotations
 
@@ -143,7 +158,136 @@ def collect():
     return findings
 
 
+# ---- component rules (shadcn agent rules) --------------------------------
+
+_MACRO_BLOCK = re.compile(r"{%-?\s*macro\b.*?{%-?\s*endmacro\s*-?%}", re.DOTALL)
+_JINJA_COMMENT = re.compile(r"{#.*?#}", re.DOTALL)
+_HTML_COMMENT = re.compile(r"<!--.*?-->", re.DOTALL)
+_DIALOG_CALL = re.compile(
+    r"{%-?\s*call\s+(modal|dialog|drawer|modal_form|confirmation_dialog)\s*\((.*?)\)\s*-?%}", re.DOTALL)
+_TITLE_ARG = re.compile(r"\b(title|labelledby)\s*=\s*(?!(?:''|\"\")\s*(?:[,)]|$))\S")
+_LABELLEDBY = re.compile(r"aria-labelledby\s*=\s*[\"']([^\"']*)[\"']")
+_EMPTY_TEXT = re.compile(
+    r">\s*No\s+[A-Za-z][\w\s,'/-]{1,60}?\s(?:yet|found|available|recorded)\b[^<]*<")
+_ICON = re.compile(r"data-lucide=|<svg\b")
+_FORM_BLOCK = re.compile(r"<form\b.*?</form>", re.DOTALL | re.IGNORECASE)
+_CONTROL = re.compile(r"<(input|select|textarea)\b", re.IGNORECASE)
+_NON_FIELD_TYPES = ("hidden", "submit", "button", "reset", "image")
+_GROUP_CALL = re.compile(
+    r"{%-?\s*call\s+form_group\b.*?{%-?\s*endcall\s*-?%}", re.DOTALL)
+
+
+def _mask(match: re.Match) -> str:
+    return re.sub(r"[^\n]", " ", match.group(0))
+
+
+def _template_view(text: str) -> str:
+    """The template with comments and macro definitions blanked, line numbers intact."""
+    for rx in (_JINJA_COMMENT, _HTML_COMMENT, _MACRO_BLOCK):
+        text = rx.sub(_mask, text)
+    return text
+
+
+def _tag_end(text: str, start: int) -> int:
+    """Index just past the '>' closing the tag opened at start, quotes respected."""
+    q = None
+    k = start + 1
+    while k < len(text):
+        ch = text[k]
+        if q:
+            if ch == q:
+                q = None
+        elif ch in "\"'":
+            q = ch
+        elif ch == ">":
+            return k + 1
+        k += 1
+    return len(text)
+
+
+def _line_of(text: str, pos: int) -> int:
+    return text.count("\n", 0, pos) + 1
+
+
+def _rule_dialog_title(rel: str, text: str, view: str):
+    out = []
+    for m in _DIALOG_CALL.finditer(view):
+        if not _TITLE_ARG.search(m.group(2)):
+            out.append((_line_of(text, m.start()),
+                        f"{m.group(1)}() call has no title; pass title='...'"))
+    for m in re.finditer(r"<(?:dialog\b|[a-z]+\b[^>]*?role\s*=\s*[\"'](?:alert)?dialog[\"'])", view):
+        tag = view[m.start():_tag_end(view, m.start())]
+        if "role" not in tag and not tag.startswith("<dialog"):
+            continue
+        lab = _LABELLEDBY.search(tag)
+        if not lab or not lab.group(1).strip():
+            out.append((_line_of(text, m.start()), "dialog has no aria-labelledby title"))
+        elif f'id="{lab.group(1)}"' not in view and f"id='{lab.group(1)}'" not in view:
+            out.append((_line_of(text, m.start()),
+                        f"dialog aria-labelledby=\"{lab.group(1)}\" names no element in this template"))
+    return out
+
+
+def _rule_empty_state(rel: str, text: str, view: str):
+    out = []
+    lines = view.splitlines()
+    for m in _EMPTY_TEXT.finditer(view):
+        ln = _line_of(view, m.start() + 1)
+        window = "\n".join(lines[max(0, ln - 9):ln])
+        if _ICON.search(window):
+            out.append((ln, "hand-written empty state; use the empty_state macro"))
+    return out
+
+
+def _rule_form_field(rel: str, text: str, view: str):
+    out = []
+    grouped = [(g.start(), g.end()) for g in _GROUP_CALL.finditer(view)]
+    for f in _FORM_BLOCK.finditer(view):
+        for c in _CONTROL.finditer(view, f.start(), f.end()):
+            tag = view[c.start():_tag_end(view, c.start())]
+            kind = re.search(r"\btype\s*=\s*[\"']?(\w+)", tag)
+            if c.group(1).lower() == "input" and kind and kind.group(1).lower() in (
+                    _NON_FIELD_TYPES):
+                continue
+            if any(a <= c.start() < b for a, b in grouped):
+                continue
+            out.append((_line_of(text, c.start()),
+                        f"<{c.group(1).lower()}> outside form_field/form_group"))
+    return out
+
+
+COMPONENT_RULES = {
+    "dialog-title": _rule_dialog_title,
+    "empty-state": _rule_empty_state,
+    "form-field": _rule_form_field,
+}
+
+
+def collect_component_rule(rule: str):
+    """[(repo path, line, message)] for one component rule, hatch lines honoured."""
+    fn = COMPONENT_RULES[rule]
+    out = []
+    for path in sorted(TPL.rglob("*.html")):
+        text = path.read_text(encoding="utf-8", errors="replace")
+        lines = text.splitlines()
+        for ln, msg in fn(str(path), text, _template_view(text)):
+            line = lines[ln - 1] if ln - 1 < len(lines) else ""
+            prev = lines[ln - 2] if ln >= 2 else ""
+            if _hatched(line, prev):
+                continue
+            out.append((path.relative_to(ROOT).as_posix(), ln, msg))
+    return out
+
+
 def main() -> int:
+    if "--rule" in sys.argv:
+        rule = sys.argv[sys.argv.index("--rule") + 1]
+        found = collect_component_rule(rule)
+        if "--list" in sys.argv:
+            for rel, ln, msg in found:
+                print(f"{rel}:{ln}: {msg}")
+        print(len(found))
+        return 0
     try:
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     except Exception:

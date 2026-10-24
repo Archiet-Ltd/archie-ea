@@ -1,0 +1,268 @@
+{# The health-check report body: six sections, answer first. Rendered inside the standalone
+   report document (HTML and PDF) and inside the public sample page, from the one dictionary
+   that app/services/health_check_report_service.py builds. Every sentence is filled from
+   data; a missing value reads "Not recorded".
+   smoke-coverage-ok: covered by tests/smoke/test_health_check_sample_journey.py #}
+{% from 'components/card.html' import card, card_header, card_title, card_description, card_content %}
+{% from 'components/table.html' import table, table_header, table_body, table_row, table_head, table_cell %}
+{% from 'components/badge.html' import badge %}
+
+{% set currency = report.currency %}
+{% set no_owner = 'No owner recorded' %}
+{% macro gap(text='Not recorded') %}<span class="text-muted-foreground">{{ text }}</span>{% endmacro %}
+{% macro money(value) %}{% if value is none %}{{ gap() }}{% else %}{{ currency }} {{ '{:,.0f}'.format(value) }}{% endif %}{% endmacro %}
+{% macro day(value) %}{% if value is none %}{{ gap() }}{% else %}{{ value.strftime('%-d %b %Y') }}{% endif %}{% endmacro %}
+{% macro pct(value) %}{% if value is none %}{{ gap() }}{% else %}{{ value }}%{% endif %}{% endmacro %}
+
+{% set inv = report.inventory %}
+{% set imp = report.impact %}
+{% set dup = report.duplicates %}
+{% set own = report.unowned %}
+{% set sco = report.scores %}
+{% set ren = report.renewals %}
+{% set rec = report.recommendations %}
+
+<div class="space-y-8" data-testid="health-check-report">
+
+  <section aria-labelledby="hc-summary" data-testid="hc-summary">
+    {% call card() %}
+      {% call card_header() %}
+        {% call card_title(class='text-xl') %}<span id="hc-summary">The short answer</span>{% endcall %}
+        {% call card_description() %}{{ report.organisation }}, as at {{ day(report.generated_on) }}. Each section below names the record behind every figure.{% endcall %}
+      {% endcall %}
+      {% call card_content() %}
+        <ul class="list-disc space-y-2 pl-5 text-sm">
+          {% for line in report.summary %}<li>{{ line }}</li>{% endfor %}
+        </ul>
+      {% endcall %}
+    {% endcall %}
+  </section>
+
+  <section aria-labelledby="hc-inventory" data-testid="hc-inventory">
+    <h2 id="hc-inventory" class="text-lg font-semibold">1. Application inventory</h2>
+    <p class="text-sm text-muted-foreground">Every application with its owner, cost, lifecycle stage and criticality, and how complete each field is.</p>
+    {% if inv.total %}
+    <p class="mt-3 text-sm" data-testid="hc-inventory-total">{{ inv.total }} {{ 'application is' if inv.total == 1 else 'applications are' }} recorded.</p>
+    <div class="mt-3">
+    {% call table() %}
+      {% call table_header() %}{% call table_row() %}
+        {% call table_head() %}Field{% endcall %}{% call table_head() %}Recorded{% endcall %}{% call table_head() %}Missing{% endcall %}{% call table_head() %}Complete{% endcall %}
+      {% endcall %}{% endcall %}
+      {% call table_body() %}
+        {% for c in inv.completeness %}{% call table_row() %}
+          {% call table_cell() %}{{ c.field }}{% endcall %}
+          {% call table_cell() %}{{ c.filled }} of {{ c.total }}{% endcall %}
+          {% call table_cell() %}{{ c.missing }}{% endcall %}
+          {% call table_cell() %}{{ pct(c.percent) }}{% endcall %}
+        {% endcall %}{% endfor %}
+      {% endcall %}
+    {% endcall %}
+    </div>
+    <div class="mt-4">
+    {% call table() %}
+      {% call table_header() %}{% call table_row() %}
+        {% call table_head() %}Application{% endcall %}{% call table_head() %}Owner{% endcall %}{% call table_head() %}Annual cost{% endcall %}{% call table_head() %}Lifecycle{% endcall %}{% call table_head() %}Criticality{% endcall %}{% call table_head() %}Business unit{% endcall %}
+      {% endcall %}{% endcall %}
+      {% call table_body() %}
+        {% for r in inv.rows %}{% call table_row() %}
+          {% call table_cell(class='font-medium') %}{{ r.name }}{% endcall %}
+          {% call table_cell() %}{% if r.owner %}{{ r.owner }}{% else %}{{ gap() }}{% endif %}{% endcall %}
+          {% call table_cell() %}{{ money(r.annual_cost) }}{% endcall %}
+          {% call table_cell() %}{% if r.lifecycle %}{{ r.lifecycle }}{% else %}{{ gap() }}{% endif %}{% endcall %}
+          {% call table_cell() %}{% if r.criticality %}{{ r.criticality|capitalize }}{% else %}{{ gap() }}{% endif %}{% endcall %}
+          {% call table_cell() %}{% if r.business_unit %}{{ r.business_unit }}{% else %}{{ gap() }}{% endif %}{% endcall %}
+        {% endcall %}{% endfor %}
+      {% endcall %}
+    {% endcall %}
+    </div>
+    {% else %}
+    <p class="mt-3 text-sm">No applications are recorded yet, so there is no inventory to report. Import an application list to produce this section.</p>
+    {% endif %}
+    <p class="mt-3 text-sm font-medium" data-testid="hc-inventory-recommendation">Recommendation: {{ rec.inventory }}</p>
+  </section>
+
+  <section aria-labelledby="hc-impact" data-testid="hc-impact">
+    <h2 id="hc-impact" class="text-lg font-semibold">2. What breaks if a critical system fails</h2>
+    <p class="text-sm text-muted-foreground">For each application marked critical or high, the things that would stop, by layer and by how many steps away they are, with the owner of each.</p>
+    {% if imp.systems %}
+      {% for s in imp.systems %}
+      <div class="mt-4" data-testid="hc-impact-system">
+        {% call card() %}
+          {% call card_header() %}
+            {% call card_title(class='text-base') %}{{ s.name }}{% endcall %}
+            {% call card_description() %}{{ s.criticality|capitalize }} criticality. Owner: {% if s.owner %}{{ s.owner }}{% else %}{{ gap(no_owner) }}{% endif %}.{% endcall %}
+          {% endcall %}
+          {% call card_content() %}
+            {% if not s.modelled %}
+              <p class="text-sm">This application is not connected to anything in the model, so its failure could not be traced. Record what depends on it to produce this answer.</p>
+            {% elif not s.affected_total %}
+              <p class="text-sm">Nothing in the model depends on this application.</p>
+            {% else %}
+              <p class="text-sm">{{ s.affected_total }} {{ 'thing depends' if s.affected_total == 1 else 'things depend' }} on it{% if s.by_layer %}: {% for layer, n in s.by_layer.items() %}{{ n }} in the {{ layer }} layer{% if not loop.last %}, {% endif %}{% endfor %}{% endif %}.</p>
+              <div class="mt-3">
+              {% call table() %}
+                {% call table_header() %}{% call table_row() %}
+                  {% call table_head() %}Affected{% endcall %}{% call table_head() %}Layer{% endcall %}{% call table_head() %}Steps away{% endcall %}{% call table_head() %}Owner{% endcall %}{% call table_head() %}Basis{% endcall %}
+                {% endcall %}{% endcall %}
+                {% call table_body() %}
+                  {% for a in s.affected %}{% call table_row() %}
+                    {% call table_cell(class='font-medium') %}{{ a.name }}{% endcall %}
+                    {% call table_cell() %}{{ a.layer|capitalize }}{% endcall %}
+                    {% call table_cell() %}{{ a.hops }}{% endcall %}
+                    {% call table_cell() %}{% if a.owner %}{{ a.owner }}{% else %}{{ gap(no_owner) }}{% endif %}{% endcall %}
+                    {% call table_cell() %}{{ a.basis }}{% endcall %}
+                  {% endcall %}{% endfor %}
+                {% endcall %}
+              {% endcall %}
+              </div>
+              {% if s.affected_total > s.affected|length %}<p class="mt-2 text-sm text-muted-foreground">Showing the nearest {{ s.affected|length }} of {{ s.affected_total }}.</p>{% endif %}
+            {% endif %}
+          {% endcall %}
+        {% endcall %}
+      </div>
+      {% endfor %}
+    {% else %}
+    <p class="mt-3 text-sm">{% if inv.total %}No application is marked critical or high, so no failure trace could be run. Mark the critical applications to produce this section.{% else %}No applications are recorded yet.{% endif %}</p>
+    {% endif %}
+    <p class="mt-3 text-sm font-medium" data-testid="hc-impact-recommendation">Recommendation: {{ rec.impact }}</p>
+  </section>
+
+  <section aria-labelledby="hc-duplicates" data-testid="hc-duplicates">
+    <h2 id="hc-duplicates" class="text-lg font-semibold">3. Duplicate and overlapping applications</h2>
+    <p class="text-sm text-muted-foreground">Applications that look like the same thing, and applications that serve the same capability, with the contracts behind them.</p>
+    <p class="mt-3 text-sm" data-testid="hc-duplicates-count">{{ dup.groups|length }} duplicate {{ 'group' if dup.groups|length == 1 else 'groups' }} and {{ dup.overlaps|length }} shared {{ 'capability' if dup.overlaps|length == 1 else 'capabilities' }} {{ 'was' if dup.groups|length + dup.overlaps|length == 1 else 'were' }} found.</p>
+    {% if dup.groups or dup.overlaps %}
+    <div class="mt-3">
+    {% call table() %}
+      {% call table_header() %}{% call table_row() %}
+        {% call table_head() %}Found as{% endcall %}{% call table_head() %}Applications{% endcall %}{% call table_head() %}Contracts{% endcall %}{% call table_head() %}Combined annual cost{% endcall %}{% call table_head() %}Nearest end date{% endcall %}
+      {% endcall %}{% endcall %}
+      {% call table_body() %}
+        {% for g in dup.groups %}{% call table_row() %}
+          {% call table_cell() %}{% call badge('warning') %}Possible duplicate{% endcall %}{% endcall %}
+          {% call table_cell() %}{{ g.applications|join(', ') }}{% endcall %}
+          {% call table_cell() %}{% if g.contracts['items'] %}{{ g.contracts['items']|map(attribute='name')|join(', ') }}{% else %}{{ gap('No contract recorded') }}{% endif %}{% endcall %}
+          {% call table_cell() %}{{ money(g.contracts.combined_annual_cost) }}{% endcall %}
+          {% call table_cell() %}{{ day(g.contracts.nearest_end) }}{% endcall %}
+        {% endcall %}{% endfor %}
+        {% for o in dup.overlaps %}{% call table_row() %}
+          {% call table_cell() %}{% call badge('neutral') %}Shares "{{ o.capability }}"{% endcall %}{% endcall %}
+          {% call table_cell() %}{{ o.applications|join(', ') }}{% endcall %}
+          {% call table_cell() %}{% if o.contracts['items'] %}{{ o.contracts['items']|map(attribute='name')|join(', ') }}{% else %}{{ gap('No contract recorded') }}{% endif %}{% endcall %}
+          {% call table_cell() %}{{ money(o.contracts.combined_annual_cost) }}{% endcall %}
+          {% call table_cell() %}{{ day(o.contracts.nearest_end) }}{% endcall %}
+        {% endcall %}{% endfor %}
+      {% endcall %}
+    {% endcall %}
+    </div>
+    {% endif %}
+    <p class="mt-3 text-sm font-medium" data-testid="hc-duplicates-recommendation">Recommendation: {{ rec.duplicates }}</p>
+  </section>
+
+  <section aria-labelledby="hc-unowned" data-testid="hc-unowned">
+    <h2 id="hc-unowned" class="text-lg font-semibold">4. Applications with no recorded owner</h2>
+    <p class="text-sm text-muted-foreground">The applications nobody is accountable for, most critical first, and how well each business unit is covered.</p>
+    <p class="mt-3 text-sm" data-testid="hc-unowned-count">{{ own.rows|length }} of {{ own.total }} applications have no recorded owner.</p>
+    {% if own.rows %}
+    <div class="mt-3">
+    {% call table() %}
+      {% call table_header() %}{% call table_row() %}
+        {% call table_head() %}Application{% endcall %}{% call table_head() %}Criticality{% endcall %}{% call table_head() %}Business unit{% endcall %}
+      {% endcall %}{% endcall %}
+      {% call table_body() %}
+        {% for r in own.rows %}{% call table_row() %}
+          {% call table_cell(class='font-medium') %}{{ r.name }}{% endcall %}
+          {% call table_cell() %}{% if r.criticality %}{{ r.criticality|capitalize }}{% else %}{{ gap() }}{% endif %}{% endcall %}
+          {% call table_cell() %}{% if r.business_unit %}{{ r.business_unit }}{% else %}{{ gap() }}{% endif %}{% endcall %}
+        {% endcall %}{% endfor %}
+      {% endcall %}
+    {% endcall %}
+    </div>
+    {% endif %}
+    {% if own.coverage %}
+    <div class="mt-4">
+    {% call table() %}
+      {% call table_header() %}{% call table_row() %}
+        {% call table_head() %}Business unit{% endcall %}{% call table_head() %}With an owner{% endcall %}{% call table_head() %}Coverage{% endcall %}
+      {% endcall %}{% endcall %}
+      {% call table_body() %}
+        {% for c in own.coverage %}{% call table_row() %}
+          {% call table_cell() %}{{ c.business_unit }}{% endcall %}
+          {% call table_cell() %}{{ c.owned }} of {{ c.total }}{% endcall %}
+          {% call table_cell() %}{{ pct(c.percent) }}{% endcall %}
+        {% endcall %}{% endfor %}
+      {% endcall %}
+    {% endcall %}
+    </div>
+    {% endif %}
+    <p class="mt-3 text-sm font-medium" data-testid="hc-unowned-recommendation">Recommendation: {{ rec.unowned }}</p>
+  </section>
+
+  <section aria-labelledby="hc-scores" data-testid="hc-scores">
+    <h2 id="hc-scores" class="text-lg font-semibold">5. What to do with each application</h2>
+    <p class="text-sm text-muted-foreground">A recommendation (Tolerate, Invest, Migrate or Eliminate) and a health score from 0 to 100 for each application with enough recorded evidence.</p>
+    <p class="mt-3 text-sm" data-testid="hc-scores-count">{{ sco.scored|length }} of {{ inv.total }} applications have enough evidence to score.</p>
+    {% if sco.scored %}
+    <div class="mt-3">
+    {% call table() %}
+      {% call table_header() %}{% call table_row() %}
+        {% call table_head() %}Application{% endcall %}{% call table_head() %}Recommendation{% endcall %}{% call table_head() %}Health score{% endcall %}
+      {% endcall %}{% endcall %}
+      {% call table_body() %}
+        {% for r in sco.scored %}{% call table_row() %}
+          {% call table_cell(class='font-medium') %}{{ r.name }}{% endcall %}
+          {% call table_cell() %}{{ r.time|capitalize }}{% endcall %}
+          {% call table_cell() %}{{ r.score }} of 100{% endcall %}
+        {% endcall %}{% endfor %}
+      {% endcall %}
+    {% endcall %}
+    </div>
+    {% endif %}
+    {% if sco.unscored %}
+    <h3 class="mt-4 text-sm font-semibold">Not yet scored</h3>
+    <p class="text-sm text-muted-foreground">These need the facts listed before a recommendation can be relied on. The indicative figures are what the scoring gives today, and they are not a recommendation.</p>
+    <div class="mt-2">
+    {% call table() %}
+      {% call table_header() %}{% call table_row() %}
+        {% call table_head() %}Application{% endcall %}{% call table_head() %}Facts still needed{% endcall %}{% call table_head() %}Indicative recommendation{% endcall %}{% call table_head() %}Indicative score{% endcall %}
+      {% endcall %}{% endcall %}
+      {% call table_body() %}
+        {% for r in sco.unscored %}{% call table_row() %}
+          {% call table_cell(class='font-medium') %}{{ r.name }}{% endcall %}
+          {% call table_cell() %}{% if r.missing %}{{ r.missing|join(', ') }}{% else %}{{ gap('The score could not be calculated') }}{% endif %}{% endcall %}
+          {% call table_cell() %}{% if r.time %}{{ r.time|capitalize }}{% else %}{{ gap() }}{% endif %}{% endcall %}
+          {% call table_cell() %}{% if r.score is not none %}{{ r.score }} of 100{% else %}{{ gap() }}{% endif %}{% endcall %}
+        {% endcall %}{% endfor %}
+      {% endcall %}
+    {% endcall %}
+    </div>
+    {% endif %}
+    <p class="mt-3 text-sm font-medium" data-testid="hc-scores-recommendation">Recommendation: {{ rec.scores }}</p>
+  </section>
+
+  <section aria-labelledby="hc-renewals" data-testid="hc-renewals">
+    <h2 id="hc-renewals" class="text-lg font-semibold">6. Renewals in the next quarter</h2>
+    <p class="text-sm text-muted-foreground">Active contracts that renew by {{ day(ren.window_end) }}, including any already past their renewal date, with what each costs a year and whether it renews by itself.</p>
+    <p class="mt-3 text-sm" data-testid="hc-renewals-count">{% if ren.contracts_total %}{{ ren.rows|length }} of {{ ren.contracts_total }} contracts renew in this period{% if ren.annual_cost is not none %}, costing {{ money(ren.annual_cost) }} a year{% endif %}.{% else %}No contracts are recorded.{% endif %}</p>
+    {% if ren.rows %}
+    <div class="mt-3">
+    {% call table() %}
+      {% call table_header() %}{% call table_row() %}
+        {% call table_head() %}Contract{% endcall %}{% call table_head() %}Application{% endcall %}{% call table_head() %}Renews{% endcall %}{% call table_head() %}Annual cost{% endcall %}{% call table_head() %}Renews by itself{% endcall %}
+      {% endcall %}{% endcall %}
+      {% call table_body() %}
+        {% for r in ren.rows %}{% call table_row() %}
+          {% call table_cell(class='font-medium') %}{{ r.name }}{% endcall %}
+          {% call table_cell() %}{% if r.application %}{{ r.application }}{% else %}{{ gap() }}{% endif %}{% endcall %}
+          {% call table_cell() %}{{ day(r.end) }}{% if r.overdue %} {% call badge('danger') %}Past due{% endcall %}{% endif %}{% endcall %}
+          {% call table_cell() %}{{ money(r.annual_cost) }}{% endcall %}
+          {% call table_cell() %}{% if r.auto_renewal is none %}{{ gap() }}{% else %}{{ 'Yes' if r.auto_renewal else 'No' }}{% endif %}{% endcall %}
+        {% endcall %}{% endfor %}
+      {% endcall %}
+    {% endcall %}
+    </div>
+    {% endif %}
+    <p class="mt-3 text-sm font-medium" data-testid="hc-renewals-recommendation">Recommendation: {{ rec.renewals }}</p>
+  </section>
+
+</div>

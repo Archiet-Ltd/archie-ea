@@ -104,6 +104,9 @@ def _init_blueprints(app):
     # --- North Star Phase 2: ArchiMate Layer Navigation (NORTH-STAR-002) ---
     _register_archimate_layer_navigation(app)
 
+    # --- SAFe Portfolio Kanban (SAFE-3A) ---
+    _register_safe_portfolio(app)
+
     # --- Enterprise Genome (ADR 0010) — deterministic, provenance-carrying
     # emitter slices; each registers non-fatally so one broken slice degrades
     # to a missing page, not a dead app. ---
@@ -220,6 +223,8 @@ def _register_optional_standalone(app):
         ("app.modules.admin.security_routes", "admin_security_bp", None),
         ("app.modules.admin.billing_routes", "billing_bp", "/admin/billing"),
         ("app.modules.admin.team_routes", "team_bp", "/admin"),
+        # Navigation v3: the platform administration tools, out of the customer sidebar.
+        ("app.modules.admin.platform_area_routes", "platform_area_bp", "/admin"),
         ("app.modules.business_model_canvas.routes", "business_model_bp", "/business-model"),
         ("app.modules.organization.routes", "organization_bp", "/organization"),
         ("app.modules.business_case.routes", "business_case_bp", "/business-case"),
@@ -2342,9 +2347,31 @@ def _register_archimate_layer_navigation(app):
     """
     try:
         from app.modules.architecture.routes.archimate_layer_nav_routes import archimate_layer_nav_bp
-        
+
         app.register_blueprint(archimate_layer_nav_bp)
         app.logger.info("[BLUEPRINT] ArchiMate Layer Navigation registered at /architecture/* (NORTH-STAR-002)")
     except Exception as e:
         app.logger.warning(f"[BLUEPRINT] ArchiMate Layer Navigation registration failed: {e}")
         # Non-fatal - navigation will fall back to main composer
+
+
+def _register_safe_portfolio(app):
+    """Register SAFe Portfolio Kanban board.
+
+    Provides Portfolio Epic workflow visualization organized by state columns
+    (Funnel, Reviewing, Analyzing, Portfolio Backlog, Implementing, Done),
+    with cards ordered by WSJF priority within each column.
+
+    Routes:
+    - GET   /safe/portfolio - Kanban board view
+    - GET   /api/safe/portfolio - JSON API
+    - PATCH /api/safe/portfolio/<id> - Move state / edit WSJF
+    """
+    try:
+        from app.modules.safe_portfolio import safe_portfolio_bp, safe_portfolio_api_bp
+
+        app.register_blueprint(safe_portfolio_bp)
+        app.register_blueprint(safe_portfolio_api_bp)
+        app.logger.info("[BLUEPRINT] SAFe Portfolio Kanban registered at /safe/portfolio and /api/safe/portfolio")
+    except Exception as e:
+        app.logger.warning(f"[BLUEPRINT] SAFe Portfolio Kanban registration failed: {e}")

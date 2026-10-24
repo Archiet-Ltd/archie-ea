@@ -148,8 +148,11 @@ def index():
         get_default_chat_persona,
     )
 
+    # The lens the person chose (or sign-up set) is read first, then the assigned role,
+    # the same order the dashboard uses; display only, never a permission.
     default_chat_persona = get_default_chat_persona(
-        getattr(current_user, "enterprise_role", None)
+        getattr(current_user, "enterprise_role", None),
+        getattr(current_user, "persona_lens", None),
     )
     from app.services.feature_flag_service import FeatureFlagService
 

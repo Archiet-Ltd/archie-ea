@@ -1,0 +1,13 @@
+/* Print layout for the health-check report. Colour comes from the token file only. */
+.hc-document { margin: 0 auto; max-width: 56rem; padding: 2rem; }
+.hc-cover { margin-bottom: 2rem; border-bottom: 1px solid hsl(var(--border)); padding-bottom: 1.5rem; }
+.hc-footer { margin-top: 2rem; border-top: 1px solid hsl(var(--border)); padding-top: 1rem; }
+[data-testid="health-check-report"] th, [data-testid="health-check-report"] td { height: auto; padding: 0.4rem 0.6rem; }
+@page { size: A4; margin: 18mm 16mm; }
+@media print {
+  .hc-document { max-width: none; padding: 0; }
+  section { break-inside: auto; }
+  h2 { break-after: avoid; }
+  tr { break-inside: avoid; }
+  thead { display: table-header-group; }
+}

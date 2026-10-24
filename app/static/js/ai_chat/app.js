@@ -29,6 +29,46 @@
     const fetch = ArchieChat.transport.apiFetch;
 
     const messagesContainer = document.getElementById('messages-container');
+
+    /* "Work them out now" on an answer that has no indirect connections yet: work them
+       out, then ask the same question again and draw the answer in place of the old one
+       (without saving a second turn to the conversation). */
+    if (messagesContainer) {
+        messagesContainer.addEventListener('click', async (event) => {
+            const button = event.target.closest('[data-recompute-button]');
+            if (!button) return;
+            const holder = button.closest('[data-answer-cards]');
+            const notice = button.parentElement;
+            const say = (text) => {
+                let line = notice.querySelector('[data-recompute-line]');
+                if (!line) {
+                    line = document.createElement('p');
+                    line.setAttribute('data-recompute-line', '');
+                    line.setAttribute('role', 'status');
+                    line.className = 'mt-2 text-sm text-muted-foreground';
+                    notice.appendChild(line);
+                }
+                line.textContent = text;
+            };
+            button.disabled = true;
+            say('Working them out…');
+            try {
+                await ArchieChat.transport.recomputeConnections();
+                const again = await ArchieChat.transport.askEstate(holder.getAttribute('data-question') || '', { remember: false });
+                if (again.found && window.DOMPurify) {
+                    const fresh = document.createElement('div');
+                    fresh.innerHTML = DOMPurify.sanitize(again.html);
+                    holder.replaceWith(fresh.firstElementChild);
+                    if (window.lucide) lucide.createIcons();
+                }
+            } catch (err) {
+                button.disabled = false;
+                say(err && err.status === 409
+                    ? 'They are already being worked out. Try again in a moment.'
+                    : 'We could not work them out just now.');
+            }
+        });
+    }
     const chatForm = document.getElementById('chat-form');
     const userInput = document.getElementById('user-input');
     const domainSelector = document.getElementById('domain-selector');
@@ -45,7 +85,7 @@
        sees — assigning state.currentDomain here is visible to render.js. */
     const state = ArchieChat.state;
     const {
-        getColorClass, appendMessage, appendSystemMessage, appendError,
+        getColorClass, appendMessage, appendSystemMessage, appendError, appendAnswerCards,
         beginStreamedMessage, updateStreamedMessage, finaliseStreamedMessage
     } = ArchieChat.render;
     const {
@@ -254,9 +294,8 @@
         const iconElement = document.getElementById('domain-icon');
         iconElement.innerHTML = `<i data-lucide="${config.icon}" class="h-5 w-5"></i>`;
 
-        // Update colors using safe class mapping
-        const bgClass = getColorClass(config.color || 'primary', 'bg');
-        iconElement.className = `flex h-9 w-9 items-center justify-center rounded-lg ${bgClass} text-primary-foreground transition-all duration-300`; // token-migration-ok
+        // The icon is read by assistive technology only; showing it put a coloured tile on its own row above the toolbar.
+        iconElement.className = 'sr-only';
 
         // Re-initialize lucide icons
         lucide.createIcons();
@@ -285,6 +324,14 @@
        it is also an accessibility defect: the chat could not be submitted from
        the keyboard at all. */
     userInput.addEventListener('keydown', handleEnter);
+    /* Escape clears what has been typed. */
+    userInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && userInput.value) {
+            e.preventDefault();
+            userInput.value = '';
+            userInput.style.height = 'auto';
+        }
+    });
 
     /* Send and Stop swap places while a turn is in flight. Salvaged from
        ai_chat.js, the 169 KB file no template loads: #stop-btn has been in the
@@ -363,6 +410,29 @@
         messagesContainer.scrollTop = messagesContainer.scrollHeight;
         lucide.createIcons();
 
+        // A question that names something in the organisation's records is answered
+        // from those records, as cited cards, before any model is asked.
+        try {
+            const estate = await ArchieChat.transport.askEstate(message);
+            if (estate.found) {
+                // The answer is kept in the conversation like any other: remember the
+                // thread it went to and refresh the history rail.
+                if (estate.thread_id) {
+                    const _wasNew = estate.thread_id !== window.__threadId;
+                    window.__threadId = estate.thread_id;
+                    try { sessionStorage.setItem('archie_chat_thread_id', estate.thread_id); } catch (e) { /* swallow-ok: private-browsing storage denial; the server-saved thread and current page still work, only reload restoration is unavailable */ }
+                    if (_wasNew && window.loadSessionList) window.loadSessionList();
+                }
+                { const _l = document.getElementById(loadingId); if (_l) _l.remove(); }
+                appendAnswerCards(estate.html);
+                return;
+            }
+        } catch (_estateErr) {
+            { const _l = document.getElementById(loadingId); if (_l) _l.remove(); }
+            appendError('The assistant could not answer just now. Your question is saved; try again in a moment.', () => _retryTurn(message, timestamp));
+            return;
+        }
+
         const startTime = performance.now();
         // Shared payload. thread_id keeps multi-turn chats in one conversation.
         const _payload = JSON.stringify({
@@ -415,7 +485,7 @@
                 // so a toast on top of the inline error below was a third
                 // surface for one fault. Keep the inline message (it carries
                 // the admin-link remedy in context); drop the toast.
-                appendError(_streamErr.message, null, { adminLink: true });
+                appendError('The assistant could not answer just now. Your question is saved; try again in a moment.', () => _retryTurn(message, timestamp), { adminLink: true });
                 return;
             }
             /* fall through to non-streaming */
@@ -505,10 +575,10 @@
                     // surfaces (banner + toast + inline) say one thing. The
                     // inline message stays; it carries the admin-link remedy
                     // in context, which the banner and a toast both lack.
-                    appendError(errorMessage || fullError, null, { adminLink: true });
+                    appendError('The assistant could not answer just now. Your question is saved; try again in a moment.', () => _retryTurn(message, timestamp), { adminLink: true });
                 } else {
                     Platform.toast.error(fullError);
-                    appendError(fullError, () => _retryTurn(message, timestamp));
+                    appendError('The assistant could not answer just now. Your question is saved; try again in a moment.', () => _retryTurn(message, timestamp));
                 }
             } else {
                 // Add AI response to history
@@ -553,7 +623,7 @@
 
         } catch (error) {
             { const _l = document.getElementById(loadingId); if (_l) _l.remove(); }
-            appendError(`Network error: ${error.message}`, () => _retryTurn(message, timestamp));
+            appendError('The assistant could not answer just now. Your question is saved; try again in a moment.', () => _retryTurn(message, timestamp));
         }
     }
 
@@ -940,16 +1010,14 @@
 
     function openCreateSolutionModal() { openCreateSolutionModalWithMessage(''); }
     function openCreateSolutionModalWithMessage(message) {
-        let modal = document.getElementById('ai-chat-create-solution-modal');
-        if (modal) modal.classList.remove('hidden');
+        if (window.Platform && Platform.modal) Platform.modal.open('ai-chat-create-solution-modal');
         const briefEl = document.getElementById('ai-chat-solution-brief');
         if (briefEl && typeof message === 'string' && message.trim()) briefEl.value = message.trim();
         const titleEl = document.getElementById('ai-chat-solution-title');
         if (titleEl) titleEl.focus();
     }
     function closeCreateSolutionModal() {
-        let modal = document.getElementById('ai-chat-create-solution-modal');
-        if (modal) modal.classList.add('hidden');
+        if (window.Platform && Platform.modal) Platform.modal.close('ai-chat-create-solution-modal');
     }
 
     // Wire the button
@@ -1078,6 +1146,13 @@ Would you like me to provide more details about the extracted elements or help y
         const contextType = urlParams.get('context_type');
         const deepLinkDomain = urlParams.get('domain');
 
+        // A question typed on the dashboard arrives in ?q= and waits in the box to be sent.
+        const incomingQuestion = urlParams.get('q');
+        if (incomingQuestion && userInput && !userInput.value) {
+            userInput.value = incomingQuestion.slice(0, 2000);
+            userInput.focus();
+        }
+
         if (deepLinkContext === 'application' && deepLinkId && !isNaN(parseInt(deepLinkId))) {
             const appId = parseInt(deepLinkId);
             selectedElementIdInput.value = appId;
@@ -1187,6 +1262,18 @@ Would you like me to provide more details about the extracted elements or help y
   var render = window.ArchieChat.render;
   function esc(s) { var d = document.createElement('div'); d.textContent = (s == null ? '' : String(s)); return d.innerHTML; }
 
+  // The search box above the list narrows it by title; an empty box shows every chat.
+  function filterSessionList() {
+    var box = document.getElementById('chat-history-search');
+    var q = box ? box.value.trim().toLowerCase() : '';
+    document.querySelectorAll('#session-list .js-thr').forEach(function (row) {
+      row.classList.toggle('hidden', q !== '' && row.textContent.toLowerCase().indexOf(q) === -1);
+    });
+  }
+  document.addEventListener('input', function (e) {
+    if (e.target && e.target.id === 'chat-history-search') filterSessionList();
+  });
+
   window.loadSessionList = async function () {
     var c = document.getElementById('session-list');
     if (!c) return;
@@ -1221,6 +1308,7 @@ Would you like me to provide more details about the extracted elements or help y
         var del = row.querySelector('.js-thr-del'); if (del) del.addEventListener('click', function (e) { e.stopPropagation(); window.deleteConversation(id); });
       });
       if (window.lucide) lucide.createIcons();
+      filterSessionList();
     } catch (e) {
       c.innerHTML = '<p class="text-xs text-destructive text-center py-4">Couldn\'t load conversations.</p>';
     }

@@ -1,7 +1,7 @@
 {# shadcn/ui Table Component #}
-{% macro table(class='') %}
+{% macro table(class='', id='', attrs_dict={}) %}
     <div class="relative w-full overflow-auto" aria-live="polite" aria-atomic="false">
-        <table class="dense-table w-full caption-bottom text-sm {{ class }}">
+        <table {% if id %}id="{{ id }}" {% endif %}class="dense-table w-full caption-bottom text-sm {{ class }}" {{ attrs_dict|xmlattr }}>
             {{ caller() }}
         </table>
     </div>
@@ -13,26 +13,26 @@
     </thead>
 {% endmacro %}
 
-{% macro table_body(class='') %}
-    <tbody class="[&_tr:last-child]:border-0 {{ class }}">
+{% macro table_body(class='', attrs_dict={}) %}
+    <tbody class="[&_tr:last-child]:border-0 {{ class }}" {{ attrs_dict|xmlattr }}>
         {{ caller() }}
     </tbody>
 {% endmacro %}
 
-{% macro table_row(class='') %}
-    <tr class="border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted {{ class }}">
+{% macro table_row(class='', attrs_dict={}) %}
+    <tr class="border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted {{ class }}" {{ attrs_dict|xmlattr }}>
         {{ caller() }}
     </tr>
 {% endmacro %}
 
-{% macro table_head(class='') %}
-    <th class="h-12 px-4 text-left align-middle font-medium text-muted-foreground [&:has([role=checkbox])]:pr-0 {{ class }}">
+{% macro table_head(class='', attrs_dict={}) %}
+    <th class="h-12 px-4 text-left align-middle font-medium text-muted-foreground [&:has([role=checkbox])]:pr-0 {{ class }}" {{ attrs_dict|xmlattr }}>
         {{ caller() }}
     </th>
 {% endmacro %}
 
-{% macro table_cell(class='') %}
-    <td class="p-4 align-middle [&:has([role=checkbox])]:pr-0 {{ class }}">
+{% macro table_cell(class='', attrs_dict={}) %}
+    <td class="p-4 align-middle [&:has([role=checkbox])]:pr-0 {{ class }}" {{ attrs_dict|xmlattr }}>
         {{ caller() }}
     </td>
 {% endmacro %}

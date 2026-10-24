@@ -40,3 +40,26 @@
         {% endif %}
     </div>
 {% endmacro %}
+
+{# Native select: the browser's own <select>, styled with the control tokens, for forms bound
+   with x-model or posted as-is. The options go in the call block. The macro above is the
+   custom dropdown; this one is the form control.
+     {% call native_select(id='status', name='status', aria_label='Status', attrs_dict={'x-model': 'form.status'}) %}
+       <option value="Draft">Draft</option>
+     {% endcall %}
+   size: default (h-10), sm (h-9) or xs (h-8).
+   options: optional [(value, label)] list rendered before the call block; selected marks one.
+   multiple: a list box showing visible_rows rows instead of a one-line control. #}
+{% macro native_select(id='', name='', size='default', class='', aria_label=none, disabled=false, options=[], selected=none, multiple=false, visible_rows=none, attrs_dict={}) %}
+    {% set heights = {'default': 'h-10', 'sm': 'h-9', 'xs': 'h-8'} %}
+    <select
+        {% if id %}id="{{ id }}"{% endif %}
+        {% if name %}name="{{ name }}"{% endif %}
+        {% if aria_label %}aria-label="{{ aria_label }}"{% endif %}
+        {% if disabled %}disabled{% endif %}
+        {% if multiple %}multiple{% endif %}
+        {% if visible_rows %}size="{{ visible_rows }}"{% endif %}
+        {{ attrs_dict|xmlattr }}
+        class="flex {% if multiple %}py-2{% else %}{{ heights.get(size, 'h-10') }}{% endif %} rounded-md border border-input bg-background px-3 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 {{ class }}"
+    >{% for value, label in options %}<option value="{{ value }}"{% if selected is not none and selected == value %} selected{% endif %}>{{ label }}</option>{% endfor %}{{ caller() if caller }}</select>
+{% endmacro %}

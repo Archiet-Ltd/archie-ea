@@ -105,7 +105,7 @@ class SolutionArchiMateService:
                         "name": elem.name,
                         "type": getattr(elem, "type", None),
                         "layer": getattr(elem, "layer", None),
-                        "plateau": getattr(elem, "plateau", None),
+                        "plateau": getattr(elem, "togaf_plateau", None),
                         "building_block_type": getattr(
                             elem, "building_block_type", None
                         ),

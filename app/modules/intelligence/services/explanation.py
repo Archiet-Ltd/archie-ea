@@ -71,6 +71,29 @@ def _decision_href(decision_id: int) -> Optional[str]:
         return None
 
 
+def _plain_path(links: List[Dict[str, Any]], source: Dict[str, Any], target: Dict[str, Any]) -> Optional[str]:
+    """How one thing reaches another, in a sentence a founder reads at a glance.
+
+    "Payments reaches Orders through the API gateway": the first and last names of
+    the chain with the things in between. ``None`` when a name is not recorded.
+    """
+    names = []
+    for link in links:
+        if not link.get("resolved"):
+            return None
+        names.append(link["source"].get("name"))
+    if links and links[-1].get("resolved"):
+        names.append(links[-1]["target"].get("name"))
+    if not names:
+        names = [source.get("name"), target.get("name")]
+    if len(names) < 2 or not all(isinstance(n, str) and n.strip() for n in names):
+        return None
+    first, last, middle = names[0], names[-1], names[1:-1]
+    if not middle:
+        return f"{first} reaches {last} directly."
+    return f"{first} reaches {last} through {', then '.join(middle)}."
+
+
 def explain_fact(organization_id: int, fact: Dict[str, Any]) -> Dict[str, Any]:
     """The explanation of one serialised derived fact of ``organization_id``."""
     from app.models import ArchiMateElement, ArchiMateRelationship
@@ -197,6 +220,7 @@ def explain_fact(organization_id: int, fact: Dict[str, Any]) -> Dict[str, Any]:
 
     rule = describe_rule(fact.get("rule_id"))
     return {
+        "plain": _plain_path(links, element(fact.get("source_element_id")), element(fact.get("target_element_id"))),
         "derived_id": fact.get("id"),
         "source": element(fact.get("source_element_id")),
         "target": element(fact.get("target_element_id")),

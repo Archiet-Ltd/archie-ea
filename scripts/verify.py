@@ -274,6 +274,17 @@ def gate_crosswalk_writer_gated(baseline: int) -> Result:
                   "", count, baseline)
 
 
+def gate_public_shell(baseline: int) -> Result:
+    """The public navbar, menus and footer: registry-driven, tokens only, accessible - must be 0."""
+    proc = _run([sys.executable, "scripts/check_public_shell.py", "--count"])
+    try:
+        count = int(proc.stdout.strip().splitlines()[-1])
+    except (ValueError, IndexError):
+        return Result("public-shell", FAIL,
+                      f"could not parse count: {proc.stdout!r} {proc.stderr[:300]}")
+    return Result("public-shell", PASS if count <= baseline else FAIL, "", count, baseline)
+
+
 def gate_design_tokens_extended(baseline: int) -> Result:
     """Non-banned colour families (emerald/orange/teal/...) - their own ratchet."""
     proc = _run([sys.executable, "scripts/check_design_tokens.py", "--extended", "--count"])
@@ -343,6 +354,22 @@ def gate_nav_verified(baseline: int) -> Result:
         details = report.stdout.strip() or report.stderr.strip()
         return Result("nav-verified", FAIL, details, count, baseline)
     return Result("nav-verified", PASS, "", count, baseline)
+
+
+def gate_counted_rule(name: str, script: str, rule: str, baseline: int) -> Result:
+    """One counted rule of a template checker, ratcheted: the count may fall, never rise.
+
+    The shell rules live in scripts/check_shell_conformance.py and the
+    component rules in scripts/check_ui_contract.py; both list the findings
+    with `--rule <rule> --list`, one `file:line: message` each.
+    """
+    proc = _run([sys.executable, script, "--rule", rule, "--count"])
+    try:
+        count = int(proc.stdout.strip().splitlines()[-1])
+    except (ValueError, IndexError):
+        return Result(name, FAIL, f"could not parse count: {proc.stdout!r} {proc.stderr[:300]}")
+    detail = "" if count <= baseline else f"run python {script} --rule {rule} --list"
+    return Result(name, PASS if count <= baseline else FAIL, detail, count, baseline)
 
 
 def gate_nav_coverage(baseline: int) -> Result:
@@ -1091,6 +1118,67 @@ def gate_raw_html_escaping(baseline: int) -> Result:
                   detail, count, baseline)
 
 
+def gate_design_map(outside_baseline: int, unmarked_baseline: int, components_baseline: int = 0,
+                    tier_baselines: dict | None = None) -> Result:
+    """Every page template is in docs/design-map.json and follows its block.
+
+    406 page templates were each styled for the task that built them, so the
+    same job looked different from page to page. The design map assigns every
+    page to one block (dashboard, data table, record detail, form, settings,
+    chat, board, onboarding, public page, empty state) with the macros that
+    block may use. Fails on a page missing from the map, a marker disagreeing
+    with the map, a spec that does not exist, or a template this branch
+    changes that is not in the map, carries no block marker, or uses a macro
+    its block does not allow. Every row also names the persona the page serves
+    and the components it may compose; a page whose macros stand for a
+    component outside its row is a finding. The pages already outside their
+    block, the pages with no marker yet and the pages outside their row's
+    components are ratcheted, so the counts only fall.
+
+    Each row also carries the designers' port-map tier (A verbatim, B composed,
+    C1 to C5 the forms shadcn has no original for). The checks of those tiers
+    that a template can answer today are ratcheted per check and reported per
+    tier: an in-house component the port map marks Replace still in use, an
+    in-house component the tier does not allow, more than two charts drawn,
+    a colour literal, an inline style and an arbitrary-value class. The checks
+    that need a golden render or a browser (A2 to A5, B2, B4 to B9, X6 to X10,
+    the Tier C forms) are listed as pending in the detail, not counted.
+    """
+    name = "design-map"
+    tier_baselines = tier_baselines or {}
+    proc = _run([sys.executable, "scripts/check_design_map.py", "--json", "--changed"])
+    try:
+        data = json.loads(proc.stdout)
+    except ValueError:
+        return Result(name, FAIL, f"could not parse: {proc.stdout[-300:]!r} {proc.stderr[-300:]}")
+    problems = list(data["errors"])
+    outside, unmarked = data["outside_block_count"], data["unmarked_count"]
+    if outside > outside_baseline:
+        problems.append(f"{outside} pages use a macro their block does not allow (baseline {outside_baseline})")
+    if unmarked > unmarked_baseline:
+        problems.append(f"{unmarked} pages carry no design-block marker (baseline {unmarked_baseline})")
+    components = data["outside_components_count"]
+    if components > components_baseline:
+        problems.append(f"{components} pages use a component outside their row's component list "
+                        f"(baseline {components_baseline})")
+    tier_extra = {}
+    for check, found in data["tier_checks"].items():
+        key = f"design_map_tier_{check}"
+        tier_extra[key] = found["count"]
+        limit = tier_baselines.get(key, 0)
+        if found["count"] > limit:
+            by_tier = ", ".join(f"{t} {n}" for t, n in found["by_tier"].items())
+            problems.append(f"{found['count']} pages: {check.replace('_', ' ')} ({by_tier}) (baseline {limit})")
+    detail = "; ".join(problems)[:1800] + ("; run python scripts/check_design_map.py" if problems else "")
+    if not problems:
+        tiers = ", ".join(f"{t} {n}" for t, n in data["tiers"].items())
+        detail = (f"tiers {tiers}; tier checks pending a golden render or browser: "
+                  + ", ".join(data["tier_checks_pending"]))
+    return Result(name, FAIL if problems else PASS, detail, outside, outside_baseline,
+                  extra={"design_map_outside_block": outside, "design_map_unmarked": unmarked,
+                         "design_map_outside_components": components, **tier_extra})
+
+
 def gate_smoke_coverage_on_change() -> Result:
     """Every changed template/JS file in this diff has a tests/smoke/ touch too.
     Gated at ZERO -- this is a per-diff question, not an accumulating debt count.
@@ -1807,6 +1895,18 @@ def gate_count_checker(name: str, script: str, baseline: int) -> Result:
     return Result(name, PASS if count <= baseline else FAIL, detail, count, baseline)
 
 
+def gate_brand_raw_colour(baseline: int) -> Result:
+    """The old brand blues written out anywhere but the token file and the logo."""
+    proc = _run([sys.executable, "scripts/check_brand_tokens.py", "--raw"])
+    try:
+        count = int(proc.stdout.strip().splitlines()[-1])
+    except (ValueError, IndexError):
+        return Result("brand-raw-colour", FAIL,
+                      f"could not parse count: {proc.stdout!r} {proc.stderr[:300]}")
+    detail = "" if count <= baseline else "run scripts/check_brand_tokens.py --raw to list them"
+    return Result("brand-raw-colour", PASS if count <= baseline else FAIL, detail, count, baseline)
+
+
 # ---------------------------------------------------------------- registry
 
 
@@ -1844,6 +1944,22 @@ def build_gates(baseline: dict) -> list[Gate]:
              lambda: gate_design_tokens(baseline["design_tokens"]),
              remediation="use semantic tokens; see the table in DESIGN.md",
              tags=["static", "ui"]),
+        Gate("brand-contrast",
+             "brand tokens keep their contrast (label on primary, control borders, chart ramp) and the logo is --primary",
+             "zero",
+             lambda: gate_count_checker(
+                 "brand-contrast", "scripts/check_brand_tokens.py", 0,
+             ),
+             remediation="run scripts/check_brand_tokens.py --report; change the value in "
+                         "app/static/css/shadcn_tokens.css, not the threshold",
+             tags=["static", "ui"]),
+        Gate("brand-raw-colour",
+             "no hard-coded old or logo brand blue outside the token file and the logo",
+             "ratchet",
+             lambda: gate_brand_raw_colour(baseline.get("brand_raw_colour", 53)),
+             remediation="use bg-primary / text-primary / the --primary token; "
+                         "scripts/check_brand_tokens.py --raw lists them",
+             tags=["static", "ui"]),
         Gate("composer-url-params",
              "No composer link carrying a parameter the composer doesn't read",
              "ratchet",
@@ -1859,6 +1975,14 @@ def build_gates(baseline: dict) -> list[Gate]:
              remediation="call assert_connector_permitted() before the write, or mark "
                           "'crosswalk-gate-ok: <reason>'",
              tags=["static", "fast"]),
+        Gate("public-shell",
+             "The public navbar, menus and footer read one registry and stay on the north-star look",
+             "zero",
+             lambda: gate_public_shell(baseline.get("public_shell", 0)),
+             remediation="add links to content/site/registry.yml, use tokens and Lucide icons from "
+                          "design/patterns.json public_icons, no literal hrefs; run "
+                          "python scripts/check_public_shell.py for the findings",
+             tags=["static", "ui"]),
         Gate("raw-fetch-sites",
              "No new raw fetch() sites bypassing Platform.fetch",
              "ratchet",
@@ -1874,6 +1998,36 @@ def build_gates(baseline: dict) -> list[Gate]:
         Gate("shell-conformance", "No new pages off the platform shell (header macro + page width)",
              "ratchet", lambda: gate_shell_conformance(baseline["shell_conformance"]),
              remediation="use page_header/page_shell and p-6 space-y-6; see DESIGN.md, or add 'shell-ok: <reason>'",
+             tags=["static", "ui"]),
+        Gate("shell-layout", "every page extends an approved layout (admin, public or composer)",
+             "ratchet",
+             lambda: gate_counted_rule("shell-layout", "scripts/check_shell_conformance.py", "layout", baseline["shell_layout"]),
+             remediation="extend layouts/admin_base.html, public_base.html or composer_base.html, or add 'shell-ok: <reason>'",
+             tags=["static", "ui"]),
+        Gate("shell-chrome", "no page draws its own sidebar, top bar, navigation or breadcrumb",
+             "ratchet",
+             lambda: gate_counted_rule("shell-chrome", "scripts/check_shell_conformance.py", "chrome", baseline["shell_chrome"]),
+             remediation="use the shell macros (page_header/page_shell breadcrumb) instead of <aside>/<nav>/<header>, or add 'shell-ok: <reason>'",
+             tags=["static", "ui"]),
+        Gate("shell-escapes", "every shell-ok escape hatch is counted and can only fall",
+             "ratchet",
+             lambda: gate_counted_rule("shell-escapes", "scripts/check_shell_conformance.py", "escapes", baseline["shell_escapes"]),
+             remediation="remove the shell-ok comment by moving the page onto the shell",
+             tags=["static", "ui"]),
+        Gate("dialog-title", "every dialog, sheet and drawer has a title",
+             "ratchet",
+             lambda: gate_counted_rule("dialog-title", "scripts/check_ui_contract.py", "dialog-title", baseline["dialog_title"]),
+             remediation="pass title= to the modal/dialog/drawer macro, or point aria-labelledby at a heading id",
+             tags=["static", "ui"]),
+        Gate("empty-state-macro", "empty states use the empty_state macro",
+             "ratchet",
+             lambda: gate_counted_rule("empty-state-macro", "scripts/check_ui_contract.py", "empty-state", baseline["empty_state_macro"]),
+             remediation="use components/empty_state.html instead of an icon and a hand-written 'No ... yet'",
+             tags=["static", "ui"]),
+        Gate("form-field-macro", "every form control sits inside form_field or form_group",
+             "ratchet",
+             lambda: gate_counted_rule("form-field-macro", "scripts/check_ui_contract.py", "form-field", baseline["form_field_macro"]),
+             remediation="render it with form_field, or wrap it in a form_group call",
              tags=["static", "ui"]),
         Gate("nav-coverage",
              "No business-architecture output with routes is missing from every sidebar",
@@ -2152,6 +2306,16 @@ def build_gates(baseline: dict) -> list[Gate]:
              remediation="wrap the interpolated value in escape(...) (from html or markupsafe); "
                          "run scripts/check_raw_html_escaping.py; else mark 'raw-html-ok: <reason>'",
              tags=["static", "security"]),
+        Gate("design-map", "every page template follows the designed block docs/design-map.json gives it",
+             "ratchet",
+             lambda: gate_design_map(baseline.get("design_map_outside_block", 0),
+                                     baseline.get("design_map_unmarked", 0),
+                                     baseline.get("design_map_outside_components", 0),
+                                     {k: v for k, v in baseline.items() if k.startswith("design_map_tier_")}),
+             remediation="run python scripts/check_design_map.py; use only the macros the page's block "
+                         "allows, add {# design-block: <block> #} to a changed page, and run --write "
+                         "for a new page",
+             tags=["static", "ui"]),
         Gate("smoke-coverage-on-change", "a template/JS change with no tests/smoke/ touch in the same diff",
              "zero", gate_smoke_coverage_on_change,
              remediation="extend an existing tests/smoke/ journey or add a new one; "
