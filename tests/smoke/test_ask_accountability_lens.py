@@ -1,5 +1,5 @@
 """L4, "who's accountable for <element>, and can they take on more?": the
-accountability question on the Ask page, in a real browser.
+accountability question in the AI chat, in a real browser.
 
 The ownership read is WITHDRAWN (a tenant-isolation gap found in external
 review of the original PR -- see
@@ -17,7 +17,7 @@ import uuid
 import pytest
 from playwright.sync_api import expect
 
-from .conftest import PAGE_TIMEOUT, PASSWORD, type_and_wait
+from .chat_ask import ask, sign_in_as
 
 pytestmark = [pytest.mark.smoke, pytest.mark.journey]
 
@@ -84,66 +84,29 @@ def accountability_graph(seeded, live_server):
     return _seed_accountability_graph(seeded["ids"]["org"])
 
 
-def _login(page, base, email):
-    page.goto(base + "/account/login", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
-    page.fill("#email", email)
-    page.fill("#password", PASSWORD)
-    try:
-        page.click("#submit", no_wait_after=True)
-    except TypeError:
-        page.locator("#submit").click()
-    try:
-        page.wait_for_url(lambda url: "/account/login" not in url, timeout=PAGE_TIMEOUT)
-    except Exception:
-        pass
-    assert "/account/login" not in page.url, "could not sign in as %s" % email
-
-
-def _ready(page, factory):
-    page.wait_for_function(
-        "(f) => { const el = document.querySelector('[x-data=\"' + f + '()\"]');"
-        " return !!(el && el._x_dataStack); }",
-        arg=factory,
-    )
+def _question(name):
+    return "Who's accountable for %s" % name
 
 
 def test_the_accountability_question_shows_the_withdrawn_state_not_seeded_data(
     page, live_server, seeded, accountability_graph
 ):
-    _login(page, live_server, seeded["emails"]["solution_architect"])
-    page.goto(live_server + "/intelligence/ask", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
-    _ready(page, "askSurface")
-
-    page.locator("#ask-question-accountability").click()
-    expect(page.locator("#ask-picker-input")).to_be_focused()
-    type_and_wait(page, "ask", accountability_graph["noun"])
-    page.locator("#ask-picker-listbox [role=option]", has_text="Service").click()
-
-    expect(page.get_by_text(
-        "Ownership data is not yet connected."
-    )).to_be_visible()
-    expect(page.get_by_text("Capacity and availability data is not yet connected.")).to_be_visible()
-    assert page.locator("[data-ask-accountability-row]").count() == 0
+    sign_in_as(page, live_server, seeded, "solution_architect")
+    card = ask(page, live_server, _question("%s Service" % accountability_graph["noun"]))
+    expect(card.get_by_text("Ownership data is not yet connected")).to_be_visible()
+    expect(card.get_by_text("Capacity and availability data is not yet connected.")).to_be_visible()
+    assert card.locator("[data-lens-row]").count() == 0
 
 
-def test_all_six_questions_keep_their_own_answers_separate(
+def test_the_accountability_and_impact_questions_keep_their_own_answers_separate(
     page, live_server, seeded, accountability_graph
 ):
-    """Regression guard: six questions share one picker component."""
-    _login(page, live_server, seeded["emails"]["solution_architect"])
-    page.goto(live_server + "/intelligence/ask", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
-    _ready(page, "askSurface")
-
-    page.locator("#ask-question-impact").click()
-    type_and_wait(page, "ask", accountability_graph["noun"])
-    page.locator("#ask-picker-listbox [role=option]", has_text="Service").click()
-    page.wait_for_selector("[data-ask-row]")
-    expect(page.locator("#ask-results")).to_be_visible()
-    expect(page.locator("#ask-accountability-results")).to_be_hidden()
-
-    page.locator("#ask-question-accountability").click()
-    type_and_wait(page, "ask", accountability_graph["noun"])
-    page.locator("#ask-picker-listbox [role=option]", has_text="Service").click()
-    page.wait_for_selector("#ask-accountability-results")
-    expect(page.locator("#ask-accountability-results")).to_be_visible()
-    expect(page.locator("#ask-results")).to_be_hidden()
+    service = "%s Service" % accountability_graph["noun"]
+    sign_in_as(page, live_server, seeded, "solution_architect")
+    impact = ask(page, live_server, "What breaks if %s fails" % service)
+    assert impact.locator("[data-answer-row]").count() >= 1
+    owners = ask(page, live_server, _question(service), fresh=False)
+    expect(owners.get_by_text("Capacity and availability data is not yet connected.")).to_be_visible()
+    assert owners.locator("[data-answer-row]").count() == 0
+    assert impact.locator("[data-lens-row]").count() == 0
+    assert impact.locator("[data-answer-row]").count() >= 1

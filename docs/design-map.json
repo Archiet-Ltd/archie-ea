@@ -32935,9 +32935,13 @@
     "breadcrumb",
     "button",
     "card",
+    "dialog",
     "empty",
+    "field",
+    "input",
     "page-header",
     "progress",
+    "select",
     "table",
     "tooltip"
    ],
@@ -32964,6 +32968,12 @@
    },
    "spec": null,
    "status": "mapped",
+   "extra_macros": [
+    "components/form_field.html",
+    "components/input.html",
+    "components/select.html",
+    "components/table.html"
+   ],
    "charts": [],
    "confidence": "high",
    "frame": "dashboard-01",

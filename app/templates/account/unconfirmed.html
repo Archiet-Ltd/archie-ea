@@ -1,4 +1,7 @@
+{# design-block: onboarding #}
 {% extends 'layouts/public_base.html' %}
+{% from 'components/button.html' import button %}
+{% from 'components/input.html' import input %}
 {% block title %}Confirm Your Email{% endblock %}
 
 {% block content %}
@@ -20,17 +23,14 @@
                     <h2 class="text-base font-semibold mb-2">No message?</h2>
                     <p class="text-sm text-muted-foreground mb-4">Check your spam folder, or send a new link. Only the newest link works.</p>
                     <form method="POST" action="{{ url_for('account.confirm_request') }}">
-                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                        <button type="submit"
-                                class="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 h-9 px-4 py-2">
-                            Send a new confirmation link
-                        </button>
+                        {{ input(type='hidden', name='csrf_token', value=csrf_token()) }}
+                        {{ button(text='Send a new confirmation link', type='submit') }}
                     </form>
                     {% else %}
                     <div role="alert" class="rounded-md border border-warning/40 bg-warning/10 p-3 text-sm text-foreground">
-                        E-mail is not available on this server, so no confirmation link can be sent to
-                        <span class="font-medium break-words">{{ current_user.email }}</span>.
-                        Ask your organisation's administrator for help.
+                        We cannot send a confirmation link to
+                        <span class="font-medium break-words">{{ current_user.email }}</span> right now.
+                        Ask your organisation's administrator to confirm your account.
                     </div>
                     {% endif %}
 
