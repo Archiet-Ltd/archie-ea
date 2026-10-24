@@ -787,6 +787,12 @@ _OWNER_USERS = [
     ("Ainsley", "NetEng", "ainsley.neteng@lantern-quay.example.com"),
 ]
 
+# The one demo user who can look but not change the model: a business analyst
+# on the Viewer platform role, so the demonstration carries a read-only persona
+# beside its sixteen architects. Matches an entry of _OWNER_USERS.
+_DEMO_READER_EMAIL = "drew.dataanalyst@lantern-quay.example.com"
+_DEMO_READER_PERSONA = "business_analyst"
+
 # Map from display name (as used in BusinessActor elements) to User email.
 _OWNER_NAME_TO_EMAIL = {
     "Ivo Reed": "ivo.reed@lantern-quay.example.com",
@@ -1710,6 +1716,12 @@ def seed_demo_company() -> dict:
             db.session.add(u)
             owner_users_created += 1
         if owner_users_created:
+            db.session.flush()
+        reader = User.query.filter_by(
+            email=_DEMO_READER_EMAIL, organization_id=org_id
+        ).first()
+        if reader is not None and reader.enterprise_role != _DEMO_READER_PERSONA:
+            reader.enterprise_role = _DEMO_READER_PERSONA
             db.session.flush()
 
         apps = _resolve_apps(org_id)
