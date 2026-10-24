@@ -1114,10 +1114,18 @@ def _req_to_dict(req):
         ).first()
         cap_name = cap.name if cap else None
     sol_name = None
+    sol_openable = False
     if req.solution_id:
         from app.models.solution_models import Solution
         sol = Solution.query.get(req.solution_id)
         sol_name = sol.name if sol else None
+        if sol:
+            # The solution page refuses people it is not shared with, so the
+            # backlog only links to it for people it will open for.
+            from app.modules.solutions_strategic.v2.routes.solution_design_routes import (
+                _check_solution_access,
+            )
+            sol_openable = bool(_check_solution_access(sol))
     # Motivation layer name resolution (lazy — use ORM relationship if loaded)
     driver_name = req.driver.name if req.driver_id and req.driver else None
     goal_name = req.goal.name if req.goal_id and req.goal else None
@@ -1139,6 +1147,7 @@ def _req_to_dict(req):
         "capability_name": cap_name,
         "solution_id": req.solution_id,
         "solution_name": sol_name,
+        "solution_openable": sol_openable,
         # ArchiMate 3.2 Motivation Layer
         "driver_id": req.driver_id,
         "driver_name": driver_name,
