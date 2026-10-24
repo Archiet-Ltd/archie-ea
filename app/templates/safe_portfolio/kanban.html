@@ -5,7 +5,7 @@
 {% from 'components/badge.html' import badge %}
 {% from 'components/button.html' import button %}
 {% from 'components/input.html' import input %}
-{% from 'components/modal_form.html' import modal_form %}
+{% from 'components/modal.html' import modal %}
 {% from 'components/avatar.html' import avatar %}
 
 {% block title %}SAFe Portfolio Kanban{% endblock %}
@@ -26,10 +26,9 @@
     ) }}
 
     {% if can_write %}
-    {% call modal_form(id='add-epic-modal', title='Add epic',
-                       description='The epic starts in the Funnel. Score each WSJF factor from 1 upwards.',
-                       submit_text='Add epic', size='md',
-                       form_action=url_for('safe_portfolio.add_epic'), form_method='POST') %}
+    {% call modal(id='add-epic-modal', title='Add epic',
+                  description='The epic starts in the Funnel. Score each WSJF factor from 1 upwards.') %}
+        <form method="post" action="{{ url_for('safe_portfolio.add_epic') }}">
         {{ input(name='csrf_token', type='hidden', value=csrf_token()) }}
         <div class="space-y-4">
             <div>
@@ -45,6 +44,11 @@
                 {% endfor %}
             </div>
         </div>
+        <div class="flex justify-end gap-2 mt-6">
+            {{ button(text='Cancel', variant='outline', attrs_dict={'data-modal-close': 'add-epic-modal'}) }}
+            {{ button(text='Add epic', type='submit', aria_label='Add epic') }}
+        </div>
+        </form>
     {% endcall %}
     {% endif %}
 

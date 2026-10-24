@@ -19,6 +19,7 @@ from app.services.element_profile_service import (
     set_wsjf_component,
     set_wsjf_components,
 )
+from app.services.archimate_backbone import create_backbone_element
 from app.services.wsjf_service import compute_wsjf_score
 from app.services.profiles.safe import KINDS
 
@@ -108,14 +109,13 @@ def add_epic():
         except ValueError:
             return 1
 
-    element = ArchiMateElement(
-        name=name[:255],
-        type="WorkPackage",
-        organization_id=org_id,
+    element = create_backbone_element(
+        element_type="WorkPackage",
+        layer="Implementation",
+        name=name,
         description=(request.form.get("description") or "").strip() or None,
+        organization_id=org_id,
     )
-    db.session.add(element)
-    db.session.flush()
     set_kind(element, "Epic", framework_id="safe", source="user")
     set_kind_property(element, "kanban_state", KANBAN_STATES[0], source="user")
     set_wsjf_components(
