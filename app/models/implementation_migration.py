@@ -418,6 +418,15 @@ class Deliverable(TenantMixin, db.Model):
         default=_default_org_id,
     )
 
+    # The TOGAF checklist item (adm_deliverables) this deliverable fulfils; the ADM
+    # board matches a solution's deliverables to the phase checklist through it.
+    adm_template_id = db.Column(
+        db.Integer,
+        db.ForeignKey("adm_deliverables.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+
     # 50 wide to match roadmap_deliverables.status, the store merged in (R1-B04 PR 2).
     delivery_status = db.Column(db.String(50), default="planned", index=True)
     deliverable_type = db.Column(db.String(50))
@@ -452,6 +461,7 @@ class Deliverable(TenantMixin, db.Model):
     )
     assigned_user = db.relationship("User", backref="assigned_migration_deliverables")
     goal = db.relationship("Goal", backref="migration_deliverables")
+    adm_template = db.relationship("ADMDeliverable", foreign_keys=[adm_template_id])
 
     def to_dict(self) -> dict:
         """Convert to dictionary for API responses."""
