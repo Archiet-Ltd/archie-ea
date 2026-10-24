@@ -788,12 +788,20 @@ def _render_family_hub(family: str, path: str, fallback_title: str, extra_entrie
             if p.url not in seen:
                 seen.add(p.url)
                 listed.append(p)
+    role_catalogue = None
+    if family == "role":
+        # Every role in the Roles menu has a place here: a role with a page
+        # links to it, the rest are listed so the menu never lands on a blank.
+        from app.services.site_registry import site_registry
+
+        role_catalogue = site_registry()["roles"]
     return render_template(
         "public/hub_index.html",
         title=title,
         canonical_url=f"https://entelim.org{path}",
         description=description,
         intro_html=intro.body_html if live_intro else None,
+        role_catalogue=role_catalogue,
         groups=groups,
         extra_groups=extra_groups,
         show_descriptions=True,
@@ -819,9 +827,11 @@ def public_role(slug):
     from app.services.public_pages import (
         MERGED_PAGES,
         build_jsonld,
+        build_landing,
         get_page_screenshot,
         load_page,
         role_siblings,
+        get_role_more_screens,
     )
 
     merge_target = MERGED_PAGES.get(f"/roles/{slug}")
@@ -835,6 +845,8 @@ def public_role(slug):
     return render_template(
         "public/page.html", page=page, jsonld=build_jsonld(page),
         screenshot=get_page_screenshot(page), siblings=role_siblings(page),
+        more_screens=get_role_more_screens(page),
+        landing=build_landing(page),
     )
 
 
