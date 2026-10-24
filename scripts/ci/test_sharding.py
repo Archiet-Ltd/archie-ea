@@ -27,6 +27,13 @@ module- or class-scoped state with another test in its own file is never
 split across two database sessions. It does not protect against state
 shared ACROSS files; ci.yml records what was checked for that.
 
+The one exception is a file named in CI_SHARD_SPLIT_FILES: it is placed one
+test function at a time (every parametrisation of a function stays together),
+because a single file heavier than a whole shard's share cannot be balanced
+otherwise. Each shard then builds that file's module-scoped fixtures for
+itself, so name only a file whose functions do not depend on one another's
+side effects.
+
 Controlled by environment variables, read once at collection time:
 
     CI_SHARD_TOTAL       total number of shards (absent, "0" or "1": no-op --
@@ -36,6 +43,8 @@ Controlled by environment variables, read once at collection time:
     CI_SHARD_DURATIONS   optional path of the duration table (default:
                          tests/shard_durations.json next to this repository's
                          scripts/ directory)
+    CI_SHARD_SPLIT_FILES optional comma-separated test files placed one test
+                         function at a time instead of as a whole file
 
     CI_SHARD_INDEX=0 CI_SHARD_TOTAL=8 pytest --collect-only -q \\
         -p scripts.ci.test_sharding --ignore=tests/smoke
@@ -61,9 +70,30 @@ _FALLBACK_SECONDS_PER_TEST = 1.0
 # 39647761444, 39648269461, 39651713459, 39651981883.
 SHARD_0_CONNECTOR_HEAD_START_SECONDS = 246
 
+# The head start never exceeds this fraction of one shard's even share of the
+# work. A fixed 246 seconds is a small lead against the backend suite but was
+# more than a whole shard's share of a smaller suite, and shard 0 then
+# received no file at all and failed with "0 selected".
+SHARD_0_HEAD_START_MAX_FRACTION = 0.5
+
 
 def _file_of(item) -> str:
     return item.nodeid.split("::", 1)[0]
+
+
+def split_files() -> frozenset[str]:
+    """Files placed one test function at a time (CI_SHARD_SPLIT_FILES)."""
+    raw = os.environ.get("CI_SHARD_SPLIT_FILES", "")
+    return frozenset(part.strip() for part in raw.split(",") if part.strip())
+
+
+def _unit_of(item, split: frozenset[str]) -> str:
+    """The unit the planner places: the file, or for a split file the test
+    function (its node id without the parametrisation)."""
+    path = _file_of(item)
+    if path in split:
+        return item.nodeid.split("[", 1)[0]
+    return path
 
 
 def load_table(path=None) -> dict:
@@ -91,12 +121,13 @@ def default_seconds_per_test(table: dict) -> float:
 
 def file_weights(file_counts: dict[str, int], table: dict) -> dict[str, int]:
     """Weight (milliseconds) of each collected file: recorded seconds per test
-    times today's test count, or the table's median rate for an unknown file."""
+    times today's test count, or the table's median rate for an unknown file.
+    A test function of a split file ("path::name") takes its file's rate."""
     fallback = default_seconds_per_test(table)
     known = table.get("files", {})
     weights: dict[str, int] = {}
     for path, count in file_counts.items():
-        entry = known.get(path)
+        entry = known.get(path.split("::", 1)[0])
         if isinstance(entry, dict) and entry.get("tests") and entry.get("seconds") is not None:
             rate = entry["seconds"] / entry["tests"]
         else:
@@ -105,34 +136,37 @@ def file_weights(file_counts: dict[str, int], table: dict) -> dict[str, int]:
     return weights
 
 
+def head_start_ms(weights: dict[str, int], total: int) -> int:
+    """Shard 0's head start, capped at a fraction of one shard's even share."""
+    even_share = sum(weights.values()) / total
+    return min(SHARD_0_CONNECTOR_HEAD_START_SECONDS * 1000, int(even_share * SHARD_0_HEAD_START_MAX_FRACTION))
+
+
 def _bin_pack(weights: dict[str, int], total: int) -> dict[str, int]:
     """Greedy longest-processing-time-first assignment, file -> shard index.
 
-    Shard 0 starts with a fixed head start (ms) so the bin-packer assigns it
-    less ordinary work, compensating for the assistant-connector (MCP) step
-    that shard 0 runs but the balancing does not count.
+    Shard 0 starts with a head start (ms) so the bin-packer assigns it less
+    ordinary work, compensating for the assistant-connector (MCP) step that
+    shard 0 runs but the balancing does not count.
+
+    No shard is ever left empty while there are at least as many files as
+    shards: once the files still to place are only just enough to give each
+    empty shard one, every remaining file goes to an empty shard. An empty
+    shard selects no test and pytest fails it with exit code 5.
     """
     ordered = sorted(weights.items(), key=lambda pair: (-pair[1], pair[0]))
     loads = [0] * total
-    # The head start can never exceed its share of the real work: when the
-    # duration table underestimates the suite, a fixed 246 s would leave shard 0
-    # with nothing to run (exit code 5) and pile everything onto the others.
-    total_weight = sum(weights.values())
-    head_start = min(SHARD_0_CONNECTOR_HEAD_START_SECONDS * 1000, total_weight // (total * 2))
-    loads[0] = head_start
+    loads[0] = head_start_ms(weights, total)
+    used = [False] * total
     assignment: dict[str, int] = {}
-    for path, weight in ordered:
-        shard = min(range(total), key=lambda i: (loads[i], i))
+    for position, (path, weight) in enumerate(ordered):
+        remaining = len(ordered) - position
+        empty = [i for i in range(total) if not used[i]]
+        candidates = empty if remaining <= len(empty) else range(total)
+        shard = min(candidates, key=lambda i: (loads[i], i))
         assignment[path] = shard
         loads[shard] += weight
-    # Every shard runs something: hand the lightest file of the fullest shard to any
-    # shard that ended up empty, so no job exits with "no tests collected".
-    for empty in [i for i in range(total) if not any(s == i for s in assignment.values())]:
-        fullest = max(range(total), key=lambda i: loads[i])
-        donor = min((p for p, s in assignment.items() if s == fullest), key=lambda p: weights[p])
-        assignment[donor] = empty
-        loads[fullest] -= weights[donor]
-        loads[empty] += weights[donor]
+        used[shard] = True
     return assignment
 
 
@@ -154,15 +188,16 @@ def pytest_collection_modifyitems(config, items):  # noqa: ARG001 - pytest hook
     if not (0 <= index < total):
         raise ValueError(f"CI_SHARD_INDEX={index} out of range for CI_SHARD_TOTAL={total}")
 
-    file_counts: dict[str, int] = defaultdict(int)
+    split = split_files()
+    unit_counts: dict[str, int] = defaultdict(int)
     for item in items:
-        file_counts[_file_of(item)] += 1
-    assignment, _loads = plan(dict(file_counts), total)
+        unit_counts[_unit_of(item, split)] += 1
+    assignment, _loads = plan(dict(unit_counts), total)
 
     kept = []
     deselected = []
     for item in items:
-        if assignment[_file_of(item)] == index:
+        if assignment[_unit_of(item, split)] == index:
             kept.append(item)
         else:
             deselected.append(item)

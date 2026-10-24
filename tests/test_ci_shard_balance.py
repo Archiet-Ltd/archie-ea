@@ -269,12 +269,102 @@ def test_the_balance_check_never_fails_the_job(tmp_path, capsys):
     assert "::warning::" in capsys.readouterr().out
 
 
-def test_no_shard_is_left_empty_when_the_head_start_exceeds_the_predicted_work():
-    # A table that underestimates the suite made the fixed 246 s head start larger than all
-    # the predicted work, so shard 0 collected nothing and exited with code 5 (23 Oct 2026).
-    table = {"default_seconds_per_test": 0.3, "files": {}}
-    counts = {f"tests/smoke/test_{i}.py": 5 for i in range(40)}
+def _assert_no_empty_shard(assignment, total):
+    homes = set(assignment.values())
+    empty = [i for i in range(total) if i not in homes]
+    assert not empty, f"shard(s) {empty} would select no test and fail with exit code 5"
+
+
+def test_a_smaller_suite_than_the_head_start_still_fills_shard_zero():
+    """The browser suite runs in three shards against a table that does not
+    know its files, so every file weighs the table's default rate. A fixed
+    246-second head start was more than shard 0's whole share and left it with
+    no file at all ("1487 deselected, 0 selected")."""
+    table = {"default_seconds_per_test": 0.317, "files": {}}
+    counts = {f"tests/smoke/test_journey_{n:03d}.py": 10 + n % 7 for n in range(110)}
     assignment, loads = sharding.plan(counts, 3, table)
-    assert set(assignment.values()) == {0, 1, 2}
-    assert all(load > 0 for load in loads)
-    assert max(loads) <= 2 * min(loads)
+    _assert_no_empty_shard(assignment, 3)
+    assert max(loads) <= (sum(loads) / 3) * 1.3, [round(ms / 60000, 1) for ms in loads]
+
+
+def test_one_file_heavier_than_all_others_together_still_leaves_no_shard_empty():
+    table = {"default_seconds_per_test": 1.0, "files": {}}
+    counts = {"tests/test_huge.py": 2000, "tests/test_small_a.py": 1, "tests/test_small_b.py": 1}
+    assignment, _loads = sharding.plan(counts, 3, table)
+    _assert_no_empty_shard(assignment, 3)
+
+
+@pytest.mark.parametrize("total", [2, 3, 5, 8])
+def test_no_shard_is_empty_whenever_there_are_enough_files(total):
+    table = {"default_seconds_per_test": 0.2, "files": {}}
+    counts = {f"tests/test_f{n}.py": (n * 37) % 11 + 1 for n in range(total)}
+    assignment, _loads = sharding.plan(counts, total, table)
+    _assert_no_empty_shard(assignment, total)
+
+
+def test_the_head_start_is_capped_at_a_fraction_of_one_even_share():
+    weights = {"tests/test_a.py": 60_000, "tests/test_b.py": 60_000, "tests/test_c.py": 60_000}
+    assert sharding.head_start_ms(weights, 3) == 30_000
+    big = {f"tests/test_{n}.py": 600_000 for n in range(30)}
+    assert sharding.head_start_ms(big, 8) == sharding.SHARD_0_CONNECTOR_HEAD_START_SECONDS * 1000
+
+
+def test_the_updater_builds_the_browser_table_from_the_main_browser_shard_files(tmp_path):
+    junit_dir = tmp_path / "run"
+    junit_dir.mkdir()
+    journey = "tests.smoke.test_archetype_journeys"
+    _junit(junit_dir / "chromium-main-0.xml", [(journey, "t1", 12.5), (journey, "t2", 7.5)])
+    _junit(junit_dir / "backend-tests-0.xml", [("tests.test_ci_shard_balance", "t", 99)])
+    out = tmp_path / "browser.json"
+    assert updater.main(["--suite", "browser", "--junit-dir", str(junit_dir), "--output", str(out)]) == 0
+    table = json.loads(out.read_text(encoding="utf-8"))
+    assert table["files"] == {"tests/smoke/test_archetype_journeys.py": {"seconds": 20.0, "tests": 2}}
+    assert "browser" in table["comment"]
+
+
+def _matrix_nodeids():
+    """One heavy file of many parametrised functions beside ordinary files."""
+    heavy = "tests/smoke/test_heavy_matrix.py"
+    nodeids = [f"{heavy}::test_route_{f}[{role}]" for f in range(12) for role in ("cto", "pm", "ea", "sa")]
+    nodeids += [f"tests/smoke/test_light_{n}.py::test_x" for n in range(4)]
+    return heavy, nodeids
+
+
+def test_a_named_heavy_file_is_placed_one_test_function_at_a_time(monkeypatch):
+    heavy, nodeids = _matrix_nodeids()
+    table = {"default_seconds_per_test": 5.0, "files": {}}
+    path = Path(os.environ.get("TMPDIR", "/tmp")) / f"shard-table-{os.getpid()}.json"
+    path.write_text(json.dumps(table), encoding="utf-8")
+    monkeypatch.setenv("CI_SHARD_SPLIT_FILES", f"{heavy}, tests/smoke/not_collected.py")
+    try:
+        homes_by_function, seen, sizes = {}, [], []
+        for index in range(3):
+            kept, _ = _run_hook(monkeypatch, nodeids, index, total=3, table_path=path)
+            sizes.append(len(kept))
+            seen += kept
+            for nodeid in kept:
+                if nodeid.startswith(heavy):
+                    homes_by_function.setdefault(nodeid.split("[")[0], set()).add(index)
+    finally:
+        path.unlink()
+    assert sorted(seen) == sorted(nodeids) and len(seen) == len(set(seen))
+    assert all(len(shards) == 1 for shards in homes_by_function.values()), "a function's parametrisations were split"
+    assert len({next(iter(s)) for s in homes_by_function.values()}) == 3, "the heavy file stayed in one shard"
+    assert max(sizes) <= len(nodeids) // 2, sizes
+
+
+def test_an_unnamed_heavy_file_still_stays_in_one_shard(monkeypatch):
+    heavy, nodeids = _matrix_nodeids()
+    monkeypatch.delenv("CI_SHARD_SPLIT_FILES", raising=False)
+    homes = set()
+    for index in range(3):
+        kept, _ = _run_hook(monkeypatch, nodeids, index, total=3)
+        if any(n.startswith(heavy) for n in kept):
+            homes.add(index)
+    assert len(homes) == 1
+
+
+def test_a_split_function_takes_its_files_recorded_rate():
+    table = {"default_seconds_per_test": 0.5, "files": {"tests/smoke/test_m.py": {"seconds": 40.0, "tests": 10}}}
+    weights = sharding.file_weights({"tests/smoke/test_m.py::test_a": 3}, table)
+    assert weights["tests/smoke/test_m.py::test_a"] == 12000

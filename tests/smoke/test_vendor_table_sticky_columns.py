@@ -23,11 +23,44 @@ that the sticky cell's background is fully opaque (alpha 1) and its z-index
 places it above the cells it covers, so the covered content is truly hidden
 rather than showing through -- that's what this test checks.
 """
+import uuid
+
 import pytest
 
 from .conftest import PAGE_TIMEOUT, PASSWORD
 
 pytestmark = [pytest.mark.smoke, pytest.mark.journey]
+
+
+@pytest.fixture(scope="module")
+def catalogue_vendors(live_server):
+    """Vendors in the shared catalogue, each with a product, so the table has
+    rows to widen it. Without them the catalogue shows its empty state, which
+    fits a 700px window, and these tests passed only when an earlier test in
+    the same run had happened to add vendors."""
+    from app import create_app, db
+    from app.models.vendor.vendor_organization import VendorOrganization, VendorProduct
+
+    suffix = uuid.uuid4().hex[:6]
+    app = create_app("testing")
+    with app.app_context():
+        vendors = []
+        for name, vendor_type, product in (
+            ("Northwind Enterprise Platforms", "software_vendor", "Northwind Customer Engagement Suite"),
+            ("Contoso Cloud Infrastructure", "cloud_provider", "Contoso Managed Kubernetes Service"),
+            ("Fabrikam Integration Services", "software_vendor", "Fabrikam Event Streaming Gateway"),
+        ):
+            vendor = VendorOrganization(name="%s %s" % (name, suffix), vendor_type=vendor_type)
+            db.session.add(vendor)
+            db.session.flush()
+            db.session.add(VendorProduct(vendor_organization_id=vendor.id, name="%s %s" % (product, suffix)))
+            vendors.append(vendor.id)
+        db.session.commit()
+    yield vendors
+    with app.app_context():
+        VendorProduct.query.filter(VendorProduct.vendor_organization_id.in_(vendors)).delete(synchronize_session=False)
+        VendorOrganization.query.filter(VendorOrganization.id.in_(vendors)).delete(synchronize_session=False)
+        db.session.commit()
 
 
 def _login(page, base, email):
@@ -67,7 +100,7 @@ def _sticky_cell_opacity(page):
     """)
 
 
-def test_vendor_catalogue_sticky_header_cells_are_opaque(browser, live_server, seeded):
+def test_vendor_catalogue_sticky_header_cells_are_opaque(browser, live_server, seeded, catalogue_vendors):
     page = browser.new_page(viewport={"width": 700, "height": 900})
     try:
         _login(page, live_server, seeded["emails"]["platform_admin"])
@@ -95,7 +128,7 @@ def test_vendor_catalogue_sticky_header_cells_are_opaque(browser, live_server, s
         page.close()
 
 
-def test_vendor_catalogue_scroll_fade_signals_more_columns(browser, live_server, seeded):
+def test_vendor_catalogue_scroll_fade_signals_more_columns(browser, live_server, seeded, catalogue_vendors):
     """A user on a narrow/docked window whose table columns overflow the
     visible area must see SOME indication that scrolling right reveals more
     -- reported 17 Sep 2026 as a real customer-facing defect: content ran off
