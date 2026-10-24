@@ -148,7 +148,8 @@ MAIN: tuple = (
        aliases=("Risks", "Risk register", "Controls", "Decisions", "Evidence", "Audit", "Policies",
                 "Governance", "Standards"),
        owns=("risk.", "arch_decisions.", "policy_monitoring.", "gdpr_bp.", "admin.audit_log_viewer",
-             "application_mgmt.compliance_frameworks_dashboard", "intelligence_ui.history_as_of_page"),
+             "application_mgmt.compliance_frameworks_dashboard", "intelligence_ui.history_as_of_page",
+             "intelligence_ui.history_changes_page"),
        note="Lands on the risk register, the canonical page for this job today; the compliance "
             "dashboard is held back until its views carry data."),
 )
@@ -252,6 +253,11 @@ PAGES: tuple = (
        aliases=("Data model", "Data lineage")),
     _l("duplicates", "Duplicates", "unified_duplicate.simple_dashboard", job="1",
        aliases=("Duplicate detection", "Dedupe")),
+    _l("history_changes", "Model changes", "intelligence_ui.history_changes_page", job="5",
+       aliases=("Changes between dates", "What changed", "Change history", "Audit trail",
+                "Who changed what", "History")),
+    _l("history_as_of", "Model as of", "intelligence_ui.history_as_of_page", job="5",
+       aliases=("Model as of a date", "Point in time", "As of")),
     _l("traceability", "Traceability", "architect_ui.traceability_matrix", job="2",
        aliases=("Traceability matrix", "Trace", "Requirements traceability")),
     _l("value_streams_at_risk", "Value streams at risk", "intelligence_ui.value_streams_at_risk", job="2",

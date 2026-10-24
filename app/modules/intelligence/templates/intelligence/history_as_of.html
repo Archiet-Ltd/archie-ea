@@ -12,6 +12,7 @@
 
 {% block content %}
 {% set home_url = url_for('dashboard.overview') if 'dashboard.overview' in flask.current_app.view_functions else none %}
+{% set composer_url = url_for('archimate.composer_page') if 'archimate.composer_page' in flask.current_app.view_functions else none %}
 {% set day = as_of_date.strftime('%Y-%m-%d') %}
 <div class="p-6 space-y-6 mx-auto max-w-7xl">
     {{ page_shell(
@@ -42,17 +43,17 @@
         {% call table() %}
             {% call table_header() %}{% call table_row() %}
                 {% call table_head() %}Element{% endcall %}
-                {% call table_head() %}Type{% endcall %}
-                {% call table_head() %}Layer{% endcall %}
-                {% call table_head() %}Last changed{% endcall %}
+                {% call table_head(class='hidden sm:table-cell') %}Type{% endcall %}
+                {% call table_head(class='hidden sm:table-cell') %}Layer{% endcall %}
+                {% call table_head(class='hidden sm:table-cell') %}Last changed{% endcall %}
             {% endcall %}{% endcall %}
             {% call table_body() %}
             {% for e in elements %}
                 {% call table_row(attrs_dict={'data-testid': 'element-row'}) %}
-                    {% call table_cell(class='font-medium') %}{{ e.name or '—' }}{% endcall %}
-                    {% call table_cell() %}{% call badge('outline') %}{{ e.type or '—' }}{% endcall %}{% endcall %}
-                    {% call table_cell() %}{{ e.layer or '—' }}{% endcall %}
-                    {% call table_cell(class='whitespace-nowrap text-muted-foreground') %}{{ e.recorded_at.strftime('%d %b %Y %H:%M') if e.recorded_at else '—' }}{% endcall %}
+                    {% call table_cell(class='font-medium') %}{{ e.name or '—' }}<div class="mt-1 text-xs font-normal text-muted-foreground sm:hidden">{{ e.type or '—' }}{% if e.layer %} · {{ e.layer }}{% endif %}</div>{% endcall %}
+                    {% call table_cell(class='hidden sm:table-cell') %}{% call badge('outline') %}{{ e.type or '—' }}{% endcall %}{% endcall %}
+                    {% call table_cell(class='hidden sm:table-cell') %}{{ e.layer or '—' }}{% endcall %}
+                    {% call table_cell(class='hidden sm:table-cell whitespace-nowrap text-muted-foreground') %}{{ e.recorded_at.strftime('%d %b %Y %H:%M') if e.recorded_at else '—' }}{% endcall %}
                 {% endcall %}
             {% endfor %}
             {% endcall %}
@@ -93,7 +94,7 @@
     {% endcall %}
     {% else %}
     {% call card() %}{% call card_content(class='pt-6') %}
-        {{ empty_state(icon='clock', title='The model was empty on this date', description='No element or relationship existed on ' ~ as_of_date.strftime('%d %b %Y') ~ '. Pick a later date to see the model take shape.', cta_text='Show the model today', cta_href=url_for('intelligence_ui.history_as_of_page'), cta_icon='clock') }}
+        {{ empty_state(icon='clock', title='The model was empty on this date', description='No element or relationship existed on ' ~ as_of_date.strftime('%d %b %Y') ~ '. Pick a later date, or add elements on the composer.', cta_text='Open the composer', cta_href=composer_url, cta_icon='pen-tool') }}
     {% endcall %}{% endcall %}
     {% endif %}
 </div>

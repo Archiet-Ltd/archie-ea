@@ -13,6 +13,7 @@
 {% block title %}Changes{% endblock %}
 
 {% block content %}
+{% set composer_url = url_for('archimate.composer_page') if 'archimate.composer_page' in flask.current_app.view_functions else none %}
 {% set home_url = url_for('dashboard.overview') if 'dashboard.overview' in flask.current_app.view_functions else none %}
 <div class="p-6 space-y-6 mx-auto max-w-7xl">
     {{ page_shell(
@@ -44,7 +45,7 @@
 
     {% if chain %}
         {% if chain.status == 'intact' %}
-            {{ alert('success', text='The record is intact: ' ~ chain.checked ~ ' entries checked, none altered or removed.') }}
+            {{ alert('success', text='Intact: ' ~ chain.checked ~ ' entries checked, none altered.') }}
         {% elif chain.status == 'broken' %}
             {{ alert('danger', title='The record has been altered', text=chain.reason) }}
         {% else %}
@@ -57,45 +58,68 @@
         <p class="text-sm text-muted-foreground" data-testid="changes-count">
             {{ total_changes }} change{{ '' if total_changes == 1 else 's' }}, newest first{% if total_changes > shown_limit %}. Showing the latest {{ shown_limit }}; narrow the dates to see the rest{% endif %}.
         </p>
+        <div class="hidden sm:block">
         {% call table() %}
             {% call table_header() %}{% call table_row() %}
-                {% call table_head() %}When{% endcall %}
                 {% call table_head() %}What changed{% endcall %}
                 {% call table_head() %}Before and after{% endcall %}
-                {% call table_head() %}Who{% endcall %}
-                {% call table_head() %}Source{% endcall %}
+                {% call table_head() %}When, who and source{% endcall %}
             {% endcall %}{% endcall %}
             {% call table_body() %}
             {% for row in rows %}
                 {% call table_row(attrs_dict={'data-testid': 'change-row'}) %}
-                    {% call table_cell(class='whitespace-nowrap text-muted-foreground') %}{{ row.when.strftime('%d %b %Y %H:%M') if row.when else '—' }}{% endcall %}
-                    {% call table_cell() %}
+                    {% call table_cell(class='align-top') %}
                         <div class="font-medium text-foreground">{{ row.what }}</div>
                         <div class="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                             {% call badge(row.variant) %}{{ row.action }}{% endcall %}
                             <span>{{ row.kind }}</span>
                         </div>
                     {% endcall %}
-                    {% call table_cell() %}
+                    {% call table_cell(class='align-top') %}
                         {% for f in row.fields %}
-                        <div class="text-sm"><span class="text-muted-foreground">{{ f.field }}:</span> {{ f.before }} <span class="text-muted-foreground">→</span> {{ f.after }}</div>
+                        <div class="break-words text-sm"><span class="text-muted-foreground">{{ f.field }}:</span> {% if f.before is not none and f.after is not none %}{{ f.before }} <span class="text-muted-foreground">→</span> {{ f.after }}{% else %}{{ f.after if f.after is not none else f.before }}{% endif %}</div>
                         {% endfor %}
                         {% if row.more_fields %}<div class="text-xs text-muted-foreground">and {{ row.more_fields }} more field{{ '' if row.more_fields == 1 else 's' }}</div>{% endif %}
                         {% if not row.fields %}<span class="text-muted-foreground">No field values were recorded for this change.</span>{% endif %}
                     {% endcall %}
-                    {% call table_cell(class='whitespace-nowrap') %}{{ row.who }}{% endcall %}
-                    {% call table_cell(class='whitespace-nowrap') %}{% call badge('outline') %}{{ row.source }}{% endcall %}{% endcall %}
+                    {% call table_cell(class='align-top') %}
+                        <div class="whitespace-nowrap text-sm">{{ row.when.strftime('%d %b %Y %H:%M') if row.when else '—' }}</div>
+                        <div class="break-all text-xs text-muted-foreground">{{ row.who }}</div>
+                        <div class="mt-1">{% call badge('outline') %}{{ row.source }}{% endcall %}</div>
+                    {% endcall %}
                 {% endcall %}
             {% endfor %}
             {% endcall %}
         {% endcall %}
+        </div>
+        <div class="space-y-3 sm:hidden">
+            {% for row in rows %}
+            {% call card() %}{% call card_content(class='p-4 space-y-2') %}
+                <div data-testid="change-card">
+                    <div class="break-words font-medium text-foreground">{{ row.what }}</div>
+                    <div class="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                        {% call badge(row.variant) %}{{ row.action }}{% endcall %}
+                        <span>{{ row.kind }}</span>
+                        {% call badge('outline') %}{{ row.source }}{% endcall %}
+                    </div>
+                    <div class="mt-2 space-y-1">
+                        {% for f in row.fields %}
+                        <div class="break-words text-sm"><span class="text-muted-foreground">{{ f.field }}:</span> {% if f.before is not none and f.after is not none %}{{ f.before }} <span class="text-muted-foreground">→</span> {{ f.after }}{% else %}{{ f.after if f.after is not none else f.before }}{% endif %}</div>
+                        {% endfor %}
+                        {% if row.more_fields %}<div class="text-xs text-muted-foreground">and {{ row.more_fields }} more field{{ '' if row.more_fields == 1 else 's' }}</div>{% endif %}
+                    </div>
+                    <div class="mt-2 break-all text-xs text-muted-foreground">{{ row.when.strftime('%d %b %Y %H:%M') if row.when else '—' }} · {{ row.who }}</div>
+                </div>
+            {% endcall %}{% endcall %}
+            {% endfor %}
+        </div>
     {% endcall %}{% endcall %}
     {% else %}
     {% call card() %}{% call card_content(class='pt-6') %}
         {% if recorded_total and source %}
             {{ empty_state(icon='history', title='No changes from this source in these dates', description='This period holds ' ~ recorded_total ~ ' recorded change' ~ ('' if recorded_total == 1 else 's') ~ ' from other sources. Choose every source to see them.', cta_text='Show every source', cta_href=url_for('intelligence_ui.history_changes_page', **{'from': from_date.strftime('%Y-%m-%d'), 'to': to_date.strftime('%Y-%m-%d')}), cta_icon='filter-x') }}
         {% else %}
-            {{ empty_state(icon='history', title='No changes recorded between these dates', description='Edits to elements, relationships, application owners, costs and capabilities, and every import, connector sync and accepted AI proposal, are recorded from the moment they happen. Try a longer period.', cta_text='Show the last 12 months', cta_href=url_for('intelligence_ui.history_changes_page', **{'from': (to_date - (to_date - to_date.replace(year=to_date.year - 1))).strftime('%Y-%m-%d'), 'to': to_date.strftime('%Y-%m-%d')}), cta_icon='calendar') }}
+            {{ empty_state(icon='history', title='No changes recorded between these dates', description='Edits to elements, relationships, application owners, costs and capabilities, and every import, connector sync and accepted AI proposal, are recorded from the moment they happen. Widen the dates above, or make a change on the composer and it will appear here.', cta_text='Open the composer', cta_href=composer_url, cta_icon='pen-tool') }}
         {% endif %}
     {% endcall %}{% endcall %}
     {% endif %}

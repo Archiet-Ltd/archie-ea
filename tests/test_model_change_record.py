@@ -90,6 +90,26 @@ def test_element_create_update_delete_each_recorded_once_with_before_and_after(a
     assert len({created.extra_json["correlation_id"], updated.extra_json["correlation_id"]}) == 1
 
 
+def test_installing_the_audit_twice_still_records_each_change_once(app, db_session, make_org):
+    from app.middleware.audit_middleware import install_audit_logging
+
+    install_audit_logging(app)
+    install_audit_logging(app)
+    org = make_org("a")
+    element = _element(db_session, org.id, "Once")
+
+    assert len(_rows(db_session, org.id, "archimate_elements", element.id)) == 1
+
+
+def test_an_update_that_changes_nothing_a_person_made_is_not_recorded(app, db_session, make_org):
+    org = make_org("a")
+    element = _element(db_session, org.id, "Quiet")
+    element.description = ""
+    db_session.flush()
+
+    assert [r.action for r in _rows(db_session, org.id, "archimate_elements", element.id)] == ["create"]
+
+
 def test_relationship_create_is_recorded(app, db_session, make_org):
     from app.models.archimate_core import ArchiMateRelationship
 
@@ -102,6 +122,7 @@ def test_relationship_create_is_recorded(app, db_session, make_org):
     (row,) = _rows(db_session, org.id, "archimate_relationships", rel.id)
     assert row.action == "create"
     assert row.new_value["source_id"] == a.id and row.new_value["target_id"] == b.id
+    assert row.extra_json["label"] == "Serving: A to B"
 
 
 def test_owner_change_is_one_update_showing_the_old_and_new_owner(app, db_session, make_org):

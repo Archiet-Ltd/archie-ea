@@ -1920,58 +1920,58 @@
    "allowed_macros": [
     "components/accessibility_helpers.html",
     "components/alert.html",
-    "components/avatar.html",
     "components/badge.html",
     "components/breadcrumb.html",
     "components/breadcrumb_nav.html",
     "components/button.html",
-    "components/canvas_box.html",
     "components/card.html",
     "components/checkbox.html",
     "components/confirmation_dialog.html",
-    "components/data_card.html",
+    "components/data_table.html",
     "components/dense_table.html",
-    "components/detail_meta.html",
     "components/dialog.html",
     "components/dropdown_menu.html",
     "components/empty_state.html",
     "components/error_boundary.html",
+    "components/filter_bar.html",
+    "components/filter_panel.html",
     "components/form_field.html",
     "components/inline_hint.html",
     "components/input.html",
     "components/loading_state.html",
-    "components/metrics_card.html",
     "components/modal.html",
     "components/page_header.html",
-    "components/progress.html",
+    "components/pagination_controls.html",
     "components/provenance.html",
+    "components/search_bar.html",
     "components/select.html",
     "components/skeleton.html",
     "components/status_badge.html",
-    "components/status_indicator.html",
+    "components/table.html",
     "components/tabs.html",
-    "components/traceability_panel.html",
-    "macros/form_macros.html",
+    "components/workbench_table.html",
     "macros/page_shell.html"
    ],
    "basis": "rule",
-   "block": "record-detail",
+   "block": "data-table",
    "components": [
     "alert",
     "badge",
     "breadcrumb",
     "button",
+    "calendar",
     "card",
     "empty",
+    "field",
+    "input",
     "page-header",
     "page-shell",
     "provenance",
-    "spinner",
-    "tabs",
     "select",
-    "calendar",
+    "skeleton",
+    "spinner",
     "table",
-    "skeleton"
+    "tabs"
    ],
    "controls": {
     "button": 3,
@@ -1988,12 +1988,12 @@
    "persona": "enterprise_architect",
    "reference": {
     "shadcn": {
-     "name": "shadcn examples: mail (reading pane)",
-     "url": "https://ui.shadcn.com/examples/mail"
+     "name": "shadcn examples: tasks",
+     "url": "https://ui.shadcn.com/examples/tasks"
     },
     "basecoat": {
-     "name": "flask-basecoat examples: product detail",
-     "image": "docs/design/reference/basecoat-product-detail.webp"
+     "name": "flask-basecoat examples: tasks",
+     "image": "docs/design/reference/basecoat-tasks.webp"
     }
    },
    "spec": null,
@@ -2007,66 +2007,71 @@
     "page-shell:Replace"
    ],
    "original": "preview",
-   "page_type": "record-detail",
+   "page_type": "data-table",
    "reason": "The model as it stood on a date: a date form, then an elements table and a relationships table.",
    "tier": "B",
-   "type_changed": false
+   "type_changed": false,
+   "extra_macros": [
+    "components/card.html"
+   ],
+   "note": "A filter card above a results card; both use the library card macro."
   },
   "app/modules/intelligence/templates/intelligence/history_changes.html": {
    "allowed_macros": [
     "components/accessibility_helpers.html",
     "components/alert.html",
-    "components/avatar.html",
     "components/badge.html",
     "components/breadcrumb.html",
     "components/breadcrumb_nav.html",
     "components/button.html",
-    "components/canvas_box.html",
     "components/card.html",
     "components/checkbox.html",
     "components/confirmation_dialog.html",
-    "components/data_card.html",
+    "components/data_table.html",
     "components/dense_table.html",
-    "components/detail_meta.html",
     "components/dialog.html",
     "components/dropdown_menu.html",
     "components/empty_state.html",
     "components/error_boundary.html",
+    "components/filter_bar.html",
+    "components/filter_panel.html",
     "components/form_field.html",
     "components/inline_hint.html",
     "components/input.html",
     "components/loading_state.html",
-    "components/metrics_card.html",
     "components/modal.html",
     "components/page_header.html",
-    "components/progress.html",
+    "components/pagination_controls.html",
     "components/provenance.html",
+    "components/search_bar.html",
     "components/select.html",
     "components/skeleton.html",
     "components/status_badge.html",
-    "components/status_indicator.html",
+    "components/table.html",
     "components/tabs.html",
-    "components/traceability_panel.html",
-    "macros/form_macros.html",
+    "components/workbench_table.html",
     "macros/page_shell.html"
    ],
    "basis": "rule",
-   "block": "record-detail",
+   "block": "data-table",
    "components": [
     "alert",
     "badge",
     "breadcrumb",
     "button",
+    "calendar",
     "card",
     "empty",
+    "field",
+    "input",
     "page-header",
     "page-shell",
     "provenance",
+    "select",
+    "skeleton",
     "spinner",
-    "tabs",
-    "calendar",
     "table",
-    "skeleton"
+    "tabs"
    ],
    "controls": {
     "button": 3,
@@ -2083,12 +2088,12 @@
    "persona": "enterprise_architect",
    "reference": {
     "shadcn": {
-     "name": "shadcn examples: mail (reading pane)",
-     "url": "https://ui.shadcn.com/examples/mail"
+     "name": "shadcn examples: tasks",
+     "url": "https://ui.shadcn.com/examples/tasks"
     },
     "basecoat": {
-     "name": "flask-basecoat examples: product detail",
-     "image": "docs/design/reference/basecoat-product-detail.webp"
+     "name": "flask-basecoat examples: tasks",
+     "image": "docs/design/reference/basecoat-tasks.webp"
     }
    },
    "spec": null,
@@ -2102,10 +2107,14 @@
     "page-shell:Replace"
    ],
    "original": "preview",
-   "page_type": "record-detail",
+   "page_type": "data-table",
    "reason": "What changed between two dates: a date form and a change list.",
    "tier": "B",
-   "type_changed": false
+   "type_changed": false,
+   "extra_macros": [
+    "components/card.html"
+   ],
+   "note": "A filter card above a results card; both use the library card macro."
   },
   "app/modules/intelligence/templates/intelligence/traceability.html": {
    "allowed_macros": [

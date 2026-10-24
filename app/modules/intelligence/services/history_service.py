@@ -293,14 +293,21 @@ SOURCE_OPTIONS = [("", "Every source")] + list(SOURCE_LABELS.items())
 
 _ACTION_LABELS = {"insert": "Created", "update": "Updated", "delete": "Deleted"}
 _ACTION_VARIANTS = {"insert": "success", "update": "info", "delete": "danger"}
-_HIDDEN_FIELDS = frozenset(["id", "organization_id", "created_at", "recorded_at", "valid_from", "valid_to"])
-_FIELDS_SHOWN = 6
+_HIDDEN_FIELDS = frozenset(["id", "organization_id", "lock_version", "source_id", "target_id", "architecture_id"])
+
+
+def _hidden(name: str) -> bool:
+    return name in _HIDDEN_FIELDS or name.endswith("_at")
+_FIELDS_SHOWN = 4
 
 
 def _plain(value: Any) -> str:
     if value is None or value == "":
         return "—"
-    return str(value)
+    text = str(value)
+    if text.endswith(".0") and text[:-2].lstrip("-").isdigit():
+        return text[:-2]
+    return text
 
 
 _PERSON_FIELDS = frozenset(["user_id", "assigned_by"])
@@ -310,7 +317,7 @@ def field_changes(change: ChangeEntry, people: dict[int, str] | None = None) -> 
     """The fields one change touched: what they held before and what they hold after."""
     before = change.previous_snapshot or {}
     after = change.snapshot or {}
-    names = [k for k in dict.fromkeys([*before, *after]) if k not in _HIDDEN_FIELDS]
+    names = [k for k in dict.fromkeys([*before, *after]) if not _hidden(k)]
     fields = []
     for name in names:
         old, new = before.get(name), after.get(name)
@@ -322,8 +329,9 @@ def field_changes(change: ChangeEntry, people: dict[int, str] | None = None) -> 
             continue
         fields.append({
             "field": {"user_id": "Owner", "assigned_by": "Assigned by"}.get(name, name.replace("_", " ").capitalize()),
-            "before": _plain(old) if change.action != "insert" else "—",
-            "after": _plain(new) if change.action != "delete" else "—",
+            # A created record has no "before" and a deleted one no "after".
+            "before": None if change.action == "insert" else _plain(old),
+            "after": None if change.action == "delete" else _plain(new),
         })
     return fields
 

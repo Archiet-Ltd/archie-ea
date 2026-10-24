@@ -86,6 +86,30 @@ def _json_safe(value):
     return str(value)
 
 
+def _label_of(connection, target):
+    """What a person calls the changed record: its name, or for a relationship its two ends."""
+    if target is None:
+        return None
+    for attr in ("name", "title"):
+        label = getattr(target, attr, None)
+        if label:
+            return label
+    source_id = getattr(target, "source_id", None)
+    target_id = getattr(target, "target_id", None)
+    if source_id is not None and target_id is not None and hasattr(target, "type"):
+        from sqlalchemy import text
+
+        names = dict(connection.execute(
+            text("SELECT id, name FROM archimate_elements WHERE id IN (:a, :b)"),  # tenancy-ok: names of the two ends of the row being audited, read by their own keys
+            {"a": source_id, "b": target_id},
+        ).all())
+        return "%s: %s to %s" % (
+            target.type, names.get(source_id, "element %s" % source_id),
+            names.get(target_id, "element %s" % target_id),
+        )
+    return None
+
+
 def _write_audit(connection, action, table_label, record_id, old_value=None, new_value=None, target=None):
     """Insert one audit row using the flush's own connection.
 
@@ -107,11 +131,7 @@ def _write_audit(connection, action, table_label, record_id, old_value=None, new
     owner_org = getattr(target, "organization_id", None) if target is not None else None
     if owner_org is not None:
         org_id = owner_org
-    label = None
-    for attr in ("name", "title"):
-        label = getattr(target, attr, None) if target is not None else None
-        if label:
-            break
+    label = _label_of(connection, target)
     # Sealed into the organisation's integrity chain like every other entry.
     chain_insert(
         connection,
@@ -140,6 +160,20 @@ def _column_snapshot(target):
             continue
         snap[attr.key] = _json_safe(getattr(target, attr.key, None))
     return snap
+
+
+_LISTENERS: dict = {}
+
+
+def _listeners_for(table_label: str):
+    """The three listeners for a table, made once so installing twice adds no second copy."""
+    if table_label not in _LISTENERS:
+        _LISTENERS[table_label] = (
+            _make_after_insert(table_label),
+            _make_after_update(table_label),
+            _make_after_delete(table_label),
+        )
+    return _LISTENERS[table_label]
 
 
 def _make_after_insert(table_label: str):
@@ -171,8 +205,12 @@ def _make_after_update(table_label: str):
                         continue
                     if key in _BOOKKEEPING_COLUMNS:
                         continue
-                    old_val[key] = _json_safe(hist.deleted[0] if hist.deleted else None)
-                    new_val[key] = _json_safe(hist.added[0] if hist.added else None)
+                    before = _json_safe(hist.deleted[0] if hist.deleted else None)
+                    after = _json_safe(hist.added[0] if hist.added else None)
+                    if before in (None, "") and after in (None, ""):
+                        continue  # empty to empty is not a change
+                    old_val[key] = before
+                    new_val[key] = after
 
             if not old_val and not new_val:
                 return  # nothing auditable changed
@@ -212,9 +250,10 @@ def install_audit_logging(app):
             module = importlib.import_module(module_path)
             model_cls = getattr(module, class_name)
 
-            event.listen(model_cls, "after_insert", _make_after_insert(table_label))
-            event.listen(model_cls, "after_update", _make_after_update(table_label))
-            event.listen(model_cls, "after_delete", _make_after_delete(table_label))
+            inserted, updated, deleted = _listeners_for(table_label)
+            for name, fn in (("after_insert", inserted), ("after_update", updated), ("after_delete", deleted)):
+                if not event.contains(model_cls, name, fn):
+                    event.listen(model_cls, name, fn)
 
             registered += 1
             logger.debug("audit_middleware: registered events for %s.%s", module_path, class_name)
