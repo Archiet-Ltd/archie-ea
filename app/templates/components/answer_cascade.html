@@ -32,7 +32,7 @@
 <section id="{{ id }}" class="cascade" data-cascade
          x-data="{ tip: null, selected: null, shared: false, saved: false,
                    continues(i, list) { var d = list[i].depth || 0; for (var j = i + 1; j < list.length; j++) { var dj = list[j].depth || 0; if (dj < d) { return false; } if (dj === d) { return true; } } return false; } }">
-    <p class="question-line mb-6 max-w-[640px]" x-text="{{ question }}"></p>
+    <p class="question-line mb-6 max-w-[640px] px-4" x-text="{{ question }}"></p>
     <ol class="relative space-y-2 py-6" role="list">
         {% if root %}
         {# Root node: the element the question was asked about. #}
@@ -59,7 +59,7 @@
                      class="absolute -left-5 -top-2 h-12 w-5 text-border" viewBox="0 0 20 48" fill="none" aria-hidden="true">
                     <path :d="'M1 0 V' + (continues(i, {{ rows }}) ? 48 : 28) + ' M1 28 H20'" stroke="currentColor" stroke-width="1" />
                 </svg>
-                <div class="flex {{ 'min-h-10 flex-wrap py-2' if rich else 'h-10' }} items-center gap-2 rounded-md border bg-card px-4 transition-colors hover:bg-muted/50"
+<div class="flex {{ 'min-h-10 flex-wrap py-2' if rich else 'h-10' }} items-center gap-2 rounded-md border bg-card px-4 transition-colors hover:bg-accent"
                      :class="selected && selected.key === node.key ? 'border-ring' : 'border-border'"
                      @click="selected = node">
                     <svg x-show="!node.derived" class="h-4 w-4 shrink-0 text-muted-foreground" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -102,17 +102,17 @@
     <div class="flex items-center justify-end gap-2" x-show="({{ rows }}).length" x-cloak>
         {% if save %}
         <button type="button"
-                class="inline-flex h-8 items-center rounded-md px-3 text-13 font-medium text-muted-foreground transition-colors hover:bg-muted/50 hover:text-info"
+                class="inline-flex h-8 items-center rounded-md px-3 text-[13px] font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-info"
                 @click="{{ save }}; saved = true; setTimeout(() => saved = false, 1500)"
                 x-text="saved ? 'Saved' : 'Save'">Save</button>
         {% endif %}
         <button type="button"
-                class="inline-flex h-8 items-center rounded-md px-3 text-13 font-medium text-muted-foreground transition-colors hover:bg-muted/50 hover:text-info"
+                class="inline-flex h-8 items-center rounded-md px-3 text-[13px] font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-info"
                 @click="navigator.clipboard && navigator.clipboard.writeText(location.href).then(() => { shared = true; setTimeout(() => shared = false, 1500) })"
                 x-text="shared ? 'Link copied' : 'Share'">Share</button>
         {% if ask %}
         <button type="button"
-                class="inline-flex h-8 items-center rounded-md px-3 text-13 font-medium text-muted-foreground transition-colors hover:bg-muted/50 hover:text-info"
+                class="inline-flex h-8 items-center rounded-md px-3 text-[13px] font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-info"
                 @click="(function (node) { if (node) { {{ ask }} } })(selected || ({{ rows }})[0])">What else depends on this</button>
         {% endif %}
     </div>

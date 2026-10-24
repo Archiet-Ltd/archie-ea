@@ -1,3 +1,4 @@
+{% from 'macros/shadcn_compat.html' import shadcn_select %}
 {% from 'components/modal_form.html' import modal_form %}
 
 {% call modal_form(
@@ -15,46 +16,42 @@
 <div class="space-y-4">
     <div>
         <label for="vp-select" class="block text-sm font-medium mb-1.5">Vendor Product <span class="text-destructive-emphasis">*</span></label>
-        <select id="vp-select" name="vendor_product_id" required
-                class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+{% call shadcn_select('vendor_product_id', bare=true, id='vp-select', class='h-9 w-full', attrs='required') %}
             <option value="">Select a vendor product...</option>
             {% for opt in vendor_form_config.all_products %}
             <option value="{{ opt.id }}">{{ opt.label }}</option>
             {% endfor %}
-        </select>
+        {% endcall %}
     </div>
 
     <div>
         <label for="vp-deployment" class="block text-sm font-medium mb-1.5">Deployment Type</label>
-        <select id="vp-deployment" name="deployment_type"
-                class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+{% call shadcn_select('deployment_type', bare=true, id='vp-deployment', class='h-9 w-full') %}
             <option value="">Select...</option>
             {% for val, label in vendor_form_config.deployment_types %}
             <option value="{{ val }}">{{ label }}</option>
             {% endfor %}
-        </select>
+        {% endcall %}
     </div>
 
     <div class="grid grid-cols-2 gap-4">
         <div>
             <label for="vp-criticality" class="block text-sm font-medium mb-1.5">Criticality</label>
-            <select id="vp-criticality" name="criticality"
-                    class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+{% call shadcn_select('criticality', bare=true, id='vp-criticality', class='h-9 w-full') %}
                 <option value="">Select...</option>
                 {% for val, label in vendor_form_config.criticalities %}
                 <option value="{{ val }}">{{ label }}</option>
                 {% endfor %}
-            </select>
+            {% endcall %}
         </div>
         <div>
             <label for="vp-hosting" class="block text-sm font-medium mb-1.5">Hosting Model</label>
-            <select id="vp-hosting" name="hosting_model"
-                    class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+{% call shadcn_select('hosting_model', bare=true, id='vp-hosting', class='h-9 w-full') %}
                 <option value="">Select...</option>
                 {% for val, label in vendor_form_config.hosting_models %}
                 <option value="{{ val }}">{{ label }}</option>
                 {% endfor %}
-            </select>
+            {% endcall %}
         </div>
     </div>
 </div>

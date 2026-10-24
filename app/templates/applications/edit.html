@@ -1,4 +1,5 @@
 {% extends "layouts/admin_base.html" %}
+{% from 'macros/shadcn_compat.html' import shadcn_select %}
 {% from 'components/form_field.html' import form_group, form_footer %}
 {% from 'macros/page_shell.html' import page_shell %}
 {% block title %}Edit — {{ application.name }}{% endblock %}
@@ -120,9 +121,8 @@
 
       <div class="grid grid-cols-1 gap-4">
         <div>
-          <label for="criticality" class="block text-sm font-medium text-muted-foreground mb-1">Business Criticality</label>
-          <select id="criticality" name="criticality"
-                  class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+<label for="criticality" class="block text-sm font-medium text-muted-foreground mb-1">Business Criticality</label>
+          {% call shadcn_select('criticality', bare=true, id='criticality', class='w-full') %}
             {% set current_crit = application.business_criticality %}
             {% set crit_options = ['Critical', 'High', 'Medium', 'Low'] %}
             {% set crit_matched = current_crit and (crit_options | map('lower') | list) | select('equalto', current_crit | lower) | list | length > 0 %}
@@ -134,7 +134,7 @@
             {# Preserve a stored value outside the standard vocabulary so a save never wipes it #}
             <option value="{{ current_crit }}" selected>{{ current_crit | capitalize }}</option>
             {% endif %}
-          </select>
+          {% endcall %}
         </div>
         {% call form_group(id='business_purpose', label='Business Purpose') %}
           <input type="text" id="business_purpose" name="business_purpose" value="{{ application.business_purpose or '' }}"
@@ -142,9 +142,8 @@
                  class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
         {% endcall %}
         <div>
-          <label for="deployment_status" class="block text-sm font-medium text-muted-foreground mb-1">Deployment Status</label>
-          <select id="deployment_status" name="deployment_status"
-                  class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+<label for="deployment_status" class="block text-sm font-medium text-muted-foreground mb-1">Deployment Status</label>
+          {% call shadcn_select('deployment_status', bare=true, id='deployment_status', class='w-full') %}
             <option value="" {% if not application.deployment_status %}selected{% endif %}>Not set</option>
             {% for val in ['production', 'development', 'testing', 'staging', 'retired'] %}
             <option value="{{ val }}" {% if application.deployment_status and application.deployment_status | lower == val | lower %}selected{% endif %}>{{ val | title }}</option>
@@ -152,7 +151,7 @@
             {% if application.deployment_status and application.deployment_status | lower not in ['production','development','testing','staging','retired'] %}
             <option value="{{ application.deployment_status }}" selected>{{ application.deployment_status | title }}</option>
             {% endif %}
-          </select>
+          {% endcall %}
         </div>
         {# F-09, Capgemini dry-run: Lifecycle Status is shown on the detail
            page, in the list filter and the Workbench facet — a genuinely
@@ -160,9 +159,8 @@
            edit form ever exposed it, so it could only be set in bulk via
            /api/bulk-lifecycle, never per-application. #}
         <div>
-          <label for="lifecycle_status" class="block text-sm font-medium text-muted-foreground mb-1">Lifecycle Status</label>
-          <select id="lifecycle_status" name="lifecycle_status"
-                  class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+<label for="lifecycle_status" class="block text-sm font-medium text-muted-foreground mb-1">Lifecycle Status</label>
+          {% call shadcn_select('lifecycle_status', bare=true, id='lifecycle_status', class='w-full') %}
             <option value="" {% if not application.lifecycle_status %}selected{% endif %}>Not set</option>
             {% for val in lifecycle_stage_choices %}
             <option value="{{ val }}" {% if application.lifecycle_status and application.lifecycle_status | lower == val | lower %}selected{% endif %}>{{ val | title }}</option>
@@ -170,7 +168,7 @@
             {% if application.lifecycle_status and application.lifecycle_status | lower not in lifecycle_stage_choices_lower %}
             <option value="{{ application.lifecycle_status }}" selected>{{ application.lifecycle_status | title }}</option>
             {% endif %}
-          </select>
+          {% endcall %}
         </div>
         {% call form_group(id='business_domain', label='Business Domain') %}
           <input type="text" id="business_domain" name="business_domain" value="{{ application.business_domain or '' }}"
@@ -187,14 +185,13 @@
            Matrix's plateau filters had nothing to find for ApplicationComponent
            rows as a direct result. #}
         <div>
-          <label for="architecture_state" class="block text-sm font-medium text-muted-foreground mb-1">Architecture state</label>
-          <select id="architecture_state" name="architecture_state"
-                  class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+<label for="architecture_state" class="block text-sm font-medium text-muted-foreground mb-1">Architecture state</label>
+          {% call shadcn_select('architecture_state', bare=true, id='architecture_state', class='w-full') %}
             <option value="" {% if not architecture_state %}selected{% endif %}>Unspecified</option>
             <option value="Baseline" {% if architecture_state == 'Baseline' %}selected{% endif %}>As-Is (baseline)</option>
             <option value="Target" {% if architecture_state == 'Target' %}selected{% endif %}>To-Be (target)</option>
             <option value="Transition" {% if architecture_state == 'Transition' %}selected{% endif %}>Transition</option>
-          </select>
+          {% endcall %}
         </div>
       </div>
     </section>

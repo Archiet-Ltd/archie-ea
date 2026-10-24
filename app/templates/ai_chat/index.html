@@ -137,7 +137,7 @@
 {% if not llm_configured %}
 <div class="flex flex-wrap items-center gap-x-2 gap-y-1 bg-warning/10 border-b border-warning/30 px-4 py-2 text-sm text-warning-emphasis"
      role="alert">
-        <i data-lucide="alert-triangle" class="h-4 w-4 shrink-0 text-amber-600" aria-hidden="true"></i><!-- token-migration-ok -->
+        <i data-lucide="alert-triangle" class="h-4 w-4 shrink-0 text-layer-strategy-emphasis" aria-hidden="true"></i><!-- token-migration-ok -->
         {# The banner named the fault and stopped there. It is the earliest and
            most visible surface for "the AI cannot answer", so it is also the
            right place to say what closes it — otherwise every archetype reads
@@ -698,8 +698,8 @@
                         </button>
                         <!-- Technology -->
                         <button type="button" data-domain="technology" data-prompt="Review my tech stack and identify lifecycle risks"
-                            class="domain-card group flex flex-col p-4 bg-card border border-border rounded-xl text-left hover:border-emerald-500 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"><!-- design-tokens-ok: domain-card legend, 6 distinct hues > available semantic tokens -->
-                            <div class="w-9 h-9 bg-emerald-50 rounded-lg flex items-center justify-center text-emerald-600 mb-2.5 group-hover:bg-emerald-500 group-hover:text-primary-foreground transition-colors"><!-- token-migration-ok -->
+class="domain-card group flex flex-col p-4 bg-card border border-border rounded-xl text-left hover:border-layer-business hover:shadow-md transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"><!-- design-tokens-ok: domain-card legend, 6 distinct hues > available semantic tokens -->
+                            <div class="w-9 h-9 bg-layer-business/10 rounded-lg flex items-center justify-center text-layer-business-emphasis mb-2.5 group-hover:bg-layer-business group-hover:text-primary-foreground transition-colors"><!-- token-migration-ok -->
                                 <i data-lucide="cpu" class="h-5 w-5" aria-hidden="true"></i>
                             </div>
                             <h3 class="text-sm font-semibold text-foreground">Technology</h3>

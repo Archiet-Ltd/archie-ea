@@ -1,4 +1,5 @@
 {% extends 'layouts/admin_base.html' %}
+{% from 'macros/shadcn_compat.html' import shadcn_select %}
 {% from 'components/modal.html' import modal %}
 {% from 'components/form_field.html' import form_group, form_footer %}
 {% from 'components/dense_table.html' import dense_table %}
@@ -78,22 +79,23 @@
     <div class="flex flex-wrap items-center gap-2" data-testid="page-actions">
       {# ARCH-105: grouped primary / data / AI-assisted, with tooltips explaining each
          action in plain business language and a divider between groups. #}
-      {% if can('create', 'application') %}
+{%- if can('create', 'application') %}
       <button type="button" data-testid="btn-add-application" data-modal-open="modal-create"
         title="Register a new application in the portfolio"
         class="inline-flex h-9 items-center gap-1.5 rounded-md bg-primary text-primary-foreground px-4 text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2" aria-label="Add application">
         <i data-lucide="plus" class="h-4 w-4" aria-hidden="true"></i>Add Application
       </button>
       {% endif %}
+      
       <div class="hidden sm:block h-6 border-l border-input" aria-hidden="true"></div>
       <button type="button" data-testid="btn-import" data-modal-open="application-import-modal"
         title="Import applications from a spreadsheet or the Abacus feed"
-        class="inline-flex h-9 items-center gap-1.5 rounded-md border border-input bg-background px-3 text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Import applications">
+        class="inline-flex h-9 items-center gap-1.5 rounded-md border border-input bg-background px-3 text-sm font-medium text-foreground transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Import applications">
         <i data-lucide="upload" class="h-4 w-4" aria-hidden="true"></i>Import
       </button>
       <button type="button" data-testid="btn-export" @click="exportCSV()"
         title="Download the current filtered list as a CSV file"
-        class="inline-flex h-9 items-center gap-1.5 rounded-md border border-input bg-background px-3 text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Export applications">
+        class="inline-flex h-9 items-center gap-1.5 rounded-md border border-input bg-background px-3 text-sm font-medium text-foreground transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Export applications">
         <i data-lucide="download" class="h-4 w-4" aria-hidden="true"></i>Export
       </button>
       <div class="hidden sm:block h-6 border-l border-input" aria-hidden="true"></div>
@@ -101,7 +103,7 @@
       <div class="relative" x-data="{ moreOpen: false }">
         <button type="button" data-testid="btn-more-actions" @click="moreOpen = !moreOpen" @click.outside="moreOpen = false" @keydown.escape="moreOpen = false"
           :aria-expanded="moreOpen.toString()" aria-haspopup="menu" aria-label="More actions"
-          class="inline-flex h-9 items-center gap-1.5 rounded-md border border-input bg-background px-3 text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+          class="inline-flex h-9 items-center gap-1.5 rounded-md border border-input bg-background px-3 text-sm font-medium text-foreground transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
           More<i data-lucide="chevron-down" class="h-4 w-4" aria-hidden="true"></i>
         </button>
         <div x-show="moreOpen" x-cloak class="absolute right-0 z-30 mt-1 w-56 rounded-md border border-border bg-popover p-1" role="menu">
@@ -109,9 +111,9 @@
 
         title="Find duplicate or overlapping applications that could be consolidated"
 
-        class="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-13 text-foreground transition-colors hover:bg-muted/50" role="menuitem">
+        class="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-[13px] text-foreground transition-colors hover:bg-accent" role="menuitem">
 
-        <i data-lucide="layers-2" class="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-13 text-foreground transition-colors hover:bg-muted/50" role="menuitem" aria-hidden="true"></i>Consolidation
+        <i data-lucide="layers-2" class="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-[13px] text-foreground transition-colors hover:bg-accent" role="menuitem" aria-hidden="true"></i>Consolidation
 
       </a>
 
@@ -123,9 +125,9 @@
 
         title="Use AI to design a target-state solution from your application estate"
 
-        class="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-13 text-foreground transition-colors hover:bg-muted/50" role="menuitem">
+        class="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-[13px] text-foreground transition-colors hover:bg-accent" role="menuitem">
 
-        <i data-lucide="star" class="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-13 text-foreground transition-colors hover:bg-muted/50" role="menuitem" aria-hidden="true"></i>Design Solution
+        <i data-lucide="star" class="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-[13px] text-foreground transition-colors hover:bg-accent" role="menuitem" aria-hidden="true"></i>Design Solution
 
       </a>
 
@@ -135,9 +137,9 @@
 
         title="Use AI to match applications to known vendor products"
 
-        class="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-13 text-foreground transition-colors hover:bg-muted/50" role="menuitem" aria-label="Match vendors">
+        class="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-[13px] text-foreground transition-colors hover:bg-accent" role="menuitem" aria-label="Match vendors">
 
-        <i data-lucide="package" class="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-13 text-foreground transition-colors hover:bg-muted/50" role="menuitem" aria-hidden="true"></i>Vendor Match
+        <i data-lucide="package" class="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-[13px] text-foreground transition-colors hover:bg-accent" role="menuitem" aria-hidden="true"></i>Vendor Match
 
       </button>
 
@@ -145,9 +147,9 @@
 
         title="Use AI to suggest capability, process and ArchiMate mappings for your applications"
 
-        class="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-13 text-foreground transition-colors hover:bg-muted/50" role="menuitem" aria-label="AI map applications">
+        class="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-[13px] text-foreground transition-colors hover:bg-accent" role="menuitem" aria-label="AI map applications">
 
-        <i data-lucide="sparkles" class="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-13 text-foreground transition-colors hover:bg-muted/50" role="menuitem" aria-hidden="true"></i>AI Map
+        <i data-lucide="sparkles" class="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-[13px] text-foreground transition-colors hover:bg-accent" role="menuitem" aria-hidden="true"></i>AI Map
 
       </button>
         </div>
@@ -253,11 +255,10 @@
         </div>
         <div class="min-w-[180px]">
           <label for="filter-status" class="block text-xs font-medium text-muted-foreground mb-1">Lifecycle Status</label>
-          <select id="filter-status" name="status" data-testid="filter-lifecycle-status" x-model="filters.status" @change="onFilterChange()"
-            class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+          {% call shadcn_select('status', bare=true, id='filter-status', class='h-9 w-full', attrs='data-testid="filter-lifecycle-status" x-model="filters.status" @change="onFilterChange()"') %}
             <option value="">All lifecycle statuses</option>
             {% for s in filter_options.lifecycle_statuses %}<option value="{{ s.value }}" {% if filters.status == s.value %}selected{% endif %}>{{ s.label }}</option>{% endfor %}
-          </select>
+          {% endcall %}
         </div>
         <div class="min-w-[140px]">
           <label for="filter-domain" class="block text-xs font-medium text-muted-foreground mb-1">Domain</label>
@@ -397,7 +398,7 @@
                 Type<i data-lucide="chevron-up" class="h-3 w-3" x-show="sort === 'type' && dir === 'asc'" x-cloak aria-hidden="true"></i><i data-lucide="chevron-down" class="h-3 w-3" x-show="sort === 'type' && dir === 'desc'" x-cloak aria-hidden="true"></i>
               </button>
             </th>
-            <th scope="col" class="h-10 px-2 align-middle text-left w-10" title="ArchiMate: whether this application has a linked ArchiMate element" aria-label="ArchiMate link status">AM</th>
+            <th scope="col" class="h-10 px-2 align-middle text-left min-w-[110px]" title="ArchiMate: whether this application has a linked ArchiMate element" aria-label="ArchiMate link status">ArchiMate</th>
             <th scope="col" class="h-10 px-2 align-middle text-left min-w-[160px]">
               <button type="button" @click="sortBy('lifecycle_status')" data-testid="th-sort-lifecycle-status"
                 class="inline-flex items-center gap-1 hover:text-foreground transition-colors" aria-label="Sort by Lifecycle Status">
@@ -421,19 +422,19 @@
           {%- set ck = (app.business_criticality or '').lower() -%}
           {%- set cc = CRIT_MAP.get(ck, 'bg-muted text-muted-foreground') -%}
           {%- set pc = app.capability_mappings[0] if app.capability_mappings else none -%}
-          <tr class="group transition-colors hover:bg-muted/50" data-app-id="{{ app.id }}" data-testid="app-row-{{ app.id }}">
-            <td class="px-2 align-middle">
+          <tr class="group h-12 border-b border-border transition-colors hover:bg-accent" data-app-id="{{ app.id }}" data-testid="app-row-{{ app.id }}">
+            <td class="px-3 py-0 align-middle">
               <input type="checkbox" class="row-select rounded border-input h-4 w-4 cursor-pointer"
                 :checked="selectedIds.has({{ app.id }})"
                 @change="toggleRow({{ app.id }}, $event.target.checked)"
                 aria-label="Select {{ app.name | e }}" data-testid="row-select-{{ app.id }}">
             </td>
-            <td class="px-2 align-middle"><span class="text-xs font-mono text-muted-foreground">{{ app.id }}</span></td>
-            <td class="px-2 align-middle">
+            <td class="px-3 py-0 align-middle"><span class="text-xs font-mono text-muted-foreground">{{ app.id }}</span></td>
+            <td class="px-3 py-0 align-middle">
               <p class="font-medium text-sm text-foreground truncate max-w-[220px]" title="{{ app.name | e }}{% if app.description %} — {{ app.description[:120] | e }}{% endif %}">{{ app.name }}</p>
             </td>
-            <td class="px-2 align-middle"><span class="text-sm text-muted-foreground">{{ app.component_type or '—' }}</span></td>
-            <td class="px-2 align-middle text-center">
+            <td class="px-3 py-0 align-middle"><span class="text-sm text-muted-foreground">{{ app.component_type or '—' }}</span></td>
+            <td class="px-3 py-0 align-middle text-center">
               {% if app.archimate_element_id %}
               {# role="img" makes the aria-label legal: a bare span is a generic
                  element, and aria-label on it is an aria-prohibited-attr
@@ -443,18 +444,18 @@
               <span class="inline-block h-2.5 w-2.5 rounded-full bg-muted-foreground/30" title="No ArchiMate link" role="img" aria-label="Not linked to an ArchiMate element"></span>
               {% endif %}
             </td>
-            <td class="px-2 align-middle">
+            <td class="px-3 py-0 align-middle">
               <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium {{ si.cls }}">{{ si.label }}</span>
             </td>
             {# Hidden until data enrichment — Criticality, Business Owner, Vendor #}
             {#
-            <td class="px-2 align-middle">
+            <td class="px-3 py-0 align-middle">
               {% if app.business_criticality %}
               <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium {{ cc }}">{{ app.business_criticality }}</span>
               {% else %}<span class="text-xs text-muted-foreground">—</span>{% endif %}
             </td>
-            <td class="px-2 align-middle"><span class="text-sm text-muted-foreground truncate max-w-[140px] block">{{ app.business_owner or '—' }}</span></td>
-            <td class="px-2 align-middle">
+            <td class="px-3 py-0 align-middle"><span class="text-sm text-muted-foreground truncate max-w-[140px] block">{{ app.business_owner or '—' }}</span></td>
+            <td class="px-3 py-0 align-middle">
               <span class="text-sm text-muted-foreground truncate max-w-[130px] block">
                 {%- if app.vendor_name %}{{ app.vendor_name }}
                 {%- elif app.primary_vendor_product is defined and app.primary_vendor_product %}{{ app.primary_vendor_product.name }}
@@ -462,24 +463,22 @@
               </span>
             </td>
             #}
-            <td class="px-2 align-middle">
+            <td class="px-3 py-0 align-middle">
               {% if pc and pc.business_capability %}
               <span class="text-xs text-muted-foreground truncate max-w-[150px] block" title="{{ pc.business_capability.name | e }}">{{ pc.business_capability.name }}</span>
               {% else %}<span class="text-xs text-muted-foreground">Not mapped</span>{% endif %}
             </td>
-            <td class="px-2 align-middle text-right">
+            <td class="px-3 py-0 align-middle text-right">
               <div class="flex justify-end gap-1 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
                 <a href="{{ url_for('unified_applications.application_detail', id=app.id) }}"
                   data-testid="btn-view-{{ app.id }}"
-                  class="inline-flex h-8 items-center justify-center rounded-md px-2.5 text-13 font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-info">View</a>
+                  class="inline-flex h-8 items-center justify-center rounded-md px-2.5 text-[13px] font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-info">View</a>
                 <a href="{{ url_for('unified_applications.application_fact_sheet', id=app.id) }}"
                   data-testid="btn-factsheet-{{ app.id }}" title="Fact sheet — single source of truth"
-                  class="inline-flex h-8 items-center justify-center rounded-md px-2.5 text-13 font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-info">Fact sheet</a>
-                {% if can('edit', 'application') %}
+                  class="inline-flex h-8 items-center justify-center rounded-md px-2.5 text-[13px] font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-info">Fact sheet</a>
                 <a href="{{ url_for('unified_applications.application_edit', id=app.id) }}"
                   data-testid="btn-edit-{{ app.id }}"
-                  class="inline-flex h-8 items-center justify-center rounded-md px-2.5 text-13 font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-info">Edit</a>
-                {% endif %}
+                  class="inline-flex h-8 items-center justify-center rounded-md px-2.5 text-[13px] font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-info">Edit</a>
                 <div class="relative" x-data="{ mapOpen: false }"
                   data-app-map-id="{{ app.id }}"
                   data-app-map-name="{{ app.name | e }}">
@@ -618,13 +617,7 @@
               class="inline-flex items-center gap-1 h-8 px-2.5 rounded-md text-xs font-medium hover:bg-accent transition-colors">
               <i data-lucide="file-text" class="h-3.5 w-3.5" aria-hidden="true"></i>Fact sheet
             </a>
-            {% if can('edit', 'application') %}
-            <a href="{{ url_for('unified_applications.application_edit', id=app.id) }}"
-              data-testid="btn-edit-mobile-{{ app.id }}"
-              class="inline-flex items-center gap-1 h-8 px-2.5 rounded-md text-xs font-medium hover:bg-accent transition-colors">
-              <i data-lucide="pencil" class="h-3.5 w-3.5" aria-hidden="true"></i>Edit
-            </a>
-            {% endif %}
+            
             <div class="relative" x-data="{ mapOpen: false }"
               data-app-map-id="{{ app.id }}"
               data-app-map-name="{{ app.name | e }}">
@@ -689,7 +682,8 @@
               <p class="text-xs text-muted-foreground mb-0.5">Capability</p>
               {% if pc and pc.business_capability %}
               <p class="text-sm text-muted-foreground truncate">{{ pc.business_capability.name }}</p>
-              {% else %}<p class="text-sm text-muted-foreground">Not mapped</p>{% endif %}
+              {% elif can('edit', 'application') %}<button type="button" class="text-sm text-muted-foreground underline hover:text-info" @click='openMappingForApp({{ app.id }}, {{ app.name | tojson }}, "capability")'>No capability mapped yet: map it</button>
+              {% else %}<p class="text-sm text-muted-foreground">No capability mapped yet</p>{% endif %}
             </div>
           </div>
         </div>
@@ -822,7 +816,6 @@
           <span x-text="aiMap.accepting ? 'Saving...' : 'Accept & Save'">Accept &amp; Save</span>
         </button>
       </div>
-    
 {% endcall %}
 </div>{# end app-portfolio-root #}
 

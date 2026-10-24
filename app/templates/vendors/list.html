@@ -1,4 +1,5 @@
 {% extends 'layouts/admin_base.html' %}
+{% from 'macros/shadcn_compat.html' import shadcn_select %}
 {% from 'components/form_field.html' import form_group, form_footer %}
 {% from "components/card.html" import card, card_header, card_title, card_description, card_content, card_footer %}
 {% from "components/page_header.html" import page_header %}
@@ -286,11 +287,10 @@
           <input type="text" id="cv-name" name="name" x-model="formData.name" required maxlength="200"
                  class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                  placeholder="Enter vendor name">
-        {% endcall %}
+{% endcall %}
         <div class="grid grid-cols-1 gap-4">
           {% call form_group(id='cv-type', label='Vendor Type') %}
-            <select id="cv-type" name="vendor_type" x-model="formData.vendor_type"
-                    class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+            {% call shadcn_select('vendor_type', bare=true, id='cv-type', class='h-10 w-full', attrs='x-model="formData.vendor_type"') %}
               <option value="">Select type...</option>
               <option value="software_vendor">Software Vendor</option>
               <option value="saas_platform">SaaS Platform</option>
@@ -298,7 +298,7 @@
               <option value="systems_integrator">Systems Integrator</option>
               <option value="consulting_partner">Consulting Partner</option>
               <option value="managed_service_provider">Managed Service Provider</option>
-            </select>
+{% endcall %}
           {% endcall %}
           {% call form_group(id='cv-country', label='Country') %}
             <input type="text" id="cv-country" name="country" x-model="formData.country"

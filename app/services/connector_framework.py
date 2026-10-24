@@ -252,6 +252,7 @@ class BaseConnector(ABC):
         *,
         source_system: str,
         to_element: Callable[[Dict[str, Any]], Dict[str, Any]],
+        evidence: Optional[Any] = None,
     ) -> Dict[str, Any]:
         """Write fetched source records into the connector's organisation.
 
@@ -263,6 +264,14 @@ class BaseConnector(ABC):
         inside a savepoint: a record that fails is counted and logged by id (never
         by content or credential) and leaves nothing behind, and the run goes on.
 
+        With ``evidence`` (an object with ``matched(element, record) -> bool`` and
+        ``unmatched(record, match) -> "proposed" | "skipped"``) the source is evidence
+        for elements that already exist rather than a source of elements: a certain
+        match is handed to ``matched`` (which adds facts and never renames), anything
+        else to ``unmatched`` (which queues a proposal), and no element is created.
+        Matching, the savepoint per record, the crosswalk link and the counts are the
+        same; proposals are counted as ``records_proposed``.
+
         The organisation is the connector's own; a connector with none writes
         nothing. Returns the counts the sync log and ``run_connector_sync`` read.
         """
@@ -272,13 +281,13 @@ class BaseConnector(ABC):
                 "A connector sync cannot write to the model without an organisation."
             )
 
-        counts = {"created": 0, "updated": 0, "skipped": 0, "failed": 0}
+        counts = {"created": 0, "updated": 0, "skipped": 0, "failed": 0, "proposed": 0}
         touched: List[Dict[str, Any]] = []
         for raw in raw_records:
             try:
                 with db.session.begin_nested():
                     outcome, element_id, external_id = _persist_element_record(
-                        org_id, source_system, to_element(raw)
+                        org_id, source_system, to_element(raw), evidence=evidence
                     )
             except Exception as exc:
                 counts["failed"] += 1
@@ -306,6 +315,7 @@ class BaseConnector(ABC):
             "records_created": counts["created"],
             "records_updated": counts["updated"],
             "records_skipped": counts["skipped"],
+            "records_proposed": counts["proposed"],
             "records_failed": counts["failed"],
             "records_deleted": 0,
             "elements_touched": touched,
@@ -376,10 +386,32 @@ def _review_already_queued(org_id: int, matched_element_id: int) -> bool:
     )
 
 
-def _persist_element_record(org_id: int, source_system: str, record: Dict[str, Any]):
+def _persist_evidence_record(org_id, source_system, external_id, match, evidence, record):
+    """The evidence-mode ending of ``_persist_element_record``: a certain match gets
+    facts added to its element (and is linked in the crosswalk); anything else is
+    handed to the evidence object to queue as a proposal. Creates no element.
+    Returns ``(outcome, element_id, external_id)``."""
+    from app.models.archimate_core import ArchiMateElement
+    from app.modules.intelligence.services.crosswalk_service import CrosswalkService
+
+    if match.matched_element_id is None or not match.certain:
+        return evidence.unmatched(record, match), None, external_id
+    element = db.session.get(ArchiMateElement, match.matched_element_id)
+    if element is None or element.organization_id != org_id:
+        raise LookupError("the linked element is not in this organisation")
+    if getattr(element, "deleted_at", None) is not None:
+        return "skipped", None, external_id
+    changed = evidence.matched(element, record)
+    CrosswalkService.write_link(source_system, external_id, element.id, org_id=org_id)
+    return ("updated" if changed else "skipped"), element.id, external_id
+
+
+def _persist_element_record(
+    org_id: int, source_system: str, record: Dict[str, Any], *, evidence: Optional[Any] = None
+):
     """Create, update or leave one source record's element. Returns
     ``(outcome, element_id, external_id)`` with outcome ``created``, ``updated``
-    or ``skipped``.
+    or ``skipped`` (``proposed`` too, in evidence mode).
 
     Identity is decided by the existing parts: the identifier crosswalk first,
     then the matcher's name match. A certain match is updated in place; an
@@ -427,6 +459,9 @@ def _persist_element_record(org_id: int, source_system: str, record: Dict[str, A
             match = MatcherService.match(
                 source_system=source_system, external_id=external_id, org_id=org_id
             )
+
+    if evidence is not None:
+        return _persist_evidence_record(org_id, source_system, external_id, match, evidence, record)
 
     if match.matched_element_id is None:
         element = create_backbone_element(
@@ -625,6 +660,7 @@ CONNECTOR_ACTION_SYNC = "sync"
 # (OrgCredentialVault.store_credentials); the three per-connector forms
 # each store one named value instead.
 CONNECTOR_CREDENTIAL_TYPES = {
+    "github": "api_token",
     "jira": "api_token",
     "m365": "client_secret",
     "servicenow": "client_secret",
@@ -637,6 +673,7 @@ CONNECTOR_CREDENTIAL_TYPES = {
 # rotating the vault credential, or the superseded value sits on the row
 # forever beside its replacement.
 CONNECTOR_LEGACY_CONFIG_KEYS = {
+    "github": {"api_token", "api_token_encrypted"},
     "jira": {"api_token", "api_token_encrypted"},
     "m365": {"client_secret"},
     "servicenow": {"client_secret"},
@@ -652,7 +689,8 @@ CONNECTOR_TYPE_LABELS = {
     "jira": "Jira",
     "m365": "Microsoft 365",
     "ea_tool": "Enterprise Architecture tool",
-    "devops": "GitHub / Azure DevOps",
+    "github": "GitHub",
+    "devops": "Code push (GitHub / Azure DevOps)",
     "lucidchart": "Lucidchart",
 }
 
@@ -666,6 +704,7 @@ def _register_concrete_connectors():
     if _CONNECTOR_CLASSES:
         return
     from app.connectors.abacus import AbacusConnector
+    from app.connectors.github import GitHubConnector
     from app.connectors.jira import JiraALMConnector
     from app.connectors.servicenow import ServiceNowCMDBConnector
 
@@ -673,6 +712,7 @@ def _register_concrete_connectors():
         {
             "abacus": AbacusConnector,
             "ea_tool": AbacusConnector,
+            "github": GitHubConnector,
             "jira": JiraALMConnector,
             "servicenow": ServiceNowCMDBConnector,
         }
@@ -1180,6 +1220,32 @@ def _write_touched_crosswalk_links(connector_type: str, touched, org_id: int) ->
     return written
 
 
+def run_coroutine_sync(coro):
+    """Run a coroutine to its result from synchronous code.
+
+    With no event loop running in this thread this is asyncio.run. When a loop is
+    already running here (a web worker, a job runner, a browser driver in the same
+    process) asyncio.run refuses. This thread is inside a synchronous call, so the
+    outer loop cannot run until the call returns: the outer loop is set aside, the
+    coroutine runs to its end on a fresh loop in this same thread, and the outer loop
+    is put back. Nothing else is started, so the application context, the database
+    session and the organisation scope are the caller's own.
+    """
+    import asyncio
+    from asyncio import events
+
+    # events._set_running_loop is private asyncio API; checked on Python 3.12.3
+    # (the build machine venv). Re-check here when the Python version is upgraded.
+    outer = events._get_running_loop()
+    if outer is None:
+        return asyncio.run(coro)
+    events._set_running_loop(None)
+    try:
+        return asyncio.run(coro)
+    finally:
+        events._set_running_loop(outer)
+
+
 def run_connector_sync(
     *,
     org_id: int,
@@ -1232,7 +1298,7 @@ def run_connector_sync(
 
     try:
         call = connector.batch_sync()
-        result = asyncio.run(call) if asyncio.iscoroutine(call) else call
+        result = run_coroutine_sync(call) if asyncio.iscoroutine(call) else call
     except Exception as exc:
         logger.error("Connector sync failed for %s org %s: %s", cfg.id, resolved, exc)
         sync_log.status = "error"
@@ -1327,6 +1393,16 @@ def _credential_field_map(connector_type: str, org_id: int, config: dict) -> dic
             "base_url": config.get("instance_url", ""),
             "client_id": config.get("client_id", ""),
             "client_secret": _secret("client_secret"),
+        }
+
+    if connector_type == "github":
+        # The GitHub organisation to read and, for GitHub Enterprise Server, its
+        # API address come from the configuration; the token (read-only scopes)
+        # from the vault, under either save path's key.
+        return {
+            "organization": config.get("organization", ""),
+            "base_url": config.get("base_url", ""),
+            "api_token": _secret("api_token"),
         }
 
     # No field map for this connector type: fall back to the generic

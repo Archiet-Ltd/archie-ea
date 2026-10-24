@@ -215,7 +215,7 @@
         <svg viewBox="0 0 {{ W }} {{ H }}" class="block h-[320px] w-full" role="img" aria-label="Applications by lifecycle stage">
             {% for g in [0, 1, 2, 3, 4] %}
             {% set y = top + plot_h - (plot_h * g / 4) %}
-            <line x1="{{ left }}" y1="{{ y }}" x2="{{ W - right }}" y2="{{ y }}" class="stroke-slate-100 dark:stroke-slate-800" stroke-width="1" />
+            <line x1="{{ left }}" y1="{{ y }}" x2="{{ W - right }}" y2="{{ y }}" class="stroke-border" stroke-width="1" />
             <text x="{{ left - 8 }}" y="{{ y + 4 }}" text-anchor="end" class="fill-muted-foreground tabular-nums" font-size="11">{{ ((maxc * g / 4) | round | int) }}</text>
             {% endfor %}
             {% for item in lc %}
@@ -303,7 +303,7 @@
                 <span class="text-2xs font-semibold uppercase tracking-[0.06em] text-muted-foreground tabular-nums">{{ gap_count }} gap{{ 's' if gap_count != 1 else '' }} of {{ ch|length }}</span>
             </div>
 {% call dense_table(columns=[('Capability', ''), ('Applications', 'text-right'), ('Coverage', ''), ('', 'text-right')], rows=(ch)|length, empty_text='No capabilities recorded yet.', max_height='480px', flush=true) %}{% for cap in ch %}
-                        <tr class="group transition-colors hover:bg-muted/50">
+                        <tr class="group transition-colors hover:bg-accent">
                             <td class="px-2 align-middle font-medium text-foreground">{{ cap.name }}</td>
                             <td class="px-2 text-right align-middle tabular-nums text-muted-foreground">{{ cap.app_count }}</td>
                             <td class="px-2 align-middle">
@@ -311,8 +311,8 @@
                                 {% elif cap.coverage_status == 'partial' %}<span class="text-warning-emphasis">Partial</span>
                                 {% else %}<span class="text-destructive-emphasis">Gap</span>{% endif %}
                             </td>
-                            <td class="px-2 text-right align-middle">
-                                <a href="{{ url_for('capability_map.index') }}?cap={{ cap.id }}" class="inline-flex h-8 items-center rounded-md px-2.5 text-13 font-medium text-muted-foreground opacity-0 transition-opacity hover:bg-accent hover:text-info group-hover:opacity-100 focus-visible:opacity-100">View</a>
+<td class="px-2 text-right align-middle">
+                                <a href="{{ url_for('capability_map.index') }}?cap={{ cap.id }}" class="inline-flex h-8 items-center rounded-md px-2.5 text-[13px] font-medium text-muted-foreground opacity-0 transition-opacity hover:bg-accent hover:text-info group-hover:opacity-100 focus-visible:opacity-100">View</a>
                             </td>
                         </tr>
                         {% endfor %}{% endcall %}

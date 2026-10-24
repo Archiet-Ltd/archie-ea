@@ -243,22 +243,15 @@ def registered_users():
         .all()
     )
     roles = Role.query.order_by(Role.name).all()
-    # A-02: this page is (correctly, per the tenant-scoping fix above)
-    # scoped to the current organisation, but the header used to say
-    # "Registered Users" with no indication of that scope, while
-    # /admin/organizations sums per-org user counts across every org — 22
-    # tenants vs. 2 users here is not a leak or a drift, it is the same
-    # figure viewed at two different scopes with neither one saying so. Name
-    # the scope explicitly and surface the platform-wide total for
-    # reconciliation rather than leaving the admin to discover the gap.
+    # The page names its organisation and counts that organisation's users
+    # only. No figure here is computed across organisations: the platform
+    # totals live on /admin/organizations, behind platform_admin_required.
     current_org = Organization.query.get(g.current_org_id)
-    platform_total_users = User.query.count()
     return render_template(
         "admin/registered_users.html",
         users=users,
         roles=roles,
         current_org=current_org,
-        platform_total_users=platform_total_users,
     )
 
 
