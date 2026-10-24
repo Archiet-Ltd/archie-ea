@@ -48,6 +48,75 @@
         }
     }
 
+    // A menu inside a scrolling table would be cut off at the table's edge and
+    // cover the buttons of the rows below. When any ancestor clips, the open
+    // panel is placed against the viewport instead, beside its button.
+    function clippedByAncestor(panel) {
+        for (var el = panel.parentElement; el && el !== doc.body && el !== doc.documentElement; el = el.parentElement) {
+            var cs = global.getComputedStyle(el);
+            if (/(auto|scroll|hidden|clip)/.test(cs.overflowX + cs.overflowY)) return true;
+        }
+        return false;
+    }
+
+    function place(root) {
+        var panel = panelOf(root);
+        var trigger = triggerOf(root);
+        if (!panel || !trigger || !isOpen(root) || !clippedByAncestor(panel)) return;
+        var t = trigger.getBoundingClientRect();
+        var w = panel.offsetWidth;
+        var h = panel.offsetHeight;
+        var vw = doc.documentElement.clientWidth;
+        var vh = global.innerHeight;
+        var left = Math.min(Math.max(8, t.right - w), Math.max(8, vw - w - 8));
+        var top = t.bottom + 4;
+        if (top + h > vh - 8 && t.top - 4 - h >= 8) top = t.top - 4 - h;
+        panel.style.position = 'fixed';
+        panel.style.left = left + 'px';
+        panel.style.top = top + 'px';
+        panel.style.right = 'auto';
+        panel.style.margin = '0';
+        lift(root);
+    }
+
+    // Sticky cells of later rows carry their own stacking level and would paint
+    // over the open panel: lift the open row's own levels while the menu is open.
+    function lift(root) {
+        if (root._lifted) return;
+        var lifted = [];
+        for (var el = root.parentElement; el && el !== doc.body; el = el.parentElement) {
+            var cs = global.getComputedStyle(el);
+            if (cs.position !== 'static' && cs.zIndex !== 'auto') {
+                lifted.push([el, el.style.zIndex]);
+                el.style.zIndex = '60';
+            }
+        }
+        if (!lifted.length) return;
+        root._lifted = lifted;
+        var trigger = triggerOf(root);
+        var watch = new global.MutationObserver(function () {
+            if (isOpen(root)) return;
+            root._lifted.forEach(function (pair) { pair[0].style.zIndex = pair[1]; });
+            root._lifted = null;
+            watch.disconnect();
+        });
+        watch.observe(trigger, { attributes: true, attributeFilter: ['aria-expanded'] });
+    }
+
+    function placeSoon(root) {
+        global.setTimeout(function () { place(root); }, 0);
+    }
+
+    // The fixed panel would stay behind when the table scrolls: close it.
+    doc.addEventListener('scroll', function (e) {
+        var open = doc.querySelectorAll('[data-dropdown-menu] [data-menu-trigger][aria-expanded="true"]');
+        for (var i = 0; i < open.length; i++) {
+            var root = rootOf(open[i]);
+            var panel = panelOf(root);
+            if (panel && panel.style.position === 'fixed' && !panel.contains(e.target)) setOpen(root, false);
+        }
+    }, true);
+
     // Focus the first item once Alpine has shown the panel.
     function focusFirstSoon(root) {
         global.setTimeout(function () {
@@ -108,6 +177,7 @@
         if (!root) return;
         var trigger = triggerOf(root);
         if (trigger && trigger.contains(e.target)) {
+            placeSoon(root);
             focusFirstSoon(root);
             return;
         }
@@ -128,6 +198,7 @@
             if ((e.key === 'ArrowDown' || e.key === 'ArrowUp') && !trigger.disabled) {
                 e.preventDefault();
                 if (!isOpen(root)) setOpen(root, true);
+                placeSoon(root);
                 focusFirstSoon(root);
             }
             return;
