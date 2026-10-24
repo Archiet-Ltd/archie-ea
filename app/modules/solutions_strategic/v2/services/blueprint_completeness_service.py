@@ -409,7 +409,15 @@ class BlueprintCompletenessService:
             if k in self.SECTION_DEFINITIONS
             and not (isinstance(v, dict) and v.get("not_applicable"))
         }
-        ranked = sorted(known_scores.items(), key=lambda kv: kv[1].get("overall", 0) if isinstance(kv[1], dict) else 0)
+        # A section already at the complete threshold needs no action; listing
+        # the three lowest regardless told a finished blueprint to keep working.
+        ranked = sorted(
+            (
+                kv for kv in known_scores.items()
+                if (kv[1].get("overall", 0) if isinstance(kv[1], dict) else 0) < SECTION_COMPLETE_THRESHOLD
+            ),
+            key=lambda kv: kv[1].get("overall", 0) if isinstance(kv[1], dict) else 0,
+        )
         actions = []
         for section_id, scores in ranked[:3]:
             defn = self.SECTION_DEFINITIONS[section_id]
