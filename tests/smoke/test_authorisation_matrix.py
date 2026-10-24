@@ -73,13 +73,13 @@ POLICY = {
     # Viewer role, which is refused, is pinned in tests/test_application_registration_check.py.
     "/applications/api/registration-check": set(ARCHETYPES),
     "/ai-chat":                set(ARCHETYPES),
-    # Ask and Twin map: both pages carry @login_required and no role gate, so
-    # every archetype is expected to reach them. Stating that in two rows is
-    # what makes a role gate added later show up here as a row change, and what
-    # keeps them in test_no_archetype_reaches_another_personas_section_
-    # unauthenticated below. The data they show is fenced per tenant by the
-    # impact endpoint they read, not by the page.
-    "/intelligence/ask":       set(ARCHETYPES),
+    # Twin map: the page carries @login_required and no role gate, so every
+    # archetype is expected to reach it (it redirects to the Composer). Stating
+    # that in a row is what makes a role gate added later show up here as a row
+    # change, and what keeps it in test_no_archetype_reaches_another_personas_
+    # section_unauthenticated below. Ask is no longer a page: its address
+    # redirects into /ai-chat, which has its own row above, and that redirect is
+    # checked in tests/test_ai_chat_estate_answer.py.
     "/intelligence/twin-map":  set(ARCHETYPES),
     # R1-B30 (TB-0106): the Answers page (ask a set or risk question, list the
     # organisation's stored answers). @login_required and no role gate, like Ask
