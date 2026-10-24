@@ -13,7 +13,6 @@ asserts that the figures a person needs are present and agree:
 
 import datetime
 import os
-from pathlib import Path
 
 import pytest
 from playwright.sync_api import expect
@@ -22,8 +21,6 @@ from .conftest import PAGE_TIMEOUT
 from .fresh_org import create_fresh_org, sign_in
 
 pytestmark = [pytest.mark.smoke, pytest.mark.journey]
-
-WALK_DIR = os.environ.get("SMOKE_WALK_DIR")
 
 PERSONA = "enterprise_architect"
 
@@ -105,12 +102,6 @@ def _seed_board_with_cards(org_id, user_id, suffix):
     return board_id
 
 
-def _shot(page, name):
-    if WALK_DIR:
-        Path(WALK_DIR).mkdir(parents=True, exist_ok=True)
-        page.screenshot(path=str(Path(WALK_DIR) / name), full_page=True)
-
-
 def test_flow_analytics_journey(browser, live_server):
     """Enterprise architect checks flow analytics for a board with cards."""
     org = create_fresh_org(PERSONA)
@@ -160,15 +151,28 @@ def test_flow_analytics_journey(browser, live_server):
         # 6. The total WIP count is shown
         expect(page.locator("text=total:").first).to_be_visible()
 
-        # 7. The shadcn-nearest meta tag is present
-        meta_shadcn = page.locator('meta[name="shadcn-nearest"]')
-        expect(meta_shadcn).to_have_attribute("content", "dashboard-01")
+# 7. The shadcn-nearest meta tag is present
+            meta_shadcn = page.locator('meta[name="shadcn-nearest"]')
+            expect(meta_shadcn).to_have_attribute("content", "dashboard-01")
 
-        # 8. Empty state and error state text are present in the markup
-        expect(page.locator("text=No flow data yet").first).to_be_visible()
-        expect(page.locator("text=Flow metrics could not be loaded").first).to_be_visible()
+            # 8. The page has rendered data (not empty state) — metric values are shown
+            expect(page.get_by_text("13d").first).to_be_visible()
+            expect(page.get_by_text("5").first).to_be_visible()
+            expect(page.get_by_text("100%").first).to_be_visible()
 
-        # 9. The Retry button exists (from button macro)
-        expect(page.locator("button:has-text('Retry')").first).to_be_visible()
+            # 9. The empty state template exists in the HTML source
+            html = page.content()
+            assert "No flow data yet" in html, "Empty state text must be present in the template"
+
+            # 10. The error state template exists in the HTML source
+            assert "Flow metrics could not be loaded" in html, "Error state text must be present in the template"
+
+            # 11. The Retry button template exists in the HTML source
+            assert "Retry" in html, "Retry button text must be present in the template"
+
+            # 12. The WIP snapshot shows the correct card count
+            wip_heading = page.get_by_role("heading").filter(has_text="WIP Snapshot").first
+            expect(wip_heading).to_be_visible()
+            expect(wip_heading).to_contain_text("total: 3")
     finally:
         context.close()
