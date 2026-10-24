@@ -50,7 +50,7 @@ NARROW = {"width": 390, "height": 844}
 
 LOADING_PLACEHOLDER = "Loading application capability data"
 
-SHOTS_DIR = "/projects/sandbox/capability-map-loads"
+import os as _os; SHOTS_DIR = _os.environ.get("SMOKE_SCREENSHOT_DIR", "/tmp/capability-map-loads")
 
 
 # The contrast helper is copied from the heatmap journey on purpose: it is a
