@@ -2,6 +2,10 @@
 {% from 'components/dense_table.html' import dense_table %}
 {% from 'macros/page_shell.html' import page_shell, section_card %}
 {% from 'components/answer_cascade.html' import answer_cascade %}
+{% from 'components/company_kind.html' import company_kind_picker %}
+{% from 'components/button.html' import button %}
+{% from 'components/input.html' import input %}
+{% from 'components/table.html' import table, table_header, table_body, table_row, table_head, table_cell, table_empty_state %}
 {% block title %}Dashboard{% endblock %}
 {% block guided_mode_steps %}
 <script id="guided-mode-steps-data" type="application/json">
@@ -15,6 +19,7 @@
 {% block extra_head_js %}
 <script src="{{ url_for('static', filename='js/intelligence/core.js') }}"></script>
 <script src="{{ url_for('static', filename='js/dashboard/overview_cascade.js') }}"></script>
+<script src="{{ url_for('static', filename='js/dashboard/company_kind.js') }}"></script>
 {% endblock %}
 {% block content %}
 {# Overview pattern (design/patterns.json: dashboard-01): page header, KPI
@@ -68,12 +73,7 @@
             <span class="font-medium">Welcome to {{ config.APP_NAME }}</span>
             <span class="text-muted-foreground"> — <a href="/ai-chat" class="text-info hover:underline">ask the AI architect</a> anytime, no setup needed.</span>
         </p>
-        <button type="button"
-                @click="dismiss()"
-                class="shrink-0 text-muted-foreground hover:text-foreground transition-colors"
-                aria-label="Dismiss welcome message">
-            <i data-lucide="x" class="h-4 w-4" aria-hidden="true"></i>
-        </button>
+        {{ button(variant='ghost', size='icon', icon='x', on_click='dismiss()', aria_label='Dismiss welcome message', class='shrink-0') }}
     </div>
     {% endif %}
     {% if mode == 'guided' %}
@@ -87,63 +87,9 @@
             visualizations appear once your portfolio has data.
         </p>
         {# T-onb-03: Company kind selector — one click choice between Startup, Scale-up and Enterprise #}
-        <div x-data="{
-            kind: '{{ company_kind or 'startup' }}',
-            saving: false,
-            async save(selectedKind) {
-                if (this.saving) return;
-                this.saving = true;
-                this.kind = selectedKind;
-                try {
-                    const response = await (window.Platform?.fetch || fetch)('/dashboard/api/company-kind', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ kind: selectedKind })
-                    });
-                    if (!response.ok) throw new Error('Failed to save');
-                } catch (err) {
-                    console.error('Failed to save company kind:', err);
-                } finally {
-                    this.saving = false;
-                }
-            }
-        }" class="rounded-lg border border-border bg-muted/30 px-4 py-3" data-testid="company-kind-selector">
+        <div class="rounded-lg border border-border bg-muted/30 px-4 py-3" data-testid="company-kind-selector">
             <h3 class="text-sm font-medium text-foreground mb-2">What kind of company are you?</h3>
-            <div class="flex flex-wrap items-center gap-2">
-                <button type="button"
-                        @click="save('startup')"
-                        :disabled="saving"
-                        :class="kind === 'startup' ? 'bg-primary text-primary-foreground' : 'bg-background text-foreground hover:bg-accent'"
-                        class="h-8 rounded-md px-3 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50"
-                        data-testid="company-kind-startup">
-                    Startup
-                    <span class="ml-1.5 text-2xs opacity-75">— validating product-market fit</span>
-                </button>
-                <button type="button"
-                        @click="save('scaleup')"
-                        :disabled="saving"
-                        :class="kind === 'scaleup' ? 'bg-primary text-primary-foreground' : 'bg-background text-foreground hover:bg-accent'"
-                        class="h-8 rounded-md px-3 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50"
-                        data-testid="company-kind-scaleup">
-                    Scale-up
-                    <span class="ml-1.5 text-2xs opacity-75">— rapid growth and expansion</span>
-                </button>
-                <button type="button"
-                        @click="save('enterprise')"
-                        :disabled="saving"
-                        :class="kind === 'enterprise' ? 'bg-primary text-primary-foreground' : 'bg-background text-foreground hover:bg-accent'"
-                        class="h-8 rounded-md px-3 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50"
-                        data-testid="company-kind-enterprise">
-                    Enterprise
-                    <span class="ml-1.5 text-2xs opacity-75">— established organisation at scale</span>
-                </button>
-                <button type="button"
-                        @click="kind = 'startup'; /* Not now keeps startup as default */"
-                        class="h-8 rounded-md px-3 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                        data-testid="company-kind-not-now">
-                    Not now
-                </button>
-            </div>
+            {{ company_kind_picker(kind=company_kind or 'startup') }}
         </div>
         <ol class="space-y-3">
             {% for step in guided_steps %}
@@ -155,9 +101,16 @@
                     <p class="text-sm font-medium text-foreground">{{ step.title }}</p>
                     <p class="text-xs text-muted-foreground mt-0.5">{{ step.description }}</p>
                 </div>
+                {% if step.post %}
+                <form method="post" action="{{ step.href }}" class="shrink-0" data-testid="guided-step-form">
+                    {{ input(type='hidden', name='csrf_token', value=csrf_token()) }}
+                    {{ button(text=step.cta, type='submit', variant='outline', size='sm', testid='guided-step-sample-load') }}
+                </form>
+                {% else %}
                 <a href="{{ step.href }}" class="shrink-0 inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline">
                     {{ 'Done' if step.done else (step.cta|default('Start')) }} <i data-lucide="arrow-right" class="h-3 w-3" aria-hidden="true"></i>
                 </a>
+                {% endif %}
             </li>
             {% endfor %}
         </ol>
@@ -202,13 +155,9 @@
        panel below. #}
     <div aria-label="Dashboard lens" class="flex w-fit max-w-full flex-wrap items-center gap-0.5 rounded-md bg-muted p-0.5">
         {% for role_key, role_label in [('overview', 'Overview'), ('cto', 'CTO'), ('cfo', 'CFO'), ('motivation', 'Motivation'), ('strategy', 'Strategy'), ('business', 'Business'), ('application', 'Application'), ('technology', 'Technology'), ('implementation', 'Implementation & Migration')] %}
-        <button type="button" @click="activeRole = '{{ role_key }}'"
-                data-testid="layer-tab-{{ role_key }}"
-                :aria-pressed="activeRole === '{{ role_key }}' ? 'true' : 'false'"
-                :class="activeRole === '{{ role_key }}' ? 'bg-background text-foreground' : 'text-muted-foreground hover:text-foreground'"
-                class="h-7 rounded px-2.5 text-xs font-medium transition-colors">
-            {{ role_label }}
-        </button>
+        {{ button(text=role_label, variant='ghost', size='sm', class='text-xs', testid='layer-tab-' ~ role_key,
+                  on_click="activeRole = '" ~ role_key ~ "'",
+                  attrs_dict={':aria-pressed': "activeRole === '" ~ role_key ~ "' ? 'true' : 'false'", ':class': "activeRole === '" ~ role_key ~ "' ? 'bg-background text-foreground' : ''"}) }}
         {% endfor %}
     </div>
 
@@ -274,7 +223,7 @@
         <svg viewBox="0 0 {{ W }} {{ H }}" class="block h-[320px] w-full" role="img" aria-label="Applications by lifecycle stage">
             {% for g in [0, 1, 2, 3, 4] %}
             {% set y = top + plot_h - (plot_h * g / 4) %}
-            <line x1="{{ left }}" y1="{{ y }}" x2="{{ W - right }}" y2="{{ y }}" class="stroke-slate-100 dark:stroke-slate-800" stroke-width="1" />
+            <line x1="{{ left }}" y1="{{ y }}" x2="{{ W - right }}" y2="{{ y }}" class="stroke-border" stroke-width="1" />
             <text x="{{ left - 8 }}" y="{{ y + 4 }}" text-anchor="end" class="fill-muted-foreground tabular-nums" font-size="11">{{ ((maxc * g / 4) | round | int) }}</text>
             {% endfor %}
             {% for item in lc %}
@@ -432,42 +381,42 @@
             </div>
             <div class="grid grid-cols-1 gap-px bg-border md:grid-cols-2">
                 <div class="bg-card">
-                    <table class="dense-table w-full border-collapse text-sm" data-testid="cto-risk-by-impact">
+                    <div data-testid="cto-risk-by-impact">
+                    {% call table() %}
                         <caption class="sr-only">Risks by impact level</caption>
-                        <thead class="bg-card">
-                            <tr class="border-b border-border">
-                                <th scope="col" class="h-10 px-4 text-left align-middle">Risk by impact</th>
-                                <th scope="col" class="h-10 px-4 text-right align-middle">Open</th>
-                            </tr>
-                        </thead>
-                        <tbody>
+                        {% call table_header() %}{% call table_row() %}
+                            {% call table_head(class='h-10') %}Risk by impact{% endcall %}
+                            {% call table_head(class='h-10 text-right') %}Open{% endcall %}
+                        {% endcall %}{% endcall %}
+                        {% call table_body() %}
                             {% for level, tone in [('critical', 'text-destructive-emphasis'), ('high', 'text-warning-emphasis'), ('medium', 'text-info'), ('low', 'text-success-emphasis')] %}
-                            <tr class="h-10 border-b border-border last:border-b-0">
-                                <td class="px-4 align-middle capitalize {{ tone }}">{{ level }}</td>
-                                <td class="px-4 text-right align-middle tabular-nums text-foreground">{{ ((cto.get('risk_counts') or {}).get(level))|dash }}</td>
-                            </tr>
+                            {% call table_row(class='h-10') %}
+                                {% call table_cell(class='py-0 capitalize ' ~ tone) %}{{ level }}{% endcall %}
+                                {% call table_cell(class='py-0 text-right tabular-nums text-foreground') %}{{ ((cto.get('risk_counts') or {}).get(level))|dash }}{% endcall %}
+                            {% endcall %}
                             {% endfor %}
-                        </tbody>
-                    </table>
+                        {% endcall %}
+                    {% endcall %}
+                    </div>
                 </div>
                 <div class="bg-card">
-                    <table class="dense-table w-full border-collapse text-sm" data-testid="cto-arb-pipeline">
+                    <div data-testid="cto-arb-pipeline">
+                    {% call table() %}
                         <caption class="sr-only">ARB pipeline by status</caption>
-                        <thead class="bg-card">
-                            <tr class="border-b border-border">
-                                <th scope="col" class="h-10 px-4 text-left align-middle">ARB pipeline</th>
-                                <th scope="col" class="h-10 px-4 text-right align-middle">Reviews</th>
-                            </tr>
-                        </thead>
-                        <tbody>
+                        {% call table_header() %}{% call table_row() %}
+                            {% call table_head(class='h-10') %}ARB pipeline{% endcall %}
+                            {% call table_head(class='h-10 text-right') %}Reviews{% endcall %}
+                        {% endcall %}{% endcall %}
+                        {% call table_body() %}
                             {% for status_key, label, tone in [('pending', 'Pending', 'text-warning-emphasis'), ('approved', 'Approved', 'text-success-emphasis'), ('rejected', 'Rejected', 'text-destructive-emphasis')] %}
-                            <tr class="h-10 border-b border-border last:border-b-0">
-                                <td class="px-4 align-middle {{ tone }}">{{ label }}</td>
-                                <td class="px-4 text-right align-middle tabular-nums text-foreground">{{ ((cto.get('arb_pipeline') or {}).get(status_key))|dash }}</td>
-                            </tr>
+                            {% call table_row(class='h-10') %}
+                                {% call table_cell(class='py-0 ' ~ tone) %}{{ label }}{% endcall %}
+                                {% call table_cell(class='py-0 text-right tabular-nums text-foreground') %}{{ ((cto.get('arb_pipeline') or {}).get(status_key))|dash }}{% endcall %}
+                            {% endcall %}
                             {% endfor %}
-                        </tbody>
-                    </table>
+                        {% endcall %}
+                    {% endcall %}
+                    </div>
                 </div>
             </div>
         </section>
@@ -499,25 +448,25 @@
                 <span class="text-2xs font-semibold uppercase tracking-[0.06em] text-muted-foreground tabular-nums">Total ${{ '{:,.0f}'.format(cfo.get('total_tco')) }}</span>
                 {% endif %}
             </div>
-            <table class="dense-table w-full border-collapse text-sm" data-testid="cfo-tco-by-category">
+            <div data-testid="cfo-tco-by-category">
+            {% call table() %}
                 <caption class="sr-only">Total cost of ownership by category</caption>
-                <thead class="bg-card">
-                    <tr class="border-b border-border">
-                        <th scope="col" class="h-10 px-4 text-left align-middle">Category</th>
-                        <th scope="col" class="h-10 px-4 text-right align-middle">Total cost</th>
-                    </tr>
-                </thead>
-                <tbody>
+                {% call table_header() %}{% call table_row() %}
+                    {% call table_head(class='h-10') %}Category{% endcall %}
+                    {% call table_head(class='h-10 text-right') %}Total cost{% endcall %}
+                {% endcall %}{% endcall %}
+                {% call table_body() %}
                     {% for cat, amount in (cfo.get('tco_by_category') or {}).items() %}
-                    <tr class="h-12 border-b border-border last:border-b-0">
-                        <td class="px-4 align-middle capitalize text-foreground">{{ cat }}</td>
-                        <td class="px-4 text-right align-middle font-medium tabular-nums text-foreground">${{ '{:,.0f}'.format(amount) }}</td>
-                    </tr>
+                    {% call table_row(class='h-12') %}
+                        {% call table_cell(class='py-0 capitalize text-foreground') %}{{ cat }}{% endcall %}
+                        {% call table_cell(class='py-0 text-right font-medium tabular-nums text-foreground') %}${{ '{:,.0f}'.format(amount) }}{% endcall %}
+                    {% endcall %}
                     {% else %}
-                    <tr><td colspan="2" class="h-12 px-4 text-sm text-muted-foreground">No TCO data recorded yet.</td></tr>
+                    {{ table_empty_state(message='No TCO data recorded yet.', icon='circle-dollar-sign') }}
                     {% endfor %}
-                </tbody>
-            </table>
+                {% endcall %}
+            {% endcall %}
+            </div>
         </section>
     </div>
 

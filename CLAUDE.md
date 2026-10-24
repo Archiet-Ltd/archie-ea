@@ -507,7 +507,7 @@ counts only the families in `BANNED_FAMILIES` (`scripts/check_design_tokens.py`)
 `orange` or `cyan` class is right per DESIGN.md but moves this number by zero, and a
 line carrying a `token-migration-ok` marker is already excluded from the count.
 
-**All 73 gates, in registry order (`scripts/verify.py`, `build_gates`) — this table
+**All 74 gates, in registry order (`scripts/verify.py`, `build_gates`) — this table
 is a snapshot, not generated. Run `grep -oE '^\s*Gate\("[a-z-]+"' scripts/verify.py`
 to reconfirm the count before trusting it:**
 
@@ -564,6 +564,7 @@ to reconfirm the count before trusting it:**
 | `raw-repr-in-template` | a Python object repr (raw dict/list `str()`) reaching a rendered page | must be 0 |
 | `duplicate-breadcrumb` | a page rendering two independent breadcrumb trails at once | ratchet @ 17 |
 | `raw-html-escaping` | unescaped interpolation into hand-built (non-Jinja) HTML | ratchet @ 0 |
+| `design-map` | a page template missing from `docs/design-map.json`, a changed page with no `design-block` marker, or a page using a macro its designed block does not allow | ratchet @ 52 outside their block, 406 unmarked; both only fall |
 | `smoke-coverage-on-change` | a template/JS change with no `tests/smoke/` touch in the same diff | must be 0 |
 | `stale-models` | a retired LLM model id (404s in prod) in shipped code | must be 0 |
 | `deployed-deps` | installed packages below the pinned floors | must be 0 (boot-health job only) |

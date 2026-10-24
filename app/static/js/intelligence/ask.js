@@ -45,7 +45,7 @@ function askSurface() {
         stale: false,
         withheld: false,
         staleNotice: '',
-        twinMapUrl: '',
+        composerUrl: '',
         recomputing: false,
         recomputeLine: '',
         recomputeFailed: false,
@@ -76,7 +76,7 @@ function askSurface() {
         lastScanAt: null,
 
         init() {
-            this.twinMapUrl = this.$el.getAttribute('data-twin-map-url') || '';
+            this.composerUrl = this.$el.getAttribute('data-composer-url') || '';
             // The route ends in a literal "/0" (a real, URL-safe int, built
             // via url_for(..., app_id=0) since Werkzeug's int converter
             // rejects a string placeholder at build time) -- drop that one
@@ -100,8 +100,8 @@ function askSurface() {
             }
         },
 
-        twinMapHref(row) {
-            return this.twinMapUrl + '?element=' + row.elementId;
+        composerHref(row) {
+            return this.composerUrl + '?element=' + row.elementId;
         },
 
         portfolioPlanningHref() {

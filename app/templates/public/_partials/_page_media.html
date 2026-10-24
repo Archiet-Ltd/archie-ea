@@ -20,7 +20,7 @@
       <img src="{{ screenshot.url }}" alt="{{ screenshot.alt }}"
            width="{{ screenshot.width }}" height="{{ screenshot.height }}"
            loading="lazy" decoding="async"
-           class="rounded-lg border border-border shadow-sm">
+           class="rounded-lg border border-border">
     </picture>
     <figcaption class="mt-2 text-sm text-muted-foreground">{{ screenshot.caption }}</figcaption>
   </figure>
@@ -35,7 +35,7 @@
     <video controls muted playsinline preload="none"
            poster="{{ recording.poster_url }}" aria-label="{{ recording.alt }}"
            width="{{ recording.width }}" height="{{ recording.height }}"
-           class="w-full rounded-lg border border-border shadow-sm">
+           class="w-full rounded-lg border border-border">
       <source src="{{ recording.video_url }}" type="video/webm">
     </video>
     <figcaption class="mt-2 text-sm text-muted-foreground">{{ recording.caption }}</figcaption>

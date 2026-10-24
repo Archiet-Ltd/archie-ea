@@ -32,20 +32,22 @@
         'default': 'h-9 px-4',
         'sm': 'h-8 px-3',
         'lg': 'h-9 px-6',
-        'icon': 'h-9 w-9'
+        'icon': 'h-9 w-9',
+        'icon-sm': 'h-8 w-8'
     } %}
     
+    {% set icon_gap = '' if size in ('icon', 'icon-sm') else 'mr-2' %}
     {% set classes = base + ' ' + variants[variant] + ' ' + sizes[size] + ' ' + class %}
     
     {% if href %}
         <a href="{{ href }}" class="{{ classes }}" {% if disabled %}aria-disabled="true"{% endif %} {% if on_click %}@click="{{ on_click }}"{% endif %} {% if aria_label %}aria-label="{{ aria_label }}"{% endif %} {% if data_action %}data-action="{{ data_action }}"{% endif %} {% if testid %}data-testid="{{ testid }}"{% endif %} {{ attrs_dict|xmlattr }}>
-            {% if icon and icon_position == 'left' %}<i data-lucide="{{ icon }}" class="mr-2 h-4 w-4"></i>{% endif %}
+            {% if icon and icon_position == 'left' %}<i data-lucide="{{ icon }}" class="{{ icon_gap }} h-4 w-4"></i>{% endif %}
             {{ text }}{{ caller() if caller }}
             {% if icon and icon_position == 'right' %}<i data-lucide="{{ icon }}" class="ml-2 h-4 w-4"></i>{% endif %}
         </a>
     {% else %}
         <button type="{{ type }}" class="{{ classes }}" {% if disabled %}disabled{% endif %} {% if on_click %}@click="{{ on_click }}"{% endif %} {% if aria_label %}aria-label="{{ aria_label }}"{% endif %} {% if data_action %}data-action="{{ data_action }}"{% endif %} {% if testid %}data-testid="{{ testid }}"{% endif %} {{ attrs_dict|xmlattr }}>
-            {% if icon and icon_position == 'left' %}<i data-lucide="{{ icon }}" class="mr-2 h-4 w-4"></i>{% endif %}
+            {% if icon and icon_position == 'left' %}<i data-lucide="{{ icon }}" class="{{ icon_gap }} h-4 w-4"></i>{% endif %}
             {{ text }}{{ caller() if caller }}
             {% if icon and icon_position == 'right' %}<i data-lucide="{{ icon }}" class="ml-2 h-4 w-4"></i>{% endif %}
         </button>

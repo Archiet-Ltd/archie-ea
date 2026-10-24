@@ -114,6 +114,27 @@ module.exports = {
           },
         },
       },
+      // Text role of the status tokens. --destructive, --success and --warning are FILL colours (a dark red,
+      // a mid green, an amber): as text they score 1.4 to 3.3 against the page in one theme or the other.
+      // Their -emphasis twin is the text colour, tuned per theme, so `text-destructive`, `text-success` and
+      // `text-warning` resolve to it. bg-*, border-* and ring-* keep the fill value.
+      textColor: {
+        destructive: {
+          DEFAULT: "hsl(var(--destructive-emphasis) / <alpha-value>)",
+          foreground: "hsl(var(--destructive-foreground) / <alpha-value>)",
+          emphasis: "hsl(var(--destructive-emphasis) / <alpha-value>)",
+        },
+        success: {
+          DEFAULT: "hsl(var(--success-emphasis) / <alpha-value>)",
+          foreground: "hsl(var(--success-foreground) / <alpha-value>)",
+          emphasis: "hsl(var(--success-emphasis) / <alpha-value>)",
+        },
+        warning: {
+          DEFAULT: "hsl(var(--warning-emphasis) / <alpha-value>)",
+          foreground: "hsl(var(--warning-foreground) / <alpha-value>)",
+          emphasis: "hsl(var(--warning-emphasis) / <alpha-value>)",
+        },
+      },
       borderRadius: {
         lg: "var(--radius)",
         md: "calc(var(--radius) - 2px)",
