@@ -2,6 +2,7 @@
 {% from 'components/page_header.html' import page_header %}
 {% from 'components/button.html' import button %}
 {% from 'components/empty_state.html' import empty_state %}
+{% from 'components/input.html' import input %}
 
 {% block title %}AI Systems Register — {{ config.APP_NAME }}{% endblock %}
 
@@ -24,7 +25,7 @@
         as <span class="font-mono">—</span>, never a fabricated default.
       </p>
       <form method="POST" action="{{ url_for('ai_systems_genome.ai_systems_seed') }}" class="shrink-0">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        {{ input(name='csrf_token', type='hidden', value=csrf_token()) }}
         {{ button(text='Generate / refresh register', type='submit') }}
       </form>
     </div>
