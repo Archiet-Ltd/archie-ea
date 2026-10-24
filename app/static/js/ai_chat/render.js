@@ -404,6 +404,13 @@
        This is the pointer the brief asks for, attached below the message
        rather than parsed out of it — no assumption about the exact wording
        survives a copy edit to agent_runner.py's fallback strings. */
+    /* The way to the provider settings is a secondary link for an administrator
+       only; the page sets window.chatIsAdmin from the same check the sidebar uses. */
+    function adminProviderLink() {
+        if (!window.chatIsAdmin) return '';
+        return '<a href="/admin/api-settings" data-testid="chat-provider-settings-link" class="mt-1 inline-flex items-center gap-1 underline hover:no-underline">Check the AI provider settings</a>';
+    }
+
     function renderApiSettingsNotice(error) {
         if (!error) return '';
         return '<div class="mt-3 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive-emphasis" role="alert">' +
@@ -411,9 +418,7 @@
                    '<i data-lucide="alert-circle" class="h-3.5 w-3.5 mt-0.5 shrink-0" aria-hidden="true"></i>' +
                    '<div class="flex-1">' +
                      '<div class="font-medium">This reply could not be completed as requested.</div>' +
-                     '<a href="/admin/api-settings" class="mt-1 inline-flex items-center gap-1 underline hover:no-underline">' +
-                       'Open Admin → API Settings' +
-                     '</a>' +
+                     adminProviderLink() +
                    '</div>' +
                  '</div>' +
                '</div>';
@@ -588,9 +593,7 @@
             '<div class="flex items-start gap-2">' +
               '<i data-lucide="alert-circle" class="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true"></i>' +
               '<div class="flex-1"><p>' + escapeForHtml(message) + '</p>' +
-                (o.adminLink
-                    ? '<a href="/admin/api-settings" class="mt-1 inline-flex items-center gap-1 underline hover:no-underline">Open Admin → API Settings</a>'
-                    : '') +
+                (o.adminLink ? adminProviderLink() : '') +
               '</div>' +
               (onRetry ? '<button type="button" class="js-retry inline-flex items-center rounded-md border border-input bg-background px-3 py-1 text-xs font-medium hover:bg-accent">Retry</button>' : '') +
             '</div>';

@@ -101,3 +101,17 @@ aside.sidebar-collapsed .sidebar-collapse-btn i[data-lucide="panel-left"] {
     -webkit-mask-image: none;
     mask-image: none;
 }
+
+/* Navigation v3: the connect card and the search results have no place in the icon rail. */
+.sidebar-collapsed .sidebar-connect-card,
+.sidebar-collapsed [data-slot="sidebar-subitem"] {
+    display: none !important;
+}
+.sidebar-collapsed [data-slot="sidebar-header"] .sidebar-app-name,
+.sidebar-collapsed [data-slot="sidebar-footer"] .sidebar-footer-text {
+    display: none !important;
+}
+.sidebar-collapsed [data-slot="sidebar-header"],
+.sidebar-collapsed [data-slot="sidebar-footer"] {
+    justify-content: center;
+}

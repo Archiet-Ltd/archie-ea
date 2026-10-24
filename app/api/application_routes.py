@@ -124,6 +124,7 @@ def api_applications_table():
         sort_direction (str): asc or desc
         status (str): Filter by status
         type (str): Filter by application type
+        filter_owner (str): "none" lists only applications with no owner
 
     Returns:
         JSON with data, recordsTotal, recordsFiltered, page, pages
@@ -187,6 +188,11 @@ def api_applications_table():
             query = query.filter(getattr(ApplicationComponent, status_field) == status_filter)
         if type_filter:
             query = query.filter(ApplicationComponent.application_type == type_filter)
+        if request.args.get("filter_owner") == "none":
+            # The same "is it owned" rule the Applications list and the chat read.
+            from app.services.element_ownership_service import application_is_owned_expression
+
+            query = query.filter(~application_is_owned_expression(ApplicationComponent))
         if search:
             search_term = f"%{search}%"
             query = query.filter(

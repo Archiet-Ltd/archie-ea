@@ -18,6 +18,7 @@ from app.services.ai_architecture_service import CognitiveArchitectureService
 from app.services.business_output_service import BusinessOutputService, StakeholderRole
 from app.services.chat_entity_matching_service import ChatEntityMatchingService
 from app.utils.duplicate_guard import find_similar_entities
+from app.modules.ai_chat.services.failure_messages import ASSISTANT_UNAVAILABLE
 from . import unified_ai_chat_bp
 
 logger = logging.getLogger(__name__)
@@ -321,11 +322,7 @@ def entity_matching_message():
             return jsonify(
                 {
                     "success": False,
-                    "error": (
-                        "Entity matching needs an LLM provider to extract entities "
-                        "from your message, and none is configured. Configure one "
-                        "at Admin > API Settings."
-                    ),
+                    "error": ASSISTANT_UNAVAILABLE,
                     "code": "LLM_NOT_CONFIGURED",
                 }
             ), 503
