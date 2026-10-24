@@ -117,8 +117,8 @@
         </fieldset>
 
         <div class="flex justify-end gap-2 pt-2">
-          {{ button(text='Cancel', variant='outline', on_click="Platform.modal.close('export-impl-data')", aria_label='Cancel export') }}
-          {{ button(text='Export CSV', type='submit', aria_label='Export data as CSV') }}
+          {{ button(text='Cancel', variant='outline', on_click="Platform.modal.close('export-impl-data')") }}
+          {{ button(text='Export CSV', type='submit') }}
         </div>
       </form>
     {% endcall %}
@@ -150,7 +150,7 @@
         <div x-show="errorMsg" x-cloak class="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive-emphasis" x-text="errorMsg"></div>
 
         <div class="flex justify-end gap-3 pt-2">
-          {{ button(text='Cancel', variant='outline', on_click='Platform.modal.close(\'create-work-package\')', aria_label='Cancel') }}
+          {{ button(text='Cancel', variant='outline', on_click='Platform.modal.close(\'create-work-package\')') }}
           {{ button(text='Create Work Package', type='submit', attrs_dict={':disabled': 'submitting'}) }}
         </div>
       </form>
