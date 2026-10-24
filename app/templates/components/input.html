@@ -1,5 +1,6 @@
 {# shadcn/ui Input Component #}
-{# aria_label: pass when the call site has no visible <label for="<id>">.
+{# attrs_dict: extra attributes for framework bindings, e.g. {'x-model': 'form.name'}.
+   aria_label: pass when the call site has no visible <label for="<id>">.
    A placeholder is not a label -- it is gone as soon as the user types. #}
 {% macro input(
     id='',
@@ -12,7 +13,8 @@
     class='',
     error=none,
     aria_describedby=none,
-    aria_label=none
+    aria_label=none,
+    attrs_dict={}
 ) %}
     <input
         {% if id %}id="{{ id }}"{% endif %}
@@ -25,6 +27,7 @@
         {% if error %}aria-invalid="true"{% endif %}
         {% if aria_describedby %}aria-describedby="{{ aria_describedby }}"{% elif error and id %}aria-describedby="{{ id }}-error"{% endif %}
         {% if aria_label %}aria-label="{{ aria_label }}"{% endif %}
+        {{ attrs_dict|xmlattr }}
         class="flex h-10 w-full rounded-md border {% if error %}border-destructive{% else %}border-input{% endif %} bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 {{ class }}"
     />
     {% if error and id %}
@@ -38,7 +41,8 @@
     </label>
 {% endmacro %}
 
-{# aria_label: pass when the call site has no visible <label for="<id>">.
+{# attrs_dict: extra attributes for framework bindings, e.g. {'x-model': 'form.name'}.
+   aria_label: pass when the call site has no visible <label for="<id>">.
    A placeholder is not a label -- it is gone as soon as the user types. #}
 {% macro textarea(
     id='',
@@ -50,7 +54,8 @@
     class='',
     error=none,
     aria_describedby=none,
-    aria_label=none
+    aria_label=none,
+    attrs_dict={}
 ) %}
     <textarea
         {% if id %}id="{{ id }}"{% endif %}
@@ -61,6 +66,7 @@
         {% if error %}aria-invalid="true"{% endif %}
         {% if aria_describedby %}aria-describedby="{{ aria_describedby }}"{% elif error and id %}aria-describedby="{{ id }}-error"{% endif %}
         {% if aria_label %}aria-label="{{ aria_label }}"{% endif %}
+        {{ attrs_dict|xmlattr }}
         rows="{{ rows }}"
         class="flex min-h-[80px] w-full rounded-md border {% if error %}border-destructive{% else %}border-input{% endif %} bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 {{ class }}"
     >{{ caller() if caller }}</textarea>

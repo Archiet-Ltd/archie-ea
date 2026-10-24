@@ -25,14 +25,18 @@
         'outline': 'border border-input bg-background text-foreground hover:bg-muted/50',
         'secondary': 'bg-secondary text-secondary-foreground hover:bg-secondary/80',
         'ghost': 'text-muted-foreground hover:bg-accent hover:text-foreground',
-        'link': 'text-primary underline-offset-4 hover:underline'
+        'link': 'text-primary underline-offset-4 hover:underline',
+        'bare': ''
     } %}
     
     {% set sizes = {
         'default': 'h-9 px-4',
         'sm': 'h-8 px-3',
         'lg': 'h-9 px-6',
-        'icon': 'h-9 w-9'
+        'icon': 'h-9 w-9',
+        'xs': 'h-7 px-2 text-xs',
+        'icon-sm': 'h-8 w-8',
+        'bare': ''
     } %}
     
     {% set classes = base + ' ' + variants[variant] + ' ' + sizes[size] + ' ' + class %}

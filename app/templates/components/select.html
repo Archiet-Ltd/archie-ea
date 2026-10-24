@@ -40,3 +40,16 @@
         {% endif %}
     </div>
 {% endmacro %}
+
+{# Native <select> for forms and framework-bound fields (the macro above is a custom dropdown and cannot carry
+   x-model or a form value). Options go in the call block. attrs_dict carries bindings such as {'x-model': 'form.status'}. #}
+{% macro native_select(id='', name='', class='', aria_label=none, disabled=false, attrs_dict={}) %}
+    <select
+        {% if id %}id="{{ id }}"{% endif %}
+        {% if name %}name="{{ name }}"{% endif %}
+        {% if aria_label %}aria-label="{{ aria_label }}"{% endif %}
+        {% if disabled %}disabled{% endif %}
+        {{ attrs_dict|xmlattr }}
+        class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 {{ class }}"
+    >{{ caller() if caller }}</select>
+{% endmacro %}
