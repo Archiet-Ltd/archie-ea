@@ -26,6 +26,21 @@ def _page(browser, viewport):
     return context, context.new_page()
 
 
+def _assert_persona(email, role="enterprise_architect"):
+    """The signed-in user is the persona the journey names, not an administrator or platform role."""
+    from app import create_app
+    from app.middleware.tenant_decorators import is_platform_admin
+    from app.models.user import User
+    from app.services.rbac_service import rbac_service
+
+    app = create_app("testing")
+    with app.app_context():
+        user = User.query.filter_by(email=email).one()
+        assert user.enterprise_role == role, user.enterprise_role
+        assert not is_platform_admin(user)
+        assert not rbac_service.is_org_admin(user, user.organization_id)
+
+
 def _top(page, selector):
     return page.locator(selector).first.evaluate("e => e.getBoundingClientRect().top")
 
@@ -63,6 +78,7 @@ def test_public_home_fold_is_one_message(browser, live_server):
 
 def test_empty_workspace_first_screen_is_one_message(browser, live_server, seeded):
     email, org_id = _empty_organisation_user(live_server)
+    _assert_persona(email)
     context, page = _page(browser, FOLD)
     try:
         _login(page, live_server, email)
@@ -98,6 +114,7 @@ def test_empty_workspace_first_screen_is_one_message(browser, live_server, seede
 @pytest.mark.parametrize("viewport", [FOLD, PHONE], ids=["1440", "390"])
 def test_populated_workspace_opens_on_question_and_cited_answer(browser, live_server, seeded, viewport):
     email = seeded["emails"]["enterprise_architect"]
+    _assert_persona(email)
     context, page = _page(browser, viewport)
     try:
         _login(page, live_server, email)
@@ -127,6 +144,7 @@ def test_populated_workspace_opens_on_question_and_cited_answer(browser, live_se
 def test_empty_workspace_fold_holds_only_the_one_message(browser, live_server, seeded, viewport):
     """Signed in as a new architect: the welcome line and the company-kind block wait below the fold."""
     email, _ = _empty_organisation_user(live_server)
+    _assert_persona(email)
     context, page = _page(browser, viewport)
     try:
         _login(page, live_server, email)
@@ -148,6 +166,7 @@ def test_first_answer_names_the_owner_and_its_source_with_a_link(browser, live_s
     reaches names the owner the capability page shows, and its source control names the import
     and opens the record."""
     email, _ = _empty_organisation_user(live_server)
+    _assert_persona(email)
     context, page = _page(browser, FOLD)
     try:
         _login(page, live_server, email)
@@ -164,7 +183,7 @@ def test_first_answer_names_the_owner_and_its_source_with_a_link(browser, live_s
         first = cascade.locator("li[data-depth]:not([data-root])").first
         first.get_by_role("button", name="Source of this connection").click()
         tip = first.get_by_role("tooltip")
-        expect(tip).to_contain_text("Imported from sample-company.oef.xml")
+        expect(tip).to_contain_text("Imported from Sample company")
         expect(tip).to_contain_text("Recorded")
         expect(tip).not_to_contain_text("Recorded in the model")
         tip.locator('[data-testid="cascade-source-link"]').click()
