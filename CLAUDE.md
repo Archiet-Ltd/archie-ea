@@ -507,7 +507,7 @@ counts only the families in `BANNED_FAMILIES` (`scripts/check_design_tokens.py`)
 `orange` or `cyan` class is right per DESIGN.md but moves this number by zero, and a
 line carrying a `token-migration-ok` marker is already excluded from the count.
 
-**All 75 gates, in registry order (`scripts/verify.py`, `build_gates`) — this table
+**All 81 gates, in registry order (`scripts/verify.py`, `build_gates`) — this table
 is a snapshot, not generated. Run `grep -oE '^\s*Gate\("[a-z-]+"' scripts/verify.py`
 to reconfirm the count before trusting it:**
 
@@ -525,6 +525,12 @@ to reconfirm the count before trusting it:**
 | `raw-fetch-sites` | `fetch()` bypassing `Platform.fetch` | ratchet @ 0 |
 | `design-tokens-extended` | raw colours outside the core banned families | ratchet @ 0 |
 | `shell-conformance` | a page off the platform shell (header macro/width) | ratchet @ 3 |
+| `shell-layout` | a page that does not reach an approved layout (admin, public or composer) through its `extends` chain | ratchet @ 16 |
+| `shell-chrome` | a page drawing its own sidebar, top bar, navigation or breadcrumb outside the shell macros | ratchet @ 54 |
+| `shell-escapes` | a `shell-ok:` escape hatch (every exception is counted) | ratchet @ 1 |
+| `dialog-title` | a dialog, sheet or drawer with no title | ratchet @ 65 |
+| `empty-state-macro` | a hand-written "No ... yet" block instead of the `empty_state` macro | ratchet @ 166 |
+| `form-field-macro` | a form control inside a form that is not in `form_field`/`form_group` | ratchet @ 583 |
 | `nav-coverage` | business-architecture output missing from every sidebar | ratchet @ 0 |
 | `air-gap` | a UI asset loaded from a public CDN | ratchet @ 0 |
 | `raw-sql-tenancy` | raw SQL on a tenant table with no `organization_id` predicate | ratchet @ 0 |
