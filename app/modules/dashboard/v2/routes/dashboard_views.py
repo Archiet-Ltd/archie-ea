@@ -49,6 +49,7 @@ def overview():
     from app.models.vendor.vendor_organization import VendorOrganization
     from app.modules.dashboard.v2.services.executive_dashboard_service import (
         format_health_score,
+        health_score_arithmetic,
     )
 
     metrics = {
@@ -525,6 +526,7 @@ def overview():
     health_score = None
     health_components = {}
     health_unavailable = []
+    health_sum = None
     try:
         # The executive-summary API uses this same tenant-scoped computation.
         # Do not derive an identically labelled score from different measures
@@ -538,9 +540,12 @@ def overview():
 
         # Enrich each component with basis, source, as_of per brief council-07
         as_of = datetime.utcnow().strftime("%d %b %Y")
+        arithmetic = health_score_arithmetic(components)
+        health_sum = arithmetic["sum"]
         health_components = {
             "phase_maturity": {
                 "key": "phase_maturity",
+                "weight": arithmetic["weights"]["phase_maturity"],
                 "label": "Phase Maturity",
                 "value": components["phase_maturity"],
                 "basis": "Share of solutions with a recorded ADM phase that are in phase C or later" if components["phase_maturity"] is not None else "No solutions with recorded ADM phases yet",
@@ -549,6 +554,7 @@ def overview():
             },
             "risk_health": {
                 "key": "risk_health",
+                "weight": arithmetic["weights"]["risk_posture"],
                 "label": "Risk Posture",
                 "value": components["risk_posture"],
                 "basis": "Inverse of high/critical risk ratio" if components["risk_posture"] is not None else "No risks recorded yet. Record a risk in the register to measure this.",
@@ -557,6 +563,7 @@ def overview():
             },
             "capability_coverage": {
                 "key": "capability_coverage",
+                "weight": arithmetic["weights"]["capability_coverage"],
                 "label": "Capability Coverage",
                 "value": components["capability_coverage"],
                 "basis": "Percentage of L1 capabilities with at least one mapped application" if components["capability_coverage"] is not None else "No capability mappings yet. Map an application to a capability to measure this.",
@@ -565,6 +572,7 @@ def overview():
             },
             "governance": {
                 "key": "governance",
+                "weight": arithmetic["weights"]["governance"],
                 "label": "Governance",
                 "value": components["governance"],
                 "basis": "ARB presence, timeliness and approval rate" if components["governance"] is not None else "No ARB activity yet. Submit an item for review to measure this.",
@@ -579,6 +587,7 @@ def overview():
         health_score = None
         health_components = {}
         health_unavailable = []
+        health_sum = None
 
     # Data Coverage strip — real per-field coverage of the application portfolio.
     # Single aggregate query; percentages match DATA_REALITY.md definitions.
@@ -824,6 +833,7 @@ def overview():
         health_score=health_score,
         health_score_text=format_health_score(health_score),
         health_components=health_components,
+        health_sum=health_sum,
         health_unavailable=health_unavailable,
         enterprise_role=enterprise_role,
         data_coverage=data_coverage,

@@ -164,13 +164,13 @@
             {% endcall %}
             <div x-show="open" x-cloak class="mt-3 space-y-2 border-t border-border pt-3" data-testid="health-score-disclosure">
                 <p class="text-xs font-medium text-foreground">Weighted from:</p>
-                <ul class="space-y-1.5 text-xs text-muted-foreground">
+                <ul class="space-y-1.5 text-xs text-muted-foreground" data-testid="health-score-parts">
                 {% for key in ['phase_maturity', 'risk_health', 'capability_coverage', 'governance'] %}
                     {% set part = health_components.get(key, {}) %}
-                    <li class="flex items-start gap-2">
+                    <li class="flex items-start gap-2" data-testid="health-score-part">
                         {% if part.value is not none %}
-                        <span class="shrink-0 text-foreground font-medium">{{ part.value }}%</span>
-                        <span>{{ part.label }}</span>
+                        <span class="shrink-0 font-medium text-foreground tabular-nums" data-testid="health-part-value">{{ part.value }}%</span>
+                        <span>{{ part.label }}, weight <span class="tabular-nums" data-testid="health-part-weight">{{ '%g'|format(part.weight) }}%</span></span>
                         {% else %}
                         <span class="shrink-0 text-muted-foreground">—</span>
                         <span>{{ part.label }}: {{ part.basis }}</span>
@@ -178,6 +178,9 @@
                     </li>
                 {% endfor %}
                 </ul>
+                {% if health_sum %}
+                <p class="text-xs text-muted-foreground" data-testid="health-score-sum">Sum: <span class="tabular-nums text-foreground">{{ health_sum }}</span></p>
+                {% endif %}
                 {% if health_unavailable %}
                 <p class="text-xs text-muted-foreground mt-2">
                     Not measured: {{ health_unavailable|join(', ')|replace('_', ' ')|title }}.
@@ -238,9 +241,7 @@
                 {{ '{:,}'.format(nav_stats.relationships) if nav_stats and nav_stats.relationships is not none else '—' }} relationships across all ArchiMate layers
             </p>
         </div>
-        <a href="/archimate/composer?viewpoint=layered" class="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90">
-            Open Composer <i data-lucide="arrow-right" class="h-3.5 w-3.5" aria-hidden="true"></i>
-        </a>
+        {{ button(text='Open Composer', href='/archimate/composer?viewpoint=layered', size='sm', icon='arrow-right', icon_position='right', class='shrink-0 gap-1.5 text-xs', testid='open-composer') }}
     </div>
 
     {# Council-07: Architecture health — each part shows value with source/date, or the
@@ -258,6 +259,7 @@
                 {% if part.value is not none %}
                 <p class="mt-1 text-lg font-semibold tabular-nums text-foreground">{{ part.value }}%</p>
                 <p class="mt-1 text-xs text-muted-foreground">{{ part.basis }}</p>
+                <p class="mt-0.5 text-xs text-muted-foreground">Counts for {{ '%g'|format(part.weight) }}% of the health score</p>
                 <p class="mt-0.5 text-xs text-muted-foreground">from {{ part.source }}, as of {{ part.as_of }}</p>
                 {% else %}
                 <p class="mt-1 text-lg font-semibold tabular-nums text-foreground">—</p>
@@ -557,12 +559,8 @@
                     <a :href="'/archimate/composer?viewpoint=layered&layer=' + activeRole" class="inline-flex h-8 items-center gap-1.5 rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90">
                         Open in composer <i data-lucide="pen-tool" class="h-3.5 w-3.5" aria-hidden="true"></i>
                     </a>
-                    <a href="/architecture/dashboard" class="inline-flex h-8 items-center gap-1.5 rounded-md border border-border px-3 text-xs font-medium text-foreground transition-colors hover:bg-muted">
-                        Browse elements <i data-lucide="boxes" class="h-3.5 w-3.5" aria-hidden="true"></i>
-                    </a>
-                    <a href="/capability-map/" x-show="activeRole === 'strategy' || activeRole === 'business'" class="inline-flex h-8 items-center gap-1.5 rounded-md border border-border px-3 text-xs font-medium text-foreground transition-colors hover:bg-muted">
-                        Capability map <i data-lucide="layers" class="h-3.5 w-3.5" aria-hidden="true"></i>
-                    </a>
+                    {{ button(text='Browse elements', variant='outline', size='sm', icon='boxes', icon_position='right', class='gap-1.5 text-xs', href='/architecture/dashboard') }}
+                    {{ button(text='Capability map', variant='outline', size='sm', icon='layers', icon_position='right', class='gap-1.5 text-xs', href='/capability-map/', attrs_dict={'x-show': "activeRole === 'strategy' || activeRole === 'business'"}) }}
                 </div>
             </div>
         </section>
