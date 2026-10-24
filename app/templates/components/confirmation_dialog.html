@@ -19,7 +19,9 @@
    ) }}
 
    Optional: confirm_label / cancel_label (accessible names, default "Close"),
-   button_class (replaces the 32px icon-button classes so the visible text fits).
+   button_class (replaces the 32px icon-button classes so the visible text fits),
+   stop_clicks (default true; false lets a click on a button reach the page's
+   data-modal-close handler, which the card's @click.stop otherwise swallows).
    
    Trigger from JavaScript:
    window.dispatchEvent(new CustomEvent('open-confirm-delete-app', { 
@@ -36,7 +38,8 @@
     variant='destructive',
     confirm_label=none,
     cancel_label=none,
-    button_class=none
+    button_class=none,
+    stop_clicks=true
 ) %}
 <div id="confirm-dialog-{{ id }}" x-data="{ callback: null }" hidden
      @open-confirm-{{ id }}.window="callback = $event.detail?.callback; Platform.modal.open('confirm-dialog-{{ id }}')"
@@ -54,7 +57,7 @@
         aria-describedby="dialog-desc-{{ id }}">
         
         <div class="bg-card rounded-lg max-w-md w-full p-6 border border-border" 
-             @click.stop>
+             {% if stop_clicks %}@click.stop{% endif %}>
             
             <!-- Icon -->
             {% if variant == 'destructive' %}
