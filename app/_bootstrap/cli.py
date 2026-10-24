@@ -30,6 +30,12 @@ def init_cli(app):
     except Exception as e:
         app.logger.warning(f"⚠️  Failed to register traceability report CLI command: {e}")
 
+    try:
+        from app.commands.health_check_report_command import register_health_check_report_command
+        register_health_check_report_command(app)
+    except Exception as e:
+        app.logger.warning(f"⚠️  Failed to register health-check-report CLI command: {e}")
+
     # Lucidchart import CLI command
     try:
         from app.commands.lucid_import_commands import register_lucid_import_commands

@@ -1,0 +1,25 @@
+{# shell-ok: a standalone downloadable document, not a page in the product shell.
+   The health-check report as a standalone document, written as HTML and converted to PDF.
+   The stylesheets are inlined so the file opens anywhere with no server behind it.
+   smoke-coverage-ok: covered by tests/smoke/test_health_check_sample_journey.py #}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Architecture health check: {{ report.organisation }}</title>
+  <style>{{ stylesheet|safe }}</style>
+</head>
+<body class="bg-background text-foreground hc-document">
+  <header class="hc-cover">
+    <p class="text-sm text-muted-foreground">Architecture health check</p>
+    <h1 class="text-3xl font-semibold">{{ report.organisation }}</h1>
+    <p class="text-sm text-muted-foreground">Prepared {{ report.generated_on.strftime('%-d %B %Y') }}</p>
+  </header>
+  <main>
+    {% include 'health_check/_report_body.html' %}
+  </main>
+  <footer class="hc-footer text-sm text-muted-foreground">
+    <p>Prepared by Entelim from the records in your workspace. A figure marked Not recorded is missing from your data and has not been estimated.</p>
+  </footer>
+</body>
+</html>
