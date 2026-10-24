@@ -16,6 +16,11 @@
     aria_describedby=none,
     aria_label=none,
     size='default',
+    inputmode='',
+    pattern='',
+    autocomplete='',
+    maxlength='',
+    autofocus=false,
     attrs_dict={}
 ) %}
     {% set heights = {'default': 'h-10', 'sm': 'h-9', 'xs': 'h-8'} %}
@@ -30,6 +35,11 @@
         {% if error %}aria-invalid="true"{% endif %}
         {% if aria_describedby %}aria-describedby="{{ aria_describedby }}"{% elif error and id %}aria-describedby="{{ id }}-error"{% endif %}
         {% if aria_label %}aria-label="{{ aria_label }}"{% endif %}
+        {% if inputmode %}inputmode="{{ inputmode }}"{% endif %}
+        {% if pattern %}pattern="{{ pattern }}"{% endif %}
+        {% if autocomplete %}autocomplete="{{ autocomplete }}"{% endif %}
+        {% if maxlength %}maxlength="{{ maxlength }}"{% endif %}
+        {% if autofocus %}autofocus{% endif %}
         {{ attrs_dict|xmlattr }}
         {% if type == 'range' %}
         class="h-2 w-full cursor-pointer accent-primary disabled:cursor-not-allowed disabled:opacity-50 {{ class }}"

@@ -227,45 +227,18 @@ def mfa_challenge():
     app; one not yet enrolled is shown a fresh secret to scan and must prove
     they captured it correctly before MFA (and the login) is considered
     satisfied.
+
+    Enrolment, the sign-in code and the recovery code are handled by
+    mfa_flow.run_mfa_challenge.
     """
     user = _mfa_pending_user()
     if user is None:
         flash("Your sign-in attempt expired. Please sign in again.", "error")
         return redirect(url_for("account.login"))
 
-    from app.services import mfa_service
+    from app.modules.account.mfa_flow import run_mfa_challenge
 
-    if not user.mfa_enabled:
-        secret = session.get("_mfa_enroll_secret")
-        if not secret:
-            secret = mfa_service.generate_secret()
-            session["_mfa_enroll_secret"] = secret
-        if request.method == "POST":
-            code = request.form.get("code", "")
-            try:
-                mfa_service.enroll(user, secret, code)
-            except mfa_service.MFAError as exc:
-                flash(str(exc), "form-error")
-                return render_template(
-                    "account/mfa_enroll.html",
-                    secret=secret,
-                    provisioning_uri=mfa_service.provisioning_uri(user, secret),
-                )
-            session.pop("_mfa_enroll_secret", None)
-            return _complete_login_after_mfa(user)
-        return render_template(
-            "account/mfa_enroll.html",
-            secret=secret,
-            provisioning_uri=mfa_service.provisioning_uri(user, secret),
-        )
-
-    if request.method == "POST":
-        code = request.form.get("code", "")
-        if mfa_service.verify_login_code(user, code):
-            return _complete_login_after_mfa(user)
-        flash("That code was not accepted. Try again.", "form-error")
-
-    return render_template("account/mfa_challenge.html")
+    return run_mfa_challenge(user, _complete_login_after_mfa)
 
 
 @account_bp.route("/register", methods=["GET", "POST"])
