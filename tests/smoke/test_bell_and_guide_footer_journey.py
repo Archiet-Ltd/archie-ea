@@ -74,3 +74,65 @@ def test_guided_footer_buttons_share_height_and_radius(page, live_server, seeded
 
     next_btn.click()
     assert panel.is_visible()
+
+
+def test_bulk_selection_bar_buttons_are_the_button_component(page, live_server, seeded, app):
+    """Procurement selects vendors; the bar's two actions share one size and work."""
+    import uuid
+
+    from app import db
+    from app.models.vendor.vendor_organization import VendorOrganization
+
+    with app.app_context():
+        tag = uuid.uuid4().hex[:6]
+        for n in ("Alpha", "Beta"):
+            db.session.add(VendorOrganization(name=f"{n} Systems {tag}", vendor_type="software_vendor"))
+        db.session.commit()
+    email = seeded["emails"]["procurement"]
+    _login(page, live_server, email)
+    page.goto(live_server + "/vendors/", wait_until="networkidle", timeout=PAGE_TIMEOUT)
+    boxes = page.get_by_role("checkbox", name="Select row")
+    boxes.first.wait_for(state="visible", timeout=15000)
+    boxes.first.check()
+
+    bar = page.locator("[role=status]").filter(has_text="selected")
+    delete_btn = bar.get_by_role("button", name="Delete selected")
+    clear_btn = bar.get_by_role("button", name="Clear selection")
+    delete_btn.wait_for(state="visible", timeout=5000)
+    assert delete_btn.is_visible() and clear_btn.is_visible()
+
+    def metrics(loc):
+        return loc.evaluate(
+            "e => [e.getBoundingClientRect().height, getComputedStyle(e).borderTopLeftRadius]"
+        )
+
+    assert metrics(delete_btn) == metrics(clear_btn) == [32, "6px"]
+
+    delete_btn.click()
+    modal = page.get_by_role("heading", name="Delete Vendors?")
+    modal.wait_for(state="visible", timeout=5000)
+    page.keyboard.press("Escape")
+
+    clear_btn.click()
+    bar.wait_for(state="hidden", timeout=5000)
+    assert not boxes.first.is_checked()
+
+
+def test_rationalization_pipeline_is_a_card_and_its_steps_land_on_content(page, live_server, seeded):
+    email = seeded["emails"]["portfolio_manager"]
+    _login(page, live_server, email)
+    page.goto(live_server + "/applications/rationalization", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    nav = page.get_by_role("navigation", name="Rationalization pipeline")
+    nav.wait_for(state="visible", timeout=15000)
+    card = nav.locator("[data-slot=card]")
+    assert card.count() == 1
+    assert "rounded-xl" not in (card.get_attribute("class") or "")
+    assert page.locator("nav.rounded-xl.border.bg-card").count() == 0
+
+    hrefs = nav.locator("a").evaluate_all("els => els.map(e => e.getAttribute('href'))")
+    assert hrefs, "pipeline steps must be links"
+    assert len(hrefs) == 5
+    for href in hrefs:
+        resp = page.goto(live_server + href, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        assert resp.status == 200, f"{href} answered {resp.status}"
+        assert len(page.locator("main, #main-content").first.inner_text().strip()) > 40, f"{href} is empty"
