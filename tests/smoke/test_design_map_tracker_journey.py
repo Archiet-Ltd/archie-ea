@@ -17,6 +17,15 @@ TRACKER = ROOT / "docs" / "design" / "tracker.html"
 DESIGN_MAP = json.loads((ROOT / "docs" / "design-map.json").read_text(encoding="utf-8"))
 
 
+def _measured():
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("check_design_map_journey", ROOT / "scripts" / "check_design_map.py")
+    tool = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(tool)
+    return tool.measure()
+
+
 def _open(browser, width):
     page = browser.new_page(viewport={"width": width, "height": 900})
     page.goto(TRACKER.as_uri(), wait_until="load")
@@ -71,6 +80,33 @@ def test_block_count_opens_exactly_that_blocks_pages_and_spec_link_lands_on_cont
         for link in re.findall(r"\]\(([^)]+\.webp)\)", spec.read_text(encoding="utf-8")):
             assert (spec.parent / link).resolve().stat().st_size > 0
 
+        page.fill("#page-search", "no-such-page-anywhere")
+        assert page.inner_text("#page-count").startswith("0 of ")
+    finally:
+        page.close()
+
+
+@pytest.mark.parametrize("width", [1440, 390])
+def test_product_manager_filters_pages_by_persona_and_reads_the_components_to_compose(browser, width):
+    """Goal: before briefing a conversion, a product manager finds a persona's pages and reads each page's component list."""
+    pages = DESIGN_MAP["pages"]
+    persona = "procurement"
+    expected = {rel: e for rel, e in pages.items() if e["persona"] == persona}
+    assert expected, "the map assigns procurement pages"
+    page = _open(browser, width)
+    try:
+        page.click("#tab-pages")
+        page.select_option("#persona-filter", persona)
+        shown = page.locator("#pages-table tbody tr:not([hidden])")
+        assert shown.count() == len(expected)
+        assert page.inner_text("#page-count").startswith("%d of %d" % (len(expected), len(pages)))
+        for i in range(shown.count()):
+            cells = shown.nth(i).locator("td")
+            rel = cells.nth(0).inner_text()
+            assert cells.nth(2).inner_text() == DESIGN_MAP["personas"][persona]
+            assert cells.nth(3).inner_text() == ", ".join(expected[rel]["components"]) != ""
+        assert page.inner_text("#outside-components") == str(_measured()["outside_components_count"])
+        page.select_option("#persona-filter", "")
         page.fill("#page-search", "no-such-page-anywhere")
         assert page.inner_text("#page-count").startswith("0 of ")
     finally:
