@@ -296,7 +296,11 @@ TOOL_SCHEMAS = [
         "mutates": False,
         "record_types_written": [],
         "description": (
-            "Search for applications by name, lifecycle status, or capability. "
+            "Search for applications by name, lifecycle status, capability or ownership. "
+            "Each row lists its owners (name and ownership type) and has_owner, "
+            "read from the same ownership records the Applications pages show; "
+            "use ownership=unowned for 'which applications have no owner' and "
+            "ownership=owned for 'who owns what'. "
             "Returns lifecycle_status (planning/development/testing/operational/"
             "deprecated/retired — matches the Applications UI and "
             "/applications/api/list exactly) for each row. "
@@ -322,6 +326,11 @@ TOOL_SCHEMAS = [
                 "capability_name": {
                     "type": "string",
                     "description": "Return only apps linked to this capability",
+                },
+                "ownership": {
+                    "type": "string",
+                    "description": "owned: only applications with an accountable owner; unowned: only those without one.",
+                    "enum": ["owned", "unowned"],
                 },
                 "limit": {
                     "type": "integer",

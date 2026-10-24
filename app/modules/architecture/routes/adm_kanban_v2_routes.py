@@ -671,6 +671,55 @@ def complete_deliverable(deliverable_id):
     return jsonify({"success": True, "deliverable": item})
 
 
+@adm_kanban_v2_bp.route("/requirements", methods=["GET"])
+@login_required
+def get_board_requirements():
+    """The organisation's requirements with the phase and solution each drives."""
+    from app.services.adm_requirement_service import board_requirements
+
+    rows = board_requirements()
+    return jsonify({"success": True, "requirements": rows, "total": len(rows)})
+
+
+@adm_kanban_v2_bp.route("/requirements/<int:requirement_id>/solution", methods=["PATCH"])
+@login_required
+@audit_log("kanban_requirement_link")
+def link_board_requirement(requirement_id):
+    """
+    Link a requirement to the solution it serves (or to none).
+
+    Body: { "solution_id": int | null }
+    Returns: { "success": true, "requirement": {...} }
+    """
+    from app.modules.capabilities.routes.enterprise_api_routes import (
+        _may_change_requirements,
+        _may_override_solution_owner,
+    )
+    from app.models.solution_models import Solution
+    from app.services.adm_requirement_service import link_requirement
+
+    if not _may_change_requirements("edit"):
+        return jsonify({
+            "success": False,
+            "error": "Your role can read requirements but not change them. Ask an architect or an administrator.",
+        }), 403
+    data = request.get_json() or {}
+    solution_id = data.get("solution_id")
+    if solution_id is not None:
+        try:
+            solution_id = int(solution_id)
+        except (TypeError, ValueError):
+            return jsonify({"success": False, "error": "Choose a solution from the list."}), 422
+        target = Solution.query.filter_by(id=solution_id).first()
+        if target is not None and target.created_by_id != current_user.id and not _may_override_solution_owner():
+            return jsonify({"success": False, "error": "You can only link requirements to your own solutions."}), 403
+    try:
+        item = link_requirement(requirement_id, solution_id)
+    except LookupError as e:
+        return jsonify({"success": False, "error": str(e)}), 404
+    return jsonify({"success": True, "requirement": item})
+
+
 @adm_kanban_v2_bp.route("/metrics", methods=["GET"])
 @login_required
 def get_metrics():

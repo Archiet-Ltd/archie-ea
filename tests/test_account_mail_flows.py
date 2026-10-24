@@ -250,7 +250,7 @@ def test_sign_up_waits_for_the_emailed_confirmation_then_goes_to_the_invite_step
     path = _link(outbox[0], "/account/confirm-account/")
     confirmed = client.get(path)
     assert confirmed.status_code == 302
-    assert confirmed.headers["Location"].endswith("/admin/team")
+    assert confirmed.headers["Location"].endswith("/account/welcome")
     assert _fresh(user).confirmed is True
 
     reused = _anonymous(app).get(path)

@@ -2272,6 +2272,7 @@ def seed_demo_company() -> dict:
         existing_owner_emails = {
             u.email for u in User.query.filter_by(organization_id=org_id).all()
         }
+        viewer_role = Role.query.filter_by(name="Viewer").first()
         owner_users_created = 0
         for first, last, email in _OWNER_USERS:
             if email in existing_owner_emails:

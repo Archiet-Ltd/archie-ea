@@ -18,6 +18,7 @@ from app.core.auth.permissions import can
 from app.decorators import audit_log
 from app.services.rate_limiter import rate_limit
 from app.models.application_portfolio import ApplicationComponent
+from app.modules.ai_chat.services.failure_messages import ASSISTANT_UNAVAILABLE
 from . import unified_ai_chat_bp
 
 # Baseline annual infrastructure cost used for rough vendor TCO estimates when
@@ -1584,7 +1585,7 @@ def generate_archimate_from_description():
 
     except ConnectionError as e:
         current_app.logger.error(f"ENT-122: LLM connection error: {e}")
-        return jsonify({"success": False, "error": "AI service unavailable. Check API configuration in Admin > API Settings."}), 503
+        return jsonify({"success": False, "error": ASSISTANT_UNAVAILABLE}), 503
     except Exception as e:
         current_app.logger.error(f"ENT-122: Error generating ArchiMate from description: {e}", exc_info=True)
         return jsonify({"success": False, "error": "An internal error occurred"}), 500
