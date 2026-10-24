@@ -1,11 +1,10 @@
 {# shadcn-reference: impact_analysis@e55b60b #}
 {% extends 'layouts/admin_base.html' %}
 {% block head %}<meta name="shadcn-nearest" content="dashboard-01">{% endblock %}
-{% from 'macros/page_shell.html' import page_shell, stat_card %}
-{% from 'components/breadcrumb.html' import breadcrumb, breadcrumb_item, breadcrumb_separator %}
+{% from 'macros/page_shell.html' import page_shell %}
 {% from 'components/badge.html' import badge %}
 {% from 'components/button.html' import button %}
-{% from 'components/card.html' import card, card_header, card_title, card_description, card_content, card_footer %}
+{% from 'components/card.html' import card, card_header, card_title, card_description, card_content %}
 {% from 'components/table.html' import table, table_header, table_body, table_row, table_head, table_cell, table_empty_state %}
 {% from 'components/tabs.html' import tabs, tabs_list, tabs_trigger, tabs_content %}
 {% from 'components/empty_state.html' import empty_state %}
@@ -99,17 +98,16 @@
         </div>
         {% endif %}
 
-        <!-- By Layer bar chart -->
+        <!-- Impact by layer, as one card per layer (not a graph) -->
         {% if analysis.by_layer %}
         {% call card() %}
             {% call card_header() %}
                 {% call card_title() %}Impact by Layer{% endcall %}
+                {% call card_description() %}Affected elements grouped by ArchiMate layer.{% endcall %}
             {% endcall %}
             {% call card_content() %}
-                {% set max_count = analysis.by_layer.values() | max %}
-                <div class="space-y-3">
+                <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                     {% for layer, count in analysis.by_layer.items() %}
-                    {% set bar_pct = ((count / max_count) * 100) | int %}
                     {% if layer == 'Strategy' %}
                         {% set badge_variant = 'info' %}
                     {% elif layer == 'Business' %}
@@ -121,14 +119,11 @@
                     {% else %}
                         {% set badge_variant = 'neutral' %}
                     {% endif %}
-                    <div class="flex items-center gap-3">
-                        <span class="w-28 text-sm shrink-0">
+                    <div class="rounded-lg border border-border bg-card px-3 py-2">
+                        <div class="mb-1">
                             {% call badge(variant=badge_variant) %}{{ layer }}{% endcall %}
-                        </span>
-                        <div class="flex-1 bg-muted rounded-full h-4 overflow-hidden">
-                            <div class="bg-primary/70 h-4 rounded-full transition-all" style="width: {{ bar_pct }}%"></div>
                         </div>
-                        <span class="text-sm font-medium w-6 text-right tabular-nums">{{ count }}</span>
+                        <p class="text-lg font-semibold tabular-nums">{{ count }} affected</p>
                     </div>
                     {% endfor %}
                 </div>
@@ -231,7 +226,13 @@
                     {% call table_body() %}
                         {% for imp in (analysis.direct_impacts + analysis.indirect_impacts) | sort(attribute='hop') %}
                         {% call table_row() %}
-                            {% call table_cell() %}<span class="font-medium">{{ imp.name }}</span>{% endcall %}
+                            {% call table_cell() %}
+                            <span class="font-medium">
+                                {% if imp.id and 'architect_ui.impact_analysis' in flask.current_app.view_functions %}
+                                <a href="{{ url_for('architect_ui.impact_analysis', element_id=imp.id) }}" class="text-primary hover:underline">{{ imp.name }}</a>
+                                {% else %}{{ imp.name }}{% endif %}
+                            </span>
+                            {% endcall %}
                             {% call table_cell() %}
                                 {% set layer = imp.layer %}
                                 {% if layer == 'Strategy' %}

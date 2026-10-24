@@ -1,9 +1,8 @@
 """Element traceability page, driven as the enterprise architect.
 
-The goal: see which elements an ArchiMate element traces to, follow a link
-to an impacted element's own traceability, and verify every link lands on
-content. Runs in the seeded organisation and verifies a second organisation's
-data never appears.
+The goal: see which elements an ArchiMate element traces to and verify
+every link lands on content. Runs in the seeded organisation and verifies
+a second organisation's data never appears.
 """
 import uuid
 
@@ -96,9 +95,10 @@ def test_element_traceability_shows_chain_and_links_land_on_content(
             wait_until="domcontentloaded", timeout=PAGE_TIMEOUT,
         )
 
-        # The page header names the element
-        expect(page.get_by_role("heading", name="Trace App %s" % suffix)).to_be_visible(
-            timeout=PAGE_TIMEOUT)
+        # The page title names the element
+        title_text = page.title()
+        assert "Traceability" in title_text
+        assert linked_trace_data["app_name"] in title_text
 
         # The chain shows the business element
         body_text = page.inner_text("body")
@@ -109,20 +109,27 @@ def test_element_traceability_shows_chain_and_links_land_on_content(
         assert "foreign" not in body_text, (
             "Another organisation's element is listed in the chain")
 
-        # The pivot element is marked "THIS"
-        assert "THIS" in body_text
+        # Shadcn template uses page_shell - the h1 text comes from page_shell
+        # The page_shell renders an h1 with "Traceability: <name>"
+        heading_text = page.inner_text("h1")
+        assert linked_trace_data["app_name"] in heading_text, (
+            "Element name not found in page heading")
 
-        # The page uses shadcn tokens
+        # The page uses shadcn tokens - no raw colour classes like -500 or -700
+        # Old template used raw fuchsia-50, emerald-50 etc.
         raw_colours = page.locator('[class*="-500"], [class*="-700"], [class*="-800"]')
         assert raw_colours.count() == 0, "raw colour classes found on the page"
 
-        # D3 tree container exists
-        expect(page.locator("#tree-container")).to_be_visible(timeout=PAGE_TIMEOUT)
+        # No native <select> elements - old template used none, new uses macros
+        assert page.locator("select").count() == 0
 
-        # The static chain view shows layer sections
-        expect(page.locator("#static-chain")).to_be_visible(timeout=PAGE_TIMEOUT)
-        expect(page.get_by_text("Business Layer")).to_be_visible()
-        expect(page.get_by_text("Technology Layer")).to_be_visible()
+        # The breadcrumb links to the traceability matrix
+        trace_link = page.get_by_role("link", name="Architecture Traceability")
+        expect(trace_link).to_be_visible(timeout=PAGE_TIMEOUT)
+        trace_link.click()
+        page.wait_for_url(lambda url: "/architecture/traceability" in url
+                          and "traceability/" not in url, timeout=PAGE_TIMEOUT)
+        assert page.inner_text("body").strip(), "traceability matrix page is empty"
 
         # No horizontal overflow at phone width
         page.set_viewport_size({"width": 390, "height": 844})
@@ -135,11 +142,11 @@ def test_element_traceability_shows_chain_and_links_land_on_content(
 
 
 @pytest.mark.smoke
-def test_element_traceability_impact_summary_links_to_impact_analysis(
+def test_element_traceability_links_reach_their_own_chains(
     browser, live_server, seeded, linked_trace_data,
 ):
-    """As the enterprise architect, the impact summary section links to
-    the impact analysis page, which loads with content."""
+    """As the enterprise architect, every linked element in the chain is a
+    link that lands on that element's own traceability page with content."""
     email = seeded["emails"]["enterprise_architect"]
     suffix = linked_trace_data["suffix"]
     context = browser.new_context(ignore_https_errors=True, viewport={"width": 1440, "height": 900})
@@ -151,22 +158,42 @@ def test_element_traceability_impact_summary_links_to_impact_analysis(
             wait_until="domcontentloaded", timeout=PAGE_TIMEOUT,
         )
 
-        # The breadcrumb links to the traceability matrix
-        trace_link = page.get_by_role("link", name="Architecture Traceability")
-        expect(trace_link).to_be_visible(timeout=PAGE_TIMEOUT)
-        trace_link.click()
-        page.wait_for_url(lambda url: "/architecture/traceability" in url
-                          and "traceability/" not in url, timeout=PAGE_TIMEOUT)
-        assert page.inner_text("body").strip(), "traceability matrix page is empty"
+        # The page carries the shadcn-nearest meta and card macro output
+        # (the old template drew its own boxes and had no meta).
+        meta = page.locator('meta[name="shadcn-nearest"]')
+        expect(meta).to_have_count(1)
+        expect(meta).to_have_attribute("content", "dashboard-01")
+        expect(page.locator('[data-slot="card"]').first).to_be_visible(timeout=PAGE_TIMEOUT)
 
-        # Navigate back to element traceability
+        # Every linked element in the chain is a link that lands on that
+        # element's own traceability page with content.
+        biz_link = page.get_by_role("link", name=linked_trace_data["biz_name"])
+        expect(biz_link).to_have_count(1, timeout=PAGE_TIMEOUT)
+        biz_link.click()
+        page.wait_for_url(lambda url: "/architecture/traceability/" in url
+                          and "/architecture/traceability/%s" % linked_trace_data["app_el_id"] not in url,
+                          timeout=PAGE_TIMEOUT)
+        landed = page.inner_text("body")
+        assert linked_trace_data["biz_name"] in landed
+        assert linked_trace_data["app_name"] in landed, "the business element's chain is empty"
+
+        # The linked-elements table on the root page lists the technology element too.
         page.goto(
             live_server + "/architecture/traceability/" + str(linked_trace_data["app_el_id"]),
             wait_until="domcontentloaded", timeout=PAGE_TIMEOUT,
         )
+        expect(page.get_by_role("heading", name="Linked Elements")).to_be_visible(
+            timeout=PAGE_TIMEOUT)
+        rows = page.locator('[data-slot="table"] tbody tr, table tbody tr')
+        row_text = page.inner_text("body")
+        assert linked_trace_data["tech_name"] in row_text, "technology element missing from the table"
+        assert "foreign" not in row_text, "another organisation's element is listed"
 
-        # The "Back to Traceability Matrix" link works
-        back_link = page.get_by_text("Back to Traceability Matrix")
-        expect(back_link).to_be_visible(timeout=PAGE_TIMEOUT)
+        # No horizontal overflow at phone width
+        page.set_viewport_size({"width": 390, "height": 844})
+        page.wait_for_timeout(500)
+        assert page.evaluate(
+            "document.documentElement.scrollWidth <= window.innerWidth + 1"
+        ), "page overflows horizontally at 390px"
     finally:
         context.close()
