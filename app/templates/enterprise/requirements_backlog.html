@@ -56,15 +56,15 @@
                 {% endfor %}
             {% endcall %}
             <span class="ml-auto text-sm text-muted-foreground" x-text="filtered.length + ' requirements'"></span>
-            {% call button(variant='default', class='justify-center', aria_label='Add requirement', attrs_dict={'@click': 'showCreateModal = true'}) %}
+            {% call button(variant='default', class='gap-2 justify-center', aria_label='Add requirement', attrs_dict={'@click': 'showCreateModal = true'}) %}
                 <i data-lucide="plus" class="h-4 w-4" aria-hidden="true"></i>
                 Add Requirement
             {% endcall %}
-            {% call button(variant='outline', class='justify-center', aria_label='Export requirements as CSV', attrs_dict={'@click': "window.location.href='/api/enterprise/requirements/export'"}) %}
+            {% call button(variant='outline', class='gap-2 justify-center', aria_label='Export requirements as CSV', attrs_dict={'@click': "window.location.href='/api/enterprise/requirements/export'"}) %}
                 <i data-lucide="download" class="h-4 w-4" aria-hidden="true"></i>
                 Export CSV
             {% endcall %}
-            {% call button(variant='outline', class='justify-center', attrs_dict={'@click': 'showEpicTree=!showEpicTree; if(showEpicTree) loadEpics()', ':aria-pressed': 'showEpicTree.toString()'}) %}
+            {% call button(variant='outline', class='gap-2 justify-center', attrs_dict={'@click': 'showEpicTree=!showEpicTree; if(showEpicTree) loadEpics()', ':aria-pressed': 'showEpicTree.toString()'}) %}
                 <i data-lucide="git-branch" class="h-4 w-4" aria-hidden="true"></i>
                 Epic View
             {% endcall %}
@@ -190,6 +190,7 @@
                                       :class="req.dod_complete ? 'text-success' : 'text-muted-foreground'"
                                       x-text="req.dod_complete ? '✓ DoD' : (req.dod_checklist.filter(i=>i.checked).length + '/' + req.dod_checklist.length + ' DoD')">
                                 </span>
+                                <span x-show="!(req.dod_checklist && req.dod_checklist.length > 0)" x-cloak class="text-xs text-muted-foreground">No checklist</span>
                             </td>
                             <td class="px-4 py-3">
                                 {% call button(variant='ghost', size='sm', class='justify-center', attrs_dict={'@click.stop': 'openDetail(req)', ':aria-label': "'Edit requirement ' + req.name", 'title': 'Edit'}) %}
@@ -468,7 +469,6 @@
                                         </div>
                                     </template>
                                 </div>
-                            </div>
                             <template x-if="!activeReq.driver_id && !activeReq.goal_id && !activeReq.stakeholder_id">
                                 <p class="text-2xs text-muted-foreground italic">Link to motivation elements to achieve full ArchiMate 3.2 traceability.</p>
                             </template>
@@ -655,7 +655,7 @@
                 </div>
             </template>
     {% endcall %}
-
+</div>
 {% endblock %}
 
 {% block scripts %}
