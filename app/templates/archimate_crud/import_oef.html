@@ -2,6 +2,7 @@
 {% from 'components/dense_table.html' import dense_table %}
 {% from 'components/button.html' import button %}
 {% from 'components/radio_group.html' import radio_group %}
+{% from 'components/checkbox.html' import checkbox %}
 {% from 'macros/page_shell.html' import page_shell %}
 
 {% block title %}Import ArchiMate Model (OEF){% endblock %}
@@ -163,17 +164,12 @@
                             ]) }}
 
                         <div class="space-y-1">
-                            <input type="hidden" name="promote_top_level" value="0">
-                            <label class="flex items-start gap-2 text-sm font-medium text-foreground" for="promote_top_level">
-                                <input type="checkbox" id="promote_top_level" name="promote_top_level" value="1" checked
-                                       data-testid="switch-promote-top-level" class="mt-1 h-4 w-4 rounded border-input">
-                                <span>Treat top-level components as applications</span>
-                            </label>
-                            <p class="text-xs text-muted-foreground pl-6">
-                                A file from another tool has no Application type. With this on, a component that no other
-                                component composes or aggregates is imported as an Application, and the preview says why.
-                                Turn it off to import every component as a component.
-                            </p>
+                            {{ checkbox(
+                            id='promote_top_level', name='promote_top_level', value='1',
+                            checked=true, label='Treat top-level components as applications',
+                            description='A file from another tool has no Application type. With this on, a component that no other component composes or aggregates is imported as an Application, and the preview says why. Turn it off to import every component as a component.',
+                            attrs_dict={'data-testid': 'switch-promote-top-level'}
+                        ) }}
                         </div>
 
                         <div class="flex flex-col gap-2 sm:flex-row">

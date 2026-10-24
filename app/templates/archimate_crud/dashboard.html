@@ -6,6 +6,7 @@
 {% from 'components/badge.html' import badge %}
 {% from 'components/modal.html' import modal %}
 {% from 'components/input.html' import input, textarea %}
+{% from 'components/dense_table.html' import dense_table %}
 {% from 'components/select.html' import native_select %}
 
 {% block title %}{{ selected_layer.title }}{% endblock %}
@@ -163,24 +164,15 @@
             <!-- Outgoing Relationships -->
             <div>
                 <h3 class="text-sm font-semibold mb-2">Outgoing Relationships</h3>
-                <div x-cloak x-show="!detailLoading && detailData && detailData.outgoing && detailData.outgoing.length > 0"
-                     class="rounded-lg border border-border bg-card overflow-hidden">
-                    <table class="dense-table w-full text-sm caption-bottom">
-                        <thead class="sticky top-0 z-10 bg-card">
-                            <tr class="border-b border-border">
-                                <th scope="col" class="h-10 px-2 align-middle text-left">Type</th>
-                                <th scope="col" class="h-10 px-2 align-middle text-left">Target</th>
+                <div x-cloak x-show="!detailLoading && detailData && detailData.outgoing && detailData.outgoing.length > 0">
+                    {% call dense_table(columns=[('Type', ''), ('Target', '')], flush=true) %}
+                        <template x-for="rel in (detailData && detailData.outgoing || [])" :key="rel.id">
+                            <tr class="group h-12 transition-colors hover:bg-muted/50">
+                                <td class="px-2 align-middle text-muted-foreground" x-text="rel.type"></td>
+                                <td class="px-2 align-middle" x-text="rel.target_name"></td>
                             </tr>
-                        </thead>
-                        <tbody>
-                            <template x-for="rel in (detailData && detailData.outgoing || [])" :key="rel.id">
-                                <tr class="border-b border-border transition-colors hover:bg-muted/50">
-                                    <td class="px-2 align-middle text-muted-foreground" x-text="rel.type"></td>
-                                    <td class="px-2 align-middle" x-text="rel.target_name"></td>
-                                </tr>
-                            </template>
-                        </tbody>
-                    </table>
+                        </template>
+                    {% endcall %}
                 </div>
                 <p x-cloak x-show="!detailLoading && (!detailData || !detailData.outgoing || detailData.outgoing.length === 0)"
                    class="text-xs text-muted-foreground">No outgoing relationships</p>
@@ -188,24 +180,15 @@
             <!-- Incoming Relationships -->
             <div>
                 <h3 class="text-sm font-semibold mb-2">Incoming Relationships</h3>
-                <div x-cloak x-show="!detailLoading && detailData && detailData.incoming && detailData.incoming.length > 0"
-                     class="rounded-lg border border-border bg-card overflow-hidden">
-                    <table class="dense-table w-full text-sm caption-bottom">
-                        <thead class="sticky top-0 z-10 bg-card">
-                            <tr class="border-b border-border">
-                                <th scope="col" class="h-10 px-2 align-middle text-left">Type</th>
-                                <th scope="col" class="h-10 px-2 align-middle text-left">Source</th>
+                <div x-cloak x-show="!detailLoading && detailData && detailData.incoming && detailData.incoming.length > 0">
+                    {% call dense_table(columns=[('Type', ''), ('Source', '')], flush=true) %}
+                        <template x-for="rel in (detailData && detailData.incoming || [])" :key="rel.id">
+                            <tr class="group h-12 transition-colors hover:bg-muted/50">
+                                <td class="px-2 align-middle text-muted-foreground" x-text="rel.type"></td>
+                                <td class="px-2 align-middle" x-text="rel.source_name"></td>
                             </tr>
-                        </thead>
-                        <tbody>
-                            <template x-for="rel in (detailData && detailData.incoming || [])" :key="rel.id">
-                                <tr class="border-b border-border transition-colors hover:bg-muted/50">
-                                    <td class="px-2 align-middle text-muted-foreground" x-text="rel.type"></td>
-                                    <td class="px-2 align-middle" x-text="rel.source_name"></td>
-                                </tr>
-                            </template>
-                        </tbody>
-                    </table>
+                        </template>
+                    {% endcall %}
                 </div>
                 <p x-cloak x-show="!detailLoading && (!detailData || !detailData.incoming || detailData.incoming.length === 0)"
                    class="text-xs text-muted-foreground">No incoming relationships</p>
@@ -331,7 +314,7 @@
     <!-- Delete Confirmation -->
     <div x-show="showDeleteConfirm && deletingElement && deletingElement.name" x-cloak
          class="fixed inset-0 z-50 flex items-center justify-center bg-overlay/50" @keydown.escape.window="showDeleteConfirm = false">
-        <div class="bg-background border rounded-lg w-full max-w-md mx-4 p-6" @click.stop role="dialog" aria-modal="true" tabindex="-1">
+        <div class="bg-background border rounded-lg w-full max-w-md mx-4 p-6" @click.stop role="alertdialog" aria-modal="true" tabindex="-1">
             <div class="flex flex-col items-center gap-4 text-center">
                 <div class="flex h-12 w-12 items-center justify-center rounded-full bg-destructive/10">
                     <i data-lucide="alert-triangle" class="h-6 w-6 text-destructive" aria-hidden="true"></i>
@@ -353,7 +336,7 @@
     <!-- Validation Results Panel -->
     <div x-show="showValidationPanel" x-cloak
          class="fixed inset-0 z-50 flex items-center justify-center bg-overlay/50" @keydown.escape.window="showValidationPanel = false">
-        <div class="bg-background border rounded-lg w-full max-w-2xl mx-4 max-h-[80vh] overflow-y-auto" @click.stop role="dialog" aria-modal="true" tabindex="-1">
+        <div class="bg-background border rounded-lg w-full max-w-2xl mx-4 max-h-[80vh] overflow-y-auto" @click.stop role="document" aria-modal="true" tabindex="-1">
             <div class="flex items-center justify-between p-6 border-b">
                 <h3 class="text-lg font-semibold flex items-center gap-2">
                     <i data-lucide="shield-check" class="h-5 w-5" aria-hidden="true"></i>
