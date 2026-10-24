@@ -9,7 +9,7 @@
  * always "Ask the AI chat", so asking is one action from any page.
  *
  * Ctrl+K (Cmd+K on a Mac) focuses the box from anywhere, opening the sidebar first on a
- * phone, unless the page has its own Ctrl+K (data-suppress-global-search-shortcut).
+ * phone or from the icon rail, unless the page has its own Ctrl+K (data-suppress-global-search-shortcut).
  *
  * Network behaviour comes from SidebarModuleSearch (module_search.js): no request under
  * two characters, one debounced request per query, a slow answer never overwrites a newer
@@ -65,11 +65,8 @@
                 },
                 focusBox: function () {
                     var input = this.$refs.input;
-                    if (window.Alpine && window.Alpine.store && window.Alpine.store('sidebar')) {
-                        var store = window.Alpine.store('sidebar');
-                        if (window.innerWidth < 1024) store.open = true;
-                        if (store.collapsed && store.toggle) store.toggle();
-                    }
+                    // Opens the drawer on a phone and expands the icon rail (js/sidebar/sidebar_shell.js).
+                    window.dispatchEvent(new CustomEvent('sidebar:open'));
                     setTimeout(function () { if (input) { input.focus(); input.select(); } }, 30);
                 },
                 searching: function () {

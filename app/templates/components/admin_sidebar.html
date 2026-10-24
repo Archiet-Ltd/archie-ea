@@ -1,6 +1,6 @@
 {#
 ===============================================================================
-SIDEBAR (navigation v3) - the one signed-in sidebar
+SIDEBAR (navigation v3 in the library's sidebar-07 shell) - the one signed-in sidebar
 ===============================================================================
 
     {% include 'components/admin_sidebar.html' %}
@@ -10,7 +10,8 @@ Renders `sidebar_navigation()` only, which reads the one navigation registry
 trail read. No link is written into this template; adding a page to the sidebar is a
 registry change.
 
-The shadcn sidebar pattern, two levels at most:
+The library's sidebar-07 shell (components/ui_sidebar.html), collapsible='icon', two levels at most.
+The layouts wrap it in sidebar_wrapper and put the page in sidebar_inset (layouts/admin_base.html):
     organisation switcher (top)
     one search box: "Search or ask..." (Ctrl/Cmd+K)
     main group: Home, AI chat, Systems, Impact, Changes, Spend, Compliance
@@ -22,86 +23,68 @@ The shadcn sidebar pattern, two levels at most:
 Budget: scripts/check_sidebar_links.py renders this per role and counts its links.
 ===============================================================================
 #}
-{% from 'components/sidebar_nav.html' import sidebar_group, sidebar_item, sidebar_subitem %}
+{% from 'components/ui_sidebar.html' import sidebar, sidebar_gap, sidebar_container, sidebar_inner, sidebar_header, sidebar_content, sidebar_footer, sidebar_group, sidebar_group_label, sidebar_menu, sidebar_menu_item, sidebar_menu_button, sidebar_menu_sub, sidebar_menu_sub_item, sidebar_menu_sub_button, sidebar_rail %}
 {% from 'components/dropdown_menu.html' import dropdown_menu %}
 {% from 'components/input.html' import input %}
 {% from 'components/button.html' import button %}
 {% import 'components/card.html' as card %}
 {% set nav = sidebar_navigation(current_user) if current_user.is_authenticated else {'main': [], 'architecture': [], 'secondary': [], 'user_menu': [], 'connected': none, 'connect_url': none} %}
-<aside
-    id="admin-sidebar"
-    data-testid="sidebar"
-    aria-label="Sidebar"
-    x-cloak
-    {#
-      $store.sidebar.open drives this transform and the mobile scrim (admin_base.html,
-      composer_base.html). Both translate classes are keys of this object map, so
-      Alpine adds one and removes the other on every run, whatever touched the DOM.
-    #}
-    :class="{
-        'translate-x-0': $store.sidebar.open,
-        '-translate-x-full': !$store.sidebar.open,
-        'sidebar-collapsed': $store.sidebar.collapsed,
-        'w-16': $store.sidebar.collapsed,
-        'w-64': !$store.sidebar.collapsed
-    }"
-    @click.away="!isDesktop && ($store.sidebar.open = false)"
-    class="fixed inset-y-0 left-0 z-50 flex h-screen w-64 flex-shrink-0 flex-col border-r border-border bg-card transition-all duration-200 ease-in-out lg:static lg:translate-x-0"
->
-    {# ── Organisation switcher (SidebarHeader) ─────────────────────────────── #}
-    <div class="flex flex-shrink-0 items-center gap-1 border-b border-border p-2" data-slot="sidebar-header">
-        {% if current_user.is_authenticated %}
-        {% set org_items = [] %}
-        {% for org in organization_memberships|default([]) %}
-            {% set _ = org_items.append({
-                'text': org.name,
-                'icon': 'building-2',
-                'post': url_for('account.switch_organization'),
-                'fields': {'organization_id': org.id},
-                'current': active_organization and org.id == active_organization.id,
-                'testid': 'org-switch-' ~ org.id,
-            }) %}
-        {% endfor %}
-        {% set _ = org_items.append({'divider': true}) %}
-        {% set _ = org_items.append({'text': 'Manage organisations', 'icon': 'settings', 'href': url_for('account.manage'), 'testid': 'org-manage'}) %}
-        {% call dropdown_menu(
-            id='org-switcher',
-            items=org_items,
-            trigger_bare=true,
-            trigger_class='min-w-0 flex-1 gap-2 px-2 py-1.5 hover:bg-accent',
-            trigger_aria_label='Switch organisation',
-            trigger_testid='org-switcher',
-            menu_width='w-60',
-            panel_class='left-0 top-full mt-1',
-            class='min-w-0 flex-1'
-        ) %}
-            <span class="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md border border-border bg-background">
-                <img src="{{ url_for('static', filename='favicon.svg') }}" alt="" class="h-5 w-5">
-            </span>
-            <span class="sidebar-app-name grid min-w-0 flex-1 text-left leading-tight">
-                <span class="truncate text-sm font-semibold text-foreground" data-testid="active-organization-chip"
-                      title="{{ active_organization_name or config.APP_NAME }}">{{ active_organization_name or config.APP_NAME }}</span>
-                <span class="truncate text-xs text-muted-foreground">{{ config.APP_NAME or 'Entelim' }}</span>
-            </span>
-            <span class="sidebar-app-name inline-flex flex-shrink-0 text-muted-foreground" aria-hidden="true"><i data-lucide="chevrons-up-down" class="h-4 w-4"></i></span>
-        {% endcall %}
-        {% else %}
-        <a href="{{ url_for('main.index') }}" class="flex min-w-0 flex-1 items-center gap-2 px-2 py-1.5">
-            <img src="{{ url_for('static', filename='favicon.svg') }}" alt="" class="h-8 w-8">
-            <span class="sidebar-app-name truncate text-sm font-semibold text-foreground">{{ config.APP_NAME }}</span>
-        </a>
-        {% endif %}
-        {{ button(variant='ghost', size='icon-sm', icon='x', class='lg:hidden', aria_label='Close navigation', on_click='$store.sidebar.open = false') }}
-    </div>
+{% set collapsed = request.cookies.get('sidebar_state') == 'false' %}
+{% call sidebar(collapsible='icon', variant='sidebar', state=('collapsed' if collapsed else 'expanded'), tag='aside', attrs={'id': 'admin-sidebar', 'data-testid': 'sidebar', 'aria-label': 'Sidebar'}) %}
+{{ sidebar_gap() }}
+{% call sidebar_container() %}
+{% call sidebar_inner() %}
 
-    {# sidebar_collapsible needs this component once per page; the search box needs its two. #}
-    <script src="{{ url_for('static', filename='js/sidebar/collapsible.js') }}"></script>
+{# ── Organisation switcher (SidebarHeader) ─────────────────────────────── #}
+{% call sidebar_header() %}
+    {% if current_user.is_authenticated %}
+    {% set org_items = [] %}
+    {% for org in organization_memberships|default([]) %}
+        {% set _ = org_items.append({
+            'text': org.name,
+            'icon': 'building-2',
+            'post': url_for('account.switch_organization'),
+            'fields': {'organization_id': org.id},
+            'current': active_organization and org.id == active_organization.id,
+            'testid': 'org-switch-' ~ org.id,
+        }) %}
+    {% endfor %}
+    {% set _ = org_items.append({'divider': true}) %}
+    {% set _ = org_items.append({'text': 'Manage organisations', 'icon': 'settings', 'href': url_for('account.manage'), 'testid': 'org-manage'}) %}
+    {% call dropdown_menu(
+        id='org-switcher',
+        items=org_items,
+        trigger_bare=true,
+        trigger_class='cn-sidebar-menu-button cn-sidebar-menu-button-size-lg flex w-full min-w-0 items-center overflow-hidden outline-none',
+        trigger_aria_label='Switch organisation',
+        trigger_testid='org-switcher',
+        trigger_attrs_dict={'data-slot': 'sidebar-menu-button', 'data-sidebar': 'menu-button', 'data-size': 'lg', 'data-tooltip': active_organization_name or config.APP_NAME},
+        menu_width='w-60',
+        panel_class='left-0 top-full mt-1',
+        class='min-w-0 flex-1'
+    ) %}
+        <span class="flex aspect-square size-8 items-center justify-center rounded-lg border border-border bg-background">
+            <img src="{{ url_for('static', filename='favicon.svg') }}" alt="" class="h-5 w-5">
+        </span>
+        <span class="sidebar-app-name grid min-w-0 flex-1 text-left text-sm leading-tight">
+            <span class="truncate font-medium text-foreground" data-testid="active-organization-chip"
+                  title="{{ active_organization_name or config.APP_NAME }}">{{ active_organization_name or config.APP_NAME }}</span>
+            <span class="truncate text-xs text-muted-foreground">{{ config.APP_NAME or 'Entelim' }}</span>
+        </span>
+        <span class="inline-flex flex-shrink-0 text-muted-foreground" aria-hidden="true"><i data-lucide="chevrons-up-down" class="h-4 w-4"></i></span>
+    {% endcall %}
+    {% else %}
+    <a href="{{ url_for('main.index') }}" class="flex min-w-0 flex-1 items-center gap-2 px-2 py-1.5">
+        <img src="{{ url_for('static', filename='favicon.svg') }}" alt="" class="h-8 w-8">
+        <span class="sidebar-app-name truncate text-sm font-semibold text-foreground">{{ config.APP_NAME }}</span>
+    </a>
+    {% endif %}
+
+    {# The one search box: pages by any name, records, and asking. Not part of the icon rail. #}
+    {% if current_user.is_authenticated %}
     <script src="{{ url_for('static', filename='js/sidebar/module_search.js') }}"></script>
     <script src="{{ url_for('static', filename='js/sidebar/search.js') }}"></script>
-
-    {# ── The one search box: pages by any name, records, and asking ─────────── #}
-    {% if current_user.is_authenticated %}
-    <div class="sidebar-search-wrap relative flex-shrink-0 px-3 pb-2 pt-3"
+    <div class="sidebar-search-wrap relative group-data-[collapsible=icon]:hidden"
          x-data="sidebarSearch('{{ url_for('unified_ai_chat.index') }}')"
          @click.away="highlighted = -1">
         <div class="relative">
@@ -137,7 +120,7 @@ Budget: scripts/check_sidebar_links.py renders this per role and counts its link
 
         <div id="sidebar-search-results" role="listbox" aria-label="Search results"
              x-cloak x-show="searching()"
-             class="absolute left-3 right-3 top-full z-30 mt-1 max-h-96 overflow-y-auto rounded-md border border-border bg-popover p-1 text-popover-foreground"
+             class="absolute left-2 right-2 top-full z-30 mt-1 max-h-96 overflow-y-auto rounded-md border border-border bg-popover p-1 text-popover-foreground"
              data-testid="sidebar-search-results">
             <p x-show="loading" class="px-2 py-1.5 text-xs text-muted-foreground">Searching…</p>
             <template x-if="error">
@@ -180,117 +163,114 @@ Budget: scripts/check_sidebar_links.py renders this per role and counts its link
                :class="highlighted === askIndex() ? 'bg-accent text-accent-foreground' : 'text-foreground'"
                class="flex items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent"
                data-testid="sidebar-search-ask">
+                {# collapsed-nav-ok: the search box and its results are hidden in the icon rail #}
                 <i data-lucide="message-square" class="h-4 w-4 flex-shrink-0 text-muted-foreground" aria-hidden="true"></i>
                 <span class="min-w-0 flex-1 truncate">Ask the AI chat: <span class="font-medium" x-text="query"></span></span>
             </a>
         </div>
     </div>
     {% endif %}
+{% endcall %}
 
-    {# ── Navigation (SidebarContent) ───────────────────────────────────────── #}
-    <nav id="sidebar-nav" aria-label="Main navigation" class="flex min-h-0 flex-1 flex-col overflow-y-auto pb-2">
-        {% if nav.main %}
-        <div data-testid="nav-main">
-        {% call sidebar_group() %}
-            {% for item in nav.main %}
-            {{ sidebar_item(item.href, item.label, icon=item.icon, active=item.active, key=item.key) }}
-            {% for child in item.children %}
-            {{ sidebar_subitem(child.href, child.label, active=child.active, key=child.key) }}
-            {% endfor %}
-            {% endfor %}
+{# ── Navigation (SidebarContent) ───────────────────────────────────────── #}
+{% macro _entry(item) -%}
+{% call sidebar_menu_item() %}
+    {% call sidebar_menu_button(href=item.href, active=item.active, tooltip=item.label, wrap=true, attrs={'data-nav-key': item.key}) %}
+        {% if item.icon %}<i data-lucide="{{ item.icon }}" aria-hidden="true"></i>{% endif %}<span>{{ item.label }}</span>
+    {% endcall %}
+    {% if item.children %}
+    {% call sidebar_menu_sub() %}
+        {% for child in item.children %}
+        {% call sidebar_menu_sub_item() %}
+            {% call sidebar_menu_sub_button(href=child.href, active=child.active, attrs={'data-nav-key': child.key}) %}<span>{{ child.label }}</span>{% endcall %}
         {% endcall %}
-        </div>
-        {% endif %}
-
-        {% if nav.architecture %}
-        <div data-testid="nav-architecture">
-        {% call sidebar_group('Architecture') %}
-            {% for item in nav.architecture %}
-            {{ sidebar_item(item.href, item.label, icon=item.icon, active=item.active, key=item.key) }}
-            {% endfor %}
-        {% endcall %}
-        </div>
-        {% endif %}
-
-        {# Stage awareness: until the organisation has connected a source. #}
-        {% if nav.connected is sameas false and nav.connect_url %}
-        <div class="sidebar-connect-card mt-auto px-2 pt-4" data-slot="sidebar-group" data-testid="connect-source-card">
-            {% call card.card(class='border-border bg-background') %}
-                {% call card.card_header(class='space-y-1 p-4') %}
-                    {% call card.card_title(class='text-sm') %}Connect GitHub or Jira to build your model{% endcall %}
-                    {% call card.card_description(class='text-xs') %}Entelim reads your repositories or projects and drafts your systems for you to approve.{% endcall %}
-                {% endcall %}
-                {% call card.card_content(class='p-4 pt-0') %}
-                    {{ button(text='Connect a source', href=nav.connect_url, size='sm', class='w-full', testid='connect-source-button') }}
-                {% endcall %}
-            {% endcall %}
-        </div>
-        {% endif %}
-
-        {% if nav.secondary %}
-        <div class="{{ '' if (nav.connected is sameas false and nav.connect_url) else 'mt-auto' }} pt-2" data-testid="nav-secondary">
-        {% call sidebar_group() %}
-            {% for item in nav.secondary %}
-            {{ sidebar_item(item.href, item.label, icon=item.icon, active=item.active, key=item.key) }}
-            {% endfor %}
-        {% endcall %}
-        </div>
-        {% endif %}
-    </nav>
-
-    {# ── User menu (SidebarFooter) ─────────────────────────────────────────── #}
-    <div class="flex-shrink-0 border-t border-border p-2" data-slot="sidebar-footer">
-        {% if current_user.is_authenticated %}
-        {% set menu_items = [] %}
-        {% for item in nav.user_menu %}
-            {% if item.key == 'platform_admin' %}{% set _ = menu_items.append({'divider': true}) %}{% endif %}
-            {% set _ = menu_items.append({'text': item.label, 'icon': item.icon, 'href': item.href, 'testid': 'user-menu-' ~ item.key}) %}
         {% endfor %}
-        {% set _ = menu_items.append({'divider': true}) %}
-        {% set _ = menu_items.append({'checkbox': true, 'text': 'Dark theme', 'icon': 'moon', 'checked': '$store.theme.dark', 'onclick': '$store.theme.toggle()', 'testid': 'user-menu-theme'}) %}
-        {% set _ = menu_items.append({'divider': true}) %}
-        {% set _ = menu_items.append({'text': 'Sign out', 'icon': 'log-out', 'href': url_for('account.logout'), 'variant': 'destructive', 'testid': 'user-menu-sign-out'}) %}
-        {% set _display = (current_user.first_name or current_user.full_name() or current_user.email or 'A') %}
-        {% call dropdown_menu(
-            id='user-menu',
-            items=menu_items,
-            trigger_bare=true,
-            trigger_class='w-full gap-2 px-2 py-1.5 hover:bg-accent',
-            trigger_aria_label='Account menu',
-            trigger_testid='user-menu',
-            trigger_attrs_dict={'id': 'user-menu-btn'},
-            menu_width='w-60',
-            panel_class='bottom-full left-0 mb-2'
-        ) %}
-            <span class="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md bg-muted text-sm font-medium text-foreground" aria-hidden="true">{{ _display[0]|upper }}</span>
-            <span class="sidebar-footer-text grid min-w-0 flex-1 text-left leading-tight">
-                <span class="truncate text-sm font-medium text-foreground" title="{{ current_user.full_name() or current_user.email }}">{{ current_user.full_name() or current_user.email }}</span>
-                <span class="truncate text-xs text-muted-foreground" title="{{ current_user.email }}">{{ current_user.email }}</span>
-            </span>
-            <span class="sidebar-footer-text inline-flex flex-shrink-0 text-muted-foreground" aria-hidden="true"><i data-lucide="chevrons-up-down" class="h-4 w-4"></i></span>
-        {% endcall %}
-        {% else %}
-        {{ button(text='Sign in', href=url_for('account.login'), variant='outline', size='sm', class='w-full', icon='log-in') }}
-        {% endif %}
+    {% endcall %}
+    {% endif %}
+{% endcall %}
+{%- endmacro %}
+
+{% call sidebar_content(tag='nav', id='sidebar-nav', attrs={'aria-label': 'Main navigation', 'tabindex': '-1'}) %}
+    {% if nav.main %}
+    <div data-testid="nav-main">
+    {% call sidebar_group() %}
+        {% call sidebar_menu() %}{% for item in nav.main %}{{ _entry(item) }}{% endfor %}{% endcall %}
+    {% endcall %}
     </div>
-</aside>
+    {% endif %}
 
-<script>
-    if (typeof lucide !== 'undefined') {
-        lucide.createIcons();
-    }
+    {% if nav.architecture %}
+    <div data-testid="nav-architecture">
+    {% call sidebar_group() %}
+        {{ sidebar_group_label(text='Architecture') }}
+        {% call sidebar_menu() %}{% for item in nav.architecture %}{{ _entry(item) }}{% endfor %}{% endcall %}
+    {% endcall %}
+    </div>
+    {% endif %}
 
-    // Scroll-fade affordance: #sidebar-nav fades at its foot while there is more below,
-    // and stops fading once scrolled to its end (styles/shadcn-sidebar.css).
-    (function initSidebarScrollFade() {
-        const nav = document.getElementById('sidebar-nav');
-        if (!nav) return;
-        const update = () => {
-            const atEnd = nav.scrollHeight - nav.clientHeight <= nav.scrollTop + 1;
-            nav.classList.toggle('at-scroll-end', atEnd);
-        };
-        update();
-        nav.addEventListener('scroll', update, { passive: true });
-        window.addEventListener('resize', update);
-    })();
-</script>
+    {# Stage awareness: until the organisation has connected a source. Not part of the icon rail. #}
+    {% if nav.connected is sameas false and nav.connect_url %}
+    <div class="sidebar-connect-card mt-auto px-2 pt-4 group-data-[collapsible=icon]:hidden" data-slot="sidebar-group" data-testid="connect-source-card">
+        {% call card.card(class='border-border bg-background') %}
+            {% call card.card_header(class='space-y-1 p-4') %}
+                {% call card.card_title(class='text-sm') %}Connect GitHub or Jira to build your model{% endcall %}
+                {% call card.card_description(class='text-xs') %}Entelim reads your repositories or projects and drafts your systems for you to approve.{% endcall %}
+            {% endcall %}
+            {% call card.card_content(class='p-4 pt-0') %}
+                {{ button(text='Connect a source', href=nav.connect_url, size='sm', class='w-full', testid='connect-source-button') }}
+            {% endcall %}
+        {% endcall %}
+    </div>
+    {% endif %}
+
+    {% if nav.secondary %}
+    <div class="{{ '' if (nav.connected is sameas false and nav.connect_url) else 'mt-auto' }}" data-testid="nav-secondary">
+    {% call sidebar_group() %}
+        {% call sidebar_menu() %}{% for item in nav.secondary %}{{ _entry(item) }}{% endfor %}{% endcall %}
+    {% endcall %}
+    </div>
+    {% endif %}
+{% endcall %}
+
+{# ── User menu (SidebarFooter) ─────────────────────────────────────────── #}
+{% call sidebar_footer() %}
+    {% if current_user.is_authenticated %}
+    {% set menu_items = [] %}
+    {% for item in nav.user_menu %}
+        {% if item.key == 'platform_admin' %}{% set _ = menu_items.append({'divider': true}) %}{% endif %}
+        {% set _ = menu_items.append({'text': item.label, 'icon': item.icon, 'href': item.href, 'testid': 'user-menu-' ~ item.key}) %}
+    {% endfor %}
+    {% set _ = menu_items.append({'divider': true}) %}
+    {% set _ = menu_items.append({'checkbox': true, 'text': 'Dark theme', 'icon': 'moon', 'checked': '$store.theme.dark', 'onclick': '$store.theme.toggle()', 'testid': 'user-menu-theme'}) %}
+    {% set _ = menu_items.append({'divider': true}) %}
+    {% set _ = menu_items.append({'text': 'Sign out', 'icon': 'log-out', 'href': url_for('account.logout'), 'variant': 'destructive', 'testid': 'user-menu-sign-out'}) %}
+    {% set _display = (current_user.first_name or current_user.full_name() or current_user.email or 'A') %}
+    {% call dropdown_menu(
+        id='user-menu',
+        items=menu_items,
+        trigger_bare=true,
+        trigger_class='cn-sidebar-menu-button cn-sidebar-menu-button-size-lg flex w-full items-center overflow-hidden outline-none',
+        trigger_aria_label='Account menu',
+        trigger_testid='user-menu',
+        trigger_attrs_dict={'id': 'user-menu-btn', 'data-slot': 'sidebar-menu-button', 'data-sidebar': 'menu-button', 'data-size': 'lg', 'data-tooltip': current_user.full_name() or current_user.email},
+        menu_width='w-60',
+        panel_class='bottom-full left-0 mb-2'
+    ) %}
+        <span class="flex size-8 flex-shrink-0 items-center justify-center rounded-lg bg-muted text-sm font-medium text-foreground" aria-hidden="true">{{ _display[0]|upper }}</span>
+        <span class="sidebar-footer-text grid min-w-0 flex-1 text-left text-sm leading-tight">
+            <span class="truncate font-medium text-foreground" title="{{ current_user.full_name() or current_user.email }}">{{ current_user.full_name() or current_user.email }}</span>
+            <span class="truncate text-xs text-muted-foreground" title="{{ current_user.email }}">{{ current_user.email }}</span>
+        </span>
+        <span class="inline-flex flex-shrink-0 text-muted-foreground" aria-hidden="true"><i data-lucide="chevrons-up-down" class="h-4 w-4"></i></span>
+    {% endcall %}
+    {% else %}
+    {{ button(text='Sign in', href=url_for('account.login'), variant='outline', size='sm', class='w-full', icon='log-in') }}
+    {% endif %}
+{% endcall %}
+
+{% endcall %}{# sidebar_inner #}
+{{ sidebar_rail() }}
+{% endcall %}{# sidebar_container #}
+{% endcall %}{# sidebar #}
+
+<script src="{{ url_for('static', filename='js/sidebar/sidebar_shell.js') }}"></script>
