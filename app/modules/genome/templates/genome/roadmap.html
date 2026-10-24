@@ -1,23 +1,24 @@
 {% extends 'layouts/admin_base.html' %}
-{% from 'macros/page_shell.html' import page_shell %}
+{% from 'components/page_header.html' import page_header %}
+{% from 'components/button.html' import button %}
+{% from 'components/empty_state.html' import empty_state %}
 {% block title %}Transformation Roadmap{% endblock %}
 
 {% block content %}
 <div class="p-6 space-y-6 mx-auto">
-    {% macro _ps_actions() %}
+    {{ page_header(
+        title='Transformation Roadmap',
+        description='Deterministic Plateau → Work Package transformation roadmap, built from the implementation-and-migration stores with element-level provenance (zero LLM).',
+        breadcrumbs=[
+            {'label': 'Home', 'href': '/'},
+            {'label': 'Transformation Roadmap'}
+        ]
+    ) }}
+
     <form method="post" action="{{ url_for('genome_roadmap.generate') }}">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <button type="submit"
-                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
-            <i data-lucide="calendar-range" class="w-4 h-4"></i>
-            Generate roadmap
-        </button>
+        {{ button(text='Generate roadmap', icon='calendar-range', type='submit') }}
     </form>
-    {% endmacro %}
-    {{ page_shell(
-        title='Transformation Roadmap', breadcrumb=[('Home', '/'), ('Transformation Roadmap', none)],
-        subtitle='Deterministic Plateau → Work Package transformation roadmap, built from the implementation-and-migration stores with element-level provenance (zero LLM).',
-        actions_caller=_ps_actions) }}
 
     {% if error %}
     <div class="px-3 py-2 border border-destructive/50 bg-destructive/10 rounded-md text-sm text-destructive">
@@ -38,11 +39,11 @@
     </p>
     {% else %}
     {% if not error %}
-    <div class="p-8 text-center text-muted-foreground border border-dashed border-border rounded-lg">
-        <i data-lucide="calendar-range" class="w-8 h-8 mx-auto mb-3 opacity-60"></i>
-        <p>Click <span class="font-medium text-foreground">Generate roadmap</span>
-        to build the deterministic transformation roadmap for your organization.</p>
-    </div>
+      {{ empty_state(
+          icon='calendar-range',
+          title='No roadmap yet',
+          description='Click Generate roadmap to build the deterministic transformation roadmap for your organization.'
+      ) }}
     {% endif %}
     {% endif %}
 </div>
