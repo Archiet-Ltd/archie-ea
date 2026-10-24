@@ -1,20 +1,21 @@
 {% extends "layouts/admin_base.html" %}
-{% from 'macros/page_shell.html' import page_shell %}
+{% from 'components/page_header.html' import page_header %}
+{% from 'components/button.html' import button %}
 {% block title %}Data Genome — Record of Processing Activities{% endblock %}
 {% block content %}
 <div class="p-6 space-y-6">
-  {{ page_shell(
+  {{ page_header(
       title='Data Genome — GDPR Article 30',
-      subtitle='Record of Processing Activities, derived from modelled data and business objects and their access relationships. Every row traces back to a real ArchiMate element.',
-      breadcrumb=[('Home', url_for('main.index')), ('Record of Processing Activities', none)]
+      description='Record of Processing Activities, derived from modelled data and business objects and their access relationships. Every row traces back to a real ArchiMate element.',
+      breadcrumbs=[
+          {'label': 'Home', 'href': url_for('main.index')},
+          {'label': 'Record of Processing Activities'}
+      ]
   ) }}
 
   <form method="post" action="{{ url_for('genome_data.generate_ropa') }}" class="mb-6">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-    <button type="submit"
-            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
-      Generate RoPA
-    </button>
+    {{ button(text='Generate RoPA', type='submit') }}
   </form>
 
   {% if ropa_html is not none %}
