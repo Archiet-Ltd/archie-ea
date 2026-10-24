@@ -973,6 +973,19 @@ def api_layer_elements(layer):
     if sort_by in ("name", "element_type", "description", "status"):
         all_elements.sort(key=lambda x: (x.get(sort_by) or "").lower(), reverse=reverse)
 
+    # A kind filter narrows the whole list before it is paged, so an Epic on a
+    # later page is found and the total counts only what matches.
+    if kind_filter:
+        from app.services.element_profile_service import read_profile as _read_kind
+        matching = []
+        for el in all_elements:
+            if el.get("element_type") != "WorkPackage":
+                continue
+            ae = db.session.get(ArchiMateElement, el["id"])
+            if ae is not None and _read_kind(ae).get("kind") == kind_filter:
+                matching.append(el)
+        all_elements = matching
+
     total = len(all_elements)
     pages = math.ceil(total / per_page) if per_page > 0 else 1
     start = (page - 1) * per_page
