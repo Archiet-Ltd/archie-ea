@@ -173,6 +173,19 @@ def test_chain_order_is_a_setting(db_session, make_org, tenant_ctx, monkeypatch)
     assert [e[0] for e in chain] == ["openrouter", "nvidia"]
 
 
+def test_a_provider_can_be_pointed_at_a_gateway_address(db_session, make_org, tenant_ctx, monkeypatch):
+    _no_env_keys(monkeypatch)
+    monkeypatch.setenv("AI_PROVIDER_BASE_URL_NVIDIA", "http://gateway.internal/v1")
+    org = make_org("gw")
+    _settings(db_session, org, "nvidia", "", "key-nv")
+    _settings(db_session, org, "openrouter", "model-a:free", "key-or")
+    with tenant_ctx(org.id):
+        chain = ar.build_provider_chain("nvidia", NVIDIA_MODEL)
+    urls = {e[0]: e[3] for e in chain}
+    assert urls["nvidia"] == "http://gateway.internal/v1"
+    assert urls["openrouter"] == ar._PROVIDER_BASE_URLS["openrouter"]
+
+
 def test_an_organisation_with_its_own_paid_key_is_asked_before_any_free_model(
     db_session, make_org, tenant_ctx, monkeypatch
 ):
