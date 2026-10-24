@@ -63,6 +63,9 @@ def test_import_diagram_page_loads_as_enterprise_architect(browser, live_server,
     # Navigate directly to the import diagram page
     page.goto(live_server + "/archimate/import/diagram", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
 
+    # The page is rebuilt on the shadcn frame (tier B names the nearest original)
+    expect(page.locator('meta[name="shadcn-nearest"]')).to_have_attribute("content", "dashboard-01", timeout=PAGE_TIMEOUT)
+
     # The page has the expected title
     expect(page.get_by_role("heading", name=re.compile(r"Import a diagram", re.I))).to_be_visible(timeout=PAGE_TIMEOUT)
 
@@ -109,6 +112,9 @@ def test_review_queue_page_loads_as_enterprise_architect(browser, live_server, s
 
     page.goto(live_server + "/capability-map/archimate/review-queue", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
 
+    # The page is rebuilt on the shadcn frame (tier B names the nearest original)
+    expect(page.locator('meta[name="shadcn-nearest"]')).to_have_attribute("content", "dashboard-01", timeout=PAGE_TIMEOUT)
+
     # The page has the expected title
     expect(page.get_by_role("heading", name=re.compile(r"Relationship Review Queue", re.I))).to_be_visible(timeout=PAGE_TIMEOUT)
 
@@ -147,6 +153,9 @@ def test_diagrams_library_page_loads_as_enterprise_architect(browser, live_serve
     _login(page, live_server, email)
 
     page.goto(live_server + "/archimate/diagrams", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+
+    # The page is rebuilt on the shadcn frame (tier B names the nearest original)
+    expect(page.locator('meta[name="shadcn-nearest"]')).to_have_attribute("content", "dashboard-01", timeout=PAGE_TIMEOUT)
 
     # The page has the expected title
     expect(page.get_by_role("heading", name=re.compile(r"^Diagrams$"))).to_be_visible(timeout=PAGE_TIMEOUT)
