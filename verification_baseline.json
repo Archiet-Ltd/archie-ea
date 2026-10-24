@@ -15,6 +15,7 @@
   "_note13": "added 2026-10-10: background_mechanisms_thread_instances 29 is a NEW measurement, not growth. The register is now keyed on file, kind and enclosing function, so the gate counts thread instances (29) beside the files holding them (background_mechanisms_thread, still 22); the older key counted one entry per file and could not see a second pool in a listed file. Both may only fall.",
   "_note14": "updated 2026-10-13: untenanted_reads 2633 -> 2361. The ratchet had 272 reads of slack (the measured count on main was 2361 against a limit of 2633; it was 2359 two merged pull requests earlier), so up to 272 new unscoped reads would have passed. The limit is now the measured count; tests/test_check_reuse_register.py pins it so it can only fall.",
   "_note15": "added 2026-10-21: request_field_writes 137 is a NEW measurement of loops under app/ that call setattr(obj, <loop key>, ...), the shape that lets a request body choose which columns are written. It may only fall.",
+  "_note16": "added 2026-10-24: design_map_outside_block 52 and design_map_unmarked 406 are NEW measurements from scripts/check_design_map.py: the page templates that use a macro their designed block does not allow, and the page templates that do not yet name their block with a design-block marker. Both may only fall.",
   "ratchets": {
     "undefined_names": 0,
     "redefinitions": 0,
@@ -52,6 +53,8 @@
     "background_mechanisms_thread_instances": 28,
     "unrendered_model_fields": 342,
     "tenant_isolation_route_coverage_pct": 44.0,
-    "interface_contract_unimplemented": 0
+    "interface_contract_unimplemented": 0,
+    "design_map_outside_block": 52,
+    "design_map_unmarked": 406
   }
 }
