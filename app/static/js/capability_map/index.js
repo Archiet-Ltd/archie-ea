@@ -202,15 +202,27 @@
         return colors[type] || 'bg-muted text-foreground';
     }
     
-    // Load data when page loads
-    document.addEventListener('DOMContentLoaded', function() {
-        lucide.createIcons();
+    // Load data when page loads. Binding only to DOMContentLoaded meant that
+    // when this script ran after the DOM was already parsed the listener never
+    // fired and the table stayed on "Loading application capability data...".
+    // Run the init straight away when the document is ready, otherwise wait
+    // for DOMContentLoaded.
+    function initCapabilityMap() {
+        if (typeof lucide !== 'undefined') {
+            lucide.createIcons();
+        }
         if (window.location.pathname.includes('/capability-roadmap')) {
             setTimeout(function() { initRoadmapTab(); }, 100);
         } else {
             loadDataForAllTabs();
         }
-    });
+    }
+
+    if (document.readyState !== 'loading') {
+        initCapabilityMap();
+    } else {
+        document.addEventListener('DOMContentLoaded', initCapabilityMap);
+    }
     
     // Unified Table Data and Pagination System
     const tableData = {

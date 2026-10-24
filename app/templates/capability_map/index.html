@@ -47,7 +47,7 @@
                    id="{{ context_id }}-search-filter" 
                    {% if filters and filters[0].alpine %}@input="{{ filters[0].handler.replace('@change=', '').replace('filterTable', 'filterTable') }}"{% else %}@input="filterTable('{{ context_id }}')"{% endif %}
                    placeholder="Search capabilities..." 
-                   class="px-3 py-2 border border-input rounded-md text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Search capabilities...">
+                   class="px-3 py-2 border border-input rounded-md text-sm bg-background text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Search capabilities...">
         </div>
         {% endif %}
         

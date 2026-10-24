@@ -435,7 +435,7 @@ function hierarchyView() {
                 html += '      </div>';
 
                 if (hasExpandable) {
-                    html += '      <button type="button" @click="toggleCapability(\'' + this.escapeHtml(cap.name).replace(/'/g, "\\'") + '\')" class="text-muted-foreground hover:text-foreground flex-shrink-0 p-1">';
+                    html += '      <button type="button" aria-label="' + (isExpanded ? 'Collapse ' : 'Expand ') + this.escapeHtml(cap.name) + '" aria-expanded="' + (isExpanded ? 'true' : 'false') + '" @click="toggleCapability(\'' + this.escapeHtml(cap.name).replace(/'/g, "\\'") + '\')" class="text-muted-foreground hover:text-foreground flex-shrink-0 p-1">';
                     html += '        <i data-lucide="chevron-down" class="w-4 h-4 transition-transform ' + chevronRotateClass + '"></i>';
                     html += '      </button>';
                 }
