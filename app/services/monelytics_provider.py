@@ -58,7 +58,7 @@ SETTINGS = (
     "MONELYTICS_CLIENT_SECRET",
 )
 
-NOT_CONFIGURED = "Online payment is not set up on this installation."
+NOT_CONFIGURED = "Online payment is not open yet. Contact us to buy a plan."
 PROVIDER_REFUSED = "The payment provider did not accept the request. Nothing was changed."
 UNREACHABLE = "The payment provider could not be reached. Nothing was changed."
 NOT_PERMITTED_YET = (

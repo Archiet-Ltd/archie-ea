@@ -424,7 +424,7 @@ def api_settings():
         "anthropic":   ("sk-ant-",),
         "huggingface": ("hf_",),
         "gemini":      ("AIza",),
-        "deepseek":    ("sk-",),
+        "nvidia":      ("nvapi-",),
         "openrouter":  ("sk-or-",),
         "azure":       (),          # Azure uses a 32-char GUID-style key — no reliable prefix
         "jira":        (),          # JIRA tokens vary; skip prefix check
@@ -599,7 +599,7 @@ def preview_env_keys():
         "ANTHROPIC_API_KEY": "anthropic",
         "GOOGLE_API_KEY": "gemini",
         "GEMINI_API_KEY": "gemini",
-        "DEEPSEEK_API_KEY": "deepseek",
+        "NVIDIA_API_KEY": "nvidia",
         "HUGGINGFACE_API_KEY": "huggingface",
         "HF_TOKEN": "huggingface",
         "AZURE_OPENAI_API_KEY": "azure",
@@ -610,10 +610,10 @@ def preview_env_keys():
         "openai": "gpt-4o",
         "anthropic": "claude-opus-5",
         "gemini": "gemini-2.0-flash-exp",
-        "deepseek": "deepseek-chat",
+        "nvidia": "nvidia/nemotron-3-ultra-550b-a55b",
         "huggingface": "meta-llama/Llama-3.1-8B-Instruct",
         "azure": "gpt-4",
-        "openrouter": "google/gemini-2.5-flash-preview:free",
+        "openrouter": "google/gemma-4-31b-it:free",
     }
 
     existing = {s.provider for s in APISettings.query.all()}
@@ -691,7 +691,7 @@ def load_env_keys():
         "ANTHROPIC_API_KEY": "anthropic",
         "GOOGLE_API_KEY": "gemini",
         "GEMINI_API_KEY": "gemini",
-        "DEEPSEEK_API_KEY": "deepseek",
+        "NVIDIA_API_KEY": "nvidia",
         "HUGGINGFACE_API_KEY": "huggingface",
         "HF_TOKEN": "huggingface",
         "AZURE_OPENAI_API_KEY": "azure",
@@ -702,10 +702,10 @@ def load_env_keys():
         "openai": "gpt-4o",
         "anthropic": "claude-opus-5",
         "gemini": "gemini-2.0-flash-exp",
-        "deepseek": "deepseek-chat",
+        "nvidia": "nvidia/nemotron-3-ultra-550b-a55b",
         "huggingface": "meta-llama/Llama-3.1-8B-Instruct",
         "azure": "gpt-4",
-        "openrouter": "google/gemini-2.5-flash-preview:free",
+        "openrouter": "google/gemma-4-31b-it:free",
     }
 
     requested_keys = data["keys"]

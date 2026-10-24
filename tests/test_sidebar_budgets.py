@@ -484,11 +484,13 @@ def test_platform_admin_collapsed_sidebar_icons_are_unambiguous():
     assert duplicates == {}
 
 
-def _without_admin_only_links(zones):
-    """The zones a person who is not an administrator is shown: Workspace holds only
-    links to administrator pages, so for them it is present and empty."""
+def _without_admin_only_links(zones, user):
+    """The zones this person is shown: Workspace holds only links to setup pages, so
+    for someone who may open neither it is present and empty."""
+    from app.utils.role_access import link_requires_satisfied
+
     return [
-        {**z, "links": [link for link in z["links"] if link.get("requires") != "admin"]}
+        {**z, "links": [link for link in z["links"] if link_requires_satisfied(user, link.get("requires"))]}
         if z["zone"] == "workspace" else z
         for z in zones
     ]
@@ -497,13 +499,15 @@ def _without_admin_only_links(zones):
 def test_get_sidebar_zones_resolves_role():
     user = _StubUser(ROLE_SOLUTION_ARCHITECT)
     zones = get_sidebar_zones(user)
-    assert zones == _without_admin_only_links(SIDEBAR_ZONES[ROLE_SOLUTION_ARCHITECT])
+    assert zones == _without_admin_only_links(SIDEBAR_ZONES[ROLE_SOLUTION_ARCHITECT], user)
 
 
 def test_get_sidebar_zones_defaults_for_unknown_role():
     user = _StubUser("not_a_real_role")
     zones = get_sidebar_zones(user)
-    assert zones == _without_admin_only_links(SIDEBAR_ZONES[ROLE_SOLUTION_ARCHITECT])
+    assert zones == _without_admin_only_links(SIDEBAR_ZONES[ROLE_SOLUTION_ARCHITECT], user)
+    workspace = next(z for z in zones if z["zone"] == "workspace")
+    assert workspace["links"] == []
 
 
 def test_get_sidebar_zones_never_raises_for_none_user():
@@ -563,13 +567,20 @@ def test_architect_collapsed_sidebar_icons_are_unambiguous(role):
 
 
 @pytest.mark.parametrize("role", sorted(SIDEBAR_ZONES))
-def test_workspace_holds_connections_and_billing_for_administrators_only(role):
-    """Both pages are administrator pages, so every role's Workspace zone lists them
-    for an administrator and for nobody else (a link that 403s is a dead end)."""
+def test_workspace_holds_connections_and_billing_for_administrators(role):
+    """An administrator is shown both setup pages whatever their persona."""
     admin = next(z for z in get_sidebar_zones(_StubUser(role, is_platform_admin=True)) if z["zone"] == "workspace")
     assert [(link["label"], link["endpoint"]) for link in admin["links"]] == [
         ("Connections", "m365_connector.connectors_index"),
         ("Billing", "billing.billing_index"),
     ]
+
+
+@pytest.mark.parametrize("role", sorted(SIDEBAR_ZONES))
+def test_workspace_for_a_person_who_does_not_administer(role):
+    """Billing is for administrators alone; Connections also for the architects who
+    bring a source in (a link that 403s is a dead end)."""
     other = next(z for z in get_sidebar_zones(_StubUser(role)) if z["zone"] == "workspace")
-    assert other["links"] == []
+    expected = ["Connections"] if role in {
+        "enterprise_architect", "solution_architect", "business_architect"} else []
+    assert [link["label"] for link in other["links"]] == expected
