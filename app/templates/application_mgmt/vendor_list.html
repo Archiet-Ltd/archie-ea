@@ -1,4 +1,6 @@
+{# design-block: data-table #}
 {% extends 'layouts/admin_base.html' %}
+{% from 'components/disabled_action.html' import disabled_action %}
 {% from 'components/page_header.html' import page_header %}
 {% from 'components/metrics_card.html' import metrics_card %}
 
@@ -20,11 +22,15 @@
         <span class="hidden sm:inline">Vendor Analysis</span>
         <span class="sm:hidden">Analysis</span>
       </button>
+      {% if is_platform_administrator() %}
       <a href="{{ url_for('application_mgmt.create_vendor') }}" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
         <i data-lucide="plus" class="h-4 w-4" aria-hidden="true"></i>
         <span class="hidden sm:inline">Add Vendor</span>
         <span class="sm:hidden">Add</span>
       </a>
+      {% else %}
+      {{ disabled_action('Add Vendor', 'Only a platform administrator can add vendors. Ask a platform administrator.', 'add-vendor-reason', icon='plus') }}
+      {% endif %}
     </div>
   </div>
 
@@ -367,14 +373,22 @@
       <h3 class="text-lg font-semibold mb-2">No vendors found</h3>
       <p class="text-sm text-muted-foreground mb-6 max-w-md mx-auto">Add vendors manually or sync from Abacus to build your vendor portfolio. Vendors link to applications, products, and capability mappings.</p>
       <div class="flex items-center justify-center gap-3">
+        {% if is_platform_administrator() %}
         <a href="{{ url_for('application_mgmt.create_vendor') }}" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
           <i data-lucide="plus" class="h-4 w-4" aria-hidden="true"></i>
           Add Vendor
         </a>
+        {% else %}
+        {{ disabled_action('Add Vendor', 'Only a platform administrator can add vendors. Ask a platform administrator.', 'add-vendor-empty-reason', icon='plus') }}
+        {% endif %}
+        {% if is_platform_administrator() %}
         <a href="{{ url_for('admin.abacus_settings') }}" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
           <i data-lucide="refresh-cw" class="h-4 w-4" aria-hidden="true"></i>
           Sync from Abacus
         </a>
+        {% else %}
+        {{ disabled_action('Sync from Abacus', 'Only a platform administrator can sync from Abacus. Ask a platform administrator.', 'abacus-reason', icon='refresh-cw') }}
+        {% endif %}
       </div>
     </div>
     {% endif %}

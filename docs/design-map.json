@@ -1550,6 +1550,7 @@
     "components/dense_table.html",
     "components/detail_meta.html",
     "components/dialog.html",
+    "components/disabled_action.html",
     "components/dropdown_menu.html",
     "components/empty_state.html",
     "components/error_boundary.html",
@@ -1579,7 +1580,11 @@
    "extends": [
     "layouts/admin_base.html"
    ],
+   "extra_macros": [
+    "components/disabled_action.html"
+   ],
    "macros": [
+    "components/disabled_action.html",
     "macros/page_shell.html"
    ],
    "reference": {
@@ -1791,6 +1796,7 @@
     "components/data_card.html",
     "components/dense_table.html",
     "components/dialog.html",
+    "components/disabled_action.html",
     "components/dropdown_menu.html",
     "components/empty_state.html",
     "components/error_boundary.html",
@@ -1820,7 +1826,11 @@
    "extends": [
     "layouts/admin_base.html"
    ],
+   "extra_macros": [
+    "components/disabled_action.html"
+   ],
    "macros": [
+    "components/disabled_action.html",
     "macros/page_shell.html"
    ],
    "reference": {
@@ -2592,6 +2602,7 @@
     "components/button.html",
     "components/card.html",
     "components/checkbox.html",
+    "components/company_kind.html",
     "components/confirmation_dialog.html",
     "components/dense_table.html",
     "components/dialog.html",
@@ -2628,6 +2639,9 @@
    "extends": [
     "layouts/admin_base.html"
    ],
+   "extra_macros": [
+    "components/company_kind.html"
+   ],
    "macros": [
     "components/company_kind.html",
     "components/page_header.html",
@@ -2645,10 +2659,7 @@
     }
    },
    "spec": null,
-   "status": "mapped",
-   "extra_macros": [
-    "components/company_kind.html"
-   ]
+   "status": "mapped"
   },
   "app/templates/account/mfa_challenge.html": {
    "allowed_macros": [
@@ -2910,6 +2921,7 @@
     "components/skeleton.html",
     "components/status_badge.html",
     "components/tabs.html",
+    "macros/kanban_board.html",
     "macros/page_shell.html"
    ],
    "basis": "rule",
@@ -2923,6 +2935,9 @@
    },
    "extends": [
     "layouts/admin_base.html"
+   ],
+   "extra_macros": [
+    "macros/kanban_board.html"
    ],
    "macros": [
     "macros/kanban_board.html",
@@ -2939,10 +2954,7 @@
     }
    },
    "spec": null,
-   "status": "mapped",
-   "extra_macros": [
-    "macros/kanban_board.html"
-   ]
+   "status": "mapped"
   },
   "app/templates/adm_kanban/gap_analysis.html": {
    "allowed_macros": [
@@ -7076,8 +7088,7 @@
    "basis": "rule",
    "block": "record-detail",
    "controls": {
-    "button": 39,
-    "link": 3,
+    "button": 37,
     "modal": 1,
     "table": 5
    },
@@ -7085,10 +7096,18 @@
     "layouts/admin_base.html"
    ],
    "macros": [
+    "components/badge.html",
+    "components/button.html",
+    "components/card.html",
+    "components/checkbox.html",
     "components/confirmation_dialog.html",
-    "components/page_header.html",
+    "components/dense_table.html",
+    "components/form_field.html",
+    "components/input.html",
+    "components/select.html",
     "components/skeleton.html",
-    "components/status_badge.html"
+    "components/tabs.html",
+    "macros/page_shell.html"
    ],
    "reference": {
     "shadcn": {
@@ -7178,6 +7197,7 @@
     "components/data_table.html",
     "components/dense_table.html",
     "components/dialog.html",
+    "components/disabled_action.html",
     "components/dropdown_menu.html",
     "components/empty_state.html",
     "components/error_boundary.html",
@@ -7187,6 +7207,7 @@
     "components/inline_hint.html",
     "components/input.html",
     "components/loading_state.html",
+    "components/metrics_card.html",
     "components/modal.html",
     "components/page_header.html",
     "components/pagination_controls.html",
@@ -7210,7 +7231,12 @@
    "extends": [
     "layouts/admin_base.html"
    ],
+   "extra_macros": [
+    "components/disabled_action.html",
+    "components/metrics_card.html"
+   ],
    "macros": [
+    "components/disabled_action.html",
     "components/metrics_card.html",
     "components/page_header.html"
    ],
@@ -7326,20 +7352,26 @@
     "components/status_indicator.html",
     "components/tabs.html",
     "components/traceability_panel.html",
+    "components/unified_mapping_modal.html",
     "macros/form_macros.html",
+    "macros/nav_macros_shadcn.html",
     "macros/page_shell.html"
    ],
    "basis": "reviewed",
    "block": "record-detail",
    "controls": {
-    "button": 23,
+    "button": 22,
     "form": 8,
     "link": 24,
     "table": 6,
-    "testid": 2
+    "testid": 1
    },
    "extends": [
     "layouts/admin_base.html"
+   ],
+   "extra_macros": [
+    "components/unified_mapping_modal.html",
+    "macros/nav_macros_shadcn.html"
    ],
    "macros": [
     "components/badge.html",
@@ -7347,6 +7379,7 @@
     "components/button.html",
     "components/card.html",
     "components/dense_table.html",
+    "components/input.html",
     "components/page_header.html",
     "components/unified_mapping_modal.html",
     "macros/nav_macros_shadcn.html",
@@ -7363,11 +7396,7 @@
     }
    },
    "spec": "docs/design/specs/application.md",
-   "status": "specified",
-   "extra_macros": [
-    "components/unified_mapping_modal.html",
-    "macros/nav_macros_shadcn.html"
-   ]
+   "status": "specified"
   },
   "app/templates/applications/edit.html": {
    "allowed_macros": [
@@ -7505,7 +7534,9 @@
     "components/breadcrumb.html",
     "components/breadcrumb_nav.html",
     "components/button.html",
+    "components/card.html",
     "components/checkbox.html",
+    "components/completeness_ring.html",
     "components/confirmation_dialog.html",
     "components/data_table.html",
     "components/dense_table.html",
@@ -7529,6 +7560,7 @@
     "components/status_badge.html",
     "components/table.html",
     "components/tabs.html",
+    "components/unified_mapping_modal.html",
     "components/workbench_table.html",
     "macros/page_shell.html"
    ],
@@ -7544,6 +7576,11 @@
    },
    "extends": [
     "layouts/admin_base.html"
+   ],
+   "extra_macros": [
+    "components/card.html",
+    "components/completeness_ring.html",
+    "components/unified_mapping_modal.html"
    ],
    "macros": [
     "components/alert.html",
@@ -7575,12 +7612,7 @@
     }
    },
    "spec": "docs/design/specs/applications-list.md",
-   "status": "specified",
-   "extra_macros": [
-    "components/card.html",
-    "components/completeness_ring.html",
-    "components/unified_mapping_modal.html"
-   ]
+   "status": "specified"
   },
   "app/templates/applications/ownership_coverage.html": {
    "allowed_macros": [
@@ -8785,6 +8817,7 @@
     "components/breadcrumb_nav.html",
     "components/button.html",
     "components/card.html",
+    "components/checkbox.html",
     "components/confirmation_dialog.html",
     "components/data_card.html",
     "components/dense_table.html",
@@ -8808,12 +8841,9 @@
     "macros/page_shell.html"
    ],
    "basis": "rule",
-   "extra_macros": [
-    "components/checkbox.html"
-   ],
    "block": "board",
    "controls": {
-    "button": 81,
+    "button": 80,
     "link": 1,
     "modal": 6,
     "table": 2,
@@ -8822,9 +8852,18 @@
    "extends": [
     "layouts/composer_base.html"
    ],
+   "extra_macros": [
+    "components/checkbox.html"
+   ],
    "macros": [
     "components/breadcrumb_nav.html",
-    "components/empty_state.html"
+    "components/button.html",
+    "components/checkbox.html",
+    "components/dense_table.html",
+    "components/empty_state.html",
+    "components/input.html",
+    "components/modal.html",
+    "components/select.html"
    ],
    "reference": {
     "shadcn": {
@@ -9163,6 +9202,7 @@
     "components/data_table.html",
     "components/dense_table.html",
     "components/dialog.html",
+    "components/disabled_action.html",
     "components/dropdown_menu.html",
     "components/empty_state.html",
     "components/error_boundary.html",
@@ -9198,7 +9238,11 @@
    "extends": [
     "layouts/admin_base.html"
    ],
+   "extra_macros": [
+    "components/disabled_action.html"
+   ],
    "macros": [
+    "components/disabled_action.html",
     "macros/page_shell.html"
    ],
    "reference": {
@@ -9231,6 +9275,7 @@
     "components/dense_table.html",
     "components/detail_meta.html",
     "components/dialog.html",
+    "components/disabled_action.html",
     "components/dropdown_menu.html",
     "components/empty_state.html",
     "components/error_boundary.html",
@@ -9247,26 +9292,37 @@
     "components/skeleton.html",
     "components/status_badge.html",
     "components/status_indicator.html",
+    "components/table.html",
     "components/tabs.html",
     "components/traceability_panel.html",
     "macros/form_macros.html",
-    "macros/page_shell.html"
+    "macros/page_shell.html",
+    "macros/shadcn_compat.html"
    ],
    "basis": "reviewed",
    "block": "record-detail",
    "controls": {
-    "button": 7,
-    "link": 14,
+    "button": 9,
+    "link": 10,
     "modal": 1,
     "table": 1,
-    "testid": 26
+    "testid": 25
    },
    "extends": [
     "layouts/admin_base.html"
    ],
+   "extra_macros": [
+    "components/disabled_action.html",
+    "components/table.html",
+    "macros/shadcn_compat.html"
+   ],
    "macros": [
     "components/badge.html",
+    "components/button.html",
+    "components/disabled_action.html",
+    "components/input.html",
     "components/modal.html",
+    "components/table.html",
     "macros/page_shell.html",
     "macros/shadcn_compat.html"
    ],
@@ -9281,11 +9337,7 @@
     }
    },
    "spec": "docs/design/specs/element.md",
-   "status": "specified",
-   "extra_macros": [
-    "components/table.html",
-    "macros/shadcn_compat.html"
-   ]
+   "status": "specified"
   },
   "app/templates/archimate_crud/import_oef.html": {
    "allowed_macros": [
@@ -9676,6 +9728,7 @@
     "components/breadcrumb.html",
     "components/breadcrumb_nav.html",
     "components/button.html",
+    "components/card.html",
     "components/checkbox.html",
     "components/confirmation_dialog.html",
     "components/data_table.html",
@@ -9693,6 +9746,7 @@
     "components/modal.html",
     "components/page_header.html",
     "components/pagination_controls.html",
+    "components/progress.html",
     "components/provenance.html",
     "components/search_bar.html",
     "components/select.html",
@@ -9706,20 +9760,33 @@
    "basis": "rule",
    "block": "data-table",
    "controls": {
-    "button": 5,
-    "form": 2,
-    "link": 11,
-    "modal": 1,
+    "button": 12,
+    "form": 1,
+    "link": 7,
     "table": 1
    },
    "extends": [
     "layouts/admin_base.html"
    ],
-   "macros": [
-    "components/breadcrumb_nav.html",
-    "components/dense_table.html",
-    "components/page_header.html"
+   "extra_macros": [
+    "components/card.html",
+    "components/progress.html"
    ],
+   "macros": [
+    "components/alert.html",
+    "components/badge.html",
+    "components/breadcrumb_nav.html",
+    "components/button.html",
+    "components/card.html",
+    "components/dense_table.html",
+    "components/dropdown_menu.html",
+    "components/empty_state.html",
+    "components/input.html",
+    "components/page_header.html",
+    "components/progress.html",
+    "components/tabs.html"
+   ],
+   "note": "Matrix page with overview tiles and a coverage bar above the table; the card and progress macros are the library ones.",
    "reference": {
     "shadcn": {
      "name": "shadcn examples: tasks",
@@ -9731,12 +9798,7 @@
     }
    },
    "spec": null,
-   "status": "mapped",
-   "extra_macros": [
-    "components/card.html",
-    "components/progress.html"
-   ],
-   "note": "Matrix page with overview tiles and a coverage bar above the table; the card and progress macros are the library ones."
+   "status": "mapped"
   },
   "app/templates/architecture/cto_scorecard.html": {
    "allowed_macros": [
@@ -9812,6 +9874,7 @@
     "components/data_table.html",
     "components/dense_table.html",
     "components/dialog.html",
+    "components/disabled_action.html",
     "components/dropdown_menu.html",
     "components/empty_state.html",
     "components/error_boundary.html",
@@ -9845,7 +9908,11 @@
    "extends": [
     "layouts/admin_base.html"
    ],
+   "extra_macros": [
+    "components/disabled_action.html"
+   ],
    "macros": [
+    "components/disabled_action.html",
     "components/page_header.html"
    ],
    "reference": {
@@ -10378,7 +10445,7 @@
     "button": 8,
     "form": 3,
     "link": 6,
-    "testid": 7
+    "testid": 8
    },
    "extends": [
     "layouts/admin_base.html"
@@ -11170,6 +11237,7 @@
     "components/breadcrumb.html",
     "components/breadcrumb_nav.html",
     "components/button.html",
+    "components/card.html",
     "components/checkbox.html",
     "components/confirmation_dialog.html",
     "components/data_table.html",
@@ -11207,6 +11275,9 @@
    },
    "extends": [
     "layouts/admin_base.html"
+   ],
+   "extra_macros": [
+    "components/card.html"
    ],
    "macros": [
     "components/badge.html",
@@ -11260,6 +11331,7 @@
     "components/skeleton.html",
     "components/status_badge.html",
     "components/status_indicator.html",
+    "components/table.html",
     "components/tabs.html",
     "macros/page_shell.html"
    ],
@@ -11273,6 +11345,9 @@
    },
    "extends": [
     "layouts/admin_base.html"
+   ],
+   "extra_macros": [
+    "components/table.html"
    ],
    "macros": [
     "components/badge.html",
@@ -12284,6 +12359,7 @@
     "components/inline_hint.html",
     "components/input.html",
     "components/loading_state.html",
+    "components/metrics_card.html",
     "components/modal.html",
     "components/page_header.html",
     "components/pagination_controls.html",
@@ -12307,6 +12383,9 @@
    "extends": [
     "layouts/admin_base.html"
    ],
+   "extra_macros": [
+    "components/metrics_card.html"
+   ],
    "macros": [
     "components/metrics_card.html",
     "components/page_header.html"
@@ -12322,15 +12401,13 @@
     }
    },
    "spec": null,
-   "status": "mapped",
-   "extra_macros": [
-    "components/metrics_card.html"
-   ]
+   "status": "mapped"
   },
   "app/templates/capability_map/error.html": {
    "allowed_macros": [
     "components/accessibility_helpers.html",
     "components/alert.html",
+    "components/breadcrumb.html",
     "components/breadcrumb_nav.html",
     "components/button.html",
     "components/empty_state.html",
@@ -12344,6 +12421,9 @@
    },
    "extends": [
     "layouts/admin_base.html"
+   ],
+   "extra_macros": [
+    "components/breadcrumb.html"
    ],
    "macros": [
     "components/breadcrumb.html",
@@ -12449,11 +12529,13 @@
     "components/modal.html",
     "components/page_header.html",
     "components/provenance.html",
+    "components/roadmap_widget.html",
     "components/search_bar.html",
     "components/select.html",
     "components/skeleton.html",
     "components/status_badge.html",
     "components/tabs.html",
+    "components/unified_mapping_modal.html",
     "macros/page_shell.html"
    ],
    "basis": "reviewed",
@@ -12466,6 +12548,10 @@
    },
    "extends": [
     "layouts/admin_base.html"
+   ],
+   "extra_macros": [
+    "components/roadmap_widget.html",
+    "components/unified_mapping_modal.html"
    ],
    "macros": [
     "components/breadcrumb_nav.html",
@@ -12493,11 +12579,7 @@
     }
    },
    "spec": "docs/design/specs/capability-map.md",
-   "status": "specified",
-   "extra_macros": [
-    "components/roadmap_widget.html",
-    "components/unified_mapping_modal.html"
-   ]
+   "status": "specified"
   },
   "app/templates/capability_map/mapping.html": {
    "allowed_macros": [
@@ -13675,6 +13757,7 @@
     "components/data_card.html",
     "components/dense_table.html",
     "components/dialog.html",
+    "components/disabled_action.html",
     "components/dropdown_menu.html",
     "components/empty_state.html",
     "components/error_boundary.html",
@@ -13703,7 +13786,11 @@
    "extends": [
     "layouts/admin_base.html"
    ],
+   "extra_macros": [
+    "components/disabled_action.html"
+   ],
    "macros": [
+    "components/disabled_action.html",
     "components/page_header.html"
    ],
    "reference": {
@@ -14341,6 +14428,7 @@
     "components/breadcrumb_nav.html",
     "components/button.html",
     "components/card.html",
+    "components/company_kind.html",
     "components/confirmation_dialog.html",
     "components/data_card.html",
     "components/dense_table.html",
@@ -14348,9 +14436,11 @@
     "components/dropdown_menu.html",
     "components/empty_state.html",
     "components/error_boundary.html",
+    "components/explained_value.html",
     "components/filter_bar.html",
     "components/gantt_timeline.html",
     "components/inline_hint.html",
+    "components/input.html",
     "components/loading_state.html",
     "components/metrics_card.html",
     "components/modal.html",
@@ -14362,27 +14452,38 @@
     "components/skeleton.html",
     "components/status_badge.html",
     "components/status_indicator.html",
+    "components/table.html",
     "components/tabs.html",
     "macros/page_shell.html"
    ],
    "basis": "reviewed",
    "block": "dashboard",
    "controls": {
-    "button": 3,
-    "form": 1,
-    "link": 15,
+    "button": 13,
+    "form": 3,
+    "link": 14,
     "table": 4,
-    "testid": 17
+    "testid": 32
    },
    "extends": [
     "layouts/admin_base.html"
    ],
+   "extra_macros": [
+    "components/company_kind.html",
+    "components/explained_value.html",
+    "components/input.html",
+    "components/table.html"
+   ],
    "macros": [
     "components/answer_cascade.html",
     "components/button.html",
+    "components/card.html",
     "components/company_kind.html",
     "components/dense_table.html",
+    "components/dropdown_menu.html",
+    "components/explained_value.html",
     "components/input.html",
+    "components/priority_actions.html",
     "components/table.html",
     "macros/page_shell.html"
    ],
@@ -14397,13 +14498,7 @@
     }
    },
    "spec": "docs/design/specs/dashboard-overview.md",
-   "status": "specified",
-   "extra_macros": [
-    "components/company_kind.html",
-    "components/explained_value.html",
-    "components/input.html",
-    "components/table.html"
-   ]
+   "status": "specified"
   },
   "app/templates/dashboards/vendor_capability_matrix.html": {
    "allowed_macros": [
@@ -15645,6 +15740,7 @@
     "components/data_card.html",
     "components/dense_table.html",
     "components/dialog.html",
+    "components/disabled_action.html",
     "components/dropdown_menu.html",
     "components/empty_state.html",
     "components/error_boundary.html",
@@ -15668,9 +15764,9 @@
    "basis": "rule",
    "block": "dashboard",
    "controls": {
-    "button": 5,
+    "button": 7,
     "form": 1,
-    "link": 12,
+    "link": 10,
     "modal": 2,
     "table": 1,
     "testid": 1
@@ -15678,10 +15774,14 @@
    "extends": [
     "layouts/admin_base.html"
    ],
+   "extra_macros": [
+    "components/disabled_action.html"
+   ],
    "macros": [
     "components/badge.html",
     "components/button.html",
     "components/card.html",
+    "components/disabled_action.html",
     "macros/page_shell.html"
    ],
    "reference": {
@@ -16587,6 +16687,7 @@
     "components/data_table.html",
     "components/dense_table.html",
     "components/dialog.html",
+    "components/disabled_action.html",
     "components/dropdown_menu.html",
     "components/empty_state.html",
     "components/error_boundary.html",
@@ -16618,8 +16719,12 @@
    "extends": [
     "layouts/admin_base.html"
    ],
+   "extra_macros": [
+    "components/disabled_action.html"
+   ],
    "macros": [
     "components/breadcrumb_nav.html",
+    "components/disabled_action.html",
     "components/page_header.html"
    ],
    "reference": {
@@ -16739,7 +16844,7 @@
    "controls": {
     "button": 26,
     "link": 2,
-    "modal": 2,
+    "modal": 3,
     "table": 1
    },
    "extends": [
@@ -16750,6 +16855,7 @@
     "components/breadcrumb_nav.html",
     "components/button.html",
     "components/checkbox.html",
+    "components/confirmation_dialog.html",
     "components/dense_table.html",
     "components/form_field.html",
     "components/input.html",
@@ -19869,23 +19975,30 @@
     "components/public_faq.html",
     "components/public_footer.html",
     "components/public_navbar.html",
+    "components/table.html",
     "macros/pricing_cta.html"
    ],
    "basis": "reviewed",
    "block": "public",
    "controls": {
-    "link": 33,
+    "button": 2,
+    "link": 31,
     "table": 1,
-    "testid": 6
+    "testid": 7
    },
    "extends": [
     "layouts/public_base.html"
    ],
+   "extra_macros": [
+    "components/table.html"
+   ],
    "macros": [
     "components/badge.html",
+    "components/button.html",
     "components/public_faq.html",
     "components/public_footer.html",
-    "components/public_navbar.html"
+    "components/public_navbar.html",
+    "components/table.html"
    ],
    "reference": {
     "shadcn": {
@@ -19898,10 +20011,7 @@
     }
    },
    "spec": "docs/design/specs/home.md",
-   "status": "specified",
-   "extra_macros": [
-    "components/table.html"
-   ]
+   "status": "specified"
   },
   "app/templates/market_intelligence/index.html": {
    "allowed_macros": [
@@ -20768,7 +20878,9 @@
    ],
    "basis": "rule",
    "block": "public",
-   "controls": {},
+   "controls": {
+    "link": 2
+   },
    "extends": [
     "layouts/public_base.html"
    ],
@@ -21056,7 +21168,9 @@
    "basis": "declared",
    "block": "board",
    "controls": {
-    "button": 1
+    "button": 4,
+    "form": 1,
+    "modal": 1
    },
    "extends": [
     "layouts/admin_base.html"
@@ -21068,6 +21182,9 @@
    "macros": [
     "components/avatar.html",
     "components/badge.html",
+    "components/button.html",
+    "components/input.html",
+    "components/modal.html",
     "macros/kanban_board.html",
     "macros/page_shell.html"
    ],
@@ -21229,10 +21346,12 @@
     "components/dense_table.html",
     "components/detail_meta.html",
     "components/dialog.html",
+    "components/disabled_action.html",
     "components/dropdown_menu.html",
     "components/empty_state.html",
     "components/error_boundary.html",
     "components/form_field.html",
+    "components/gantt_timeline.html",
     "components/inline_hint.html",
     "components/input.html",
     "components/loading_state.html",
@@ -21263,7 +21382,12 @@
    "extends": [
     "layouts/admin_base.html"
    ],
+   "extra_macros": [
+    "components/disabled_action.html",
+    "components/gantt_timeline.html"
+   ],
    "macros": [
+    "components/disabled_action.html",
     "components/gantt_timeline.html",
     "macros/page_shell.html"
    ],
@@ -21734,6 +21858,7 @@
     "components/data_table.html",
     "components/dense_table.html",
     "components/dialog.html",
+    "components/disabled_action.html",
     "components/dropdown_menu.html",
     "components/empty_state.html",
     "components/error_boundary.html",
@@ -21750,6 +21875,7 @@
     "components/search_bar.html",
     "components/select.html",
     "components/skeleton.html",
+    "components/sol_confirm_modal.html",
     "components/status_badge.html",
     "components/table.html",
     "components/tabs.html",
@@ -21768,8 +21894,13 @@
    "extends": [
     "layouts/admin_base.html"
    ],
+   "extra_macros": [
+    "components/disabled_action.html",
+    "components/sol_confirm_modal.html"
+   ],
    "macros": [
     "components/button.html",
+    "components/disabled_action.html",
     "components/dropdown_menu.html",
     "components/empty_state.html",
     "components/filter_bar.html",
@@ -24633,6 +24764,7 @@
     "components/page_header.html",
     "components/progress.html",
     "components/provenance.html",
+    "components/radio_group.html",
     "components/select.html",
     "components/skeleton.html",
     "components/status_badge.html",
@@ -24645,7 +24777,7 @@
    "basis": "rule",
    "block": "record-detail",
    "controls": {
-    "button": 20,
+    "button": 13,
     "form": 6,
     "modal": 6,
     "table": 1
@@ -24653,10 +24785,20 @@
    "extends": [
     "layouts/admin_base.html"
    ],
+   "extra_macros": [
+    "components/radio_group.html"
+   ],
    "macros": [
+    "components/button.html",
+    "components/card.html",
+    "components/checkbox.html",
+    "components/dense_table.html",
     "components/empty_state.html",
+    "components/form_field.html",
+    "components/input.html",
     "components/modal.html",
     "components/page_header.html",
+    "components/radio_group.html",
     "components/skeleton.html",
     "components/status_badge.html"
    ],
@@ -24671,10 +24813,7 @@
     }
    },
    "spec": null,
-   "status": "mapped",
-   "extra_macros": [
-    "components/radio_group.html"
-   ]
+   "status": "mapped"
   },
   "app/templates/value_streams/index.html": {
    "allowed_macros": [
