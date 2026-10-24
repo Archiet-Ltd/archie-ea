@@ -14373,6 +14373,9 @@
    "extends": [
     "layouts/admin_base.html"
    ],
+   "extra_macros": [
+    "components/table.html"
+   ],
    "macros": [
     "components/page_header.html"
    ],
@@ -14461,6 +14464,9 @@
    },
    "extends": [
     "layouts/admin_base.html"
+   ],
+   "extra_macros": [
+    "components/table.html"
    ],
    "macros": [
     "components/breadcrumb_nav.html",
