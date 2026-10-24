@@ -176,7 +176,7 @@ def test_every_lens_question_is_answered_with_cards_or_a_plain_empty_state(clien
     _load(client, login_as, architect)
     asked = {
         "risk": "What could hurt Payments service and what does it touch",
-        "portfolio": "What is the rationalisation status of Payments service",
+        "portfolio": "What is the rationalization status of Payments service",
         "programme": "What's changing at Payments service and is it on track",
         "accountability": "Who's accountable for Payments service",
         "data": "What data does Payments service hold or produce and where does it flow",

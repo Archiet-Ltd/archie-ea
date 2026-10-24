@@ -11,7 +11,7 @@
 {% set headings = {
     'strategy': 'What we are trying to achieve at ' ~ name ~ ', and how it is tracking',
     'risk': 'What could hurt ' ~ name ~ ', and what it touches',
-    'portfolio': 'Rationalisation status of ' ~ name,
+    'portfolio': 'Rationalization status of ' ~ name,
     'programme': 'What is changing at ' ~ name ~ ', and whether it is on track',
     'accountability': 'Who is accountable for ' ~ name,
     'data': 'What data ' ~ name ~ ' holds or produces, who stewards it and where it flows',
@@ -41,9 +41,9 @@
             <div data-lens-row>
                 <div class="flex flex-wrap items-start justify-between gap-2">
                     <h3 class="min-w-0 break-words text-sm font-semibold text-foreground">{{ item.name }}</h3>
-                    {% call badge('neutral') %}{{ item.status or 'Status not recorded' }}{% endcall %}
+                    {% call badge('neutral') %}{{ (item.status | replace('_', ' ') | title) if item.status else 'Status not recorded' }}{% endcall %}
                 </div>
-                <p class="mt-1 text-sm text-muted-foreground">{{ item.completion_percentage if item.completion_percentage is not none else '—' }}% complete{% if item.health_status %} — {{ item.health_status }}{% endif %}</p>
+                <p class="mt-1 text-sm text-muted-foreground">{{ ('%g' | format(item.completion_percentage)) if item.completion_percentage is not none else '—' }}% complete{% if item.health_status %} — {{ item.health_status }}{% endif %}</p>
                 <p class="mt-1 text-sm text-foreground">{{ item.executive_sponsor or 'No sponsor recorded' }}</p>
                 <p class="mt-1 text-sm text-foreground">{{ restricted_or('Budget variance', item.budget_variance_pct, item.budget_reason, 'financial_data_restricted') }}</p>
                 {% for metric in item.success_metrics or [] %}
@@ -62,9 +62,9 @@
             <div data-lens-row>
                 <div class="flex flex-wrap items-start justify-between gap-2">
                     <h3 class="min-w-0 break-words text-sm font-semibold text-foreground">{{ item.name }}</h3>
-                    {% call badge('neutral') %}{{ item.status or 'Status not recorded' }}{% endcall %}
+                    {% call badge('neutral') %}{{ (item.status | replace('_', ' ') | title) if item.status else 'Status not recorded' }}{% endcall %}
                 </div>
-                <p class="mt-1 text-sm text-muted-foreground">{{ item.progress_percentage if item.progress_percentage is not none else '—' }}% complete{% if item.is_overdue %} — overdue{% endif %}</p>
+                <p class="mt-1 text-sm text-muted-foreground">{{ ('%g' | format(item.progress_percentage)) if item.progress_percentage is not none else '—' }}% complete{% if item.is_overdue %} — overdue{% endif %}</p>
                 <p class="mt-1 text-sm text-foreground">{{ item.owner or 'No owner recorded' }}</p>
                 <p class="mt-1 text-sm text-foreground">{{ restricted_or('Cost variance', item.cost_variance_pct, item.cost_reason, 'financial_data_restricted') }}</p>
                 <p class="mt-2 text-sm text-foreground">{{ reached(item.affected_rows or []) }}</p>
@@ -96,12 +96,12 @@
         {% if planning_url %}
         {% call card(class='p-4') %}
             <div data-lens-row data-lens-portfolio>
-                <p class="text-sm text-muted-foreground">Rationalisation status, cost and ownership for this application.</p>
-                <div class="mt-3">{{ button(text='Open rationalisation planning', variant='outline', size='sm', href=planning_url, icon='external-link', testid='lens-open-planning') }}</div>
+                <p class="text-sm text-muted-foreground">Rationalization status, cost and ownership for this application.</p>
+                <div class="mt-3">{{ button(text='Open rationalization planning', variant='outline', size='sm', href=planning_url, icon='external-link', testid='lens-open-planning') }}</div>
             </div>
         {% endcall %}
         {% else %}
-            {{ empty_state(icon='layers', title='This is not something the rationalisation view tracks', description=name ~ ' is not an application, so it has no rationalisation record to open.', padding='py-6') }}
+            {{ empty_state(icon='layers', title='This is not something the rationalization view tracks', description=name ~ ' is not an application, so it has no rationalization record to open.', padding='py-6') }}
         {% endif %}
 
     {% elif lens == 'accountability' %}

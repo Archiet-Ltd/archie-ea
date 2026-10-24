@@ -5,7 +5,8 @@ import logging
 from flask import jsonify, render_template, request, url_for
 from flask_login import current_user, login_required
 
-from app.modules.ai_chat.services.estate_answer import answer_estate_question
+from app.middleware.tenant_context import current_org_id
+from app.modules.ai_chat.services.estate_answer import answer_estate_question, explanations_for, recorded_text
 from app.modules.ai_chat.services.lens_answer import answer_lens_question
 from app.modules.intelligence.services import answer_envelope as envelope
 
@@ -16,6 +17,7 @@ from . import unified_ai_chat_bp
 logger = logging.getLogger(__name__)
 
 MAX_QUESTION_CHARS = 2000
+SHOWN_LIMIT = 25  # connections drawn as cards; the template and its explanations agree on it
 
 # What each lens's answer is a list of, for the line kept in the conversation.
 _LENS_RECORDS = {
@@ -28,14 +30,28 @@ _LENS_RECORDS = {
 }
 
 
-def _remember(thread_id, message, answer_text):
+def _remember(thread_id, message, answer_text, *, keep=True):
     """Keep the question and its answer in the person's conversation history, as any
     other answer is, and return the thread they were kept in (or None if they could
     not be: the answer on screen is unaffected)."""
+    if not keep:
+        return None
     try:
         return persist_turn(current_user.id, thread_id, message, answer_text)
     except Exception:
         logger.warning("estate answer was not saved to the conversation", exc_info=True)
+        return None
+
+
+def _derivation_status():
+    """When the organisation's indirect connections were last worked out, or None when
+    that could not be read (the card then says so rather than showing zeros)."""
+    try:
+        from app.modules.intelligence.services.derived_facts import derivation_status
+
+        return derivation_status(int(current_org_id()))
+    except Exception:
+        logger.warning("derivation status unavailable", exc_info=True)
         return None
 
 
@@ -44,7 +60,7 @@ def _lens_line(lens):
     data = lens["data"] or {}
     if lens["lens"] == "portfolio":
         tracked = "is tracked" if data.get("application_component_id") else "is not tracked"
-        return "Answer from your records: %s %s by rationalisation planning." % (name, tracked)
+        return "Answer from your records: %s %s by rationalization planning." % (name, tracked)
     key, noun = _LENS_RECORDS[lens["lens"]]
     count = len(data.get(key) or [])
     return "Answer from your records about %s: %d %s%s recorded." % (name, count, noun, "" if count == 1 else "s")
@@ -64,10 +80,11 @@ def estate_answer():
     if not isinstance(message, str) or not message.strip():
         return jsonify({"success": False, "error": "Ask a question first."}), 400
     thread_id = body.get("thread_id") if isinstance(body.get("thread_id"), str) else None
+    keep = body.get("remember") is not False
     lens = answer_lens_question(message[:MAX_QUESTION_CHARS])
     if lens is not None:
         component_id = ((lens["data"] or {}).get("application_component_id")) if lens["lens"] == "portfolio" else None
-        kept = _remember(thread_id, message, _lens_line(lens)) if lens["data"] is not None else None
+        kept = _remember(thread_id, message, _lens_line(lens), keep=keep) if lens["data"] is not None else None
         return jsonify(
             {
                 "success": True,
@@ -111,6 +128,7 @@ def estate_answer():
         message,
         "Answer from your records: %d connection%s. [Open this answer](%s)"
         % (total, "" if total == 1 else "s", answer["page_url"]),
+        keep=keep,
     )
     return jsonify(
         {
@@ -123,6 +141,11 @@ def estate_answer():
                 "ai_chat/_estate_answer.html",
                 answer=answer,
                 composer_url=url_for("archimate.composer_page"),
+                question=message[:MAX_QUESTION_CHARS],
+                derivation=_derivation_status(),
+                shown_limit=SHOWN_LIMIT,
+                explanations=explanations_for(answer, SHOWN_LIMIT),
+                recorded_text=recorded_text,
             ),
         }
     )
