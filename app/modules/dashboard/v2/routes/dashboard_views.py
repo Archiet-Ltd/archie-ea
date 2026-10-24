@@ -695,9 +695,10 @@ def overview():
             if _can_load_sample:
                 sample_step = {
                     "title": "Try the sample company",
-                    "description": "See a working answer in under a minute, without connecting anything yet.",
+                    "description": "See a populated workspace in under a minute, without connecting anything yet.",
                     "href": safe_url_for_with_fallback("architect_ui.load_sample_company", FALLBACK_HREF),
                     "cta": "Load sample",
+                    "post": True,
                     "done": False,
                 }
             else:

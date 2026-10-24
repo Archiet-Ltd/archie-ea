@@ -39,9 +39,13 @@
      meta_caller    — a row below the title for identity badges / counters that
                       belong to the header but are not actions.
 
-   Passing both `subtitle` and `subtitle_caller` renders the caller only. #}
+   Passing both `subtitle` and `subtitle_caller` renders the caller only.
+
+     title_caller   — a {% call %}-style slot for a title that carries markup (an Alpine
+                      x-text span for a name the page loads). Defaults to off; `title`
+                      is still the plain string. #}
 {% from 'components/_breadcrumb_root.html' import crumb_label %}
-{% macro page_shell(title, subtitle=None, breadcrumb=[], actions_caller=None, tabs=[], icon=None, subtitle_caller=None, meta_caller=None, stack_actions=False) %}
+{% macro page_shell(title, subtitle=None, breadcrumb=[], actions_caller=None, tabs=[], icon=None, subtitle_caller=None, meta_caller=None, stack_actions=False, title_caller=None) %}
 <div class="mb-6">
     {% if breadcrumb %}
     {# Full breadcrumb trail on sm+; single back-link below sm when stack_actions #}
@@ -105,10 +109,10 @@
             {% if icon %}
             <div class="flex items-center gap-3">
                 <i data-lucide="{{ icon }}" class="h-6 w-6 shrink-0 text-primary" aria-hidden="true"></i>
-                <h1 class="text-3xl font-bold tracking-[-0.02em] text-foreground">{{ title }}</h1>
+                <h1 class="text-3xl font-bold tracking-[-0.02em] text-foreground">{% if title_caller %}{{ title_caller() }}{% else %}{{ title }}{% endif %}</h1>
             </div>
             {% else %}
-            <h1 class="text-3xl font-bold tracking-[-0.02em] text-foreground">{{ title }}</h1>
+            <h1 class="text-3xl font-bold tracking-[-0.02em] text-foreground">{% if title_caller %}{{ title_caller() }}{% else %}{{ title }}{% endif %}</h1>
             {% endif %}
             {% if subtitle_caller %}
             <div class="mt-1 text-sm text-muted-foreground">{{ subtitle_caller() }}</div>
@@ -191,9 +195,9 @@
 {% set tag = 'a' if href else ('button' if onclick else 'div') %}
 {% if href or onclick %}
     {% set state_classes = ('border-warning ring-2 ring-warning/20 bg-warning/10' if active else 'border-warning/40 bg-warning/10 hover:border-warning/60') if is_warning else ('border-primary ring-2 ring-primary/20 bg-primary/5' if active else 'border-input bg-background hover:border-primary/50') %}
- {% set card_classes ='rounded-xl border-2' ~ state_classes ~' cursor-pointer transition-all duration-200 p-5 block no-underline text-inherit w-full text-left' %}
+ {% set card_classes ='rounded-lg border-2' ~ state_classes ~' cursor-pointer transition-all duration-200 p-5 block no-underline text-inherit w-full text-left' %}
 {% else %}
-    {% set card_classes = 'rounded-xl border border-warning/40 bg-warning/10 text-card-foreground p-6' if is_warning else 'rounded-xl border border-border bg-card text-card-foreground p-6' %}
+    {% set card_classes = 'rounded-lg border border-warning/40 bg-warning/10 text-card-foreground p-6' if is_warning else 'rounded-lg border border-border bg-card text-card-foreground p-6' %}
 {% endif %}
 {% set hint_classes = 'text-warning-emphasis' if is_warning else 'text-muted-foreground' %}
 {% set value_size = value_classes['standard'] if is_warning else value_classes[variant] %}

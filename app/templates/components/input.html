@@ -1,6 +1,8 @@
 {# shadcn/ui Input Component #}
 {# aria_label: pass when the call site has no visible <label for="<id>">.
-   A placeholder is not a label -- it is gone as soon as the user types. #}
+   A placeholder is not a label -- it is gone as soon as the user types.
+   attrs_dict: extra attributes as a dict (x-model, @input, :id ...); values are escaped.
+   size: default (h-10), sm (h-9) or xs (h-8). #}
 {% macro input(
     id='',
     name='',
@@ -12,8 +14,11 @@
     class='',
     error=none,
     aria_describedby=none,
-    aria_label=none
+    aria_label=none,
+    size='default',
+    attrs_dict={}
 ) %}
+    {% set heights = {'default': 'h-10', 'sm': 'h-9', 'xs': 'h-8'} %}
     <input
         {% if id %}id="{{ id }}"{% endif %}
         {% if name %}name="{{ name }}"{% endif %}
@@ -25,7 +30,12 @@
         {% if error %}aria-invalid="true"{% endif %}
         {% if aria_describedby %}aria-describedby="{{ aria_describedby }}"{% elif error and id %}aria-describedby="{{ id }}-error"{% endif %}
         {% if aria_label %}aria-label="{{ aria_label }}"{% endif %}
-        class="flex h-10 w-full rounded-md border {% if error %}border-destructive{% else %}border-input{% endif %} bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 {{ class }}"
+        {{ attrs_dict|xmlattr }}
+        {% if type == 'range' %}
+        class="h-2 w-full cursor-pointer accent-primary disabled:cursor-not-allowed disabled:opacity-50 {{ class }}"
+        {% else %}
+        class="flex {{ heights.get(size, 'h-10') }} w-full rounded-md border {% if error %}border-destructive{% else %}border-input{% endif %} bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 {{ class }}"
+        {% endif %}
     />
     {% if error and id %}
     <p id="{{ id }}-error" class="text-sm text-destructive-emphasis mt-1" role="alert">{{ error }}</p>
@@ -50,7 +60,8 @@
     class='',
     error=none,
     aria_describedby=none,
-    aria_label=none
+    aria_label=none,
+    attrs_dict={}
 ) %}
     <textarea
         {% if id %}id="{{ id }}"{% endif %}
@@ -62,6 +73,7 @@
         {% if aria_describedby %}aria-describedby="{{ aria_describedby }}"{% elif error and id %}aria-describedby="{{ id }}-error"{% endif %}
         {% if aria_label %}aria-label="{{ aria_label }}"{% endif %}
         rows="{{ rows }}"
+        {{ attrs_dict|xmlattr }}
         class="flex min-h-[80px] w-full rounded-md border {% if error %}border-destructive{% else %}border-input{% endif %} bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 {{ class }}"
     >{{ caller() if caller }}</textarea>
     {% if error and id %}

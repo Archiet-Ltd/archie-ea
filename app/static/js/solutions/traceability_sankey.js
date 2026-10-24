@@ -1,9 +1,30 @@
 /* Extracted from _traceability_sankey.html (ARCH-064: keep large JS out of the
    server-rendered payload; cacheable across the 4 pages that embed the sankey).
    Pure JS, zero Jinja — defines the global traceabilitySankey() Alpine factory. */
-function traceabilitySankey(solutionId, apiUrl) {
+// Loads a script once and resolves when it has run. Used for the d3 bundles on
+// pages that only draw the diagram when the person opens its tab.
+function loadSankeyScript(src) {
+  return new Promise((resolve, reject) => {
+    const existing = document.querySelector(`script[data-sankey-dep="${src}"]`);
+    if (existing) {
+      if (existing.dataset.ready === '1') { resolve(); return; }
+      existing.addEventListener('load', () => resolve());
+      existing.addEventListener('error', () => reject(new Error(`Could not load ${src}`)));
+      return;
+    }
+    const el = document.createElement('script');
+    el.src = src;
+    el.dataset.sankeyDep = src;
+    el.addEventListener('load', () => { el.dataset.ready = '1'; resolve(); });
+    el.addEventListener('error', () => reject(new Error(`Could not load ${src}`)));
+    document.head.appendChild(el);
+  });
+}
+
+function traceabilitySankey(solutionId, apiUrl, lazy) {
   return {
     solutionId,
+    lazy: !!lazy,
     apiUrl: apiUrl || '',
     loading: false,
     loaded: false,
@@ -27,55 +48,83 @@ function traceabilitySankey(solutionId, apiUrl) {
       {id:'risk',   label:'Risk',   icon:'<svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>'},
     ],
 
-    legends: {
-      layer:  [{label:'Motivation',color:'#8b5cf6'},{label:'Strategy',color:'#0ea5e9'},{label:'Business',color:'#f59e0b'},{label:'Application',color:'#10b981'},{label:'Technology',color:'#6b7280'},{label:'Implementation',color:'#f97316'},{label:'Code',color:'#ec4899'}],
-      health: [{label:'Complete (4/4)',color:'#10b981'},{label:'Partial (2-3/4)',color:'#f59e0b'},{label:'Minimal (1/4)',color:'#f97316'},{label:'Empty (0/4)',color:'#ef4444'}],
-      status: [{label:'Implemented',color:'#10b981'},{label:'Approved',color:'#0ea5e9'},{label:'Proposed',color:'#8b5cf6'},{label:'Deprecated',color:'#ef4444'},{label:'Unknown',color:'#94a3b8'}],
-      origin: [{label:'Human (primary)',color:'#0ea5e9'},{label:'Human (supporting)',color:'#38bdf8'},{label:'AI derived',color:'#a855f7'},{label:'Impacted',color:'#f59e0b'}],
-      risk:   [{label:'Critical path',color:'#ef4444'},{label:'Critical dep.',color:'#f97316'},{label:'High dep.',color:'#f59e0b'},{label:'Medium dep.',color:'#84cc16'},{label:'Low / none',color:'#94a3b8'}],
+    // Every colour is a design token name (a `--<token>` custom property in
+    // shadcn_tokens.css). Legend swatches take the matching bg-* class; the SVG
+    // resolves the same token at draw time, so light and dark both follow it.
+    swatchClass: {
+      'layer-motivation': 'bg-layer-motivation', 'layer-strategy': 'bg-layer-strategy',
+      'layer-business': 'bg-layer-business', 'layer-application': 'bg-layer-application',
+      'layer-technology': 'bg-layer-technology', 'layer-implementation': 'bg-layer-implementation',
+      'layer-risk': 'bg-layer-risk', 'primary': 'bg-primary', 'success': 'bg-success',
+      'warning': 'bg-warning', 'destructive': 'bg-destructive', 'info': 'bg-info',
+      'muted-foreground': 'bg-muted-foreground',
     },
 
-    get activeLegend() { return this.legends[this.colorMode] || []; },
+    legends: {
+      layer:  [{label:'Motivation',token:'layer-motivation'},{label:'Strategy',token:'layer-strategy'},{label:'Business',token:'layer-business'},{label:'Application',token:'layer-application'},{label:'Technology',token:'layer-technology'},{label:'Implementation',token:'layer-implementation'},{label:'Code',token:'primary'}],
+      health: [{label:'Complete (4/4)',token:'success'},{label:'Partial (2-3/4)',token:'warning'},{label:'Minimal (1/4)',token:'layer-implementation'},{label:'Empty (0/4)',token:'destructive'}],
+      status: [{label:'Implemented',token:'success'},{label:'Approved',token:'info'},{label:'Proposed',token:'layer-motivation'},{label:'Deprecated',token:'destructive'},{label:'Unknown',token:'muted-foreground'}],
+      origin: [{label:'Human (primary)',token:'info'},{label:'Human (supporting)',token:'layer-implementation'},{label:'AI derived',token:'layer-motivation'},{label:'Impacted',token:'warning'}],
+      risk:   [{label:'Critical path',token:'destructive'},{label:'Critical dep.',token:'layer-implementation'},{label:'High dep.',token:'warning'},{label:'Medium dep.',token:'success'},{label:'Low / none',token:'muted-foreground'}],
+    },
+
+    get activeLegend() {
+      return (this.legends[this.colorMode] || []).map(i => ({...i, swatch: this.swatchClass[i.token]}));
+    },
 
     setColorMode(mode) { this.colorMode = mode; this.render(); },
 
-    nodeColor(node) {
+    // Resolve a token name to a colour string the SVG can use.
+    tokenColor(token) {
+      const resolve = window.ArchieColorTokens && window.ArchieColorTokens.cssHSL;
+      return (resolve && resolve('--' + token)) || 'currentColor';
+    },
+
+    nodeToken(node) {
       switch (this.colorMode) {
-        case 'health': return this.healthColor(node);
-        case 'status': return this.statusColor(node);
-        case 'origin': return this.originColor(node);
-        case 'risk':   return this.riskColor(node);
-        default:       return this.layerColor(node.layer);
+        case 'health': return this.healthToken(node);
+        case 'status': return this.statusToken(node);
+        case 'origin': return this.originToken(node);
+        case 'risk':   return this.riskToken(node);
+        default:       return this.layerToken(node.layerName ?? node.layer);
       }
     },
 
-    layerColor(layer) {
-      const map = {motivation:'#8b5cf6',strategy:'#0ea5e9',business:'#f59e0b',application:'#10b981',technology:'#6b7280',implementation:'#f97316',code:'#ec4899'};
-      return map[layer] || '#94a3b8';
+    nodeColor(node) { return this.tokenColor(this.nodeToken(node)); },
+
+    nodeSwatch(node) { return this.swatchClass[this.nodeToken(node)]; },
+
+    healthSwatch(node) { return this.swatchClass[this.healthToken(node)]; },
+
+    layerToken(layer) {
+      const map = {motivation:'layer-motivation',strategy:'layer-strategy',business:'layer-business',application:'layer-application',technology:'layer-technology',implementation:'layer-implementation',code:'primary'};
+      return map[layer] || 'muted-foreground';
     },
 
-    healthColor(node) {
+    layerColor(layer) { return this.tokenColor(this.layerToken(layer)); },
+
+    healthToken(node) {
       const h = node.health ?? 0;
-      if (h >= 4) return '#10b981';
-      if (h >= 2) return '#f59e0b';
-      if (h >= 1) return '#f97316';
-      return '#ef4444';
+      if (h >= 4) return 'success';
+      if (h >= 2) return 'warning';
+      if (h >= 1) return 'layer-implementation';
+      return 'destructive';
     },
 
-    statusColor(node) {
-      const map = {implemented:'#10b981',approved:'#0ea5e9',proposed:'#8b5cf6',deprecated:'#ef4444'};
-      return map[(node.status||'').toLowerCase()] || '#94a3b8';
+    statusToken(node) {
+      const map = {implemented:'success',approved:'info',proposed:'layer-motivation',deprecated:'destructive'};
+      return map[(node.status||'').toLowerCase()] || 'muted-foreground';
     },
 
-    originColor(node) {
-      const map = {primary:'#0ea5e9',supporting:'#38bdf8',ai_derived:'#a855f7',impacted:'#f59e0b'};
-      return map[node.origin||'primary'] || '#0ea5e9';
+    originToken(node) {
+      const map = {primary:'info',supporting:'layer-implementation',ai_derived:'layer-motivation',impacted:'warning'};
+      return map[node.origin||'primary'] || 'info';
     },
 
-    riskColor(node) {
-      if (node.critical_path) return '#ef4444';
-      const map = {critical:'#f97316',high:'#f59e0b',medium:'#84cc16',low:'#94a3b8'};
-      return map[(node.dependency_level||'').toLowerCase()] || '#94a3b8';
+    riskToken(node) {
+      if (node.critical_path) return 'destructive';
+      const map = {critical:'layer-implementation',high:'warning',medium:'success',low:'muted-foreground'};
+      return map[(node.dependency_level||'').toLowerCase()] || 'muted-foreground';
     },
 
     get linkedNodes() {
@@ -89,8 +138,13 @@ function traceabilitySankey(solutionId, apiUrl) {
       return [...linked].map(i => this.nodes[i]).filter(Boolean);
     },
 
+    async ensureD3() {
+      if (typeof d3 === 'undefined') await loadSankeyScript('/static/vendor/d3.min.js');
+      if (typeof d3.sankey === 'undefined') await loadSankeyScript('/static/vendor/d3-sankey.min.js');
+    },
+
     init() {
-      this.load();
+      if (!this.lazy) this.load();
       window.addEventListener(`load-sankey-${this.solutionId}`, () => this.load());
     },
 
@@ -99,6 +153,7 @@ function traceabilitySankey(solutionId, apiUrl) {
       this.loading = true;
       this.error = null;
       try {
+        await this.ensureD3();
         const endpoint = this.apiUrl || `/architecture-journey/${this.solutionId}/traceability-flow`;
         // Platform.fetch will throw a structured PlatformError on non‑ok responses.
         // It returns the parsed JSON directly, or null for 204 No Content.
@@ -169,7 +224,8 @@ function traceabilitySankey(solutionId, apiUrl) {
         .extent([[margin.left,margin.top],[W-margin.right,H-margin.bottom]]);
 
       const graph = sankey({
-        nodes: connectedNodes.map((n,i) => ({...n, index:i})),
+        // d3-sankey overwrites `layer` with the column number, so keep the name.
+        nodes: connectedNodes.map((n,i) => ({...n, index:i, layerName:n.layer})),
         links: connectedLinks.map(l => ({...l, value:l.value||1})),
       });
 
@@ -179,7 +235,7 @@ function traceabilitySankey(solutionId, apiUrl) {
       svg.append('g').attr('fill','none')
         .selectAll('path').data(graph.links).join('path')
         .attr('d', d3.sankeyLinkHorizontal())
-        .attr('stroke', d => self.layerColor(graph.nodes[d.source.index]?.layer||''))
+        .attr('stroke', d => self.layerColor(graph.nodes[d.source.index]?.layerName||''))
         .attr('stroke-width', d => Math.max(1,d.width))
         .attr('stroke-opacity', 0.22)
         .on('mouseover', function() { d3.select(this).attr('stroke-opacity',0.5); })
@@ -200,13 +256,13 @@ function traceabilitySankey(solutionId, apiUrl) {
       node.filter(d => d.has_spec||d.has_code)
         .append('circle')
         .attr('cx', d=>d.x1+4).attr('cy', d=>(d.y0+d.y1)/2)
-        .attr('r',3).attr('fill', d=>d.has_code?'#8b5cf6':'#10b981');
+        .attr('r',3).attr('fill', d=>self.tokenColor(d.has_code?'layer-motivation':'success'));
 
       // AI-origin marker
       node.filter(d => d.origin==='ai_derived')
         .append('circle')
         .attr('cx', d=>d.x0+2).attr('cy', d=>d.y0+2)
-        .attr('r',2).attr('fill','#a855f7').attr('opacity',0.9);
+        .attr('r',2).attr('fill', self.tokenColor('layer-motivation')).attr('opacity',0.9);
 
       // Critical-path ring
       node.filter(d => d.critical_path)
@@ -214,7 +270,7 @@ function traceabilitySankey(solutionId, apiUrl) {
         .attr('x', d=>d.x0-2).attr('y', d=>d.y0-2)
         .attr('height', d=>Math.max(2,d.y1-d.y0)+4)
         .attr('width',  d=>(d.x1-d.x0)+4)
-        .attr('fill','none').attr('stroke','#ef4444')
+        .attr('fill','none').attr('stroke', self.tokenColor('destructive'))
         .attr('stroke-width',1.5).attr('rx',3).attr('opacity',0.6);
 
       node.filter(d => (d.y1-d.y0)>=14)

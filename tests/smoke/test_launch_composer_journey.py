@@ -1,5 +1,5 @@
 """Application architects model a component landscape in the ArchiMate Composer,
-and a solution architect asks the twin map why two things are connected.
+and a solution architect asks Ask why two things are connected.
 
 Composer: a fresh organisation. Elements are added through the Components
 palette (drag onto the canvas, then name a new one or pick an existing one
@@ -239,18 +239,23 @@ def test_solution_architect_asks_why_two_things_are_connected(browser, live_serv
     _pick_type(page, _connect(page, checkout, portal), "serving")
     expect(page.locator(".joint-link")).to_have_count(2, timeout=PAGE_TIMEOUT)
 
-    # The twin map, centred on the Ledger through its own picker.
-    page.goto(base + "/intelligence/twin-map", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
-    picker_input = page.locator("#twin-picker-input")
-    expect(picker_input).to_be_visible(timeout=PAGE_TIMEOUT)
+    # Ask about the Ledger through its own picker; the old twin map address now goes to the
+    # Composer, and the Why? explanation of a worked-out connection lives on Ask.
+    page.goto(base + "/intelligence/ask", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    page.locator("#ask-question-impact").click()
+    picker_input = page.locator("#ask-picker-input")
+    expect(picker_input).to_be_focused(timeout=PAGE_TIMEOUT)
     picker_input.press_sequentially(ledger, delay=15)
-    option = page.locator("#twin-picker-listbox [role=option]", has_text=ledger)
+    option = page.locator("#ask-picker-listbox [role=option]", has_text=ledger)
     expect(option).to_be_visible(timeout=PAGE_TIMEOUT)
     option.click()
-    page.wait_for_url(re.compile(r"/intelligence/twin-map\?element=\d+"), timeout=PAGE_TIMEOUT)
-    ledger_id = int(re.search(r"element=(\d+)", page.url).group(1))
+    page.wait_for_function(
+        "() => { const el = document.querySelector('[x-data^=\"askSurface\"]');"
+        " return !!(el && Alpine.$data(el).centreId); }", timeout=PAGE_TIMEOUT)
+    ledger_id = int(page.evaluate(
+        "() => Alpine.$data(document.querySelector('[x-data^=\"askSurface\"]')).centreId"))
 
-    # Nothing worked out yet in a new organisation: the map says so and offers to.
+    # Nothing worked out yet in a new organisation: the answer says so and offers to.
     recompute = page.locator("[data-not-computed-notice] [data-recompute-button]")
     expect(recompute).to_be_visible(timeout=PAGE_TIMEOUT)
     with page.expect_response(
@@ -259,7 +264,7 @@ def test_solution_architect_asks_why_two_things_are_connected(browser, live_serv
         recompute.click()
     assert resp.value.status < 400, resp.value.text()[:300]
 
-    derived_row = page.locator("[data-map-row][data-kind=derived]")
+    derived_row = page.locator("[data-ask-row][data-kind=derived]")
     expect(derived_row).to_have_count(1, timeout=PAGE_TIMEOUT)
     expect(derived_row).to_contain_text(portal)
 

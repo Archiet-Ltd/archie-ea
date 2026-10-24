@@ -71,9 +71,9 @@ def test_load_sample_company_creates_elements(client, make_org, tenant_ctx):
                 sess["_fresh"] = True
 
             response = client.post("/architecture/sample-company/load", follow_redirects=False)
-            # Should redirect to the ask page
+            # Should redirect to the first screen, which shows the loaded sample
             assert response.status_code == 302, f"Got {response.status_code}"
-            assert "/ai-chat" in response.location or "/intelligence/ask" in response.location
+            assert "/dashboard/overview" in response.location
 
             # Count after
             count_after = ArchiMateElement.query.count()

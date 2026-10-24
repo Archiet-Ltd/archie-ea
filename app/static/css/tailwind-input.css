@@ -133,4 +133,26 @@
     letter-spacing: 0;
     color: hsl(var(--muted-foreground));
   }
+
+  /* Kanban stage bands. The SAFe portfolio board tints its column headers by
+     stage so a person who knows the method reads the discovery / execution /
+     done bands at a glance: discovery (Funnel, Reviewing, Analyzing) in the
+     info/blue token, execution (Portfolio Backlog, Implementing) in the
+     success/green token, Done neutral. Boards that set no data-stage-group
+     (the ADM board) keep their own header colour and are untouched. These
+     reference existing tokens; they do not declare a new one, so the one token
+     source is unchanged. A column at its WIP limit still wins with the
+     destructive border set in the macro. */
+  .kanban-column-header[data-stage-group="discovery"] {
+    background-color: hsl(var(--info) / 0.1);
+    border-color: hsl(var(--info) / 0.3);
+  }
+  .kanban-column-header[data-stage-group="execution"] {
+    background-color: hsl(var(--success) / 0.1);
+    border-color: hsl(var(--success) / 0.3);
+  }
+  .kanban-column-header[data-stage-group="done"] {
+    background-color: hsl(var(--muted));
+    border-color: hsl(var(--border));
+  }
 }

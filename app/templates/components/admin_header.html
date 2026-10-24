@@ -3,6 +3,7 @@
 
 {% set resolved_page_guide_context = page_guide_context | default({'enabled': false, 'supported': false}, true) %}
 {% from 'components/switch.html' import switch %}
+{% from 'components/button.html' import button %}
 <header id="admin-header"
         class="sticky top-0 z-30 flex h-12 shrink-0 items-center justify-between pl-14 lg:pl-4 pr-4 bg-background border-b border-border">
     <div class="flex items-center gap-4">
@@ -117,11 +118,9 @@
                  role="menu">
                 <div class="p-3 border-b border-border flex items-center justify-between">
                     <span class="text-sm font-semibold">Notifications</span>
-                    <button type="button" id="notif-mark-read-btn"
-                            class="text-xs text-muted-foreground hover:text-foreground transition-colors hidden"
-                            aria-label="Mark all notifications as read">
-                        Mark all read
-                    </button>
+                    <span id="notif-mark-read-btn-wrapper" class="hidden">
+                        {{ button(text='Mark all read', variant='ghost', size='sm', class='text-xs', aria_label='Mark all notifications as read', attrs_dict={'id': 'notif-mark-read-btn'}) }}
+                    </span>
                 </div>
                 <div id="notif-list" class="max-h-72 overflow-y-auto" role="none">
                     <div class="px-4 py-6 text-center text-sm text-muted-foreground">
@@ -141,7 +140,7 @@
                     aria-label="User menu">
                 <!-- Avatar: coloured circle derived from display name -->
                 <div id="user-avatar"
-                     class="w-8 h-8 rounded-full flex items-center justify-center shrink-0 text-primary-foreground font-semibold text-sm select-none"
+                     class="w-8 h-8 rounded-full flex items-center justify-center shrink-0 font-semibold text-sm select-none"
                      aria-hidden="true">
                     {% if current_user.is_authenticated %}
                         {% set _display = (current_user.first_name or current_user.full_name() or current_user.email or 'A') %}
@@ -295,19 +294,22 @@
         const avatar = document.getElementById('user-avatar');
         if (!avatar) return;
         const text = avatar.textContent.trim();
-        // The 700 shade of each hue: every one keeps the light initial above
-        // 4.5:1. The 600 shades left amber, green and cyan near 3.5:1.
-        const COLOURS = [
-            '#1d4ed8','#6d28d9','#be185d','#b91c1c',
-            '#b45309','#047857','#0e7490','#7e22ce',
+        // A tint of each ArchiMate layer hue with that layer's readable-text
+        // token, so the initial keeps its contrast in light and dark. The class
+        // names are written out whole so the stylesheet build keeps them.
+        const CLASSES = [
+            'bg-layer-motivation/10 text-layer-motivation-emphasis',
+            'bg-layer-strategy/10 text-layer-strategy-emphasis',
+            'bg-layer-business/10 text-layer-business-emphasis',
+            'bg-layer-application/10 text-layer-application-emphasis',
+            'bg-layer-technology/10 text-layer-technology-emphasis',
+            'bg-layer-implementation/10 text-layer-implementation-emphasis',
+            'bg-layer-risk/10 text-layer-risk-emphasis',
         ];
         let hash = 0;
         const name = avatar.dataset.name || text;
         for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
-        avatar.style.backgroundColor = COLOURS[Math.abs(hash) % COLOURS.length];
-        // Pinned rather than text-primary-foreground: that token turns navy in
-        // the dark theme, while this background does not change with it.
-        avatar.style.color = '#f8fafc';
+        avatar.classList.add(...CLASSES[Math.abs(hash) % CLASSES.length].split(' '));
     })();
 
     /* ── Role badge colour ───────────────────────────────────────────────── */
@@ -419,11 +421,16 @@
                 '<i data-lucide="bell-off" class="h-6 w-6 mx-auto mb-2 opacity-40"></i>' +
                 'No notifications</div>';
             if (typeof lucide !== 'undefined') lucide.createIcons();
-            if (markReadBtn) markReadBtn.style.display = 'none';
+            const wrapper = document.getElementById('notif-mark-read-btn-wrapper');
+            if (wrapper) wrapper.classList.add('hidden');
             return;
         }
         const unread = notifItems.filter(function(n) { return !n.read; }).length;
-        if (markReadBtn) markReadBtn.style.display = unread > 0 ? 'inline' : 'none';
+        const wrapper = document.getElementById('notif-mark-read-btn-wrapper');
+        if (wrapper) {
+            if (unread > 0) { wrapper.classList.remove('hidden'); }
+            else { wrapper.classList.add('hidden'); }
+        }
         notifList.innerHTML = notifItems.map(function(item) {
             // ── XSS fix: all user content escaped via esc() ──
             const msgHtml = esc(item.message || '');
