@@ -129,7 +129,7 @@ def _get_epics() -> List[Dict]:
         created_by_id = getattr(element, "created_by_id", None)
         if created_by_id:
             from app.models.user import User
-            owner = db.session.query(User).filter_by(id=created_by_id).first()
+            owner = db.session.query(User).filter_by(id=created_by_id, organization_id=org_id).first()
             if owner:
                 owner_name = f"{owner.first_name} {owner.last_name}".strip() or owner.email
 
