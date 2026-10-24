@@ -32,6 +32,7 @@ from flask import (
 from flask_login import current_user, login_required
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import aliased
+from app.modules.ai_chat.services.model_defaults import DEFAULT_MODELS
 from app.utils.pagination import safe_int_arg
 
 try:
@@ -907,7 +908,7 @@ def preview_env_keys():
         "openai": "gpt-4o",
         "anthropic": "claude-opus-5",
         "gemini": "gemini-2.0-flash-exp",
-        "nvidia": "nvidia/nemotron-3-super-120b-a12b",
+        "nvidia": DEFAULT_MODELS["nvidia"],
         "huggingface": "meta-llama/Llama-3.1-8B-Instruct",
         "azure": "gpt-4",
         "openrouter": "google/gemma-4-31b-it:free",
@@ -1003,7 +1004,7 @@ def load_env_keys():
         "openai": "gpt-4o",
         "anthropic": "claude-opus-5",
         "gemini": "gemini-2.0-flash-exp",
-        "nvidia": "nvidia/nemotron-3-super-120b-a12b",
+        "nvidia": DEFAULT_MODELS["nvidia"],
         "huggingface": "meta-llama/Llama-3.1-8B-Instruct",
         "azure": "gpt-4",
         "openrouter": "google/gemma-4-31b-it:free",
