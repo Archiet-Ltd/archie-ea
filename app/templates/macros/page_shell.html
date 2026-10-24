@@ -191,9 +191,9 @@
 {% set tag = 'a' if href else ('button' if onclick else 'div') %}
 {% if href or onclick %}
     {% set state_classes = ('border-warning ring-2 ring-warning/20 bg-warning/10' if active else 'border-warning/40 bg-warning/10 hover:border-warning/60') if is_warning else ('border-primary ring-2 ring-primary/20 bg-primary/5' if active else 'border-input bg-background hover:border-primary/50') %}
- {% set card_classes ='rounded-xl border-2' ~ state_classes ~' cursor-pointer transition-all duration-200 p-5 block no-underline text-inherit w-full text-left' %}
+ {% set card_classes ='rounded-lg border-2' ~ state_classes ~' cursor-pointer transition-all duration-200 p-5 block no-underline text-inherit w-full text-left' %}
 {% else %}
-    {% set card_classes = 'rounded-xl border border-warning/40 bg-warning/10 text-card-foreground p-6' if is_warning else 'rounded-xl border border-border bg-card text-card-foreground p-6' %}
+    {% set card_classes = 'rounded-lg border border-warning/40 bg-warning/10 text-card-foreground p-6' if is_warning else 'rounded-lg border border-border bg-card text-card-foreground p-6' %}
 {% endif %}
 {% set hint_classes = 'text-warning-emphasis' if is_warning else 'text-muted-foreground' %}
 {% set value_size = value_classes['standard'] if is_warning else value_classes[variant] %}
