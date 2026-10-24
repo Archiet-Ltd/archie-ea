@@ -3,17 +3,50 @@
 {% from 'macros/page_shell.html' import page_shell %}
 {% from 'macros/kanban_board.html' import kanban_board, kanban_move_select %}
 {% from 'components/badge.html' import badge %}
+{% from 'components/button.html' import button %}
+{% from 'components/input.html' import input %}
+{% from 'components/modal_form.html' import modal_form %}
 {% from 'components/avatar.html' import avatar %}
 
 {% block title %}SAFe Portfolio Kanban{% endblock %}
 
 {% block content %}
 <div class="p-6 space-y-6">
+    {% macro _page_actions() %}
+        {% if can_write %}
+        {{ button(text='Add epic', icon='plus', testid='btn-add-epic', aria_label='Add epic',
+                  attrs_dict={'data-modal-open': 'add-epic-modal', 'title': 'Record a new epic in the Funnel'}) }}
+        {% endif %}
+    {% endmacro %}
     {{ page_shell(
         title='Portfolio Kanban',
         subtitle='Epics organized by workflow state, ordered by WSJF priority',
-        breadcrumb=[('SAFe', None), ('Portfolio Kanban', None)]
+        breadcrumb=[('SAFe', None), ('Portfolio Kanban', None)],
+        actions_caller=_page_actions
     ) }}
+
+    {% if can_write %}
+    {% call modal_form(id='add-epic-modal', title='Add epic',
+                       description='The epic starts in the Funnel. Score each WSJF factor from 1 upwards.',
+                       submit_text='Add epic', size='md',
+                       form_action=url_for('safe_portfolio.add_epic'), form_method='POST') %}
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="space-y-4">
+            <div>
+                <label for="epic-name" class="block text-sm font-medium mb-1.5">Name <span class="text-destructive-emphasis" aria-hidden="true">*</span></label>
+                {{ input(id='epic-name', name='name', required=true, placeholder='e.g. Customer onboarding modernisation') }}
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+                {% for field, label in [('business_value', 'Business Value'), ('time_criticality', 'Time Criticality'), ('risk_reduction', 'Risk Reduction'), ('job_size', 'Job Size')] %}
+                <div>
+                    <label for="epic-{{ field }}" class="block text-sm font-medium mb-1.5">{{ label }}</label>
+                    {{ input(id='epic-' ~ field, name=field, type='number', value='1', attrs_dict={'min': '1', 'max': '20'}) }}
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    {% endcall %}
+    {% endif %}
 
     {# Config for the shared board component is handed over as a JSON data
        island, not inline in x-data: the app runs Alpine's CSP build, whose
@@ -40,11 +73,13 @@
         </p>
 
         {% call(state) kanban_board(
+                plain_headers=true,
                 states=kanban_states,
                 empty_hints=empty_hints,
                 can_write=can_write,
                 stage_group=stage_group,
                 region_label='Portfolio Kanban board, scrolls horizontally') %}
+            {% set group = stage_group.get(state) %}
             <template x-for="card in columnCards('{{ state }}')" :key="card.id">
                 <div draggable="true"
                      class="kanban-card bg-card border rounded-lg p-3 transition-colors"
@@ -61,29 +96,23 @@
                      @dragend="onDragEnd()">
 
                     <div class="flex items-start justify-between gap-2 mb-2">
-                        <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-primary-emphasis border border-primary/30"
-                              x-text="`WSJF: ${card.wsjf_score}`"
-                              title="Weighted Shortest Job First priority score"></span>
+                        {% call badge(variant='info') %}<span x-text="`WSJF: ${card.wsjf_score}`" title="Weighted Shortest Job First priority score"></span>{% endcall %}
                         <span class="text-xs text-muted-foreground font-mono" x-text="card.id"></span>
                     </div>
 
                     <h3 class="text-sm font-medium text-foreground line-clamp-2 mb-2" x-text="card.name"></h3>
 
-                    <template x-if="isTopCard(card)">
-                        <div class="mb-2">
-                            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium bg-success/10 text-success-emphasis border border-success/30">
-                                <i data-lucide="star" class="h-3 w-3" aria-hidden="true"></i>
-                                <span>Top WSJF</span>
-                            </span>
-                        </div>
-                    </template>
+                    <div class="flex flex-wrap items-center gap-1 mb-2">
+                        {% call badge(variant='info' if group == 'discovery' else 'success' if group == 'execution' else 'neutral') %}{{ 'Discovery' if group == 'discovery' else 'Execution' if group == 'execution' else 'Done' }}{% endcall %}
+                        <template x-if="isTopCard(card)">
+                            {% call badge(variant='success') %}<i data-lucide="star" class="h-3 w-3 mr-1" aria-hidden="true"></i>Top WSJF{% endcall %}
+                        </template>
+                    </div>
 
-                    <button type="button"
-                            @click="expanded = !expanded"
-                            class="w-full text-left text-xs text-primary hover:text-primary/80 flex items-center gap-1 mb-2">
+                    {% call button(variant='ghost', size='xs', class='w-full justify-start gap-1 mb-2 text-primary', on_click="expanded = !expanded") %}
                         <i data-lucide="chevron-right" class="h-3 w-3 transition-transform" :class="{ 'rotate-90': expanded }" aria-hidden="true"></i>
                         <span x-text="expanded ? 'Hide details' : 'Show WSJF factors'"></span>
-                    </button>
+                    {% endcall %}
 
                     <div x-show="expanded" x-collapse class="border-t border-border pt-2 mb-2">
                         <dl class="text-xs space-y-1">

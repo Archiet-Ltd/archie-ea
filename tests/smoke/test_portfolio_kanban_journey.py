@@ -41,15 +41,14 @@ def _assert_board_keeps_its_shape(page):
 
 
 def _assert_column_headers_have_dot_name_count(page):
-    """Each column header shows a colored dot (when stage group is set), the column name, and the card count."""
+    """Each column header shows the column name and the card count on the plain surface."""
     for state in STATES:
         header = page.locator(f".kanban-column[data-state='{state}'] .kanban-column-header")
         assert header.count() == 1, f"missing header for {state}"
 
-        # Check for colored dot (only for states with a stage group)
-        if state in STAGE_GROUP:
-            dot = header.locator("span.h-2.w-2.rounded-full")
-            assert dot.count() == 1, f"{state} header missing colored status dot"
+        # Headers sit on the plain surface: no box, no stage dot.
+        assert header.locator("span.h-2.w-2.rounded-full").count() == 0, f"{state} header still carries a stage dot"
+        assert header.evaluate("el => getComputedStyle(el).borderTopWidth") == "0px", f"{state} header is boxed"
 
         # Check column name is visible
         assert state in header.inner_text(), f"{state} name not in header text"
@@ -69,7 +68,7 @@ def _assert_cards_have_badge_id_title_date_avatar(page):
         card_text = card.inner_text()
 
         # Priority badge (WSJF score)
-        badge = card.locator("span.bg-primary\\/10.text-primary-emphasis")
+        badge = card.get_by_text("WSJF:")
         assert badge.count() >= 1, "Card missing WSJF priority badge"
         badge_text = badge.first.inner_text()
         assert "WSJF:" in badge_text, f"Badge doesn't show WSJF score: {badge_text}"
@@ -85,7 +84,7 @@ def _assert_cards_have_badge_id_title_date_avatar(page):
         assert title.first.inner_text().strip() in card_text, "Card text does not contain its own title"
 
         # Date with icon
-        calendar_icon = card.locator("i[data-lucide='calendar']")
+        calendar_icon = card.locator("[data-lucide='calendar']")
         assert calendar_icon.count() >= 1, "Card missing calendar icon for date"
 
         # Owner avatar or initials (may not be present if no owner set)
@@ -102,7 +101,9 @@ def _assert_no_inline_styles(page):
     bad_elements = []
     for el in elements_with_style:
         style_attr = el.get_attribute("style")
-        if style_attr and style_attr.strip():
+        # Alpine's x-show hides an element (and x-collapse) with display:none; that is a
+        # visibility toggle, not authored styling.
+        if style_attr and 'display:none' not in style_attr.replace(' ', ''):
             # Get element info for debugging
             tag = el.evaluate("el => el.tagName")
             classes = el.get_attribute("class") or ""
@@ -112,9 +113,12 @@ def _assert_no_inline_styles(page):
 
 
 def _assert_cards_use_words(page):
-    board_text = page.locator(".kanban-board").inner_text()
+    card = page.locator(".kanban-card").first
+    card.get_by_role("button", name="Show WSJF factors").click()
+    card_text = card.inner_text()
     for label in ("Business Value", "Time Criticality", "Risk Reduction", "Job Size"):
-        assert label in board_text, f"Card label {label!r} missing"
+        assert label in card_text, f"Card label {label!r} missing"
+    board_text = page.locator(".kanban-board").inner_text()
     for initials in ("BV:", "TC:", "RR:", "JS:"):
         assert initials not in board_text, f"Bare initials {initials!r} on the board"
 
@@ -138,20 +142,23 @@ STAGE_GROUP = {
 WIP_LIMITS = {"Reviewing": 4, "Analyzing": 3, "Portfolio Backlog": 6, "Implementing": 5}
 
 
-def _assert_headers_are_colour_coded_by_stage(page):
-    """Every column header carries its stage band, and the three bands render
-    visibly different header backgrounds (criterion 6)."""
+def _assert_stage_colour_is_on_the_cards(page):
+    """Headers are plain; the discovery / execution / done bands are read from a
+    chip on each card, and the bands render visibly different chips."""
+    word = {"discovery": "Discovery", "execution": "Execution", "done": "Done"}
     tints = {}
     for state, group in STAGE_GROUP.items():
         header = page.locator(f".kanban-column[data-state='{state}'] .kanban-column-header")
-        assert header.count() == 1, f"missing header for {state}"
-        assert header.get_attribute("data-stage-group") == group, (
-            f"{state} header is not banded as {group}"
+        assert header.get_attribute("data-stage-group") is None, f"{state} header still carries a stage band"
+        assert header.evaluate("el => getComputedStyle(el).backgroundColor") == "rgba(0, 0, 0, 0)", (
+            f"{state} header is tinted"
         )
-        tints[group] = header.evaluate("el => getComputedStyle(el).backgroundColor")
-    # Discovery, execution and done must not all share one background colour, or
-    # the banding is invisible to the person it is for.
-    assert len(set(tints.values())) >= 2, f"stage bands are not visually distinct: {tints}"
+        cards = page.locator(f".kanban-column[data-state='{state}'] .kanban-card")
+        if cards.count():
+            chip = cards.first.get_by_text(word[group], exact=True)
+            assert chip.count() == 1, f"{state} card has no {word[group]} chip"
+            tints[group] = chip.evaluate("el => getComputedStyle(el).backgroundColor")
+    assert len(set(tints.values())) >= 2 or len(tints) < 2, f"stage chips are not visually distinct: {tints}"
 
 
 def _assert_wip_limits_show_on_headers(page):
@@ -300,7 +307,7 @@ def test_portfolio_kanban_journey(browser, live_server, seeded, db_session):
         expect(page.get_by_role("heading", name="Platform Modernization Epic")).to_be_visible(timeout=PAGE_TIMEOUT)
 
         # === Step 2a: colour-coded stage headers and WIP limits (criteria 5, 6) ===
-        _assert_headers_are_colour_coded_by_stage(page)
+        _assert_stage_colour_is_on_the_cards(page)
         _assert_wip_limits_show_on_headers(page)
 
         # === Step 2b: the highest-WSJF card in a column carries the Top WSJF accent ===
@@ -312,6 +319,7 @@ def test_portfolio_kanban_journey(browser, live_server, seeded, db_session):
         # board — before any move changes which columns are empty. The board keeps
         # its six columns in one row and scrolls sideways at 390 (section 26). ===
         email = seeded["emails"]["solution_architect"]
+        _assert_no_inline_styles(page)
         _assert_board_keeps_its_shape(page)
         _assert_cards_use_words(page)
         _assert_empty_columns_name_the_next_step(page)
@@ -319,7 +327,6 @@ def test_portfolio_kanban_journey(browser, live_server, seeded, db_session):
         # === Step 2d: flask-basecoat anatomy assertions (fix931b brief) ===
         _assert_column_headers_have_dot_name_count(page)
         _assert_cards_have_badge_id_title_date_avatar(page)
-        _assert_no_inline_styles(page)
 
         for width, height in ((1440, 900), (390, 844)):
             for scheme in ("light", "dark"):
@@ -510,3 +517,58 @@ def _seed_named_epic(org_id, name):
         )
         db.session.commit()
         return element.id
+
+
+def test_architect_adds_an_epic_from_the_board(browser, live_server, seeded, request):
+    """The architect clicks Add epic, fills the form, and the new epic is in the
+    Funnel with its WSJF score, still there after a reload, and not visible to
+    another organisation. A viewer is not offered the button."""
+    from .conftest import _seed_standard_org
+
+    org_id = seeded["ids"]["org"]
+    _seed_epics(org_id)
+    other = _seed_standard_org(request, None)
+
+    context = browser.new_context(viewport={"width": 1440, "height": 900})
+    try:
+        page = context.new_page()
+        _login(page, live_server, seeded["emails"]["solution_architect"])
+        page.goto(live_server + "/safe/portfolio", timeout=PAGE_TIMEOUT)
+        page.wait_for_load_state("networkidle")
+        page.get_by_role("button", name="Add epic").first.click()
+        dialog = page.get_by_role("dialog", name="Add epic")
+        expect(dialog).to_be_visible(timeout=PAGE_TIMEOUT)
+        dialog.get_by_label("Name").fill("Onboarding Rework Epic")
+        dialog.get_by_label("Business Value").fill("8")
+        dialog.get_by_label("Time Criticality").fill("4")
+        dialog.get_by_label("Risk Reduction").fill("2")
+        dialog.get_by_label("Job Size").fill("2")
+        dialog.get_by_role("button", name="Add epic").click()
+        page.wait_for_load_state("networkidle")
+
+        funnel = page.locator(".kanban-column[data-state='Funnel']")
+        card = funnel.locator(".kanban-card").filter(has_text="Onboarding Rework Epic")
+        expect(card).to_be_visible(timeout=PAGE_TIMEOUT)
+        assert "WSJF: 7" in card.inner_text(), card.inner_text()  # (8+4+2)/2
+        page.reload(timeout=PAGE_TIMEOUT)
+        expect(page.locator(".kanban-column[data-state='Funnel'] .kanban-card").filter(
+            has_text="Onboarding Rework Epic")).to_be_visible(timeout=PAGE_TIMEOUT)
+
+        page2 = context.new_page()
+        context.clear_cookies()
+        _login(page2, live_server, other["emails"]["solution_architect"])
+        page2.goto(live_server + "/safe/portfolio", timeout=PAGE_TIMEOUT)
+        page2.wait_for_load_state("networkidle")
+        assert "Onboarding Rework Epic" not in page2.locator(".kanban-board").inner_text()
+    finally:
+        context.close()
+
+    viewer = browser.new_context(viewport={"width": 1440, "height": 900})
+    try:
+        vpage = viewer.new_page()
+        _login(vpage, live_server, _make_viewer(org_id))
+        vpage.goto(live_server + "/safe/portfolio", timeout=PAGE_TIMEOUT)
+        vpage.wait_for_load_state("networkidle")
+        assert vpage.get_by_role("button", name="Add epic").count() == 0
+    finally:
+        viewer.close()
