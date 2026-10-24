@@ -679,6 +679,40 @@ class TestWhatBreaksIfFailsTwoOrgIsolation:
         assert result["citations"] == []
         assert "did not match" in result["reason"]
 
+    def test_no_service_named_returns_single_points_of_failure_with_citations(
+        self, app, db_session, make_org
+    ):
+        """The "single points of failure" phrasing names no one service, so
+        the answer is the systems the most other things depend on — each an
+        openable record — not an empty "name the service" reason."""
+        from app import db
+        from app.models.archimate_core import ArchiMateElement, ArchiMateRelationship
+        from app.modules.intelligence.services.query_catalogue import run_entry
+
+        org = make_org("breaks-spof")
+        hub = ArchiMateElement(
+            name="Shared Database", type="ApplicationComponent", layer="application",
+            organization_id=org.id,
+        )
+        a = ArchiMateElement(name="App A", type="ApplicationComponent", layer="application", organization_id=org.id)
+        b = ArchiMateElement(name="App B", type="ApplicationComponent", layer="application", organization_id=org.id)
+        db.session.add_all([hub, a, b])
+        db.session.flush()
+        # Two things depend on the hub -> it is a single point of failure.
+        db.session.add_all([
+            ArchiMateRelationship(type="Serving", source_id=a.id, target_id=hub.id, organization_id=org.id),
+            ArchiMateRelationship(type="Serving", source_id=b.id, target_id=hub.id, organization_id=org.id),
+        ])
+        db.session.flush()
+
+        result = run_entry("what_breaks_if_fails", org.id)
+        names = {r["name"] for r in result["rows"]}
+        assert "Shared Database" in names
+        hub_row = next(r for r in result["rows"] if r["name"] == "Shared Database")
+        assert hub_row["depends_on_count"] == 2
+        targets = {c["target"] for c in result["citations"]}
+        assert f"/api/v1/elements/{hub.id}" in targets
+
     def test_org_a_service_name_never_resolves_to_org_b_element(self, app, db_session, make_org):
         from app.modules.intelligence.services.query_catalogue import run_entry
 
