@@ -24,6 +24,11 @@
 {% endcall %}
 {% endmacro %}
 
+{% macro stage_empty(basis, edit_attrs) %}
+<span class="text-muted-foreground">{{ basis }}</span>
+{{ button(text='Add it', variant='link', size='xs', class='h-auto px-1 py-0 text-xs', on_click='openStageEditModal(JSON.parse($el.dataset.stage))', attrs_dict=edit_attrs) }}
+{% endmacro %}
+
 {% block content %}
 {% set stage_types = [
     {'value': 'operational', 'label': 'Operational'},
@@ -54,108 +59,128 @@
             {% call meta_tile('Code', value_class='font-mono') %}{{ value_stream.code or '—' }}{% endcall %}
             {% call meta_tile('Type') %}{{ (value_stream.value_stream_type or '—')|replace('_', ' ')|title }}{% endcall %}
             {% call meta_tile('Cycle Time (Current / Target)') %}
+                {% if value_stream.current_cycle_time is none and value_stream.target_cycle_time is none %}
+                <span data-vs-empty="cycle-time" class="block text-sm font-normal text-muted-foreground">No cycle time recorded yet.</span>
+                {{ button(text='Record cycle time', variant='link', size='xs', class='px-0', on_click="Platform.modal.open('vs-edit-modal')") }}
+                {% else %}
                 {{ value_stream.current_cycle_time if value_stream.current_cycle_time is not none else '—' }}
                 /
                 {{ value_stream.target_cycle_time if value_stream.target_cycle_time is not none else '—' }} days
+                {% endif %}
             {% endcall %}
             {% call meta_tile('Quality (Current / Target)') %}
+                {% if value_stream.current_quality is none and value_stream.quality_target is none %}
+                <span data-vs-empty="quality" class="block text-sm font-normal text-muted-foreground">No quality figure recorded yet.</span>
+                {{ button(text='Record quality', variant='link', size='xs', class='px-0', on_click="Platform.modal.open('vs-edit-modal')") }}
+                {% else %}
                 {{ value_stream.current_quality if value_stream.current_quality is not none else '—' }}%
                 /
                 {{ value_stream.quality_target if value_stream.quality_target is not none else '—' }}%
+                {% endif %}
             {% endcall %}
         </div>
 
-        <!-- Stage swimlane -->
+        <!-- Stages as chevrons -->
         {% call card.card() %}
             {% call card.card_header(class='border-b border-border') %}
             <div class="flex w-full items-center justify-between gap-3">
-                {% call card.card_title(class='text-lg') %}Stage Swimlane{% endcall %}
+                {% call card.card_title(class='text-lg') %}Stages{% endcall %}
                 <span class="text-sm text-muted-foreground">{{ value_stream.stages|length }} stage{{ 's' if value_stream.stages|length != 1 else '' }}</span>
             </div>
             {% endcall %}
             {% call card.card_content(class='pt-4') %}
                 {% if value_stream.stages %}
-                <div class="overflow-x-auto">
-                    <div class="flex items-stretch gap-3 min-w-max pb-2">
+                <div class="overflow-x-auto" data-stage-chevrons>
+                    <div class="flex items-stretch gap-1 min-w-max pb-2">
                         {% for stage in value_stream.stages %}
-                        <div class="w-64 shrink-0 rounded-md border border-border bg-muted/20 px-3 py-2 relative" data-stage-card data-stage-id="{{ stage.id }}">
-                            <div class="flex items-center justify-between mb-2">
-                                <span class="inline-flex items-center justify-center h-6 w-6 rounded-full bg-primary/10 text-primary text-xs font-bold">{{ stage.stage_order }}</span>
-                                <div class="flex items-center gap-1">
-                                    {% call button(variant='ghost', size='icon', class='h-6 w-6 p-0', aria_label='Edit stage',
+                        {% set edit_attrs = {'data-stage': stage|tojson|forceescape} %}
+                        <div class="w-72 shrink-0" data-stage-card data-stage-id="{{ stage.id }}">
+                            <div class="flex h-14 items-center gap-2 bg-primary/10 px-8 text-primary [clip-path:polygon(0_0,90%_0,100%_50%,90%_100%,0_100%,10%_50%)]" data-stage-chevron>
+                                <span class="text-xs font-bold">{{ stage.stage_order }}</span>
+                                <h4 class="min-w-0 flex-1 truncate text-sm font-semibold" :title='{{ stage.name|tojson }}'>{{ stage.name }}</h4>
+                            </div>
+                            <div class="px-3 py-2">
+                                <div class="flex items-center justify-end gap-1">
+                                    {% call button(variant='ghost', size='icon-xs', aria_label='Edit stage',
                                                    on_click='openStageEditModal(JSON.parse($el.dataset.stage))',
-                                                   attrs_dict={'data-stage': stage|tojson|forceescape}) %}<i data-lucide="pencil" class="h-3 w-3" aria-hidden="true"></i>{% endcall %}
-                                    {% call button(variant='ghost', size='icon', class='h-6 w-6 p-0 hover:bg-destructive/10 hover:text-destructive-emphasis', aria_label='Delete stage',
+                                                   attrs_dict=edit_attrs) %}<i data-lucide="pencil" class="h-3 w-3" aria-hidden="true"></i>{% endcall %}
+                                    {% call button(variant='ghost', size='icon-xs', aria_label='Delete stage',
                                                    on_click='openStageDeleteModal({ id: Number($el.dataset.stageId), name: $el.dataset.stageName })',
                                                    attrs_dict={'data-stage-id': stage.id, 'data-stage-name': stage.name}) %}<i data-lucide="trash-2" class="h-3 w-3" aria-hidden="true"></i>{% endcall %}
                                 </div>
-                            </div>
-                            <h4 class="font-semibold text-sm text-foreground truncate" :title='{{ stage.name|tojson }}'>{{ stage.name }}</h4>
-                            <p class="text-xs text-muted-foreground mt-1 line-clamp-2">{{ stage.description or '—' }}</p>
-                            <div class="flex items-center gap-1.5 mt-3 flex-wrap">
-                                {% if stage.stage_type %}
-                                {{ status_badge(stage.stage_type|replace('_', ' ')|title, 'neutral') }}
+                                <div class="text-xs text-muted-foreground mt-1" data-stage-field="description">
+                                    {% if stage.description %}<p class="line-clamp-2">{{ stage.description }}</p>
+                                    {% else %}{{ stage_empty('No description yet.', edit_attrs) }}{% endif %}
+                                </div>
+                                <div class="flex items-center gap-1.5 mt-3 flex-wrap">
+                                    {% if stage.stage_type %}
+                                    {{ status_badge(stage.stage_type|replace('_', ' ')|title, 'neutral') }}
+                                    {% endif %}
+                                    {% if stage.customer_facing %}
+                                    {{ status_badge('Customer Facing', 'info', icon='user') }}
+                                    {% endif %}
+                                    {% if stage.quality_gate %}
+                                    {{ status_badge('Quality Gate', 'warning', icon='shield-check') }}
+                                    {% endif %}
+                                </div>
+                                {% if stage.target_duration is not none or stage.current_duration is not none %}
+                                <p class="text-xs text-muted-foreground mt-3">
+                                    Duration: {{ stage.current_duration if stage.current_duration is not none else '—' }} / {{ stage.target_duration if stage.target_duration is not none else '—' }}
+                                </p>
                                 {% endif %}
-                                {% if stage.customer_facing %}
-                                {{ status_badge('Customer Facing', 'info', icon='user') }}
-                                {% endif %}
-                                {% if stage.quality_gate %}
-                                {{ status_badge('Quality Gate', 'warning', icon='shield-check') }}
-                                {% endif %}
-                            </div>
-                            {% if stage.target_duration is not none or stage.current_duration is not none %}
-                            <p class="text-xs text-muted-foreground mt-3">
-                                Duration: {{ stage.current_duration if stage.current_duration is not none else '—' }} / {{ stage.target_duration if stage.target_duration is not none else '—' }}
-                            </p>
-                            {% endif %}
-                            <dl class="mt-3 space-y-2 text-xs">
-                                <div>
-                                    <dt class="font-medium text-muted-foreground">Entry criteria</dt>
-                                    <dd class="text-foreground whitespace-pre-line break-words" data-stage-field="entry_criteria">{{ stage.entry_criteria or '—' }}</dd>
-                                </div>
-                                <div>
-                                    <dt class="font-medium text-muted-foreground">Exit criteria</dt>
-                                    <dd class="text-foreground whitespace-pre-line break-words" data-stage-field="exit_criteria">{{ stage.exit_criteria or '—' }}</dd>
-                                </div>
-                                <div>
-                                    <dt class="font-medium text-muted-foreground">Stakeholders</dt>
-                                    <dd class="text-foreground break-words" data-stage-field="stakeholders">
-                                        {% if stage.stakeholder_list %}
-                                        <ul class="list-disc pl-4">{% for item in stage.stakeholder_list %}<li>{{ item }}</li>{% endfor %}</ul>
-                                        {% else %}—{% endif %}
-                                    </dd>
-                                </div>
-                                <div>
-                                    <dt class="font-medium text-muted-foreground">Value items</dt>
-                                    <dd class="text-foreground break-words" data-stage-field="value_items">
-                                        {% if stage.value_item_list %}
-                                        <ul class="list-disc pl-4">{% for item in stage.value_item_list %}<li>{{ item }}</li>{% endfor %}</ul>
-                                        {% else %}—{% endif %}
-                                    </dd>
-                                </div>
-                                <div>
-                                    <dt class="font-medium text-muted-foreground">Capabilities &middot; maturity</dt>
-                                    <dd class="text-foreground" data-stage-field="capabilities">
-                                        <template x-if="!loading && capabilitiesForStage({{ stage.id }}).length === 0">
-                                            <span>—</span>
-                                        </template>
-                                        <ul class="space-y-0.5">
-                                            <template x-for="cap in capabilitiesForStage({{ stage.id }})" :key="cap.id">
-                                                <li class="flex items-center justify-between gap-2">
-                                                    <span class="truncate" :title="cap.name" x-text="cap.name"></span>
-                                                    <span class="shrink-0 font-mono text-muted-foreground" data-maturity x-text="maturityLabel(cap)"></span>
-                                                </li>
+                                <dl class="mt-3 space-y-2 text-xs">
+                                    <div>
+                                        <dt class="font-medium text-muted-foreground">Entry criteria</dt>
+                                        <dd class="text-foreground break-words" data-stage-field="entry_criteria">{% if stage.entry_criteria %}<span class="whitespace-pre-line">{{ stage.entry_criteria }}</span>{% else %}{{ stage_empty('No entry criteria yet.', edit_attrs) }}{% endif %}</dd>
+                                    </div>
+                                    <div>
+                                        <dt class="font-medium text-muted-foreground">Exit criteria</dt>
+                                        <dd class="text-foreground break-words" data-stage-field="exit_criteria">{% if stage.exit_criteria %}<span class="whitespace-pre-line">{{ stage.exit_criteria }}</span>{% else %}{{ stage_empty('No exit criteria yet.', edit_attrs) }}{% endif %}</dd>
+                                    </div>
+                                    <div>
+                                        <dt class="font-medium text-muted-foreground">Stakeholders</dt>
+                                        <dd class="text-foreground break-words" data-stage-field="stakeholders">
+                                            {% if stage.stakeholder_list %}
+                                            <ul class="list-disc pl-4">{% for item in stage.stakeholder_list %}<li>{{ item }}</li>{% endfor %}</ul>
+                                            {% else %}{{ stage_empty('No stakeholders named yet.', edit_attrs) }}{% endif %}
+                                        </dd>
+                                    </div>
+                                    <div>
+                                        <dt class="font-medium text-muted-foreground">Value items</dt>
+                                        <dd class="text-foreground break-words" data-stage-field="value_items">
+                                            {% if stage.value_item_list %}
+                                            <ul class="list-disc pl-4">{% for item in stage.value_item_list %}<li>{{ item }}</li>{% endfor %}</ul>
+                                            {% else %}{{ stage_empty('No value items yet.', edit_attrs) }}{% endif %}
+                                        </dd>
+                                    </div>
+                                    <div>
+                                        <dt class="font-medium text-muted-foreground">Capabilities &middot; maturity &middot; health</dt>
+                                        <dd class="text-foreground" data-stage-field="capabilities">
+                                            <template x-if="!loading && capabilitiesForStage({{ stage.id }}).length === 0">
+                                                <span class="text-muted-foreground">No capability supports this stage yet. Set a cell in the grid below.</span>
                                             </template>
-                                        </ul>
-                                    </dd>
-                                </div>
-                            </dl>
+                                            <ul class="space-y-0.5">
+                                                <template x-for="cap in capabilitiesForStage({{ stage.id }})" :key="cap.id">
+                                                    <li class="flex items-center justify-between gap-2">
+                                                        <template x-if="cap.fact_sheet_url">
+                                                            <a class="truncate text-primary hover:underline" :href="cap.fact_sheet_url" :title="cap.name" x-text="cap.name"></a>
+                                                        </template>
+                                                        <template x-if="!cap.fact_sheet_url">
+                                                            <span class="truncate" :title="cap.name" x-text="cap.name"></span>
+                                                        </template>
+                                                        <span class="shrink-0 font-mono text-muted-foreground">
+                                                            <span data-maturity title="Current / target maturity" x-text="maturityLabel(cap)"></span>
+                                                            <span aria-hidden="true">&middot;</span>
+                                                            <span data-health :title="healthTitle(cap)" x-text="healthLabel(cap)"></span>
+                                                        </span>
+                                                    </li>
+                                                </template>
+                                            </ul>
+                                        </dd>
+                                    </div>
+                                </dl>
+                            </div>
                         </div>
-                        {% if not loop.last %}
-                        <div class="flex items-center shrink-0 self-center text-muted-foreground">
-                            <i data-lucide="chevron-right" class="h-5 w-5" aria-hidden="true"></i>
-                        </div>
-                        {% endif %}
                         {% endfor %}
                     </div>
                 </div>
@@ -277,6 +302,7 @@
                     {% set grid_header %}
                         <th scope="col" class="h-10 px-3 text-left sticky left-0 bg-card">Capability</th>
                         <th scope="col" class="h-10 px-3 text-center whitespace-nowrap">Maturity</th>
+                        <th scope="col" class="h-10 px-3 text-center whitespace-nowrap">Health</th>
                         <template x-for="stage in stages" :key="stage.id">
                             <th scope="col" class="h-10 px-3 text-center whitespace-nowrap" x-text="stage.name"></th>
                         </template>
@@ -284,8 +310,12 @@
                     {% call dense_table(header=grid_header, caption='Capability by stage support', flush=true) %}
                         <template x-for="cap in capabilities" :key="cap.id">
                             <tr>
-                                <td class="sticky left-0 bg-card text-sm font-medium text-foreground px-3 py-2 whitespace-nowrap" x-text="cap.name"></td>
+                                <td class="sticky left-0 bg-card text-sm font-medium text-foreground px-3 py-2 whitespace-nowrap">
+                                    <a x-show="cap.fact_sheet_url" class="text-primary hover:underline" :href="cap.fact_sheet_url" x-text="cap.name"></a>
+                                    <span x-show="!cap.fact_sheet_url" x-text="cap.name"></span>
+                                </td>
                                 <td class="text-center text-sm font-mono text-muted-foreground px-3 py-2 whitespace-nowrap" data-maturity :title="'Current / target maturity of ' + cap.name" x-text="maturityLabel(cap)"></td>
+                                <td class="text-center text-sm font-mono text-muted-foreground px-3 py-2 whitespace-nowrap" data-health :title="healthTitle(cap)" x-text="healthLabel(cap)"></td>
                                 <template x-for="stage in stages" :key="stage.id">
                                     <td class="text-center px-2 py-2">
                                         {% call button(variant='outline', class='w-16 border text-xs font-semibold',
@@ -422,6 +452,12 @@
         {% call form_group(id='vs-edit-current', label='Current Cycle Time (days)') %}
             {{ input(id='vs-edit-current', name='current_cycle_time', type='number', class='h-9', value=value_stream.current_cycle_time if value_stream.current_cycle_time is not none else '') }}
         {% endcall %}
+        {% call form_group(id='vs-edit-quality-current', label='Current Quality (%)') %}
+            {{ input(id='vs-edit-quality-current', name='current_quality', type='number', class='h-9', value=value_stream.current_quality if value_stream.current_quality is not none else '') }}
+        {% endcall %}
+        {% call form_group(id='vs-edit-quality-target', label='Target Quality (%)') %}
+            {{ input(id='vs-edit-quality-target', name='quality_target', type='number', class='h-9', value=value_stream.quality_target if value_stream.quality_target is not none else '') }}
+        {% endcall %}
         {{ form_footer(cancel_attrs={'data-modal-close': 'vs-edit-modal'}) }}
     </form>
     {% endcall %}
@@ -442,3 +478,4 @@
 
 <script src="{{ url_for('static', filename='js/value_stream/grid.js') }}"></script>
 {% endblock %}
+{# design-block: record-detail #}

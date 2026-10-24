@@ -55,7 +55,7 @@
     "unrendered_model_fields": 342,
     "tenant_isolation_route_coverage_pct": 44.0,
     "interface_contract_unimplemented": 0,
-    "design_map_outside_block": 52,
-    "design_map_unmarked": 406
+    "design_map_outside_block": 48,
+    "design_map_unmarked": 376
   }
 }

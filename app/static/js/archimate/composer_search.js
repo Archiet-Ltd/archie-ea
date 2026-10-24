@@ -128,6 +128,7 @@ let ComposerSearch = (function() {
                 self.relCount = relationships.length;
                 self.viewpointLoading = false;
                 self.statusText = self.activeViewpointName + ' — ' + elements.length + ' elements, ' + relationships.length + ' relationships';
+                if (data.omitted_note) self.statusText += ' (' + data.omitted_note + ' of ' + data.store_total + ' in your model)';
 
                 UndoStack.resume();
                 UndoStack.clear();

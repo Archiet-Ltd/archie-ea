@@ -153,3 +153,95 @@ def test_traceability_matrix_empty_search_says_why_and_offers_next_step(browser,
         assert page.evaluate("document.documentElement.scrollWidth <= window.innerWidth + 1")
     finally:
         context.close()
+
+
+@pytest.fixture()
+def counted_chain(app, seeded):
+    """An application serving a capability that a goal and a requirement also reach,
+    in the seeded organisation, plus a goal that only a second organisation owns."""
+    with app.app_context():
+        from app import db
+        from app.models.archimate_core import ArchiMateElement, ArchiMateRelationship
+        from app.models.organization import Organization
+
+        suffix = uuid.uuid4().hex[:6]
+        org_id = seeded["ids"]["org"]
+        other = Organization(name="Count Other %s" % suffix, slug="count-other-%s" % suffix)
+        db.session.add(other)
+        db.session.commit()
+
+        def element(name, type_, layer, org):
+            el = ArchiMateElement(name=name, type=type_, layer=layer, organization_id=org)
+            db.session.add(el)
+            db.session.commit()
+            return el
+
+        app_el = element("Counted Ledger %s" % suffix, "ApplicationComponent", "Application", org_id)
+        cap = element("Counted Capability %s" % suffix, "Capability", "Strategy", org_id)
+        goal = element("Counted Goal %s" % suffix, "Goal", "Motivation", org_id)
+        foreign = element("Counted Foreign Goal %s" % suffix, "Goal", "Motivation", other.id)
+        for source, target, kind in ((app_el, cap, "ServingRelationship"), (goal, app_el, "InfluenceRelationship")):
+            db.session.add(ArchiMateRelationship(type=kind, source_id=source.id, target_id=target.id,
+                                                 organization_id=org_id))
+        db.session.commit()
+        ids = [app_el.id, cap.id, goal.id, foreign.id]
+        yield {"suffix": suffix, "cap_id": cap.id, "goal_id": goal.id}
+        db.session.rollback()
+        ArchiMateRelationship.query.filter(
+            ArchiMateRelationship.source_id.in_(ids) | ArchiMateRelationship.target_id.in_(ids)
+        ).delete(synchronize_session=False)
+        ArchiMateElement.query.filter(ArchiMateElement.id.in_(ids)).delete(synchronize_session=False)
+        db.session.commit()
+
+
+@pytest.mark.smoke
+def test_traceability_cells_open_their_element_and_counts_name_their_store(browser, live_server, seeded, counted_chain):
+    """As the enterprise architect: from a layer cell reach the element it names, and
+    read which store each figure on the page counts."""
+    email = seeded["emails"]["enterprise_architect"]
+    suffix = counted_chain["suffix"]
+    context = browser.new_context(ignore_https_errors=True, viewport={"width": 1440, "height": 900})
+    try:
+        page = context.new_page()
+        _login(page, live_server, email)
+        page.goto(live_server + "/architecture/traceability?search=Counted+Ledger+" + suffix,
+                  wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        row = page.locator("#matrix-view tbody tr").first
+
+        # The goal is in the Motivation / Goals cell and its name opens the goal's own chain.
+        goal_link = row.get_by_role("link", name="Counted Goal %s" % suffix)
+        expect(goal_link).to_have_count(1, timeout=PAGE_TIMEOUT)
+        goal_link.click()
+        page.wait_for_url(lambda url: "/architecture/traceability/%s" % counted_chain["goal_id"] in url,
+                          timeout=PAGE_TIMEOUT)
+        landed = page.inner_text("body")
+        assert "Counted Goal %s" % suffix in landed
+        assert "Counted Capability %s" % suffix in landed, "the goal's chain is empty"
+
+        # The capability cell does the same.
+        page.go_back(wait_until="domcontentloaded")
+        page.locator("#matrix-view tbody tr").first.get_by_role("link", name="Counted Capability %s" % suffix).click()
+        page.wait_for_url(lambda url: "/architecture/traceability/%s" % counted_chain["cap_id"] in url,
+                          timeout=PAGE_TIMEOUT)
+        assert "Counted Capability %s" % suffix in page.inner_text("body")
+
+        # Every empty cell says it is not traced rather than showing a bare dash.
+        page.goto(live_server + "/architecture/traceability?search=Counted+Ledger+" + suffix,
+                  wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        matrix_text = page.inner_text("#matrix-view")
+        assert "Not traced" in matrix_text
+        assert "—" not in matrix_text
+
+        # The figures say what they count, and the capability figure equals the capability map's.
+        sources = page.locator("#count-sources")
+        expect(sources).to_contain_text("Counted from the ArchiMate model")
+        text = sources.inner_text()
+        page.goto(live_server + "/capability-map/", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        map_figure = page.locator("#unified-cap-count").inner_text().strip()
+        assert map_figure.isdigit(), "the capability map shows no figure"
+        assert "holds %s capabilities" % map_figure in text, (map_figure, text)
+        page.goto(live_server + "/architecture/traceability?search=Counted+Ledger+" + suffix,
+                  wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        assert "Counted Foreign Goal %s" % suffix not in page.inner_text("body")
+    finally:
+        context.close()

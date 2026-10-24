@@ -266,6 +266,54 @@ def _resolve_owners_batch(
     return results
 
 
+def _resolve_health_batch(
+    element_ids: List[int],
+    org_id: int,
+    elements: Dict[str, Dict[str, Any]],
+) -> Dict[int, str]:
+    """The health word recorded for each element that has one, in two reads.
+
+    An application carries the ``health_status`` its owner recorded; a capability
+    carries the status the capability health score already computes for the
+    dashboard (measured ones only). Every other element has no health anywhere
+    in the model, so it is left out and the row says so rather than guessing.
+    """
+    distinct_ids = sorted(set(element_ids))
+    found: Dict[int, str] = {}
+    app_ids = [e for e in distinct_ids if is_application_kind((elements.get(str(e)) or {}).get("type"))]
+    cap_ids = [e for e in distinct_ids if ((elements.get(str(e)) or {}).get("type") or "").lower() == "capability"]
+    if app_ids:
+        from app.models.application_portfolio import ApplicationComponent
+
+        for element_id, status in db.session.execute(
+            db.select(ApplicationComponent.archimate_element_id, ApplicationComponent.health_status)
+            .where(ApplicationComponent.archimate_element_id.in_(app_ids))
+            .where(ApplicationComponent.organization_id == org_id)
+            .order_by(ApplicationComponent.id.desc())
+        ).all():
+            if status:
+                found[element_id] = str(status).replace("_", " ").capitalize()
+    if cap_ids:
+        from app.models.business_capabilities import BusinessCapability
+        from app.modules.capabilities.services.capability_health_service import CapabilityHealthService
+
+        element_by_capability = {
+            cap_id: element_id
+            for cap_id, element_id in db.session.execute(
+                db.select(BusinessCapability.id, BusinessCapability.archimate_element_id)
+                .where(BusinessCapability.archimate_element_id.in_(cap_ids))
+                .where(BusinessCapability.organization_id == org_id)
+            ).all()
+        }
+        if element_by_capability:
+            metrics = CapabilityHealthService().get_capability_health_metrics()
+            for item in metrics.get("health_by_capability") or []:
+                element_id = element_by_capability.get(item.get("id"))
+                if element_id is not None and item.get("score") is not None:
+                    found[element_id] = str(item["status"])
+    return found
+
+
 def _resolve_application_owners_batch(
     element_ids: List[int],
     org_id: int,
@@ -1205,6 +1253,14 @@ class IntelligenceQueryService:
                     # explicit row) rather than being dropped from the row.
                     existing_reason = row.get("reason")
                     row["reason"] = existing_reason if existing_reason else None
+
+            health_by_element = (
+                _resolve_health_batch([row["element_id"] for row in rows], org_id, elements)
+                if org_id is not None and rows
+                else {}
+            )
+            for row in rows:
+                row["health"] = health_by_element.get(row["element_id"])
 
         summary["latency_ms"] = scope.latency_ms
 

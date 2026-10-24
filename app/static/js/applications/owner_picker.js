@@ -50,6 +50,25 @@
     // through them, Enter chooses, Escape closes, and a status line says how
     // many people matched.
     var pickerCount = 0;
+    var SAVED_KEY = 'ownerStepSaved';
+
+    // A save reloads the page so every figure on it follows; the confirmation
+    // is kept across the reload and shown once the page is back.
+    function reloadWithConfirmation(message) {
+        try { window.sessionStorage.setItem(SAVED_KEY, message); } catch (e) { /* storage blocked: the page still reloads */ }
+        window.location.reload();
+    }
+
+    (function showPendingConfirmation() {
+        var message = null;
+        try {
+            message = window.sessionStorage.getItem(SAVED_KEY);
+            window.sessionStorage.removeItem(SAVED_KEY);
+        } catch (e) { return; }
+        if (message && window.Platform.toast && window.Platform.toast.success) {
+            window.Platform.toast.success(message);
+        }
+    })();
 
     function initPicker(root) {
         var url = root.getAttribute('data-owners-url');
@@ -63,6 +82,7 @@
         var selectedId = null;
         var active = -1;
         var options = [];
+        var wantFirst = false;
         pickerCount += 1;
         var listId = 'owner-results-' + pickerCount;
 
@@ -138,28 +158,40 @@
             });
             results.classList.remove('hidden');
             input.setAttribute('aria-expanded', 'true');
+            if (wantFirst) {
+                wantFirst = false;
+                setActive(0);
+            }
             say(users.length + (users.length === 1 ? ' person' : ' people') + ' found. Use the arrow keys to choose.');
         }
 
-        var search = debounce(function (query) {
+        function runSearch(query) {
             query = (query || '').trim();
             if (query.length < 2) {
+                wantFirst = false;
                 hideResults();
                 return;
             }
             Platform.fetch.get('/api/users', { q: query, limit: 10 }, { silent: true })
                 .then(function (data) { render(data.users || []); })
                 .catch(function () { hideResults(); });
-        }, 300);
+        }
+        var search = debounce(runSearch, 300);
 
         input.addEventListener('input', function () {
             selectedId = null;
+            wantFirst = false;
             saveBtn.disabled = true;
             search(input.value);
         });
 
         input.addEventListener('keydown', function (event) {
-            if (event.key === 'ArrowDown' && options.length) {
+            if (event.key === 'ArrowDown' && !options.length && input.value.trim().length >= 2 && !selectedId) {
+                // The list is still on its way: ask now and land on the first person when it arrives.
+                event.preventDefault();
+                wantFirst = true;
+                runSearch(input.value);
+            } else if (event.key === 'ArrowDown' && options.length) {
                 event.preventDefault();
                 setActive((active + 1) % options.length);
             } else if (event.key === 'ArrowUp' && options.length) {
@@ -185,7 +217,7 @@
             var body = { user_id: selectedId, ownership_type: 'primary' };
             if (replace) body.replace = true;
             Platform.fetch.post(url, body)
-                .then(function () { window.location.reload(); })
+                .then(function () { reloadWithConfirmation('Owner saved'); })
                 .catch(function () { saveBtn.disabled = false; });
         });
     }
@@ -199,7 +231,7 @@
                 if (!ok) return;
                 btn.disabled = true;
                 Platform.fetch.delete(url)
-                    .then(function () { window.location.reload(); })
+                    .then(function () { reloadWithConfirmation('Owner cleared'); })
                     .catch(function () { btn.disabled = false; });
             });
         });

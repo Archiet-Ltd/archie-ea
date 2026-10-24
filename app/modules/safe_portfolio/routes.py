@@ -3,7 +3,7 @@
 import logging
 from typing import Dict, List
 
-from flask import abort, jsonify, render_template, request
+from flask import abort, flash, jsonify, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
 
 from app import db
@@ -11,7 +11,15 @@ from app.core.auth.decorators import require_permission
 from app.core.auth.permissions import can
 from app.middleware.tenant_context import current_org_id
 from app.models.archimate_core import ArchiMateElement
-from app.services.element_profile_service import read_profile, set_wsjf_component, get_kind_property, set_kind_property
+from app.services.element_profile_service import (
+    get_kind_property,
+    read_profile,
+    set_kind,
+    set_kind_property,
+    set_wsjf_component,
+    set_wsjf_components,
+)
+from app.services.archimate_backbone import create_backbone_element
 from app.services.wsjf_service import compute_wsjf_score
 from app.services.profiles.safe import KINDS
 
@@ -79,6 +87,48 @@ EMPTY_COLUMN_HINTS = {
         "next_read": "Someone with edit access moves an epic here from Implementing when its outcome is delivered.",
     },
 }
+
+
+@safe_portfolio_bp.route("/epics", methods=["POST"])
+@login_required
+@require_permission("edit", "motivation_element")
+def add_epic():
+    """Record a new Epic in the Funnel from the board's Add epic form."""
+    org_id = current_org_id()
+    if org_id is None:
+        abort(404)
+
+    name = (request.form.get("name") or "").strip()
+    if not name:
+        flash("Give the epic a name before adding it.", "error")
+        return redirect(url_for("safe_portfolio.index"))
+
+    def _score(field):
+        try:
+            return min(max(int(request.form.get(field) or 1), 1), 20)
+        except ValueError:
+            return 1
+
+    element = create_backbone_element(
+        element_type="WorkPackage",
+        layer="Implementation",
+        name=name,
+        description=(request.form.get("description") or "").strip() or None,
+        organization_id=org_id,
+    )
+    set_kind(element, "Epic", framework_id="safe", source="user")
+    set_kind_property(element, "kanban_state", KANBAN_STATES[0], source="user")
+    set_wsjf_components(
+        element,
+        business_value=_score("business_value"),
+        time_criticality=_score("time_criticality"),
+        risk_reduction=_score("risk_reduction"),
+        job_size=_score("job_size"),
+        source="user",
+    )
+    db.session.commit()
+    flash(f"Added {name} to the {KANBAN_STATES[0]} column.", "success")
+    return redirect(url_for("safe_portfolio.index"))
 
 
 def _can_write() -> bool:

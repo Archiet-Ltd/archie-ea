@@ -50,6 +50,60 @@ def _has_aligned_traceability_rows(matrix) -> bool:
     )
 
 
+def _traceability_store_counts():
+    """Counts of the two record stores the matrix's model counts sit beside.
+
+    The matrix counts ArchiMate elements. The capability map counts the
+    capability store and the requirements backlog counts solution requirements;
+    the page shows all of them side by side, each read from the same function
+    those screens use. None means the count could not be read.
+    """
+    from app.models.solution_architect_models import SolutionRequirement
+    from app.modules.capabilities.services.capability_count_service import count_capabilities
+
+    counts = {}
+    try:
+        counts['capabilities'] = count_capabilities()
+    except Exception:
+        logger.exception("Could not count capabilities for the traceability page")
+        counts['capabilities'] = None
+    try:
+        counts['requirements'] = SolutionRequirement.query.filter(
+            SolutionRequirement.deleted_at == None  # noqa: E711
+        ).count()
+    except Exception:
+        logger.exception("Could not count requirements for the traceability page")
+        counts['requirements'] = None
+    return counts
+
+
+def _link_model_cells(matrix):
+    """Give every element in a model-built row the page that opens it.
+
+    Rows built from the ArchiMate model carry ArchiMate element ids, so each
+    cell entry opens that element's chain. Rows built from the solution
+    fallback carry ids from other stores and are left unlinked.
+    """
+    for row in matrix or []:
+        for layer in ('motivation', 'strategy', 'business', 'technology', 'data'):
+            for entry in row.get(layer) or []:
+                if entry.get('id'):
+                    entry['href'] = url_for('architect_ui.element_traceability', element_id=entry['id'])
+
+
+def _traceability_goals(limit=10):
+    """The goals in the model, for the line that says how many trace to an application."""
+    from app.models.archimate_core import ArchiMateElement
+
+    rows = ArchiMateElement.query.filter(
+        ArchiMateElement.type == 'Goal', ~ArchiMateElement.name.like('tmp-%')
+    ).order_by(ArchiMateElement.name).all()
+    return {
+        'total': len(rows),
+        'items': [{'id': g.id, 'name': g.name} for g in rows[:limit]],
+    }
+
+
 def _normalize_traceability_matrix(matrix):
     if isinstance(matrix, dict):
         return matrix.get("rows", [])
@@ -459,6 +513,7 @@ def load_sample_company():
     {"success": true, "redirect": "..."} depending on state.
     """
     import os
+    from app.services import sample_company_service
     from app.services.archimate_import_service import ArchiMateImportService, ImportRequestError
 
     wants_json = request.headers.get("Accept", "").startswith("application/json") or request.is_json
@@ -501,12 +556,14 @@ def load_sample_company():
         flash(error, "error")
         return redirect(url_for("dashboard.overview"))
 
+    elements_before = ArchiMateElement.query.count()
+
     # Import the sample
     try:
         result = ArchiMateImportService().import_xml(
             xml_content,
             strategy="skip_duplicates",
-            source_label="sample-company.oef.xml",
+            source_label=sample_company_service.SOURCE_LABEL,
             promote_top_level=False,
         )
     except ImportRequestError as exc:
@@ -518,13 +575,12 @@ def load_sample_company():
 
     # The elements alone count no applications and score no health; add the
     # applications, owners, costs, capabilities and risks a real estate carries.
-    from app.services import sample_company_service
-
     point = sample_company_service.find_restore_point(g.current_org_id)
     if point is not None:
         try:
             sample_company_service.add_working_data(g.current_org_id, current_user, point)
             db.session.commit()
+            sample_company_service.work_out_connections(g.current_org_id)
         except Exception:
             db.session.rollback()
             current_app.logger.exception("sample company working data not added")
@@ -537,16 +593,19 @@ def load_sample_company():
     # The first screen now shows the loaded sample: its counts, applications and the
     # "You are looking at the sample company" bar with the way to remove it.
     answer_url = url_for("dashboard.overview")
+    # Everything the load put in the model, as the first screen counts it: the
+    # file's elements and the ones the added capabilities and applications mirror.
+    created = ArchiMateElement.query.count() - elements_before
 
     if wants_json:
         return jsonify({
             "success": True,
             "redirect": answer_url,
-            "elements_created": result.get("created", 0),
+            "elements_created": created,
             "relationships_created": result.get("relationships_created", 0)
         }), 200
 
-    flash(f"Sample company loaded: {result.get('created', 0)} elements created.", "success")
+    flash(f"Sample company loaded: {created} elements created.", "success")
     return redirect(answer_url)
 
 
@@ -565,6 +624,7 @@ def remove_sample_company():
     if result is None:
         flash("There is no sample company to remove.", "info")
     else:
+        sample_company_service.work_out_connections(g.current_org_id)
         flash("Sample company removed.", "success")
     return redirect(url_for("dashboard.overview")), 303
 
@@ -823,6 +883,7 @@ def traceability_matrix():
     # dropdown read (archimate_elements + archimate_relationships), so the three
     # surfaces on this page agree instead of counting three different stores.
     gap_analysis = get_archimate_gap_analysis()
+    _link_model_cells(matrix)
     if direction == 'forward' and is_application_kind(pivot_type) and not plateau and not search and page == 1 and (
         not matrix or not _has_aligned_traceability_rows(matrix)
     ):
@@ -833,6 +894,8 @@ def traceability_matrix():
         "archimate_views/traceability.html",
         matrix=matrix,
         gap_analysis=gap_analysis,
+        store_counts=_traceability_store_counts(),
+        goals=_traceability_goals(),
         pivot_types=pivot_types,
         current_pivot_type=pivot_type,
         current_plateau=plateau,

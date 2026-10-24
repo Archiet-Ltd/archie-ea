@@ -46,12 +46,16 @@
 {% macro kanban_board(states=None, labels=None, empty_hints=None, can_write=False,
                       stage_group=None, show_wip=True, show_move=True,
                       card_width='w-64', region_label='Kanban board, scrolls horizontally',
-                      columns='server', inner_class='flex gap-4 min-w-max lg:min-w-0') %}
+                      columns='server', inner_class='flex gap-4 min-w-max lg:min-w-0',
+                      plain_headers=False) %}
 {#
   Two column-rendering modes share one shell:
     columns='server'  the macro renders each column from the Jinja `states`
                       list (the portfolio board). The caller supplies only the
                       card body via {{ caller(state) }}.
+    plain_headers     True puts the column header on the plain surface (no box, no
+                      stage dot) so colour is carried by the cards; default False
+                      keeps the boxed header every other caller renders.
     columns='client'  the board's columns are rendered by the caller's own
                       Alpine `x-for` (the ADM board, whose columns come from the
                       server as data, not as a fixed template list). The macro
@@ -79,11 +83,11 @@
                  @dragleave="onDragLeave($event)"
                  @drop.prevent="onDrop($event, '{{ state }}')"{% endif %}>
 
-                <div class="kanban-column-header border rounded-lg p-3 mb-3 flex items-center justify-between gap-2"
-                     {% if group %}data-stage-group="{{ group }}"{% endif %}
-                     :class="wipAtLimit('{{ state }}') ? 'border-destructive bg-destructive/10' : 'border-border'">
+                <div class="kanban-column-header {% if plain_headers %}rounded-lg px-1 py-2 mb-2{% else %}border rounded-lg p-3 mb-3{% endif %} flex items-center justify-between gap-2"
+                     {% if group and not plain_headers %}data-stage-group="{{ group }}"{% endif %}
+                     :class="wipAtLimit('{{ state }}') ? 'border border-destructive bg-destructive/10' : '{{ '' if plain_headers else 'border-border' }}'">
                     <div class="flex items-start gap-2 min-w-0">
-                        {% if group %}
+                        {% if group and not plain_headers %}
                         <span class="shrink-0 h-2 w-2 rounded-full mt-1.5
                             {% if group == 'discovery' %}bg-info
                             {% elif group == 'execution' %}bg-success

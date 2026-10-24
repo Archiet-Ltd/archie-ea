@@ -247,7 +247,6 @@
    "app/static/css/toast-notifications.css": 3,
    "app/templates/ai_chat/entity_matching_chat_interface.html": 10,
    "app/templates/application_mgmt/portfolio_gap_analysis.html": 4,
-   "app/templates/archimate/composer.html": 9,
    "app/templates/architecture_assistant/archimate_model_viewer.html": 1,
    "app/templates/errors/400.html": 4,
    "app/templates/errors/401.html": 4,

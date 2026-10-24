@@ -49,7 +49,11 @@
     {% for el in elements %}
     {% set relationship_label = el.relationship_type | replace('Relationship', '') if el.relationship_type else none %}
     {% call badge(variant, class='gap-1.5 font-medium' ~ (' cursor-help' if relationship_label else '')) %}
+        {% if el.href %}
+        <a href="{{ el.href }}" class="underline-offset-2 hover:underline focus-visible:underline" {% if relationship_label %}title="{{ relationship_label }}"{% endif %}>{{ el.name }}</a>
+        {% else %}
         <span {% if relationship_label %}title="{{ relationship_label }}"{% endif %}>{{ el.name }}</span>
+        {% endif %}
         {% if el.type %}
         <span class="text-muted-foreground">{{ el.type | plain_name(current_user) }}</span>
         {% endif %}
@@ -59,7 +63,7 @@
     {% endcall %}
     {% endfor %}
     {% if not elements %}
-    <span class="text-xs text-muted-foreground">—</span>
+    <span class="text-xs text-muted-foreground">Not traced</span>
     {% endif %}
 </div>
 {% endmacro %}
@@ -184,6 +188,20 @@
                     </div>
                     {% endfor %}
                 </div>
+                {# One word, one figure: these percentages count ArchiMate elements, so the page
+                   says so and sets the capability store and the requirements backlog beside them. #}
+                <p class="text-xs text-muted-foreground" id="count-sources">
+                    Counted from the ArchiMate model: {{ gap_analysis.total_capabilities }} capability elements,
+                    {{ gap_analysis.total_requirements }} requirement elements and {{ goals.total }} goals.
+                    {% if store_counts.capabilities is not none %}
+                    The capability map holds
+                    {% if store_counts.capabilities %}<a class="text-primary hover:underline" href="{{ url_for('capability_map.index') }}">{{ store_counts.capabilities }} capabilities</a>{% else %}{{ store_counts.capabilities }} capabilities{% endif %}{% if store_counts.requirements is not none %},{% else %}.{% endif %}
+                    {% endif %}
+                    {% if store_counts.requirements is not none %}
+                    {% if store_counts.capabilities is none %}The requirements backlog holds{% else %}and the requirements backlog holds{% endif %}
+                    {% if store_counts.requirements %}<a class="text-primary hover:underline" href="{{ url_for('enterprise_crud.requirements_backlog') }}">{{ store_counts.requirements }} requirements</a>{% else %}{{ store_counts.requirements }} requirements{% endif %}.
+                    {% endif %}
+                </p>
             </div>
             {% call button(variant='outline', icon='list-tree', on_click='gapOpen = !gapOpen', attrs_dict={':aria-expanded': 'gapOpen.toString()', 'aria-controls': 'gap-panel'}) %}<span x-text="gapOpen ? 'Hide gap panel' : 'Show gap panel'"></span>{% endcall %}
         </div>
@@ -234,6 +252,15 @@
         {% endcall %}
 
         {% call tabs_content(value='matrix', class='mt-4') %}
+        {% if matrix and goals.total and not (matrix | selectattr('motivation') | list) %}
+        <div class="mb-4" id="goals-untraced">
+            {% call notice(kind='info', title='No goal traced yet', class='items-start') %}
+                {{ goals.total }} goals are modelled and none reaches an application. A goal appears in the Motivation / Goals column once a relationship connects it to an application or to an element the application reaches.
+                Open a goal to see its chain:
+                {% for g in goals['items'] %}<a class="text-primary hover:underline" href="{{ url_for('architect_ui.element_traceability', element_id=g.id) }}">{{ g.name }}</a>{% if not loop.last %}, {% endif %}{% endfor %}.
+            {% endcall %}
+        </div>
+        {% endif %}
         <div id="matrix-view" class="rounded-lg border border-border bg-card overflow-hidden">
         {% if matrix %}
 {% set _dt_header %}

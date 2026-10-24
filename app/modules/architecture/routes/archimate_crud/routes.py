@@ -509,8 +509,16 @@ def _element_owner_target(element, element_type, organization_id):
             archimate_element_id=element.id, organization_id=organization_id,
         ).first()
         return ("application", component.id) if component is not None else None
-    if element_type == "BusinessProcess" and isinstance(element, BusinessProcess):
-        return ("business_process", element.id)
+    if element_type == "BusinessProcess":
+        if isinstance(element, BusinessProcess):
+            return ("business_process", element.id)
+        # A page opened on the generic element is the process that points at
+        # it; a process modelled only as an element gets its record on the
+        # first assignment.
+        process = BusinessProcess.query.filter_by(
+            archimate_element_id=element.id, organization_id=organization_id,
+        ).first()
+        return ("business_process", process.id) if process is not None else ("process_element", element.id)
     if element_type == "Capability":
         # Capability owners are recorded on the unified capability this row
         # projects into (by provenance), never on the source row's own id.
@@ -534,6 +542,8 @@ def _element_owner_rows(element, element_type, organization_id):
     kind, target_id = target
     if kind == "application":
         return ApplicationOwner.get_display_rows_for_application(target_id, organization_id)
+    if kind == "process_element":
+        return []
     return ApplicationOwner.get_display_rows_for_element(kind, target_id, organization_id)
 
 
@@ -549,6 +559,8 @@ def _element_owner_url(element, element_type, organization_id):
         return url_for("capability_map.api_set_capability_owner", capability_id=target_id)
     if kind == "business_process":
         return url_for("archimate_crud.process_set_owner", process_id=target_id)
+    if kind == "process_element":
+        return url_for("archimate_crud.process_element_set_owner", element_id=target_id)
     return url_for("ai_systems_genome.ai_system_set_owner", element_id=target_id)
 
 
@@ -558,6 +570,8 @@ def _element_owner_remove_urls(element, element_type, organization_id, owner_row
     if target is None:
         return owner_rows
     kind, target_id = target
+    if kind == "process_element":
+        return owner_rows
     endpoints = {
         "application": ("unified_applications.remove_owner", "app_id"),
         "capability": ("capability_map.api_delete_capability_owner", "capability_id"),
@@ -569,6 +583,31 @@ def _element_owner_remove_urls(element, element_type, organization_id, owner_row
         dict(row, remove_url=url_for(endpoint, owner_id=row["id"], **{key: target_id}))
         for row in owner_rows
     ]
+
+
+@archimate_crud.route("/business-process/element/<int:element_id>/owners", methods=["POST"])
+@login_required
+def process_element_set_owner(element_id):
+    """Record the first owner of a process that so far exists only as an element."""
+    from app.core.auth.permissions import can
+
+    org_id = g.current_org_id
+    if not (can(current_user, "assign", "owner") or can(current_user, "edit", "application")):
+        return jsonify({"message": "You cannot assign owners"}), 403
+    element = ArchiMateElement.query.filter_by(
+        id=element_id, type="BusinessProcess", organization_id=org_id,
+    ).first()
+    if element is None:
+        return jsonify({"message": "Business process not found"}), 404
+    process = BusinessProcess.query.filter_by(archimate_element_id=element.id, organization_id=org_id).first()
+    if process is None:
+        process = BusinessProcess(
+            name=element.name, description=element.description, organization_id=org_id,
+            archimate_element_id=element.id, status="active",
+        )
+        db.session.add(process)
+        db.session.commit()
+    return process_set_owner(process.id)
 
 
 @archimate_crud.route("/business-process/<int:process_id>/owners", methods=["POST"])
