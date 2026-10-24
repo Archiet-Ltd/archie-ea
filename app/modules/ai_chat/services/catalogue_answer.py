@@ -10,7 +10,7 @@ answers, and turns each citation into a page a person can open.
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 from flask import url_for
 
@@ -64,7 +64,8 @@ def answer_catalogue_question(message: str, organization_id: int) -> Optional[Di
         return None
     entry_id = interpretation["entry_id"]
     result = run_entry(entry_id, organization_id, **interpretation["params"])
-    seen, records = set(), []  # type: set, List[Dict[str, Any]]
+    seen: Set[Tuple[Any, Any]] = set()
+    records: List[Dict[str, Any]] = []
     for citation in result.get("citations") or []:
         page = _page_for(citation)
         key = (citation.get("type"), citation.get("id"))
