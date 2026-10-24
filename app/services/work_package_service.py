@@ -1298,7 +1298,7 @@ def get_by_source(table: str, source_id: int, organization_id: int) -> Optional[
 # work_packages key is filled only when the work package has a row there.
 _DELIVERABLE_FIELDS = ("description", "delivery_status", "deliverable_type", "start_date",
                        "target_date", "delivered_date", "review_date", "approval_criteria",
-                       "approval_status", "quality_score", "related_task_ids")
+                       "approval_status", "quality_score", "related_task_ids", "adm_template_id")
 _DELIVERABLE_DATES = ("start_date", "target_date", "delivered_date")
 
 
@@ -1332,6 +1332,12 @@ def _deliverable_value(key: str, value: Any):
     if key == "delivery_status":
         if not isinstance(value, str) or not value.strip() or len(value) > STATUS_MAX:
             raise WorkPackageError("Status must be a short word.")
+    if key == "adm_template_id" and value is not None:
+        from app.models.adm_deliverable import ADMDeliverable
+
+        template = db.session.get(ADMDeliverable, value) if isinstance(value, int) else None
+        if template is None or not template.is_template:
+            raise WorkPackageError("Choose one of the TOGAF deliverables on the list.")
     if key == "related_task_ids" and isinstance(value, (list, tuple)):
         import json
 

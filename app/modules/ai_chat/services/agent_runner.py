@@ -674,23 +674,34 @@ class AgentRunner:
         # Records the read tools actually returned this turn, for citation.
         sources = []
 
+        tried_providers: set = set()
         for iteration in range(MAX_ITERATIONS):
             # Call LLM
             self._held_tokens = []
-            try:
-                llm_resp = self._call_llm(
-                    provider, model, api_key, system_prompt, messages, tool_schemas,
-                    stream=stream_mode,
-                    base_url=base_url,
-                )
-            except Exception as e:
-                self._release_held_tokens(False)
-                logger.exception("AgentRunner LLM call failed (iteration %d)", iteration)
-                return self._finalize(
-                    self._fallback(f"LLM call failed: {e}"),
-                    user_message=user_message, domain=domain, context=context,
-                    persona=persona, model_used=model,
-                )
+            while True:
+                try:
+                    llm_resp = self._call_llm(
+                        provider, model, api_key, system_prompt, messages, tool_schemas,
+                        stream=stream_mode,
+                        base_url=base_url,
+                    )
+                    break
+                except Exception as e:
+                    self._release_held_tokens(False)
+                    logger.exception("AgentRunner LLM call failed (iteration %d)", iteration)
+                    # A route that is out of quota or down hands the turn to the
+                    # next configured route (OpenRouter, then NVIDIA).
+                    tried_providers.add(provider)
+                    alternate = self._alternate_route(e, tried_providers, LLMService)
+                    if alternate is None:
+                        return self._finalize(
+                            self._fallback(f"LLM call failed: {e}"),
+                            user_message=user_message, domain=domain, context=context,
+                            persona=persona, model_used=model,
+                        )
+                    provider, model, api_key = alternate
+                    base_url = _PROVIDER_BASE_URLS.get(provider)
+                    tool_schemas = self._build_tool_schemas(provider, TOOL_SCHEMAS)
 
             # Text-only response — we're done
             if not llm_resp.get("tool_calls"):
@@ -1426,6 +1437,31 @@ class AgentRunner:
     # ------------------------------------------------------------------ #
     # Fallbacks                                                           #
     # ------------------------------------------------------------------ #
+
+    @staticmethod
+    def _alternate_route(error: Exception, tried: set, llm_service) -> Optional[tuple]:
+        """The next configured route to try after ``error``, or None.
+
+        Only a route that is out of quota, rate limited, down or timing out
+        hands over; a refused request would be refused by every route.
+        """
+        import re as _re
+
+        text = str(error).lower()
+        status = _re.search(r"\b(4\d\d|5\d\d)\b", text)
+        transient = (status and status.group(1) in ("402", "429") or bool(status and status.group(1).startswith("5"))) or any(
+            t in text for t in ("rate limit", "quota", "timed out", "timeout", "connection")
+        )
+        if not transient:
+            return None
+        try:
+            provider, model = llm_service._get_configured_provider(exclude_providers=sorted(tried))
+            keys = llm_service._get_all_api_keys(provider)
+        except Exception:
+            return None
+        if not keys or provider in tried or provider not in ("anthropic", "openai", "openrouter", "nvidia"):
+            return None
+        return provider, model, keys[0]
 
     def _fallback(self, reason: str) -> dict:
         reason_l = (reason or "").lower()
