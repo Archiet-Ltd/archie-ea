@@ -70,7 +70,7 @@ def test_portfolio_manager_creates_views_and_finds_blocked_work_packages(browser
             page.get_by_role("button", name="Create Work Package").click()
         # The form redirects to the edit page after creating.
         page.wait_for_url(re.compile(r"/implementation/work-packages/\d+/edit$"), timeout=PAGE_TIMEOUT)
-        blocker_id = int(re.search(r"/work-packages/(\d+)/edit", page.url).group(1))
+        _blocker_id = int(re.search(r"/work-packages/(\d+)/edit", page.url).group(1))
         expect(page.get_by_role("heading", name="Edit Work Package").first).to_be_visible()
         # The blocker's name and programme are on the page.
         expect(page.locator("#name")).to_have_value(blocker_name)
