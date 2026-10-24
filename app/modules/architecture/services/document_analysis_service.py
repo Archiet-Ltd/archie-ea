@@ -441,7 +441,6 @@ class DocumentAnalysisService:
                             from app.models.models import APISettings
 
                             for paid_provider in [
-                                "deepseek",
                                 "anthropic",
                                 "openai",
                                 "gemini",

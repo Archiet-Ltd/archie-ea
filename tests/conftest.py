@@ -34,10 +34,10 @@ _LLM_API_KEY_PROVIDERS = (
     "ANTHROPIC",
     "AZURE",
     "CLAUDE",
-    "DEEPSEEK",
     "GEMINI",
     "GOOGLE",
     "HUGGINGFACE",
+    "NVIDIA",
     "OPENAI",
     "OPENROUTER",
 )
