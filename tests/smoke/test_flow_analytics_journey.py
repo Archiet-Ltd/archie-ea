@@ -9,6 +9,9 @@ asserts that the figures a person needs are present and agree:
 - The throughput chart canvas exists
 - The WIP snapshot table shows the card count by column
 - The empty/error states are structurally present
+
+When WALK_DIR is set, saves full-page screenshots at 1440 and 390,
+light and dark, after all assertions pass.
 """
 
 import datetime
@@ -102,6 +105,51 @@ def _seed_board_with_cards(org_id, user_id, suffix):
     return board_id
 
 
+def _save_screenshots(browser, live_server, email, board_id, walk_dir):
+    """Save full-page screenshots at 1440 and 390, light and dark."""
+    os.makedirs(walk_dir, exist_ok=True)
+    for width, height in [(1440, 1000), (390, 800)]:
+        for theme in ("light", "dark"):
+            ctx = browser.new_context(
+                ignore_https_errors=True,
+                viewport={"width": width, "height": height},
+            )
+            ctx.add_init_script(
+                "localStorage.setItem('archie_onboarding_ts', Date.now().toString());"
+            )
+            p = ctx.new_page()
+            try:
+                sign_in(p, live_server, email)
+                p.goto(
+                    live_server + "/analytics/flow?board_id=%d" % board_id,
+                    wait_until="domcontentloaded",
+                    timeout=PAGE_TIMEOUT,
+                )
+                # Toggle dark mode if needed
+                if theme == "dark":
+                    p.evaluate(
+                        """() => {
+                            localStorage.setItem('theme', 'dark');
+                            document.documentElement.classList.add('dark');
+                        }"""
+                    )
+                    p.wait_for_timeout(500)
+                else:
+                    p.evaluate(
+                        """() => {
+                            localStorage.setItem('theme', 'light');
+                            document.documentElement.classList.remove('dark');
+                        }"""
+                    )
+                    p.wait_for_timeout(500)
+                fname = "e-flow-analytics-%d-%s.png" % (width, theme)
+                path = os.path.join(walk_dir, fname)
+                p.screenshot(path=path, full_page=True)
+                print("[screenshot] Saved %s" % fname)
+            finally:
+                ctx.close()
+
+
 def test_flow_analytics_journey(browser, live_server):
     """Enterprise architect checks flow analytics for a board with cards."""
     org = create_fresh_org(PERSONA)
@@ -174,5 +222,10 @@ def test_flow_analytics_journey(browser, live_server):
         wip_heading = page.get_by_role("heading").filter(has_text="WIP Snapshot").first
         expect(wip_heading).to_be_visible()
         expect(wip_heading).to_contain_text("total: 3")
+
+        # 13. Save screenshots if WALK_DIR is set
+        walk_dir = os.environ.get("WALK_DIR")
+        if walk_dir:
+            _save_screenshots(browser, live_server, email, board_id, walk_dir)
     finally:
         context.close()
