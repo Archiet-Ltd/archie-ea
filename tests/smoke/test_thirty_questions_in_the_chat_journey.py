@@ -163,3 +163,32 @@ def test_an_empty_workspace_is_told_what_would_let_the_chat_answer(browser, live
         _shot(page, "thirty-empty", 390)
     finally:
         context.close()
+
+
+@pytest.mark.parametrize("width", [1440, 390])
+def test_the_cited_and_the_plain_answers_read_in_dark_mode(browser, live_server, seeded, width):
+    email, org_id = _empty_organisation_user(live_server)
+    assert _role_of(live_server, email) == "enterprise_architect"
+    context = browser.new_context(viewport={"width": width, "height": 900})
+    context.set_default_timeout(PAGE_TIMEOUT)
+    page = context.new_page()
+    try:
+        context.add_init_script("localStorage.setItem('archie_onboarding_ts', '1')")
+        context.add_init_script("try { localStorage.setItem('theme', 'dark') } catch (e) {}")
+        _login(page, live_server, email)
+        _load_sample(page, live_server)
+        page.goto(live_server + "/ai-chat", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        for question, expected in (
+            ("What applications do we run and who owns each one?", "[data-catalogue-record] a"),
+            ("What came from GitHub?", "text=Connect a GitHub repository"),
+        ):
+            cards = page.get_by_test_id("estate-answer")
+            before = cards.count()
+            page.locator("#user-input").fill(question)
+            page.locator("#user-input").press("Enter")
+            expect(cards).to_have_count(before + 1, timeout=ANSWER_TIMEOUT)
+            expect(cards.last.locator(expected).first).to_be_visible()
+        assert page.evaluate("document.documentElement.classList.contains('dark')")
+        _shot(page, "thirty-answers", width, theme="dark")
+    finally:
+        context.close()
