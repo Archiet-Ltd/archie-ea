@@ -265,11 +265,13 @@ def test_workspace_cards_match_my_work_zone(app, db_session, make_org):
 
     assert 'data-testid="health-score-value"' in html, "expected data mode, not guided mode"
 
+    # Navigation v3: the overview carries no workspace cards and the sidebar no longer
+    # lists each persona's own pages; every one of them is one search away (the one
+    # search box reads the navigation registry), by its old name as well as its new one.
     for label in expected_labels:
-        assert html.count(label) >= 1, (
-            f"Your Workspace cards missing my_work zone link {label!r} -- "
-            "the cards must render from get_sidebar_zones(), not a "
-            "hand-maintained parallel list"
+        hits = client.get("/api/sidebar/search", query_string={"q": label}).get_json()["results"]
+        assert [h for h in hits if h["type"] == "module"], (
+            f"my_work page {label!r} cannot be found by its name from the search box"
         )
 
 
@@ -354,11 +356,13 @@ def test_workspace_cards_render_for_platform_admin(app, db_session, make_org):
 
     assert 'data-testid="health-score-value"' in html, "expected data mode, not guided mode"
 
+    # Navigation v3: the overview carries no workspace cards and the sidebar no longer
+    # lists each persona's own pages; every one of them is one search away (the one
+    # search box reads the navigation registry), by its old name as well as its new one.
     for label in expected_labels:
-        assert html.count(label) >= 1, (
-            f"Your Workspace cards missing my_work zone link {label!r} for "
-            "platform_admin -- the section must render for this role too, "
-            "not only every other one"
+        hits = client.get("/api/sidebar/search", query_string={"q": label}).get_json()["results"]
+        assert [h for h in hits if h["type"] == "module"], (
+            f"my_work page {label!r} cannot be found by its name from the search box"
         )
 
 

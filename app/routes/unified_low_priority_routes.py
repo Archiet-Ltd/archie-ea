@@ -23,6 +23,7 @@ from flask import (
 from flask_login import login_required
 
 from app.decorators import audit_log, require_roles
+from app.modules.genome.services.roadmap_links import redirect_to_roadmap
 from sqlalchemy import or_, text
 
 from .. import db
@@ -337,57 +338,8 @@ def capability_map_mapping():
 @unified_low_priority_bp.route("/strategic/roadmap")
 @login_required
 def strategic_roadmap():
-    """Strategic roadmap view with swimlane visualization"""
-    try:
-        # Get filter parameters
-        year = request.args.get("year", type=int)
-        quarter = request.args.get("quarter")
-
-        # Get roadmap data from services
-        roadmap_by_lane_result = strategic_service.get_roadmap_by_lane()
-        roadmap_items_result = strategic_service.get_roadmap_items(
-            year=year, quarter=quarter
-        )
-        health_scores_result = strategic_service.get_initiative_health_scores()
-
-        # Extract data using correct keys (not "data")
-        roadmap_by_lane = (
-            roadmap_by_lane_result.get("roadmap_by_lane", {})
-            if roadmap_by_lane_result.get("success")
-            else {}
-        )
-        roadmap_items = (
-            roadmap_items_result.get("roadmap_items", [])
-            if roadmap_items_result.get("success")
-            else []
-        )
-        health_scores = (
-            health_scores_result.get("health_scores", [])
-            if health_scores_result.get("success")
-            else []
-        )
-
-        return render_template(
-            "strategic/roadmap.html",
-            roadmap_items=roadmap_items,
-            roadmap_by_lane=roadmap_by_lane,
-            health_scores=health_scores,
-            year=year,
-            quarter=quarter,
-        )
-    except Exception as e:
-        db.session.rollback()
-        current_app.logger.exception("Strategic roadmap error: %s", e)
-        flash("Error loading strategic roadmap", "error")
-        return render_template(
-            "strategic/roadmap.html",
-            roadmap_items=[],
-            roadmap_by_lane={},
-            health_scores=[],
-            year=None,
-            quarter=None,
-            load_error="The strategic roadmap could not be read.",
-        )
+    """The enterprise strategic roadmap is the one roadmap, Strategic view."""
+    return redirect_to_roadmap("strategic")
 
 
 @unified_low_priority_bp.route("/strategic/initiatives")

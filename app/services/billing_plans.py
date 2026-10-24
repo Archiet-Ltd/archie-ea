@@ -131,6 +131,53 @@ def get_plan(key: Optional[str]) -> Plan:
     return _BY_KEY.get(key, _BY_KEY["free"])
 
 
+def _money(amount: int) -> str:
+    return "${:,}".format(amount)
+
+
+def price_lines(plan: Plan) -> Tuple[str, ...]:
+    """The plan's price as people read it, from the same display figures the
+    pricing page is pinned to: ``("$490 a year", "$49 a month")`` for Startup,
+    ``("Free",)`` for Community, ``("From $24,000 a year",)`` for Enterprise.
+    Empty when the plan has no figure to show."""
+    if plan.display_price_floor_annual is not None:
+        return ("From %s a year" % _money(plan.display_price_floor_annual),)
+    if plan.display_price_monthly == 0 and plan.display_price_annual is None:
+        return ("Free",)
+    unit = " per %s" % plan.display_price_unit if plan.display_price_per_unit else ""
+    lines = []
+    if plan.display_price_annual is not None:
+        lines.append("%s%s a year" % (_money(plan.display_price_annual), unit))
+    if plan.display_price_monthly is not None:
+        lines.append("%s%s a month" % (_money(plan.display_price_monthly), unit))
+    return tuple(lines)
+
+
+def renewal_summary(sub, plan: Plan, live: bool) -> Dict[str, Optional[str]]:
+    """What the "next renewal" tile says. ``label`` names the date (renews, ends,
+    trial ends); ``value`` is the date with the amount when it is known, or
+    "No renewal yet" when nothing is bought, never a bare dash."""
+    if not live or sub is None or sub.current_period_end is None:
+        return {"label": "Next renewal", "value": "No renewal yet", "note": None}
+    when = sub.current_period_end.strftime("%d %b %Y")
+    status = getattr(getattr(sub, "status", None), "value", None)
+    if sub.cancel_at_period_end:
+        return {"label": "Ends on", "value": when, "note": None}
+    if status == "trialing":
+        return {"label": "Trial ends", "value": when, "note": None}
+    amount = None
+    interval = sub.billing_interval
+    price = plan.display_price_annual if interval == "year" else plan.display_price_monthly
+    if price is not None:
+        seats = (sub.seats_purchased or 1) if plan.per_seat else 1
+        amount = _money(price * seats)
+    return {
+        "label": "Next renewal",
+        "value": when,
+        "note": ("%s a %s" % (amount, interval)) if amount and interval else None,
+    }
+
+
 def purchasable_plans() -> Tuple[Plan, ...]:
     return tuple(p for p in PLANS if p.purchasable)
 

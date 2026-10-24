@@ -481,6 +481,49 @@ def overview():
         logger.warning("ENH-002: lifecycle distribution unavailable: %s", exc)
         db.session.rollback()
 
+    # Records added per day over the last 90 days: applications and model elements,
+    # counted from their created_at (applications) and recorded_at (elements) dates. None when the query fails, so the chart
+    # says it could not be drawn instead of drawing a flat line.
+    activity_series = None
+    activity_undated = 0
+    try:
+        from app.models.archimate_core import ArchiMateElement
+
+        activity_undated = (
+            db.session.query(db.func.count(ArchiMateElement.id))
+            .filter(ArchiMateElement.recorded_at.is_(None))
+            .scalar()
+        ) or 0
+
+        today = _dt.datetime.utcnow().date()
+        first_day = today - _dt.timedelta(days=89)
+        per_day = {}
+        for key, column, model in (
+            ("applications", ApplicationComponent.created_at, ApplicationComponent),
+            ("elements", ArchiMateElement.recorded_at, ArchiMateElement),
+        ):
+            day = db.func.date(column)
+            for when, count in (
+                db.session.query(day, db.func.count(model.id))
+                .filter(column >= first_day)
+                .group_by(day)
+                .all()
+            ):
+                per_day.setdefault(str(when), {})[key] = count
+        activity_series = []
+        for offset in range(90):
+            d = first_day + _dt.timedelta(days=offset)
+            row = per_day.get(d.isoformat(), {})
+            activity_series.append({
+                "date": d.isoformat(),
+                "label": d.strftime("%b ") + str(d.day),
+                "applications": row.get("applications", 0),
+                "elements": row.get("elements", 0),
+            })
+    except Exception as exc:
+        logger.warning("activity series unavailable: %s", exc)
+        db.session.rollback()
+
     # ENH-002: Solution pipeline by ADM phase
     solution_pipeline = []
     try:
@@ -674,6 +717,17 @@ def overview():
         else "data"
     )
 
+    from app.models.organization import Organization
+    from app.modules.account.services import onboarding_service
+
+    # How far each source given at sign-up has got; empty when none was given.
+    org_for_sources = db.session.get(Organization, g.current_org_id) if g.current_org_id else None
+    signup_sources = (
+        [row for row in onboarding_service.sources(org_for_sources) if row["state"] != "not_given"]
+        if org_for_sources is not None else []
+    )
+    given_sources = bool(signup_sources)
+
     guided_steps = []
     first_actions = {"connect": False, "sample": False, "import_href": None}
     if dashboard_mode == "guided":
@@ -738,18 +792,21 @@ def overview():
             except Exception:
                 _can_load_sample = False
 
-            first_actions["sample"] = _can_load_sample
+            # Not offered to someone who already gave a source: their own data is on its way.
+            first_actions["sample"] = _can_load_sample and not given_sources
         # Same test the connector pages apply, so the link is only shown to
         # someone it opens for.
         try:
             from app.middleware.tenant_decorators import is_platform_admin
             from app.services.rbac_service import rbac_service
+            from app.utils.role_access import may_use_connections
 
             first_actions["connect"] = bool(
                 'm365_connector.github_connect' in current_app.view_functions
                 and (
                     is_platform_admin(current_user)
                     or rbac_service.is_org_admin(current_user, g.current_org_id)
+                    or may_use_connections(current_user)
                 )
             )
         except Exception:
@@ -824,6 +881,7 @@ def overview():
 
     return render_template(
         "dashboards/overview.html",
+        signup_sources=signup_sources,
         metrics=metrics,
         nav_stats=nav_stats,
         layer_breakdown=layer_breakdown,
@@ -831,6 +889,8 @@ def overview():
         persona_metrics=persona_metrics,
         capability_health=capability_health,
         lifecycle_distribution=lifecycle_distribution,
+        activity_series=activity_series,
+        activity_undated=activity_undated,
         solution_pipeline=solution_pipeline,
         health_score=health_score,
         health_score_text=format_health_score(health_score),

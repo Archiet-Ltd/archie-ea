@@ -5,11 +5,12 @@ import logging
 import re
 from datetime import datetime
 
-from flask import abort, current_app, g, jsonify, redirect, render_template, request, url_for
+from flask import abort, current_app, g, jsonify, render_template, request
 from flask_login import current_user, login_required
 from sqlalchemy import func
 
 from app import db
+from app.modules.genome.services.roadmap_links import redirect_to_roadmap
 from app.main.views import main
 from app.models.roadmap import RoadmapTask
 from app.models.implementation_migration import Deliverable
@@ -422,15 +423,15 @@ def capability_roadmap():
 @main.route("/hybrid-roadmap")
 @login_required
 def hybrid_roadmap_redirect():
-    """Consolidated into /capability-roadmap (Feb 2026)."""
-    return redirect(url_for("main.capability_roadmap"))
+    """The hybrid roadmap is the one roadmap, Capability view."""
+    return redirect_to_roadmap("capability")
 
 
 @main.route("/technology-roadmap")
 @login_required
 def technology_roadmap_redirect():
-    """Consolidated into /capability-roadmap (Feb 2026)."""
-    return redirect(url_for("main.capability_roadmap"))
+    """The technology roadmap is the one roadmap, Technology view."""
+    return redirect_to_roadmap("technology")
 
 
 

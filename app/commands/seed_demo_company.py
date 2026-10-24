@@ -785,6 +785,7 @@ _OWNER_USERS = [
     ("Ellis", "DataSteward", "ellis.datasteward@lantern-quay.example.com"),
     ("Cameron", "SysAdmin", "cameron.sysadmin@lantern-quay.example.com"),
     ("Ainsley", "NetEng", "ainsley.neteng@lantern-quay.example.com"),
+    ("Bryn", "BusinessArch", "bryn.businessarch@lantern-quay.example.com"),
 ]
 
 # The one demo user who can look but not change the model: a business analyst
@@ -792,6 +793,10 @@ _OWNER_USERS = [
 # beside its sixteen architects. Matches an entry of _OWNER_USERS.
 _DEMO_READER_EMAIL = "drew.dataanalyst@lantern-quay.example.com"
 _DEMO_READER_PERSONA = "business_analyst"
+
+# The one business architect in the demonstration, so what that persona does and
+# does not see (Connections yes, Billing no) can be walked signed in as them.
+_DEMO_BUSINESS_ARCHITECT_EMAIL = "bryn.businessarch@lantern-quay.example.com"
 
 # Map from display name (as used in BusinessActor elements) to User email.
 _OWNER_NAME_TO_EMAIL = {
@@ -2267,6 +2272,7 @@ def seed_demo_company() -> dict:
         existing_owner_emails = {
             u.email for u in User.query.filter_by(organization_id=org_id).all()
         }
+        viewer_role = Role.query.filter_by(name="Viewer").first()
         owner_users_created = 0
         for first, last, email in _OWNER_USERS:
             if email in existing_owner_emails:
@@ -2279,7 +2285,11 @@ def seed_demo_company() -> dict:
                 organization_id=org_id,
                 confirmed=True,
                 role=viewer_role,
-                enterprise_role="enterprise_architect",
+                enterprise_role=(
+                    "business_architect"
+                    if email == _DEMO_BUSINESS_ARCHITECT_EMAIL
+                    else "enterprise_architect"
+                ),
             )
             db.session.add(u)
             owner_users_created += 1
@@ -2290,6 +2300,13 @@ def seed_demo_company() -> dict:
         ).first()
         if reader is not None and reader.enterprise_role != _DEMO_READER_PERSONA:
             reader.enterprise_role = _DEMO_READER_PERSONA
+            db.session.flush()
+
+        architect = User.query.filter_by(
+            email=_DEMO_BUSINESS_ARCHITECT_EMAIL, organization_id=org_id
+        ).first()
+        if architect is not None and architect.enterprise_role != "business_architect":
+            architect.enterprise_role = "business_architect"
             db.session.flush()
 
         apps = _resolve_apps(org_id)

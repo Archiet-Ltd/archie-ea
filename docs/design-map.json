@@ -1652,7 +1652,11 @@
    "spec": null,
    "status": "mapped",
    "tier": "C3",
-   "type_changed": true
+   "type_changed": true,
+   "extra_macros": [
+    "components/roadmap/board.html"
+   ],
+   "note": "The one roadmap: the vendored roadmap board from the component library, not a time axis."
   },
   "app/modules/intelligence/templates/intelligence/answer.html": {
    "allowed_macros": [
@@ -4765,6 +4769,8 @@
     "layouts/admin_base.html"
    ],
    "extra_macros": [
+    "components/drawer.html",
+    "macros/adm_cycle.html",
     "macros/kanban_board.html"
    ],
    "frame": "dashboard-01",
@@ -4888,7 +4894,7 @@
    "tier": "B",
    "type_changed": false
   },
-  "app/templates/adm_kanban/plateau_roadmap.html": {
+"app/templates/adm_kanban/plateau_roadmap.html": {
    "allowed_macros": [
     "components/accessibility_helpers.html",
     "components/alert.html",
@@ -5932,6 +5938,18 @@
    },
    "spec": null,
    "status": "mapped",
+"extra_macros": [
+    "components/table.html"
+   ],
+   "charts": [],
+   "confidence": "high",
+   "frame": "dashboard-01",
+   "inhouse_components": [
+    "page-shell:Replace"
+   ],
+   "original": "preview-02",
+   "page_type": "settings",
+   "reason": "Plan, invoices and cancel; one section per card.",
    "tier": "B",
    "type_changed": false
   },
@@ -8113,6 +8131,83 @@
    "tier": "B",
    "type_changed": false
   },
+  "app/templates/admin/platform_area.html": {
+   "allowed_macros": [
+    "components/accessibility_helpers.html",
+    "components/alert.html",
+    "components/answer_cascade.html",
+    "components/app_stats_grid.html",
+    "components/badge.html",
+    "components/breadcrumb.html",
+    "components/breadcrumb_nav.html",
+    "components/button.html",
+    "components/card.html",
+    "components/confirmation_dialog.html",
+    "components/data_card.html",
+    "components/dense_table.html",
+    "components/dialog.html",
+    "components/dropdown_menu.html",
+    "components/empty_state.html",
+    "components/error_boundary.html",
+    "components/filter_bar.html",
+    "components/gantt_timeline.html",
+    "components/inline_hint.html",
+    "components/loading_state.html",
+    "components/metrics_card.html",
+    "components/modal.html",
+    "components/page_header.html",
+    "components/priority_actions.html",
+    "components/progress.html",
+    "components/provenance.html",
+    "components/review_queue_panel.html",
+    "components/skeleton.html",
+    "components/status_badge.html",
+    "components/status_indicator.html",
+    "components/tabs.html",
+    "macros/page_shell.html"
+   ],
+   "basis": "rule",
+   "block": "dashboard",
+   "components": [
+    "page-header",
+    "card",
+    "empty"
+   ],
+   "controls": {
+    "link": 1,
+    "testid": 2
+   },
+   "extends": [
+    "layouts/admin_base.html"
+   ],
+   "macros": [
+    "components/card.html",
+    "components/empty_state.html",
+    "components/page_header.html"
+   ],
+   "persona": "platform_admin",
+   "reference": {
+    "shadcn": {
+     "name": "shadcn blocks: dashboard-01",
+     "url": "https://ui.shadcn.com/blocks#dashboard-01"
+    },
+    "basecoat": {
+     "name": "flask-basecoat examples: dashboard",
+     "image": "docs/design/reference/basecoat-dashboard.webp"
+    }
+   },
+   "spec": null,
+   "status": "mapped",
+   "charts": [],
+   "confidence": "high",
+   "frame": "dashboard-01",
+   "inhouse_components": [],
+   "original": "dashboard-01",
+   "page_type": "dashboard",
+   "reason": "The platform administration area: one card per cross-organisation tool, opened from the Platform admin entry of the user menu.",
+   "tier": "B",
+   "type_changed": false
+  },
   "app/templates/admin/pricing_analytics.html": {
    "allowed_macros": [
     "components/accessibility_helpers.html",
@@ -9965,7 +10060,10 @@
    "spec": "docs/design/specs/ai-chat.md",
    "status": "specified",
    "tier": "B",
-   "type_changed": false
+   "type_changed": false,
+   "extra_macros": [
+    "components/drawer.html"
+   ]
   },
   "app/templates/ai_chat/run_records/detail.html": {
    "allowed_macros": [
@@ -14236,7 +14334,7 @@
    "tier": "B",
    "type_changed": false
   },
-  "app/templates/archimate_roadmap/enhanced_roadmap_fixed.html": {
+"app/templates/archimate_roadmap/enhanced_roadmap_fixed.html": {
    "allowed_macros": [
     "components/accessibility_helpers.html",
     "components/alert.html",
@@ -25198,7 +25296,7 @@
    "tier": "B",
    "type_changed": false
   },
-  "app/templates/enterprise/technology_roadmap.html": {
+"app/templates/enterprise/technology_roadmap.html": {
    "allowed_macros": [
     "components/accessibility_helpers.html",
     "components/alert.html",
@@ -27474,7 +27572,7 @@
    "tier": "B",
    "type_changed": false
   },
-  "app/templates/governance/roadmap.html": {
+"app/templates/governance/roadmap.html": {
    "allowed_macros": [
     "components/accessibility_helpers.html",
     "components/alert.html",
@@ -35459,7 +35557,7 @@
    "tier": "B",
    "type_changed": false
   },
-  "app/templates/strategic/roadmap.html": {
+"app/templates/strategic/roadmap.html": {
    "allowed_macros": [
     "components/accessibility_helpers.html",
     "components/alert.html",

@@ -36,8 +36,8 @@ def _link_expired(title, message, action_label, action_href):
 
 def _after_confirmation_url(user):
     """Where a newly confirmed person goes: an owner lands on inviting the team."""
-    if "team.team" in current_app.view_functions and getattr(user, "is_org_admin", False):
-        return url_for("team.team")
+    if "account.welcome" in current_app.view_functions and getattr(user, "is_org_admin", False):
+        return url_for("account.welcome")
     return url_for("dashboard.overview")
 
 
@@ -86,9 +86,12 @@ def register_view():
         if chosen is not None:
             # Usable at once: sign in and go straight to that plan's checkout.
             return redirect(url_for("account.login", plan=chosen[0], interval=chosen[1]))
+        if "account.welcome" in current_app.view_functions:
+            # Signed in at once: the second step of sign-up.
+            return redirect(url_for("account.welcome"))
         return redirect(url_for("main.index"))
     return render_template(
-        "account/register.html", form=form,
+        "account/register.html", form=form, step=1,
         signin_args={"plan": chosen[0], "interval": chosen[1]} if chosen else {},
     )
 
