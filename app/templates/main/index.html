@@ -1,4 +1,4 @@
-{% extends 'layouts/public_base.html' %}{% from 'components/badge.html' import badge %}{% from 'components/public_faq.html' import faq_chevron %}{# smoke-coverage-ok: public landing page; visual layout verified by unit tests and Playwright screenshots under .task/ #}
+{% extends 'layouts/public_base.html' %}{% from 'components/badge.html' import badge %}{% from 'components/table.html' import table %}{% from 'components/public_faq.html' import faq_chevron %}{# smoke-coverage-ok: public landing page; visual layout verified by unit tests and Playwright screenshots under .task/ #}
 {% block full_title %}Entelim — The Company Brain for every enterprise{% endblock %}
 {% block meta_description %}
 <link rel="canonical" href="https://entelim.org/">
@@ -339,7 +339,7 @@
     </div>
 
     <div class="mt-6 overflow-x-auto rounded-2xl border border-border public-table-scroll" tabindex="0" role="region" aria-label="Pricing plans table, scrollable">
-      <table class="public-table">
+      {% call table(class='public-table') %}
         <thead>
           <tr>
             <th scope="col">Plan</th>
@@ -379,7 +379,7 @@
             <td>Unlimited editors, SAML, audit export, own key by default, supported self-hosting, named contact.</td>
           </tr>
         </tbody>
-      </table>
+      {% endcall %}
     </div>
 
     <div class="mt-6 grid gap-6 sm:grid-cols-2">
