@@ -30,8 +30,11 @@
     message='This action cannot be undone.',
     confirm_text='Confirm',
     cancel_text='Cancel',
-    variant='destructive'
-) %}
+    variant='destructive',
+    confirm_label=none,
+    cancel_label=none,
+    button_class=none,
+    stop_clicks=true) %}
 <div id="confirm-dialog-{{ id }}" x-data="{ callback: null }" hidden
      @open-confirm-{{ id }}.window="callback = $event.detail?.callback; Platform.modal.open('confirm-dialog-{{ id }}')"
      @keydown.escape.window="Platform.modal.close('confirm-dialog-{{ id }}')"
@@ -48,7 +51,7 @@
         aria-describedby="dialog-desc-{{ id }}">
         
         <div class="bg-card rounded-lg max-w-md w-full p-6 border border-border" 
-             @click.stop>
+             {% if stop_clicks %}@click.stop{% endif %}>
             
             <!-- Icon -->
             {% if variant == 'destructive' %}
@@ -79,15 +82,15 @@
             
             <!-- Actions -->
             <div class="flex justify-end gap-3">
-                <button data-modal-close="confirm-dialog-{{ id }}" 
-                        class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                        type="button" aria-label="Close">
+                <button data-modal-close="confirm-dialog-{{ id }}"
+                        class="inline-flex h-9 items-center justify-center whitespace-nowrap rounded-md border border-input bg-background px-4 text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        type="button">
                     {{ cancel_text }}
                 </button>
-                
-                <button @click="if (callback) callback();" data-modal-close="confirm-dialog-{{ id }}" 
-                        class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                        type="button" aria-label="Close">
+
+                <button @click="if (callback) callback();" data-modal-close="confirm-dialog-{{ id }}"
+                        class="inline-flex h-9 items-center justify-center whitespace-nowrap rounded-md px-4 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring {% if variant == 'destructive' %}bg-destructive text-destructive-foreground hover:bg-destructive/90{% else %}bg-primary text-primary-foreground hover:bg-primary/90{% endif %}"
+                        type="button">
                     {{ confirm_text }}
                 </button>
             </div>

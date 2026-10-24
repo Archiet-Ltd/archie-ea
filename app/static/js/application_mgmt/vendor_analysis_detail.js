@@ -46,10 +46,10 @@ function vendorAnalysisDetail(analysisId) {
 
     capabilityTypes: [
       { value: '', label: 'All Types', color: 'bg-foreground/40' },
-      { value: 'BUSINESS', label: 'Business', color: 'bg-amber-500' },
+      { value: 'BUSINESS', label: 'Business', color: 'bg-warning' },
       { value: 'APPLICATION', label: 'Application', color: 'bg-primary' },
       { value: 'TECHNICAL', label: 'Technical', color: 'bg-primary' },
-      { value: 'MANUFACTURING', label: 'Manufacturing', color: 'bg-orange-500' }
+      { value: 'MANUFACTURING', label: 'Manufacturing', color: 'bg-info' }
     ],
 
     analysis: { name: '', status: 'new' },
@@ -143,10 +143,10 @@ function vendorAnalysisDetail(analysisId) {
     archimateLayerClass(type) {
       if (!type) return 'border-border text-muted-foreground';
       switch (type.toUpperCase()) {
-        case 'BUSINESS': return 'border-amber-500/50 text-amber-600 bg-amber-500/10';
+        case 'BUSINESS': return 'border-warning/50 text-warning-emphasis bg-warning/10';
         case 'APPLICATION': return 'border-primary/50 text-primary bg-primary/10';
         case 'TECHNICAL': return 'border-primary/50 text-primary bg-primary/10';
-        case 'MANUFACTURING': return 'border-orange-500/50 text-orange-600 bg-orange-500/10';
+        case 'MANUFACTURING': return 'border-info/50 text-info-emphasis bg-info/10';
         default: return 'border-border text-muted-foreground';
       }
     },
@@ -292,6 +292,20 @@ function vendorAnalysisDetail(analysisId) {
       if (id === 'comparison' && this.analysisId) { this.loadComparison(); this.loadScenarios(); this.loadRequirements(); }
       if (id === 'decision' && this.analysisId) this.loadResults();
       this.$nextTick(function() { if (typeof lucide !== 'undefined') lucide.createIcons(); });
+    },
+
+    statusTone() {
+      const a = this.analysis || {};
+      if (a.approval_status === 'approved') return 'success';
+      if (a.approval_status === 'rejected') return 'destructive';
+      if (a.status === 'draft' || a.status === 'running') return 'warning';
+      if (a.status === 'completed' && !a.approval_status) return 'info';
+      return 'neutral';
+    },
+
+    vendorMatchTone(v) {
+      const pct = this.vendorMatchPct(v);
+      return pct >= 80 ? 'high' : pct >= 50 ? 'mid' : 'low';
     },
 
     stepStatus(tabId) {

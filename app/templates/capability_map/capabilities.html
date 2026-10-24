@@ -100,7 +100,7 @@
                 </div>
                 {% if current_mat %}
                 <div class="w-full h-1.5 rounded-full bg-muted overflow-hidden">
-                    <div class="h-full rounded-full {% if mat_pct >= 80 %}bg-success{% elif mat_pct >= 40 %}bg-warning{% else %}bg-destructive/40{% endif %}"
+                    <div class="h-full rounded-full {% if mat_pct >= 80 %}bg-success{% elif mat_pct >= 40 %}bg-warning{% else %}bg-destructive{% endif %}"
                          style="width: {{ mat_pct }}%"></div>
                 </div>
                 {% else %}

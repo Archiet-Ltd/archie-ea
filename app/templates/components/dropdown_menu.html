@@ -62,7 +62,11 @@
     position='right',
     class='',
     trigger_class='',
-    menu_width='w-48'
+    menu_width='w-48',
+    trigger_size='default',
+    trigger_testid=none,
+    trigger_aria_label=none,
+    trigger_title=none
 ) %}
 {% set unique_id = id or 'dropdown-' ~ range(1000, 9999) | random %}
 
@@ -93,8 +97,8 @@
         @click="menuOpen = !menuOpen"
         :aria-expanded="menuOpen"
         aria-haspopup="true"
-        class="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-10 {{ 'w-10' if trigger_icon_only else 'px-4 py-2' }} {{ trigger_variants.get(trigger_variant, trigger_variants['default']) }} {{ trigger_class }}"
-     aria-label="Open">
+        class="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 {{ 'h-8' if trigger_size == 'sm' else ('h-9' if trigger_size == 'md' else 'h-10') }} {{ ('w-8' if trigger_size == 'sm' else ('w-9' if trigger_size == 'md' else 'w-10')) if trigger_icon_only else ('px-3' if trigger_size in ('sm', 'md') else 'px-4 py-2') }} {{ trigger_variants.get(trigger_variant, trigger_variants['default']) }} {{ trigger_class }}"
+     aria-label="{{ trigger_aria_label or 'Open' }}"{% if trigger_testid %} data-testid="{{ trigger_testid }}"{% endif %}{% if trigger_title %} title="{{ trigger_title }}"{% endif %}>
         {% if trigger_icon %}
         <i data-lucide="{{ trigger_icon }}" class="{% if not trigger_icon_only %}mr-2{% endif %} w-4 h-4" aria-hidden="true"></i>
         {% endif %}
@@ -149,6 +153,7 @@
                             @click="menuOpen = false"
                             class="w-full text-left px-4 py-2 text-sm flex items-center gap-2 transition-colors {{ item_variants.get(item.variant, item_variants['default']) }} {% if loop.first %}rounded-t-lg{% endif %} {% if loop.last %}rounded-b-lg{% endif %} {{ item.class|default('') }}"
                             role="menuitem"
+                            {% if item.testid %}data-testid="{{ item.testid }}"{% endif %} {% if item.title %}title="{{ item.title }}"{% endif %} {% if item.aria_label %}aria-label="{{ item.aria_label }}"{% endif %}
                             {% if item.disabled %}aria-disabled="true" class="opacity-50 cursor-not-allowed pointer-events-none"{% endif %}
                         >
                             {% if item.icon %}
@@ -175,8 +180,9 @@
                             @click="{{ item.onclick }}; menuOpen = false"
                             class="w-full text-left px-4 py-2 text-sm flex items-center gap-2 transition-colors {{ item_variants.get(item.variant, item_variants['default']) }} {% if loop.first %}rounded-t-lg{% endif %} {% if loop.last %}rounded-b-lg{% endif %} {{ item.class|default('') }}"
                             role="menuitem"
+                            {% if item.testid %}data-testid="{{ item.testid }}"{% endif %} {% if item.title %}title="{{ item.title }}"{% endif %}
                             {% if item.disabled %}disabled class="opacity-50 cursor-not-allowed"{% endif %}
-                         aria-label="Open">
+                         aria-label="{{ item.aria_label or 'Open' }}">
                             {% if item.icon %}
                             <i data-lucide="{{ item.icon }}" class="w-4 h-4" aria-hidden="true"></i>
                             {% endif %}

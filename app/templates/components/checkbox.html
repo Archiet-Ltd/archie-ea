@@ -20,7 +20,7 @@
     description='',
     error=none,
     class='',
-    attrs={}
+    attrs_dict={}
 ) %}
 <div class="flex items-start gap-2.5 {{ class }}">
     <input
@@ -33,7 +33,7 @@
         {% if required %}required aria-required="true"{% endif %}
         {% if error %}aria-invalid="true"{% endif %}
         {% if error and id %}aria-describedby="{{ id }}-error"{% endif %}
-        {{ attrs|xmlattr }}
+        {{ attrs_dict|xmlattr }}
         class="mt-0.5 h-4 w-4 shrink-0 rounded border-input accent-primary text-primary
                focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2
                disabled:cursor-not-allowed disabled:opacity-50" />

@@ -1,6 +1,7 @@
 {# app/templates/adm_kanban/board_v2.html #}
 {% extends "layouts/admin_base.html" %}
 {% from 'macros/page_shell.html' import page_shell %}
+{% from 'macros/kanban_board.html' import kanban_board %}
 
 {% block title %}ADM Kanban — Architect's Operating View{% endblock %}
 
@@ -147,8 +148,15 @@
     </div>
 
     {# -- Flat Kanban Columns (flat mode only) --------------------------- #}
-    <div x-show="!loading && !error && cards.length > 0 && viewMode === 'flat'" x-cloak
-         class="grid grid-cols-6 gap-3 min-h-[60vh]">
+    {# The one shared board shell (macros/kanban_board.html). The ADM board
+       renders its own columns from server data via Alpine's x-for, so it uses
+       the macro's client-columns mode: the macro owns the kanban-board
+       container and the sideways-scroll region, this template owns the column
+       and card markup its architects know. #}
+    <div x-show="!loading && !error && cards.length > 0 && viewMode === 'flat'" x-cloak>
+    {% call kanban_board(columns='client', can_write=True,
+                         inner_class='grid grid-cols-6 gap-3 min-h-[60vh]',
+                         region_label='ADM architecture Kanban board, scrolls horizontally') %}
 
         <template x-for="col in columns" :key="col.id">
             <div class="kanban-column flex flex-col min-w-0"
@@ -389,6 +397,7 @@
                 </button>
             </div>
         </template>
+    {% endcall %}
     </div>
 
     {# -- Swimlane Layout (swimlane mode only) --------------------------- #}

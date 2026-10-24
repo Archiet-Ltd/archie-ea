@@ -104,6 +104,9 @@ def _init_blueprints(app):
     # --- North Star Phase 2: ArchiMate Layer Navigation (NORTH-STAR-002) ---
     _register_archimate_layer_navigation(app)
 
+    # --- SAFe Portfolio Kanban (SAFE-3A) ---
+    _register_safe_portfolio(app)
+
     # --- Enterprise Genome (ADR 0010) — deterministic, provenance-carrying
     # emitter slices; each registers non-fatally so one broken slice degrades
     # to a missing page, not a dead app. ---
@@ -2342,9 +2345,31 @@ def _register_archimate_layer_navigation(app):
     """
     try:
         from app.modules.architecture.routes.archimate_layer_nav_routes import archimate_layer_nav_bp
-        
+
         app.register_blueprint(archimate_layer_nav_bp)
         app.logger.info("[BLUEPRINT] ArchiMate Layer Navigation registered at /architecture/* (NORTH-STAR-002)")
     except Exception as e:
         app.logger.warning(f"[BLUEPRINT] ArchiMate Layer Navigation registration failed: {e}")
         # Non-fatal - navigation will fall back to main composer
+
+
+def _register_safe_portfolio(app):
+    """Register SAFe Portfolio Kanban board.
+
+    Provides Portfolio Epic workflow visualization organized by state columns
+    (Funnel, Reviewing, Analyzing, Portfolio Backlog, Implementing, Done),
+    with cards ordered by WSJF priority within each column.
+
+    Routes:
+    - GET   /safe/portfolio - Kanban board view
+    - GET   /api/safe/portfolio - JSON API
+    - PATCH /api/safe/portfolio/<id> - Move state / edit WSJF
+    """
+    try:
+        from app.modules.safe_portfolio import safe_portfolio_bp, safe_portfolio_api_bp
+
+        app.register_blueprint(safe_portfolio_bp)
+        app.register_blueprint(safe_portfolio_api_bp)
+        app.logger.info("[BLUEPRINT] SAFe Portfolio Kanban registered at /safe/portfolio and /api/safe/portfolio")
+    except Exception as e:
+        app.logger.warning(f"[BLUEPRINT] SAFe Portfolio Kanban registration failed: {e}")

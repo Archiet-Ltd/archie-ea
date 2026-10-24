@@ -231,7 +231,7 @@
                 </div>
                 <div class="relative">
                     {{ input(type='text', placeholder='Add capability to grid...', aria_label='Add capability to grid...', class='w-64 h-9',
-                             attrs={'x-model': 'capabilitySearch', '@input.debounce.300ms': 'searchCapabilities()'}) }}
+                             attrs_dict={'x-model': 'capabilitySearch', '@input.debounce.300ms': 'searchCapabilities()'}) }}
                     <div x-show="capabilityResults.length > 0" x-cloak @click.outside="capabilityResults = []"
                          class="absolute z-10 mt-1 w-full rounded-md border border-border bg-card max-h-64 overflow-y-auto">
                         <template x-for="cap in capabilityResults" :key="cap.id">
@@ -324,12 +324,12 @@
             </div>
             {% call form_group(id='cell-support-level', label='Support Level (1-5)') %}
                 {{ input(id='cell-support-level', type='range', aria_label='Support Level (1-5)', class='mt-2 h-auto border-0 p-0',
-                         attrs={'min': 1, 'max': 5, 'step': 1, 'x-model.number': 'cellForm.support_level'}) }}
+                         attrs_dict={'min': 1, 'max': 5, 'step': 1, 'x-model.number': 'cellForm.support_level'}) }}
                 <div class="text-center text-sm font-semibold mt-1" x-text="cellForm.support_level"></div>
             {% endcall %}
             {% call form_group(id='cell-contribution', label='Contribution (%)') %}
                 {{ input(id='cell-contribution', type='number', aria_label='Contribution (%)', class='h-9',
-                         attrs={'min': 0, 'max': 100, 'x-model.number': 'cellForm.capability_contribution'}) }}
+                         attrs_dict={'min': 0, 'max': 100, 'x-model.number': 'cellForm.capability_contribution'}) }}
             {% endcall %}
             {{ radio_group(name='cell_support_type', label='Support Type', inline=true, id_prefix='cell', attrs={'x-model': 'cellForm.support_type'},
                            options=[{'value': 'primary', 'label': 'Primary'}, {'value': 'secondary', 'label': 'Secondary'}, {'value': 'supporting', 'label': 'Supporting'}]) }}
@@ -362,7 +362,7 @@
         {% call form_group(id='stage-stakeholders', label='Stakeholders (one per line)') %}{{ textarea(id='stage-stakeholders', name='stakeholders', rows=2) }}{% endcall %}
         {% call form_group(id='stage-value-items', label='Value items (one per line)') %}{{ textarea(id='stage-value-items', name='value_items', rows=2) }}{% endcall %}
         {{ radio_group(name='stage_type', label='Stage Type', inline=true, value='operational', id_prefix='create', options=stage_types) }}
-        {% call form_group(id='stage-order', label='Order') %}{{ input(id='stage-order', name='stage_order', type='number', placeholder='Auto', class='h-9', attrs={'min': 1}) }}{% endcall %}
+        {% call form_group(id='stage-order', label='Order') %}{{ input(id='stage-order', name='stage_order', type='number', placeholder='Auto', class='h-9', attrs_dict={'min': 1}) }}{% endcall %}
         <div class="flex items-center gap-6">
             {{ checkbox(id='stage-customer-facing', name='customer_facing', label='Customer facing') }}
             {{ checkbox(id='stage-quality-gate', name='quality_gate', label='Quality gate') }}
@@ -376,17 +376,17 @@
     <form method="POST" x-bind:action="stageEditForm.id ? '{{ url_for('value_stream.edit_stage', stage_id=0) }}'.replace('/0/', '/' + stageEditForm.id + '/') : '#'" class="space-y-4">
         {{ input(type='hidden', name='csrf_token', value=csrf_token()) }}
         {{ input(type='hidden', name='value_stream_id', value=value_stream.id) }}
-        {% call form_group(id='stage-edit-name', label='Name') %}{{ input(id='stage-edit-name', name='name', required=true, class='h-9', attrs={'x-model': 'stageEditForm.name'}) }}{% endcall %}
-        {% call form_group(id='stage-edit-description', label='Description') %}{{ textarea(id='stage-edit-description', name='description', rows=2, attrs={'x-model': 'stageEditForm.description'}) }}{% endcall %}
-        {% call form_group(id='stage-edit-entry-criteria', label='Entry criteria') %}{{ textarea(id='stage-edit-entry-criteria', name='entry_criteria', rows=2, attrs={'x-model': 'stageEditForm.entry_criteria'}) }}{% endcall %}
-        {% call form_group(id='stage-edit-exit-criteria', label='Exit criteria') %}{{ textarea(id='stage-edit-exit-criteria', name='exit_criteria', rows=2, attrs={'x-model': 'stageEditForm.exit_criteria'}) }}{% endcall %}
-        {% call form_group(id='stage-edit-stakeholders', label='Stakeholders (one per line)') %}{{ textarea(id='stage-edit-stakeholders', name='stakeholders', rows=2, attrs={'x-model': 'stageEditForm.stakeholders'}) }}{% endcall %}
-        {% call form_group(id='stage-edit-value-items', label='Value items (one per line)') %}{{ textarea(id='stage-edit-value-items', name='value_items', rows=2, attrs={'x-model': 'stageEditForm.value_items'}) }}{% endcall %}
+        {% call form_group(id='stage-edit-name', label='Name') %}{{ input(id='stage-edit-name', name='name', required=true, class='h-9', attrs_dict={'x-model': 'stageEditForm.name'}) }}{% endcall %}
+        {% call form_group(id='stage-edit-description', label='Description') %}{{ textarea(id='stage-edit-description', name='description', rows=2, attrs_dict={'x-model': 'stageEditForm.description'}) }}{% endcall %}
+        {% call form_group(id='stage-edit-entry-criteria', label='Entry criteria') %}{{ textarea(id='stage-edit-entry-criteria', name='entry_criteria', rows=2, attrs_dict={'x-model': 'stageEditForm.entry_criteria'}) }}{% endcall %}
+        {% call form_group(id='stage-edit-exit-criteria', label='Exit criteria') %}{{ textarea(id='stage-edit-exit-criteria', name='exit_criteria', rows=2, attrs_dict={'x-model': 'stageEditForm.exit_criteria'}) }}{% endcall %}
+        {% call form_group(id='stage-edit-stakeholders', label='Stakeholders (one per line)') %}{{ textarea(id='stage-edit-stakeholders', name='stakeholders', rows=2, attrs_dict={'x-model': 'stageEditForm.stakeholders'}) }}{% endcall %}
+        {% call form_group(id='stage-edit-value-items', label='Value items (one per line)') %}{{ textarea(id='stage-edit-value-items', name='value_items', rows=2, attrs_dict={'x-model': 'stageEditForm.value_items'}) }}{% endcall %}
         {{ radio_group(name='stage_type', label='Stage Type', inline=true, id_prefix='edit', attrs={'x-model': 'stageEditForm.stage_type'}, options=stage_types) }}
-        {% call form_group(id='stage-edit-order', label='Order') %}{{ input(id='stage-edit-order', name='stage_order', type='number', class='h-9', attrs={'min': 1, 'x-model.number': 'stageEditForm.stage_order'}) }}{% endcall %}
+        {% call form_group(id='stage-edit-order', label='Order') %}{{ input(id='stage-edit-order', name='stage_order', type='number', class='h-9', attrs_dict={'min': 1, 'x-model.number': 'stageEditForm.stage_order'}) }}{% endcall %}
         <div class="flex items-center gap-6">
-            {{ checkbox(id='stage-edit-customer-facing', name='customer_facing', label='Customer facing', attrs={':checked': 'stageEditForm.customer_facing'}) }}
-            {{ checkbox(id='stage-edit-quality-gate', name='quality_gate', label='Quality gate', attrs={':checked': 'stageEditForm.quality_gate'}) }}
+            {{ checkbox(id='stage-edit-customer-facing', name='customer_facing', label='Customer facing', attrs_dict={':checked': 'stageEditForm.customer_facing'}) }}
+            {{ checkbox(id='stage-edit-quality-gate', name='quality_gate', label='Quality gate', attrs_dict={':checked': 'stageEditForm.quality_gate'}) }}
         </div>
         {{ form_footer(cancel_attrs={'data-modal-close': 'stage-edit-modal'}) }}
     </form>
