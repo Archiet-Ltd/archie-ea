@@ -1,0 +1,62 @@
+{#- smoke-coverage-ok: covered by tests/test_public_landing_layout.py (role pages) and tests/test_proof_assets.py (home page)
+   Partial: public/_partials/_hero.html -- the one hero of the home page and the role pages: category
+   pill, headline, lead and two actions in one centred column, then the product screen in a browser
+   frame below. Layout and type: public_site.css .home-hero*, .home-display, .home-lead, .home-frame*.
+   Expects `hero`, a dict:
+     testid        data-testid of the <section> ("home-hero" / "landing-hero"); the figure gets "<testid>-figure"
+     badge_short / badge_long   optional pill text (phone / wider); author-written strings, may hold entities
+     breadcrumb    optional (label, url) shown above the pill
+     title, lead   headline and lead paragraph (lead may be Markup)
+     compact       optional true: smaller headline scale for long headlines (role pages)
+     primary / secondary   (label, url); the secondary is the outline button
+     figure        {url, mobile_url, width, height, mobile_width, mobile_height, alt, caption, frame_label} -#}
+{% from 'components/badge.html' import badge %}
+{% set figure = hero.figure %}
+<section class="home-hero" data-testid="{{ hero.testid }}">
+  <div class="mx-auto max-w-5xl px-4 text-center">
+    {% if hero.breadcrumb %}
+    <nav aria-label="Breadcrumb" class="mb-6 text-sm font-medium text-muted-foreground">
+      <a href="{{ hero.breadcrumb[1] }}" class="text-muted-foreground hover:text-foreground">{{ hero.breadcrumb[0] }}</a>
+    </nav>
+    {% endif %}
+    {% if hero.badge_long %}
+    {% call badge(size='pill') %}
+      <span class="sm:hidden">{{ (hero.badge_short or hero.badge_long) | safe }}</span>
+      <span class="hidden sm:inline">{{ hero.badge_long | safe }}</span>
+    {% endcall %}
+    {% endif %}
+
+    <h1 class="home-display{% if hero.compact %} home-display--compact{% endif %}">{{ hero.title }}</h1>
+
+    {% if hero.lead %}
+    <p class="home-lead">{{ hero.lead }}</p>
+    {% endif %}
+
+    <div class="mt-9 flex flex-col gap-3 sm:flex-row sm:justify-center">
+      <a href="{{ hero.primary[1] }}" class="public-btn public-btn--lg public-btn--primary">{{ hero.primary[0] }}</a>
+      <a href="{{ hero.secondary[1] }}" class="public-btn public-btn--lg public-btn--outline">{{ hero.secondary[0] }}</a>
+    </div>
+  </div>
+
+  {% if figure %}
+  <div class="home-hero__stage mt-16">
+    <figure class="home-hero__figure" data-testid="{{ hero.testid }}-figure">
+      <div class="home-frame">
+        <div class="home-frame__bar" aria-hidden="true">
+          <span class="home-frame__dot"></span><span class="home-frame__dot"></span><span class="home-frame__dot"></span>
+          <span class="home-frame__url">{{ figure.frame_label }}</span>
+        </div>
+        <picture>
+          {% if figure.mobile_url %}
+          <source media="(max-width: 739px)" srcset="{{ figure.mobile_url }}"
+                  width="{{ figure.mobile_width }}" height="{{ figure.mobile_height }}">
+          {% endif %}
+          <img src="{{ figure.url }}" alt="{{ figure.alt }}"
+               width="{{ figure.width }}" height="{{ figure.height }}" decoding="async" fetchpriority="high" class="home-frame__img">
+        </picture>
+      </div>
+      <figcaption class="public-card-body mt-3 text-center">{{ figure.caption }}</figcaption>
+    </figure>
+  </div>
+  {% endif %}
+</section>

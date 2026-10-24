@@ -274,6 +274,17 @@ def gate_crosswalk_writer_gated(baseline: int) -> Result:
                   "", count, baseline)
 
 
+def gate_public_shell(baseline: int) -> Result:
+    """The public navbar, menus and footer: registry-driven, tokens only, accessible - must be 0."""
+    proc = _run([sys.executable, "scripts/check_public_shell.py", "--count"])
+    try:
+        count = int(proc.stdout.strip().splitlines()[-1])
+    except (ValueError, IndexError):
+        return Result("public-shell", FAIL,
+                      f"could not parse count: {proc.stdout!r} {proc.stderr[:300]}")
+    return Result("public-shell", PASS if count <= baseline else FAIL, "", count, baseline)
+
+
 def gate_design_tokens_extended(baseline: int) -> Result:
     """Non-banned colour families (emerald/orange/teal/...) - their own ratchet."""
     proc = _run([sys.executable, "scripts/check_design_tokens.py", "--extended", "--count"])
@@ -1889,6 +1900,14 @@ def build_gates(baseline: dict) -> list[Gate]:
              remediation="call assert_connector_permitted() before the write, or mark "
                           "'crosswalk-gate-ok: <reason>'",
              tags=["static", "fast"]),
+        Gate("public-shell",
+             "The public navbar, menus and footer read one registry and stay on the north-star look",
+             "zero",
+             lambda: gate_public_shell(baseline.get("public_shell", 0)),
+             remediation="add links to content/site/registry.yml, use tokens and Lucide icons from "
+                          "design/patterns.json public_icons, no literal hrefs; run "
+                          "python scripts/check_public_shell.py for the findings",
+             tags=["static", "ui"]),
         Gate("raw-fetch-sites",
              "No new raw fetch() sites bypassing Platform.fetch",
              "ratchet",
