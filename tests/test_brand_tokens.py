@@ -38,3 +38,19 @@ def test_a_weakened_border_fails_the_check():
 def test_a_drifting_logo_blue_fails_the_check():
     drift = re.sub(r"--brand: 213\.2 81\.3% 40\.7%", "--brand: 243 75% 58%", CSS, count=1)
     assert any("brand" in f for f in checker.contrast_failures(drift))
+
+
+def test_the_login_glows_and_skip_links_read_the_primary_token():
+    root = checker.ROOT
+    login = (root / "app/templates/account/login.html").read_text(encoding="utf-8")
+    glows = [ln for ln in login.splitlines() if ln.strip().startswith(".login-brand__ring--")]
+    assert len(glows) == 2 and all("hsl(var(--primary) / 0.16)" in ln for ln in glows)
+    skip = (root / "app/static/css/accessibility.css").read_text(encoding="utf-8")
+    block = skip.split(".skip-link {", 1)[1].split("}", 1)[0]
+    assert "background: hsl(var(--primary))" in block and "#3b82f6" not in block
+
+
+def test_the_raw_scan_catches_the_old_blue_written_as_rgba():
+    assert checker.RAW_BLUES.search("background-color: rgba(37, 99, 235, 0.16);")
+    assert checker.RAW_BLUES.search("background-color: rgba(29, 78, 216, 0.16);")
+    assert not checker.RAW_BLUES.search("background-color: hsl(var(--primary) / 0.16);")
