@@ -126,6 +126,8 @@
 
                     <div class="flex flex-wrap items-center gap-1.5">
                         {% call badge(variant='info') %}<span x-text="`WSJF: ${card.wsjf_score}`" title="Weighted Shortest Job First priority score"></span>{% endcall %}
+                        {% set group = stage_group.get(state) %}
+                        {% call badge(variant='info' if group == 'discovery' else 'success' if group == 'execution' else 'neutral') %}{{ 'Discovery' if group == 'discovery' else 'Execution' if group == 'execution' else 'Done' }}{% endcall %}
                         <template x-if="isTopCard(card)">
                             {% call badge(variant='success') %}<i data-lucide="star" class="h-3 w-3 mr-1" aria-hidden="true"></i>Top WSJF{% endcall %}
                         </template>

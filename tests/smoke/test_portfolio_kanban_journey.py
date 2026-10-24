@@ -331,7 +331,7 @@ def test_portfolio_kanban_journey(browser, live_server, seeded, db_session):
 
         # === Step 3: Verify WSJF ordering in Funnel column (descending) ===
         # Platform Modernization (13.5) should be first, Customer Portal (7.67) second, Legacy Migration (2.8) third
-        cards = page.locator(".kanban-column[data-state='Funnel'] .bg-card").all()
+        cards = page.locator(".kanban-column[data-state='Funnel'] .kanban-card").all()
         assert len(cards) >= 3, "Expected at least 3 epic cards in Funnel"
 
         # Check order by card position (first card should have highest WSJF)
@@ -360,7 +360,7 @@ def test_portfolio_kanban_journey(browser, live_server, seeded, db_session):
         expect(implementing_column.get_by_text("Customer Portal Epic")).to_be_visible(timeout=PAGE_TIMEOUT)
 
         # Funnel should now only have 2 epics
-        funnel_cards = page.locator(".kanban-column[data-state='Funnel'] .bg-card").all()
+        funnel_cards = page.locator(".kanban-column[data-state='Funnel'] .kanban-card").all()
         assert len(funnel_cards) == 2, "Funnel should have 2 epics after moving one"
 
         # === Step 6: Reload and verify state persisted ===
@@ -371,7 +371,7 @@ def test_portfolio_kanban_journey(browser, live_server, seeded, db_session):
         implementing_column = page.locator(".kanban-column[data-state='Implementing']")
         expect(implementing_column.get_by_text("Customer Portal Epic")).to_be_visible(timeout=PAGE_TIMEOUT)
 
-        funnel_cards_after_reload = page.locator(".kanban-column[data-state='Funnel'] .bg-card").all()
+        funnel_cards_after_reload = page.locator(".kanban-column[data-state='Funnel'] .kanban-card").all()
         assert len(funnel_cards_after_reload) == 2, "Funnel should still have 2 epics after reload"
 
         # === Step 7: Drag an epic from Funnel to Reviewing (criterion 3) ===
