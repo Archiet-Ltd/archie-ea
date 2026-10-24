@@ -7,6 +7,8 @@
 {% from 'components/table.html' import table, table_header, table_body, table_row, table_head, table_cell, table_empty_state %}
 {% from 'components/input.html' import input, label, textarea %}
 {% from 'components/select.html' import native_select %}
+{% from 'components/tabs.html' import tabs, tabs_list, tabs_trigger, tabs_content %}
+{% from 'components/empty_state.html' import empty_state %}
 
 {% block title %}{{ application.name }} Roadmap{% endblock %}
 
@@ -64,7 +66,7 @@
     {% endcall %}
   </div>
 
-  {# Work packages table card #}
+  {# Timeline / List toggle and work packages card #}
   {% call card() %}
     {% call card_header() %}
       {% call card_title() %}Work Packages{% endcall %}
@@ -86,64 +88,123 @@
         </div>
       </div>
 
-      {% call table() %}
-        {% call table_header() %}
-          <tr>
-            {% call table_head() %}Name{% endcall %}
-            {% call table_head() %}Type{% endcall %}
-            {% call table_head() %}Status{% endcall %}
-            {% call table_head() %}Priority{% endcall %}
-            {% call table_head() %}Timeline{% endcall %}
-            {% call table_head(class='text-right') %}Actions{% endcall %}
-          </tr>
+      {# View toggle: Timeline / List #}
+      {% call tabs(id='roadmap-view', default_value='timeline') %}
+        {% call tabs_list(class='mb-4') %}
+          {% call tabs_trigger(value='timeline') %}
+            <i data-lucide="calendar-range" class="w-4 h-4 mr-1.5" aria-hidden="true"></i>
+            Timeline
+          {% endcall %}
+          {% call tabs_trigger(value='list') %}
+            <i data-lucide="list" class="w-4 h-4 mr-1.5" aria-hidden="true"></i>
+            List
+          {% endcall %}
         {% endcall %}
-        {% call table_body(attrs_dict={'x-show': 'filteredItems.length === 0'}) %}
-          {{ table_empty_state(message='No work packages for this filter.', icon='inbox') }}
+
+        {# --- Timeline view --- #}
+        {% call tabs_content(value='timeline') %}
+          <div x-show="filteredItems.length === 0" x-cloak>
+            {{ empty_state(icon='calendar-range', title='No work packages for this filter.', description='Add a work package to see it on the timeline.', cta_text='Add Work Package', cta_onclick='openCreateModal()', cta_icon='plus') }}
+          </div>
+          <div x-show="filteredItems.length > 0" x-cloak class="relative overflow-x-auto pb-4">
+            {# Timeline container: compute range from items #}
+            <div class="relative min-w-[600px]">
+              {# Time axis #}
+              <div class="flex border-b border-border mb-2 pb-1 text-xs text-muted-foreground">
+                <template x-for="(label, idx) in timelineLabels" :key="idx">
+                  <div class="flex-1 text-center" x-text="label"></div>
+                </template>
+              </div>
+              {# Today marker #}
+              <div x-show="timelineRange.start && timelineRange.end" class="absolute top-0 bottom-0 w-px bg-destructive/50 z-10" 
+                   :style="'left: ' + todayPosition + '%'"
+                   :aria-label="'Today: ' + todayLabel">
+                <span class="absolute -top-4 left-1/2 -translate-x-1/2 text-[10px] text-destructive-emphasis whitespace-nowrap" x-text="todayLabel"></span>
+              </div>
+              {# Work package bars #}
+              <div class="space-y-2 pt-4">
+                <template x-for="item in filteredItems" :key="item.id">
+                  <div class="relative h-8">
+                    <button type="button"
+                      :style="'left: ' + itemTimelineLeft(item) + '%; width: ' + itemTimelineWidth(item) + '%'"
+                      :class="timelineBarClass(item)"
+                      :aria-label="item.name + ', ' + formatDate(item.start_date) + ' to ' + formatDate(item.target_date) + ', ' + formatLabel(item.status)"
+                      class="absolute h-full rounded-md px-2 text-xs font-medium truncate border text-left transition-colors hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      @click="openEditModal(item)"
+                      title="">
+                      <span class="truncate" x-text="item.name"></span>
+                      <span class="ml-1 opacity-70" x-text="formatLabel(item.status)"></span>
+                    </button>
+                  </div>
+                </template>
+              </div>
+            </div>
+          </div>
         {% endcall %}
-        {% call table_body() %}
-          <template x-for="item in filteredItems" :key="item.id">
-            {% call table_row() %}
-              {% call table_cell() %}
-                <p class="font-medium text-foreground" x-text="item.name"></p>
-                <p class="mt-1 text-xs text-muted-foreground" x-text="item.description || 'No description'"></p>
-                <div class="mt-1 flex flex-wrap gap-1.5">
-                  <span x-show="item.plateau_name" class="inline-flex items-center rounded-md border border-info/30 bg-info/10 px-2 py-0.5 text-xs font-medium text-info-emphasis"
-                      x-text="'Plateau: ' + item.plateau_name"></span>
-                  <span x-show="item.archimate_element_name" class="inline-flex items-center rounded-md border border-info/30 bg-info/10 px-2 py-0.5 text-xs font-medium text-info-emphasis"
-                      x-text="item.archimate_element_name"></span>
-                  <span x-show="item.capability_name" class="inline-flex items-center rounded-md border border-warning/30 bg-warning/10 px-2 py-0.5 text-xs font-medium text-warning-emphasis"
-                      x-text="'Cap: ' + item.capability_name"></span>
-                </div>
-              {% endcall %}
-              {% call table_cell() %}
-                <span x-text="formatLabel(item.transformation_type || 'Modernization')"></span>
-              {% endcall %}
-              {% call table_cell() %}
-                <span :class="statusClass(item.status)" class="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold capitalize"
-                  x-text="formatLabel(item.status || 'planned')"></span>
-              {% endcall %}
-              {% call table_cell() %}
-                <span x-text="formatLabel(item.priority || 'medium')"></span>
-              {% endcall %}
-              {% call table_cell(class='text-xs text-muted-foreground') %}
-                <span x-text="formatDate(item.start_date)"></span>
-                <span> → </span>
-                <span x-text="formatDate(item.target_date)"></span>
-              {% endcall %}
-              {% call table_cell(class='text-right') %}
-                <div class="inline-flex items-center gap-2">
-                  {{ button('Edit', variant='outline', size='xs', on_click='openEditModal(item)') }}
-                  {{ button('Delete', variant='ghost', size='xs', class='text-destructive-emphasis hover:bg-destructive/10', on_click='deleteItem(item)') }}
-                </div>
-              {% endcall %}
+
+        {# --- List view --- #}
+        {% call tabs_content(value='list') %}
+          {% call table() %}
+            {% call table_header() %}
+              <tr>
+                {% call table_head() %}Name{% endcall %}
+                {% call table_head() %}Type{% endcall %}
+                {% call table_head() %}Status{% endcall %}
+                {% call table_head() %}Priority{% endcall %}
+                {% call table_head() %}Timeline{% endcall %}
+                {% call table_head(class='text-right') %}Actions{% endcall %}
+              </tr>
             {% endcall %}
-          </template>
+            {% call table_body(attrs_dict={'x-show': 'filteredItems.length === 0'}) %}
+              {{ table_empty_state(message='No work packages for this filter.', icon='inbox') }}
+            {% endcall %}
+            {% call table_body() %}
+              <template x-for="item in filteredItems" :key="item.id">
+                {% call table_row() %}
+                  {% call table_cell() %}
+                    <p class="font-medium text-foreground" x-text="item.name"></p>
+                    <p class="mt-1 text-xs text-muted-foreground" x-text="item.description || 'No description'"></p>
+                    <div class="mt-1 flex flex-wrap gap-1.5">
+                      <span x-show="item.plateau_name" class="inline-flex items-center rounded-md border border-info/30 bg-info/10 px-2 py-0.5 text-xs font-medium text-info-emphasis"
+                          x-text="'Plateau: ' + item.plateau_name"></span>
+                      <span x-show="item.archimate_element_name" class="inline-flex items-center rounded-md border border-info/30 bg-info/10 px-2 py-0.5 text-xs font-medium text-info-emphasis"
+                          x-text="item.archimate_element_name"></span>
+                      <span x-show="item.capability_name" class="inline-flex items-center rounded-md border border-warning/30 bg-warning/10 px-2 py-0.5 text-xs font-medium text-warning-emphasis"
+                          x-text="'Cap: ' + item.capability_name"></span>
+                    </div>
+                  {% endcall %}
+                  {% call table_cell() %}
+                    <span x-text="formatLabel(item.transformation_type || 'Modernization')"></span>
+                  {% endcall %}
+                  {% call table_cell() %}
+                    <span :class="statusBadgeClass(item.status)" class="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold capitalize"
+                      x-text="formatLabel(item.status || 'planned')"></span>
+                  {% endcall %}
+                  {% call table_cell() %}
+                    <span x-text="formatLabel(item.priority || 'medium')"></span>
+                  {% endcall %}
+                  {% call table_cell(class='text-xs text-muted-foreground') %}
+                    <span x-text="formatDate(item.start_date)"></span>
+                    <span> → </span>
+                    <span x-text="formatDate(item.target_date)"></span>
+                  {% endcall %}
+                  {% call table_cell(class='text-right') %}
+                    <div class="inline-flex items-center gap-2">
+                      {{ button('Edit', variant='outline', size='xs', on_click='openEditModal(item)') }}
+                      {{ button('Delete', variant='ghost', size='xs', class='text-destructive-emphasis hover:bg-destructive/10', on_click='deleteItem(item)') }}
+                    </div>
+                  {% endcall %}
+                {% endcall %}
+              </template>
+            {% endcall %}
+          {% endcall %}
         {% endcall %}
       {% endcall %}
     {% endcall %}
   {% endcall %}
 
   {# CRUD modal for creating and editing work packages #}
+  <div data-entelim-form>
   {% call modal(id='roadmap-work-package-modal', size='lg', labelledby='roadmap-modal-title') %}
       <h3 id="roadmap-modal-title" class="text-base font-semibold text-foreground pr-8 mb-4" x-text="isEditing ? 'Edit Work Package' : 'Create Work Package'"></h3>
       <form class="space-y-4" @submit.prevent="submitForm()">
@@ -186,7 +247,7 @@
           <div>
             {% call label(for='wp-plateau') %}Target Plateau{% endcall %}
             {% call native_select(id='wp-plateau', name='plateau_id', aria_label='Target Plateau', attrs_dict={'x-model.number': 'form.plateau_id'}) %}
-              <option :value="null">— None —</option>
+              <option :value="null">None</option>
               <template x-for="p in plateaus" :key="p.id">
                 <option :value="p.id" x-text="p.name"></option>
               </template>
@@ -195,7 +256,7 @@
           <div>
             {% call label(for='wp-capability') %}Linked Capability{% endcall %}
             {% call native_select(id='wp-capability', name='capability_id', aria_label='Linked Capability', attrs_dict={'x-model.number': 'form.capability_id'}) %}
-              <option :value="null">— None —</option>
+              <option :value="null">None</option>
               <template x-for="c in capabilities" :key="c.id">
                 <option :value="c.id" x-text="c.name"></option>
               </template>
@@ -238,6 +299,7 @@
         </div>
       </form>
   {% endcall %}
+  </div>
 </div>
 {% endblock %}
 
@@ -294,15 +356,10 @@
           ]);
           this.plateaus = pd.plateaus || [];
           const grouped = cd.capabilities || cd;
-          // Dedupe by id (a capability can appear in multiple groups, and Alpine
-          // x-for :key must be unique/defined — duplicate keys crash the render).
           this.capabilities = [...new Map(
             Object.values(grouped).flat().filter(c => c && c.id != null).map(c => [c.id, c])
           ).values()];
         } catch (e) {
-          // Plateau/capability lists are optional for the form, so this is a
-          // heads-up rather than a blocker — but the user must still be told
-          // the dropdowns may be unavailable.
           Platform.toast.warning(e.message + ' — some dropdown options may be unavailable.');
         }
       },
@@ -325,6 +382,93 @@
         return counts;
       },
 
+      /** Timeline helpers **/
+      get timelineRange() {
+        if (!this.filteredItems.length) return { start: null, end: null };
+        const dates = this.filteredItems.flatMap(item => {
+          const s = item.start_date ? new Date(item.start_date) : null;
+          const e = item.target_date ? new Date(item.target_date) : null;
+          return [s, e].filter(d => d && !isNaN(d.getTime()));
+        });
+        if (!dates.length) return { start: null, end: null };
+        const min = new Date(Math.min(...dates));
+        const max = new Date(Math.max(...dates));
+        // Add padding: 30 days before and after
+        min.setDate(min.getDate() - 30);
+        max.setDate(max.getDate() + 30);
+        return { start: min.getTime(), end: max.getTime() };
+      },
+
+      get timelineLabels() {
+        const r = this.timelineRange;
+        if (!r.start) return [];
+        const labels = [];
+        const start = new Date(r.start);
+        const end = new Date(r.end);
+        const diffMs = end - start;
+        const numLabels = Math.min(12, Math.ceil(diffMs / (30 * 24 * 60 * 60 * 1000)));
+        const step = diffMs / numLabels;
+        for (let i = 0; i <= numLabels; i++) {
+          const d = new Date(start.getTime() + i * step);
+          labels.push(d.toLocaleDateString(undefined, { month: 'short', year: '2-digit' }));
+        }
+        return labels;
+      },
+
+      get todayLabel() {
+        return new Date().toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+      },
+
+      get todayPosition() {
+        const r = this.timelineRange;
+        if (!r.start || !r.end) return 0;
+        const today = Date.now();
+        const range = r.end - r.start;
+        if (range <= 0) return 0;
+        return Math.max(0, Math.min(100, ((today - r.start) / range) * 100));
+      },
+
+      itemTimelineLeft(item) {
+        const r = this.timelineRange;
+        if (!r.start || !r.end) return 0;
+        const start = item.start_date ? new Date(item.start_date).getTime() : r.start;
+        const range = r.end - r.start;
+        if (range <= 0) return 0;
+        return Math.max(0, ((start - r.start) / range) * 100);
+      },
+
+      itemTimelineWidth(item) {
+        const r = this.timelineRange;
+        if (!r.start || !r.end) return 10;
+        const start = item.start_date ? new Date(item.start_date).getTime() : r.start;
+        const end = item.target_date ? new Date(item.target_date).getTime() : r.end;
+        const itemRange = end - start;
+        const totalRange = r.end - r.start;
+        if (totalRange <= 0 || itemRange <= 0) return 5;
+        return Math.max(5, (itemRange / totalRange) * 100);
+      },
+
+      timelineBarClass(item) {
+        const status = (item.status || '').toLowerCase();
+        if (status === 'completed') return 'bg-success/20 border-success/30 text-success-emphasis';
+        if (status === 'in_progress') return 'bg-primary/15 border-primary/30 text-primary';
+        if (status === 'blocked') return 'bg-destructive/15 border-destructive/30 text-destructive-emphasis';
+        return 'bg-muted border-border text-muted-foreground';
+      },
+
+      statusBadgeClass(status) {
+        switch ((status || '').toLowerCase()) {
+          case 'completed':
+            return 'border-success/30 bg-success/10 text-success-emphasis';
+          case 'in_progress':
+            return 'border-primary/30 bg-primary/5 text-primary';
+          case 'blocked':
+            return 'border-destructive/30 bg-destructive/10 text-destructive';
+          default:
+            return 'border-border bg-muted text-muted-foreground';
+        }
+      },
+
       formatDate(value) {
         if (!value) {
           return 'N/A';
@@ -340,19 +484,6 @@
         return String(value || '')
           .replaceAll('_', ' ')
           .replace(/\b\w/g, c => c.toUpperCase());
-      },
-
-      statusClass(status) {
-        switch ((status || '').toLowerCase()) {
-          case 'completed':
-            return 'border-success/30 bg-success/10 text-success-emphasis';
-          case 'in_progress':
-            return 'border-primary/30 bg-primary/5 text-primary';
-          case 'blocked':
-            return 'border-destructive/30 bg-destructive/10 text-destructive';
-          default:
-            return 'border-border bg-muted text-muted-foreground';
-        }
       },
 
       openCreateModal() {
