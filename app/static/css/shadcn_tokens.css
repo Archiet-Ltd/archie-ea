@@ -80,6 +80,12 @@
     /* Dialog backdrop: navy in both themes, used at 50% (bg-overlay/50). */
     --overlay: 222.2 47.4% 11.2%;
     --radius: 0.5rem;
+    /* Sidebar (the library's sidebar-07 shell, components/ui_sidebar.html): aliases of the page tokens. */
+    --sidebar: var(--card);
+    --sidebar-foreground: var(--foreground);
+    --sidebar-accent: var(--accent);
+    --sidebar-accent-foreground: var(--accent-foreground);
+    --sidebar-border: var(--border);
 
     /* ArchiMate layer semantic colors (TOGAF ADM phases) */
     --layer-motivation: 263 70% 50%;     /* violet — Goals, Drivers, Outcomes */
