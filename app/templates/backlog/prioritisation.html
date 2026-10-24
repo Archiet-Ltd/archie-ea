@@ -1,28 +1,20 @@
+{# design-block: board #}
 {% extends "layouts/admin_base.html" %}
 {% from 'macros/page_shell.html' import page_shell %}
-<!-- modal-a11y-ok -->
+{% from 'macros/kanban_board.html' import kanban_board, kanban_card %}
+{% from 'components/tabs.html' import tabs_list, tabs_trigger %}
+{% from 'components/table.html' import table, table_header, table_body, table_row, table_head, table_cell %}
+{% from 'components/input.html' import input %}
+{% from 'components/button.html' import button %}
+{% from 'components/badge.html' import badge %}
+{% from 'components/empty_state.html' import empty_state %}
 
 {% block title %}Backlog Prioritisation — MoSCoW / WSJF / RICE{% endblock %}
 
-{% block extra_css %}
-<style>
-.moscow-board { display: flex; gap: 1rem; overflow-x: auto; min-height: 300px; }
-.moscow-col { flex: 1; min-width: 200px; border-radius: 8px; padding: 1rem; }
-.moscow-col.must  { background: #fee2e2; }
-.moscow-col.should{ background: #fef9c3; }
-.moscow-col.could { background: #dcfce7; }
-.moscow-col.wont  { background: #f3f4f6; }
-.moscow-card { background: #fff; border: 1px solid #e5e7eb; border-radius: 6px;
-               padding: 0.5rem 0.75rem; margin-bottom: 0.5rem; cursor: grab; font-size: 0.875rem; }
-.moscow-card:active { cursor: grabbing; }
-.wsjf-score-cell { font-weight: 600; color: #4f46e5; }
-.rice-score-cell  { font-weight: 600; color: #0891b2; }
-input.score-input { width: 60px; border: 1px solid #d1d5db; border-radius: 4px;
-                    padding: 2px 4px; text-align: center; }
-</style>
-{% endblock %}
-
 {% block content %}
+{% set moscow_states = ['UNSET', 'MUST', 'SHOULD', 'COULD', 'WONT'] %}
+{% set moscow_labels = {'UNSET': 'Not yet prioritised', 'MUST': 'Must have', 'SHOULD': 'Should have', 'COULD': 'Could have', 'WONT': "Won't have"} %}
+{% set move_states = ['MUST', 'SHOULD', 'COULD', 'WONT'] %}
 <div class="p-6 space-y-6 mx-auto" x-data="prioritisationApp()">
 
   {{ page_shell(
@@ -30,125 +22,112 @@ input.score-input { width: 60px; border: 1px solid #d1d5db; border-radius: 4px;
       subtitle='Classify requirements with MoSCoW, score them with WSJF or RICE.'
   ) }}
 
-  <!-- Tab bar -->
-  <div class="flex gap-2 mb-6 border-b border-border">
-    <button type="button" @click="tab='moscow'"
-            :class="tab==='moscow' ? 'border-b-2 border-info text-primary font-semibold' : 'text-muted-foreground hover:text-foreground'"
-            class="pb-2 px-3 text-sm">MoSCoW</button>
-    <button type="button" @click="tab='wsjf'"
-            :class="tab==='wsjf' ? 'border-b-2 border-info text-primary font-semibold' : 'text-muted-foreground hover:text-foreground'"
-            class="pb-2 px-3 text-sm">WSJF</button>
-    <button type="button" @click="tab='rice'"
-            :class="tab==='rice' ? 'border-b-2 border-info text-primary font-semibold' : 'text-muted-foreground hover:text-foreground'"
-            class="pb-2 px-3 text-sm">RICE</button>
-  </div>
+  {% call tabs_list() %}
+    {% call tabs_trigger(value='moscow', click="tab = 'moscow'", selected="tab === 'moscow'") %}MoSCoW{% endcall %}
+    {% call tabs_trigger(value='wsjf', click="tab = 'wsjf'", selected="tab === 'wsjf'") %}WSJF{% endcall %}
+    {% call tabs_trigger(value='rice', click="tab = 'rice'", selected="tab === 'rice'") %}RICE{% endcall %}
+  {% endcall %}
 
-  <!-- Loading / error banner -->
   <template x-if="loading">
-    <div class="text-sm text-muted-foreground py-4">Loading requirements…</div>
+    <p class="text-sm text-muted-foreground" role="status">Loading requirements…</p>
   </template>
   <template x-if="error">
-    <div class="text-sm text-destructive-emphasis py-2" x-text="error"></div>
+    <p class="text-sm text-destructive-emphasis" role="alert" x-text="error"></p>
   </template>
 
-  <!-- ── MoSCoW tab ── -->
-  <div x-show="tab==='moscow'" x-cloak>
-    <p class="text-sm text-muted-foreground mb-4">Drag cards between columns to assign priority.</p>
-    <div class="moscow-board">
-      <template x-for="col in moscowCols" :key="col.key">
-        <div class="moscow-col" :class="col.key.toLowerCase()"
-             @dragover.prevent
-             @drop="onDrop($event, col.key)">
-          <h2 class="font-semibold text-sm mb-3" x-text="col.label"></h2>
-          <template x-for="req in reqs.filter(r => (r.moscow_priority||'UNSET')===col.key)" :key="req.id">
-            <div class="moscow-card"
-                 draggable="true"
-                 @dragstart="onDragStart($event, req)"
-                 x-text="req.title || ('#' + req.id)">
-            </div>
-          </template>
-          <!-- Unassigned bucket shown in MUST column -->
-          <template x-if="col.key==='MUST'">
-            <template x-for="req in reqs.filter(r => !r.moscow_priority)" :key="'u'+req.id">
-              <div class="moscow-card opacity-50"
-                   draggable="true"
-                   @dragstart="onDragStart($event, req)"
-                   x-text="(req.title || ('#' + req.id)) + ' (unset)'">
-              </div>
-            </template>
-          </template>
-        </div>
-      </template>
-    </div>
-  </div>
+  <template x-if="!loading && !error && cards.length === 0">
+    {{ empty_state(
+        icon='list-checks',
+        title='No requirements to prioritise',
+        description='Prioritisation ranks the requirements recorded for your solutions. Add requirements first, then come back to rank them.',
+        cta_text='Open the requirements backlog',
+        cta_href='/enterprise/requirements-backlog'
+    ) }}
+  </template>
 
-  <!-- ── WSJF tab ── -->
-  <div x-show="tab==='wsjf'" x-cloak>
-    <p class="text-sm text-muted-foreground mb-4">Edit Fibonacci components (1–13). Score = CoD / Job Size.</p>
-    <div class="overflow-x-auto">
-      <table class="dense-table w-full text-sm border-collapse">
-        <thead>
-          <tr class="bg-muted/30 text-left">
-            <th class="px-3 py-2 font-medium text-muted-foreground border-b">Requirement</th>
-            <th class="px-3 py-2 font-medium text-muted-foreground border-b">Biz Value</th>
-            <th class="px-3 py-2 font-medium text-muted-foreground border-b">Time Criticality</th>
-            <th class="px-3 py-2 font-medium text-muted-foreground border-b">Risk Reduction</th>
-            <th class="px-3 py-2 font-medium text-muted-foreground border-b">Job Size</th>
-            <th class="px-3 py-2 font-medium text-muted-foreground border-b">WSJF Score</th>
-            <th class="px-3 py-2 font-medium text-muted-foreground border-b"></th>
-          </tr>
-        </thead>
-        <tbody>
+  <div x-show="cards.length > 0" x-cloak>
+
+    {# ── MoSCoW tab ── #}
+    <div x-show="tab === 'moscow'" x-cloak>
+      <p class="text-sm text-muted-foreground mb-4" data-testid="moscow-help">
+        {% if can_write %}Drag a card to a column, use its "Move to" menu, or focus it and press Space, then the left or right arrow keys, then Space again. Priorities are saved as you go.{% else %}You can view this board. Ask an architect to change priorities.{% endif %}
+      </p>
+      {% call(state) kanban_board(
+            states=moscow_states, labels=moscow_labels, can_write=can_write,
+            show_wip=False, unit='requirement',
+            region_label='MoSCoW board, scrolls horizontally',
+            empty_hints={
+              'UNSET': {'why': 'Every requirement has a priority.', 'next_write': 'New requirements land here first.', 'next_read': ''},
+              'MUST': {'why': 'Nothing is a must have yet.', 'next_write': 'Move a requirement here to commit to it.', 'next_read': ''},
+              'SHOULD': {'why': 'Nothing is a should have yet.', 'next_write': 'Move a requirement here when it matters but can wait.', 'next_read': ''},
+              'COULD': {'why': 'Nothing is a could have yet.', 'next_write': 'Move a requirement here when it is nice to have.', 'next_read': ''},
+              'WONT': {'why': 'Nothing is ruled out for now.', 'next_write': 'Move a requirement here to record that it will not be built this time.', 'next_read': ''}
+            }) %}
+        <template x-for="card in columnCards('{{ state }}')" :key="card.id">
+          {% call kanban_card(move_states, moscow_labels) %}
+            <p class="mt-1 text-xs text-muted-foreground" x-text="card.wsjf_score == null ? 'Not scored yet' : `WSJF ${Number(card.wsjf_score).toFixed(2)}`"></p>
+          {% endcall %}
+        </template>
+      {% endcall %}
+    </div>
+
+    {# ── WSJF tab ── #}
+    <div x-show="tab === 'wsjf'" x-cloak>
+      <p class="text-sm text-muted-foreground mb-4">Edit Fibonacci components (1–13). Score = CoD / Job Size.</p>
+      {% call table() %}
+        {% call table_header() %}
+          {% call table_row() %}
+            {% call table_head() %}Requirement{% endcall %}
+            {% call table_head() %}Biz Value{% endcall %}
+            {% call table_head() %}Time Criticality{% endcall %}
+            {% call table_head() %}Risk Reduction{% endcall %}
+            {% call table_head() %}Job Size{% endcall %}
+            {% call table_head() %}WSJF Score{% endcall %}
+            {% call table_head() %}<span class="sr-only">Actions</span>{% endcall %}
+          {% endcall %}
+        {% endcall %}
+        {% call table_body() %}
           <template x-for="req in wsjfSorted" :key="req.id">
-            <tr class="border-b hover:bg-muted/30">
-              <td class="px-3 py-2" x-text="req.title || ('#' + req.id)"></td>
-              <td class="px-3 py-2"><input type="number" min="1" max="13" x-model.number="req.business_value" class="score-input"  aria-label="Business value"/></td>
-              <td class="px-3 py-2"><input type="number" min="1" max="13" x-model.number="req.time_criticality" class="score-input"  aria-label="Time criticality"/></td>
-              <td class="px-3 py-2"><input type="number" min="1" max="13" x-model.number="req.risk_reduction" class="score-input"  aria-label="Risk reduction"/></td>
-              <td class="px-3 py-2"><input type="number" min="1" max="13" x-model.number="req.job_size" class="score-input"  aria-label="Job size"/></td>
-              <td class="px-3 py-2 wsjf-score-cell" x-text="calcWsjf(req).toFixed(2)"></td>
-              <td class="px-3 py-2">
-                <button type="button" @click="saveWsjf(req)"
-                        class="px-2 py-1 text-xs bg-primary text-primary-foreground rounded hover:bg-primary/90">Save</button>
-              </td>
-            </tr>
+            {% call table_row() %}
+              {% call table_cell() %}<span x-text="req.name"></span>{% endcall %}
+              {% for field, label in [('business_value', 'Business value'), ('time_criticality', 'Time criticality'), ('risk_reduction', 'Risk reduction'), ('job_size', 'Job size')] %}
+              {% call table_cell() %}{{ input(type='number', size='xs', class='w-20', aria_label=label, attrs_dict={'min': 1, 'max': 13, 'x-model.number': 'req.' ~ field, ':disabled': '!canWrite'}) }}{% endcall %}
+              {% endfor %}
+              {% call table_cell(class='font-semibold') %}<span x-text="calcWsjf(req).toFixed(2)"></span>{% endcall %}
+              {% call table_cell() %}{{ button(text='Save', size='xs', on_click='saveWsjf(req)', attrs_dict={'x-show': 'canWrite'}) }}{% endcall %}
+            {% endcall %}
           </template>
-        </tbody>
-      </table>
+        {% endcall %}
+      {% endcall %}
     </div>
-  </div>
 
-  <!-- ── RICE tab ── -->
-  <div x-show="tab==='rice'" x-cloak>
-    <p class="text-sm text-muted-foreground mb-4">RICE = (Reach × Impact × Confidence%) / Story Points.</p>
-    <div class="overflow-x-auto">
-      <table class="dense-table w-full text-sm border-collapse">
-        <thead>
-          <tr class="bg-muted/30 text-left">
-            <th class="px-3 py-2 font-medium text-muted-foreground border-b">Requirement</th>
-            <th class="px-3 py-2 font-medium text-muted-foreground border-b">Reach</th>
-            <th class="px-3 py-2 font-medium text-muted-foreground border-b">Impact (1–5)</th>
-            <th class="px-3 py-2 font-medium text-muted-foreground border-b">Confidence %</th>
-            <th class="px-3 py-2 font-medium text-muted-foreground border-b">RICE Score</th>
-            <th class="px-3 py-2 font-medium text-muted-foreground border-b"></th>
-          </tr>
-        </thead>
-        <tbody>
+    {# ── RICE tab ── #}
+    <div x-show="tab === 'rice'" x-cloak>
+      <p class="text-sm text-muted-foreground mb-4">RICE = (Reach × Impact × Confidence%) / Story Points.</p>
+      {% call table() %}
+        {% call table_header() %}
+          {% call table_row() %}
+            {% call table_head() %}Requirement{% endcall %}
+            {% call table_head() %}Reach{% endcall %}
+            {% call table_head() %}Impact (1–5){% endcall %}
+            {% call table_head() %}Confidence %{% endcall %}
+            {% call table_head() %}RICE Score{% endcall %}
+            {% call table_head() %}<span class="sr-only">Actions</span>{% endcall %}
+          {% endcall %}
+        {% endcall %}
+        {% call table_body() %}
           <template x-for="req in riceSorted" :key="req.id">
-            <tr class="border-b hover:bg-muted/30">
-              <td class="px-3 py-2" x-text="req.title || ('#' + req.id)"></td>
-              <td class="px-3 py-2"><input type="number" min="0" x-model.number="req.reach" class="score-input"  aria-label="Reach"/></td>
-              <td class="px-3 py-2"><input type="number" min="1" max="5" x-model.number="req.impact" class="score-input"  aria-label="Impact"/></td>
-              <td class="px-3 py-2"><input type="number" min="0" max="100" x-model.number="req.confidence" class="score-input"  aria-label="Confidence"/></td>
-              <td class="px-3 py-2 rice-score-cell" x-text="calcRice(req).toFixed(2)"></td>
-              <td class="px-3 py-2">
-                <button type="button" @click="saveRice(req)"
-                        class="px-2 py-1 text-xs bg-info text-primary-foreground rounded hover:bg-info/90">Save</button>
-              </td>
-            </tr>
+            {% call table_row() %}
+              {% call table_cell() %}<span x-text="req.name"></span>{% endcall %}
+              {% call table_cell() %}{{ input(type='number', size='xs', class='w-20', aria_label='Reach', attrs_dict={'min': 0, 'x-model.number': 'req.reach', ':disabled': '!canWrite'}) }}{% endcall %}
+              {% call table_cell() %}{{ input(type='number', size='xs', class='w-20', aria_label='Impact', attrs_dict={'min': 1, 'max': 5, 'x-model.number': 'req.impact', ':disabled': '!canWrite'}) }}{% endcall %}
+              {% call table_cell() %}{{ input(type='number', size='xs', class='w-20', aria_label='Confidence', attrs_dict={'min': 0, 'max': 100, 'x-model.number': 'req.confidence', ':disabled': '!canWrite'}) }}{% endcall %}
+              {% call table_cell(class='font-semibold') %}<span x-text="calcRice(req).toFixed(2)"></span>{% endcall %}
+              {% call table_cell() %}{{ button(text='Save', size='xs', variant='secondary', on_click='saveRice(req)', attrs_dict={'x-show': 'canWrite'}) }}{% endcall %}
+            {% endcall %}
           </template>
-        </tbody>
-      </table>
+        {% endcall %}
+      {% endcall %}
     </div>
   </div>
 
@@ -156,24 +135,35 @@ input.score-input { width: 60px; border: 1px solid #d1d5db; border-radius: 4px;
 {% endblock %}
 
 {% block extra_js %}
+<script src="{{ url_for('static', filename='js/components/kanban_board.js') }}"></script>
 <script>
 function prioritisationApp() {
-  return {
+  const board = kanbanBoard({
+    columns: [
+      { state: 'UNSET', label: 'Not yet prioritised' },
+      { state: 'MUST', label: 'Must have' },
+      { state: 'SHOULD', label: 'Should have' },
+      { state: 'COULD', label: 'Could have' },
+      { state: 'WONT', label: "Won't have" },
+    ],
+    canWrite: {{ can_write | tojson }},
+    moveUrl: '/api/backlog/{id}/moscow',
+    moveField: 'priority',
+    noMoveTo: ['UNSET'],
+    noMoveMessage: 'A requirement cannot go back to not yet prioritised. Choose Must, Should, Could or Won\'t have.',
+  });
+  const page = {
     tab: 'moscow',
     loading: true,
     error: null,
-    reqs: [],
-    dragging: null,
-    moscowCols: [
-      { key: 'MUST',   label: 'Must Have' },
-      { key: 'SHOULD', label: 'Should Have' },
-      { key: 'COULD',  label: 'Could Have' },
-      { key: 'WONT',   label: "Won't Have" },
-    ],
 
     async init() {
       try {
-        this.reqs = await Platform.fetch('/api/backlog/prioritised?method=moscow');
+        const rows = await Platform.fetch('/api/backlog/prioritised?method=moscow');
+        this.cards = rows.map(r => Object.assign(r, {
+          state: r.moscow_priority || 'UNSET',
+          name: r.title || ('Requirement #' + r.id),
+        }));
       } catch (e) {
         this.error = 'Failed to load requirements: ' + e.message;
       } finally {
@@ -182,10 +172,10 @@ function prioritisationApp() {
     },
 
     get wsjfSorted() {
-      return [...this.reqs].sort((a, b) => this.calcWsjf(b) - this.calcWsjf(a));
+      return [...this.cards].sort((a, b) => this.calcWsjf(b) - this.calcWsjf(a));
     },
     get riceSorted() {
-      return [...this.reqs].sort((a, b) => this.calcRice(b) - this.calcRice(a));
+      return [...this.cards].sort((a, b) => this.calcRice(b) - this.calcRice(a));
     },
 
     calcWsjf(req) {
@@ -195,24 +185,6 @@ function prioritisationApp() {
     calcRice(req) {
       const sp = req.story_points || 1;
       return ((req.reach||0) * (req.impact||1) * ((req.confidence||100)/100)) / Math.max(sp, 1);
-    },
-
-    onDragStart(event, req) {
-      this.dragging = req;
-      event.dataTransfer.effectAllowed = 'move';
-    },
-    async onDrop(event, colKey) {
-      if (!this.dragging) return;
-      const req = this.dragging;
-      this.dragging = null;
-      const prev = req.moscow_priority;
-      req.moscow_priority = colKey;
-      try {
-        await Platform.fetch.patch(`/api/backlog/${req.id}/moscow`, { priority: colKey });
-      } catch (e) {
-        req.moscow_priority = prev;
-        this.error = e.message;
-      }
     },
 
     async saveWsjf(req) {
@@ -242,9 +214,7 @@ function prioritisationApp() {
       }
     },
   };
+  return Object.defineProperties(board, Object.getOwnPropertyDescriptors(page));
 }
-
-// CSRF token is automatically injected by Platform.fetch for mutating methods.
-// No manual token handling needed.
 </script>
 {% endblock %}
