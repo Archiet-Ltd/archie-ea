@@ -111,3 +111,56 @@ def test_product_manager_filters_pages_by_persona_and_reads_the_components_to_co
         assert page.inner_text("#page-count").startswith("0 of ")
     finally:
         page.close()
+
+
+@pytest.mark.parametrize("width", [1440, 390])
+def test_product_manager_finds_the_timeline_pages_and_the_low_confidence_rows_and_reads_the_tier_checks(browser, width):
+    """Goal: before briefing the timeline conversions, a product manager lists every Tier C3 page with its
+    page type and why, narrows to the ones the designers are unsure of, and reads how the gate scores each tier."""
+    pages = DESIGN_MAP["pages"]
+    tiers = {}
+    for entry in pages.values():
+        tiers[entry["tier"]] = tiers.get(entry["tier"], 0) + 1
+    timeline = {rel: e for rel, e in pages.items() if e["tier"] == "C3"}
+    unsure = {rel: e for rel, e in timeline.items() if e["confidence"] == "low"}
+    assert len(timeline) == 16 and unsure, "the map has timeline pages and at least one the designers are unsure of"
+    measured = _measured()
+    page = _open(browser, width)
+    try:
+        summary = page.inner_text("#tier-counts")
+        for tier, count in tiers.items():
+            assert f"{tier} {count}" in summary, f"the summary shows {count} pages in tier {tier}"
+
+        page.click("#tab-pages")
+        page.select_option("#tier-filter", "C3")
+        shown = page.locator("#pages-table tbody tr:not([hidden])")
+        assert shown.count() == len(timeline)
+        assert page.inner_text("#page-count").startswith("%d of %d" % (len(timeline), len(pages)))
+        for i in range(shown.count()):
+            cells = shown.nth(i).locator("td")
+            entry = timeline[cells.nth(0).inner_text()]
+            assert cells.nth(4).inner_text() == "C3"
+            assert cells.nth(5).inner_text().startswith(entry["page_type"])
+            assert entry["reason"] in cells.nth(5).inner_text(), "the row says why the designers chose this type"
+
+        page.select_option("#confidence-filter", "low")
+        shown = page.locator("#pages-table tbody tr:not([hidden])")
+        assert shown.count() == len(unsure)
+        for i in range(shown.count()):
+            assert shown.nth(i).locator("td").nth(6).inner_text() == "low"
+        page.select_option("#tier-filter", "")
+        assert page.locator("#pages-table tbody tr:not([hidden])").count() == sum(
+            1 for e in pages.values() if e["confidence"] == "low") == 93
+
+        checks = page.locator("#tier-checks tbody tr")
+        assert checks.count() == len(measured["tier_checks"])
+        for i in range(checks.count()):
+            row = checks.nth(i)
+            found = measured["tier_checks"][row.get_attribute("data-check")]
+            assert row.locator("td").nth(0).inner_text() == str(found["count"])
+            assert row.locator("th").inner_text().strip()
+        pending = page.inner_text("#tier-pending")
+        assert "A2-A5" in pending and "golden render" in pending
+        assert page.evaluate("document.documentElement.scrollWidth") <= width + 2, "page scrolls sideways"
+    finally:
+        page.close()
