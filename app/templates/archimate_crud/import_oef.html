@@ -5,6 +5,7 @@
 {% from 'components/checkbox.html' import checkbox %}
 {% from 'components/file_upload.html' import file_upload %}
 {% from 'macros/page_shell.html' import page_shell %}
+{% from 'components/input.html' import hidden_input %}
 
 {% block title %}Import ArchiMate Model (OEF){% endblock %}
 
@@ -143,7 +144,7 @@
                     <h2 class="text-lg font-semibold">Upload OEF XML File</h2>
                     <form method="POST" action="{{ url_for('architect_ui.import_oef') }}" enctype="multipart/form-data" class="space-y-4"
                           x-ref="importForm" @change="syncStrategy($event)" @file-selected="fileChosen($event)">
-                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        {{ hidden_input(name='csrf_token', value=csrf_token()) }}
                         {{ file_upload(
                             id='oef_file',
                             name='oef_file',
