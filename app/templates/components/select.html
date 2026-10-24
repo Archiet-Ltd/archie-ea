@@ -40,3 +40,23 @@
         {% endif %}
     </div>
 {% endmacro %}
+
+{# Native select — a real <select> for filters and forms that submit or bind a value.
+   The Alpine select above is a custom popover; this one keeps the browser's own
+   keyboard, accessibility and form behaviour.
+     options       list of (value, label) pairs
+     selected      the value to preselect
+     empty_label   adds a leading option with an empty value (e.g. "All types")
+     attrs_dict    extra attributes (x-model, @change, data-testid ...)
+     size          'sm' is 36px, the default 40px, matching input() #}
+{% macro select_native(id='', name='', options=[], selected=none, empty_label=none, size='default', class='', aria_label=none, attrs_dict={}) %}
+    <select
+        {% if id %}id="{{ id }}"{% endif %}
+        {% if name %}name="{{ name }}"{% endif %}
+        {% if aria_label %}aria-label="{{ aria_label }}"{% endif %}
+        {{ attrs_dict|xmlattr }}
+        class="flex {{ 'h-8 px-2 py-1' if size == 'xs' else ('h-9 px-3 py-2' if size == 'sm' else 'h-10 px-3 py-2') }} w-full rounded-md border border-input bg-background text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 {{ class }}">
+        {% if empty_label is not none %}<option value="">{{ empty_label }}</option>{% endif %}
+        {% for value, label in options %}<option value="{{ value }}"{% if selected is not none and selected|string == value|string %} selected{% endif %}>{{ label }}</option>{% endfor %}
+    </select>
+{% endmacro %}
