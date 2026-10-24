@@ -136,3 +136,33 @@ def test_rationalization_pipeline_is_a_card_and_its_steps_land_on_content(page, 
         resp = page.goto(live_server + href, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
         assert resp.status == 200, f"{href} answered {resp.status}"
         assert len(page.locator("main, #main-content").first.inner_text().strip()) > 40, f"{href} is empty"
+
+
+def test_org_administrator_sidebar_every_entry_answers_200(page, live_server):
+    """An organisation administrator is not shown AI Prompts (platform-only) and
+    every sidebar entry they are shown answers 200."""
+    from .fresh_org import create_fresh_org, sign_in
+
+    org = create_fresh_org("platform_admin", org_admin=True, platform_role="Administrator")
+    email = org["emails"]["platform_admin"]
+    # The persona is an organisation administrator, not a platform administrator.
+    sign_in(page, live_server, email)
+    page.goto(live_server + "/dashboard/overview", wait_until="networkidle", timeout=PAGE_TIMEOUT)
+    me = page.evaluate("fetch('/api/v1/me').then(r => r.ok ? r.json() : {})")
+    if me:
+        data = me.get("data", me)
+        assert not data.get("is_platform_admin"), data
+
+    hrefs = page.locator("#sidebar a[href], aside a[href], nav[aria-label*='idebar' i] a[href]").evaluate_all(
+        "els => [...new Set(els.map(e => e.getAttribute('href')))]"
+    )
+    hrefs = [h for h in hrefs if h.startswith("/") and not h.startswith("//") and h != "#"]
+    assert len(hrefs) > 5, hrefs
+    assert "/admin/" in " ".join(hrefs) or "/admin" in hrefs, "this persona must be shown the Admin zone"
+    assert "/admin/solution-prompts" not in hrefs, "AI Prompts must not be offered to an organisation administrator"
+    bad = {}
+    for href in hrefs:
+        status = page.evaluate("h => fetch(h, {credentials: 'same-origin'}).then(r => r.status)", href)
+        if status != 200:
+            bad[href] = status
+    assert not bad, bad
