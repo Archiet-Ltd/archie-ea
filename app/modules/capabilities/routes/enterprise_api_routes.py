@@ -52,11 +52,9 @@ def _may_change_requirements(action):
     an enterprise architect whose platform role carried no write permission
     could open the backlog and was refused on every save.
     """
-    from app.core.auth.permissions import can
+    from app.core.auth.permissions import may_change_model_element
 
-    if can(current_user, action, "motivation_element"):
-        return True
-    return can(current_user, "edit", "archimate") or can(current_user, "edit", "solution")
+    return may_change_model_element(current_user, action)
 
 
 def _may_override_solution_owner():

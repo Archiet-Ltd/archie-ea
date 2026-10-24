@@ -225,6 +225,18 @@ def can(user, action: str, object_type: str, organization_id: Optional[int] = No
     return default_allowed(key, action, object_type)
 
 
+def may_change_model_element(user, action: str = "edit") -> bool:
+    """Whether ``user`` may ``action`` a goal, requirement, epic or other model element.
+
+    The motivation-element row of the matrix, or the persona an administrator
+    assigned: enterprise, business and solution architects edit the model and
+    its solutions even when their platform role carries no write permission.
+    """
+    if can(user, action, "motivation_element"):
+        return True
+    return can(user, "edit", "archimate") or can(user, "edit", "solution")
+
+
 def role_cell(org_id: int, role: str, action: str, object_type: str):
     """(allowed, is_set) for one role cell: ``is_set`` when a row decides it."""
     row = _grant(org_id, "role", role, object_type, action)
