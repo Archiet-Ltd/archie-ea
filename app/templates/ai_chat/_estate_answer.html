@@ -96,12 +96,16 @@
             {% set why = explanations.get(relation.derived_id) %}
             <p class="font-medium text-foreground">The links behind this</p>
             {% if why %}
-                <p data-why-rule>{{ why.rule or 'How it was worked out is not recorded.' }}</p>
+                <p class="text-foreground" data-why-sentence>{{ why.plain or 'How these are connected is not recorded.' }}</p>
+                <details class="group">
+                    <summary class="cursor-pointer text-xs font-medium text-muted-foreground underline underline-offset-4 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" data-why-toggle>How this was worked out</summary>
+                    <div class="mt-1 space-y-1" data-why-detail>
+                        <p data-why-rule>{{ why.rule or 'How it was worked out is not recorded.' }}</p>
                 <ol class="space-y-1" aria-label="Links, in order">
                 {% for link in why.links %}
                     <li data-why-link>
                     {% if link.resolved %}
-                        <span class="text-foreground">{{ link.sentence }}</span>
+                        <span class="text-foreground">{{ link.sentence or (link.source.name ~ ' and ' ~ link.target.name ~ ' are linked.') }}</span>
                         <a class="text-foreground underline underline-offset-4" href="{{ link.source.href }}">{{ link.source.name or '—' }}</a>
                         <span aria-hidden="true">→</span>
                         <a class="text-foreground underline underline-offset-4" href="{{ link.target.href }}">{{ link.target.name or '—' }}</a>
@@ -112,6 +116,8 @@
                     <li>The links it was worked out from are not recorded.</li>
                 {% endfor %}
                 </ol>
+                    </div>
+                </details>
                 <p class="font-medium text-foreground">Decisions about these things</p>
                 {% for decision in why.decisions %}
                 {% if loop.first %}<ul class="space-y-1" data-why-decisions>{% endif %}
@@ -165,7 +171,7 @@
             {% if derivation.runs %}
             <ol class="mt-2 space-y-1 text-xs text-muted-foreground" aria-label="Recent runs">
                 {% for run in derivation.runs %}
-                <li data-derivation-run>{{ run.finished_at | format_datetime if run.finished_at else '—' }} · started by {{ {'on_demand': 'A person', 'scheduled': 'The schedule'}.get(run.trigger, '—') }} · {{ run.explicit_count if run.explicit_count is not none else '—' }} relationships read · {{ run.derived_count if run.derived_count is not none else '—' }} connections found</li>
+                <li data-derivation-run>{{ run.finished_at | format_datetime if run.finished_at else '—' }} · {{ run.explicit_count if run.explicit_count is not none else '—' }} relationships read · {{ run.derived_count if run.derived_count is not none else '—' }} connections found</li>
                 {% endfor %}
             </ol>
             {% else %}
