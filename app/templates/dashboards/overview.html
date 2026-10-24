@@ -170,7 +170,7 @@
                     <li class="flex items-start gap-2" data-testid="health-score-part">
                         {% if part.value is not none %}
                         <span class="shrink-0 font-medium text-foreground tabular-nums" data-testid="health-part-value">{{ part.value }}%</span>
-                        <span>{{ part.label }}, weight <span class="tabular-nums" data-testid="health-part-weight">{{ '%g'|format(part.weight) }}%</span></span>
+                        <span>{{ part.label }}{% if part.weight %}, weight <span class="tabular-nums" data-testid="health-part-weight">{{ '%g'|format(part.weight) }}%</span>{% endif %}</span>
                         {% else %}
                         <span class="shrink-0 text-muted-foreground">—</span>
                         <span>{{ part.label }}: {{ part.basis }}</span>
@@ -259,7 +259,7 @@
                 {% if part.value is not none %}
                 <p class="mt-1 text-lg font-semibold tabular-nums text-foreground">{{ part.value }}%</p>
                 <p class="mt-1 text-xs text-muted-foreground">{{ part.basis }}</p>
-                <p class="mt-0.5 text-xs text-muted-foreground">Counts for {{ '%g'|format(part.weight) }}% of the health score</p>
+                {% if part.weight %}<p class="mt-0.5 text-xs text-muted-foreground">Counts for {{ '%g'|format(part.weight) }}% of the health score</p>{% endif %}
                 <p class="mt-0.5 text-xs text-muted-foreground">from {{ part.source }}, as of {{ part.as_of }}</p>
                 {% else %}
                 <p class="mt-1 text-lg font-semibold tabular-nums text-foreground">—</p>
