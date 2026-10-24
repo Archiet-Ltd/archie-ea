@@ -373,7 +373,7 @@ class LLMRouter:
             LLMProvider.ANTHROPIC: "claude-haiku-4-5-20251001",
             LLMProvider.OPENAI: "gpt-4o-mini",
             LLMProvider.GEMINI: "gemini-2.0-flash",
-            LLMProvider.NVIDIA: "nvidia/nemotron-3-super-120b-a12b",
+            LLMProvider.NVIDIA: "nvidia/nemotron-3-ultra-550b-a55b",
             LLMProvider.OPENROUTER: "google/gemma-4-31b-it:free",
             LLMProvider.AZURE: "gpt-4o",
             LLMProvider.HUGGINGFACE: "meta-llama/Llama-3.1-8B-Instruct",

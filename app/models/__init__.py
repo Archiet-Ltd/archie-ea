@@ -389,7 +389,7 @@ else:
     from .rate_card import RateCard  # noqa: F401
 
     # SA-009: TOGAF ADM deliverable checklists per phase
-    from .adm_deliverable import ADMDeliverable, ADMDeliverableCheck  # noqa: F401
+    from .adm_deliverable import ADMDeliverable  # noqa: F401
 
     # RRT-001: Requirement templates with 16 seeded architecture-layer templates
     from .requirement_template import RequirementTemplate  # noqa: F401

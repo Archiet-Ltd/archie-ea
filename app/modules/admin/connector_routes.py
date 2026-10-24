@@ -33,6 +33,7 @@ other way.
 
 import json as _json
 import logging
+from functools import wraps
 
 from flask import Blueprint, abort, flash, jsonify, redirect, render_template, request, url_for
 from flask_login import login_required
@@ -43,6 +44,26 @@ from app.models.connector_config import _is_sensitive_key
 logger = logging.getLogger(__name__)
 
 m365_connector_bp = Blueprint("m365_connector", __name__, url_prefix="/admin/connectors")
+
+
+def connections_access(f):
+    """Who may open and change connectors: administrators of the active
+    organisation (what ``admin_required`` asks) and the architects who bring a
+    source in, answered by ``may_use_connections`` -- the same predicate the
+    sidebar's Connections link uses, so the link and the page cannot disagree."""
+    admin_gated = admin_required(f)
+
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        from flask_login import current_user
+
+        from app.utils.role_access import may_use_connections
+
+        if current_user.is_authenticated and may_use_connections(current_user):
+            return f(*args, **kwargs)
+        return admin_gated(*args, **kwargs)
+
+    return decorated
 
 
 def _active_org_id():
@@ -77,7 +98,7 @@ def _permit_connector_type(connector_type: str):
 
 @m365_connector_bp.route("", methods=["GET"])
 @login_required
-@admin_required
+@connections_access
 def connectors_index():
     """The one connectors page: every connector of the signed-in
     organisation with health, last synchronisation, the masked credential
@@ -114,7 +135,7 @@ def connectors_index():
 
 @m365_connector_bp.route("", methods=["POST"])
 @login_required
-@admin_required
+@connections_access
 def connectors_save():
     """Add or update a connector of the signed-in organisation.
 
@@ -235,7 +256,7 @@ def connectors_save():
 
 @m365_connector_bp.route("/<string:connector_id>/sync", methods=["POST"])
 @login_required
-@admin_required
+@connections_access
 def connectors_sync(connector_id):
     """Propose a sync for one connector of the signed-in organisation, or run
     it directly when the organisation has delegated the sync action.
@@ -291,7 +312,7 @@ def connectors_sync(connector_id):
 
 @m365_connector_bp.route("/<string:connector_id>/delete", methods=["POST"])
 @login_required
-@admin_required
+@connections_access
 def connectors_delete(connector_id):
     """Propose removal of one connector, or remove it directly when the
     organisation has delegated the delete action. Removal also clears the
@@ -342,7 +363,7 @@ def current_user_id():
 
 @m365_connector_bp.route("/m365", methods=["GET"])
 @login_required
-@admin_required
+@connections_access
 def m365_config():
     """Render the M365 connector configuration form for the active org."""
     from app.modules.codegen.services.credential_vault import OrgCredentialVault
@@ -364,7 +385,7 @@ def m365_config():
 
 @m365_connector_bp.route("/m365", methods=["POST"])
 @login_required
-@admin_required
+@connections_access
 def m365_config_save():
     """Persist M365 connector configuration through the change path.
 
@@ -457,7 +478,7 @@ def m365_config_save():
 
 @m365_connector_bp.route("/m365/test", methods=["POST"])
 @login_required
-@admin_required
+@connections_access
 def m365_test():
     """Test M365 OAuth2 authentication and return JSON status.
 
@@ -502,7 +523,7 @@ def m365_test():
 
 @m365_connector_bp.route("/servicenow", methods=["GET"])
 @login_required
-@admin_required
+@connections_access
 def servicenow_config():
     """Display the ServiceNow connector configuration form for the active org."""
     from app.modules.codegen.services.credential_vault import OrgCredentialVault
@@ -524,7 +545,7 @@ def servicenow_config():
 
 @m365_connector_bp.route("/servicenow", methods=["POST"])
 @login_required
-@admin_required
+@connections_access
 def servicenow_config_save():
     """Save ServiceNow connector configuration through the change path.
 
@@ -611,7 +632,7 @@ def servicenow_config_save():
 
 @m365_connector_bp.route("/servicenow/sync", methods=["POST"])
 @login_required
-@admin_required
+@connections_access
 def servicenow_sync():
     """Route a ServiceNow sync through the organisation's approval queue (or
     run it directly when the org has delegated the sync action)."""
@@ -656,7 +677,7 @@ def servicenow_sync():
 
 @m365_connector_bp.route("/servicenow/status", methods=["GET"])
 @login_required
-@admin_required
+@connections_access
 def servicenow_status():
     """Return JSON status for the ServiceNow connector of the active org."""
     from app.services.connector_framework import _load_org_connector
@@ -695,7 +716,7 @@ def _get_jira_config(org_id: int):
 
 @m365_connector_bp.route("/jira", methods=["GET"])
 @login_required
-@admin_required
+@connections_access
 def jira_config():
     """Display the Jira connector configuration form for the active org."""
     from app.modules.codegen.services.credential_vault import OrgCredentialVault
@@ -713,7 +734,7 @@ def jira_config():
 
 @m365_connector_bp.route("/jira", methods=["POST"])
 @login_required
-@admin_required
+@connections_access
 def jira_config_save():
     """Persist Jira connector configuration through the change path.
 
@@ -799,7 +820,7 @@ def jira_config_save():
 
 @m365_connector_bp.route("/jira/test", methods=["POST"])
 @login_required
-@admin_required
+@connections_access
 def jira_config_test():
     """Test Jira credentials by calling /rest/api/3/myself. Returns JSON."""
     from app.services.jira_connector_service import JiraConnectorService
@@ -866,7 +887,7 @@ def _github_state(org_id: int) -> dict:
 
 @m365_connector_bp.route("/github", methods=["GET"])
 @login_required
-@admin_required
+@connections_access
 def github_connect():
     """The one page that connects GitHub: paste a read-only token, and the first read starts at once."""
     org_id = _require_active_org()
@@ -880,7 +901,7 @@ def github_connect():
 
 @m365_connector_bp.route("/github/status", methods=["GET"])
 @login_required
-@admin_required
+@connections_access
 def github_status():
     """JSON for the connect page to poll while the first read runs."""
     return jsonify(_github_state(_require_active_org()))
@@ -888,7 +909,7 @@ def github_status():
 
 @m365_connector_bp.route("/github", methods=["POST"])
 @login_required
-@admin_required
+@connections_access
 def github_connect_save():
     """Store the read-only token in the organisation's vault, save the connection and start the first read.
 
@@ -955,7 +976,7 @@ def github_connect_save():
 
 @m365_connector_bp.route("/github/sync", methods=["POST"])
 @login_required
-@admin_required
+@connections_access
 def github_resync():
     """Read the repositories again: adds what is new and changes nothing a person edited."""
     from app.connectors import github as gh
@@ -976,7 +997,7 @@ def github_resync():
 
 @m365_connector_bp.route("/github/review", methods=["GET"])
 @login_required
-@admin_required
+@connections_access
 def github_review():
     """The review screen: every proposal the read made, grouped, with one Approve all."""
     from app.connectors import github as gh
@@ -992,7 +1013,7 @@ def github_review():
 
 @m365_connector_bp.route("/github/review/approve-all", methods=["POST"])
 @login_required
-@admin_required
+@connections_access
 def github_review_approve_all():
     from app.connectors import github as gh
 
@@ -1013,7 +1034,7 @@ def github_review_approve_all():
 
 @m365_connector_bp.route("/github/review/<int:approval_id>/classify", methods=["POST"])
 @login_required
-@admin_required
+@connections_access
 def github_review_classify(approval_id):
     from app.connectors import github as gh
     from app.extensions import db
@@ -1031,7 +1052,7 @@ def github_review_classify(approval_id):
 
 @m365_connector_bp.route("/github/review/<int:approval_id>/skip", methods=["POST"])
 @login_required
-@admin_required
+@connections_access
 def github_review_skip(approval_id):
     from app.connectors import github as gh
 
