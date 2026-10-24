@@ -85,7 +85,7 @@
             {% if can_link %}
             <div class="relative mt-4 max-w-md">
                 {% call label(for='wp-gap-search') %}Link a gap{% endcall %}
-                {{ input(id='wp-gap-search', name='', type='search', placeholder='Search gaps by name', attrs_dict={'autocomplete': 'off', 'x-model': 'query', '@input.debounce.300ms': 'search()', 'data-testid': 'gap-picker-input'}) }}
+{{ input(id='wp-gap-search', name='', type='search', placeholder='Search gaps by name', attrs_dict={'autocomplete': 'off', 'x-model': 'query', '@input.debounce.300ms': 'search()', 'data-testid': 'gap-picker-input'}) }}
                 <ul x-show="results.length > 0" x-cloak class="absolute z-20 mt-1 w-full rounded-md border border-border bg-card" data-testid="gap-picker-results">
                     <template x-for="g in results" :key="g.id">
                         <li>
