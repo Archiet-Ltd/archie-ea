@@ -1,3 +1,4 @@
+{# design-block: onboarding #}
 {% extends 'layouts/public_base.html' %}
 {% block title %}Set up two-factor authentication{% endblock %}
 {% from 'components/accessibility_helpers.html' import live_region with context %}
@@ -21,8 +22,8 @@
     {% call card_content(class='space-y-6') %}
       <form method="post" action="{{ url_for('account.mfa_challenge') }}" class="space-y-6" novalidate
             x-data="{ saved: false, copied: false, codes: {{ recovery_codes | tojson | forceescape }} }">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <input type="hidden" name="step" value="codes">
+        {{ input(name='csrf_token', type='hidden', value=csrf_token()) }}
+        {{ input(name='step', type='hidden', value='codes') }}
 
         <ul id="recovery-codes" class="grid grid-cols-2 gap-2 rounded-md border border-border bg-muted/30 p-4 text-sm font-mono">
           {% for code in recovery_codes %}
@@ -80,7 +81,7 @@
       </div>
 
       <form method="post" action="{{ url_for('account.mfa_challenge') }}" class="space-y-4" novalidate>
-        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        {{ input(name='csrf_token', type='hidden', value=csrf_token()) }}
         <div class="space-y-2">
           {% call label(for='mfa-code', required=True) %}6-digit code from your app{% endcall %}
           {{ input(

@@ -14,7 +14,6 @@ Endpoints:
 - /join-from-invite/<user_id>/<token>
 - /unconfirmed
 """
-import json
 import logging
 
 from flask import (

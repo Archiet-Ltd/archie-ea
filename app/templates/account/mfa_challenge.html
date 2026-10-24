@@ -1,3 +1,4 @@
+{# design-block: onboarding #}
 {% extends 'layouts/public_base.html' %}
 {% block title %}Verification code{% endblock %}
 {% from 'components/accessibility_helpers.html' import live_region with context %}
@@ -21,8 +22,8 @@
     {% endcall %}
     {% call card_content(class='space-y-4') %}
       <form method="post" action="{{ url_for('account.mfa_challenge') }}" class="space-y-4" novalidate>
-        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        {% if use_recovery %}<input type="hidden" name="use_recovery" value="1">{% endif %}
+        {{ input(name='csrf_token', type='hidden', value=csrf_token()) }}
+        {% if use_recovery %}{{ input(name='use_recovery', type='hidden', value='1') }}{% endif %}
         <div class="space-y-2">
           {% if use_recovery %}
           {% call label(for='mfa-code', required=True) %}Recovery code{% endcall %}
