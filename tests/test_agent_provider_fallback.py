@@ -81,6 +81,12 @@ def test_rate_limited_provider_hands_the_question_to_the_next(runner, monkeypatc
     assert SECRET not in caplog.text and "nvapi-secret" not in caplog.text
 
 
+def test_the_reply_names_the_provider_that_answered_not_the_first_tried(runner, monkeypatch):
+    _script(monkeypatch, runner, [_rate_limit(), "Three applications are recorded."])
+    result = runner.run("How many applications do we run?")
+    assert result["answered_by"] == {"provider": "nvidia", "model": NVIDIA_MODEL}
+
+
 def test_server_error_and_missing_model_also_move_on(runner, monkeypatch):
     first = _status_error(openai.InternalServerError, 503, "upstream unavailable")
     calls = _script(monkeypatch, runner, [first, "ok"])
@@ -96,6 +102,13 @@ def test_all_providers_refusing_shows_a_plain_busy_message(runner, monkeypatch):
     assert "busy" in result["response"].lower() and "Retry" in result["response"]
     assert "API Settings" not in result["response"]
     assert result["error"]
+
+
+def test_a_turn_nobody_answered_names_no_model(runner, monkeypatch):
+    _script(monkeypatch, runner, [_rate_limit(), _status_error(openai.InternalServerError, 502, "bad gateway")])
+    result = runner.run("q")
+    assert not result.get("answered_by")
+    assert NVIDIA_MODEL not in result["response"] and "gemma" not in result["response"]
 
 
 def test_a_bad_request_is_not_retried(runner, monkeypatch):
@@ -158,6 +171,19 @@ def test_chain_order_is_a_setting(db_session, make_org, tenant_ctx, monkeypatch)
     with tenant_ctx(org.id):
         chain = ar.build_provider_chain("nvidia", NVIDIA_MODEL)
     assert [e[0] for e in chain] == ["openrouter", "nvidia"]
+
+
+def test_a_provider_can_be_pointed_at_a_gateway_address(db_session, make_org, tenant_ctx, monkeypatch):
+    _no_env_keys(monkeypatch)
+    monkeypatch.setenv("AI_PROVIDER_BASE_URL_NVIDIA", "http://gateway.internal/v1")
+    org = make_org("gw")
+    _settings(db_session, org, "nvidia", "", "key-nv")
+    _settings(db_session, org, "openrouter", "model-a:free", "key-or")
+    with tenant_ctx(org.id):
+        chain = ar.build_provider_chain("nvidia", NVIDIA_MODEL)
+    urls = {e[0]: e[3] for e in chain}
+    assert urls["nvidia"] == "http://gateway.internal/v1"
+    assert urls["openrouter"] == ar._PROVIDER_BASE_URLS["openrouter"]
 
 
 def test_an_organisation_with_its_own_paid_key_is_asked_before_any_free_model(

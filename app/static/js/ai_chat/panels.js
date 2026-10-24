@@ -135,7 +135,7 @@
                             <div class="rounded-lg border bg-card p-3 shadow-sm cursor-pointer hover:bg-accent transition-colors"
                                  data-action="select-context" data-id="${escape(el.id)}" data-type="archimate_element">
                                 <div class="flex items-center gap-2 mb-1">
-                                    <span class="bg-muted text-foreground text-xs px-1.5 py-0.5 rounded font-medium">${escape(el.type)}</span>
+                                    <span class="bg-muted text-foreground text-xs px-1.5 py-0.5 rounded font-medium">${escape(plainTypeName(el.type))}</span>
                                     <span class="font-medium text-sm">${escape(el.name)}</span>
                                 </div>
                             </div>
@@ -377,6 +377,33 @@
     }
 
 
+    /* An ArchiMate type in plain words: ApplicationComponent reads Application, and any other
+       CamelCase name reads as separate words (BusinessCapability, Business capability). */
+    function plainTypeName(type) {
+        if (!type) return '—';
+        if (type === 'ApplicationComponent') return 'Application';
+        const words = String(type).replace(/([a-z0-9])([A-Z])/g, '$1 $2');
+        return words.charAt(0) + words.slice(1).toLowerCase();
+    }
+
+    /* One suggestion card per question. */
+    const cardRows = (items) => items.map((it, i) => {
+        const question = it.question;
+        const detail = ArchieChat.render.escapeForHtml((it.detail || '').slice(0, 120));
+        return '<button type="button" class="js-briefing-item group h-auto w-full rounded-lg border ' +
+                 'border-border bg-background p-4 text-left transition-colors hover:border-primary ' +
+                 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" ' +
+                 'data-index="' + i + '" data-question="' + ArchieChat.render.escapeForHtml(question) + '" data-testid="first-question-suggestion">' +
+                 '<span class="flex items-start justify-between gap-3">' +
+                   '<span class="min-w-0">' +
+                     '<span class="block text-sm font-medium text-foreground">' + ArchieChat.render.escapeForHtml(question) + '</span>' +
+                     (detail ? '<span class="mt-1 block text-xs text-muted-foreground">' + detail + '</span>' : '') +
+                   '</span>' +
+                   '<i data-lucide="arrow-up-right" class="h-4 w-4 shrink-0 text-muted-foreground group-hover:text-primary" aria-hidden="true"></i>' +
+                 '</span>' +
+               '</button>';
+    }).join('');
+
     /* ── Opening screen: this tenant's portfolio, not 21 generic buttons ─────
        Uses /ai-chat/recommendations, which the page already called into a
        sidebar tab nobody opens.
@@ -440,6 +467,23 @@
             }
             const shown = questions.slice(0, 4);
 
+            const startupSteps = document.getElementById('startup-first-steps');
+            if (shown.length === 0 && startupSteps) {
+                /* A startup with nothing recorded: the next step first, then four questions that need no records. */
+                const startupQuestions = [
+                    { question: 'What should a startup write down about its software first?', detail: '' },
+                    { question: 'Which architecture decisions are worth recording early?', detail: '' },
+                    { question: 'When does a monolith stop being enough?', detail: '' },
+                    { question: 'What should a first architecture review cover?', detail: '' }
+                ];
+                done('<div data-startup-next-step></div>' +
+                    '<div class="mt-6 grid grid-cols-1 gap-3 md:grid-cols-2">' + cardRows(startupQuestions) + '</div>' +
+                    '<p class="mt-3 text-center text-xs text-muted-foreground">General questions to start with. Once your applications are in, these become questions about them.</p>');
+                host.querySelector('[data-startup-next-step]').appendChild(startupSteps.content.cloneNode(true));
+                host._items = startupQuestions;
+                return;
+            }
+
             if (shown.length === 0) {
                 done(
                     '<div class="text-center py-2">' +
@@ -466,22 +510,7 @@
                 ? named.length + (named.length === 1 ? ' item' : ' items')
                 : named.length + ' of ' + total + ' open finding' + (total === 1 ? '' : 's');
 
-            const rows = shown.map((it, i) => {
-                const question = it.question;
-                const detail = ArchieChat.render.escapeForHtml((it.detail || '').slice(0, 120));
-                return '<button type="button" class="js-briefing-item group h-auto w-full rounded-lg border ' +
-                         'border-border bg-background p-4 text-left transition-colors hover:border-primary ' +
-                         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" ' +
-                         'data-index="' + i + '" data-question="' + ArchieChat.render.escapeForHtml(question) + '" data-testid="first-question-suggestion">' +
-                         '<span class="flex items-start justify-between gap-3">' +
-                           '<span class="min-w-0">' +
-                             '<span class="block text-sm font-medium text-foreground">' + ArchieChat.render.escapeForHtml(question) + '</span>' +
-                             (detail ? '<span class="mt-1 block text-xs text-muted-foreground">' + detail + '</span>' : '') +
-                           '</span>' +
-                           '<i data-lucide="arrow-up-right" class="h-4 w-4 shrink-0 text-muted-foreground group-hover:text-primary" aria-hidden="true"></i>' +
-                         '</span>' +
-                       '</button>';
-            }).join('');
+            const rows = cardRows(shown);
 
             done(
                 '<div class="grid grid-cols-1 gap-3 md:grid-cols-2">' + rows + '</div>' +

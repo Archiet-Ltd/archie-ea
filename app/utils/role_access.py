@@ -365,6 +365,39 @@ def may_use_connections(user) -> bool:
         return False
 
 
+def may_load_sample_company(user) -> bool:
+    """True when the user may load the sample company: the architects who model
+    the estate, and administrators."""
+    try:
+        return bool(
+            getattr(user, "enterprise_role", None)
+            in ("enterprise_architect", "solution_architect", "platform_admin")
+        ) or bool(user.is_admin())
+    except Exception:  # noqa: BLE001 - a nav gate must not be able to 500 a page
+        return False
+
+
+def may_connect_github(user, org_id) -> bool:
+    """True when the GitHub connection page is registered and opens for this user:
+    the same test the connector pages apply."""
+    try:
+        from flask import current_app
+
+        from app.middleware.tenant_decorators import is_platform_admin
+        from app.services.rbac_service import rbac_service
+
+        return bool(
+            "m365_connector.github_connect" in current_app.view_functions
+            and (
+                is_platform_admin(user)
+                or rbac_service.is_org_admin(user, org_id)
+                or may_use_connections(user)
+            )
+        )
+    except Exception:  # noqa: BLE001 - a nav gate must not be able to 500 a page
+        return False
+
+
 def can_edit_capabilities(user) -> bool:
     """True when the user's enterprise_role owns the capability model.
 

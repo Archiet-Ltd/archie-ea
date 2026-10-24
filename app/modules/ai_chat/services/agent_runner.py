@@ -195,6 +195,8 @@ def build_provider_chain(first_provider: str, first_model: str, pin_first: bool 
     without a key of its own starts on the free providers. ``pin_first`` keeps
     the caller's explicit choice at the front.
     A provider contributes each of its models in turn, each with every key.
+    ``AI_PROVIDER_BASE_URL_<PROVIDER>`` points a provider at a gateway or mirror
+    instead of its public address.
     """
     import os
 
@@ -243,7 +245,7 @@ def build_provider_chain(first_provider: str, first_model: str, pin_first: bool 
             keys = []
         for model in models:
             for key in keys:
-                chain.append((provider, model, key, _PROVIDER_BASE_URLS.get(provider)))
+                chain.append((provider, model, key, os.getenv("AI_PROVIDER_BASE_URL_" + provider.upper()) or _PROVIDER_BASE_URLS.get(provider)))
     return chain
 
 
@@ -735,10 +737,11 @@ class AgentRunner:
                 )
             api_key = api_keys[0]
             chain = []
+            first_base_url = None
             if provider in _TOOL_PROVIDERS:
                 chain = build_provider_chain(provider, model, pin_first=bool(requested_model))
                 if chain:
-                    provider, model, api_key, _ = chain[0]
+                    provider, model, api_key, first_base_url = chain[0]
         except Exception as e:
             logger.warning("AgentRunner: provider selection failed: %s", e)
             return self._finalize(
@@ -760,7 +763,7 @@ class AgentRunner:
             )
 
         # Resolve base_url for OpenAI-compatible third-party providers
-        base_url = _PROVIDER_BASE_URLS.get(provider)
+        base_url = (first_base_url if chain else None) or _PROVIDER_BASE_URLS.get(provider)
 
         # Build tool schemas for the provider
         tool_schemas = self._build_tool_schemas(provider, TOOL_SCHEMAS)
@@ -872,6 +875,7 @@ class AgentRunner:
                     context=context,
                     persona=persona,
                     model_used=model,
+                    provider_used=provider,
                 )
 
             # Text before a tool call is a preface, not an answer: it is never
@@ -977,6 +981,7 @@ class AgentRunner:
             context=context,
             persona=persona,
             model_used=model,
+            provider_used=provider,
         )
 
     # ------------------------------------------------------------------ #
@@ -1832,9 +1837,16 @@ class AgentRunner:
         context: Optional[dict],
         persona: Optional[str],
         model_used: Optional[str] = None,
+        provider_used: Optional[str] = None,
     ) -> dict:
-        """Apply the citation gate, record the run and return the result dict."""
+        """Apply the citation gate, record the run and return the result dict.
+
+        ``answered_by`` names the provider and model that produced the reply,
+        read from the entry that answered (``model_used``), never the first one
+        tried. A refused or failed turn carries none, so no model is named."""
         self._apply_citation_gate(result)
+        if model_used and not result.get("error"):
+            result["answered_by"] = {"provider": provider_used, "model": model_used}
         record_error = self._record_run(
             persona=persona,
             domain=domain,

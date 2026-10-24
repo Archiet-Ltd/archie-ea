@@ -9,13 +9,16 @@ export, the context and query panels) is one "Chat options" sheet away.
 Every journey starts at /account/register as a new person. The signed-in person is the startup CTO
 (lens "cto"), never a platform administrator, asserted in each journey.
 """
+import json
 import os
 import re
+import threading
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import pytest
 from playwright.sync_api import expect
 
-from .conftest import PAGE_TIMEOUT
+from .conftest import PAGE_TIMEOUT, boot_live_server
 from .test_sign_up_first_screen_journey import SIZES, _assert_persona, _sign_up
 
 pytestmark = [pytest.mark.smoke, pytest.mark.journey]
@@ -23,8 +26,8 @@ pytestmark = [pytest.mark.smoke, pytest.mark.journey]
 WALK = os.environ.get("ASK_WALK_DIR")
 
 
-def _open_chat(browser, live_server, viewport, load_sample=True):
-    context = browser.new_context(viewport=viewport)
+def _open_chat(browser, live_server, viewport, load_sample=True, locale=None):
+    context = browser.new_context(viewport=viewport, **({'locale': locale} if locale else {}))
     context.set_default_timeout(PAGE_TIMEOUT)
     if os.environ.get("ASK_THEME") == "dark":
         context.add_init_script(
@@ -165,14 +168,165 @@ def test_clicking_a_suggestion_asks_it_and_the_answer_cites_the_records(browser,
         context.close()
 
 
-def test_an_organisation_with_no_records_is_told_what_to_do_next(browser, live_server):
+def test_a_new_startup_owner_with_nothing_recorded_sees_the_startup_next_step(browser, live_server):
     context, page = _open_chat(browser, live_server, SIZES[0][1], load_sample=False)
     try:
         briefing = page.locator("#portfolio-briefing")
-        expect(briefing).to_contain_text("Import a portfolio", timeout=PAGE_TIMEOUT)
-        expect(briefing.get_by_role("link", name="Import a portfolio")).to_have_attribute("href", "/import")
-        assert page.locator('[data-testid="first-question-suggestion"]').count() == 0
-        for phrase in ("Nothing here yet", "No data", "N/A"):
-            assert phrase not in page.locator("body").inner_text()
+        steps = briefing.get_by_test_id("startup-first-steps")
+        expect(steps).to_be_visible(timeout=PAGE_TIMEOUT)
+        expect(steps.get_by_role("link", name="Connect GitHub")).to_be_visible()
+        expect(steps.get_by_role("button", name="See a sample company")).to_be_visible()
+        # four starter questions follow, and none of them is the enterprise portfolio prompt
+        cards = briefing.get_by_test_id("first-question-suggestion")
+        expect(cards).to_have_count(4)
+        assert "Import a portfolio" not in page.locator("body").inner_text()
+        assert "Nothing flagged in your portfolio" not in page.locator("body").inner_text()
+        _shot(page, "startup-empty", "1440")
+        # the link lands on the connection page with content
+        steps.get_by_role("link", name="Connect GitHub").click()
+        page.wait_for_load_state("networkidle")
+        assert "/connect" in page.url or "github" in page.url, page.url
+        assert page.get_by_role("heading").first.inner_text().strip()
+        # the sample button loads the company; the chat then offers questions about its records
+        page.goto(live_server + "/ai-chat", wait_until="networkidle")
+        page.get_by_test_id("startup-first-steps").get_by_role("button", name="See a sample company").click()
+        page.goto(live_server + "/ai-chat", wait_until="networkidle")
+        first = page.locator('[data-testid="first-question-suggestion"]').first
+        expect(first).to_contain_text("What breaks if", timeout=PAGE_TIMEOUT)
+        assert page.get_by_test_id("startup-first-steps").count() == 0
+    finally:
+        context.close()
+
+
+@pytest.mark.parametrize("name,viewport", SIZES, ids=[s[0] for s in SIZES])
+def test_the_chat_fills_the_screen_with_the_composer_on_the_bottom_edge(browser, live_server, name, viewport):
+    context, page = _open_chat(browser, live_server, viewport)
+    try:
+        expect(page.locator('[data-testid="first-question-suggestion"]')).to_have_count(4, timeout=PAGE_TIMEOUT)
+        box = page.locator("#chat-form").evaluate("e => { const r = e.closest('.border-t').getBoundingClientRect(); return [r.bottom, window.innerHeight, document.documentElement.scrollHeight]; }")
+        assert abs(box[0] - box[1]) <= 1, box          # the composer sits on the bottom edge
+        assert box[2] <= box[1] + 1, box               # and the page itself does not scroll
+    finally:
+        context.close()
+
+
+def test_at_390_the_unavailable_notice_is_one_line_and_the_first_screen_keeps_the_questions(browser, live_server):
+    context, page = _open_chat(browser, live_server, SIZES[1][1])
+    try:
+        cards = page.locator('[data-testid="first-question-suggestion"]')
+        expect(cards).to_have_count(4, timeout=PAGE_TIMEOUT)
+        notice = page.get_by_test_id("model-unavailable-notice")
+        if notice.count():
+            assert notice.bounding_box()["height"] <= 34, notice.bounding_box()  # one line of text
+        composer_top = page.locator("#chat-form").evaluate("e => e.closest('.border-t').getBoundingClientRect().top")
+        for i in range(4):
+            bottom = cards.nth(i).bounding_box()
+            assert bottom["y"] + bottom["height"] <= composer_top + 1, (i, bottom, composer_top)
+        expect(page.get_by_role("heading", level=1)).to_be_in_viewport()
+        _shot(page, "first-screen", "390")
+    finally:
+        context.close()
+
+
+def test_history_rows_use_the_body_font_and_a_locale_date(browser, live_server):
+    context, page = _open_chat(browser, live_server, SIZES[0][1], locale="en-GB")
+    try:
+        cards = page.locator('[data-testid="first-question-suggestion"]')
+        expect(cards).to_have_count(4, timeout=PAGE_TIMEOUT)
+        cards.first.click()
+        expect(page.get_by_test_id("estate-answer")).to_be_visible(timeout=PAGE_TIMEOUT)
+        page.reload(wait_until="networkidle")
+        row = page.locator("#session-list .js-thr-open").first
+        expect(row).to_be_visible(timeout=PAGE_TIMEOUT)
+        fonts = row.evaluate("e => [getComputedStyle(e).fontFamily, getComputedStyle(e.firstElementChild).fontFamily, getComputedStyle(document.body).fontFamily]")
+        assert fonts[0] == fonts[2] and fonts[1] == fonts[2], fonts
+        date = row.locator("div").nth(1).inner_text()
+        assert re.match(r"^\d{1,2} [A-Z][a-z]{2}\b", date), date
+    finally:
+        context.close()
+
+
+def test_the_context_panel_names_types_in_plain_words(browser, live_server):
+    context, page = _open_chat(browser, live_server, SIZES[0][1])
+    try:
+        page.get_by_role("button", name="Chat options").click()
+        sheet = page.get_by_role("dialog", name="Chat options")
+        sheet.locator("#domain-selector").select_option("architecture")
+        context_panel = sheet.locator("#domain-context")
+        expect(context_panel).to_contain_text("Application", timeout=PAGE_TIMEOUT)
+        text = context_panel.inner_text()
+        assert "ApplicationComponent" not in text and "BusinessCapability" not in text, text
+        _shot(page, "context-panel", "1440")
+    finally:
+        context.close()
+
+
+# ---- the footer names the provider that answered -------------------------------------------
+
+
+class _TwoProviders(BaseHTTPRequestHandler):
+    """The first provider refuses with a rate limit; the second answers."""
+    hits = []
+
+    def log_message(self, *args):
+        pass
+
+    def do_POST(self):
+        self.rfile.read(int(self.headers.get("Content-Length", "0")))
+        _TwoProviders.hits.append(self.path)
+        if self.path.startswith("/openrouter/"):
+            body = json.dumps({"error": {"message": "free-models-per-day: 0 left"}}).encode()
+            self.send_response(429)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+            return
+        base = {"id": "c1", "created": 0, "model": "answering-model", "object": "chat.completion.chunk"}
+        text = "A monolith stops being enough when teams block each other."
+        frames = [{**base, "choices": [{"index": 0, "delta": {"content": text}, "finish_reason": None}]},
+                  {**base, "choices": [{"index": 0, "delta": {}, "finish_reason": "stop"}]}]
+        payload = "".join("data: %s\n\n" % json.dumps(f) for f in frames).encode() + b"data: [DONE]\n\n"
+        self.send_response(200)
+        self.send_header("Content-Type", "text/event-stream")
+        self.send_header("Content-Length", str(len(payload)))
+        self.end_headers()
+        self.wfile.write(payload)
+
+
+@pytest.fixture(scope="module")
+def two_provider_server(request, app):
+    _TwoProviders.hits = []
+    peer = ThreadingHTTPServer(("127.0.0.1", 0), _TwoProviders)
+    threading.Thread(target=peer.serve_forever, daemon=True).start()
+    request.addfinalizer(peer.shutdown)
+    base = "http://127.0.0.1:%d" % peer.server_port
+    return boot_live_server(request, None, app, extra_env={
+        "OPENROUTER_API_KEY": "first-key", "NVIDIA_API_KEY": "second-key",
+        "AI_PROVIDER_ORDER": "openrouter,nvidia",
+        "AI_PROVIDER_BASE_URL_OPENROUTER": base + "/openrouter/v1",
+        "AI_PROVIDER_BASE_URL_NVIDIA": base + "/nvidia/v1",
+        "NO_PROXY": "127.0.0.1,localhost", "no_proxy": "127.0.0.1,localhost",
+    })
+
+
+def test_when_the_first_provider_refuses_the_footer_names_the_one_that_answered(browser, two_provider_server):
+    try:
+        _footer_journey(browser, two_provider_server)
+    except Exception:
+        print("\n[two providers] server log:\n%s" % two_provider_server.tail(60))
+        raise
+
+
+def _footer_journey(browser, two_provider_server):
+    context, page = _open_chat(browser, two_provider_server, SIZES[0][1], load_sample=False)
+    try:
+        page.locator('[data-testid="first-question-suggestion"]', has_text="monolith").click()
+        expect(page.locator("#messages-container")).to_contain_text("teams block each other", timeout=PAGE_TIMEOUT)
+        footer = page.locator("#chat-model-name")
+        expect(footer).to_contain_text("Nvidia")
+        assert "Openrouter" not in footer.inner_text() and "OpenRouter" not in footer.inner_text()
+        asked = [h.split("/")[1] for h in _TwoProviders.hits]
+        assert asked[0] == "openrouter" and asked[-1] == "nvidia", asked  # the first refused, the second answered
     finally:
         context.close()
