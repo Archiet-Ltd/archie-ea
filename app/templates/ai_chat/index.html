@@ -94,7 +94,7 @@
 
                     <div id="domain-welcome-suggestions" class="mt-8 w-full text-left">
                         {# Four questions from what this organisation's records flag now. panels.js fills it, including the failed and empty states. #}
-                        {% if startup_first_steps.show %}
+                        {% if startup_first_steps and startup_first_steps.show %}
                         {# The empty-workspace next step for a startup. panels.js shows it when no application is recorded. #}
                         <template id="startup-first-steps">
                             <div class="flex flex-col items-center gap-3 sm:flex-row sm:justify-center" data-testid="startup-first-steps">
