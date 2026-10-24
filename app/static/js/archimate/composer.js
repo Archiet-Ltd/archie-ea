@@ -3225,7 +3225,10 @@ function composerApp() {
             if (self._focusFitObserver || typeof ResizeObserver === 'undefined') return;
             let timer = null;
             self._focusFitObserver = new ResizeObserver(function() {
-                if (Date.now() > self._focusFitUntil) return;
+                /* A neighbourhood nobody has edited keeps following the canvas: a resize,
+                   a panel opening or the phone layout refits it. Once the person has
+                   moved something the drawing is theirs and stays where they put it. */
+                if (self._focusViewEdited) return;
                 window.clearTimeout(timer);
                 timer = window.setTimeout(fit, 80);
             });
@@ -4187,13 +4190,26 @@ function composerApp() {
                 || (this.deltaMode && this.plateauSuggestions && this.plateauSuggestions.length > 0)
                 || this.commentPanelOpen
                 || this.auditPanelOpen;
-            let rightPadding = rightPanelOpen ? 40 + 320 : 40;
+            /* A neighbourhood's connections loop outside its outermost elements, and their
+               words sit on those loops: leave room for both on the left and right. */
+            let sidePadding = 40;
+            if (this.focusView) {
+                let width = (document.getElementById('composer-canvas') || {}).clientWidth || 0;
+                sidePadding = width ? Math.max(40, Math.min(88, Math.round(width * 0.12))) : 88;
+            }
+            let rightPadding = rightPanelOpen ? sidePadding + 320 : sidePadding;
             /* The unsaved-view card floats over the top of the canvas: fit below it. */
             let topPadding = 40;
             let card = this.focusView ? document.getElementById('composer-focus-banner') : null;
             let canvasEl = document.getElementById('composer-canvas');
             if (card && canvasEl && card.offsetHeight) {
                 topPadding = Math.max(40, Math.round(card.getBoundingClientRect().bottom - canvasEl.getBoundingClientRect().top) + 16);
+            }
+            /* The minimap floats over the bottom-left corner: keep the drawing above it. */
+            let bottomPadding = 40;
+            let miniMap = document.querySelector('.mini-map');
+            if (miniMap && canvasEl && miniMap.getClientRects().length) {
+                bottomPadding = Math.max(40, Math.round(canvasEl.getBoundingClientRect().bottom - miniMap.getBoundingClientRect().top) + 16);
             }
             /* CMP-05: fit was unreliable in the narrow side-panel — it zoomed to
                150% with the element half off the left edge. Two causes fixed:
@@ -4203,7 +4219,7 @@ function composerApp() {
                useModelGeometry reads the model bboxes instead, which are always
                current. */
             this.paper.scaleContentToFit({
-                padding: { top: topPadding, bottom: 40, left: 40, right: rightPadding },
+                padding: { top: topPadding, bottom: bottomPadding, left: sidePadding, right: rightPadding },
                 maxScale: 1,
                 minScale: 0.1,
                 useModelGeometry: true

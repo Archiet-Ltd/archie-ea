@@ -303,7 +303,7 @@ let ComposerRenderer = (function() {
             iconBox:            { x: 12, y: 12, width: 40, height: 40, rx: 8, ry: 8, fill: 'rgba(255,255,255,0.65)', stroke: 'rgba(0,0,0,0.04)', strokeWidth: 1 },
             typeIcon:           { transform: 'translate(22, 22) scale(1.2)', fill: 'none', stroke: '#1a1a1a', strokeWidth: 1.1, strokeLinecap: 'round', strokeLinejoin: 'round', d: '' },
             nameLabel:          { x: 12, y: 60, textAnchor: 'start', textVerticalAnchor: 'top', fontSize: 12, fontWeight: 700, fontFamily: 'Public Sans, Inter, system-ui, sans-serif', fill: '#1a1a1a', text: 'Element', textWrap: { width: -24, maxLineCount: 2, ellipsis: true } },
-            typeLabel:          { x: 12, y: 79, textAnchor: 'start', textVerticalAnchor: 'top', fontSize: 9,  fontWeight: 500, fontFamily: 'Public Sans, Inter, system-ui, sans-serif', fill: 'rgba(26,26,26,0.45)', text: '', textWrap: { width: -24, maxLineCount: 1, ellipsis: true } },
+            typeLabel:          { x: 12, y: 92, textAnchor: 'start', textVerticalAnchor: 'top', fontSize: 9,  fontWeight: 500, fontFamily: 'Public Sans, Inter, system-ui, sans-serif', fill: 'rgba(26,26,26,0.45)', text: '', textWrap: { width: -24, maxLineCount: 1, ellipsis: true } },
             maturityBadgeBg:    { refX: '100%', x: -50, y: 10, width: 36, height: 18, rx: 9, ry: 9, fill: 'rgba(0,0,0,0.75)', display: 'none' },
             maturityBadgeLabel: { refX: '100%', x: -32, y: 19, textAnchor: 'middle', textVerticalAnchor: 'middle', fontSize: 8, fontWeight: 800, fontFamily: 'Public Sans, Inter, system-ui, sans-serif', fill: '#ffffff', text: '', display: 'none' },
             maturityLeftLabel:  { x: 12, refY: '100%', y: -28, textAnchor: 'start', textVerticalAnchor: 'middle', fontSize: 7.5, fontWeight: 700, fontFamily: 'Public Sans, Inter, system-ui, sans-serif', fill: 'rgba(26,26,26,0.45)', text: '', letterSpacing: '0.06em', display: 'none' },
@@ -1244,33 +1244,77 @@ let ComposerRenderer = (function() {
             }
         }
 
-    /* Slide each connection label along its own line until no two labels on the
-     * screen overlap. Connections that share a stretch of route (a fan of lines
-     * leaving one element) all put their word at the middle of the line, so the
-     * words land in one row; this moves a word to the nearest clear point on its
-     * own line and leaves it at the middle when the middle is already clear.
+    /* Slide each connection label along its own line until no label on the screen
+     * overlaps another label or an element. Connections that share a stretch of route
+     * (a fan of lines leaving one element, or lines crossing) all put their word at the
+     * middle of the line, so the words land in one row or on a box; this moves a word to
+     * the nearest clear point on its own line, then off the line by a label's height on
+     * either side, and leaves it at the middle when the middle is already clear. The
+     * "worked out" badge is one of the labels, so a badge keeps clear of the words too.
      * Measured on the rendered labels, so call it once the drawing is on screen. */
     function separateLabels(paper, graph) {
+        /* Words keep 3px from each other; an element only needs 1px, because the channel
+           between two rows of elements is barely taller than a word. Both shrink with a
+           zoomed-out drawing, as the words and elements themselves do. */
+        let zoom = Math.min(1, paper.scale().sx);
+        let box = function(r, pad) { pad = (pad == null ? 3 : pad) * zoom; return { left: r.left - pad, right: r.right + pad, top: r.top - pad, bottom: r.bottom + pad }; };
         let placed = [];
-        let tries = [0.5, 0.42, 0.58, 0.34, 0.66, 0.26, 0.74, 0.18, 0.82, 0.12, 0.88];
+        let nodes = graph.getElements().map(function(el) {
+            let view = paper.findViewByModel(el);
+            return view ? box(view.el.getBoundingClientRect(), 1) : null;
+        }).filter(Boolean);
+        let tries = [];
+        for (let d = 0; d <= 0.44; d += 0.02) {
+            tries.push(0.5 + d);
+            if (d) tries.push(0.5 - d);
+        }
+        let offsets = [0, 14, -14, 28, -28];
         let hits = function(a, b) {
             return a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top;
+        };
+        let clashes = function(b) {
+            return placed.filter(function(o) { return hits(b, o); }).length
+                + nodes.filter(function(o) { return hits(b, o); }).length;
         };
         graph.getLinks().forEach(function(link) {
             let view = paper.findViewByModel(link);
             let count = link.labels().length;
             if (!view || !count) return;
             for (let i = 0; i < count; i++) {
-                let box = null;
-                for (let k = 0; k < tries.length; k++) {
-                    link.prop('labels/' + i + '/position/distance', tries[k]);
-                    let node = view.el.querySelectorAll('.labels > .label')[i];
-                    if (!node) break;
-                    let r = node.getBoundingClientRect();
-                    box = { left: r.left - 2, right: r.right + 2, top: r.top - 2, bottom: r.bottom + 2 };
-                    if (!placed.some(function(o) { return hits(box, o); })) break;
+                let best = null;
+                let node = view.el.querySelectorAll('.labels > .label')[i];
+                if (!node) continue;
+                let size = node.getBoundingClientRect();
+                let conn = view.getConnection();
+                /* A label's rendered box is not reliable while its position is changing, so
+                   its place is worked out from the route: the point on the line, moved
+                   sideways along the line's normal, in screen pixels. */
+                let measure = function(distance, offset) {
+                    let at = conn.pointAt(distance);
+                    let tangent = conn.tangentAt(distance);
+                    let dx = 0, dy = 0;
+                    if (tangent && offset) {
+                        let len = Math.hypot(tangent.end.x - tangent.start.x, tangent.end.y - tangent.start.y) || 1;
+                        dx = -(tangent.end.y - tangent.start.y) / len * offset;
+                        dy = (tangent.end.x - tangent.start.x) / len * offset;
+                    }
+                    let c = paper.localToClientPoint(at.x + dx, at.y + dy);
+                    return box({ left: c.x - size.width / 2, right: c.x + size.width / 2, top: c.y - size.height / 2, bottom: c.y + size.height / 2 });
+                };
+                search:
+                for (let o = 0; o < offsets.length; o++) {
+                    for (let k = 0; k < tries.length; k++) {
+                        let b = measure(tries[k], offsets[o]);
+                        if (!b) break search;
+                        let n = clashes(b);
+                        if (!best || n < best.n) best = { n: n, distance: tries[k], offset: offsets[o], box: b };
+                        if (n === 0) break search;
+                    }
                 }
-                if (box) placed.push(box);
+                if (!best) continue;
+                link.prop('labels/' + i + '/position', { distance: best.distance, offset: best.offset });
+                let kept = best.box;
+                placed.push(kept);
             }
         });
     }
