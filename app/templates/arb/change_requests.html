@@ -32,7 +32,7 @@
     {% set assessing_count = change_requests | selectattr('status', 'equalto', 'assessing') | list | length %}
     {% set closed_count = change_requests | selectattr('status', 'equalto', 'closed') | list | length %}
 
-    <div class="grid grid-cols-1 gap-4 px-4 lg:px-6 @xl/main:grid-cols-2 @5xl/main:grid-cols-4">
+    <div class="grid grid-cols-2 gap-4 px-4 lg:px-6 lg:grid-cols-4">
         {% call card() %}
             {% call card_header() %}
                 {% call card_description() %}Total{% endcall %}
@@ -122,7 +122,7 @@
                             {% endif %}
                         {% endcall %}
                         {% call table_cell() %}
-                            <span class="text-muted-foreground">{{ cr.raised_by.name if cr.raised_by else '—' }}</span>
+                            <span class="text-muted-foreground">{{ cr.raised_by.name if cr.raised_by else 'Not recorded' }}</span>
                         {% endcall %}
                         {% call table_cell() %}
                             <span class="text-xs text-muted-foreground">{{ cr.raised_at.strftime('%Y-%m-%d') if cr.raised_at else '—' }}</span>
