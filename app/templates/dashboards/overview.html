@@ -6,6 +6,7 @@
 {% from 'components/company_kind.html' import company_kind_picker %}
 {% from 'components/button.html' import button %}
 {% from 'components/input.html' import input %}
+{% from 'components/card.html' import card, card_header, card_title, card_description, card_content %}
 {% from 'components/table.html' import table, table_header, table_body, table_row, table_head, table_cell, table_empty_state %}
 {% block title %}Dashboard{% endblock %}
 {% block guided_mode_steps %}
@@ -23,6 +24,12 @@
 <script src="{{ url_for('static', filename='js/dashboard/company_kind.js') }}"></script>
 {% endblock %}
 {% block content %}
+{% macro question_box() %}
+<form method="get" action="/ai-chat" class="flex flex-col gap-2 sm:flex-row" data-testid="first-question-form">
+    {{ input(name='q', type='text', placeholder='Ask anything, for example: what breaks if our payments service fails?', aria_label='Ask a question about your company', class='sm:flex-1', attrs_dict={'data-testid': 'first-question-input', 'maxlength': '2000', 'autocomplete': 'off'}) }}
+    {{ button(text='Ask', type='submit', icon='arrow-right', icon_position='right', testid='first-question-submit') }}
+</form>
+{% endmacro %}
 {# Overview pattern (design/patterns.json: dashboard-01): page header, KPI
    band, lens tabs, chart, answer cascade, dense table. No navigation card grid. #}
 {% set mode = dashboard_mode|default('data') %}
@@ -71,6 +78,36 @@
     {# ══════════════════════════════════════════════════════════════════════
        GUIDED MODE — sparse org: a setup journey, not a failing report card.
        ══════════════════════════════════════════════════════════════════════ #}
+    {% call card(class='') %}
+    <div data-testid="first-message">
+        {% call card_header() %}
+            {% call card_title(class='text-xl') %}{{ 'Bring in your company, or look around a sample first' if (first_actions.sample or first_actions.connect) else 'Bring your applications in' }}{% endcall %}
+            {% call card_description(class='max-w-[60ch]') %}Connect GitHub or Jira and {{ config.APP_NAME }} maps your services, owners and dependencies, then answers in plain words and cites the source of every fact. Nothing to connect yet? A sample company shows you what that looks like in under a minute.{% endcall %}
+        {% endcall %}
+        {% call card_content(class='space-y-4') %}
+            <div class="flex flex-col gap-3 sm:flex-row" data-testid="first-actions">
+                {% if first_actions.connect %}
+                {{ button(text='Connect GitHub', href=url_for('m365_connector.github_connect'), icon='github', testid='first-action-connect') }}
+                {% endif %}
+                {% if first_actions.sample %}
+                <form method="post" action="{{ url_for('architect_ui.load_sample_company') }}" data-testid="first-action-sample-form">
+                    {{ input(type='hidden', name='csrf_token', value=csrf_token()) }}
+                    {{ button(text='See a sample company', type='submit', variant='outline' if first_actions.connect else 'default', testid='first-action-sample') }}
+                </form>
+                {% endif %}
+                {% if not first_actions.connect and not first_actions.sample %}
+                {{ button(text='Import your applications', href=first_actions.import_href, testid='first-action-import') }}
+                {% endif %}
+            </div>
+            {% if not first_actions.connect %}
+            <p class="text-sm text-muted-foreground">Connecting GitHub or Jira is done by an organisation administrator.</p>
+            {% endif %}
+            {{ question_box() }}
+        {% endcall %}
+    </div>
+    {% endcall %}
+
+    {# The checklist sits beneath the one message. #}
     {% call section_card(title="Set up your workspace") %}
     <div class="space-y-4" data-testid="guided-setup">
         <p class="text-sm text-muted-foreground max-w-[60ch]">
@@ -111,6 +148,31 @@
     </div>
     {% endcall %}
     {% else %}
+
+    {# The one message: a question box and, beneath it, the first cited answer. #}
+    {% call card() %}
+    <div data-testid="first-message">
+        {% call card_header() %}
+            {% call card_title(class='text-xl') %}Ask your company a question{% endcall %}
+            {% call card_description() %}Answers cite the records they come from.{% endcall %}
+        {% endcall %}
+        {% call card_content(class='space-y-6') %}
+            {{ question_box() }}
+        <section aria-labelledby="impact-answer-heading" x-data="overviewCascade()" data-testid="overview-cascade">
+            <h2 id="impact-answer-heading" class="mb-3 text-base font-semibold text-foreground">What breaks if it fails</h2>
+            <div x-show="state === 'loading'" class="space-y-2" aria-busy="true">
+                <div class="h-5 w-2/3 max-w-[640px] rounded bg-muted"></div>
+                <div class="h-10 rounded-md border border-border bg-card"></div>
+                <div class="ml-5 h-10 rounded-md border border-border bg-card"></div>
+            </div>
+            <div x-show="state === 'ready'" x-cloak>
+                {{ answer_cascade('overview-answer-cascade', question='questionText', rows='rows', ask='load(node.elementId)', root='centreName') }}
+            </div>
+            <p x-show="state === 'empty'" x-cloak class="text-sm text-muted-foreground">No connections recorded yet. <a href="{{ url_for('intelligence_ui.ask') }}" class="text-info hover:underline">Ask about anything you depend on</a>.</p>
+            <p x-show="state === 'error'" x-cloak role="status" class="text-sm text-muted-foreground">We could not load an answer just now. <a href="{{ url_for('intelligence_ui.ask') }}" class="text-info hover:underline">Open Ask</a>.</p>
+        {% endcall %}
+    </div>
+    {% endcall %}
 
     {# KPI band: four tiles, each with number, source, as-of date, and link to the list.
        Council-07: each tile is clickable and links to the list it counts. Real zeros
@@ -164,13 +226,13 @@
             {% endcall %}
             <div x-show="open" x-cloak class="mt-3 space-y-2 border-t border-border pt-3" data-testid="health-score-disclosure">
                 <p class="text-xs font-medium text-foreground">Weighted from:</p>
-                <ul class="space-y-1.5 text-xs text-muted-foreground">
+                <ul class="space-y-1.5 text-xs text-muted-foreground" data-testid="health-score-parts">
                 {% for key in ['phase_maturity', 'risk_health', 'capability_coverage', 'governance'] %}
                     {% set part = health_components.get(key, {}) %}
-                    <li class="flex items-start gap-2">
+                    <li class="flex items-start gap-2" data-testid="health-score-part">
                         {% if part.value is not none %}
-                        <span class="shrink-0 text-foreground font-medium">{{ part.value }}%</span>
-                        <span>{{ part.label }}</span>
+                        <span class="shrink-0 font-medium text-foreground tabular-nums" data-testid="health-part-value">{{ part.value }}%</span>
+                        <span>{{ part.label }}{% if part.weight %}, weight <span class="tabular-nums" data-testid="health-part-weight">{{ '%g'|format(part.weight) }}%</span>{% endif %}</span>
                         {% else %}
                         <span class="shrink-0 text-muted-foreground">—</span>
                         <span>{{ part.label }}: {{ part.basis }}</span>
@@ -178,6 +240,9 @@
                     </li>
                 {% endfor %}
                 </ul>
+                {% if health_sum %}
+                <p class="text-xs text-muted-foreground" data-testid="health-score-sum">Sum: <span class="tabular-nums text-foreground">{{ health_sum }}</span></p>
+                {% endif %}
                 {% if health_unavailable %}
                 <p class="text-xs text-muted-foreground mt-2">
                     Not measured: {{ health_unavailable|join(', ')|replace('_', ' ')|title }}.
@@ -238,9 +303,7 @@
                 {{ '{:,}'.format(nav_stats.relationships) if nav_stats and nav_stats.relationships is not none else '—' }} relationships across all ArchiMate layers
             </p>
         </div>
-        <a href="/archimate/composer?viewpoint=layered" class="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90">
-            Open Composer <i data-lucide="arrow-right" class="h-3.5 w-3.5" aria-hidden="true"></i>
-        </a>
+        {{ button(text='Open Composer', href='/archimate/composer?viewpoint=layered', size='sm', icon='arrow-right', icon_position='right', class='shrink-0 gap-1.5 text-xs', testid='open-composer') }}
     </div>
 
     {# Council-07: Architecture health — each part shows value with source/date, or the
@@ -258,6 +321,7 @@
                 {% if part.value is not none %}
                 <p class="mt-1 text-lg font-semibold tabular-nums text-foreground">{{ part.value }}%</p>
                 <p class="mt-1 text-xs text-muted-foreground">{{ part.basis }}</p>
+                {% if part.weight %}<p class="mt-0.5 text-xs text-muted-foreground">Counts for {{ '%g'|format(part.weight) }}% of the health score</p>{% endif %}
                 <p class="mt-0.5 text-xs text-muted-foreground">from {{ part.source }}, as of {{ part.as_of }}</p>
                 {% else %}
                 <p class="mt-1 text-lg font-semibold tabular-nums text-foreground">—</p>
@@ -348,25 +412,11 @@
     {% endif %}
     {% endcall %}
 
-    {# Answer cascade: one high-impact answer, full width. #}
-    <section aria-labelledby="impact-answer-heading" x-data="overviewCascade()" data-testid="overview-cascade">
-        <h2 id="impact-answer-heading" class="mb-3 text-base font-semibold text-foreground">What breaks if it fails</h2>
-        <div x-show="state === 'loading'" class="space-y-2" aria-busy="true">
-            <div class="h-5 w-2/3 max-w-[640px] rounded bg-muted"></div>
-            <div class="h-10 rounded-md border border-border bg-card"></div>
-            <div class="ml-5 h-10 rounded-md border border-border bg-card"></div>
-        </div>
-        <div x-show="state === 'ready'" x-cloak>
-            {{ answer_cascade('overview-answer-cascade', question='questionText', rows='rows', ask='load(node.elementId)', root='centreName') }}
-        </div>
-        <p x-show="state === 'empty'" x-cloak class="text-sm text-muted-foreground">No connections recorded yet. <a href="{{ url_for('intelligence_ui.ask') }}" class="text-info hover:underline">Ask about anything you depend on</a>.</p>
-        <p x-show="state === 'error'" x-cloak role="status" class="text-sm text-muted-foreground">We could not load an answer just now. <a href="{{ url_for('intelligence_ui.ask') }}" class="text-info hover:underline">Open Ask</a>.</p>
-
         {# Dense table: capability coverage, 48px rows, sticky header, tabular
            figures, hover-revealed action. Gaps are the at-risk rows. #}
         {% set ch = capability_health|default([]) %}
         {% set gap_count = ch | selectattr('coverage_status', 'equalto', 'gap') | list | length %}
-        <section aria-labelledby="capability-coverage-heading" class="mt-8 rounded-lg border border-border bg-card" data-testid="capability-health-widget">
+        <section aria-labelledby="capability-coverage-heading" class="rounded-lg border border-border bg-card" data-testid="capability-health-widget">
             <div class="flex items-center justify-between border-b border-border px-4 py-2">
                 <h2 id="capability-coverage-heading" class="text-base font-semibold text-foreground">Capability coverage</h2>
                 <span class="text-2xs font-semibold uppercase tracking-[0.06em] text-muted-foreground tabular-nums">{{ gap_count }} gap{{ 's' if gap_count != 1 else '' }} of {{ ch|length }}</span>
@@ -386,7 +436,6 @@
                         </tr>
                         {% endfor %}{% endcall %}
         </section>
-    </section>
     </div>
 
     {# ══════════════════════════════════════════════════════════════════════
@@ -557,12 +606,8 @@
                     <a :href="'/archimate/composer?viewpoint=layered&layer=' + activeRole" class="inline-flex h-8 items-center gap-1.5 rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90">
                         Open in composer <i data-lucide="pen-tool" class="h-3.5 w-3.5" aria-hidden="true"></i>
                     </a>
-                    <a href="/architecture/dashboard" class="inline-flex h-8 items-center gap-1.5 rounded-md border border-border px-3 text-xs font-medium text-foreground transition-colors hover:bg-muted">
-                        Browse elements <i data-lucide="boxes" class="h-3.5 w-3.5" aria-hidden="true"></i>
-                    </a>
-                    <a href="/capability-map/" x-show="activeRole === 'strategy' || activeRole === 'business'" class="inline-flex h-8 items-center gap-1.5 rounded-md border border-border px-3 text-xs font-medium text-foreground transition-colors hover:bg-muted">
-                        Capability map <i data-lucide="layers" class="h-3.5 w-3.5" aria-hidden="true"></i>
-                    </a>
+                    {{ button(text='Browse elements', variant='outline', size='sm', icon='boxes', icon_position='right', class='gap-1.5 text-xs', href='/architecture/dashboard') }}
+                    {{ button(text='Capability map', variant='outline', size='sm', icon='layers', icon_position='right', class='gap-1.5 text-xs', href='/capability-map/', attrs_dict={'x-show': "activeRole === 'strategy' || activeRole === 'business'"}) }}
                 </div>
             </div>
         </section>
@@ -570,3 +615,4 @@
     {% endif %}
 </div>
 {% endblock %}
+{# design-block: dashboard #}

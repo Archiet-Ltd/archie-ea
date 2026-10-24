@@ -489,6 +489,8 @@ entries:
         scope: [app/static/css, app/templates]
         suffixes: [.css, .html]
     known_exceptions:
+      - path: app/static/css/archimate_composer.css
+        reason: authenticated-app composer toolbar and search buttons, moved unchanged out of the composer page where the baseline already recorded them; not a public-site button
       - path: app/static/css/vendor/
         reason: third-party stylesheets, not ours to change
       - path: app/static/css/tailwind-output*
@@ -520,6 +522,8 @@ entries:
         reason: authenticated-app skip-link and focus styles, not the public inline link
       - path: app/static/css/app.css
         reason: authenticated-app link styles, not the public inline link
+      - path: app/static/css/archimate_composer.css
+        reason: the .joint-link rules style the diagram library's own link elements on the composer canvas, not an inline text link
       - path: app/static/css/vendor/
         reason: third-party stylesheets, not ours to change
       - path: app/static/css/tailwind-output*

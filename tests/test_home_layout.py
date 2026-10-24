@@ -79,10 +79,10 @@ def test_pricing_table_has_five_headers_and_four_rows(home_html):
     assert all(len(re.findall(r"<td", r)) == 5 for r in rows)
 
 
-def test_hero_figure_is_the_product_window_and_not_the_twin_map(home_html):
-    assert "img/home/product-portfolio.webp" in home_html
-    assert "img/home/product-portfolio-mobile.webp" in home_html
-    assert "impact-answer" not in home_html
+def test_hero_figure_is_a_real_answer_and_not_the_stale_list(home_html):
+    assert "img/home/impact-answer.webp" in home_html
+    assert "img/home/impact-answer-mobile.webp" in home_html
+    assert "product-portfolio" not in home_html
 
 
 def test_closing_band_has_the_call_to_action_pair(home_html):
