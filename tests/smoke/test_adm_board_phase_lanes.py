@@ -33,10 +33,11 @@ LANE_NAMES = [
     "Requirements Management",
 ]
 
+# Each solution's own deliverables, and the TOGAF checklist item (if any) it fulfils.
 DELIVERABLES = {
-    "B": ["Lane Test Business Architecture Document", "Lane Test Business Gap Analysis", "Lane Test Business Principles"],
-    "D": ["Lane Test Technology Architecture", "Lane Test Technology Roadmap Update"],
-    "F": ["Lane Test Migration Plan", "Lane Test Transition Architecture"],
+    "B": [("Lane Test Process Model", "Business Architecture document"), ("Lane Test Impact Note", None)],
+    "D": [("Lane Test Platform Design", "Technology Architecture")],
+    "F": [("Lane Test Cut-over", "Finalized Implementation Plan"), ("Lane Test Rollback Plan", None)],
 }
 
 SOLUTIONS = [
@@ -89,40 +90,44 @@ def _assert_signed_in_as_enterprise_architect(email):
 
 def _seed_board(org_id, architect_email):
     from app import create_app, db
-    from app.models.adm_deliverable import ADMDeliverable, ADMDeliverableCheck
+    from app.models.adm_deliverable import ADMDeliverable
     from app.models.adm_kanban import create_adm_phases
-    from app.models.solution_models import Solution
+    from app.models.implementation_migration import Deliverable
+    from app.models.solution_models import Solution, solution_deliverables
     from app.models.user import User
+    from app.services.adm_deliverable_service import seed_deliverables
 
     with create_app("testing").app_context():
-        # The ten ADM phases are reference data every deployment loads; tasks are created against them.
+        # The ten ADM phases and the TOGAF checklist are reference data every deployment loads.
         create_adm_phases()
+        seed_deliverables()
+        templates = {(t.phase, t.name): t.id for t in ADMDeliverable.query.filter_by(is_template=True)}
         architect_id = User.query.filter_by(email=architect_email).one().id
-        # The deliverable catalogue is shared by every organisation; start from a known set.
-        ADMDeliverableCheck.query.delete()
-        ADMDeliverable.query.delete()
-        for phase, names in DELIVERABLES.items():
-            for name in names:
-                if not ADMDeliverable.query.filter_by(name=name).first():
-                    db.session.add(ADMDeliverable(
-                        phase=phase, name=name, is_template=True,
-                        description="Produced in phase %s." % phase))
         for name, phase, status in SOLUTIONS:
-            db.session.add(Solution(
+            solution = Solution(
                 name=name, description="Board fixture.", organization_id=org_id,
                 governance_status=status, adm_phase=phase, solution_owner="Someone Else",
                 # Only the data platform solution is the signed-in architect's own.
-                created_by_id=architect_id if name == SOLUTIONS[1][0] else None))
+                created_by_id=architect_id if name == SOLUTIONS[1][0] else None)
+            db.session.add(solution)
+            db.session.flush()
+            for d_name, d_template in DELIVERABLES[phase]:
+                deliverable = Deliverable(
+                    name=d_name, organization_id=org_id, delivery_status="planned",
+                    adm_template_id=templates.get((phase, d_template)))
+                db.session.add(deliverable)
+                db.session.flush()
+                db.session.execute(solution_deliverables.insert().values(
+                    solution_id=solution.id, deliverable_id=deliverable.id))
         db.session.commit()
 
 
-def _drop_deliverables():
+def _drop_deliverables(org_id):
     from app import create_app, db
-    from app.models.adm_deliverable import ADMDeliverable, ADMDeliverableCheck
+    from app.models.implementation_migration import Deliverable
 
     with create_app("testing").app_context():
-        ADMDeliverableCheck.query.delete()
-        ADMDeliverable.query.delete()
+        Deliverable.query.filter_by(organization_id=org_id).delete()
         db.session.commit()
 
 
@@ -130,7 +135,7 @@ def _drop_deliverables():
 def seeded_board(own_org):
     _seed_board(own_org, _make_enterprise_architect(own_org))
     yield own_org
-    _drop_deliverables()
+    _drop_deliverables(own_org)
 
 
 def _open(browser, live_server, email, width):
@@ -168,7 +173,7 @@ def test_architect_reads_the_cycle_as_lanes_with_solutions_and_deliverables(
             expect(card).to_have_count(1)
             chip = card.get_by_test_id("adm-deliverables-chip")
             count = len(DELIVERABLES[phase])
-            expect(chip).to_have_text(re.compile(r"%d deliverables?" % count))
+            expect(chip).to_have_text(re.compile(r"0 of %d deliverables? complete" % count))
 
         # Counts agree between the lane header and what the lane holds, in the right number.
         expect(_lane(page, "B")).to_contain_text("1 solution")
@@ -198,8 +203,10 @@ def test_architect_reads_the_cycle_as_lanes_with_solutions_and_deliverables(
         card.get_by_test_id("adm-deliverables-chip").click()
         dialog = page.get_by_role("dialog", name=re.compile("Deliverables"))
         expect(dialog).to_be_visible(timeout=PAGE_TIMEOUT)
-        for name in DELIVERABLES["B"]:
+        for name, _template in DELIVERABLES["B"]:
             expect(dialog).to_contain_text(name)
+        # What the phase expects is the checklist; what this solution has not begun says so.
+        expect(dialog.get_by_test_id("adm-checklist").locator("li").filter(has_text="Gap Analysis")).to_contain_text("Not started")
     finally:
         context.close()
 
@@ -236,7 +243,7 @@ def test_deliverables_filter_lists_the_deliverables_not_an_empty_board(browser, 
     try:
         page.get_by_label("Filter by type").select_option("deliverable")
         for names in DELIVERABLES.values():
-            for name in names:
+            for name, _template in names:
                 expect(page.locator("main").get_by_text(name).first).to_be_visible(timeout=PAGE_TIMEOUT)
         total = sum(len(names) for names in DELIVERABLES.values())
         expect(page.get_by_test_id("adm-status-summary")).to_contain_text("%d deliverables" % total)
