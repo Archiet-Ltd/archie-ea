@@ -127,8 +127,8 @@
   }
   /* The question line above an answer cascade. */
   .question-line {
-    font-family: theme(fontFamily.serif);
-    font-style: italic;
+    font-family: theme(fontFamily.sans);
+    font-style: normal;
     font-size: 1.125rem;
     letter-spacing: 0;
     color: hsl(var(--muted-foreground));

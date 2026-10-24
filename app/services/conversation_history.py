@@ -168,7 +168,7 @@ class ConversationHistoryService:
             self.add_message(thread_id, "user", initial_message, model=None)
 
         # Invalidate cache
-        invalidate_cache(f"threads:user:{user_id}:*")
+        invalidate_cache("threads:user:*")
 
         return thread
 
@@ -252,7 +252,7 @@ class ConversationHistoryService:
                 print(f"Warning: Vector indexing failed: {e}")
 
         # Invalidate cache
-        invalidate_cache(f"thread:{thread_id}:messages")
+        invalidate_cache(f"thread:messages:*{thread_id}*")
 
         return ConversationMessage(
             id=message_id,
@@ -452,7 +452,7 @@ class ConversationHistoryService:
         db.session.commit()
 
         # Invalidate cache
-        invalidate_cache(f"thread:{thread_id}:*")
+        invalidate_cache(f"thread:messages:*{thread_id}*")
         invalidate_cache("threads:user:*")
 
     def update_thread_title(self, thread_id: str, title: str):
