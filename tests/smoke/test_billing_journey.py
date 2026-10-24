@@ -46,7 +46,7 @@ def test_pricing_buy_button_leads_a_visitor_to_that_plans_checkout(browser, live
         expect(page.get_by_test_id("plan-card-startup")).to_be_visible()
         # No keys on this server: say so, and offer no payment button that cannot work.
         expect(page.get_by_test_id("checkout-unavailable")).to_contain_text(
-            "Online payment is not set up on this installation")
+            "Checkout opens soon")
         expect(page.get_by_test_id("checkout-submit")).to_have_count(0)
     finally:
         context.close()
@@ -82,8 +82,12 @@ def test_administrator_sees_plan_limits_and_can_choose_a_plan(browser, live_serv
         expect(page.locator("#checkout").get_by_role("heading", name="Buy Team")).to_be_visible(
             timeout=PAGE_TIMEOUT)
 
-        # Invoices and billing details say why they are empty instead of showing zeros.
-        expect(page.get_by_text("Invoices are not available")).to_be_visible()
+        # Invoices say why they are empty and what to do next, instead of showing zeros.
+        expect(page.get_by_text("No invoices yet")).to_be_visible()
+        expect(page.get_by_text("Invoices appear here once online payment is open")).to_be_visible()
+        page.get_by_role("link", name="Contact us").last.click()
+        page.wait_for_url(lambda url: "/contact" in url, timeout=PAGE_TIMEOUT)
+        expect(page.locator("main").first).not_to_be_empty()
     finally:
         context.close()
 

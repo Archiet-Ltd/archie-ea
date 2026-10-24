@@ -5,6 +5,8 @@
 {% from 'components/button.html' import button %}
 {% from 'components/badge.html' import badge %}
 {% from 'components/checkbox.html' import checkbox %}
+{% from 'components/dialog.html' import dialog %}
+{% from 'components/skeleton.html' import skeleton %}
 {% from 'components/empty_state.html' import empty_state %}
 {% from 'components/input.html' import input, textarea %}
 {% from 'components/select.html' import native_select %}
@@ -56,9 +58,13 @@
     {{ _ps_actions() }}
 
     {# -- Loading / Error ------------------------------------------------ #}
-    <div x-show="loading" x-cloak class="p-12 text-center">
-        <div class="inline-block w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
-        <p class="mt-2 text-sm text-muted-foreground">Loading board...</p>
+    <div x-show="loading" x-cloak class="space-y-3" role="status" aria-label="Loading the board" data-testid="adm-board-loading">
+        <div class="flex gap-4 overflow-hidden">
+            {{ skeleton(class='h-64 w-72 shrink-0') }}
+            {{ skeleton(class='h-64 w-72 shrink-0') }}
+            {{ skeleton(class='h-64 w-72 shrink-0') }}
+            {{ skeleton(class='h-64 w-72 shrink-0') }}
+        </div>
     </div>
     <div x-show="error && !loading" x-cloak class="p-8 text-center" role="alert">
         <p class="text-sm text-destructive-emphasis" x-text="error"></p>
@@ -89,14 +95,16 @@
         <span class="font-medium text-foreground" x-text="plural(visibleCards().length, visibleNoun())"></span>
         <div x-show="filters.card_type !== 'deliverable'" class="flex flex-wrap items-center gap-2">
             <template x-for="col in columns" :key="col.id">
+                <div class="inline-flex" :title="wipLimit(col.id) > 0 ? 'At most ' + wipLimit(col.id) + ' cards should be in ' + col.label + ' at once. Finish or move one before starting another.' : null">
                 {% call badge('neutral', class='gap-1') %}
                     <span x-text="col.label"></span>
-                    <span x-text="wipCount(col.id) + (wipLimit(col.id) > 0 ? ' / ' + wipLimit(col.id) : '')"
+                    <span x-text="wipCount(col.id) + (wipLimit(col.id) > 0 ? ' of ' + wipLimit(col.id) + ' limit' : '')"
                           :class="wipAtLimit(col.id) ? 'text-destructive-emphasis' : ''"></span>
                     <i x-show="wipAtLimit(col.id)" x-cloak data-lucide="lock" class="h-3 w-3" aria-hidden="true"></i>
                     <span x-show="colSlaStatus(col.id) && colSlaStatus(col.id).overdue_count > 0" x-cloak class="text-destructive-emphasis"
                           x-text="colSlaStatus(col.id) ? colSlaStatus(col.id).overdue_count + ' past ' + colSlaStatus(col.id).sla_days + '-day limit' : ''"></span>
                 {% endcall %}
+                </div>
             </template>
         </div>
     </div>
@@ -152,7 +160,10 @@
                                             {% call badge('info') %}<span data-testid="adm-status" x-text="columnLabel(card.column)"></span>{% endcall %}
                                         </template>
                                         <template x-if="card.card_type === 'deliverable'">
-                                            {% call badge('neutral') %}Deliverable{% endcall %}
+                                            <div class="flex flex-wrap items-center gap-1.5">
+                                                {% call badge('neutral') %}Deliverable{% endcall %}
+                                                {% call badge('info') %}<span data-testid="adm-status" x-text="stateLabelFor(card.column)"></span>{% endcall %}
+                                            </div>
                                         </template>
                                         <template x-if="card.card_type === 'task'">
                                             {% call badge('neutral') %}Task{% endcall %}
@@ -184,7 +195,7 @@
 
                                     <template x-if="card.card_type === 'solution'">
                                         <div class="mt-3 flex flex-wrap items-center gap-2 border-t border-border pt-2">
-                                            {% call button(variant='outline', size='xs', class='gap-1', attrs_dict={'data-testid': 'adm-deliverables-chip', '@click': 'openDeliverables(card.phase)', ':aria-label': "'Deliverables for ' + card.title"}) %}<i data-lucide="file-check" class="h-3 w-3" aria-hidden="true"></i><span x-text="phaseDeliverableCards(card.phase).length ? plural(phaseDeliverableCards(card.phase).length, 'deliverable') : 'No deliverables'"></span>{% endcall %}
+                                            {% call button(variant='outline', size='xs', class='gap-1', attrs_dict={'data-testid': 'adm-deliverables-chip', '@click': 'openDeliverables(card)', ':aria-label': "'Deliverables for ' + card.title"}) %}<i data-lucide="file-check" class="h-3 w-3" aria-hidden="true"></i><span x-text="deliverableChipText(card)"></span>{% endcall %}
                                             <a x-show="card.link_url" :href="card.link_url" class="text-xs font-medium text-primary hover:underline" x-text="card.link_label || 'Open'"></a>
                                             <span x-show="!card.link_url" class="text-xs text-muted-foreground">Open to its owner and stakeholders</span>
                                         </div>
@@ -242,37 +253,55 @@
         {{ button(text='Cancel', variant='ghost', size='xs', on_click='clearSelection()') }}
     </div>
 
-    {# Deliverables of a phase: opened from the count chip on a solution #}
-    <div x-show="deliverablePhase" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4"
-         @keydown.escape.window="deliverablePhase = null">
-        <div class="fixed inset-0 bg-overlay/50" @click="deliverablePhase = null"></div>
-        <div class="relative w-full max-w-md rounded-lg border border-border bg-card p-6" role="dialog" aria-modal="true"
-             aria-labelledby="adm-deliverables-title" @click.stop>
-            <div class="flex items-start justify-between gap-4">
-                <div class="min-w-0">
-                    <h2 id="adm-deliverables-title" class="text-base font-semibold text-foreground" x-text="'Deliverables — ' + phaseLabel(deliverablePhase)"></h2>
-                    <p class="mt-1 text-sm text-muted-foreground" x-text="plural(phaseDeliverableCards(deliverablePhase).length, 'deliverable') + ' produced in this phase'"></p>
-                </div>
-                {{ button(variant='ghost', size='icon-sm', icon='x', aria_label='Close deliverables', on_click='deliverablePhase = null') }}
+    {# A solution's deliverables against the TOGAF checklist of its phase: opened from the chip on its card #}
+    {% call dialog(open_expr='deliverableSolution', close_expr='closeDeliverables()', title_expr="deliverableTitle()", start_hidden=false) %}
+        <div data-testid="adm-deliverables-dialog">
+            <p class="text-sm text-muted-foreground" x-text="deliverableSummary()"></p>
+            <div x-show="deliverableState.loading" class="mt-4 space-y-2" role="status" aria-label="Loading deliverables">
+                {{ skeleton(class='h-12 w-full') }}
+                {{ skeleton(class='h-12 w-full') }}
             </div>
-            <ul class="mt-4 max-h-[60vh] space-y-3 overflow-y-auto">
-                <template x-for="item in phaseDeliverableItems(deliverablePhase)" :key="item.id">
-                    <li class="flex items-start gap-3 rounded-md border border-border p-3">
-                        {{ checkbox(attrs_dict={':checked': 'item.checked', ':disabled': '!item.ready', '@change': 'toggleDeliverable(item.entityId, deliverablePhase, $event.target.checked)', ':aria-label': "'Mark ' + item.title + ' complete'"}) }}
-                        <div class="min-w-0">
-                            <p class="text-sm font-medium text-foreground" :class="item.checked ? 'line-through text-muted-foreground' : ''" x-text="item.title"></p>
-                            <p class="mt-1 text-xs text-muted-foreground" x-show="item.subtitle" x-text="item.subtitle"></p>
-                        </div>
-                    </li>
-                </template>
-            </ul>
-            <p class="mt-4 text-sm text-muted-foreground" x-show="phaseDeliverableCards(deliverablePhase).length === 0">
-                No deliverables are listed for this phase yet.
-            </p>
-            <p class="mt-4 border-t border-border pt-3 text-xs text-muted-foreground" x-show="phaseDeliverableCards(deliverablePhase).length > 0"
-               x-text="phaseDeliverableItems(deliverablePhase).filter(function (i) { return i.checked; }).length + ' of ' + phaseDeliverableCards(deliverablePhase).length + ' complete'"></p>
+            <p x-show="deliverableState.error" x-cloak class="mt-4 text-sm text-destructive-emphasis" role="alert" x-text="deliverableState.error"></p>
+            <div x-show="!deliverableState.loading && !deliverableState.error" x-cloak class="mt-4 max-h-[60vh] space-y-4 overflow-y-auto">
+                <ul class="space-y-2" data-testid="adm-checklist">
+                    <template x-for="row in deliverableState.checklist" :key="row.template_id">
+                        <li class="flex items-start gap-3 rounded-md border border-border p-3">
+                            <template x-if="row.deliverable">
+                                {{ checkbox(attrs_dict={':checked': 'row.deliverable.complete', '@change': 'toggleDeliverable(row.deliverable, $event.target.checked)', ':aria-label': "'Mark ' + row.deliverable.name + ' complete'"}) }}
+                            </template>
+                            <div class="min-w-0 flex-1">
+                                <p class="text-sm font-medium text-foreground" x-text="row.name"></p>
+                                <p class="mt-0.5 text-xs text-muted-foreground" x-show="row.deliverable"
+                                   x-text="row.deliverable ? row.deliverable.name : ''"></p>
+                            </div>
+                            <template x-if="row.deliverable">
+                                {% call badge('neutral', class='shrink-0') %}<span x-text="stateLabel(row.deliverable)"></span>{% endcall %}
+                            </template>
+                            <template x-if="!row.deliverable">
+                                {% call badge('outline', class='shrink-0') %}Not started{% endcall %}
+                            </template>
+                        </li>
+                    </template>
+                </ul>
+                <div x-show="deliverableState.also_produced.length > 0" x-cloak>
+                    <h3 class="mb-2 text-xs font-medium text-muted-foreground">Also produced</h3>
+                    <ul class="space-y-2" data-testid="adm-also-produced">
+                        <template x-for="item in deliverableState.also_produced" :key="item.id">
+                            <li class="flex items-start gap-3 rounded-md border border-border p-3">
+                                {{ checkbox(attrs_dict={':checked': 'item.complete', '@change': 'toggleDeliverable(item, $event.target.checked)', ':aria-label': "'Mark ' + item.name + ' complete'"}) }}
+                                <p class="min-w-0 flex-1 text-sm font-medium text-foreground" x-text="item.name"></p>
+                                {% call badge('neutral', class='shrink-0') %}<span x-text="stateLabel(item)"></span>{% endcall %}
+                            </li>
+                        </template>
+                    </ul>
+                </div>
+                <p x-show="deliverableState.checklist.length === 0 && deliverableState.also_produced.length === 0" x-cloak
+                   class="text-sm text-muted-foreground">
+                    This solution has no deliverables yet, and phase <span x-text="deliverableState.phase || 'none set'"></span> has no TOGAF checklist to set against.
+                </p>
+            </div>
         </div>
-    </div>
+    {% endcall %}
 
 </div>
 

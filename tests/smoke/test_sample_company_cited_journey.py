@@ -46,7 +46,7 @@ def test_first_answer_is_cited_and_the_figures_agree(browser, live_server, seede
         context.add_init_script("localStorage.setItem('archie_onboarding_ts', '1')")
         _login(page, live_server, email)
         page.goto(live_server + "/dashboard/overview", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
-        page.get_by_role("button", name="Load sample").first.click()
+        page.get_by_test_id("first-action-sample").click()
         expect(page.locator('[data-testid="sample-company-indicator"]')).to_be_visible(timeout=PAGE_TIMEOUT * 2)
 
         # The toast counts what the card counts.
@@ -98,7 +98,7 @@ def test_a_failed_answer_offers_try_again(browser, live_server, seeded):
         context.add_init_script("localStorage.setItem('archie_onboarding_ts', '1')")
         _login(page, live_server, email)
         page.goto(live_server + "/dashboard/overview", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
-        page.get_by_role("button", name="Load sample").first.click()
+        page.get_by_test_id("first-action-sample").click()
         expect(page.locator('[data-testid="sample-company-indicator"]')).to_be_visible(timeout=PAGE_TIMEOUT * 2)
 
         failures = {"left": 1}
@@ -129,7 +129,7 @@ def test_the_removal_dialog_closes_by_its_name(browser, live_server, seeded):
         context.add_init_script("localStorage.setItem('archie_onboarding_ts', '1')")
         _login(page, live_server, email)
         page.goto(live_server + "/dashboard/overview", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
-        page.get_by_role("button", name="Load sample").first.click()
+        page.get_by_test_id("first-action-sample").click()
         expect(page.locator('[data-testid="sample-company-indicator"]')).to_be_visible(timeout=PAGE_TIMEOUT * 2)
         page.get_by_role("button", name="Remove the sample company").first.click()
         dialog = page.get_by_test_id("sample-company-indicator").get_by_role("dialog")

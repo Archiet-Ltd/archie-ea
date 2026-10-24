@@ -43,7 +43,7 @@ function aiChatDocumentUploader() {
             claude: { name: 'Claude', icon: 'bot' },
             openai: { name: 'GPT-4', icon: 'sparkles' },
             gemini: { name: 'Gemini', icon: 'zap' },
-            deepseek: { name: 'DeepSeek', icon: 'cpu' },
+            nvidia: { name: 'NVIDIA', icon: 'cpu' },
             huggingface: { name: 'Hugging Face', icon: 'brain' }
         },
 

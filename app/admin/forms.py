@@ -138,7 +138,7 @@ class APISettingsForm(FlaskForm):
             ("gemini", "Google Gemini"),
             ("azure", "Azure OpenAI"),
             ("huggingface", "Hugging Face"),
-            ("deepseek", "DeepSeek"),
+            ("nvidia", "NVIDIA (free models)"),
             ("openrouter", "OpenRouter (65+ Models)"),
             ("custom", "Custom API"),
             ("jira", "JIRA"),

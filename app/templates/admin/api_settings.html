@@ -6,7 +6,7 @@
 <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
     {{ page_header(
         title='API Settings',
-        description='Configure API keys and settings for LLM providers (Anthropic, OpenAI, Gemini, Azure, Hugging Face, DeepSeek, OpenRouter), custom web APIs, and other services.',
+        description='Configure API keys and settings for LLM providers (Anthropic, OpenAI, Gemini, Azure, Hugging Face, OpenRouter, NVIDIA), custom web APIs, and other services.',
         breadcrumbs=[
             {'label': 'Home', 'href': url_for('main.index')},
             {'label': 'Admin', 'href': url_for('admin.index')},
@@ -285,7 +285,7 @@
                                     <p class="text-sm text-destructive-emphasis mt-1">{{ form.default_model.errors[0] }}</p>
                                 {% endif %}
                                 <p class="text-xs text-muted-foreground mt-1">
-                                    Examples: claude-opus-5, gpt-4o, gemini-2.0-flash, deepseek-chat. For OpenRouter, use the model browser to select up to 5 models (comma-separated, first is primary).
+                                    Examples: claude-opus-5, gpt-4o, gemini-2.0-flash, google/gemma-4-31b-it:free. For OpenRouter, use the model browser to select up to 5 models (comma-separated, first is primary).
                                 </p>
                             </div>
 
@@ -431,7 +431,7 @@
                     <p><strong>Gemini:</strong> Get your API key from <a href="https://makersuite.google.com/app/apikey" target="_blank" class="text-primary underline">Google AI Studio</a></p>
                     <p><strong>Azure:</strong> Configure through Azure Portal and set endpoint via environment variable</p>
                     <p><strong>Hugging Face:</strong> Get your API key from <a href="https://huggingface.co/settings/tokens" target="_blank" class="text-primary underline">huggingface.co/settings/tokens</a>. Choose from thousands of models including Llama, Mistral, Gemma, and more.</p>
-                    <p><strong>DeepSeek:</strong> Get your API key from <a href="https://platform.deepseek.com/" target="_blank" class="text-primary underline">platform.deepseek.com</a>. Access powerful reasoning and coding models.</p>
+                    <p><strong>NVIDIA:</strong> Get your API key from <a href="https://build.nvidia.com/" target="_blank" class="text-primary underline">build.nvidia.com</a>. Free hosted models, used when OpenRouter is unavailable.</p>
                     <p><strong>OpenRouter:</strong> Get your API key from <a href="https://openrouter.ai/keys" target="_blank" class="text-primary underline">openrouter.ai/keys</a>. Access 65+ models from multiple providers through a single API key, including free models.</p>
                     <p><strong>Custom API:</strong> Connect to any REST API with flexible authentication options (Bearer token, API key header, Basic auth, or no auth).</p>
                     <p><strong>JIRA:</strong> Configure JIRA integration for project management</p>
@@ -444,8 +444,8 @@
                         <p><strong>OpenAI:</strong> gpt-4o, gpt-4-turbo, gpt-3.5-turbo</p>
                         <p><strong>Gemini:</strong> gemini-2.0-flash, gemini-2.0-flash-lite</p>
                         <p><strong>Hugging Face:</strong> meta-llama/Llama-3.1-8B-Instruct, mistralai/Mistral-7B-Instruct-v0.2, google/gemma-2-9b-it</p>
-                        <p><strong>DeepSeek:</strong> deepseek-chat, deepseek-coder</p>
-                        <p><strong>OpenRouter:</strong> google/gemini-2.5-flash-preview:free, meta-llama/llama-3-8b-instruct:free, mistralai/mistral-7b-instruct:free</p>
+                        <p><strong>NVIDIA:</strong> nvidia/nemotron-3-ultra-550b-a55b</p>
+                        <p><strong>OpenRouter:</strong> google/gemma-4-31b-it:free, nvidia/nemotron-3-super-120b-a12b:free</p>
                     </div>
                 </div>
                 
