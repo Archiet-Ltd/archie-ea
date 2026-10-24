@@ -22,6 +22,7 @@ from flask_login import current_user, login_required
 from sqlalchemy import or_
 
 from app import db
+from app.core.auth.decorators import admit_model_changers
 from app.decorators import require_roles
 from app.utils.tenant_users import escape_like_literal
 from . import archimate_crud
@@ -119,7 +120,7 @@ logger = logging.getLogger(__name__)
 # One write-role gate for every mutating route in this module, matching the
 # generic Elements page (architecture_crud_routes.py): admin or architect.
 # Reads stay open to any signed-in user.
-write_role_required = require_roles("admin", "architect")
+write_role_required = admit_model_changers(require_roles("admin", "architect"))
 
 # Model registry mapping element types to model classes
 MODEL_REGISTRY = StandardTypeTable({

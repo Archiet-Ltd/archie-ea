@@ -1,4 +1,6 @@
+{# design-block: dashboard #}
 {% extends "layouts/admin_base.html" %}
+{% from 'components/disabled_action.html' import disabled_action %}
 {% from 'components/page_header.html' import page_header %}
 
 {% block title %}Regulatory Compliance{% endblock %}
@@ -9,7 +11,7 @@
        tracks software license entitlement compliance, not regulatory
        frameworks -- cross-linked so neither page reads as the other. #}
     {% set _actions = [] %}
-    {% if 'procurement.compliance_dashboard' in flask.current_app.view_functions %}
+    {% if 'procurement.compliance_dashboard' in flask.current_app.view_functions and may_open_procurement() %}
     {% set _ = _actions.append({'text': 'License Compliance', 'icon': 'file-check', 'href': url_for('procurement.compliance_dashboard'), 'variant': 'outline'}) %}
     {% endif %}
     {{ page_header(
@@ -21,6 +23,9 @@
         ],
         actions=_actions
     ) }}
+    {% if 'procurement.compliance_dashboard' in flask.current_app.view_functions and not may_open_procurement() %}
+    {{ disabled_action('License Compliance', 'Only the procurement role can open License Compliance. Ask an administrator in Team settings.', 'license-compliance-reason', icon='file-check') }}
+    {% endif %}
 
     {# Summary tiles — every value is a real query result; 0 when there is nothing to show. #}
     <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">

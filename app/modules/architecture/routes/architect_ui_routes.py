@@ -22,7 +22,7 @@ from flask import Blueprint, Response, current_app, flash, g, jsonify, redirect,
 from flask_login import current_user, login_required
 
 from app import db
-from app.core.auth.decorators import require_permission
+from app.core.auth.decorators import admit_model_changers, require_permission
 from app.utils.pagination import safe_int_arg
 from app.models.archimate_element_types import is_application_kind
 # ArchiMateHealthService import removed — architecture_health route deleted
@@ -356,7 +356,7 @@ def _oef_wants_json():
 
 @architect_ui_bp.route("/architecture/import/oef", methods=["GET", "POST"])
 @login_required
-@require_permission("create", "relationship")
+@admit_model_changers(require_permission("create", "relationship"))
 def import_oef():
     """The model-import screen, over the one OEF import engine.
 
@@ -427,7 +427,7 @@ def import_oef():
 
 @architect_ui_bp.route("/architecture/import/oef/preview", methods=["POST"])
 @login_required
-@require_permission("create", "relationship")
+@admit_model_changers(require_permission("create", "relationship"))
 def import_oef_preview():
     """What an import of this document would do, writing nothing (JSON).
 
@@ -499,7 +499,7 @@ def _user_labels(user_ids, org_id):
 
 @architect_ui_bp.route("/architecture/sample-company/load", methods=["POST"])
 @login_required
-@require_permission("create", "relationship")
+@admit_model_changers(require_permission("create", "relationship"))
 def load_sample_company():
     """Load the sample company into the current organisation.
 
@@ -611,7 +611,7 @@ def load_sample_company():
 
 @architect_ui_bp.route("/architecture/sample-company/remove", methods=["POST"])
 @login_required
-@require_permission("create", "relationship")
+@admit_model_changers(require_permission("create", "relationship"))
 def remove_sample_company():
     """Remove the sample company from the current organisation, then return to setup."""
     from app.services import import_restore_service, sample_company_service

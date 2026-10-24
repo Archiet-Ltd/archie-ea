@@ -1,3 +1,4 @@
+{# design-block: data-table #}
 {% extends 'layouts/admin_base.html' %}
 {% from 'components/page_header.html' import page_header %}
 {% import 'components/card.html' as card %}
@@ -11,7 +12,7 @@
 <div class="space-y-6" x-data="batchReview({{ job.id if job else 0 }}, {{ batch.id if batch else 0 }})">
     <!-- Breadcrumb -->
     {% call breadcrumb.breadcrumb() %}
-        {% call breadcrumb.breadcrumb_item(href=url_for('admin.dashboard')) %}
+        {% call breadcrumb.breadcrumb_item(href=home_url()) %}
             <i data-lucide="home" class="h-4 w-4" aria-hidden="true"></i>
         {% endcall %}
         {{ breadcrumb.breadcrumb_separator() }}

@@ -1,3 +1,4 @@
+{# design-block: dashboard #}
 {% extends 'layouts/admin_base.html' %}
 {% from 'components/page_header.html' import page_header %}
 {% from 'components/modal.html' import modal %}
@@ -22,7 +23,7 @@
         title='Batch Import',
         description='Manage bulk application imports and ArchiMate element generation',
         breadcrumbs=[
-            {'label': 'Home', 'href': url_for('admin.dashboard')},
+            {'label': 'Home', 'href': home_url()},
             {'label': 'Batch Import'}
         ],
         actions=[
