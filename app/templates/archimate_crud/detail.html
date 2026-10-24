@@ -11,6 +11,9 @@
 {% from 'macros/shadcn_compat.html' import shadcn_select %}
 {% from 'components/modal.html' import modal %}
 {% from 'components/badge.html' import badge %}
+{% from 'components/button.html' import button %}
+{% from 'components/input.html' import input %}
+{% from 'components/table.html' import table, table_header, table_body, table_row, table_head, table_cell %}
 
 {% block title %}{{ element_type | plain_name(current_user) }}: {{ element.name if element.name else (element.title if element.title else 'Unnamed') }}{% endblock %}
 
@@ -20,10 +23,6 @@
 {% set layer_label = layer | plain_layer(current_user) %}
 {% set conn = page.connections %}
 {% set edit_url = url_for('archimate_crud.update_element', layer=layer, element_type=element_type, element_id=element.id) %}
-{% set btn_base = 'inline-flex h-9 items-center justify-center gap-2 whitespace-nowrap rounded-md px-4 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50' %}
-{% set btn_primary = btn_base ~ ' bg-primary font-semibold text-primary-foreground hover:bg-primary/90' %}
-{% set btn_outline = btn_base ~ ' border border-input bg-background font-medium text-foreground hover:bg-muted/50' %}
-{% set btn_quiet = btn_base ~ ' border border-input bg-background font-medium text-destructive-emphasis hover:bg-muted/50' %}
 {% set flag_help = {
     'Critical path member': 'Part of a chain that has to keep running for the business to run.',
     'Is customized': 'Changed from the standard definition this element started from.',
@@ -57,25 +56,23 @@
     {% macro _actions() %}
         <div class="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:flex-wrap sm:items-center">
             {% if conn.available %}
-            <a href="{{ url_for('architect_ui.impact_analysis', element_id=source_ae_id) }}" data-testid="impact-analysis-link"
-               class="{{ btn_primary }} col-span-2 sm:col-span-1">
+            {% call button(variant='primary', href=url_for('architect_ui.impact_analysis', element_id=source_ae_id), testid='impact-analysis-link', class='gap-2 col-span-2 sm:col-span-1') %}
                 <i data-lucide="zap" class="h-4 w-4" aria-hidden="true"></i>Impact analysis
-            </a>
-            <a href="{{ url_for('archimate.element_impact_graph_page', element_id=source_ae_id) }}" class="{{ btn_outline }}">
+            {% endcall %}
+            {% call button(variant='outline', href=url_for('archimate.element_impact_graph_page', element_id=source_ae_id), class='gap-2') %}
                 <i data-lucide="git-fork" class="h-4 w-4" aria-hidden="true"></i>Impact graph
-            </a>
+            {% endcall %}
             {% endif %}
-            <a href="{{ edit_url }}" class="{{ btn_outline }}">
+            {% call button(variant='outline', href=edit_url, class='gap-2') %}
                 <i data-lucide="pencil" class="h-4 w-4" aria-hidden="true"></i>Edit
-            </a>
-            <button type="button" @click="downloadDiagram()" class="{{ btn_outline }} col-span-2 sm:col-span-1" aria-label="Export diagram as SVG">
+            {% endcall %}
+            {% call button(variant='outline', on_click='downloadDiagram()', aria_label='Export diagram as SVG', class='gap-2 col-span-2 sm:col-span-1') %}
                 <i data-lucide="download" class="h-4 w-4" aria-hidden="true"></i>Export diagram
-            </button>
+            {% endcall %}
             <span class="mx-1 hidden h-6 w-px bg-border sm:block" aria-hidden="true"></span>
-            <button type="button" @click="deleteElement()" data-testid="delete-element"
-                    class="{{ btn_quiet }} col-span-2 sm:col-span-1" aria-label="Delete {{ elem_name }}">
+            {% call button(variant='outline', on_click='deleteElement()', testid='delete-element', aria_label='Delete ' ~ elem_name, class='gap-2 text-destructive-emphasis col-span-2 sm:col-span-1') %}
                 <i data-lucide="trash-2" class="h-4 w-4" aria-hidden="true"></i>Delete
-            </button>
+            {% endcall %}
         </div>
     {% endmacro %}
 
@@ -188,9 +185,9 @@
         <div class="flex flex-wrap items-center justify-between gap-3 p-6 pb-0">
             <h2 id="connections-heading" class="text-xl font-semibold tracking-[-0.01em] text-foreground">Connections</h2>
             {% if source_ae_id %}
-            <button type="button" data-modal-open="add-relationship-dialog" data-testid="add-relationship" class="{{ btn_outline }}">
+            {% call button(variant='outline', testid='add-relationship', class='gap-2', attrs_dict={'data-modal-open': 'add-relationship-dialog'}) %}
                 <i data-lucide="plus" class="h-4 w-4" aria-hidden="true"></i>Add relationship
-            </button>
+            {% endcall %}
             {% endif %}
         </div>
         {% if row_total == 0 %}
@@ -198,36 +195,36 @@
         {% else %}
         <div class="p-6">
             <div class="overflow-hidden rounded-lg border border-border">
-                <table class="dense-table w-full text-sm">
-                    <thead class="bg-muted/50">
-                        <tr>
-                            <th scope="col" class="p-3 text-left font-medium text-muted-foreground">Relationship</th>
-                            <th scope="col" class="p-3 text-left font-medium text-muted-foreground">Element</th>
-                            <th scope="col" class="hidden p-3 text-left font-medium text-muted-foreground md:table-cell">Type</th>
-                            <th scope="col" class="hidden p-3 text-left font-medium text-muted-foreground md:table-cell">Layer</th>
-                        </tr>
-                    </thead>
+                {% call table() %}
+                    {% call table_header(class='bg-muted/50') %}
+                        {% call table_row() %}
+                            {% call table_head(class='h-auto p-3', attrs_dict={'scope': 'col'}) %}Relationship{% endcall %}
+                            {% call table_head(class='h-auto p-3', attrs_dict={'scope': 'col'}) %}Element{% endcall %}
+                            {% call table_head(class='h-auto p-3 hidden md:table-cell', attrs_dict={'scope': 'col'}) %}Type{% endcall %}
+                            {% call table_head(class='h-auto p-3 hidden md:table-cell', attrs_dict={'scope': 'col'}) %}Layer{% endcall %}
+                        {% endcall %}
+                    {% endcall %}
                     {% for group_id, group_title, group_rows in [('depends-on', 'Depends on', conn.depends_on), ('used-by', 'Used by', conn.used_by), ('other', 'Other links', conn.other)] %}
                     {% if group_rows %}
-                    <tbody class="divide-y divide-border" data-group="{{ group_id }}">
-                        <tr class="bg-muted/30">
-                            <th scope="rowgroup" colspan="4" class="p-3 text-left text-xs font-semibold uppercase tracking-[0.06em] text-muted-foreground">{{ group_title }} ({{ group_rows | length }})</th>
-                        </tr>
+                    {% call table_body(class='divide-y divide-border', attrs_dict={'data-group': group_id}) %}
+                        {% call table_row(class='bg-muted/30') %}
+                            {% call table_head(class='h-auto p-3 text-xs font-semibold uppercase tracking-[0.06em]', attrs_dict={'scope': 'rowgroup', 'colspan': 4}) %}{{ group_title }} ({{ group_rows | length }}){% endcall %}
+                        {% endcall %}
                         {% for row in group_rows %}
-                        <tr class="hover:bg-muted/30" data-testid="connection-row" data-group="{{ group_id }}">
-                            <td class="p-3 text-muted-foreground"><span title="ArchiMate relationship: {{ row.relationship_raw }}">{{ row.relationship }}</span></td>
-                            <td class="p-3 font-medium">
+                        {% call table_row(class='border-0', attrs_dict={'data-testid': 'connection-row', 'data-group': group_id}) %}
+                            {% call table_cell(class='p-3 text-muted-foreground') %}<span title="ArchiMate relationship: {{ row.relationship_raw }}">{{ row.relationship }}</span>{% endcall %}
+                            {% call table_cell(class='p-3 font-medium') %}
                                 {% if row.href %}<a href="{{ row.href }}" class="text-primary hover:underline">{{ row.name }}</a>{% else %}{{ row.name }}{% endif %}
                                 <span class="block text-xs font-normal text-muted-foreground md:hidden">{{ row.type_label }} · {{ row.layer_label }}</span>
-                            </td>
-                            <td class="hidden p-3 text-muted-foreground md:table-cell">{{ row.type_label }}</td>
-                            <td class="hidden p-3 text-muted-foreground md:table-cell">{{ row.layer_label }}</td>
-                        </tr>
+                            {% endcall %}
+                            {% call table_cell(class='hidden p-3 text-muted-foreground md:table-cell') %}{{ row.type_label }}{% endcall %}
+                            {% call table_cell(class='hidden p-3 text-muted-foreground md:table-cell') %}{{ row.layer_label }}{% endcall %}
+                        {% endcall %}
                         {% endfor %}
-                    </tbody>
+                    {% endcall %}
                     {% endif %}
                     {% endfor %}
-                </table>
+                {% endcall %}
             </div>
         </div>
         {% endif %}
@@ -248,6 +245,7 @@
             {% endif %}
 
             <dl class="grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2">
+                {% if has_owner_field %}
                 <div class="text-sm" data-testid="element-owner">
                     <dt class="text-muted-foreground">Owner</dt>
                     <dd class="mt-0.5 font-medium">
@@ -259,13 +257,10 @@
                         <div class="mt-3 space-y-2 font-normal" data-owner-picker data-owners-url="{{ owner_assign_url }}">
                             <p class="text-sm font-medium text-foreground">Assign owner</p>
                             <div class="relative">
-                                <input type="text" data-owner-search autocomplete="off" aria-label="Search for an owner by name"
-                                       placeholder="Search by name"
-                                       class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+                                {{ input(placeholder='Search by name', aria_label='Search for an owner by name', class='h-9', attrs_dict={'data-owner-search': '', 'autocomplete': 'off'}) }}
                                 <div data-owner-results class="hidden absolute z-10 mt-1 w-full rounded-md border border-border bg-card max-h-48 overflow-y-auto"></div>
                             </div>
-                            <button type="button" data-owner-save disabled
-                                    class="inline-flex h-9 items-center justify-center rounded-md border border-input bg-background px-3 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50">Save owner</button>
+                            {{ button(text='Save owner', variant='outline', disabled=true, attrs_dict={'data-owner-save': ''}) }}
                         </div>
                         {% elif owner_assign_link and (can('assign', 'owner') or can('edit', 'application')) %}
                         <a href="{{ owner_assign_link }}" class="ml-2 text-primary hover:underline">Assign owner</a>
@@ -273,6 +268,7 @@
                         {% endif %}
                     </dd>
                 </div>
+                {% endif %}
                 {% for field in display_fields if field.label not in flag_help %}
                 <div class="text-sm">
                     <dt class="text-muted-foreground">{{ field.label }}</dt>
@@ -367,15 +363,13 @@
     <div x-data="addRelationshipForm({{ source_ae_id }})" class="space-y-4">
         <div>
             <label class="mb-1.5 block text-sm font-medium" for="rel-target-search">Target element</label>
-            <input id="rel-target-search" type="text" x-model="targetQuery" @input.debounce.400ms="searchTargets()"
-                   placeholder="Search by name…" autocomplete="off"
-                   class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+            {{ input(id='rel-target-search', placeholder='Search by name…', attrs_dict={'x-model': 'targetQuery', '@input.debounce.400ms': 'searchTargets()', 'autocomplete': 'off'}) }}
             <div x-show="targetResults.length > 0" x-cloak class="mt-1 max-h-48 divide-y divide-border overflow-y-auto rounded-md border border-border">
                 <template x-for="r in targetResults" :key="r.id">
-                    <button type="button" @click="selectTarget(r)" class="w-full px-3 py-2 text-left text-sm hover:bg-accent">
+                    {% call button(variant='ghost', on_click='selectTarget(r)', class='h-auto w-full justify-start rounded-none px-3 py-2 text-left font-normal') %}
                         <span x-text="r.name"></span>
-                        <span class="text-xs text-muted-foreground" x-text="' · ' + r.type"></span>
-                    </button>
+                        <span class="ml-1 text-xs text-muted-foreground" x-text="' · ' + r.type"></span>
+                    {% endcall %}
                 </template>
             </div>
             <p x-show="selectedTarget" x-cloak class="mt-2 text-sm">
@@ -391,10 +385,10 @@
         </div>
         <p x-show="errorMsg" x-cloak class="text-sm text-destructive-emphasis" role="alert" x-text="errorMsg"></p>
         <div class="flex flex-col-reverse gap-2 pt-2 sm:flex-row sm:justify-end">
-            <button type="button" data-modal-close="add-relationship-dialog" class="{{ btn_outline }}">Cancel</button>
-            <button type="button" @click="createRelationship()" :disabled="!selectedTarget || !relType || saving" class="{{ btn_primary }}">
+            {{ button(text='Cancel', variant='outline', attrs_dict={'data-modal-close': 'add-relationship-dialog'}) }}
+            {% call button(variant='primary', on_click='createRelationship()', attrs_dict={':disabled': '!selectedTarget || !relType || saving'}) %}
                 <span x-text="saving ? 'Saving…' : 'Create relationship'"></span>
-            </button>
+            {% endcall %}
         </div>
     </div>
     {% endcall %}

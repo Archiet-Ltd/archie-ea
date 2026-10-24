@@ -355,3 +355,105 @@ def test_application_element_page_step_assigns_from_generic_row(
     page.goto("%s/applications/%d" % (live_server, ids["application_id"]),
               wait_until="networkidle", timeout=PAGE_TIMEOUT)
     assert owner_name in page.locator("[data-testid='application-owner']").inner_text()
+
+
+# ---------------------------------------------------------------------------
+# An enterprise architect whose platform role carries no general write
+# permission still takes the step wherever it is shown, because the
+# permission matrix grants the architect personas "assign owner".
+# ---------------------------------------------------------------------------
+
+
+def _seed_technology_elements(org_id):
+    """A technology service (which has an owner field) and a node (which has
+    none), each as the generic element row the lists link to."""
+    from app import create_app, db
+    from app.models.application_portfolio import ApplicationComponent
+    from app.models.models import ArchiMateElement
+
+    app = create_app("testing")
+    suffix = uuid.uuid4().hex[:6]
+    with app.app_context():
+        service = ArchiMateElement(
+            name="Gateway service %s" % suffix, type="TechnologyService",
+            layer="technology", organization_id=org_id,
+        )
+        node = ArchiMateElement(
+            name="Rack node %s" % suffix, type="Node",
+            layer="technology", organization_id=org_id,
+        )
+        component = ApplicationComponent(
+            name="Matrix application %s" % suffix, organization_id=org_id,
+            lifecycle_status="operational",
+        )
+        db.session.add_all([service, node, component])
+        db.session.commit()
+        ids = {
+            "service_id": service.id,
+            "node_id": node.id,
+            "application_id": component.id,
+        }
+        db.session.remove()
+    return ids
+
+
+@pytest.fixture
+def matrix_orgs():
+    orgs = []
+    for _ in range(2):
+        org = fresh_org.create_fresh_org(
+            ARCHITECT, org_admin=False, extra_roles=(OWNER,), platform_role="Viewer",
+        )
+        org["ids"] = _seed_technology_elements(org["org_id"])
+        orgs.append(org)
+    return orgs
+
+
+def test_architect_without_write_role_saves_owner_on_application(
+    page, live_server, matrix_orgs
+):
+    org_a, org_b = matrix_orgs
+    owner_name = _owner_name(org_a)
+    fresh_org.sign_in(page, live_server, org_a["emails"][ARCHITECT])
+    app_url = "%s/applications/%d" % (live_server, org_a["ids"]["application_id"])
+    page.goto(app_url, wait_until="networkidle", timeout=PAGE_TIMEOUT)
+    page.locator("[data-testid='application-owner-empty']").wait_for(
+        state="visible", timeout=PAGE_TIMEOUT)
+    _assign_with_picker(page, owner_name)
+    page.goto(app_url, wait_until="networkidle", timeout=PAGE_TIMEOUT)
+    assert owner_name in page.locator("[data-testid='application-owner']").inner_text()
+
+    # The other organisation's application still has no owner.
+    page.goto(live_server + "/account/logout", wait_until="networkidle", timeout=PAGE_TIMEOUT)
+    fresh_org.sign_in(page, live_server, org_b["emails"][ARCHITECT])
+    page.goto("%s/applications/%d" % (live_server, org_b["ids"]["application_id"]),
+              wait_until="networkidle", timeout=PAGE_TIMEOUT)
+    assert owner_name not in page.inner_text("main")
+
+
+def test_pages_of_types_with_no_owner_field_claim_no_missing_owner(
+    page, live_server, matrix_orgs
+):
+    org_a, org_b = matrix_orgs
+    fresh_org.sign_in(page, live_server, org_a["emails"][ARCHITECT])
+
+    # A technology service and a node have no owner field, so neither page
+    # shows an Owner row that claims a gap, or a step that could not save.
+    for type_name, key in (("TechnologyService", "service_id"), ("Node", "node_id")):
+        page.goto("%s/architecture/technology/%s/%d" % (
+            live_server, type_name, org_a["ids"][key]),
+            wait_until="networkidle", timeout=PAGE_TIMEOUT)
+        assert page.locator("[data-testid='about-card']").count() == 1
+        assert page.locator("[data-testid='element-owner']").count() == 0
+        assert "No owner recorded" not in page.inner_text("main")
+        assert page.locator("[data-owner-picker]").count() == 0
+
+    # An application opened as its generic element row has an owner field:
+    # it states the gap and offers the step, in either organisation.
+    for org in (org_a, org_b):
+        if org is org_b:
+            page.goto(live_server + "/account/logout", wait_until="networkidle", timeout=PAGE_TIMEOUT)
+            fresh_org.sign_in(page, live_server, org["emails"][ARCHITECT])
+        page.goto("%s/applications/%d" % (live_server, org["ids"]["application_id"]),
+                  wait_until="networkidle", timeout=PAGE_TIMEOUT)
+        assert "No owner" in page.inner_text("main")
