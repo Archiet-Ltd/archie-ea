@@ -1,7 +1,7 @@
 {# shadcn/ui Table Component #}
-{% macro table(class='') %}
+{% macro table(class='', id='', attrs_dict={}) %}
     <div class="relative w-full overflow-auto" aria-live="polite" aria-atomic="false">
-        <table class="dense-table w-full caption-bottom text-sm {{ class }}">
+        <table {% if id %}id="{{ id }}" {% endif %}class="dense-table w-full caption-bottom text-sm {{ class }}" {{ attrs_dict|xmlattr }}>
             {{ caller() }}
         </table>
     </div>
