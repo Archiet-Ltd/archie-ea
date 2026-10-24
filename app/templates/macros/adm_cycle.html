@@ -1,27 +1,28 @@
 {# The TOGAF ADM cycle as a compact ring: Preliminary above, phases A to H clockwise,
    Requirements Management in the centre. Drawn from tokens. It reads the board's Alpine
-   scope: cycleCount(code), cycleLabel(code), phaseFilter, chooseCycle(code), requirementTotal().
+   scope: cycleCount(code), cycleLabel(code), cycleName(code), cycleTip, phaseFilter, chooseCycle(code), requirementTotal().
    The ordered list is the accessible alternative to the drawing. #}
 {% macro adm_cycle() %}
 {%- set nodes = [
-    ('PRELIM', 'Pre', 100, 16),
-    ('A', 'A', 100, 48), ('B', 'B', 143.8, 66.2), ('C', 'C', 162, 110), ('D', 'D', 143.8, 153.8),
-    ('E', 'E', 100, 172), ('F', 'F', 56.2, 153.8), ('G', 'G', 38, 110), ('H', 'H', 56.2, 66.2)
+    ('PRELIM', 'Pre', 120, 20),
+    ('A', 'A', 120, 64), ('B', 'B', 176.6, 87.4), ('C', 'C', 200, 144), ('D', 'D', 176.6, 200.6),
+    ('E', 'E', 120, 224), ('F', 'F', 63.4, 200.6), ('G', 'G', 40, 144), ('H', 'H', 63.4, 87.4)
 ] -%}
 <div class="shrink-0" data-testid="adm-cycle">
-    <svg viewBox="0 0 200 190" class="h-44 w-44" role="group" aria-label="ADM cycle: cards in each phase. Choose a phase to show only its lane.">
-        <circle cx="100" cy="110" r="62" fill="none" class="stroke-border" stroke-width="1.5"></circle>
-        <line x1="100" y1="29" x2="100" y2="35" class="stroke-border" stroke-width="1.5"></line>
+    <svg viewBox="0 0 240 246" class="h-auto w-60 max-w-none" role="group" aria-label="ADM cycle: cards in each phase. Choose a phase to show only its lane.">
+        <circle cx="120" cy="144" r="80" fill="none" class="stroke-border" stroke-width="1.5"></circle>
+        <line x1="120" y1="39" x2="120" y2="45" class="stroke-border" stroke-width="1.5"></line>
         {% for code, short, x, y in nodes %}
         <g role="button" tabindex="0" data-testid="adm-cycle-phase-{{ code }}"
            class="cursor-pointer outline-none"
            :aria-label="cycleLabel('{{ code }}')" :aria-pressed="phaseFilter === '{{ code }}' ? 'true' : 'false'"
+           @mouseenter="cycleTip = '{{ code }}'" @mouseleave="cycleTip = ''" @focus="cycleTip = '{{ code }}'" @blur="cycleTip = ''"
            @click="chooseCycle('{{ code }}')" @keydown.enter.prevent="chooseCycle('{{ code }}')" @keydown.space.prevent="chooseCycle('{{ code }}')">
-            <circle cx="{{ x }}" cy="{{ y }}" r="14" stroke-width="1.5"
+            <circle cx="{{ x }}" cy="{{ y }}" r="19" stroke-width="1.5"
                     :class="phaseFilter === '{{ code }}' ? 'fill-primary stroke-primary' : 'fill-muted stroke-border'"></circle>
-            <text x="{{ x }}" y="{{ y - 2 }}" text-anchor="middle" font-size="9" font-weight="600"
+            <text x="{{ x }}" y="{{ y - 2 }}" text-anchor="middle" font-size="12" font-weight="600"
                   :class="phaseFilter === '{{ code }}' ? 'fill-primary-foreground' : 'fill-foreground'">{{ short }}</text>
-            <text x="{{ x }}" y="{{ y + 9 }}" text-anchor="middle" font-size="9"
+            <text x="{{ x }}" y="{{ y + 11 }}" text-anchor="middle" font-size="12"
                   :class="phaseFilter === '{{ code }}' ? 'fill-primary-foreground' : 'fill-muted-foreground'" x-text="cycleCount('{{ code }}')"></text>
         </g>
         {% endfor %}
@@ -29,11 +30,15 @@
            class="cursor-pointer outline-none"
            :aria-label="'Requirements Management: ' + plural(requirementTotal(), 'requirement') + '. Open the requirements.'"
            @click="openRequirements()" @keydown.enter.prevent="openRequirements()" @keydown.space.prevent="openRequirements()">
-            <circle cx="100" cy="110" r="24" class="fill-card stroke-border" stroke-width="1.5"></circle>
-            <text x="100" y="106" text-anchor="middle" font-size="7.5" class="fill-muted-foreground">Reqs</text>
-            <text x="100" y="120" text-anchor="middle" font-size="13" font-weight="600" class="fill-foreground" x-text="requirementTotal()"></text>
+            <circle cx="120" cy="144" r="42" class="fill-card stroke-border" stroke-width="1.5"></circle>
+            <text x="120" y="140" text-anchor="middle" font-size="12" class="fill-muted-foreground">Requirements</text>
+            <text x="120" y="162" text-anchor="middle" font-size="16" font-weight="600" class="fill-foreground" x-text="requirementTotal()"></text>
         </g>
     </svg>
+    <div role="tooltip" data-testid="adm-cycle-tip"
+         :class="cycleTip ? '' : 'invisible'"
+         class="pointer-events-none mx-auto mt-1 h-7 w-fit max-w-full rounded-md border border-border bg-popover px-2 py-1 text-xs text-popover-foreground"
+         x-text="cycleTip ? cycleName(cycleTip) : ''"></div>
     <ol class="sr-only">
         {% for code, short, x, y in nodes %}<li x-text="cycleLabel('{{ code }}')"></li>{% endfor %}
     </ol>
