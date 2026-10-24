@@ -94,3 +94,54 @@ def test_merge_check_runs_from_the_command_line_and_names_the_page():
     data = json.loads(proc.stdout)
     assert data["errors"] == []
     assert data["outside_block_count"] >= 0 and data["unmarked_count"] > 0
+
+
+# ---- persona and components on every row
+
+def test_every_row_names_a_persona_from_the_role_list_and_lists_components(design_map):
+    from app.models.user import VALID_ROLES
+
+    personas = design_map["personas"]
+    assert set(VALID_ROLES) <= set(personas), "every enterprise role is a persona the map can name"
+    assert len(design_map["pages"]) == 406
+    for rel, entry in design_map["pages"].items():
+        assert entry["persona"] in personas, rel
+        assert entry["components"], rel
+        assert set(entry["components"]) <= set(design_map["components"]), rel
+
+
+def test_a_row_with_an_unknown_persona_or_no_components_is_an_error(tool, design_map):
+    import copy
+
+    broken = copy.deepcopy(design_map)
+    rel = LIST_PAGE
+    broken["pages"][rel]["persona"] = "not_a_persona"
+    broken["pages"][rel]["components"] = []
+    pages = {rel: {"extends": ["layouts/base.html"], "macros": [], "marker": broken["pages"][rel]["block"]}}
+    errors = tool.measure(broken, pages)["errors"]
+    assert any(rel in e and "persona" in e for e in errors)
+    assert any(rel in e and "lists no components" in e for e in errors)
+
+
+def test_a_page_whose_macro_is_outside_its_rows_components_is_counted_and_named(tool, design_map):
+    import copy
+
+    narrowed = copy.deepcopy(design_map)
+    rel = LIST_PAGE
+    narrowed["pages"][rel]["components"] = ["page-header"]
+    pages = {rel: {"extends": ["layouts/base.html"], "macros": ["components/data_table.html"],
+                   "marker": narrowed["pages"][rel]["block"]}}
+    result = tool.measure(narrowed, pages)
+    assert [o["template"] for o in result["outside_components"]] == [rel]
+    assert result["outside_components"][0]["components"] == ["table"]
+    problems = tool.check_block(rel, _page("data-table", "components/data_table.html"), narrowed)
+    assert len(problems) == 1 and "component list" in problems[0] and "'table'" in problems[0]
+    assert tool.check_block(rel, _page("data-table", "components/data_table.html"), design_map) == []
+
+
+def test_the_gate_holds_the_count_of_pages_outside_their_components():
+    baseline = json.loads((ROOT / "verification_baseline.json").read_text(encoding="utf-8"))["ratchets"]
+    proc = subprocess.run([sys.executable, "scripts/check_design_map.py", "--json"],
+                          cwd=ROOT, capture_output=True, text=True, timeout=300)
+    data = json.loads(proc.stdout[proc.stdout.index("{"):])
+    assert data["outside_components_count"] <= baseline["design_map_outside_components"]

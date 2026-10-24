@@ -67,7 +67,22 @@ PATTERNS_PATH = ROOT / "design" / "patterns.json"
 MARKER_RE = re.compile(r"{#-?\s*design-block:\s*([a-z][a-z-]*)\s*-?#}")
 SHARED_PREFIXES = ("components/", "macros/")
 STATUSES = ("mapped", "specified", "implemented", "verified")
-DESIGNED_FIELDS = ("block", "basis", "spec", "status", "extra_macros", "note")
+DESIGNED_FIELDS = ("block", "basis", "spec", "status", "extra_macros", "note", "persona", "also_serves", "components")
+
+# Shared macro file stem -> the shadcn component it is an instance of. A macro with no
+# shadcn counterpart is an app component named after its file (source "app").
+SHADCN_ALIASES = {
+    "alert": "alert", "avatar": "avatar", "badge": "badge", "status_badge": "badge",
+    "breadcrumb": "breadcrumb", "breadcrumb_nav": "breadcrumb", "button": "button",
+    "card": "card", "data_card": "card", "metrics_card": "card", "checkbox": "checkbox",
+    "dialog": "dialog", "modal": "dialog", "modal_form": "dialog", "modal_standardized": "dialog",
+    "confirmation_dialog": "alert-dialog", "drawer": "drawer", "dropdown_menu": "dropdown-menu",
+    "empty_state": "empty", "form_field": "field", "input": "input", "search_bar": "input",
+    "pagination_controls": "pagination", "progress": "progress", "radio_group": "radio-group",
+    "select": "select", "skeleton": "skeleton", "loading_state": "spinner", "switch": "switch",
+    "table": "table", "data_table": "table", "dense_table": "table", "workbench_table": "table",
+    "tabs": "tabs",
+}
 
 
 # ------------------------------------------------------------------ reading
@@ -120,6 +135,18 @@ def load_map(path=MAP_PATH):
     return json.loads(Path(path).read_text(encoding="utf-8"))
 
 
+def component_of(macro):
+    """The component name a shared macro file is an instance of."""
+    stem = Path(macro).stem
+    return SHADCN_ALIASES.get(stem, stem.replace("_", "-"))
+
+
+def row_macros(design_map, entry):
+    """The macro files a row's components stand for: every macro of the vocabulary whose component the row lists."""
+    wanted = set(entry.get("components", []))
+    return sorted(m for name in wanted for m in design_map.get("components", {}).get(name, {}).get("macros", []))
+
+
 def allowed_macros(design_map, entry):
     block = design_map["blocks"].get(entry.get("block"), {})
     return sorted(set(block.get("allowed_macros", [])) | set(entry.get("extra_macros", [])))
@@ -156,6 +183,13 @@ def check_block(rel, source, design_map):
         if macro not in allowed:
             problems.append(f"{rel}: uses {macro}, which the {block} block does not allow "
                             f"(allowed: {', '.join(sorted(allowed))})")
+    if entry.get("components"):
+        in_row = set(row_macros(design_map, entry))
+        for macro in facts["macros"]:
+            if macro in allowed and macro not in in_row:
+                problems.append(f"{rel}: uses {macro} (component {component_of(macro)!r}), which is not in "
+                                f"this page's component list in docs/design-map.json "
+                                f"(its components: {', '.join(sorted(entry['components']))})")
     return problems
 
 
@@ -166,7 +200,9 @@ def measure(design_map=None, pages=None):
     pages = pages if pages is not None else tree_pages()
     blocks = design_map["blocks"]
     entries = design_map["pages"]
-    errors, outside, unmarked = [], [], []
+    errors, outside, unmarked, outside_components = [], [], [], []
+    personas = design_map.get("personas", {})
+    vocabulary = design_map.get("components", {})
     for rel in sorted(set(pages) - set(entries)):
         errors.append(f"{rel}: page template missing from docs/design-map.json")
     for rel in sorted(set(entries) - set(pages)):
@@ -192,6 +228,22 @@ def measure(design_map=None, pages=None):
         extra = [m for m in facts["macros"] if m not in allowed]
         if extra:
             outside.append({"template": rel, "block": block, "macros": extra})
+        if entry.get("persona") not in personas:
+            errors.append(f"{rel}: persona {entry.get('persona')!r} is not one of the personas in docs/design-map.json")
+        for other in entry.get("also_serves", []):
+            if other not in personas:
+                errors.append(f"{rel}: also_serves {other!r} is not one of the personas in docs/design-map.json")
+        listed = entry.get("components") or []
+        if not listed:
+            errors.append(f"{rel}: lists no components")
+        for name in listed:
+            if name not in vocabulary:
+                errors.append(f"{rel}: component {name!r} is not in the component list of docs/design-map.json")
+        in_row = set(row_macros(design_map, entry))
+        beyond = [m for m in facts["macros"] if m not in in_row]
+        if beyond:
+            outside_components.append({"template": rel, "components": sorted({component_of(m) for m in beyond}),
+                                       "macros": beyond})
     patterns = json.loads(PATTERNS_PATH.read_text(encoding="utf-8")).get("pilot_patterns", {})
     for name, block in sorted(blocks.items()):
         for key in block.get("patterns", []):
@@ -204,6 +256,8 @@ def measure(design_map=None, pages=None):
         "outside_block": outside,
         "outside_block_count": len(outside),
         "unmarked_count": len(unmarked),
+        "outside_components": outside_components,
+        "outside_components_count": len(outside_components),
     }
 
 
@@ -233,6 +287,8 @@ def regenerate(design_map, pages, controls):
             designed = {"block": facts["marker"], "basis": "declared", "spec": None, "status": "mapped"}
         entry = dict(designed)
         block = blocks[entry["block"]]
+        entry.setdefault("persona", persona_for(design_map, rel, entry["block"]))
+        entry.setdefault("components", default_components(design_map, entry, facts))
         entry["reference"] = block["reference"]
         entry["allowed_macros"] = allowed_macros(design_map, entry)
         entry["extends"] = facts["extends"]
@@ -240,6 +296,39 @@ def regenerate(design_map, pages, controls):
         entry["controls"] = controls.get(rel, {})
         out[rel] = {k: entry[k] for k in sorted(entry)}
     return {**{k: v for k, v in design_map.items() if k != "pages"}, "pages": out}
+
+
+def persona_for(design_map, rel, block):
+    """The primary persona of a page: the longest matching path rule, else the block's default."""
+    rules = design_map.get("persona_rules", {})
+    hits = [prefix for prefix in rules if prefix in rel]
+    if hits:
+        return rules[max(hits, key=len)]
+    return design_map["blocks"][block].get("default_persona")
+
+
+def default_components(design_map, entry, facts):
+    """The block's core components plus the components of the page's own macros that its block allows."""
+    block = design_map["blocks"][entry["block"]]
+    allowed = set(allowed_macros(design_map, entry))
+    names = set(block.get("core_components", []))
+    names |= {component_of(m) for m in facts["macros"] if m in allowed}
+    return sorted(names)
+
+
+def build_vocabulary(design_map):
+    """{component: {source, macros}} over every shared macro any block allows or any page uses."""
+    macros = set()
+    for block in design_map["blocks"].values():
+        macros |= set(block.get("allowed_macros", []))
+    for entry in design_map["pages"].values():
+        macros |= set(entry.get("macros", [])) | set(entry.get("extra_macros", []))
+    out = {}
+    for m in sorted(macros):
+        name = component_of(m)
+        slot = out.setdefault(name, {"source": "shadcn" if Path(m).stem in SHADCN_ALIASES else "app", "macros": []})
+        slot["macros"].append(m)
+    return dict(sorted(out.items()))
 
 
 def dump(design_map):
@@ -301,16 +390,21 @@ def render_tracker(design_map, result):
             f'<p><a class="spec" href="{_esc(spec)}">Open the redesign spec</a></p></article>'
         )
     page_rows = "\n".join(
-        f'<tr data-block="{_esc(e["block"])}"><td>{_esc(rel)}</td>'
-        f'<td>{_esc(design_map["blocks"][e["block"]]["title"])}</td><td>{_esc(e["status"])}</td>'
+        f'<tr data-block="{_esc(e["block"])}" data-persona="{_esc(e["persona"])}"><td>{_esc(rel)}</td>'
+        f'<td>{_esc(design_map["blocks"][e["block"]]["title"])}</td>'
+        f'<td>{_esc(design_map["personas"][e["persona"]])}</td>'
+        f'<td>{_esc(", ".join(e["components"]))}</td><td>{_esc(e["status"])}</td>'
         f'<td>{_esc(", ".join(outside[rel])) if rel in outside else "None: follows its block"}</td>'
         f'<td>{(chr(60) + "a href=" + chr(34) + _esc(e["spec"].replace("docs/design/", "")) + chr(34) + ">Spec</a>") if e.get("spec") else "Not written yet"}</td></tr>'
         for rel, e in design_map["pages"].items()
     )
     options = "".join(f'<option value="{_esc(r["block"])}">{_esc(r["title"])}</option>' for r in rows)
+    persona_options = "".join(
+        f'<option value="{_esc(key)}">{_esc(name)}</option>' for key, name in design_map["personas"].items()
+        if any(e["persona"] == key for e in design_map["pages"].values()))
     return TRACKER_TEMPLATE.format(
-        total=total, block_rows=block_rows, cards="\n".join(cards), page_rows=page_rows, options=options,
-        outside=result["outside_block_count"], unmarked=result["unmarked_count"],
+        total=total, block_rows=block_rows, cards="\n".join(cards), page_rows=page_rows, options=options, persona_options=persona_options,
+        outside=result["outside_block_count"], outside_components=result["outside_components_count"], unmarked=result["unmarked_count"],
         specified=sum(r["specified"] for r in rows),
     )
 
@@ -361,6 +455,7 @@ select, input {{ font:inherit; padding:6px 8px; border:1px solid hsl(var(--borde
 <div><strong id="specified-pages">{specified}</strong>with a redesign spec</div>
 <div><strong id="outside-pages">{outside}</strong>use a macro their block does not allow</div>
 <div><strong id="unmarked-pages">{unmarked}</strong>do not yet name their block in the template</div>
+<div><strong id="outside-components">{outside_components}</strong>use a component their row does not list</div>
 </div>
 <div role="tablist" aria-label="Views">
 <button type="button" role="tab" id="tab-blocks" aria-controls="panel-blocks" aria-selected="true">Blocks</button>
@@ -384,11 +479,12 @@ select, input {{ font:inherit; padding:6px 8px; border:1px solid hsl(var(--borde
 <section role="tabpanel" id="panel-pages" aria-labelledby="tab-pages" hidden>
 <div class="filters">
 <label>Block <select id="block-filter"><option value="">Every block</option>{options}</select></label>
+<label>Persona <select id="persona-filter"><option value="">Every persona</option>{persona_options}</select></label>
 <label>Search <input id="page-search" type="search" placeholder="Template path"></label>
 <span class="muted" id="page-count" aria-live="polite"></span>
 </div>
 <div class="scroll"><table id="pages-table">
-<thead><tr><th scope="col">Template</th><th scope="col">Block</th><th scope="col">Status</th><th scope="col">Macros outside its block</th><th scope="col">Spec</th></tr></thead>
+<thead><tr><th scope="col">Template</th><th scope="col">Block</th><th scope="col">Persona</th><th scope="col">Components</th><th scope="col">Status</th><th scope="col">Macros outside its block</th><th scope="col">Spec</th></tr></thead>
 <tbody>
 {page_rows}
 </tbody></table></div>
@@ -406,21 +502,23 @@ select, input {{ font:inherit; padding:6px 8px; border:1px solid hsl(var(--borde
   }}
   tabs.forEach(function (t) {{ t.addEventListener('click', function () {{ select(t); }}); }});
   var filter = document.getElementById('block-filter');
+  var persona = document.getElementById('persona-filter');
   var search = document.getElementById('page-search');
   var rows = Array.prototype.slice.call(document.querySelectorAll('#pages-table tbody tr'));
   function apply() {{
-    var block = filter.value, text = search.value.toLowerCase(), shown = 0;
+    var block = filter.value, who = persona.value, text = search.value.toLowerCase(), shown = 0;
     rows.forEach(function (r) {{
-      var on = (!block || r.getAttribute('data-block') === block) && r.cells[0].textContent.toLowerCase().indexOf(text) !== -1;
+      var on = (!block || r.getAttribute('data-block') === block) && (!who || r.getAttribute('data-persona') === who) && r.cells[0].textContent.toLowerCase().indexOf(text) !== -1;
       r.hidden = !on; if (on) shown += 1;
     }});
     document.getElementById('page-count').textContent = shown + ' of ' + rows.length + ' pages';
   }}
   filter.addEventListener('change', apply);
+  persona.addEventListener('change', apply);
   search.addEventListener('input', apply);
   Array.prototype.slice.call(document.querySelectorAll('.show-block')).forEach(function (b) {{
     b.addEventListener('click', function () {{
-      filter.value = b.getAttribute('data-block'); search.value = ''; apply(); select(document.getElementById('tab-pages'));
+      filter.value = b.getAttribute('data-block'); persona.value = ''; search.value = ''; apply(); select(document.getElementById('tab-pages'));
     }});
   }});
   apply();
