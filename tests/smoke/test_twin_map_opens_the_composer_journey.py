@@ -119,11 +119,12 @@ def test_ask_row_link_lands_on_the_composer_with_the_element_drawn(page, live_se
     expect(page.locator(APP)).to_be_visible(timeout=PAGE_TIMEOUT)
 
 
-def test_old_twin_map_address_with_no_element_opens_the_composer(page, live_server, seeded):
+def test_old_twin_map_address_with_no_element_opens_a_drawn_neighbourhood(page, live_server, seeded):
     sign_in(page, live_server, seeded["emails"]["enterprise_architect"])
     page.goto("%s/intelligence/twin-map" % live_server, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
-    assert page.url.rstrip("/").endswith("/archimate/composer"), page.url
+    assert re.search(r"/archimate/composer\?element=\d+&most_connected=1$", page.url), page.url
     expect(page.locator(APP)).to_be_visible(timeout=PAGE_TIMEOUT)
+    expect(page.locator("#composer-focus-most-connected")).to_be_visible(timeout=PAGE_TIMEOUT)
     # The seeded company has a model, so the "nothing is modelled" state is not shown.
     expect(page.get_by_test_id("composer-empty-workspace")).to_have_count(0)
 

@@ -170,6 +170,10 @@ class AccountService:
         # The user owns the organisation just created for them, so granting
         # org-admin here is always a grant in their own organisation.
         user.grant_org_admin()
+        # A self-serve owner is a startup CTO until they say otherwise: the lens shapes
+        # the dashboard and chat wording only and grants nothing, so no role question is
+        # asked at sign-up. It can be changed later.
+        user.persona_lens = User.DEFAULT_PERSONA_LENS
         db.session.add(user)
         try:
             db.session.flush()

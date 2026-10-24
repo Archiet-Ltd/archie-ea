@@ -2423,10 +2423,14 @@ function composerApp() {
             });
 
             /* ── Dirty state tracking ── */
-            this.graph.on('change:position', function() { self.viewpointDirty = true; });
-            this.graph.on('change:size', function() { self.viewpointDirty = true; });
-            this.graph.on('add', function() { self.viewpointDirty = true; });
-            this.graph.on('remove', function() { self.viewpointDirty = true; });
+            this.graph.on('change:position', function() { if (!self._focusQuiet) self.viewpointDirty = true; });
+            this.graph.on('change:size', function() { if (!self._focusQuiet) self.viewpointDirty = true; });
+            this.graph.on('add', function() { if (!self._focusQuiet) self.viewpointDirty = true; });
+            this.graph.on('remove', function() { if (!self._focusQuiet) self.viewpointDirty = true; });
+
+            /* A neighbourhood opened to look at is not an edit: the drawing and its
+               settling do not count, the first touch on the canvas does. */
+            this.paper.el.addEventListener('pointerdown', function() { self._focusQuiet = false; }, true);
 
             /* ── Mini-map: update on graph/paper changes ── */
             let mmUpdate = function() { self._scheduleMiniMapUpdate(); };
@@ -3082,10 +3086,12 @@ function composerApp() {
         _openFocusView: function(elementId, centreName, depth, includeDerived) {
             let self = this;
             self.viewpointLoading = true;
+            self._focusQuiet = true;
             self.statusText = 'Loading neighbourhood...';
             let fail = function(err) {
                 self.viewpointLoading = false;
                 self.focusView = null;
+                self._focusQuiet = false;
                 self.statusText = 'Failed to load the neighbourhood of ' + (centreName || 'this element');
                 _toast('error', 'Could not load the neighbourhood of ' + (centreName || 'this element'));
             };
@@ -3126,7 +3132,6 @@ function composerApp() {
                 self.currentSavedVpId = null;
                 self.mode = 'edit';
                 self.viewpointLoading = false;
-                self.viewpointDirty = true;
                 self.focusView = {
                     name: centreName || ('Element #' + elementId),
                     depth: depth,
@@ -3154,6 +3159,8 @@ function composerApp() {
                     self._applyNeighborFocus(centre);
                 }
                 self.statusText = relationships.length === 0 ? 'No connections at this depth' : 'Neighbourhood loaded';
+                self.viewpointDirty = false;
+                window.setTimeout(function() { self._focusQuiet = false; }, 3500);
                 /* Fit once the card is on screen, so the drawing sits below it. */
                 self.$nextTick(function() {
                     if (window.lucide) lucide.createIcons();

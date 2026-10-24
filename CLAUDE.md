@@ -507,7 +507,7 @@ counts only the families in `BANNED_FAMILIES` (`scripts/check_design_tokens.py`)
 `orange` or `cyan` class is right per DESIGN.md but moves this number by zero, and a
 line carrying a `token-migration-ok` marker is already excluded from the count.
 
-**All 81 gates, in registry order (`scripts/verify.py`, `build_gates`) — this table
+**All 83 gates, in registry order (`scripts/verify.py`, `build_gates`) — this table
 is a snapshot, not generated. Run `grep -oE '^\s*Gate\("[a-z-]+"' scripts/verify.py`
 to reconfirm the count before trusting it:**
 
@@ -519,6 +519,8 @@ to reconfirm the count before trusting it:**
 | `redefinitions` | shadowed definitions (ruff F811) | ratchet @ 0 |
 | `lint-core` | correctness lint (ruff `F,E4,E7,E9`) | ratchet @ 0 |
 | `design-tokens` | raw Tailwind colours (DESIGN.md rule) | ratchet @ 0 |
+| `brand-contrast` | a brand token pair (label on primary, control borders, chart ramp) below its contrast threshold, or the logo's `--brand` differing from `--primary` | must be 0 |
+| `brand-raw-colour` | a hard-coded `#2563eb` / `#135fbc` outside the token file and the logo | ratchet @ 53 |
 | `composer-url-params` | a literal composer link carrying a param the composer doesn't read | ratchet @ 0 |
 | `crosswalk-writer-gated` | a write to `external_identity_crosswalk` with no allowlist gate on its call path | must be 0 |
 | `public-shell` | the public navbar, menus and footer reading one registry, tokens and Lucide icons only, no literal links, accessible disclosure menus | must be 0 |
@@ -526,7 +528,7 @@ to reconfirm the count before trusting it:**
 | `design-tokens-extended` | raw colours outside the core banned families | ratchet @ 0 |
 | `shell-conformance` | a page off the platform shell (header macro/width) | ratchet @ 3 |
 | `shell-layout` | a page that does not reach an approved layout (admin, public or composer) through its `extends` chain | ratchet @ 16 |
-| `shell-chrome` | a page drawing its own sidebar, top bar, navigation or breadcrumb outside the shell macros | ratchet @ 54 |
+| `shell-chrome` | a page drawing its own sidebar, top bar, navigation or breadcrumb outside the shell macros | ratchet @ 53 |
 | `shell-escapes` | a `shell-ok:` escape hatch (every exception is counted) | ratchet @ 1 |
 | `dialog-title` | a dialog, sheet or drawer with no title | ratchet @ 65 |
 | `empty-state-macro` | a hand-written "No ... yet" block instead of the `empty_state` macro | ratchet @ 166 |

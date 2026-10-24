@@ -67,7 +67,13 @@ PATTERNS_PATH = ROOT / "design" / "patterns.json"
 MARKER_RE = re.compile(r"{#-?\s*design-block:\s*([a-z][a-z-]*)\s*-?#}")
 SHARED_PREFIXES = ("components/", "macros/")
 STATUSES = ("mapped", "specified", "implemented", "verified")
-DESIGNED_FIELDS = ("block", "basis", "spec", "status", "extra_macros", "note", "persona", "also_serves", "components")
+DESIGNED_FIELDS = ("block", "basis", "spec", "status", "extra_macros", "note", "persona", "also_serves", "components",
+                   "tier", "page_type", "type_changed", "original", "frame", "charts", "inhouse_components",
+                   "confidence", "reason")
+# The designers' port map: how close each page is to a shadcn original. A is the original verbatim,
+# B is composed inside the nearest original's frame, C1 to C5 are the five forms shadcn has no original for.
+TIERS = ("A", "B", "C1", "C2", "C3", "C4", "C5")
+CONFIDENCE = ("high", "low")
 
 # Shared macro file stem -> the shadcn component it is an instance of. A macro with no
 # shadcn counterpart is an app component named after its file (source "app").
@@ -141,15 +147,128 @@ def component_of(macro):
     return SHADCN_ALIASES.get(stem, stem.replace("_", "-"))
 
 
+def macro_name(macro):
+    """The name the port map gives an in-house component: its macro file stem, dashed."""
+    return Path(macro).stem.replace("_", "-")
+
+
+def inhouse_names(entry):
+    """{in-house component name: verdict} a row lists, e.g. {'page-shell': 'Replace'}."""
+    out = {}
+    for item in entry.get("inhouse_components", []):
+        name, _, verdict = item.rpartition(":")
+        out[name.replace("_", "-")] = verdict
+    return out
+
+
+def inhouse_verdicts(design_map):
+    """{in-house component name: verdict} over every row; the port map gives one verdict per component."""
+    out = {}
+    for entry in design_map["pages"].values():
+        out.update(inhouse_names(entry))
+    return out
+
+
 def row_macros(design_map, entry):
-    """The macro files a row's components stand for: every macro of the vocabulary whose component the row lists."""
-    wanted = set(entry.get("components", []))
-    return sorted(m for name in wanted for m in design_map.get("components", {}).get(name, {}).get("macros", []))
+    """The macro files a row stands for: those of the components it lists and of the in-house components it names."""
+    vocabulary = design_map.get("components", {})
+    macros = {m for name in entry.get("components", []) for m in vocabulary.get(name, {}).get("macros", [])}
+    named = set(inhouse_names(entry))
+    macros |= {m for slot in vocabulary.values() for m in slot.get("macros", []) if macro_name(m) in named}
+    return sorted(macros)
 
 
 def allowed_macros(design_map, entry):
     block = design_map["blocks"].get(entry.get("block"), {})
     return sorted(set(block.get("allowed_macros", [])) | set(entry.get("extra_macros", [])))
+
+
+# ------------------------------------------------------------------ the tier checks
+
+# Checks of criteria v2 that need a rendered golden original or a browser. They are listed, not faked.
+PENDING_TIER_CHECKS = {
+    "A2-A5": "structure, class, computed-style and pixel match against the original's golden render (no render of "
+             "the site examples or preview cards yet)",
+    "B2": "the page frame equals the nearest original's frame (needs the golden render)",
+    "B4-B6": "every component node carries its pinned recipe and every other node is a layout or text element",
+    "B7": "regions below the header, stat cards and primary tables counted from the rendered DOM",
+    "B8": "frame pixel difference against the golden render",
+    "B9": "each chart's family, series, tooltip and legend read from the rendered page",
+    "X6-X10": "computed colours, fonts, accessibility findings and horizontal overflow in a browser",
+    "C": "the form-specific check of each Tier C form (the marked region and its geometry)",
+}
+TIER_CHECKS = {
+    "replace_in_use": "pages still using an in-house component the port map marks Replace",
+    "in_house_beyond_tier": "pages using an in-house component their tier does not allow (A: any Compose or Keep; B: Keep)",
+    "charts_over_two": "Tier A and B pages whose own template draws more than two charts",
+    "colour_literals": "pages whose own template holds a colour literal instead of a token (X1)",
+    "inline_style": "pages whose own template sets an inline style beyond the geometry properties (X2)",
+    "arbitrary_values": "pages whose own template uses an arbitrary-value class such as h-[250px] (X4)",
+}
+GEOMETRY_PROPERTIES = {"--x", "--y", "--w", "--h", "--col", "--row"}
+COLOUR_LITERAL_RE = re.compile(
+    r"(?:\b(?:rgba?|hsla?|oklch|oklab|lab|lch)\((?!\s*var\()|"
+    r"(?:fill|stroke|stop-color|color|background(?:-color)?|border(?:-[a-z]+)?-color)\s*[:=]\s*[\"']?#[0-9a-fA-F]{3,8}\b)")
+STYLE_ATTR_RE = re.compile(r"""\bstyle\s*=\s*(?:"([^"]*)"|'([^']*)')""")
+CLASS_ATTR_RE = re.compile(r"""\bclass\s*=\s*(?:"([^"]*)"|'([^']*)')""")
+ARBITRARY_RE = re.compile(r"(?<![\w-])[a-z0-9:!-]*-\[[^\]\s]+\]")
+CHART_CALL_RE = re.compile(r"new\s+Chart\s*\(")
+
+
+def style_properties(source):
+    """Every property name set in an inline style attribute that holds no template expression."""
+    names = set()
+    for match in STYLE_ATTR_RE.finditer(source):
+        value = match.group(1) if match.group(1) is not None else match.group(2)
+        if "{{" in value or "{%" in value:
+            value = re.sub(r"{{.*?}}|{%.*?%}", "", value)
+        names |= {part.split(":", 1)[0].strip().lower() for part in value.split(";") if ":" in part}
+    return names
+
+
+def charts_drawn(source):
+    return max(len(re.findall(r"<canvas\b", source)), len(CHART_CALL_RE.findall(source)))
+
+
+def tier_checks(design_map, pages, read=None):
+    """Each row measured against the checks of its tier that a template can answer today.
+
+    {check: {"count": pages failing, "by_tier": {tier: pages}, "pages": [templates]}}. The source checks read
+    the page's own template, so a macro it includes is not followed; they ratchet at today's count.
+    """
+    verdicts = inhouse_verdicts(design_map)
+    read = read or (lambda rel: (ROOT / rel).read_text(encoding="utf-8", errors="replace")
+                    if (ROOT / rel).is_file() else None)
+    found = {name: [] for name in TIER_CHECKS}
+    for rel in sorted(set(design_map["pages"]) & set(pages)):
+        entry, tier = design_map["pages"][rel], design_map["pages"][rel].get("tier")
+        used = {macro_name(m): verdicts.get(macro_name(m)) for m in pages[rel]["macros"]}
+        used = {name: verdict for name, verdict in used.items() if verdict}
+        if "Replace" in used.values():
+            found["replace_in_use"].append((rel, tier))
+        visible = {name: v for name, v in used.items() if name != "accessibility-helpers"}
+        beyond = {"A": {"Compose", "Keep"}, "B": {"Keep"}}.get(tier, set())
+        if beyond & set(visible.values()):
+            found["in_house_beyond_tier"].append((rel, tier))
+        source = read(rel)
+        if source is None:
+            continue
+        if tier in ("A", "B") and charts_drawn(source) > 2:
+            found["charts_over_two"].append((rel, tier))
+        if COLOUR_LITERAL_RE.search(source):
+            found["colour_literals"].append((rel, tier))
+        extra = style_properties(source) - (GEOMETRY_PROPERTIES if tier and tier.startswith("C") else set())
+        if extra:
+            found["inline_style"].append((rel, tier))
+        if any(ARBITRARY_RE.search(m.group(1) if m.group(1) is not None else m.group(2))
+               for m in CLASS_ATTR_RE.finditer(source)):
+            found["arbitrary_values"].append((rel, tier))
+    out = {}
+    for name, hits in found.items():
+        by_tier = Counter(tier for _rel, tier in hits)
+        out[name] = {"count": len(hits), "by_tier": {t: by_tier[t] for t in TIERS if by_tier[t]},
+                     "pages": [rel for rel, _tier in hits]}
+    return out
 
 
 # ------------------------------------------------------------------ the merge check
@@ -183,7 +302,10 @@ def check_block(rel, source, design_map):
         if macro not in allowed:
             problems.append(f"{rel}: uses {macro}, which the {block} block does not allow "
                             f"(allowed: {', '.join(sorted(allowed))})")
-    if entry.get("components"):
+    # The component list is the page as designed. Once the page is rebuilt to it, a macro outside it is a
+    # finding on the change; until then the page still holds today's macros and the outside-components
+    # ratchet in measure() counts the gap, so a branch that touches many unconverted pages is not refused.
+    if entry.get("components") and entry.get("status") in STATUSES[2:]:
         in_row = set(row_macros(design_map, entry))
         for macro in facts["macros"]:
             if macro in allowed and macro not in in_row:
@@ -233,6 +355,15 @@ def measure(design_map=None, pages=None):
         for other in entry.get("also_serves", []):
             if other not in personas:
                 errors.append(f"{rel}: also_serves {other!r} is not one of the personas in docs/design-map.json")
+        if entry.get("tier") not in TIERS:
+            errors.append(f"{rel}: tier {entry.get('tier')!r} is not one of {', '.join(TIERS)}")
+        if entry.get("confidence") not in CONFIDENCE:
+            errors.append(f"{rel}: confidence {entry.get('confidence')!r} is not one of {', '.join(CONFIDENCE)}")
+        for field in ("page_type", "original", "frame"):
+            if not entry.get(field):
+                errors.append(f"{rel}: no {field.replace('_', ' ')} from the port map")
+        if not (entry.get("reason") or "").strip():
+            errors.append(f"{rel}: no reason from the port map")
         listed = entry.get("components") or []
         if not listed:
             errors.append(f"{rel}: lists no components")
@@ -258,6 +389,9 @@ def measure(design_map=None, pages=None):
         "unmarked_count": len(unmarked),
         "outside_components": outside_components,
         "outside_components_count": len(outside_components),
+        "tiers": dict(sorted(Counter(e.get("tier") for e in entries.values()).items())),
+        "tier_checks": tier_checks(design_map, pages),
+        "tier_checks_pending": PENDING_TIER_CHECKS,
     }
 
 
@@ -328,6 +462,10 @@ def build_vocabulary(design_map):
         name = component_of(m)
         slot = out.setdefault(name, {"source": "shadcn" if Path(m).stem in SHADCN_ALIASES else "app", "macros": []})
         slot["macros"].append(m)
+    # A pinned shadcn component the port map names has no in-house macro, but it is still a component.
+    for entry in design_map["pages"].values():
+        for name in entry.get("components", []):
+            out.setdefault(name, design_map.get("components", {}).get(name) or {"source": "shadcn", "macros": []})
     return dict(sorted(out.items()))
 
 
@@ -336,6 +474,10 @@ def dump(design_map):
 
 
 # ------------------------------------------------------------------ tracker
+
+TIER_NAMES = {"A": "the original verbatim", "B": "composed in the nearest original's frame", "C1": "diagram canvas",
+              "C2": "matrix and map", "C3": "timeline", "C4": "board and canvas", "C5": "generated document"}
+
 
 def tracker_rows(design_map, result):
     """Pages per block and per status, plus pages outside their block."""
@@ -390,10 +532,13 @@ def render_tracker(design_map, result):
             f'<p><a class="spec" href="{_esc(spec)}">Open the redesign spec</a></p></article>'
         )
     page_rows = "\n".join(
-        f'<tr data-block="{_esc(e["block"])}" data-persona="{_esc(e["persona"])}"><td>{_esc(rel)}</td>'
+        f'<tr data-block="{_esc(e["block"])}" data-persona="{_esc(e["persona"])}" data-tier="{_esc(e["tier"])}" '
+        f'data-confidence="{_esc(e["confidence"])}"><td>{_esc(rel)}</td>'
         f'<td>{_esc(design_map["blocks"][e["block"]]["title"])}</td>'
         f'<td>{_esc(design_map["personas"][e["persona"]])}</td>'
-        f'<td>{_esc(", ".join(e["components"]))}</td><td>{_esc(e["status"])}</td>'
+        f'<td>{_esc(", ".join(e["components"]))}</td><td>{_esc(e["tier"])}</td>'
+        f'<td>{_esc(e["page_type"])}{" (corrected)" if e["type_changed"] else ""}<br>'
+        f'<span class="muted">{_esc(e["reason"])}</span></td><td>{_esc(e["confidence"])}</td><td>{_esc(e["status"])}</td>'
         f'<td>{_esc(", ".join(outside[rel])) if rel in outside else "None: follows its block"}</td>'
         f'<td>{(chr(60) + "a href=" + chr(34) + _esc(e["spec"].replace("docs/design/", "")) + chr(34) + ">Spec</a>") if e.get("spec") else "Not written yet"}</td></tr>'
         for rel, e in design_map["pages"].items()
@@ -402,7 +547,18 @@ def render_tracker(design_map, result):
     persona_options = "".join(
         f'<option value="{_esc(key)}">{_esc(name)}</option>' for key, name in design_map["personas"].items()
         if any(e["persona"] == key for e in design_map["pages"].values()))
+    tier_counts = ", ".join(f"{t} {n}" for t, n in result["tiers"].items())
+    tier_options = "".join(f'<option value="{_esc(t)}">Tier {_esc(t)}: {_esc(TIER_NAMES[t])} ({n})</option>'
+                           for t, n in result["tiers"].items())
+    check_rows = "\n".join(
+        f'<tr data-check="{_esc(name)}"><th scope="row">{_esc(TIER_CHECKS[name])}</th>'
+        f'<td class="n">{found["count"]}</td>'
+        f'<td>{_esc(", ".join(f"{t} {n}" for t, n in found["by_tier"].items()) or "None")}</td></tr>'
+        for name, found in result["tier_checks"].items())
+    pending = "".join(f"<li><strong>{_esc(k)}</strong>: needs {_esc(v)}</li>"
+                      for k, v in result["tier_checks_pending"].items())
     return TRACKER_TEMPLATE.format(
+        tier_counts=_esc(tier_counts), tier_options=tier_options, check_rows=check_rows, pending=pending,
         total=total, block_rows=block_rows, cards="\n".join(cards), page_rows=page_rows, options=options, persona_options=persona_options,
         outside=result["outside_block_count"], outside_components=result["outside_components_count"], unmarked=result["unmarked_count"],
         specified=sum(r["specified"] for r in rows),
@@ -442,6 +598,7 @@ a {{ color:inherit; }}
 figure {{ margin:8px 0; }} img {{ width:100%; border:1px solid hsl(var(--border)); border-radius:6px; }}
 figcaption {{ font-size:12px; color:hsl(var(--muted-foreground)); }}
 .filters {{ display:flex; gap:8px; flex-wrap:wrap; margin-bottom:8px; }}
+.filters label {{ max-width:100%; }} .filters select {{ max-width:100%; }}
 select, input {{ font:inherit; padding:6px 8px; border:1px solid hsl(var(--border)); border-radius:6px; background:hsl(var(--background)); color:hsl(var(--foreground)); }}
 .summary {{ display:flex; gap:24px; flex-wrap:wrap; }} .summary div strong {{ display:block; font-size:22px; }}
 </style>
@@ -457,6 +614,7 @@ select, input {{ font:inherit; padding:6px 8px; border:1px solid hsl(var(--borde
 <div><strong id="unmarked-pages">{unmarked}</strong>do not yet name their block in the template</div>
 <div><strong id="outside-components">{outside_components}</strong>use a component their row does not list</div>
 </div>
+<p class="muted">Pages by tier: <span id="tier-counts">{tier_counts}</span></p>
 <div role="tablist" aria-label="Views">
 <button type="button" role="tab" id="tab-blocks" aria-controls="panel-blocks" aria-selected="true">Blocks</button>
 <button type="button" role="tab" id="tab-startup" aria-controls="panel-startup" aria-selected="false">Startup path</button>
@@ -468,6 +626,15 @@ select, input {{ font:inherit; padding:6px 8px; border:1px solid hsl(var(--borde
 <tbody>
 {block_rows}
 </tbody></table></div>
+<h2>Checks against each page's tier</h2>
+<p class="muted">What the gate can measure from the templates today. Each count may only fall.</p>
+<div class="scroll"><table id="tier-checks">
+<thead><tr><th scope="col">Check</th><th scope="col">Pages failing</th><th scope="col">Tiers</th></tr></thead>
+<tbody>
+{check_rows}
+</tbody></table></div>
+<p class="muted">Not measured yet, because each needs a rendered original or a browser:</p>
+<ul id="tier-pending">{pending}</ul>
 <p class="muted">Mapped: the page has a block. Specified: it has a redesign spec. Implemented: it has been rebuilt to the spec. Verified: someone walked it beside the reference. Each stage counts the pages that have reached it or gone further.</p>
 </section>
 <section role="tabpanel" id="panel-startup" aria-labelledby="tab-startup" hidden>
@@ -480,11 +647,13 @@ select, input {{ font:inherit; padding:6px 8px; border:1px solid hsl(var(--borde
 <div class="filters">
 <label>Block <select id="block-filter"><option value="">Every block</option>{options}</select></label>
 <label>Persona <select id="persona-filter"><option value="">Every persona</option>{persona_options}</select></label>
+<label>Tier <select id="tier-filter"><option value="">Every tier</option>{tier_options}</select></label>
+<label>Confidence <select id="confidence-filter"><option value="">Any confidence</option><option value="high">High</option><option value="low">Low</option></select></label>
 <label>Search <input id="page-search" type="search" placeholder="Template path"></label>
 <span class="muted" id="page-count" aria-live="polite"></span>
 </div>
 <div class="scroll"><table id="pages-table">
-<thead><tr><th scope="col">Template</th><th scope="col">Block</th><th scope="col">Persona</th><th scope="col">Components</th><th scope="col">Status</th><th scope="col">Macros outside its block</th><th scope="col">Spec</th></tr></thead>
+<thead><tr><th scope="col">Template</th><th scope="col">Block</th><th scope="col">Persona</th><th scope="col">Components</th><th scope="col">Tier</th><th scope="col">Page type and why</th><th scope="col">Confidence</th><th scope="col">Status</th><th scope="col">Macros outside its block</th><th scope="col">Spec</th></tr></thead>
 <tbody>
 {page_rows}
 </tbody></table></div>
@@ -503,22 +672,27 @@ select, input {{ font:inherit; padding:6px 8px; border:1px solid hsl(var(--borde
   tabs.forEach(function (t) {{ t.addEventListener('click', function () {{ select(t); }}); }});
   var filter = document.getElementById('block-filter');
   var persona = document.getElementById('persona-filter');
+  var tier = document.getElementById('tier-filter');
+  var confidence = document.getElementById('confidence-filter');
   var search = document.getElementById('page-search');
   var rows = Array.prototype.slice.call(document.querySelectorAll('#pages-table tbody tr'));
   function apply() {{
     var block = filter.value, who = persona.value, text = search.value.toLowerCase(), shown = 0;
+    var level = tier.value, sure = confidence.value;
     rows.forEach(function (r) {{
-      var on = (!block || r.getAttribute('data-block') === block) && (!who || r.getAttribute('data-persona') === who) && r.cells[0].textContent.toLowerCase().indexOf(text) !== -1;
+      var on = (!block || r.getAttribute('data-block') === block) && (!who || r.getAttribute('data-persona') === who) && (!level || r.getAttribute('data-tier') === level) && (!sure || r.getAttribute('data-confidence') === sure) && r.cells[0].textContent.toLowerCase().indexOf(text) !== -1;
       r.hidden = !on; if (on) shown += 1;
     }});
     document.getElementById('page-count').textContent = shown + ' of ' + rows.length + ' pages';
   }}
   filter.addEventListener('change', apply);
   persona.addEventListener('change', apply);
+  tier.addEventListener('change', apply);
+  confidence.addEventListener('change', apply);
   search.addEventListener('input', apply);
   Array.prototype.slice.call(document.querySelectorAll('.show-block')).forEach(function (b) {{
     b.addEventListener('click', function () {{
-      filter.value = b.getAttribute('data-block'); persona.value = ''; search.value = ''; apply(); select(document.getElementById('tab-pages'));
+      filter.value = b.getAttribute('data-block'); persona.value = ''; tier.value = ''; confidence.value = ''; search.value = ''; apply(); select(document.getElementById('tab-pages'));
     }});
   }});
   apply();

@@ -10,6 +10,7 @@ This journey validates:
 6. Organization B sees an empty board (tenant isolation)
 """
 import os
+import re
 import pathlib
 import pytest
 from playwright.sync_api import expect
@@ -73,9 +74,8 @@ def _assert_cards_have_badge_id_title_date_avatar(page):
         badge_text = badge.first.inner_text()
         assert "WSJF:" in badge_text, f"Badge doesn't show WSJF score: {badge_text}"
 
-        # Item ID (top right, in monospace)
-        id_span = card.locator("span.font-mono")
-        assert id_span.count() >= 1, "Card missing item id"
+        # Names, not ids: no bare number stands in for the element
+        assert card.locator("span.font-mono").count() == 0, "Card shows a raw element id"
 
         # Title (h3 element, line-clamped)
         title = card.locator("h3.line-clamp-2")
@@ -83,9 +83,9 @@ def _assert_cards_have_badge_id_title_date_avatar(page):
         assert len(title.inner_text()) > 0, "Card title is empty"
         assert title.first.inner_text().strip() in card_text, "Card text does not contain its own title"
 
-        # Date with icon
-        calendar_icon = card.locator("[data-lucide='calendar']")
-        assert calendar_icon.count() >= 1, "Card missing calendar icon for date"
+        # A date carries its icon; a card with no recorded date shows no dash in its place
+        if card.locator("[data-lucide='calendar']").count() == 0:
+            assert "—" not in card_text, "Card shows a bare dash instead of a date"
 
         # Owner avatar or initials (may not be present if no owner set)
         # This is optional, so we just check the structure allows it
@@ -114,7 +114,7 @@ def _assert_no_inline_styles(page):
 
 def _assert_cards_use_words(page):
     card = page.locator(".kanban-card").first
-    card.get_by_role("button", name="Show WSJF factors").click()
+    card.get_by_role("button", name=re.compile("Show WSJF factors")).click()
     card_text = card.inner_text()
     for label in ("Business Value", "Time Criticality", "Risk Reduction", "Job Size"):
         assert label in card_text, f"Card label {label!r} missing"
@@ -173,31 +173,26 @@ def _assert_wip_limits_show_on_headers(page):
 
 
 def _drag_card(page, card, to_state):
-    """Drive a native HTML5 drag-and-drop of a card onto a target column,
-    dispatching the dragstart/dragover/drop/dragend sequence the board listens
-    for with a shared DataTransfer so the payload survives. The board's
-    @dragover / @drop handlers sit on the .kanban-column element, so the drop
-    is dispatched there."""
+    """Drag a card onto a column with real mouse events: press on the card's
+    drag handle, move across the board in steps, release over the target lane.
+    The browser raises dragstart, dragover and drop itself."""
     target = page.locator(f".kanban-column[data-state='{to_state}']")
     card.scroll_into_view_if_needed()
+    handle = card.locator("[data-drag-handle]").bounding_box()
+    page.mouse.move(handle["x"] + handle["width"] / 2, handle["y"] + handle["height"] / 2)
+    page.mouse.down()
     target.scroll_into_view_if_needed()
-    page.evaluate(
-        """([src, dst]) => {
-            const dt = new DataTransfer();
-            const fire = (el, type) => {
-                const ev = new DragEvent(type, { bubbles: true, cancelable: true, dataTransfer: dt });
-                Object.defineProperty(ev, 'dataTransfer', { value: dt });
-                el.dispatchEvent(ev);
-            };
-            fire(src, 'dragstart');
-            fire(dst, 'dragenter');
-            fire(dst, 'dragover');
-            fire(dst, 'drop');
-            fire(src, 'dragend');
-        }""",
-        [card.element_handle(), target.element_handle()],
-    )
+    box = target.bounding_box()
+    page.mouse.move(box["x"] + box["width"] / 2, box["y"] + 60, steps=12)
+    page.mouse.move(box["x"] + box["width"] / 2, box["y"] + 70, steps=4)
+    page.mouse.up()
     page.wait_for_timeout(800)
+
+
+def _move_by_menu(card, name, to_state):
+    """Open the card's actions menu and choose a column."""
+    card.get_by_role("button", name=f"Move {name} to a different column").click()
+    card.get_by_role("menuitem", name=f"Move to {to_state}").click()
 
 
 def _shoot(browser, live_server, email, width, height, scheme, name, scroll_to_end=False):
@@ -336,7 +331,7 @@ def test_portfolio_kanban_journey(browser, live_server, seeded, db_session):
 
         # === Step 3: Verify WSJF ordering in Funnel column (descending) ===
         # Platform Modernization (13.5) should be first, Customer Portal (7.67) second, Legacy Migration (2.8) third
-        cards = page.locator(".kanban-column[data-state='Funnel'] .bg-card").all()
+        cards = page.locator(".kanban-column[data-state='Funnel'] .kanban-card").all()
         assert len(cards) >= 3, "Expected at least 3 epic cards in Funnel"
 
         # Check order by card position (first card should have highest WSJF)
@@ -354,10 +349,8 @@ def test_portfolio_kanban_journey(browser, live_server, seeded, db_session):
 
         # === Step 4: Move Customer Portal Epic to Implementing ===
         # Find the select dropdown for Customer Portal Epic
-        customer_card = page.locator(".kanban-column[data-state='Funnel'] .bg-card").filter(has_text="Customer Portal Epic")
-        move_select = customer_card.locator("select").first
-        expect(move_select).to_be_visible(timeout=PAGE_TIMEOUT)
-        move_select.select_option("Implementing")
+        customer_card = page.locator(".kanban-column[data-state='Funnel'] .kanban-card").filter(has_text="Customer Portal Epic")
+        _move_by_menu(customer_card, "Customer Portal Epic", "Implementing")
 
         # Wait for the move to complete (card should disappear from Funnel)
         page.wait_for_timeout(1000)
@@ -367,7 +360,7 @@ def test_portfolio_kanban_journey(browser, live_server, seeded, db_session):
         expect(implementing_column.get_by_text("Customer Portal Epic")).to_be_visible(timeout=PAGE_TIMEOUT)
 
         # Funnel should now only have 2 epics
-        funnel_cards = page.locator(".kanban-column[data-state='Funnel'] .bg-card").all()
+        funnel_cards = page.locator(".kanban-column[data-state='Funnel'] .kanban-card").all()
         assert len(funnel_cards) == 2, "Funnel should have 2 epics after moving one"
 
         # === Step 6: Reload and verify state persisted ===
@@ -378,7 +371,7 @@ def test_portfolio_kanban_journey(browser, live_server, seeded, db_session):
         implementing_column = page.locator(".kanban-column[data-state='Implementing']")
         expect(implementing_column.get_by_text("Customer Portal Epic")).to_be_visible(timeout=PAGE_TIMEOUT)
 
-        funnel_cards_after_reload = page.locator(".kanban-column[data-state='Funnel'] .bg-card").all()
+        funnel_cards_after_reload = page.locator(".kanban-column[data-state='Funnel'] .kanban-card").all()
         assert len(funnel_cards_after_reload) == 2, "Funnel should still have 2 epics after reload"
 
         # === Step 7: Drag an epic from Funnel to Reviewing (criterion 3) ===
@@ -449,9 +442,8 @@ def test_portfolio_board_viewer_is_read_only(browser, live_server, seeded, db_se
         # The "Move to" select is gated on canWrite (x-show), so for a viewer no
         # select is visible — a hidden node may remain in the DOM, so the test
         # asserts visibility, not DOM presence.
-        selects = page.locator(".kanban-card select")
-        for i in range(selects.count()):
-            assert not selects.nth(i).is_visible(), "viewer is shown a Move to select"
+        assert page.locator(".kanban-card [data-testid='card-actions']").count() == 0, "viewer is shown a card actions menu"
+        assert page.locator("[data-drag-handle]").count() == 0, "viewer is shown a drag handle"
         # The board's read-only-ness is also reported by the API it renders from.
         import json
         page.goto(live_server + "/api/safe/portfolio", timeout=PAGE_TIMEOUT)
