@@ -18,7 +18,7 @@ from pathlib import Path
 import pytest
 from playwright.sync_api import expect
 
-from .conftest import PAGE_TIMEOUT, PASSWORD
+from .conftest import PAGE_TIMEOUT
 from .fresh_org import create_fresh_org, sign_in
 
 pytestmark = [pytest.mark.smoke, pytest.mark.journey]
@@ -33,16 +33,16 @@ def _assert_persona(email):
     from app import create_app
     from app.middleware.tenant_decorators import is_platform_admin
     from app.models.user import User
-    from app.services import rbac_service
 
     app = create_app("testing")
     with app.app_context():
         user = User.query.filter_by(email=email).one()
         assert user.enterprise_role == PERSONA, \
             "Expected enterprise_role=%s, got %s" % (PERSONA, user.enterprise_role)
+        assert user.role.name not in ("Administrator", "Platform Admin"), \
+            "Platform role must not be Administrator/Platform Admin, got %s" % user.role.name
         assert not is_platform_admin(user), "User must not be a platform admin"
-        assert not rbac_service.is_org_admin(user, user.organization_id), \
-            "User must not be an org admin"
+        assert not user.is_org_admin, "User must not be an org admin"
         db_session = app.extensions["sqlalchemy"].session
         db_session.remove()
 
