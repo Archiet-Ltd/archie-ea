@@ -1,3 +1,4 @@
+{# design-block: settings #}
 {% extends 'layouts/admin_base.html' %}
 {% block title %}Microsoft 365 Integration{% endblock %}
 {% from 'components/page_header.html' import page_header %}
@@ -8,7 +9,7 @@
         title='Microsoft 365 Integration',
         description='Configure SharePoint blueprint export and Teams ARB notifications via Microsoft Graph API.',
         breadcrumbs=[
-            {'label': 'Admin', 'href': url_for('admin.index')},
+            ({'label': 'Admin', 'href': url_for('admin.index')} if current_user.is_admin() else {'label': 'Workspace'}),
             {'label': 'M365 Integration'}
         ]
     ) }}
