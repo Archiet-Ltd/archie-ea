@@ -9,7 +9,7 @@
 {% from 'components/completeness_ring.html' import completeness_ring %}
 {% from 'components/button.html' import button %}
 {% from 'components/badge.html' import badge %}
-{% from 'components/alert.html' import alert %}
+{% from 'components/alert.html' import alert as quiet_alert %}
 {% from 'components/input.html' import input, textarea %}
 {% from 'components/select.html' import select_native %}
 {% from 'components/checkbox.html' import checkbox %}
@@ -157,7 +157,7 @@
   {% if stats.summary_total %}
   {%- set total_n = stats.summary_total -%}
   {%- set keep_decom = 'true' if include_decom else none -%}
-  {% call alert('warning' if (stats.no_owner or stats.no_capability or stats.no_vendor) else 'success', title='Data quality', testid='data-quality-alert',
+  {% call quiet_alert('warning' if (stats.no_owner or stats.no_capability or stats.no_vendor) else 'success', title='Data quality', testid='data-quality-alert',
                 link_href=url_for('enterprise_crud.data_freshness_cockpit'), link_text='View full data-freshness report', class='flex-wrap') %}
     {%- if stats.no_owner > 0 -%}
     <a href="{{ url_for('unified_applications.application_list', no_owner='true', include_decom=keep_decom) }}" class="font-medium text-warning-emphasis hover:underline" data-testid="dq-no-owner">{{ stats.no_owner }} of {{ total_n }} have no owner</a>
@@ -537,7 +537,7 @@
         </div>
 
         <div x-show="aiMap.error" x-cloak>
-          {% call alert('danger', testid='ai-map-error') %}<span x-text="aiMap.error"></span>{% endcall %}
+          {% call quiet_alert('danger', testid='ai-map-error') %}<span x-text="aiMap.error"></span>{% endcall %}
         </div>
 
         <div x-show="aiMap.result && !aiMap.loading" x-cloak class="space-y-3" data-testid="ai-map-results">
@@ -563,7 +563,7 @@
         </div>
 
         <div x-show="aiMap.acceptResult" x-cloak data-testid="ai-map-accept-result">
-          {% call alert('success') %}<span x-text="aiMap.acceptResult"></span>{% endcall %}
+          {% call quiet_alert('success') %}<span x-text="aiMap.acceptResult"></span>{% endcall %}
         </div>
       </div>
       <div class="flex shrink-0 justify-end gap-3 border-t border-border p-6">
@@ -646,7 +646,7 @@
           {% endcall %}
         </div>
         <div x-show="errorMsg" x-cloak>
-          {% call alert('danger') %}<span x-text="errorMsg"></span>{% endcall %}
+          {% call quiet_alert('danger') %}<span x-text="errorMsg"></span>{% endcall %}
         </div>
         <div class="flex justify-end gap-3 border-t border-border pt-2">
           {{ button(text='Cancel', variant='ghost', on_click="Platform.modal.close('modal-create')") }}
