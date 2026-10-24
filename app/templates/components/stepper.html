@@ -36,7 +36,7 @@
                 :class="{
  'cursor-pointer': !{{ locked_steps_expr }}.includes({{ step.num }}),
  'cursor-not-allowed opacity-40': {{ locked_steps_expr }}.includes({{ step.num }}),
- 'bg-primary text-primary-foreground shadow-primary/25 ring-4 ring-primary/20': {{ current_step_expr }} === {{ step.num }} && !{{ completed_expr }}.includes({{ step.num }}) && !{{ locked_steps_expr }}.includes({{ step.num }}),
+ 'bg-primary text-primary-foreground ring-4 ring-primary/20': {{ current_step_expr }} === {{ step.num }} && !{{ completed_expr }}.includes({{ step.num }}) && !{{ locked_steps_expr }}.includes({{ step.num }}),
  'bg-success/15 text-success-emphasis border border-success/30': {{ completed_expr }}.includes({{ step.num }}),
  'bg-muted text-muted-foreground': ({{ current_step_expr }} !== {{ step.num }} && !{{ completed_expr }}.includes({{ step.num }})) || {{ locked_steps_expr }}.includes({{ step.num }})
  }"

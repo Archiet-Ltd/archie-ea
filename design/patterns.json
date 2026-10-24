@@ -101,6 +101,95 @@
         "exclusive-accordion",
         "hover-flyout-on-desktop"
       ]
+    },
+    "record_detail": {
+      "pattern": "record-detail",
+      "structure": [
+        "page-header",
+        "detail-meta",
+        "sections",
+        "related-records"
+      ],
+      "rules": [
+        "actions-in-header",
+        "one-column-on-narrow",
+        "every-link-lands-on-content"
+      ]
+    },
+    "settings": {
+      "pattern": "settings-sections",
+      "structure": [
+        "page-header",
+        "section-nav",
+        "form-body",
+        "form-footer"
+      ],
+      "rules": [
+        "one-section-per-panel",
+        "label-above-input",
+        "right-aligned-actions"
+      ]
+    },
+    "conversation": {
+      "pattern": "conversation",
+      "structure": [
+        "thread",
+        "answer-cascade",
+        "composer"
+      ],
+      "rules": [
+        "sources-under-every-answer",
+        "composer-pinned-to-bottom"
+      ]
+    },
+    "board": {
+      "pattern": "board",
+      "structure": [
+        "action-bar",
+        "columns",
+        "cards"
+      ],
+      "rules": [
+        "column-heading-with-count",
+        "keyboard-move",
+        "empty-column-says-why"
+      ]
+    },
+    "onboarding": {
+      "pattern": "onboarding",
+      "structure": [
+        "brand",
+        "single-card",
+        "form-body",
+        "next-step"
+      ],
+      "rules": [
+        "one-task-per-screen",
+        "label-above-input"
+      ]
+    },
+    "public": {
+      "pattern": "public-page",
+      "structure": [
+        "public-navbar",
+        "hero",
+        "sections",
+        "public-footer"
+      ],
+      "rules": [
+        "public-palette-scoped"
+      ]
+    },
+    "empty_state": {
+      "pattern": "empty-state",
+      "structure": [
+        "page-header",
+        "empty-state"
+      ],
+      "rules": [
+        "says-why-it-is-empty",
+        "offers-the-next-step"
+      ]
     }
   },
   "banned_patterns": [

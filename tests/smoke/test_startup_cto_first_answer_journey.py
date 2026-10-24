@@ -402,7 +402,7 @@ def test_13_the_answer_gives_a_sentence_a_cto_could_forward(asked):
 @pytest.mark.xfail(strict=True, reason=SNAG_06_07)
 def test_14_clicking_a_listed_system_lands_on_a_page_with_content_for_it(asked):
     j, page = asked, asked.page
-    link = page.locator("main").get_by_role("link", name=re.compile("View on twin map", re.I)).first
+    link = page.locator("main").get_by_role("link", name=re.compile("Open in the Composer", re.I)).first
     expect(link).to_be_visible(timeout=SHORT)
     ask_url = page.url
     link.click()

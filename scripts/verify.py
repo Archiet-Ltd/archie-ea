@@ -1091,6 +1091,36 @@ def gate_raw_html_escaping(baseline: int) -> Result:
                   detail, count, baseline)
 
 
+def gate_design_map(outside_baseline: int, unmarked_baseline: int) -> Result:
+    """Every page template is in docs/design-map.json and follows its block.
+
+    406 page templates were each styled for the task that built them, so the
+    same job looked different from page to page. The design map assigns every
+    page to one block (dashboard, data table, record detail, form, settings,
+    chat, board, onboarding, public page, empty state) with the macros that
+    block may use. Fails on a page missing from the map, a marker disagreeing
+    with the map, a spec that does not exist, or a template this branch
+    changes that is not in the map, carries no block marker, or uses a macro
+    its block does not allow. The pages already outside their block and the
+    pages with no marker yet are ratcheted, so both counts only fall.
+    """
+    name = "design-map"
+    proc = _run([sys.executable, "scripts/check_design_map.py", "--json", "--changed"])
+    try:
+        data = json.loads(proc.stdout)
+    except ValueError:
+        return Result(name, FAIL, f"could not parse: {proc.stdout[-300:]!r} {proc.stderr[-300:]}")
+    problems = list(data["errors"])
+    outside, unmarked = data["outside_block_count"], data["unmarked_count"]
+    if outside > outside_baseline:
+        problems.append(f"{outside} pages use a macro their block does not allow (baseline {outside_baseline})")
+    if unmarked > unmarked_baseline:
+        problems.append(f"{unmarked} pages carry no design-block marker (baseline {unmarked_baseline})")
+    detail = "; ".join(problems)[:1800] + ("; run python scripts/check_design_map.py" if problems else "")
+    return Result(name, FAIL if problems else PASS, detail, outside, outside_baseline,
+                  extra={"design_map_outside_block": outside, "design_map_unmarked": unmarked})
+
+
 def gate_smoke_coverage_on_change() -> Result:
     """Every changed template/JS file in this diff has a tests/smoke/ touch too.
     Gated at ZERO -- this is a per-diff question, not an accumulating debt count.
@@ -2152,6 +2182,14 @@ def build_gates(baseline: dict) -> list[Gate]:
              remediation="wrap the interpolated value in escape(...) (from html or markupsafe); "
                          "run scripts/check_raw_html_escaping.py; else mark 'raw-html-ok: <reason>'",
              tags=["static", "security"]),
+        Gate("design-map", "every page template follows the designed block docs/design-map.json gives it",
+             "ratchet",
+             lambda: gate_design_map(baseline.get("design_map_outside_block", 0),
+                                     baseline.get("design_map_unmarked", 0)),
+             remediation="run python scripts/check_design_map.py; use only the macros the page's block "
+                         "allows, add {# design-block: <block> #} to a changed page, and run --write "
+                         "for a new page",
+             tags=["static", "ui"]),
         Gate("smoke-coverage-on-change", "a template/JS change with no tests/smoke/ touch in the same diff",
              "zero", gate_smoke_coverage_on_change,
              remediation="extend an existing tests/smoke/ journey or add a new one; "

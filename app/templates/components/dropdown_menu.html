@@ -182,7 +182,7 @@
                             role="menuitem"
                             {% if item.testid %}data-testid="{{ item.testid }}"{% endif %} {% if item.title %}title="{{ item.title }}"{% endif %}
                             {% if item.disabled %}disabled class="opacity-50 cursor-not-allowed"{% endif %}
-                         aria-label="{{ item.aria_label or item.text or 'Open' }}">
+                         aria-label="{{ item.aria_label or 'Open' }}">
                             {% if item.icon %}
                             <i data-lucide="{{ item.icon }}" class="w-4 h-4" aria-hidden="true"></i>
                             {% endif %}
