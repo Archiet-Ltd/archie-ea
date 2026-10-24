@@ -1,4 +1,5 @@
 {% extends "layouts/composer_base.html" %}
+{# design-block: board #}
 {% from 'components/empty_state.html' import empty_state %}
 {% block title %}Architecture Composer{% endblock %}
 
@@ -1471,7 +1472,7 @@ z-index: 45;
                     <p class="text-xs text-muted-foreground mb-3">A previous session left unsaved changes. Would you like to restore them?</p>
                     <div class="flex gap-2">
                         {% call button(variant='default', size='xs', class="text-xs", attrs_dict={"@click": "restoreAutosave()"}) %}Restore{% endcall %}
-                        {% call button(variant='outline', size='xs', class="text-xs", attrs_dict={"@click": "discardAutosave()", "style": "border-color: hsl(var(--border));"}) %}Discard{% endcall %}
+                        {% call button(variant='outline', size='xs', class="text-xs", attrs_dict={"@click": "discardAutosave()"}) %}Discard{% endcall %}
                     </div>
                 </div>
             </div>
@@ -1488,41 +1489,25 @@ z-index: 45;
                     <p class="text-xs text-muted-foreground mb-1" id="composer-focus-empty-note" x-show="focusView && focusView.empty">No connections at this depth</p>
                     <p class="text-xs text-muted-foreground mb-2" id="composer-focus-derived-note" x-show="focusView && focusView.hasDerived">Worked-out connections are shown dashed and are not stored with a saved diagram.</p>
                     <div class="mb-2" x-show="focusView && !focusView.empty">
-                        <button type="button" id="composer-focus-list-toggle" @click="focusView.listOpen = !focusView.listOpen"
-                                :aria-expanded="focusView && focusView.listOpen ? 'true' : 'false'" aria-controls="composer-focus-list"
-                                class="text-xs font-medium text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                                x-text="focusView && focusView.listOpen ? 'Hide the connections as a list' : ('Show the connections as a list (' + (focusView ? focusView.rows.length : 0) + ')')"></button>
+                        {% call button(variant='link', size='bare', class="h-auto p-0 text-xs", attrs_dict={"id": "composer-focus-list-toggle", "@click": "focusView.listOpen = !focusView.listOpen", ":aria-expanded": "focusView && focusView.listOpen ? 'true' : 'false'", "aria-controls": "composer-focus-list", "x-text": "focusView && focusView.listOpen ? 'Hide the connections as a list' : ('Show the connections as a list (' + (focusView ? focusView.rows.length : 0) + ')')"}) %}{% endcall %}
                         <div id="composer-focus-list" x-show="focusView && focusView.listOpen" x-cloak class="mt-2 max-h-64 overflow-auto rounded-md border border-border">
-                            <table class="dense-table w-full text-left text-xs">
-                                <caption class="sr-only">Connections of the chosen element</caption>
-                                <thead class="bg-muted/50 text-muted-foreground">
-                                    <tr>
-                                        <th scope="col" class="px-2 py-1 font-medium">From</th>
-                                        <th scope="col" class="px-2 py-1 font-medium">Relationship</th>
-                                        <th scope="col" class="px-2 py-1 font-medium">To</th>
-                                        <th scope="col" class="px-2 py-1 font-medium">Kind</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
+                            {% call dense_table(columns=[('From', ''), ('Relationship', ''), ('To', ''), ('Kind', '')], caption='Connections of the chosen element', flush=true, table_class='text-xs') %}
                                     <template x-for="row in (focusView ? focusView.rows : [])" :key="row.key">
                                         <tr class="border-t border-border" data-focus-row>
                                             <td class="px-2 py-1 text-foreground" x-text="row.from || 'Unnamed element'"></td>
                                             <td class="px-2 py-1 text-foreground" x-text="row.relation"></td>
                                             <td class="px-2 py-1">
-                                                <button type="button" @click="openFocusConnection(row.elementId)"
-                                                        class="text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                                                        x-text="row.name || 'Unnamed element'"></button>
+                                                {% call button(variant='link', size='bare', class="h-auto p-0 text-xs font-normal whitespace-normal text-left", attrs_dict={"@click": "openFocusConnection(row.elementId)", "x-text": "row.name || 'Unnamed element'"}) %}{% endcall %}
                                             </td>
                                             <td class="px-2 py-1 text-foreground" x-text="row.kind"></td>
                                         </tr>
                                     </template>
-                                </tbody>
-                            </table>
+                                {% endcall %}
                         </div>
                     </div>
                     <div class="flex gap-2">
                         {% call button(variant='default', size='xs', class="text-xs", attrs_dict={"id": "composer-focus-save", "@click": "saveFocusView()", ":disabled": "focusView && focusView.saving"}) %}Save as diagram{% endcall %}
-                        {% call button(variant='outline', size='xs', class="text-xs", attrs_dict={"id": "composer-focus-discard", "@click": "discardFocusView()", "style": "border-color: hsl(var(--border));"}) %}Discard{% endcall %}
+                        {% call button(variant='outline', size='xs', class="text-xs", attrs_dict={"id": "composer-focus-discard", "@click": "discardFocusView()"}) %}Discard{% endcall %}
                     </div>
                 </div>
             </div>
