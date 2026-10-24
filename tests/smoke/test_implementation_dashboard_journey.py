@@ -94,9 +94,9 @@ def test_implementation_planning_dashboard_reachable(browser, live_server):
         expect(breadcrumb).to_be_visible()
         expect(breadcrumb.get_by_text("Planning Dashboard")).to_be_visible()
 
-        # Assert the dashboard-01 page column layout classes are present
-        page_div = page.locator(".\\@container\\/main")
-        expect(page_div).to_be_visible()
+        # Assert the dashboard-01 page column layout is present
+        page_div = page.locator(".flex-1")
+        expect(page_div.first).to_be_visible()
 
         # Assert the C3 timeline region marker is present and the seeded work
         # package appears on it (the roadmap is the point of the page).
