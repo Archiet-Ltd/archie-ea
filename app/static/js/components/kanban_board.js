@@ -160,12 +160,43 @@
                 this._persistMove(card, toState, selectEl);
             },
 
+            // Arrow keys on a focused card move it one column left or right,
+            // so the board can be worked without a pointer.
+            onCardKey: function (event, card) {
+                if (!this.canWrite || event.target !== event.currentTarget) return;
+                var step = event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0;
+                if (!step) return;
+                var ids = this.columns.map(function (c) { return c.state; });
+                var to = ids[ids.indexOf(card.state) + step];
+                if (!to) return;
+                event.preventDefault();
+                var el = event.currentTarget;
+                var id = card.id;
+                var self = this;
+                var done = this._persistMove(card, to);
+                if (done && done.then) {
+                    done.then(function () {
+                        self.$nextTick(function () {
+                            var next = global.document.querySelector('[data-card-id="' + id + '"]');
+                            if (next) next.focus();
+                        });
+                    });
+                }
+            },
+
             // Shared move: optimistic update, PATCH, re-sort, revert on failure.
             _persistMove: function (card, toState, selectEl) {
                 var self = this;
                 var prevState = card.state;
                 var url = moveUrl(card, toState);
                 if (!url) return;
+
+                if (self.wipAtLimit(toState)) {
+                    if (selectEl) selectEl.value = prevState;
+                    _toastError(toState + ' is at its limit of ' + self.wipLimit(toState) +
+                        ' epics. Finish or move one on before adding another.');
+                    return;
+                }
 
                 self.moving = card.id;
                 card.state = toState;   // optimistic

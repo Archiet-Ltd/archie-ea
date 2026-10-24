@@ -7,8 +7,7 @@ from flask import abort, flash, jsonify, redirect, render_template, request, url
 from flask_login import current_user, login_required
 
 from app import db
-from app.core.auth.decorators import require_permission
-from app.core.auth.permissions import can
+from app.core.auth.permissions import may_change_model_element
 from app.middleware.tenant_context import current_org_id
 from app.models.archimate_core import ArchiMateElement
 from app.services.element_profile_service import (
@@ -91,9 +90,10 @@ EMPTY_COLUMN_HINTS = {
 
 @safe_portfolio_bp.route("/epics", methods=["POST"])
 @login_required
-@require_permission("edit", "motivation_element")
 def add_epic():
     """Record a new Epic in the Funnel from the board's Add epic form."""
+    if not _can_write():
+        abort(403)
     org_id = current_org_id()
     if org_id is None:
         abort(404)
@@ -133,7 +133,7 @@ def add_epic():
 
 def _can_write() -> bool:
     """Whether the signed-in user may edit work packages, per the permission matrix."""
-    return can(current_user, "edit", "motivation_element")
+    return may_change_model_element(current_user, "edit")
 
 
 def _owner_name(element: ArchiMateElement, org_id: int):
@@ -278,9 +278,10 @@ def api_list():
 
 @safe_portfolio_api_bp.route("/<int:element_id>", methods=["PATCH"])
 @login_required
-@require_permission("edit", "motivation_element")
 def api_update(element_id: int):
     """Update an epic's kanban state or WSJF components."""
+    if not _can_write():
+        return jsonify({"error": "Your role can view this board but not change it."}), 403
     org_id = current_org_id()
     if org_id is None:
         abort(404)
@@ -308,6 +309,14 @@ def api_update(element_id: int):
         new_state = data["kanban_state"]
         if new_state not in KANBAN_STATES:
             return jsonify({"error": "Invalid kanban state"}), 400
+        limit = WIP_LIMITS.get(new_state, 0)
+        if limit and get_kind_property(element, "kanban_state") != new_state:
+            in_column = sum(1 for epic in _get_epics() if epic["state"] == new_state)
+            if in_column >= limit:
+                return jsonify({
+                    "error": f"{new_state} is at its limit of {limit} epics. "
+                             "Finish or move one on before adding another."
+                }), 409
         set_kind_property(element, "kanban_state", new_state, source="user")
 
     # Update WSJF components
