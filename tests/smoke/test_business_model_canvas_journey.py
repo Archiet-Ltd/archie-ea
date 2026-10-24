@@ -1,17 +1,7 @@
-"""Create -> block-save -> operating-model save -> delete journey for the
-Business Model Canvas module.
-
-Wave 1 (measurement) found this module (app/modules/business_model_canvas) had
-ZERO smoke coverage. Same information-architecture gap as Business Case: it
-has no sidebar entry, so a `business_architect` reaches it only by a direct
-URL -- reported separately, not a reason to skip proving the CRUD works.
-
-While instrumenting this journey, delete_canvas required "admin" only, while
-create/update/save_block accept admin/architect/business_architect -- the
-exact DEF-075 bug already fixed once on business_case.delete. Fixed in
-app/modules/business_model_canvas/routes.py alongside this test so the
-journey below (which deletes as `business_architect`) is real coverage of the
-fix, not proof it still needs making.
+"""A business architect opens the Business Model Canvas of a seeded company and
+finds every box filled from the model; adds a segment, a price and a partner,
+sees the segment on the Value Proposition Canvas, and follows every entry to
+the element it names. A second, empty canvas says why each box is empty.
 """
 
 import re
@@ -22,8 +12,11 @@ from playwright.sync_api import expect
 from tests.smoke.conftest import PASSWORD
 
 PAGE_TIMEOUT = 30000
-BLOCK_API = re.compile(r"/business-model/\d+/api/block")
-UPDATE_API = re.compile(r"/business-model/\d+/update")
+expect.set_options(timeout=PAGE_TIMEOUT)
+BOXES = (
+    "key-partners", "key-activities", "key-resources", "value-propositions",
+    "customer-relationships", "channels", "customer-segments", "cost-structure", "revenue-streams",
+)
 
 
 def _login(page, base, email):
@@ -34,124 +27,176 @@ def _login(page, base, email):
     page.wait_for_url(lambda url: "/account/login" not in url, timeout=PAGE_TIMEOUT)
 
 
+def _assert_persona(email, role="business_architect"):
+    """The signed-in user is the persona the journey names, not an administrator or platform role."""
+    from app import create_app
+    from app.middleware.tenant_decorators import is_platform_admin
+    from app.models.user import User
+    from app.services.rbac_service import rbac_service
+
+    app = create_app("testing")
+    with app.app_context():
+        user = User.query.filter_by(email=email).one()
+        assert user.enterprise_role == role, user.enterprise_role
+        assert not is_platform_admin(user)
+        assert not rbac_service.is_org_admin(user, user.organization_id)
+
+
+def _count_elements(name, org_id):
+    from app import create_app
+    from app.models.archimate_core import ArchiMateElement
+
+    app = create_app("testing")
+    with app.app_context():
+        return ArchiMateElement.query.filter_by(name=name, organization_id=org_id).count()
+
+
+def _seed_canvases(org_id):
+    """A filled canvas (elements, a price, an application with a recorded cost) and an empty one."""
+    from app import create_app, db
+    from app.commands.seed_demo_company import _seed_canvas_model
+    from app.models.application_portfolio import ApplicationComponent
+    from app.models.archimate_core import ArchiMateElement
+    from app.models.business_model import BusinessModelCanvas
+    from app.services import cost_fact_store
+
+    app = create_app("testing")
+    with app.app_context():
+        filled = BusinessModelCanvas(name="Journey Canvas", organization_id=org_id)
+        empty = BusinessModelCanvas(name="Empty Journey Canvas", organization_id=org_id)
+        db.session.add_all([filled, empty])
+        db.session.flush()
+        _seed_canvas_model(org_id, filled)
+        if not ArchiMateElement.query.filter_by(name="Existing logistics firm", organization_id=org_id).count():
+            db.session.add(ArchiMateElement(
+                name="Existing logistics firm", type="BusinessActor", layer="business", organization_id=org_id,
+            ))
+        app_row = ApplicationComponent(name="Journey Billing Platform", organization_id=org_id)
+        db.session.add(app_row)
+        db.session.flush()
+        cost_fact_store.upsert_fact(org_id, "application", app_row.id, 120000, "GBP", "journey")
+        db.session.commit()
+        return filled.id, empty.id
+
+
 @pytest.mark.smoke
 @pytest.mark.journey
-def test_business_model_canvas_create_edit_and_delete(browser, live_server, seeded):
-    """A business_architect creates a canvas, fills in a block and the
-    operating-model archetype, confirms both survived a reload, then deletes
-    the canvas (proving the business_architect role can, per the fix above)
-    and confirms it is gone from the server's own list on a fresh load."""
-    context = browser.new_context(ignore_https_errors=True)
+def test_business_architect_fills_and_follows_the_canvas(browser, live_server, seeded):
+    email = seeded["emails"]["business_architect"]
+    _assert_persona(email)
+    filled_id, empty_id = _seed_canvases(seeded["ids"]["org"])
+
+    context = browser.new_context(ignore_https_errors=True, viewport={"width": 1440, "height": 900})
     page = context.new_page()
-    page.on("dialog", lambda d: d.accept())
+    errors = []
+    page.on("console", lambda m: errors.append(m.text) if m.type == "error" else None)
+    page.on("pageerror", lambda e: errors.append(str(e)))
     try:
-        _login(page, live_server, seeded["emails"]["business_architect"])
+        _login(page, live_server, email)
+        canvas_url = f"{live_server}/business-model/{filled_id}"
+        page.goto(canvas_url, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
 
-        # ---- CREATE (POST /business-model/create) --------------------------
-        index_url = live_server + "/business-model/"
-        page.goto(index_url, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
-        page.get_by_role("button", name=re.compile("New Canvas", re.I)).first.click()
-        form = page.locator('[data-testid="bmc-create-form"]')
-        expect(form).to_be_visible(timeout=PAGE_TIMEOUT)
-        form.locator("#bmc-name").fill("Smoke Canvas")
-        form.locator("#bmc-description").fill("Created by the smoke journey.")
-        with page.expect_response(
-            lambda r: "/business-model/create" in r.url and r.request.method == "POST",
-            timeout=PAGE_TIMEOUT,
-        ) as created:
-            page.get_by_test_id("bmc-create-submit").click()
-        assert created.value.status < 400, f"create POST failed: {created.value.status}"
-        page.wait_for_url(re.compile(r"/business-model/\d+$"), timeout=PAGE_TIMEOUT)
-        detail_url = page.url
+        # Every box has model content, and every entry names the element it opens.
+        hrefs = {}
+        for box in BOXES:
+            notes = page.locator(f'[data-canvas-notes="{box}"] > li')
+            assert notes.count() >= 1, f"{box} is empty on a seeded company"
+            for i in range(notes.count()):
+                link = notes.nth(i).locator("a")
+                assert link.count() == 1, f"{box} entry {i} does not open anything"
+                hrefs[link.get_attribute("href")] = link.inner_text()
+        assert len(hrefs) >= 20
+        for href, text in hrefs.items():
+            response = context.request.get(live_server + href)
+            assert response.status == 200, (href, response.status)
+            assert text.split(":")[0].strip() in response.text(), f"{href} does not show {text}"
 
-        # ---- BLOCK SAVE (POST/PUT .../api/block, inline @blur) -------------
-        vp_block = page.get_by_test_id("bmc-textarea-value_propositions")
-        expect(vp_block).to_be_visible(timeout=PAGE_TIMEOUT)
-        vp_block.fill("Single pane of glass for enterprise architecture.")
-        with page.expect_response(
-            lambda r: bool(BLOCK_API.search(r.url)),
-            timeout=PAGE_TIMEOUT,
-        ) as block_saved:
-            vp_block.blur()
-        assert block_saved.value.status < 400, f"block save failed: {block_saved.value.status}"
+        # The cost box shows the recorded cost, and revenue shows the recorded price.
+        expect(page.locator('[data-canvas-notes="cost-structure"]')).to_contain_text("Journey Billing Platform: 120,000 GBP a year")
+        expect(page.locator('[data-canvas-notes="revenue-streams"]')).to_contain_text("1,850.00 GBP per use")
+        expect(page.get_by_test_id("bmc-vision")).to_contain_text("Recover every sensor assembly for reuse")
 
-        # ---- OPERATING MODEL SAVE (select, POST/PUT .../update) ------------
-        select = page.get_by_test_id("bmc-operating-model-select")
-        options = select.locator("option").all_inner_texts()
-        chosen = next(o for o in options if o.strip() and o.strip() != "Not set")
-        with page.expect_response(
-            lambda r: bool(UPDATE_API.search(r.url)),
-            timeout=PAGE_TIMEOUT,
-        ) as model_saved:
-            select.select_option(label=chosen)
-        assert model_saved.value.status < 400, f"operating model save failed: {model_saved.value.status}"
+        # Add a segment through the box's own control; it survives a reload.
+        page.get_by_role("button", name="Add to Customer Segments").click()
+        page.get_by_test_id("bmc-name-customer_segments").fill("Grocery chains")
+        with page.expect_navigation(timeout=PAGE_TIMEOUT):
+            page.get_by_test_id("bmc-add-submit-customer_segments").click()
+        expect(page.locator('[data-canvas-notes="customer-segments"]')).to_contain_text("Grocery chains")
+        page.reload()
+        expect(page.locator('[data-canvas-notes="customer-segments"]')).to_contain_text("Grocery chains")
 
-        # ---- PERSISTENCE (reload -- both writes must survive a fresh GET) --
-        page.goto(detail_url, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
-        expect(page.get_by_test_id("bmc-textarea-value_propositions")).to_have_value(
-            re.compile("Single pane of glass"), timeout=PAGE_TIMEOUT
-        )
-        expect(page.get_by_test_id("bmc-operating-model-select")).to_have_value(
-            re.compile(r".+"), timeout=PAGE_TIMEOUT
-        )
+        # An element the model already holds is offered first, and choosing it adds that
+        # element to the box instead of creating a second one.
+        page.get_by_role("button", name="Add to Key Partners").click()
+        picker = page.get_by_test_id("bmc-pick-key_partners")
+        assert "Existing logistics firm (BusinessActor)" in picker.locator("option").all_inner_texts()
+        picker.select_option(label="Existing logistics firm (BusinessActor)")
+        with page.expect_navigation(timeout=PAGE_TIMEOUT):
+            page.get_by_test_id("bmc-add-submit-key_partners").click()
+        expect(page.locator('[data-canvas-notes="key-partners"]')).to_contain_text("Existing logistics firm")
+        assert _count_elements("Existing logistics firm", seeded["ids"]["org"]) == 1
 
-        page.goto(index_url, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
-        expect(page.get_by_text("Smoke Canvas", exact=False)).to_be_visible(timeout=PAGE_TIMEOUT)
+        # Add a price to a value proposition.
+        page.get_by_role("button", name="Add to Revenue Streams").click()
+        page.fill("#price-name", "Pilot licence")
+        page.fill("#price-amount", "5400")
+        page.select_option("#price-period", "month")
+        with page.expect_navigation(timeout=PAGE_TIMEOUT):
+            page.get_by_test_id("bmc-add-submit-revenue_streams").click()
+        expect(page.locator('[data-canvas-notes="revenue-streams"]')).to_contain_text("Pilot licence, 5,400.00 GBP per month")
 
-        # ---- DELETE (POST .../delete) as business_architect -----------------
-        page.goto(detail_url, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
-        page.get_by_role("button", name=re.compile("Delete Canvas", re.I)).click()
-        delete_form = page.locator('[data-testid="bmc-delete-form"]')
-        expect(delete_form).to_be_visible(timeout=PAGE_TIMEOUT)
-        with page.expect_response(
-            lambda r: "/delete" in r.url and "/business-model/" in r.url
-            and r.request.method == "POST",
-            timeout=PAGE_TIMEOUT,
-        ) as deleted:
-            page.get_by_test_id("bmc-delete-submit").click()
-        assert deleted.value.status < 400, f"delete failed: {deleted.value.status}"
+        # The list view holds the same entries as the drawing.
+        page.get_by_role("button", name="List", exact=True).click()
+        expect(page.get_by_role("table", name=re.compile("list view"))).to_contain_text("Grocery chains")
+        page.get_by_role("button", name="Canvas", exact=True).click()
 
-        # ---- PERSISTENCE (reload the index -- canvas is really gone) --------
-        page.goto(index_url, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
-        expect(page.get_by_text("Smoke Canvas", exact=False)).to_have_count(0, timeout=PAGE_TIMEOUT)
+        # The new segment is on the Value Proposition Canvas, linked to its element.
+        page.get_by_role("link", name="Value Proposition Canvas").first.click()
+        page.wait_for_url(re.compile(r"/value-proposition$"), timeout=PAGE_TIMEOUT)
+        segment = page.get_by_test_id("vpc-segments").get_by_role("link", name="Grocery chains")
+        expect(segment).to_be_visible()
+        expect(page.locator('[data-canvas-notes="gain-creators"]')).to_contain_text("Operators know their readings can be trusted")
+        segment.click()
+        page.wait_for_load_state("domcontentloaded")
+        expect(page.locator("body")).to_contain_text("Grocery chains")
+
+        # Removing an entry takes it off the canvas and keeps the element.
+        page.goto(canvas_url, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        with page.expect_navigation(timeout=PAGE_TIMEOUT):
+            page.get_by_role("button", name="Remove Grocery chains from this canvas").click()
+        expect(page.locator('[data-canvas-notes="customer-segments"]')).not_to_contain_text("Grocery chains")
+        assert context.request.get(live_server + [h for h, t in hrefs.items()][0]).status == 200
+
+        # An empty canvas says why each box is empty and what to do next.
+        page.goto(f"{live_server}/business-model/{empty_id}", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        # Cost Structure reads the organisation's recorded application costs, so it is not empty here.
+        expect(page.locator('[data-canvas-notes="cost-structure"]')).to_contain_text("Journey Billing Platform")
+        for box in (b for b in BOXES if b != "cost-structure"):
+            empty = page.locator(f'[data-canvas-empty="{box}"]')
+            expect(empty).to_be_visible()
+            assert len(empty.inner_text()) > 20
+        assert not errors, errors
     finally:
         context.close()
 
 
 @pytest.mark.smoke
 @pytest.mark.journey
-def test_business_model_canvas_grid_aligns_with_the_page_title(browser, live_server, seeded):
-    """The grid of canvas cards must start at the same left edge as the page
-    title above it -- an extra padding wrapper around the grid alone used to
-    push every card in further than the title, by about 24px."""
-    context = browser.new_context(ignore_https_errors=True)
+def test_canvas_keeps_its_nine_boxes_at_phone_width(browser, live_server, seeded):
+    email = seeded["emails"]["business_architect"]
+    _assert_persona(email)
+    filled_id, _ = _seed_canvases(seeded["ids"]["org"])
+    context = browser.new_context(ignore_https_errors=True, viewport={"width": 390, "height": 844})
     page = context.new_page()
-    page.on("dialog", lambda d: d.accept())
     try:
-        _login(page, live_server, seeded["emails"]["business_architect"])
-
-        index_url = live_server + "/business-model/"
-        page.goto(index_url, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
-        page.get_by_role("button", name=re.compile("New Canvas", re.I)).first.click()
-        form = page.locator('[data-testid="bmc-create-form"]')
-        expect(form).to_be_visible(timeout=PAGE_TIMEOUT)
-        form.locator("#bmc-name").fill("Alignment Smoke Canvas")
-        with page.expect_response(
-            lambda r: "/business-model/create" in r.url and r.request.method == "POST",
-            timeout=PAGE_TIMEOUT,
-        ) as created:
-            page.get_by_test_id("bmc-create-submit").click()
-        assert created.value.status < 400, f"create POST failed: {created.value.status}"
-
-        page.goto(index_url, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
-        grid = page.locator('[data-testid="bmc-canvas-grid"]')
-        expect(grid).to_be_visible(timeout=PAGE_TIMEOUT)
-
-        title_left = page.locator("h1").first.evaluate("el => el.getBoundingClientRect().left")
-        grid_left = grid.evaluate("el => el.getBoundingClientRect().left")
-        assert abs(title_left - grid_left) <= 1, (
-            f"canvas grid left edge ({grid_left}) does not match the page "
-            f"title's left edge ({title_left})"
-        )
+        _login(page, live_server, email)
+        page.goto(f"{live_server}/business-model/{filled_id}", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        region = page.get_by_role("region", name=re.compile("scroll horizontally"))
+        assert region.evaluate("e => e.scrollWidth > e.clientWidth"), "the canvas must scroll sideways, not stack"
+        tops = {
+            box: page.locator(f'[data-canvas-notes="{box}"]').evaluate("e => e.closest('[data-slot=card]').getBoundingClientRect().top")
+            for box in ("key-partners", "value-propositions", "customer-segments")
+        }
+        assert len({round(t) for t in tops.values()}) == 1, tops
     finally:
         context.close()

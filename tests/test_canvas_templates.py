@@ -258,7 +258,7 @@ class TestComposerRenderShape:
 
 
 class TestBothPagesRenderEmpty:
-    def test_bmc_page_shows_the_empty_hint_and_zero_unclassified(
+    def test_bmc_page_says_why_every_box_is_empty_and_what_to_do(
         self, app, db_session, make_org, client, login_as
     ):
         from app.models.business_model import BusinessModelCanvas
@@ -276,26 +276,14 @@ class TestBothPagesRenderEmpty:
         soup = BeautifulSoup(resp.get_data(as_text=True), "html.parser")
 
         zones = CANVAS_TEMPLATES["business_model_canvas"]["zones"]
-        headers = soup.find_all(attrs={"data-testid": re.compile(r"^canvas-box-reason-")})
-        assert len(headers) == len(zones)
-
         for zone in zones:
-            reason = soup.find(attrs={"data-testid": f"canvas-box-reason-{zone['box_key']}"})
+            slug = zone["box_key"].replace("_", "-")
+            reason = soup.find(attrs={"data-canvas-empty": slug})
             assert reason is not None, zone["box_key"]
-            assert "Nothing here yet" in reason.get_text()
-            # The hint sits outside the input: never rendered inside the
-            # existing textarea's own value/placeholder as example content.
-            textarea = soup.find(attrs={"data-testid": f"bmc-textarea-{zone['box_key']}"})
-            assert textarea is not None
-            assert (textarea.string or "") == ""
-
-        unclassified = soup.find(attrs={"data-testid": "canvas-unclassified"})
-        assert unclassified is not None
-        assert " ".join(unclassified.get_text().split()) == "0 not yet classified"
-
-        content = _content_root(soup, "businessModelCanvas")
-        zero_tokens = re.findall(r"(?<!\d)0(?!\d)", content.get_text())
-        assert len(zero_tokens) == 1, "a literal 0 outside the unclassified count: %r" % content.get_text()
+            assert len(reason.get_text().split()) >= 5, reason.get_text()
+            # Nothing is typed into a box as text: no textarea, no dash, no bare zero.
+            assert soup.find(attrs={"data-testid": f"bmc-textarea-{zone['box_key']}"}) is None
+        assert not soup.find_all("textarea")
 
     def test_business_case_page_shows_the_empty_hint_and_zero_unclassified(
         self, app, db_session, make_org, client, login_as

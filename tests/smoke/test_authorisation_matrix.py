@@ -60,6 +60,11 @@ POLICY = {
     # risk.risk_register and risk.risk_page (/risks/<id>, 404 for another
     # organisation's risk, pinned in tests/test_risk_ranking.py) are @login_required only.
     "/risks/":                 set(ARCHETYPES),
+    # The Business Model Canvas list and each canvas (and its Value Proposition
+    # Canvas) are @login_required only: every archetype reads them, and a canvas
+    # of another organisation answers 404 (tests/test_business_model_canvas_model.py).
+    # The writes carry require_roles("admin", "architect", "business_architect").
+    "/business-model/":        set(ARCHETYPES),
     # My Applications is gated by the permission matrix (read on application),
     # which every archetype holds; the detail page keeps its own ownership check.
     "/my-applications/":       set(ARCHETYPES),

@@ -18,7 +18,7 @@
 {% import 'components/canvas/_ui.html' as ui with context %}
 
 {#- The marked region plus everything around it. The caller draws the canvas inside the region.
-    columns/rows describe the list route; rows are [box key, box title, note]. -#}
+    columns/rows describe the list route; rows are [box key, box title, (cells...), note, note link or '']. -#}
 {% macro frame(id, form, name, data, rows, hint, credit='', width='min-w-240', columns=['Box', 'Note']) -%}
 {%- set drawing = caller() -%}
 <div class="flex flex-col gap-4" data-canvas="{{ id }}" x-data="{ view: 'canvas' }">
@@ -50,7 +50,8 @@
         {% for r in rows %}
         {% call ui.table_row(attrs={'data-box': r[0]}) %}
           {% call ui.table_head(class='font-medium', attrs={'scope': 'row'}) %}{{ r[1] }}{% endcall %}
-          {% for cell in r[2:] %}{{ ui.table_cell(text=cell) }}{% endfor %}
+          {% for cell in r[2:-2] %}{{ ui.table_cell(text=cell) }}{% endfor %}
+          {% call ui.table_cell() %}{% if r[-1] %}<a href="{{ r[-1] }}" class="text-primary hover:underline">{{ r[-2] }}</a>{% else %}{{ r[-2] }}{% endif %}{% endcall %}
         {% endcall %}
         {% endfor %}
       {% endcall %}
@@ -63,26 +64,41 @@
 </div>
 {%- endmacro %}
 
-{#- The notes of one box (or sub-area): chips in a list, the edit button's target. -#}
-{% macro notes(key, items, title) -%}
+{#- The notes of one box (or sub-area). A note is a string, or a dict {'text', 'href', 'remove_url'}: with an href
+    the text links to the thing it names; with a remove_url a small form takes the note off the canvas. -#}
+{% macro notes(key, items, title, empty='') -%}
 <ul class="flex flex-col gap-1.5" data-canvas-notes="{{ key }}" data-title="{{ title }}" aria-label="{{ title }} notes">
-  {% for n in items %}<li class="rounded-md border bg-muted px-2 py-1.5 text-sm">{{ n }}</li>{% endfor %}
+  {% for n in items %}
+  <li class="flex items-start justify-between gap-1 rounded-md border bg-muted px-2 py-1.5 text-sm">
+    {% if n is mapping and n.href %}<a href="{{ n.href }}" class="min-w-0 break-words text-primary hover:underline">{{ n.text }}</a>{% else %}<span class="min-w-0 break-words">{{ n.text if n is mapping else n }}</span>{% endif %}
+    {% if n is mapping and n.remove_url %}
+    <form method="post" action="{{ n.remove_url }}" class="shrink-0">
+      {{ ui.hidden('csrf_token', csrf_token()) }}
+      {{ ui.hidden('box', n.box) }}
+      {% call ui.button(variant='ghost', size='icon-xs', type='submit', class='text-muted-foreground', attrs={'aria-label': 'Remove ' ~ n.text ~ ' from this canvas'}) %}{{ ui.lucide('x', 'size-3') }}{% endcall %}
+    </form>
+    {% endif %}
+  </li>
+  {% endfor %}
 </ul>
+{% if not items and empty %}<p class="text-xs text-muted-foreground" data-canvas-empty="{{ key }}">{{ empty }}</p>{% endif %}
 {%- endmacro %}
 
 {#- One box: a Card with an icon title, the framework's guiding question and its notes.
     b = {'key', 'title', 'question', 'icon', 'area' (grid placement classes), 'number' (fill-in order), 'subs': [{'key', 'title', 'question'}]} -#}
-{% macro box(canvas_id, b, boxes) -%}
+{% macro box(canvas_id, b, boxes, editable=false) -%}
 {% call ui.card(size='sm', class=b.area ~ ' ' ~ (b.class or '')) %}
+  <div id="box-{{ b.key }}" class="contents"></div>
   {% call ui.card_header() %}
     {% call ui.card_title(class='flex items-center gap-2') %}
       {% if b.number %}{{ ui.badge(text=b.number, variant='outline', class='size-5 rounded-full px-0') }}{% elif b.icon %}{{ ui.lucide(b.icon, 'size-4 text-muted-foreground') }}{% endif %}
       <span>{{ b.title }}</span>
     {% endcall %}
     {{ ui.card_description(text=b.question, class='text-xs') }}
+    {% if editable and not b.readonly %}{% call ui.card_action() %}{% call ui.button(variant='ghost', size='icon-xs', class='text-muted-foreground', attrs={'@click': "Platform.modal.open('add-" ~ b.key ~ "')", 'aria-label': 'Add to ' ~ b.title}) %}{{ ui.lucide('plus') }}{% endcall %}{% endcall %}{% endif %}
   {% endcall %}
   {% call ui.card_content(class='flex flex-1 flex-col gap-3') %}
-    {{ notes(b.key, boxes.get(b.key) or [], b.title) }}
+    {{ notes(b.key, boxes.get(b.key) or [], b.title, b.empty) }}
     {% for s in (b.subs or []) %}
     {{ ui.separator() }}
     <div class="flex flex-col gap-1.5">
@@ -99,12 +115,12 @@
 {%- set boxes = data.boxes or {} -%}
 {%- set rows = [] -%}
 {%- for b in spec.boxes -%}
-  {%- for n in boxes.get(b.key) or ['No notes yet'] %}{% set _ = rows.append([b.key, b.title, n]) %}{% endfor -%}
-  {%- for s in b.subs or [] -%}{%- for n in boxes.get(s.key) or ['No notes yet'] %}{% set _ = rows.append([s.key, s.title, n]) %}{% endfor -%}{%- endfor -%}
+  {%- for n in boxes.get(b.key) or [b.empty or 'Nothing here yet'] %}{% set _ = rows.append([b.key, b.title, n.text if n is mapping else n, n.href if n is mapping else '']) %}{% endfor -%}
+  {%- for s in b.subs or [] -%}{%- for n in boxes.get(s.key) or ['Nothing here yet'] %}{% set _ = rows.append([s.key, s.title, n.text if n is mapping else n, n.href if n is mapping else '']) %}{% endfor -%}{%- endfor -%}
 {%- endfor -%}
 {% call frame(id, spec.form, spec.name, data, rows, spec.hint, credit=spec.credit, width=spec.width or 'min-w-240') %}
   <div class="grid gap-2 rounded-lg border bg-muted/30 p-2 {{ spec.grid }}">
-    {% for b in spec.boxes %}{{ box(id, b, boxes) }}{% endfor %}
+    {% for b in spec.boxes %}{{ box(id, b, boxes, data.editable) }}{% endfor %}
   </div>
 {% endcall %}
 {%- endmacro %}

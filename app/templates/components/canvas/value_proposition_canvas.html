@@ -14,14 +14,14 @@
 {% import 'components/canvas/_frame.html' as f with context %}
 
 {% set MAP = [
-  {'key': 'products-services', 'title': 'Products and Services', 'icon': 'package', 'question': 'What do you offer that helps the customer?', 'area': 'col-start-2 col-span-7 row-start-2 row-span-18'},
-  {'key': 'gain-creators', 'title': 'Gain Creators', 'icon': 'trending-up', 'question': 'How do you create customer gains?', 'area': 'col-start-11 col-span-9 row-start-2 row-span-8'},
-  {'key': 'pain-relievers', 'title': 'Pain Relievers', 'icon': 'life-buoy', 'question': 'How do you relieve customer pains?', 'area': 'col-start-11 col-span-9 row-start-12 row-span-8'},
+  {'key': 'products-services', 'empty': 'No products or services yet. Add them on the business model canvas under Value Propositions.', 'title': 'Products and Services', 'icon': 'package', 'question': 'What do you offer that helps the customer?', 'area': 'col-start-2 col-span-7 row-start-2 row-span-18'},
+  {'key': 'gain-creators', 'empty': 'No value recorded yet. Add it on the business model canvas under Value Propositions.', 'title': 'Gain Creators', 'icon': 'trending-up', 'question': 'How do you create customer gains?', 'area': 'col-start-11 col-span-9 row-start-2 row-span-8'},
+  {'key': 'pain-relievers', 'empty': 'No pain relievers recorded yet.', 'title': 'Pain Relievers', 'icon': 'life-buoy', 'question': 'How do you relieve customer pains?', 'area': 'col-start-11 col-span-9 row-start-12 row-span-8'},
 ] %}
 {% set PROFILE = [
-  {'key': 'gains', 'title': 'Gains', 'icon': 'smile', 'question': 'What outcomes do customers want?', 'area': 'col-start-5 col-span-8 row-start-3 row-span-7'},
-  {'key': 'pains', 'title': 'Pains', 'icon': 'triangle-alert', 'question': 'What annoys customers before, during and after?', 'area': 'col-start-5 col-span-8 row-start-12 row-span-7'},
-  {'key': 'customer-jobs', 'title': 'Customer Jobs', 'icon': 'briefcase', 'question': 'What jobs are customers trying to get done?', 'area': 'col-start-14 col-span-5 row-start-6 row-span-10'},
+  {'key': 'gains', 'empty': 'No customer gains recorded yet.', 'title': 'Gains', 'icon': 'smile', 'question': 'What outcomes do customers want?', 'area': 'col-start-5 col-span-8 row-start-3 row-span-7'},
+  {'key': 'pains', 'empty': 'No customer pains recorded yet.', 'title': 'Pains', 'icon': 'triangle-alert', 'question': 'What annoys customers before, during and after?', 'area': 'col-start-5 col-span-8 row-start-12 row-span-7'},
+  {'key': 'customer-jobs', 'empty': 'No customer jobs recorded yet.', 'title': 'Customer Jobs', 'icon': 'briefcase', 'question': 'What jobs are customers trying to get done?', 'area': 'col-start-14 col-span-5 row-start-6 row-span-10'},
 ] %}
 
 
@@ -29,7 +29,7 @@
 {%- set boxes = data.boxes or {} -%}
 {%- set rows = [] -%}
 {%- for part, group in [('Value Map', MAP), ('Customer Profile', PROFILE)] -%}
-  {%- for b in group -%}{%- for n in boxes.get(b.key) or ['No notes yet'] %}{% set _ = rows.append([b.key, b.title, part, n]) %}{% endfor -%}{%- endfor -%}
+  {%- for b in group -%}{%- for n in boxes.get(b.key) or [b.empty or 'Nothing here yet'] %}{% set _ = rows.append([b.key, b.title, part, n.text if n is mapping else n, n.href if n is mapping else '']) %}{% endfor -%}{%- endfor -%}
 {%- endfor -%}
 {% call f.frame(id, 'C4', 'Value proposition canvas', data, rows, 'Scroll sideways on a narrow screen to see the value map, the fit arrows and the customer profile.',
      credit='Value Proposition Canvas by Strategyzer AG (strategyzer.com), Alexander Osterwalder, Yves Pigneur, Greg Bernarda and Alan Smith, licensed under CC BY-SA.',

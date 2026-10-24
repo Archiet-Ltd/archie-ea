@@ -1,0 +1,146 @@
+{# design-block: record-detail #}
+{% extends 'layouts/admin_base.html' %}
+{% from 'components/page_header.html' import page_header %}
+{% from 'components/modal.html' import modal %}
+{% from 'components/button.html' import button %}
+{% from 'components/input.html' import input, label %}
+{% from 'components/select.html' import native_select %}
+{% from 'components/empty_state.html' import empty_state %}
+{% import 'components/canvas/index.html' as canvas_lib with context %}
+
+{% block title %}{{ canvas.name or 'Business Model Canvas' }}{% endblock %}
+
+{% block content %}
+{% set actions = [{'text': 'Value Proposition Canvas', 'icon': 'layout-grid', 'href': url_for('business_model.value_proposition', canvas_id=canvas.id), 'variant': 'outline'}] %}
+{% if can_edit %}{% set actions = actions + [{'text': 'Delete Canvas', 'icon': 'trash-2', 'onclick': "Platform.modal.open('bmc-delete-modal')", 'variant': 'outline'}] %}{% endif %}
+
+<div class="flex-1 overflow-auto">
+  {{ page_header(
+      title=canvas.name or 'Untitled Canvas',
+      description=canvas.description,
+      breadcrumbs=[
+          {'label': 'Home', 'href': url_for('main.index')},
+          {'label': 'Business Model Canvas', 'href': url_for('business_model.index')},
+          {'label': canvas.name or 'Canvas'}
+      ],
+      actions=actions
+  ) }}
+
+  <div class="p-6 space-y-6">
+    {% for category, message in get_flashed_messages(with_categories=true) %}
+    <div role="alert" class="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive-emphasis" data-testid="bmc-error">{{ message }}</div>
+    {% endfor %}
+
+    <div class="flex flex-wrap items-end gap-4">
+      {% if vision %}
+      <p class="text-sm text-muted-foreground" data-testid="bmc-vision">Vision: <a class="text-primary hover:underline" href="{{ vision_href }}">{{ vision.name }}</a></p>
+      {% endif %}
+      <form method="post" action="{{ url_for('business_model.update_canvas', canvas_id=canvas.id) }}" class="flex items-end gap-2" data-testid="bmc-operating-model-panel">
+        {{ input(type='hidden', name='csrf_token', value=csrf_token()) }}
+        <div class="flex flex-col gap-1.5">
+          {% call label(for='bmc-operating-model') %}Operating model{% endcall %}
+          {% call native_select(id='bmc-operating-model', name='operating_model_type', size='sm', attrs_dict={'data-testid': 'bmc-operating-model-select', 'x-on:change': '$el.form.requestSubmit()'}, disabled=not can_edit) %}
+            <option value="">Not set</option>
+            {% for t in operating_model_types %}<option value="{{ t }}"{% if canvas.operating_model_type == t %} selected{% endif %}>{{ t | capitalize }}</option>{% endfor %}
+          {% endcall %}
+        </div>
+      </form>
+      <form method="get" action="{{ url_for('business_model.export_canvas', canvas_id=canvas.id) }}" class="flex items-end gap-2" data-testid="bmc-export-panel">
+        <div class="flex flex-col gap-1.5">
+          {% call label(for='bmc-export-format') %}Download as{% endcall %}
+          {% call native_select(id='bmc-export-format', name='format', size='sm', attrs_dict={'data-testid': 'bmc-export-format'}) %}
+            <option value="mermaid">Mermaid</option>
+            <option value="lucid">Lucidchart</option>
+            <option value="archi">Archi</option>
+          {% endcall %}
+        </div>
+        {{ button(text='Download', variant='outline', size='sm', type='submit', testid='bmc-export-file') }}
+      </form>
+    </div>
+
+    {{ canvas_lib.business_model_canvas({
+         'title': canvas.name or 'Business Model Canvas',
+         'subtitle': 'Every entry is an element of your model. Select one to open it.',
+         'boxes': boxes,
+         'editable': can_edit,
+       }) }}
+  </div>
+</div>
+
+{% if can_edit %}
+{% for key, zone in zones.items() if zone.membership != 'attribute' %}
+{% set slug = key | replace('_', '-') %}
+{% call modal(id='add-' ~ slug, title='Add to ' ~ zone.label, description='Pick an element you already have, or name a new one.', size='sm') %}
+<form method="post" action="{{ url_for('business_model.add_entry', canvas_id=canvas.id) }}" class="flex flex-col gap-4" data-testid="bmc-add-form-{{ key }}">
+  {{ input(type='hidden', name='csrf_token', value=csrf_token()) }}
+  {{ input(type='hidden', name='box', value=key) }}
+  <div class="flex flex-col gap-1.5">
+    {% call label(for='pick-' ~ slug) %}Existing element{% endcall %}
+    {% call native_select(id='pick-' ~ slug, name='element_id', attrs_dict={'data-testid': 'bmc-pick-' ~ key}) %}
+      <option value="">{{ 'Choose one' if pickers[key] else 'None to choose yet' }}</option>
+      {% for el in pickers[key] %}<option value="{{ el.id }}">{{ el.name }} ({{ el.type }})</option>{% endfor %}
+    {% endcall %}
+  </div>
+  <div class="flex flex-col gap-1.5">
+    {% call label(for='name-' ~ slug) %}Or a new name{% endcall %}
+    {{ input(id='name-' ~ slug, name='name', attrs_dict={'data-testid': 'bmc-name-' ~ key, 'autocomplete': 'off'}) }}
+  </div>
+  <div class="flex justify-end gap-3">
+    {{ button(text='Cancel', variant='ghost', attrs_dict={'data-modal-close': 'add-' ~ slug}) }}
+    {{ button(text='Add', type='submit', testid='bmc-add-submit-' ~ key) }}
+  </div>
+</form>
+{% endcall %}
+{% endfor %}
+
+{% call modal(id='add-revenue-streams', title='Add to Revenue Streams', description='A price belongs to one of your value propositions.', size='sm') %}
+{% if priceable %}
+<form method="post" action="{{ url_for('business_model.add_price', canvas_id=canvas.id) }}" class="flex flex-col gap-4" data-testid="bmc-add-form-revenue_streams">
+  {{ input(type='hidden', name='csrf_token', value=csrf_token()) }}
+  <div class="flex flex-col gap-1.5">
+    {% call label(for='price-element') %}Priced value proposition{% endcall %}
+    {% call native_select(id='price-element', name='element_id') %}
+      {% for p in priceable %}<option value="{{ p.id }}">{{ p.text }}</option>{% endfor %}
+    {% endcall %}
+  </div>
+  <div class="flex flex-col gap-1.5">
+    {% call label(for='price-name') %}Plan name{% endcall %}
+    {{ input(id='price-name', name='name', required=true) }}
+  </div>
+  <div class="grid grid-cols-3 gap-3">
+    <div class="flex flex-col gap-1.5">
+      {% call label(for='price-amount') %}Price{% endcall %}
+      {{ input(id='price-amount', name='price', required=true, attrs_dict={'inputmode': 'decimal'}) }}
+    </div>
+    <div class="flex flex-col gap-1.5">
+      {% call label(for='price-currency') %}Currency{% endcall %}
+      {{ input(id='price-currency', name='currency', value='GBP', required=true) }}
+    </div>
+    <div class="flex flex-col gap-1.5">
+      {% call label(for='price-period') %}Per{% endcall %}
+      {% call native_select(id='price-period', name='billing_period') %}
+        {% for p in billing_periods %}<option value="{{ p }}">{{ p }}</option>{% endfor %}
+      {% endcall %}
+    </div>
+  </div>
+  <div class="flex justify-end gap-3">
+    {{ button(text='Cancel', variant='ghost', attrs_dict={'data-modal-close': 'add-revenue-streams'}) }}
+    {{ button(text='Add price', type='submit', testid='bmc-add-submit-revenue_streams') }}
+  </div>
+</form>
+{% else %}
+{{ empty_state(icon='gem', title='No value propositions yet', description='Add a value proposition first, then give it a price.') }}
+{% endif %}
+{% endcall %}
+
+{% call modal(id='bmc-delete-modal', title='Delete this canvas?', description='The elements it shows stay in your model.', size='sm') %}
+<form method="POST" action="{{ url_for('business_model.delete_canvas', canvas_id=canvas.id) }}" data-testid="bmc-delete-form">
+  {{ input(type='hidden', name='csrf_token', value=csrf_token()) }}
+  <div class="flex justify-end gap-3 pt-2">
+    {{ button(text='Cancel', variant='ghost', attrs_dict={'data-modal-close': 'bmc-delete-modal'}) }}
+    {{ button(text='Delete', variant='destructive', type='submit', testid='bmc-delete-submit') }}
+  </div>
+</form>
+{% endcall %}
+{% endif %}
+{% endblock %}

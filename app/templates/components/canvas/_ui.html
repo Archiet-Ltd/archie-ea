@@ -4,6 +4,7 @@
 {% import 'components/button.html' as b %}
 {% import 'components/badge.html' as bd %}
 {% import 'components/table.html' as t %}
+{% import 'components/input.html' as inp %}
 
 {% macro lucide(name, class='') %}<i data-lucide="{{ name }}" class="{{ class }}" aria-hidden="true"></i>{% endmacro %}
 
@@ -25,3 +26,5 @@
 {% macro table_row(attrs={}) %}{% set inner = caller() %}{% call t.table_row(attrs_dict=attrs) %}{{ inner }}{% endcall %}{% endmacro %}
 {% macro table_head(text='', class='', attrs={}) %}{% set inner = caller() if caller is defined else '' %}{% call t.table_head(class=class, attrs_dict=attrs) %}{{ text }}{{ inner }}{% endcall %}{% endmacro %}
 {% macro table_cell(text='', class='', attrs={}) %}{% set inner = caller() if caller is defined else '' %}{% call t.table_cell(class=class, attrs_dict=attrs) %}{{ text }}{{ inner }}{% endcall %}{% endmacro %}
+
+{% macro hidden(name, value) %}{{ inp.input(type='hidden', name=name, value=value) }}{% endmacro %}
