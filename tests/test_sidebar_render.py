@@ -115,7 +115,7 @@ def _sidebar(client, path="/dashboard/overview"):
 
 def _entries(links):
     """Sidebar entries (main, Architecture and secondary) in screen order."""
-    return [link for link in links if link["slot"] == "sidebar-item"]
+    return [link for link in links if link["slot"] == "sidebar-menu-button"]
 
 
 def _labels(links):
@@ -160,7 +160,7 @@ def test_a_startup_cto_sees_exactly_ten_entries_and_the_connect_card(app, db_ses
     _, sidebar_html, links = _sidebar(client)
     entries = _entries(links)
     assert _labels(entries) == MAIN + SECONDARY
-    assert not [link for link in links if link["slot"] == "sidebar-subitem"]
+    assert not [link for link in links if link["slot"] == "sidebar-menu-sub-button"]
     assert "Architecture" not in sidebar_html
     assert 'data-testid="connect-source-card"' in sidebar_html
     assert "Connect GitHub or Jira to build your model" in sidebar_html
@@ -198,11 +198,11 @@ def test_architecture_roles_get_one_extra_group(app, db_session, make_org, role,
 def test_procurement_roles_get_their_pages_under_spend(app, db_session, make_org, role, label, expected):
     client, _ = _person(app, db_session, make_org, role, label)
     _, _, links = _sidebar(client)
-    order = [link for link in links if link["slot"] in ("sidebar-item", "sidebar-subitem")]
+    order = [link for link in links if link["slot"] in ("sidebar-menu-button", "sidebar-menu-sub-button")]
     spend_at = _labels(order).index("Spend")
     subs = []
     for link in order[spend_at + 1:]:
-        if link["slot"] != "sidebar-subitem":
+        if link["slot"] != "sidebar-menu-sub-button":
             break
         subs.append(link)
     assert _labels(subs) == expected

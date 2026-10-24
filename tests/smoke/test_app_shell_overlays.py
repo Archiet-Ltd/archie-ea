@@ -35,35 +35,32 @@ def _login(page, base, email):
 # ── Phone sidebar opener ────────────────────────────────────────────────────
 
 
-def test_phone_sidebar_opener_z_index_below_backdrop(browser, live_server, seeded):
-    """At a phone viewport the sidebar opener must render at a lower z-index
-    than the mobile sidebar backdrop, so it never draws over content or
-    modal backdrops."""
+def test_phone_sidebar_drawer_draws_over_the_header_trigger(browser, live_server, seeded):
+    """At a phone viewport the sidebar is a drawer. It must draw over the header (and so
+    over the trigger that opened it), so nothing of the page is clickable through it."""
     page = browser.new_page(viewport={"width": 390, "height": 844})
     try:
         _login(page, live_server, seeded["emails"]["platform_admin"])
         page.goto(live_server + "/dashboard/overview",
                   wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
         page.wait_for_timeout(1000)
-
+        trigger = page.locator('[data-slot="sidebar-trigger"]')
+        assert trigger.count() == 1, "phone sidebar trigger not found"
+        trigger.click()
+        drawer = page.get_by_role("dialog", name="Navigation")
+        assert drawer.is_visible(), "the trigger did not open the drawer"
         z_indices = page.evaluate("""() => {
-            const opener = document.querySelector('[aria-label="Open sidebar"]');
-            // The mobile backdrop is the fixed inset-0 div with z-40 inside
-            // the overflow-hidden layout container.
-            const backdrop = document.querySelector(
-                'div.fixed.inset-0.z-40, div[class*="fixed inset-0"][class*="z-40"]'
-            );
+            const header = document.getElementById('admin-header');
+            const sheet = document.querySelector('[data-fb-sidebar-mobile] [data-slot="sheet-content"]');
             return {
-                openerZ: opener ? parseInt(getComputedStyle(opener).zIndex, 10) : null,
-                backdropZ: backdrop ? parseInt(getComputedStyle(backdrop).zIndex, 10) : null,
+                headerZ: header ? parseInt(getComputedStyle(header).zIndex, 10) : null,
+                sheetZ: sheet ? parseInt(getComputedStyle(sheet.parentElement).zIndex, 10) : null,
             };
         }""")
-
-        assert z_indices["openerZ"] is not None, "phone sidebar opener not found"
-        assert z_indices["backdropZ"] is not None, "mobile sidebar backdrop not found"
-        assert z_indices["openerZ"] <= z_indices["backdropZ"], (
-            "opener z-index (%d) must be at or below backdrop z-index (%d)"
-            % (z_indices["openerZ"], z_indices["backdropZ"])
+        assert z_indices["headerZ"] is not None and z_indices["sheetZ"] is not None, z_indices
+        assert z_indices["sheetZ"] > z_indices["headerZ"], (
+            "drawer z-index (%d) must be above the header's (%d)"
+            % (z_indices["sheetZ"], z_indices["headerZ"])
         )
     finally:
         page.close()
@@ -371,12 +368,12 @@ def test_onboarding_modal_z_index_is_200(browser, live_server):
             db.session.remove()
 
 
-# ── Phone sidebar opener clickable ───────────────────────────────────────────
+# ── Phone sidebar trigger clickable ──────────────────────────────────────────
 
 
-def test_phone_sidebar_opener_clickable_and_below_modal(browser, live_server, seeded):
-    """At a phone viewport the sidebar opener must be clickable (no force)
-    and must sit below an open modal in the stacking context."""
+def test_phone_sidebar_trigger_clickable_and_below_modal(browser, live_server, seeded):
+    """At a phone viewport the sidebar trigger must be clickable (no force), open the
+    drawer, and the drawer must sit below an open modal in the stacking context."""
     page = browser.new_page(viewport={"width": 390, "height": 844})
     try:
         _login(page, live_server, seeded["emails"]["platform_admin"])
@@ -384,34 +381,14 @@ def test_phone_sidebar_opener_clickable_and_below_modal(browser, live_server, se
                   wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
         page.wait_for_timeout(1000)
 
-        # The opener must be visible at phone width
-        opener = page.locator("button[aria-label='Open sidebar']")
-        assert opener.count() > 0, "phone sidebar opener not rendered at 390px"
+        trigger = page.locator('[data-slot="sidebar-trigger"]')
+        assert trigger.count() > 0, "phone sidebar trigger not rendered at 390px"
+        trigger.first.click()
+        drawer = page.get_by_role("dialog", name="Navigation")
+        assert drawer.is_visible(), "the click on the trigger did not open the drawer"
+        page.keyboard.press("Escape")
+        assert not drawer.is_visible(), "Escape did not close the drawer"
 
-        # Click the opener normally — no force=True. If the spacer intercepts
-        # pointer events this click lands on the spacer and the sidebar never opens.
-        opener.first.click()
-        page.wait_for_timeout(700)
-
-        # The sidebar must be open: the Alpine store must report open=true
-        sidebar_open = page.evaluate("""() => {
-            const store = window.Alpine
-                && window.Alpine.store('sidebar');
-            return store ? store.open : null;
-        }""")
-        assert sidebar_open is True, (
-            "sidebar store.open is %s after clicking the opener — "
-            "the click was intercepted" % sidebar_open
-        )
-
-        # Close the sidebar for the modal test
-        page.evaluate("""() => {
-            const store = window.Alpine && window.Alpine.store('sidebar');
-            if (store) store.open = false;
-        }""")
-        page.wait_for_timeout(300)
-
-        # Open the search modal (z-[100]) and verify the opener (z-30) is below it
         page.evaluate("""() => {
             const modal = document.getElementById('search-modal');
             if (modal) modal.style.display = 'flex';
@@ -419,19 +396,19 @@ def test_phone_sidebar_opener_clickable_and_below_modal(browser, live_server, se
         page.wait_for_timeout(300)
 
         z_indices = page.evaluate("""() => {
-            const opener = document.querySelector('[aria-label="Open sidebar"]');
+            const sheet = document.querySelector('[data-fb-sidebar-mobile]');
             const searchModal = document.getElementById('search-modal');
             return {
-                openerZ: opener ? parseInt(getComputedStyle(opener).zIndex, 10) : null,
+                drawerZ: sheet ? parseInt(getComputedStyle(sheet).zIndex, 10) : null,
                 modalZ: searchModal ? parseInt(getComputedStyle(searchModal).zIndex, 10) : null,
             };
         }""")
 
-        assert z_indices["openerZ"] is not None, "phone sidebar opener not found"
+        assert z_indices["drawerZ"] is not None, "phone sidebar drawer not found"
         assert z_indices["modalZ"] is not None, "search modal not found"
-        assert z_indices["openerZ"] < z_indices["modalZ"], (
-            "opener z-index (%d) must be below search modal z-index (%d)"
-            % (z_indices["openerZ"], z_indices["modalZ"])
+        assert z_indices["drawerZ"] < z_indices["modalZ"], (
+            "drawer z-index (%d) must be below search modal z-index (%d)"
+            % (z_indices["drawerZ"], z_indices["modalZ"])
         )
     finally:
         page.close()
