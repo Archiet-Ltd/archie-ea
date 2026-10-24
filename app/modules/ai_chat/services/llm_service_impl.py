@@ -2967,7 +2967,7 @@ Format as JSON: {{"quality_score": 85, "issues": ["issue1", "issue2"], "comments
             },
             "nvidia": {
                 "name": "NVIDIA (free models)",
-                "default_models": ["nvidia/nemotron-3-ultra-550b-a55b"]
+                "default_models": [DEFAULT_MODELS["nvidia"]]
             },
             "huggingface": {
                 "name": "Hugging Face (Local Models)",

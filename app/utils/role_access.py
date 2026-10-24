@@ -531,7 +531,13 @@ def get_all_roles_with_access(section: str) -> List[str]:
 # the same reason as above; taking the budget 32 -> 33.
 # Workspace (24 Oct 2026): Connections and Billing, one lasting place for the two
 # setup pages an administrator needs from any screen; taking the budget 33 -> 35.
-SIDEBAR_LINK_BUDGET = 35
+# Navigation v3 (24 Oct 2026): the sidebar renders app/navigation/registry.py, not the
+# zones below: seven main entries, the Architecture group for the architecture roles,
+# Spend's procurement sub-items, three secondary entries and the user menu. The ceiling
+# falls 35 -> 25 (navigation standard rule 4); scripts/check_sidebar_links.py measures it.
+# The zones below are no longer a sidebar: they are each role's page catalogue, which the
+# All-modules directory and the search index read.
+SIDEBAR_LINK_BUDGET = 25
 
 _ZONE_TITLES = {
     "home": "Home",
@@ -1224,6 +1230,30 @@ def link_requires_satisfied(user, requires):
             from app.models.user import Permission
 
             return bool(user.can(Permission.GENERAL))
+        except Exception:  # anonymous / unexpected user object
+            return False
+    if requires.startswith("section:"):
+        # A route guarded by can_access_section (the agent registry's _guard).
+        return can_access_section(user, requires.split(":", 1)[1])
+    if requires in ("procurement", "procurement_or_finance"):
+        # The guards on the procurement pages (requires_procurement and
+        # requires_procurement_or_finance), through the one predicate the
+        # templates already use for them.
+        try:
+            from app.decorators.requires_role import may_open_procurement
+
+            if may_open_procurement(user):
+                return True
+            return requires == "procurement_or_finance" and get_user_role(user) == ROLE_FINANCE
+        except Exception:  # anonymous / unexpected user object
+            return False
+    if requires == "org_or_platform_admin":
+        # require_org_or_platform_admin (the Team page): a platform administrator, or an
+        # administrator of the organisation the request is acting as.
+        try:
+            from app.middleware.tenant_decorators import is_active_org_admin
+
+            return bool(is_active_org_admin(user))
         except Exception:  # anonymous / unexpected user object
             return False
     if requires == "cto_or_portfolio_manager":

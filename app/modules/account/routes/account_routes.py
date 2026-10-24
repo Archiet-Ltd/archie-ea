@@ -275,6 +275,20 @@ def register():
     return mail_views.register_view()
 
 
+def _company_card():
+    from app.modules.account.services import onboarding_service
+
+    org = getattr(current_user, "organization", None)
+    return onboarding_service.settings_card(org) if org is not None else None
+
+
+# Sign-up after the account: bring the company in, then choose the AI provider.
+from app.modules.admin.connector_routes import connections_access as _connections_access  # noqa: E402
+from app.modules.account.routes import onboarding_views  # noqa: E402
+
+onboarding_views.add_routes(account_bp, _connections_access)
+
+
 @account_bp.route("/logout")
 @login_required
 def logout():
@@ -311,6 +325,7 @@ def manage():
         "account/manage.html",
         user=current_user,
         form=None,
+        company=_company_card(),
         last_login_entry=last_login_entry,
         recent_auth_events=auth_audit.recent_auth_events(current_user.id),
     )

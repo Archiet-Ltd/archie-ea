@@ -76,7 +76,7 @@ def test_the_briefing_does_not_invent_a_total():
 def test_briefing_items_are_escaped():
     """Titles and descriptions are database content going into innerHTML."""
     js = _panels()
-    assert "ArchieChat.render.escapeForHtml(it.title" in js
+    assert "ArchieChat.render.escapeForHtml(question)" in js
     assert js.count("escapeForHtml") >= 3
 
 
