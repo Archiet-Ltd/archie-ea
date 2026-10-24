@@ -37,7 +37,7 @@
     {% call alert('warning', title='Online payment is not open yet.', testid='billing-not-configured') %} {# ui-contract-ok: the alert macro, not a native dialog #}
         To buy or change a plan, <a href="{{ contact_sales_url }}" class="font-medium underline">contact us</a> and we will set it up with you. Invoices will appear here once payment is open.
     {% endcall %}
-    {% if payment.missing and current_user.is_platform_admin %}
+    {% if payment is defined and payment.missing and current_user.is_platform_admin %}
     <p class="text-xs text-muted-foreground">Settings the operator has not provided: {{ payment.missing | join(', ') }}.</p>
     {% endif %}
     {% endif %}
