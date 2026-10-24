@@ -346,6 +346,25 @@ CAPABILITY_EDITOR_ROLES: Set[str] = {
 }
 
 
+# The architects who bring a source in. Not platform_admin: that is the stored
+# default persona of legacy accounts and grants nothing by itself (see
+# role_required), so administrators come in through is_admin() instead.
+CONNECTION_ARCHITECT_ROLES: Set[str] = CAPABILITY_EDITOR_ROLES - {ROLE_PLATFORM_ADMIN}
+
+
+def may_use_connections(user) -> bool:
+    """True when the user is one of the architects who bring a source in, by
+    their assigned persona. Administrators are answered by ``is_admin()``."""
+    if not user:
+        return False
+    try:
+        # The stored persona, not get_user_role(): that falls back to the
+        # solution architect for a person with none, which must grant nothing.
+        return getattr(user, "enterprise_role", None) in CONNECTION_ARCHITECT_ROLES
+    except Exception:  # noqa: BLE001 - a nav gate must not be able to 500 a page
+        return False
+
+
 def can_edit_capabilities(user) -> bool:
     """True when the user's enterprise_role owns the capability model.
 
@@ -572,10 +591,11 @@ _APPROVAL_INBOX_LINK = _link(
 )
 
 # Workspace: the organisation's own setup, in the same place for everyone who may use
-# it. Both pages are @admin_required, so both links carry requires="admin" and a
-# person the route would refuse never sees them.
+# it. Billing is @admin_required, so its link carries requires="admin". Connections is
+# open to the architects who bring a source in (requires="connections"), and a person
+# the route would refuse never sees either link.
 _WORKSPACE_LINKS = [
-    _link("Connections", "m365_connector.connectors_index", "plug", requires="admin"),
+    _link("Connections", "m365_connector.connectors_index", "plug", requires="connections"),
     _link("Billing", "billing.billing_index", "credit-card", requires="admin"),
 ]
 
@@ -1175,6 +1195,13 @@ def link_requires_satisfied(user, requires):
     if requires == "admin":
         try:
             return bool(user.is_admin())
+        except Exception:  # anonymous / unexpected user object
+            return False
+    if requires == "connections":
+        # Whoever may bring a source in: the architects who author the model,
+        # and administrators. The same predicate as the Connections routes.
+        try:
+            return may_use_connections(user) or bool(user.is_admin())
         except Exception:  # anonymous / unexpected user object
             return False
     if requires == "org_admin":

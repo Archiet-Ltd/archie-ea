@@ -5920,6 +5920,9 @@
    },
    "spec": null,
    "status": "mapped",
+   "extra_macros": [
+    "components/table.html"
+   ],
    "charts": [],
    "confidence": "high",
    "frame": "dashboard-01",
