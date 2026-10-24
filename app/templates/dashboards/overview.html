@@ -2,11 +2,12 @@
 {% from 'components/dense_table.html' import dense_table %}
 {% from 'components/dropdown_menu.html' import dropdown_menu %}
 {% from 'macros/page_shell.html' import page_shell, section_card %}
-{% from 'components/answer_cascade.html' import answer_cascade %}
+{% from 'components/empty_state.html' import empty_state %}
+{% from 'components/tabs.html' import tabs_list, tabs_trigger %}
 {% from 'components/company_kind.html' import company_kind_picker %}
 {% from 'components/button.html' import button %}
 {% from 'components/input.html' import input %}
-{% from 'components/card.html' import card, card_header, card_title, card_description, card_content %}
+{% from 'components/card.html' import card, card_header, card_title, card_description, card_content, card_footer %}
 {% from 'components/table.html' import table, table_header, table_body, table_row, table_head, table_cell, table_empty_state %}
 {% block title %}Dashboard{% endblock %}
 {% block guided_mode_steps %}
@@ -20,7 +21,6 @@
 {% endblock %}
 {% block extra_head_js %}
 <script src="{{ url_for('static', filename='js/intelligence/core.js') }}"></script>
-<script src="{{ url_for('static', filename='js/dashboard/overview_cascade.js') }}"></script>
 <script src="{{ url_for('static', filename='js/dashboard/company_kind.js') }}"></script>
 {% endblock %}
 {% block content %}
@@ -72,7 +72,7 @@
     {# ══════════════════════════════════════════════════════════════════════
        GUIDED MODE — sparse org: a setup journey, not a failing report card.
        ══════════════════════════════════════════════════════════════════════ #}
-    <div class="min-h-screen" data-testid="first-fold">
+    <div class="min-h-screen" data-testid="first-fold"><div data-testid="dashboard-empty-state">
     {% call card(class='') %}
     <div data-testid="first-message">
         {% call card_header() %}
@@ -109,7 +109,7 @@
         {% endcall %}
     </div>
     {% endcall %}
-    </div>
+    </div></div>
 
     {# The welcome line and the checklist sit beneath the one message, below the fold. #}
     {% if mode == 'guided' and not current_user.welcome_banner_dismissed_at %}
@@ -166,110 +166,85 @@
     {% endcall %}
     {% else %}
 
-    {# The one message: a question box and, beneath it, the first cited answer. #}
+    {# Ask: the question goes to the AI chat and is answered there; this page never renders an answer. #}
     {% call card() %}
     <div data-testid="first-message">
-        {% call card_header() %}
-            {% call card_title(class='text-xl') %}Ask your company a question{% endcall %}
-            {% call card_description() %}Answers cite the records they come from.{% endcall %}
+        {% call card_header(class='pb-3') %}
+            {% call card_title(class='text-base') %}Ask your company a question{% endcall %}
+            {% call card_description() %}Opens the AI chat with your question. Answers cite the records they come from.{% endcall %}
         {% endcall %}
-        {% call card_content(class='space-y-6') %}
+        {% call card_content() %}
             {{ question_box() }}
-        <section aria-labelledby="impact-answer-heading" x-data="overviewCascade()" data-testid="overview-cascade">
-            <h2 id="impact-answer-heading" class="mb-3 text-base font-semibold text-foreground">What breaks if it fails</h2>
-            <div x-show="state === 'loading'" class="space-y-2" aria-busy="true">
-                <div class="h-5 w-2/3 max-w-[640px] rounded bg-muted"></div>
-                <div class="h-10 rounded-md border border-border bg-card"></div>
-                <div class="ml-5 h-10 rounded-md border border-border bg-card"></div>
-            </div>
-            <div x-show="state === 'ready'" x-cloak>
-                {{ answer_cascade('overview-answer-cascade', question='questionText', rows='rows', ask='load(node.elementId)', root='centreName') }}
-            </div>
-            <p x-show="state === 'empty'" x-cloak class="text-sm text-muted-foreground">No connections recorded yet. <a href="{{ url_for('intelligence_ui.ask') }}" class="text-info hover:underline">Ask about anything you depend on</a>.</p>
-            <p x-show="state === 'error'" x-cloak role="status" class="text-sm text-muted-foreground">We could not load an answer just now. <a href="{{ url_for('intelligence_ui.ask') }}" class="text-info hover:underline">Open Ask</a>.</p>
         {% endcall %}
     </div>
     {% endcall %}
 
-    {# KPI band: four tiles, each with number, source, as-of date, and link to the list.
-       Council-07: each tile is clickable and links to the list it counts. Real zeros
-       are explained with next steps; unmeasured values never show as "0.0%". #}
+    {# Section cards (shadcn dashboard-01): each figure links to the list it counts; the health score opens its workings. #}
     {% from 'components/explained_value.html' import explained_value %}
     {% set _now = as_of_date %}
-    <section aria-label="Key figures" class="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        {# Applications #}
-        <a href="{{ url_for('unified_applications.application_list') if 'unified_applications.application_list' in flask.current_app.view_functions else '/applications/' }}"
-           class="rounded-lg border border-border bg-card p-4 transition-colors hover:border-ring"
-           data-testid="kpi-tile-applications">
-            <p class="text-2xs font-semibold uppercase tracking-[0.06em] text-muted-foreground">Applications</p>
-            <p class="mt-1 text-28 font-semibold leading-9 tabular-nums text-foreground" data-testid="health-kpi-applications">{{ metrics.applications }}</p>
-            <p class="mt-1 text-xs text-muted-foreground">from Application portfolio, as of {{ _now }}</p>
-        </a>
-
-        {# Solution designs #}
-        {% set solutions_count = nav_stats.solutions %}
-        <a href="{{ url_for('solution_design.list_solutions') if 'solution_design.list_solutions' in flask.current_app.view_functions else '/solutions/' }}"
-           class="rounded-lg border border-border bg-card p-4 transition-colors hover:border-ring"
-           data-testid="kpi-tile-solutions">
-            <p class="text-2xs font-semibold uppercase tracking-[0.06em] text-muted-foreground">Solution designs</p>
-            {% if solutions_count == 0 %}
-            <p class="mt-1 text-28 font-semibold leading-9 tabular-nums text-foreground" data-testid="health-kpi-solutions">0</p>
-            <p class="mt-1 text-xs text-muted-foreground">No solution designs yet. Start one from a journey.</p>
-            {% else %}
-            <p class="mt-1 text-28 font-semibold leading-9 tabular-nums text-foreground" data-testid="health-kpi-solutions">{{ solutions_count }}</p>
-            <p class="mt-1 text-xs text-muted-foreground">from Solution pipeline, as of {{ _now }}</p>
-            {% endif %}
-        </a>
-
-        {# Elements in the model #}
-        <a href="{{ url_for('archimate_crud.dashboard') if 'archimate_crud.dashboard' in flask.current_app.view_functions else '/architecture/dashboard' }}"
-           class="rounded-lg border border-border bg-card p-4 transition-colors hover:border-ring"
-           data-testid="kpi-tile-elements">
-            <p class="text-2xs font-semibold uppercase tracking-[0.06em] text-muted-foreground">Elements in the model</p>
-            <p class="mt-1 text-28 font-semibold leading-9 tabular-nums text-foreground" data-testid="health-kpi-elements">{{ nav_stats.elements }}</p>
-            <p class="mt-1 text-xs text-muted-foreground">from ArchiMate repository, as of {{ _now }}</p>
-        </a>
-
-        {# Health score with disclosure #}
-        <div class="rounded-lg border border-border bg-card p-4" data-testid="kpi-tile-health-score"
-             x-data="{ open: false }">
-            <p class="text-2xs font-semibold uppercase tracking-[0.06em] text-muted-foreground">Health score</p>
-            {% if health_score is not none %}
-            <p class="mt-1 text-28 font-semibold leading-9 tabular-nums text-foreground" data-testid="health-score-value">{{ health_score_text }}</p>
-            <p class="mt-1 text-xs text-muted-foreground">weighted composite, as of {{ _now }}</p>
-            {% call button(variant='link', size='sm', class='mt-2 h-auto px-0 text-xs', on_click='open = !open', testid='health-score-disclosure-button') %}
-                <span x-show="!open">How this is worked out</span>
-                <span x-show="open" x-cloak>Hide details</span>
+    {% set _apps_href = url_for('unified_applications.application_list') if 'unified_applications.application_list' in flask.current_app.view_functions else '/applications/' %}
+    {% set _sol_href = url_for('solution_design.list_solutions') if 'solution_design.list_solutions' in flask.current_app.view_functions else '/solutions/' %}
+    {% set _el_href = url_for('archimate_crud.dashboard') if 'archimate_crud.dashboard' in flask.current_app.view_functions else '/architecture/dashboard' %}
+    <section aria-label="Key figures" class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        {% for tile_href, tile_id, tile_label, tile_value, tile_source, tile_value_id in [
+            (_apps_href, 'applications', 'Applications', metrics.applications, 'Application portfolio', 'health-kpi-applications'),
+            (_sol_href, 'solutions', 'Solution designs', nav_stats.solutions, 'Solution pipeline', 'health-kpi-solutions'),
+            (_el_href, 'elements', 'Elements in the model', nav_stats.elements, 'ArchiMate repository', 'health-kpi-elements'),
+        ] %}
+        <a href="{{ tile_href }}" class="block rounded-lg transition-colors hover:bg-muted/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" data-testid="kpi-tile-{{ tile_id }}">
+            {% call card(class='h-full') %}
+                {% call card_header(class='pb-2') %}
+                    {% call card_description() %}{{ tile_label }}{% endcall %}
+                    {% call card_title(class='text-3xl tabular-nums') %}<span data-testid="{{ tile_value_id }}">{{ tile_value }}</span>{% endcall %}
+                {% endcall %}
+                {% call card_footer(class='text-xs text-muted-foreground') %}from {{ tile_source }}, as of {{ _now }}{% endcall %}
             {% endcall %}
-            <div x-show="open" x-cloak class="mt-3 space-y-2 border-t border-border pt-3" data-testid="health-score-disclosure">
-                <p class="text-xs font-medium text-foreground">Weighted from:</p>
-                <ul class="space-y-1.5 text-xs text-muted-foreground" data-testid="health-score-parts">
-                {% for key in ['phase_maturity', 'risk_health', 'capability_coverage', 'governance'] %}
-                    {% set part = health_components.get(key, {}) %}
-                    <li class="flex items-start gap-2" data-testid="health-score-part">
-                        {% if part.value is not none %}
-                        <span class="shrink-0 font-medium text-foreground tabular-nums" data-testid="health-part-value">{{ part.value }}%</span>
-                        <span>{{ part.label }}{% if part.weight %}, weight <span class="tabular-nums" data-testid="health-part-weight">{{ '%g'|format(part.weight) }}%</span>{% endif %}</span>
-                        {% else %}
-                        <span class="shrink-0 text-muted-foreground">—</span>
-                        <span>{{ part.label }}: {{ part.basis }}</span>
-                        {% endif %}
-                    </li>
-                {% endfor %}
-                </ul>
-                {% if health_sum %}
-                <p class="text-xs text-muted-foreground" data-testid="health-score-sum">Sum: <span class="tabular-nums text-foreground">{{ health_sum }}</span></p>
+        </a>
+        {% endfor %}
+
+        <div data-testid="kpi-tile-health-score" x-data="{ open: false }">
+            {% call card(class='h-full') %}
+                {% call card_header(class='pb-2') %}
+                    {% call card_description() %}Health score{% endcall %}
+                    {% call card_title(class='text-3xl tabular-nums') %}<span data-testid="health-score-value">{{ health_score_text if health_score is not none else '—' }}</span>{% endcall %}
+                {% endcall %}
+                {% call card_content(class='text-xs text-muted-foreground') %}
+                {% if health_score is not none %}
+                <p>weighted composite, as of {{ _now }}</p>
+                {% call button(variant='link', size='sm', class='mt-2 h-auto px-0 text-xs', on_click='open = !open', testid='health-score-disclosure-button') %}
+                    <span x-show="!open">How this is worked out</span>
+                    <span x-show="open" x-cloak>Hide details</span>
+                {% endcall %}
+                <div x-show="open" x-cloak class="mt-3 space-y-2 border-t border-border pt-3" data-testid="health-score-disclosure">
+                    <p class="text-xs font-medium text-foreground">Weighted from:</p>
+                    <ul class="space-y-1.5 text-xs text-muted-foreground" data-testid="health-score-parts">
+                    {% for key in ['phase_maturity', 'risk_health', 'capability_coverage', 'governance'] %}
+                        {% set part = health_components.get(key, {}) %}
+                        <li class="flex items-start gap-2" data-testid="health-score-part">
+                            {% if part.value is not none %}
+                            <span class="shrink-0 font-medium text-foreground tabular-nums" data-testid="health-part-value">{{ part.value }}%</span>
+                            <span>{{ part.label }}{% if part.weight %}, weight <span class="tabular-nums" data-testid="health-part-weight">{{ '%g'|format(part.weight) }}%</span>{% endif %}</span>
+                            {% else %}
+                            <span class="shrink-0 text-muted-foreground">—</span>
+                            <span>{{ part.label }}: {{ part.basis }}</span>
+                            {% endif %}
+                        </li>
+                    {% endfor %}
+                    </ul>
+                    {% if health_sum %}
+                    <p class="text-xs text-muted-foreground" data-testid="health-score-sum">Sum: <span class="tabular-nums text-foreground">{{ health_sum }}</span></p>
+                    {% endif %}
+                    {% if health_unavailable %}
+                    <p class="text-xs text-muted-foreground mt-2">
+                        Not measured: {{ health_unavailable|join(', ')|replace('_', ' ')|title }}.
+                    </p>
+                    {% endif %}
+                </div>
+                {% else %}
+                {{ explained_value(basis="Health score could not be computed", action="Record data in at least two of the four components to see a score") }}
                 {% endif %}
-                {% if health_unavailable %}
-                <p class="text-xs text-muted-foreground mt-2">
-                    Not measured: {{ health_unavailable|join(', ')|replace('_', ' ')|title }}.
-                </p>
-                {% endif %}
-            </div>
-            {% else %}
-            <p class="mt-1 text-28 font-semibold leading-9 tabular-nums text-foreground" data-testid="health-score-value">—</p>
-            {{ explained_value(basis="Health score could not be computed", action="Record data in at least two of the four components to see a score") }}
-            {% endif %}
+                {% endcall %}
+            {% endcall %}
         </div>
     </section>
 
@@ -278,6 +253,129 @@
     {% include 'components/priority_actions.html' %}
     {% endif %}
 
+    {# Activity chart (shadcn dashboard-01 interactive area chart): records added per day, drawn on the server from created_at dates. #}
+    {% macro activity_area(rows, label) %}
+    {% set W = 720 %}{% set H = 260 %}{% set top = 16 %}{% set bottom = 32 %}{% set left = 44 %}{% set right = 12 %}
+    {% set plot_w = W - left - right %}{% set plot_h = H - top - bottom %}
+    {% set n = rows|length %}
+    {% set peak = (rows | map(attribute='total') | max) or 1 %}
+    {% set base = top + plot_h %}
+    {% set ns = namespace(apps_path='', total_path='', apps_top='', total_top='') %}
+    {% for r in rows %}
+        {% set x = left + (plot_w * loop.index0 / (n - 1)) %}
+        {% set y_apps = base - plot_h * r.applications / peak %}
+        {% set y_total = base - plot_h * r.total / peak %}
+        {% set ns.apps_top = ns.apps_top ~ ('M' if loop.first else 'L') ~ (x|round(1)) ~ ',' ~ (y_apps|round(1)) ~ ' ' %}
+        {% set ns.total_top = ns.total_top ~ ('M' if loop.first else 'L') ~ (x|round(1)) ~ ',' ~ (y_total|round(1)) ~ ' ' %}
+    {% endfor %}
+    <svg viewBox="0 0 {{ W }} {{ H }}" class="block h-[260px] w-full" role="img" aria-label="{{ label }}">
+        {% for g in [0, 1, 2, 3] %}
+        {% set gy = top + plot_h - (plot_h * g / 3) %}
+        <line x1="{{ left }}" y1="{{ gy }}" x2="{{ W - right }}" y2="{{ gy }}" class="stroke-border" stroke-width="1" />
+        <text x="{{ left - 6 }}" y="{{ gy + 4 }}" text-anchor="end" class="fill-muted-foreground tabular-nums" font-size="15">{{ (peak * g / 3) | round | int }}</text>
+        {% endfor %}
+        <path d="{{ ns.total_top }}L{{ left + plot_w }},{{ base }} L{{ left }},{{ base }} Z" class="fill-primary/25" />
+        <path d="{{ ns.total_top }}" class="fill-none stroke-primary/60" stroke-width="1.5" />
+        <path d="{{ ns.apps_top }}L{{ left + plot_w }},{{ base }} L{{ left }},{{ base }} Z" class="fill-primary/60" />
+        <path d="{{ ns.apps_top }}" class="fill-none stroke-primary" stroke-width="1.5" />
+        {% set step = ((n / 5) | round(0, 'ceil') | int) or 1 %}
+        {% for r in rows if r.idx % step == 0 or r.idx == n - 1 %}
+        {% set tx = left + (plot_w * r.idx / (n - 1)) %}
+        <text x="{{ tx }}" y="{{ H - 10 }}" text-anchor="{{ 'end' if r.idx == n - 1 else ('start' if r.idx == 0 else 'middle') }}" class="fill-muted-foreground" font-size="15">{{ r.label }}</text>
+        {% endfor %}
+    </svg>
+    {% endmacro %}
+    {% set series = activity_series %}
+    {% call card() %}
+    <div data-testid="activity-chart" x-data="{ range: '90d' }">
+        {% call card_header() %}
+            {% call card_title(class='text-base') %}Records added{% endcall %}
+            {% call card_description() %}Applications and model elements added per day, from the date each was recorded.{% endcall %}
+        {% endcall %}
+        {% call card_content() %}
+        {% if series is none %}
+            <p role="status" class="py-8 text-center text-sm text-muted-foreground">The activity chart could not be drawn because the dates could not be read. Reload the page to try again.</p>
+        {% elif (series | sum(attribute='applications')) + (series | sum(attribute='elements')) == 0 %}
+            {{ empty_state(icon='chart-area', title='Nothing added in the last 90 days', description='Applications and model elements appear here, day by day, as they are imported or created.', cta_text='Import applications', cta_href=_apps_href, padding='py-8') }}
+        {% else %}
+            {% call tabs_list(class='mb-4 h-auto w-fit max-w-full flex-wrap') %}
+                {% for key, text in [('90d', 'Last 3 months'), ('30d', 'Last 30 days'), ('7d', 'Last 7 days')] %}
+                {% call tabs_trigger(value='range-' ~ key, click="range = '" ~ key ~ "'", selected="range === '" ~ key ~ "'") %}{{ text }}{% endcall %}
+                {% endfor %}
+            {% endcall %}
+            {% for key, days, text in [('90d', 90, 'last 3 months'), ('30d', 30, 'last 30 days'), ('7d', 7, 'last 7 days')] %}
+            {% set rows = [] %}
+            {% for r in series[-days:] %}{% set _ = rows.append({'label': r.label, 'applications': r.applications, 'total': r.applications + r.elements, 'idx': loop.index0}) %}{% endfor %}
+            <div data-testid="activity-range-{{ key }}" x-show="range === '{{ key }}'"{% if key != '90d' %} x-cloak{% endif %}>
+                {{ activity_area(rows, 'Records added per day, ' ~ text) }}
+            </div>
+            {% endfor %}
+            {% if activity_undated %}<p class="mt-3 text-xs text-muted-foreground" data-testid="activity-undated">{{ activity_undated }} model element{{ 's' if activity_undated != 1 else '' }} {{ 'has' if activity_undated == 1 else 'have' }} no recorded date and {{ 'is' if activity_undated == 1 else 'are' }} not drawn.</p>{% endif %}
+            <p class="mt-3 flex flex-wrap gap-x-6 gap-y-1 text-xs text-muted-foreground">
+                <span class="inline-flex items-center gap-2"><span class="size-2.5 rounded-sm bg-primary/60" aria-hidden="true"></span>Applications</span>
+                <span class="inline-flex items-center gap-2"><span class="size-2.5 rounded-sm bg-primary/25" aria-hidden="true"></span>Model elements, stacked above</span>
+            </p>
+        {% endif %}
+        {% endcall %}
+    </div>
+    {% endcall %}
+
+    {# Data table (shadcn dashboard-01): capability coverage with its tabs and pagination. Gaps first. #}
+    {% set ch = (capability_health|default([]))|sort(attribute='app_count') %}
+    {% set gap_count = ch | selectattr('coverage_status', 'equalto', 'gap') | list | length %}
+    {% set partial_count = ch | selectattr('coverage_status', 'equalto', 'partial') | list | length %}
+    {% set covered_count = ch | selectattr('coverage_status', 'equalto', 'covered') | list | length %}
+    <section aria-labelledby="capability-coverage-heading" data-testid="capability-health-widget"
+             x-data="{ tab: 'all', page: 0, size: 10,
+                       rows() { return Array.from(this.$root.querySelectorAll('[data-row]')); },
+                       matching() { return this.rows().filter(r => this.tab === 'all' || r.dataset.status === this.tab); },
+                       pages() { return Math.max(1, Math.ceil(this.matching().length / this.size)); },
+                       pick(t) { this.tab = t; this.page = 0; },
+                       show() { const keep = this.matching().slice(this.page * this.size, (this.page + 1) * this.size); this.rows().forEach(r => { r.hidden = !keep.includes(r); }); } }"
+             x-effect="show()">
+        {% call card() %}
+        {% call card_header() %}
+            {% call card_title(class='text-base') %}<span id="capability-coverage-heading">Capability coverage</span>{% endcall %}
+            {% call card_description() %}{{ gap_count }} gap{{ 's' if gap_count != 1 else '' }} of {{ ch|length }} capabilities. A capability with no application is a gap, with one it is partial, with two or more it is covered.{% endcall %}
+        {% endcall %}
+        {% call card_content(class='space-y-4') %}
+        {% if ch %}
+            {% call tabs_list(class='h-auto w-fit max-w-full flex-wrap') %}
+                {% for key, text, count in [('all', 'All', ch|length), ('gap', 'Gaps', gap_count), ('partial', 'Partial', partial_count), ('covered', 'Covered', covered_count)] %}
+                {% call tabs_trigger(value='coverage-' ~ key, click="pick('" ~ key ~ "')", selected="tab === '" ~ key ~ "'") %}{{ text }} <span class="ml-1 tabular-nums text-muted-foreground">{{ count }}</span>{% endcall %}
+                {% endfor %}
+            {% endcall %}
+            {% call dense_table(columns=[('Capability', ''), ('Applications', 'hidden text-right sm:table-cell'), ('Coverage', ''), ('', 'text-right')], rows=ch|length, caption='Capability coverage', max_height='none', flush=false) %}{% for cap in ch %}
+                <tr class="group h-12 transition-colors hover:bg-muted/50" data-row data-status="{{ cap.coverage_status }}" data-testid="coverage-row"{% if loop.index > 10 %} hidden{% endif %}>
+                    <td class="px-2 align-middle font-medium text-foreground">{{ cap.name }}</td>
+                    <td class="hidden px-2 text-right align-middle tabular-nums text-muted-foreground sm:table-cell">{{ cap.app_count }}</td>
+                    <td class="px-2 align-middle">
+                        {% if cap.coverage_status == 'covered' %}<span class="text-success-emphasis">Covered</span>
+                        {% elif cap.coverage_status == 'partial' %}<span class="text-warning-emphasis">Partial</span>
+                        {% else %}<span class="text-destructive-emphasis">Gap</span>{% endif %}
+                    </td>
+                    <td class="px-2 text-right align-middle">
+                        <a href="{{ url_for('capability_map.index') }}?cap={{ cap.id }}" class="inline-flex h-8 items-center rounded-md px-2.5 text-13 font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">Open<span class="sr-only"> {{ cap.name }} on the capability map</span></a>
+                    </td>
+                </tr>
+            {% endfor %}{% endcall %}
+            <div class="flex items-center justify-between gap-2">
+                <p class="text-sm text-muted-foreground tabular-nums" data-testid="coverage-page-label" x-text="'Page ' + (page + 1) + ' of ' + pages()">Page 1 of {{ ((ch|length) / 10) | round(0, 'ceil') | int }}</p>
+                <div class="flex items-center gap-2">
+                    {{ button(text='Previous', variant='outline', size='sm', icon='chevron-left', testid='coverage-prev', attrs_dict={':disabled': 'page === 0', '@click': 'page = Math.max(0, page - 1)'}) }}
+                    {{ button(text='Next', variant='outline', size='sm', icon='chevron-right', icon_position='right', testid='coverage-next', attrs_dict={':disabled': 'page >= pages() - 1', '@click': 'page = Math.min(pages() - 1, page + 1)'}) }}
+                </div>
+            </div>
+        {% else %}
+            {{ empty_state(icon='layers', title='No capabilities modelled yet', description='Coverage appears here once capabilities exist and applications are mapped to them.', cta_text='Open the capability map', cta_href=url_for('capability_map.index'), padding='py-8') }}
+        {% endif %}
+        {% endcall %}
+        {% endcall %}
+    </section>
+
+    {# Other ways to read the same model: executive summaries and the ArchiMate layers. Opens on the lens that matches the signed-in role. #}
+    <section aria-labelledby="lens-heading" class="space-y-6">
+    <h2 id="lens-heading" class="text-base font-semibold text-foreground">Read it another way</h2>
     {# Council-07: Lenses split into two labelled groups: "View as" (executive summaries)
        and "Layer" (ArchiMate 3.2 layers). At 390 the layer group becomes a select. #}
     <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:gap-6" aria-label="Dashboard lenses">
@@ -305,9 +403,6 @@
         </div>
     </div>
 
-    {# ══════════════════════════════════════════════════════════════════════
-       OVERVIEW LENS
-       ══════════════════════════════════════════════════════════════════════ #}
     <div x-show="activeRole === 'overview'" class="space-y-8">
 
     {# Architecture overview: the layered viewpoint as counts and a link, one
@@ -378,7 +473,7 @@
             {% endfor %}
         </svg>
         {% else %}
-        <p class="px-4 py-12 text-center text-sm text-muted-foreground">No lifecycle data recorded yet.</p>
+        {{ empty_state(icon='refresh-cw', title='No lifecycle stages recorded', description='Set a lifecycle stage on your applications to see how many sit in each.', cta_text='Open applications', cta_href=_apps_href, padding='py-8') }}
         {% endif %}
     </section>
 
@@ -429,30 +524,6 @@
     {% endif %}
     {% endcall %}
 
-        {# Dense table: capability coverage, 48px rows, sticky header, tabular
-           figures, hover-revealed action. Gaps are the at-risk rows. #}
-        {% set ch = capability_health|default([]) %}
-        {% set gap_count = ch | selectattr('coverage_status', 'equalto', 'gap') | list | length %}
-        <section aria-labelledby="capability-coverage-heading" class="rounded-lg border border-border bg-card" data-testid="capability-health-widget">
-            <div class="flex items-center justify-between border-b border-border px-4 py-2">
-                <h2 id="capability-coverage-heading" class="text-base font-semibold text-foreground">Capability coverage</h2>
-                <span class="text-2xs font-semibold uppercase tracking-[0.06em] text-muted-foreground tabular-nums">{{ gap_count }} gap{{ 's' if gap_count != 1 else '' }} of {{ ch|length }}</span>
-            </div>
-{% call dense_table(columns=[('Capability', ''), ('Applications', 'text-right'), ('Coverage', ''), ('', 'text-right')], rows=(ch)|length, empty_text='No capabilities recorded yet.', max_height='480px', flush=true) %}{% for cap in ch %}
-                        <tr class="group transition-colors hover:bg-muted/50">
-                            <td class="px-2 align-middle font-medium text-foreground">{{ cap.name }}</td>
-                            <td class="px-2 text-right align-middle tabular-nums text-muted-foreground">{{ cap.app_count }}</td>
-                            <td class="px-2 align-middle">
-                                {% if cap.coverage_status == 'covered' %}<span class="text-success-emphasis">Covered</span>
-                                {% elif cap.coverage_status == 'partial' %}<span class="text-warning-emphasis">Partial</span>
-                                {% else %}<span class="text-destructive-emphasis">Gap</span>{% endif %}
-                            </td>
-                            <td class="px-2 text-right align-middle">
-                                <a href="{{ url_for('capability_map.index') }}?cap={{ cap.id }}" class="inline-flex h-8 items-center rounded-md px-2.5 text-13 font-medium text-muted-foreground opacity-0 transition-opacity hover:bg-accent hover:text-info group-hover:opacity-100 focus-visible:opacity-100">View</a>
-                            </td>
-                        </tr>
-                        {% endfor %}{% endcall %}
-        </section>
     </div>
 
     {# ══════════════════════════════════════════════════════════════════════
@@ -629,6 +700,7 @@
             </div>
         </section>
     </div>
+    </section>
     {% endif %}
 </div>
 {% endblock %}

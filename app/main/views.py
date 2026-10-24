@@ -17,6 +17,7 @@ from flask import (
 from flask_login import current_user, login_required
 
 from app import db
+from app.modules.genome.services.roadmap_links import redirect_to_roadmap
 
 # D-5 (admin-rbac-active-org continuation): repointed from
 # app.core.auth.decorators.admin_required (one of three duplicate
@@ -378,8 +379,8 @@ def login_redirect():
 
 @main.route("/roadmaps")
 def roadmaps_redirect():
-    """Redirect /roadmaps to canonical /capability-roadmap."""
-    return redirect(url_for("main.capability_roadmap"), code=301)
+    """Redirect /roadmaps to the one roadmap."""
+    return redirect_to_roadmap("strategic")
 
 
 @main.route("/favicon.ico")

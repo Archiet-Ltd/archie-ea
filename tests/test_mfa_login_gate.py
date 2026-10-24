@@ -127,6 +127,16 @@ def test_enrolling_with_the_right_code_completes_login(app, db_session, make_org
     code = pyotp.TOTP(secret).now()
 
     resp = client.post("/account/mfa-challenge", data={"code": code}, follow_redirects=False)
+    # The right code turns two-factor on and shows the recovery codes once;
+    # the sign-in finishes when the person confirms they saved them.
+    assert resp.status_code == 200
+    assert b"recovery-codes" in resp.data
+    assert client.get("/dashboard/overview").status_code in (302, 401)
+    resp = client.post(
+        "/account/mfa-challenge",
+        data={"step": "codes", "recovery_confirmed": "1"},
+        follow_redirects=False,
+    )
     assert resp.status_code in (302, 303)
 
     from app.models.user import User
