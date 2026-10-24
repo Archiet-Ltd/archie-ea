@@ -145,12 +145,12 @@
             <!-- Edit mode -->
             <div x-cloak x-show="!detailLoading && detailEditing" class="space-y-4">
                 {{ input(aria_label='Element name', attrs_dict={'x-model': 'detailForm.name'}) }}
-                {% call native_select(aria_label='Layer', attrs_dict={'x-model': 'detailForm.layer', '@change': 'onDetailLayerChange()'}, testid='detail-layer-select') %}
+                {% call native_select(aria_label='Layer', attrs_dict={'x-model': 'detailForm.layer', '@change': 'onDetailLayerChange()', 'data-testid': 'detail-layer-select'}) %}
                     <template x-for="[key, cfg] in Object.entries(layerConfig)" :key="key">
                         <option :value="key" x-text="cfg.name"></option>
                     </template>
                 {% endcall %}
-                {% call native_select(aria_label='Type', attrs_dict={'x-model': 'detailForm.element_type'}, testid='detail-type-select') %}
+                {% call native_select(aria_label='Type', attrs_dict={'x-model': 'detailForm.element_type', 'data-testid': 'detail-type-select'}) %}
                     <template x-for="et in detailFormLayerTypes" :key="et">
                         <option :value="et" x-text="formatTypeName(et)"></option>
                     </template>
@@ -277,13 +277,13 @@
                     <option :value="key" x-text="cfg.name"></option>
                 </template>
             {% endcall %}
-            {% call native_select(aria_label='Element Type', attrs_dict={'x-model': 'aiGenerate.elementType'}, testid='ai-generate-element-type') %}
+            {% call native_select(aria_label='Element Type', attrs_dict={'x-model': 'aiGenerate.elementType', 'data-testid': 'ai-generate-element-type'}) %}
                 <option value="">Select type...</option>
                 <template x-for="et in aiGenerateLayerTypes" :key="et">
                     <option :value="et" x-text="formatTypeName(et)"></option>
                 </template>
             {% endcall %}
-            {{ textarea(aria_label='Prompt', placeholder="Describe the element to generate, e.g. 'A driver capturing the need to comply with the new data residency regulation'", attrs_dict={'x-model': 'aiGenerate.prompt'}, testid='ai-generate-prompt') }}
+            {{ textarea(aria_label='Prompt', placeholder="Describe the element to generate, e.g. 'A driver capturing the need to comply with the new data residency regulation'", attrs_dict={'x-model': 'aiGenerate.prompt', 'data-testid': 'ai-generate-prompt'}) }}
         </div>
 
         <div x-show="aiGenerate.loading" x-cloak class="flex items-center gap-2 text-sm text-muted-foreground py-6 justify-center" data-testid="ai-generate-loading">
