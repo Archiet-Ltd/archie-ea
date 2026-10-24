@@ -73,6 +73,7 @@ from app.services.ai_chat_approval_service import AIChatApprovalService
 from app.modules.ai_chat.services.context_window_service import ContextWindowService
 from app.modules.ai_chat.services.intent_classifier_service import IntentClassifierService
 from app.utils.validators import sanitize_html
+from app.modules.ai_chat.services.failure_messages import ASSISTANT_UNAVAILABLE
 from app.modules.architecture.services.archimate_prompts import ARCHIMATE_SYSTEM_PROMPT
 
 logger = logging.getLogger(__name__)
@@ -1379,14 +1380,7 @@ class MultiDomainChatService:
             error_str = str(e)
             # Provide a clear, actionable message when no LLM provider is configured
             if "no enabled provider" in error_str.lower() or "no llm provider" in error_str.lower() or "valueerror" in type(e).__name__.lower():
-                user_message = (
-                    "**No AI provider configured.**\n\n"
-                    "To enable AI responses, please do one of the following:\n\n"
-                    "1. **Admin UI**: Go to [Admin → API Settings](/admin/api-settings) and add an API key for OpenAI, Anthropic, Gemini, or OpenRouter.\n"
-                    "2. **.env file**: Add your API key to the `.env` file in the project root and restart the server.\n\n"
-                    "**Recommended for demo**: Get a free OpenRouter key at [openrouter.ai/keys](https://openrouter.ai/keys) — "
-                    "it provides access to Gemini 2.5 Flash at no cost."
-                )
+                user_message = ASSISTANT_UNAVAILABLE
             else:
                 user_message = error_str
 

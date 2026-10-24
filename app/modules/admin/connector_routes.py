@@ -919,57 +919,13 @@ def github_connect_save():
     the connector's settings, a flash message or a response.
     """
     from app.connectors import github as gh
-    from app.extensions import db
-    from app.modules.codegen.services.credential_vault import OrgCredentialVault
-    from app.services.connector_framework import (
-        CONNECTOR_ACTION_CREATE,
-        CONNECTOR_ACTION_UPDATE,
-        _load_org_connector,
-        apply_connector_change,
-    )
-    from app.services.job_queue_service import get_job_queue_service
 
     org_id = _require_active_org()
-    organization = (request.form.get("organization") or "").strip()
-    token = (request.form.get("api_token") or "").strip()
-    existing = _load_org_connector(org_id, connector_type="github")
-    has_token = OrgCredentialVault().get_masked(org_id, "github", "api_token") is not None
-
-    if not gh.is_valid_organization(organization):
-        flash("Enter your GitHub organisation name exactly as it appears in github.com/<name>.", "error")
+    try:
+        gh.connect_and_start(org_id, request.form.get("organization"), request.form.get("api_token"))
+    except gh.ConnectRefused as exc:
+        flash(str(exc), "error")
         return redirect(url_for("m365_connector.github_connect"))
-    if not token and not has_token:
-        flash("Paste a read-only GitHub token to connect.", "error")
-        return redirect(url_for("m365_connector.github_connect"))
-    if token and (len(token) > 255 or any(ch.isspace() for ch in token)):
-        flash("That does not look like a GitHub token.", "error")
-        return redirect(url_for("m365_connector.github_connect"))
-
-    config = dict((existing.config or {}) if existing else {})
-    config["organization"] = organization
-    payload = {
-        "connector_type": "github",
-        "connector_id": existing.id if existing else None,
-        "name": "GitHub",
-        "config": config,
-        "status": "active",
-        "credential_provided": bool(token),
-    }
-    cfg = apply_connector_change(
-        org_id=org_id,
-        action=CONNECTOR_ACTION_UPDATE if existing else CONNECTOR_ACTION_CREATE,
-        payload=payload,
-        delegated=True,
-    )
-    if token:
-        OrgCredentialVault().store(org_id=org_id, connector_type="github", credential_type="api_token", value=token)
-    db.session.commit()
-    get_job_queue_service().create_job(
-        "GitHub: read repositories",
-        gh.FIRST_SYNC_TASK,
-        {"connector_id": cfg.id},
-        organization_id=org_id,
-    )
     flash("Connected. Reading your repositories now; this page shows when it is done.", "success")
     return redirect(url_for("m365_connector.github_connect"))
 

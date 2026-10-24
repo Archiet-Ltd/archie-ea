@@ -4760,6 +4760,8 @@
     "layouts/admin_base.html"
    ],
    "extra_macros": [
+    "components/drawer.html",
+    "macros/adm_cycle.html",
     "macros/kanban_board.html"
    ],
    "macros": [
@@ -8113,6 +8115,83 @@
    "tier": "B",
    "type_changed": false
   },
+  "app/templates/admin/platform_area.html": {
+   "allowed_macros": [
+    "components/accessibility_helpers.html",
+    "components/alert.html",
+    "components/answer_cascade.html",
+    "components/app_stats_grid.html",
+    "components/badge.html",
+    "components/breadcrumb.html",
+    "components/breadcrumb_nav.html",
+    "components/button.html",
+    "components/card.html",
+    "components/confirmation_dialog.html",
+    "components/data_card.html",
+    "components/dense_table.html",
+    "components/dialog.html",
+    "components/dropdown_menu.html",
+    "components/empty_state.html",
+    "components/error_boundary.html",
+    "components/filter_bar.html",
+    "components/gantt_timeline.html",
+    "components/inline_hint.html",
+    "components/loading_state.html",
+    "components/metrics_card.html",
+    "components/modal.html",
+    "components/page_header.html",
+    "components/priority_actions.html",
+    "components/progress.html",
+    "components/provenance.html",
+    "components/review_queue_panel.html",
+    "components/skeleton.html",
+    "components/status_badge.html",
+    "components/status_indicator.html",
+    "components/tabs.html",
+    "macros/page_shell.html"
+   ],
+   "basis": "rule",
+   "block": "dashboard",
+   "components": [
+    "page-header",
+    "card",
+    "empty"
+   ],
+   "controls": {
+    "link": 1,
+    "testid": 2
+   },
+   "extends": [
+    "layouts/admin_base.html"
+   ],
+   "macros": [
+    "components/card.html",
+    "components/empty_state.html",
+    "components/page_header.html"
+   ],
+   "persona": "platform_admin",
+   "reference": {
+    "shadcn": {
+     "name": "shadcn blocks: dashboard-01",
+     "url": "https://ui.shadcn.com/blocks#dashboard-01"
+    },
+    "basecoat": {
+     "name": "flask-basecoat examples: dashboard",
+     "image": "docs/design/reference/basecoat-dashboard.webp"
+    }
+   },
+   "spec": null,
+   "status": "mapped",
+   "charts": [],
+   "confidence": "high",
+   "frame": "dashboard-01",
+   "inhouse_components": [],
+   "original": "dashboard-01",
+   "page_type": "dashboard",
+   "reason": "The platform administration area: one card per cross-organisation tool, opened from the Platform admin entry of the user menu.",
+   "tier": "B",
+   "type_changed": false
+  },
   "app/templates/admin/pricing_analytics.html": {
    "allowed_macros": [
     "components/accessibility_helpers.html",
@@ -9965,7 +10044,10 @@
    "page_type": "chat",
    "reason": "AI chat on the startup path; sources-chat with the evidence footer as the source part, held at B until the preview-03 render exists (G-12), then A.",
    "tier": "B",
-   "type_changed": false
+   "type_changed": false,
+   "extra_macros": [
+    "components/drawer.html"
+   ]
   },
   "app/templates/ai_chat/run_records/detail.html": {
    "allowed_macros": [
