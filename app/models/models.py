@@ -1568,6 +1568,20 @@ class ExternalSystem(db.Model):
     system_name = db.Column(db.String(100), nullable=False, unique=True)
     system_type = db.Column(db.String(50))  # servicenow, confluence, ldap, vault, sonarqube
 
+    # The organisation this connection belongs to. An inbound webhook signed for
+    # this connection may only move that organisation's cards, so the receiver
+    # scopes the card lookup to this id rather than matching any card with the
+    # posted issue key. Nullable because external_systems is an existing table
+    # (reconcile-schema can only ADD nullable columns, ADR 0002) and legacy
+    # single-connection installs have no owner recorded yet; a webhook whose
+    # connection has no organisation recorded touches nothing.
+    organization_id = db.Column(
+        db.Integer,
+        db.ForeignKey("organizations.id", ondelete="CASCADE"),
+        nullable=True,
+        index=True,
+    )
+
     # Connection
     base_url = db.Column(db.String(500))
     api_endpoint = db.Column(db.String(500))
