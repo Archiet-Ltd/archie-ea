@@ -264,7 +264,7 @@
     {% endcall %}
 
     <!-- Generate with AI Modal -->
-    {% call modal(id='ai-generate-modal', labelledby='ai-generate-modal-title', size='lg') %}
+    {% call modal(id='ai-generate-modal', labelledby='ai-generate-modal-title', size='lg', attrs={'data-testid': 'ai-generate-modal'}) %}
         <div class="flex items-center justify-between mb-4" data-modal-header>
             <h2 id="ai-generate-modal-title" class="text-base font-semibold text-foreground">Generate Element with AI</h2>
             {{ button(variant='ghost', size='icon-sm', icon='x', aria_label='Close', attrs_dict={'@click': "Platform.modal.close('ai-generate-modal')"}) }}
