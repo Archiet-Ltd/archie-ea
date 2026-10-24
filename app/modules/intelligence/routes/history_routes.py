@@ -16,7 +16,12 @@ from datetime import datetime, timezone
 from flask import render_template, request
 from flask_login import login_required
 
-from app.modules.intelligence.services.history_service import HistoryService
+from app.modules.intelligence.services.history_service import (
+    CHANGE_ROWS_SHOWN,
+    SOURCE_OPTIONS,
+    HistoryService,
+    change_row,
+)
 from app.utils.api_response import error_response, success_response
 from app.utils.tenant import current_organization_id
 
@@ -52,6 +57,30 @@ def _parse_datetime_param(raw: str | None, param_name: str) -> tuple[datetime | 
 # ----------------------------------------------------------------------
 
 
+def _element_names(result) -> dict[int, str]:
+    """Names of the elements a relationship joins, for the as-of table."""
+    ids = {
+        end
+        for rel in result.relationships
+        for end in (rel.source_id, rel.target_id)
+        if end is not None
+    }
+    names = {e.id: e.name for e in result.elements if e.id in ids}
+    missing = ids - set(names)
+    if missing:
+        from app.extensions import db
+        from app.models.archimate_core import ArchiMateElement
+
+        for element_id, name in db.session.execute(
+            db.select(ArchiMateElement.id, ArchiMateElement.name).where(
+                ArchiMateElement.id.in_(missing),
+                ArchiMateElement.organization_id == current_organization_id(),
+            )
+        ):
+            names[element_id] = name
+    return names
+
+
 @intelligence_ui.route("/history/as-of", methods=["GET"])
 @login_required
 def history_as_of_page():
@@ -85,6 +114,7 @@ def history_as_of_page():
         as_of_date=as_of_date,
         elements=result.elements,
         relationships=result.relationships,
+        element_names=_element_names(result),
     )
 
 
@@ -108,6 +138,9 @@ def history_changes_page():
     from_date, err = _parse_datetime_param(request.args.get("from"), "from")
     if err or from_date is None or from_date >= to_date:
         from_date = to_date - timedelta(days=30)
+    # A date with no time of day means the whole of that day.
+    if request.args.get("to") and "T" not in request.args["to"]:
+        to_date = to_date + timedelta(days=1) - timedelta(seconds=1)
 
     organization_id = current_organization_id()
     if organization_id is None:
@@ -121,11 +154,30 @@ def history_changes_page():
     service = HistoryService(db.session, organization_id)
     result = service.difference(from_date, to_date)
 
+    source = request.args.get("source") or ""
+    changes = [c for c in result.changes if not source or c.source == source]
+
+    shown = changes[:CHANGE_ROWS_SHOWN]
+    people = service.people_in(shown)
+
+    chain = None
+    if request.args.get("verify"):
+        from app.models.audit_log import AuditLog
+
+        chain = AuditLog.verify_chain(organization_id)
+
     return render_template(
         "intelligence/history_changes.html",
         from_date=from_date,
         to_date=to_date,
-        changes=result.changes,
+        changes=changes,
+        rows=[change_row(c, people) for c in shown],
+        total_changes=len(changes),
+        recorded_total=len(result.changes),
+        shown_limit=CHANGE_ROWS_SHOWN,
+        source=source,
+        source_options=SOURCE_OPTIONS,
+        chain=chain,
     )
 
 
@@ -258,6 +310,9 @@ def history_changes_api():
                 "changed_by_id": c.changed_by_id,
                 "changed_by_name": c.changed_by_name,
                 "change_reason": c.change_reason,
+                "source": c.source,
+                "correlation_id": c.correlation_id,
+                "label": c.label,
                 "snapshot": c.snapshot,
                 "previous_snapshot": c.previous_snapshot,
             }
