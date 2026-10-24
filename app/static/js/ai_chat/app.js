@@ -1262,6 +1262,18 @@ Would you like me to provide more details about the extracted elements or help y
   var render = window.ArchieChat.render;
   function esc(s) { var d = document.createElement('div'); d.textContent = (s == null ? '' : String(s)); return d.innerHTML; }
 
+  // The search box above the list narrows it by title; an empty box shows every chat.
+  function filterSessionList() {
+    var box = document.getElementById('chat-history-search');
+    var q = box ? box.value.trim().toLowerCase() : '';
+    document.querySelectorAll('#session-list .js-thr').forEach(function (row) {
+      row.classList.toggle('hidden', q !== '' && row.textContent.toLowerCase().indexOf(q) === -1);
+    });
+  }
+  document.addEventListener('input', function (e) {
+    if (e.target && e.target.id === 'chat-history-search') filterSessionList();
+  });
+
   window.loadSessionList = async function () {
     var c = document.getElementById('session-list');
     if (!c) return;
@@ -1296,6 +1308,7 @@ Would you like me to provide more details about the extracted elements or help y
         var del = row.querySelector('.js-thr-del'); if (del) del.addEventListener('click', function (e) { e.stopPropagation(); window.deleteConversation(id); });
       });
       if (window.lucide) lucide.createIcons();
+      filterSessionList();
     } catch (e) {
       c.innerHTML = '<p class="text-xs text-destructive text-center py-4">Couldn\'t load conversations.</p>';
     }
