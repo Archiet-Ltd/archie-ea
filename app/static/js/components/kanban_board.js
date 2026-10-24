@@ -53,6 +53,15 @@
             sortKey = function (card) { return card.sortKey || 0; };
         }
 
+        // The request body for a move; a board whose endpoint wants a different
+        // value than the column key (the roadmap's empty horizon) supplies moveBody.
+        function moveBody(card, toState) {
+            if (typeof config.moveBody === 'function') return config.moveBody(card, toState);
+            var body = {};
+            body[moveField] = toState;
+            return body;
+        }
+
         function moveUrl(card, toState) {
             if (typeof config.moveUrl === 'function') return config.moveUrl(card, toState);
             if (typeof config.moveUrl === 'string') return config.moveUrl.replace('{id}', card.id);
@@ -65,6 +74,8 @@
             cards: config.cards || [],
             canWrite: !!config.canWrite,
             moving: null,
+            picked: null,
+            announcement: '',
             draggingCard: null,
             dragOverColumn: null,
 
@@ -160,10 +171,39 @@
                 this._persistMove(card, toState, selectEl);
             },
 
-            // Arrow keys on a focused card move it one column left or right,
-            // so the board can be worked without a pointer.
+            // The "Move to" menu: move a card to the named column.
+            moveCardTo: function (card, toState) {
+                if (!this.canWrite || this.moving === card.id || card.state === toState) return;
+                return this._persistMove(card, toState);
+            },
+
+            _label: function (state) {
+                var col = this.columns.filter(function (c) { return c.state === state; })[0];
+                return (col && col.label) || state;
+            },
+
+            // Space or Enter picks a focused card up (and drops it again);
+            // Escape puts it back down. Arrow keys on a focused card move it one
+            // column left or right, so the board can be worked without a pointer.
             onCardKey: function (event, card) {
                 if (!this.canWrite || event.target !== event.currentTarget) return;
+                if (event.key === ' ' || event.key === 'Enter') {
+                    event.preventDefault();
+                    if (this.picked === card.id) {
+                        this.picked = null;
+                        this.announcement = (card.name || card.title) + ' dropped in ' + this._label(card.state) + '.';
+                    } else {
+                        this.picked = card.id;
+                        this.announcement = (card.name || card.title) + ' picked up from ' + this._label(card.state) +
+                            '. Use the left and right arrow keys to move it, then Space to drop it.';
+                    }
+                    return;
+                }
+                if (event.key === 'Escape' && this.picked === card.id) {
+                    this.picked = null;
+                    this.announcement = 'Move cancelled.';
+                    return;
+                }
                 var step = event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0;
                 if (!step) return;
                 var ids = this.columns.map(function (c) { return c.state; });
@@ -176,6 +216,9 @@
                 var done = this._persistMove(card, to);
                 if (done && done.then) {
                     done.then(function () {
+                        if (card.state === to) {
+                            self.announcement = (card.name || card.title) + ' moved to ' + self._label(to) + '.';
+                        }
                         self.$nextTick(function () {
                             var next = global.document.querySelector('[data-card-id="' + id + '"]');
                             if (next) next.focus();
@@ -191,6 +234,12 @@
                 var url = moveUrl(card, toState);
                 if (!url) return;
 
+                if ((config.noMoveTo || []).indexOf(toState) !== -1) {
+                    if (selectEl) selectEl.value = prevState;
+                    _toastError(config.noMoveMessage || 'Cards cannot be moved to that column.');
+                    return;
+                }
+
                 if (self.wipAtLimit(toState)) {
                     if (selectEl) selectEl.value = prevState;
                     _toastError(toState + ' is at its limit of ' + self.wipLimit(toState) +
@@ -201,8 +250,7 @@
                 self.moving = card.id;
                 card.state = toState;   // optimistic
 
-                var body = {};
-                body[moveField] = toState;
+                var body = moveBody(card, toState);
 
                 var platformFetch = _fetch();
                 var request = platformFetch

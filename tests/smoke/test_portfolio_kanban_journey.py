@@ -172,6 +172,12 @@ def _assert_wip_limits_show_on_headers(page):
         assert "/" not in header.replace("epics", ""), f"{state} should show no WIP limit: {header!r}"
 
 
+def _move_by_menu(card, state):
+    """Move a card with its "Move to" menu: open it, choose the column."""
+    card.get_by_role("button", name="Move to a different column").click()
+    card.get_by_role("menuitem", name="Move to %s" % state).click()
+
+
 def _drag_card(page, card, to_state):
     """Drive a native HTML5 drag-and-drop of a card onto a target column,
     dispatching the dragstart/dragover/drop/dragend sequence the board listens
@@ -336,7 +342,7 @@ def test_portfolio_kanban_journey(browser, live_server, seeded, db_session):
 
         # === Step 3: Verify WSJF ordering in Funnel column (descending) ===
         # Platform Modernization (13.5) should be first, Customer Portal (7.67) second, Legacy Migration (2.8) third
-        cards = page.locator(".kanban-column[data-state='Funnel'] .bg-card").all()
+        cards = page.locator(".kanban-column[data-state='Funnel'] .kanban-card").all()
         assert len(cards) >= 3, "Expected at least 3 epic cards in Funnel"
 
         # Check order by card position (first card should have highest WSJF)
@@ -354,10 +360,9 @@ def test_portfolio_kanban_journey(browser, live_server, seeded, db_session):
 
         # === Step 4: Move Customer Portal Epic to Implementing ===
         # Find the select dropdown for Customer Portal Epic
-        customer_card = page.locator(".kanban-column[data-state='Funnel'] .bg-card").filter(has_text="Customer Portal Epic")
-        move_select = customer_card.locator("select").first
-        expect(move_select).to_be_visible(timeout=PAGE_TIMEOUT)
-        move_select.select_option("Implementing")
+        customer_card = page.locator(".kanban-column[data-state='Funnel'] .kanban-card").filter(has_text="Customer Portal Epic")
+        expect(customer_card.get_by_role("button", name="Move to a different column")).to_be_visible(timeout=PAGE_TIMEOUT)
+        _move_by_menu(customer_card, "Implementing")
 
         # Wait for the move to complete (card should disappear from Funnel)
         page.wait_for_timeout(1000)
@@ -367,7 +372,7 @@ def test_portfolio_kanban_journey(browser, live_server, seeded, db_session):
         expect(implementing_column.get_by_text("Customer Portal Epic")).to_be_visible(timeout=PAGE_TIMEOUT)
 
         # Funnel should now only have 2 epics
-        funnel_cards = page.locator(".kanban-column[data-state='Funnel'] .bg-card").all()
+        funnel_cards = page.locator(".kanban-column[data-state='Funnel'] .kanban-card").all()
         assert len(funnel_cards) == 2, "Funnel should have 2 epics after moving one"
 
         # === Step 6: Reload and verify state persisted ===
@@ -378,7 +383,7 @@ def test_portfolio_kanban_journey(browser, live_server, seeded, db_session):
         implementing_column = page.locator(".kanban-column[data-state='Implementing']")
         expect(implementing_column.get_by_text("Customer Portal Epic")).to_be_visible(timeout=PAGE_TIMEOUT)
 
-        funnel_cards_after_reload = page.locator(".kanban-column[data-state='Funnel'] .bg-card").all()
+        funnel_cards_after_reload = page.locator(".kanban-column[data-state='Funnel'] .kanban-card").all()
         assert len(funnel_cards_after_reload) == 2, "Funnel should still have 2 epics after reload"
 
         # === Step 7: Drag an epic from Funnel to Reviewing (criterion 3) ===
@@ -446,12 +451,12 @@ def test_portfolio_board_viewer_is_read_only(browser, live_server, seeded, db_se
         page.wait_for_load_state("networkidle")
         # The epics are visible (read access), but no move control is shown.
         expect(page.get_by_role("heading", name="Platform Modernization Epic").first).to_be_visible(timeout=PAGE_TIMEOUT)
-        # The "Move to" select is gated on canWrite (x-show), so for a viewer no
-        # select is visible — a hidden node may remain in the DOM, so the test
+        # The "Move to" menu is gated on canWrite (x-show), so for a viewer none
+        # is visible — a hidden node may remain in the DOM, so the test
         # asserts visibility, not DOM presence.
-        selects = page.locator(".kanban-card select")
-        for i in range(selects.count()):
-            assert not selects.nth(i).is_visible(), "viewer is shown a Move to select"
+        menus = page.locator(".kanban-card [data-kanban-move] button")
+        for i in range(menus.count()):
+            assert not menus.nth(i).is_visible(), "viewer is shown a Move to menu"
         # The board's read-only-ness is also reported by the API it renders from.
         import json
         page.goto(live_server + "/api/safe/portfolio", timeout=PAGE_TIMEOUT)

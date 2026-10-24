@@ -7,7 +7,7 @@ from playwright.sync_api import expect
 
 from .conftest import PAGE_TIMEOUT, PASSWORD
 from .test_archetype_journeys import _login
-from .test_portfolio_kanban_journey import _drag_card, _make_viewer, _seed_epics
+from .test_portfolio_kanban_journey import _drag_card, _make_viewer, _move_by_menu, _seed_epics
 
 pytestmark = [pytest.mark.smoke, pytest.mark.journey]
 
@@ -100,10 +100,9 @@ def test_enterprise_architect_moves_epics_by_select_drag_and_keyboard(browser, l
     try:
         assert page.get_by_test_id("board-read-only").count() == 0
         legacy = page.locator(".kanban-card").filter(has_text="Legacy Migration Epic")
-        select = legacy.get_by_label("Move Legacy Migration Epic to a different column")
-        expect(select).to_be_visible(timeout=PAGE_TIMEOUT)
+        expect(legacy.get_by_role("button", name="Move to a different column")).to_be_visible(timeout=PAGE_TIMEOUT)
         with page.expect_response(_is_move) as moved:
-            select.select_option("Reviewing")
+            _move_by_menu(legacy, "Reviewing")
         assert moved.value.status == 200
         expect(page.locator(".kanban-column[data-state='Reviewing']").get_by_role(
             "heading", name="Legacy Migration Epic")).to_be_visible(timeout=PAGE_TIMEOUT)
@@ -147,7 +146,7 @@ def test_enterprise_architect_is_refused_at_the_limit_and_adds_an_epic(browser, 
     context, page = _open_board(browser, live_server, email)
     try:
         legacy = page.locator(".kanban-card").filter(has_text="Legacy Migration Epic")
-        legacy.get_by_label("Move Legacy Migration Epic to a different column").select_option("Analyzing")
+        _move_by_menu(legacy, "Analyzing")
         expect(page.get_by_text("Analyzing is at its limit of 3 epics").first).to_be_visible(timeout=PAGE_TIMEOUT)
         assert _column_of(page, "Legacy Migration Epic") == "Funnel"
         page.reload(timeout=PAGE_TIMEOUT)
