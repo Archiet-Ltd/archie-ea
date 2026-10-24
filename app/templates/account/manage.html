@@ -102,6 +102,83 @@
         </div>
     </div>
 
+    {# T-onb-03: Company Kind Setting #}
+    <div class="rounded-lg border border-border bg-card text-card-foreground mt-6" data-testid="company-kind-card">
+        <div class="p-6">
+            <h3 class="text-sm font-semibold mb-1">Company Type</h3>
+            <p class="text-xs text-muted-foreground mb-5">This helps us tailor canvas suggestions and guidance to your organisation's stage.</p>
+            <div x-data="{
+                kind: '{{ (user.organization.settings or {}).get('company_context', {}).get('kind', 'startup') }}',
+                saving: false,
+                async save(selectedKind) {
+                    if (this.saving) return;
+                    this.saving = true;
+                    const previousKind = this.kind;
+                    this.kind = selectedKind;
+                    try {
+                        const response = await (window.Platform?.fetch || fetch)('/dashboard/api/company-kind', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ kind: selectedKind })
+                        });
+                        if (!response.ok) {
+                            this.kind = previousKind;
+                            throw new Error('Failed to save');
+                        }
+                    } catch (err) {
+                        this.kind = previousKind;
+                        console.error('Failed to save company kind:', err);
+                    } finally {
+                        this.saving = false;
+                    }
+                }
+            }" class="space-y-3">
+                <div class="flex flex-col gap-3">
+                    <label class="flex items-start gap-3 rounded-lg border border-border px-4 py-3 transition-colors cursor-pointer"
+                           :class="kind === 'startup' ? 'bg-accent/40 border-primary' : 'hover:bg-accent/20'"
+                           @click="save('startup')">
+                        <input type="radio"
+                               name="company_kind"
+                               value="startup"
+                               :checked="kind === 'startup'"
+                               class="mt-0.5 h-4 w-4 border-input text-primary focus:ring-ring">
+                        <div class="flex-1">
+                            <span class="block text-sm font-medium text-foreground">Startup</span>
+                            <span class="block text-xs text-muted-foreground">Validating product-market fit</span>
+                        </div>
+                    </label>
+                    <label class="flex items-start gap-3 rounded-lg border border-border px-4 py-3 transition-colors cursor-pointer"
+                           :class="kind === 'scaleup' ? 'bg-accent/40 border-primary' : 'hover:bg-accent/20'"
+                           @click="save('scaleup')">
+                        <input type="radio"
+                               name="company_kind"
+                               value="scaleup"
+                               :checked="kind === 'scaleup'"
+                               class="mt-0.5 h-4 w-4 border-input text-primary focus:ring-ring">
+                        <div class="flex-1">
+                            <span class="block text-sm font-medium text-foreground">Scale-up</span>
+                            <span class="block text-xs text-muted-foreground">Rapid growth and expansion</span>
+                        </div>
+                    </label>
+                    <label class="flex items-start gap-3 rounded-lg border border-border px-4 py-3 transition-colors cursor-pointer"
+                           :class="kind === 'enterprise' ? 'bg-accent/40 border-primary' : 'hover:bg-accent/20'"
+                           @click="save('enterprise')">
+                        <input type="radio"
+                               name="company_kind"
+                               value="enterprise"
+                               :checked="kind === 'enterprise'"
+                               class="mt-0.5 h-4 w-4 border-input text-primary focus:ring-ring">
+                        <div class="flex-1">
+                            <span class="block text-sm font-medium text-foreground">Enterprise</span>
+                            <span class="block text-xs text-muted-foreground">Established organisation at scale</span>
+                        </div>
+                    </label>
+                </div>
+                <p x-show="saving" class="text-xs text-muted-foreground">Saving...</p>
+            </div>
+        </div>
+    </div>
+
     {# Security Information — Last Login #}
     <div class="rounded-lg border border-border bg-card text-card-foreground mt-6">
         <div class="p-6">

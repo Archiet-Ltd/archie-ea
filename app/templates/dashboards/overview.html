@@ -86,6 +86,65 @@
             A few steps to get real signal into your dashboards — health score and
             visualizations appear once your portfolio has data.
         </p>
+        {# T-onb-03: Company kind selector — one click choice between Startup, Scale-up and Enterprise #}
+        <div x-data="{
+            kind: '{{ company_kind or 'startup' }}',
+            saving: false,
+            async save(selectedKind) {
+                if (this.saving) return;
+                this.saving = true;
+                this.kind = selectedKind;
+                try {
+                    const response = await (window.Platform?.fetch || fetch)('/dashboard/api/company-kind', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ kind: selectedKind })
+                    });
+                    if (!response.ok) throw new Error('Failed to save');
+                } catch (err) {
+                    console.error('Failed to save company kind:', err);
+                } finally {
+                    this.saving = false;
+                }
+            }
+        }" class="rounded-lg border border-border bg-muted/30 px-4 py-3" data-testid="company-kind-selector">
+            <h3 class="text-sm font-medium text-foreground mb-2">What kind of company are you?</h3>
+            <div class="flex flex-wrap items-center gap-2">
+                <button type="button"
+                        @click="save('startup')"
+                        :disabled="saving"
+                        :class="kind === 'startup' ? 'bg-primary text-primary-foreground' : 'bg-background text-foreground hover:bg-accent'"
+                        class="h-8 rounded-md px-3 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50"
+                        data-testid="company-kind-startup">
+                    Startup
+                    <span class="ml-1.5 text-2xs opacity-75">— validating product-market fit</span>
+                </button>
+                <button type="button"
+                        @click="save('scaleup')"
+                        :disabled="saving"
+                        :class="kind === 'scaleup' ? 'bg-primary text-primary-foreground' : 'bg-background text-foreground hover:bg-accent'"
+                        class="h-8 rounded-md px-3 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50"
+                        data-testid="company-kind-scaleup">
+                    Scale-up
+                    <span class="ml-1.5 text-2xs opacity-75">— rapid growth and expansion</span>
+                </button>
+                <button type="button"
+                        @click="save('enterprise')"
+                        :disabled="saving"
+                        :class="kind === 'enterprise' ? 'bg-primary text-primary-foreground' : 'bg-background text-foreground hover:bg-accent'"
+                        class="h-8 rounded-md px-3 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50"
+                        data-testid="company-kind-enterprise">
+                    Enterprise
+                    <span class="ml-1.5 text-2xs opacity-75">— established organisation at scale</span>
+                </button>
+                <button type="button"
+                        @click="kind = 'startup'; /* Not now keeps startup as default */"
+                        class="h-8 rounded-md px-3 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        data-testid="company-kind-not-now">
+                    Not now
+                </button>
+            </div>
+        </div>
         <ol class="space-y-3">
             {% for step in guided_steps %}
             <li class="flex items-start gap-3 rounded-lg border border-border p-4">

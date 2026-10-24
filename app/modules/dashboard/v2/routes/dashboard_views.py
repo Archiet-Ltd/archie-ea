@@ -717,6 +717,17 @@ def overview():
     except Exception as _ga_exc:  # noqa: BLE001 — alerts are advisory
         logger.debug("governance alerts unavailable: %s", _ga_exc)
 
+    # T-onb-03: Read company kind from organization settings
+    company_kind = None
+    try:
+        from app.models.organization import Organization
+        org = Organization.query.get(g.current_org_id)
+        if org and org.settings:
+            company_context = org.settings.get("company_context") or {}
+            company_kind = company_context.get("kind")
+    except Exception as _ck_exc:
+        logger.debug("company kind unavailable: %s", _ck_exc)
+
     return render_template(
         "dashboards/overview.html",
         metrics=metrics,
@@ -736,6 +747,7 @@ def overview():
         dashboard_mode=dashboard_mode,
         guided_steps=guided_steps,
         capability_mapping_count=capability_mapping_count,
+        company_kind=company_kind,
     )
 
 
@@ -803,6 +815,55 @@ def api_welcome_dismiss():
             logger.error("welcome-dismiss failed: %s", exc)
             return jsonify({"success": False, "error": str(exc)}), 500
     return jsonify({"success": True})
+
+
+@dashboard_bp_v2.route("/api/company-kind", methods=["POST"])
+@timed_route
+@login_required
+def api_save_company_kind():
+    """T-onb-03: Save the organisation's company kind (Startup, Scale-up, Enterprise).
+
+    Stores in Organization.settings["company_context"]["kind"]. The kind decides
+    which canvas and suggestions the guided steps use. Choosing nothing leaves
+    'startup' as the default.
+    """
+    from app.models.organization import Organization
+
+    data = request.get_json(silent=True) or {}
+    kind = data.get("kind")
+
+    # Valid kinds: startup, scaleup, enterprise, or null/"" for "Not now"
+    if kind and kind not in ("startup", "scaleup", "enterprise"):
+        return jsonify({"success": False, "error": "Invalid company kind"}), 400
+
+    try:
+        org = Organization.query.get(g.current_org_id)
+        if not org:
+            return jsonify({"success": False, "error": "Organization not found"}), 404
+
+        # Initialize settings if needed
+        if org.settings is None:
+            org.settings = {}
+
+        # Initialize company_context if needed
+        if "company_context" not in org.settings:
+            org.settings["company_context"] = {}
+
+        # Save the kind (or None for "Not now")
+        org.settings["company_context"]["kind"] = kind if kind else "startup"
+
+        # Mark as modified so SQLAlchemy knows to update the JSON column
+        from sqlalchemy.orm.attributes import flag_modified
+        flag_modified(org, "settings")
+
+        db.session.commit()
+        logger.info("T-onb-03: company kind set to %s for org %s", kind or "startup", g.current_org_id)
+    except Exception as exc:
+        db.session.rollback()
+        logger.error("T-onb-03: save company kind failed: %s", exc)
+        return jsonify({"success": False, "error": str(exc)}), 500
+
+    return jsonify({"success": True, "kind": org.settings["company_context"]["kind"]})
 
 
 @dashboard_bp_v2.route("/api/overview/table")
