@@ -10,7 +10,7 @@
 
 {% block content %}
 <div class="flex flex-1 flex-col">
-    <div class="@container/main flex flex-1 flex-col gap-2">
+    <div class="flex flex-1 flex-col gap-2">
         <div class="flex flex-col gap-4 py-4 md:gap-6 md:py-6">
             <div class="px-4 lg:px-6">
                 {% macro _ps_actions() %}
@@ -149,7 +149,8 @@
                             name='oef_file',
                             label='OEF XML file',
                             accept='.xml,application/xml,text/xml',
-                            description='ArchiMate OEF XML files (.xml), up to 10 MB',
+                            accept_label='ArchiMate exchange file (.xml)',
+                            description='Up to 10 MB',
                             max_size='10MB',
                             max_files=1,
                             show_preview=true

@@ -1,6 +1,5 @@
 {# design-block: data-table #}
 {% extends 'layouts/admin_base.html' %}
-{% from 'components/disabled_action.html' import disabled_action %}
 {% from 'macros/page_shell.html' import page_shell %}
 {% from 'components/button.html' import button %}
 {% from 'components/badge.html' import badge %}
@@ -8,12 +7,13 @@
 {% from 'components/input.html' import input, textarea %}
 {% from 'components/dense_table.html' import dense_table %}
 {% from 'components/select.html' import native_select %}
+{% from 'components/dropdown_menu.html' import dropdown_menu %}
 
 {% block title %}{{ selected_layer.title }}{% endblock %}
 
 {% block content %}
 <div class="flex flex-1 flex-col" x-data="archDashboard()">
-    <div class="@container/main flex flex-1 flex-col gap-2">
+        <div class="flex flex-1 flex-col gap-2">
         <div class="flex flex-col gap-4 py-4 md:gap-6 md:py-6">
             <div class="px-4 lg:px-6">
                 <section class="border-l-4 pl-4 border-{{ selected_layer.color_token[2:] }}" data-testid="architecture-page-header">
@@ -22,18 +22,28 @@
                     <span x-text="layerTotalKnown ? layerTotal + ' repository ' + (layerTotal === 1 ? 'item' : 'items') : 'repository total unavailable'">repository total unavailable</span></span>{% endmacro %}
                 {% macro _ps_actions() %}
                     {{ button(text='Create element', variant='default', icon='plus', attrs_dict={'@click': 'openCreateModal()'}, testid='btn-create-element', aria_label='Create element') }}
-                    <div class="hidden h-6 border-l border-input sm:block" aria-hidden="true"></div>
+                    {% set _more_items = [] %}
                     {% if can_change_model() %}
-                    {{ button(text='Import model file', variant='outline', icon='upload', href=url_for('architect_ui.import_oef'), testid='btn-import-oef', aria_label='Import model file') }}
+                        {% set _more_items = _more_items + [{'text': 'Import model file', 'icon': 'upload', 'href': url_for('architect_ui.import_oef'), 'testid': 'dropdown-import-oef'}] %}
                     {% else %}
-                    {{ disabled_action('Import model file', 'Only an architect can import model files. Ask an administrator in Team settings.', 'import-oef-reason', icon='upload') }}
+                        {% set _more_items = _more_items + [{'text': 'Import model file', 'icon': 'upload', 'disabled': True, 'aria_label': 'Import model file (only an architect can import model files)'}] %}
                     {% endif %}
-                    {{ button(text='Export', variant='outline', icon='download', href=url_for('architect_ui.export_oef'), testid='btn-export-oef', aria_label='Export architecture as Open Exchange Format') }}
-                    <div class="hidden h-6 border-l border-input sm:block" aria-hidden="true"></div>
-                    {{ button(text='Validate', variant='outline', icon='shield-check', attrs_dict={'@click': 'runValidation()', ':disabled': 'validating'}, testid='btn-run-validation', aria_label='Validate ArchiMate repository') }}
-                    {{ button(text='Health', variant='outline', icon='activity', href=url_for('archimate_crud.repository_health'), testid='btn-repository-health', aria_label='Open repository health') }}
-                    {{ button(text='Templates', variant='outline', icon='building-2', href=url_for('architecture.vendor_templates'), testid='btn-vendor-templates', aria_label='Open vendor architecture templates') }}
-                    {{ button(text='Generate with AI', variant='outline', icon='sparkles', attrs_dict={'@click': 'openAiGenerateModal()'}, testid='btn-ai-generate-element', aria_label='Generate architecture element with AI') }}
+                    {% set _more_items = _more_items + [
+                        {'text': 'Export', 'icon': 'download', 'href': url_for('architect_ui.export_oef'), 'testid': 'dropdown-export-oef'},
+                        {'text': 'Validate', 'icon': 'shield-check', 'onclick': 'runValidation()', 'testid': 'dropdown-run-validation'},
+                        {'text': 'Health', 'icon': 'activity', 'href': url_for('archimate_crud.repository_health'), 'testid': 'dropdown-repository-health'},
+                        {'text': 'Templates', 'icon': 'building-2', 'href': url_for('architecture.vendor_templates'), 'testid': 'dropdown-vendor-templates'},
+                        {'text': 'Generate with AI', 'icon': 'sparkles', 'onclick': 'openAiGenerateModal()', 'testid': 'dropdown-ai-generate-element'},
+                    ] %}
+                    {{ dropdown_menu(
+                        trigger_text='More',
+                        trigger_icon='more-horizontal',
+                        trigger_variant='outline',
+                        trigger_size='default',
+                        items=_more_items,
+                        position='right',
+                        trigger_aria_label='More actions'
+                    ) }}
                 {% endmacro %}
                 {{ page_shell(
                     title=selected_layer.title,
