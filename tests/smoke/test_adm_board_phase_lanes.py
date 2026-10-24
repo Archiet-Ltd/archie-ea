@@ -216,12 +216,15 @@ def test_every_card_link_lands_on_the_solution(browser, live_server, seeded_boar
         assert "/solutions/" in page.url
         expect(page.get_by_text(SOLUTIONS[1][0]).first).to_be_visible(timeout=PAGE_TIMEOUT)
 
-        # One the architect cannot open carries no link to a refusal; it says why.
+        # A solution someone else owns opens too: the permission matrix lets an
+        # architect read every solution of their own organisation.
         page.goto(live_server + BOARD, timeout=PAGE_TIMEOUT)
         page.wait_for_load_state("networkidle")
         other = _lane(page, "B").locator('[data-testid="adm-card"]').filter(has_text=SOLUTIONS[0][0])
-        expect(other.get_by_role("link", name=re.compile("Open"))).to_have_count(0)
-        expect(other).to_contain_text("Open to its owner and stakeholders")
+        other.get_by_role("link", name=re.compile("Open")).click()
+        page.wait_for_load_state("networkidle")
+        assert "/solutions/" in page.url
+        expect(page.get_by_text(SOLUTIONS[0][0]).first).to_be_visible(timeout=PAGE_TIMEOUT)
     finally:
         context.close()
 
