@@ -1102,7 +1102,7 @@ def gate_raw_html_escaping(baseline: int) -> Result:
                   detail, count, baseline)
 
 
-def gate_design_map(outside_baseline: int, unmarked_baseline: int) -> Result:
+def gate_design_map(outside_baseline: int, unmarked_baseline: int, components_baseline: int = 0) -> Result:
     """Every page template is in docs/design-map.json and follows its block.
 
     406 page templates were each styled for the task that built them, so the
@@ -1112,8 +1112,11 @@ def gate_design_map(outside_baseline: int, unmarked_baseline: int) -> Result:
     block may use. Fails on a page missing from the map, a marker disagreeing
     with the map, a spec that does not exist, or a template this branch
     changes that is not in the map, carries no block marker, or uses a macro
-    its block does not allow. The pages already outside their block and the
-    pages with no marker yet are ratcheted, so both counts only fall.
+    its block does not allow. Every row also names the persona the page serves
+    and the components it may compose; a page whose macros stand for a
+    component outside its row is a finding. The pages already outside their
+    block, the pages with no marker yet and the pages outside their row's
+    components are ratcheted, so the counts only fall.
     """
     name = "design-map"
     proc = _run([sys.executable, "scripts/check_design_map.py", "--json", "--changed"])
@@ -1127,9 +1130,14 @@ def gate_design_map(outside_baseline: int, unmarked_baseline: int) -> Result:
         problems.append(f"{outside} pages use a macro their block does not allow (baseline {outside_baseline})")
     if unmarked > unmarked_baseline:
         problems.append(f"{unmarked} pages carry no design-block marker (baseline {unmarked_baseline})")
+    components = data["outside_components_count"]
+    if components > components_baseline:
+        problems.append(f"{components} pages use a component outside their row's component list "
+                        f"(baseline {components_baseline})")
     detail = "; ".join(problems)[:1800] + ("; run python scripts/check_design_map.py" if problems else "")
     return Result(name, FAIL if problems else PASS, detail, outside, outside_baseline,
-                  extra={"design_map_outside_block": outside, "design_map_unmarked": unmarked})
+                  extra={"design_map_outside_block": outside, "design_map_unmarked": unmarked,
+                         "design_map_outside_components": components})
 
 
 def gate_smoke_coverage_on_change() -> Result:
@@ -2204,7 +2212,8 @@ def build_gates(baseline: dict) -> list[Gate]:
         Gate("design-map", "every page template follows the designed block docs/design-map.json gives it",
              "ratchet",
              lambda: gate_design_map(baseline.get("design_map_outside_block", 0),
-                                     baseline.get("design_map_unmarked", 0)),
+                                     baseline.get("design_map_unmarked", 0),
+                                     baseline.get("design_map_outside_components", 0)),
              remediation="run python scripts/check_design_map.py; use only the macros the page's block "
                          "allows, add {# design-block: <block> #} to a changed page, and run --write "
                          "for a new page",
