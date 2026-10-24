@@ -44,7 +44,7 @@
 {% endblock %}
 
 {% block content %}
-<div x-data="implementationPlanningDashboard()" class="@container/main flex flex-1 flex-col gap-2">
+<div x-data="implementationPlanningDashboard()" class="flex flex-1 flex-col gap-2">
   <div class="flex flex-col gap-4 py-4 md:gap-6 md:py-6">
     <div class="px-4 lg:px-6">
       {{ page_header(
@@ -73,11 +73,10 @@
       {% call card() %}
         {% call card_header() %}
           {% call card_title() %}Gap register{% endcall %}
-          {{ button(text='Run gap discovery', on_click='runGapDiscovery()', aria_label='Run gap discovery', variant='default', size='sm', attrs_dict={':disabled': 'discoveringGaps'}) }}
         {% endcall %}
         {% call card_content() %}
           <div x-show="criticalGaps.length === 0" x-cloak>
-            {{ empty_state(icon='search-check', title='No critical gaps', description='No critical gaps recorded yet.') }}
+            {{ empty_state(icon='search-check', title='No critical gaps', description='No critical gaps recorded yet.', cta_text='Run gap discovery', cta_onclick='runGapDiscovery()') }}
           </div>
           <ul x-show="criticalGaps.length > 0" x-cloak class="divide-y divide-border" data-testid="critical-gaps-list">
             <template x-for="gap in criticalGaps" :key="gap.id">
@@ -95,7 +94,8 @@
           data_endpoint=url_for('implementation_planning.api_roadmap_data'),
           title='Implementation Roadmap',
           subtitle='Work Packages & Plateaus Timeline',
-          container_id='impl-archimate-gantt'
+          container_id='impl-archimate-gantt',
+          show_export=false
         ) }}
       </div>
     </div>
