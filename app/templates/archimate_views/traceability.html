@@ -6,7 +6,7 @@
 {% from 'components/badge.html' import badge %}
 {% from 'components/input.html' import input %}
 {% from 'components/progress.html' import progress %}
-{% from 'components/alert.html' import alert %}
+{% from 'components/alert.html' import alert as notice %}
 {% from 'components/empty_state.html' import empty_state %}
 {% from 'components/tabs.html' import tabs, tabs_list, tabs_trigger, tabs_content %}
 {% import 'components/card.html' as card %}
@@ -204,7 +204,7 @@
                 {% endfor %}
             </div>
             {% else %}
-            {{ alert(kind='success', text='All elements are connected across the current traceability chain.') }}
+            {{ notice(kind='success', text='All elements are connected across the current traceability chain.') }}
             {% endif %}
         </div>
     {% endcall %}
@@ -285,7 +285,7 @@
         {% endfor %}
         {% if ns.aligned == 0 %}
         <div class="m-4">
-            {% call alert(kind='warning', title='No cross-layer relationships modelled yet', link_href=url_for('archimate.composer_page'), link_text='Open ArchiMate Composer', class='items-start') %}
+            {% call notice(kind='warning', title='No cross-layer relationships modelled yet', link_href=url_for('archimate.composer_page'), link_text='Open ArchiMate Composer', class='items-start') %}
                 All {{ matrix | length }} application components show no alignment because no ArchiMate relationships connect
                 them to Strategy, Business, or Technology layers. Use the ArchiMate Composer to define cross-layer relationships.
             {% endcall %}
