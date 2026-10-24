@@ -1758,6 +1758,7 @@ _BLUEPRINTS = {
             ("Calibration Automation Phase 1", "Calibration records must be immutable", "realization"),
         ],
         "spec": _FCP_SPEC,
+        "capabilities": ["Sensor Calibration", "Field Service Management", "Order Fulfilment"],
     },
     "Supplier Collaboration Hub": {
         "narratives": {
@@ -1790,6 +1791,7 @@ _BLUEPRINTS = {
             "gap_analysis": ["Supplier performance gap", "Baseline Architecture", "Target Architecture"],
             "work_packages": ["Supplier Consolidation Programme", "Consolidated Supplier Panel"],
         },
+        "capabilities": ["Supplier Management", "Regulatory Compliance"],
         "relationships": [
             ("Supply chain volatility", "Reduce supplier lead time by 20%", "influence"),
             ("Procurement Officer", "Onboard new supplier", "assignment"),
@@ -1832,6 +1834,7 @@ _BLUEPRINTS = {
             "security_viewpoint": ["No single point of failure in event path", "Failures must be visible within five minutes"],
             "nfr_satisfaction": ["Recovery time objective of four hours"],
         },
+        "capabilities": ["Event Processing"],
         "relationships": [
             ("Event Relay", "Event Delivery", "realization"),
             ("Event Transport", "Event Relay", "serving"),
@@ -1931,7 +1934,9 @@ def _seed_solution_blueprints(org_id, solutions) -> dict:
     from app.models import ArchiMateRelationship
     from app.models.archimate_core import ArchitectureModel
     from app.services.archimate_backbone import create_backbone_element
+    from app.models.business_capabilities import BusinessCapability
     from app.models.solution_models import SolutionArchiMateElement as SolutionElementLink
+    from app.models.solution_models import SolutionCapabilityMapping
     from app.modules.solutions_strategic.v2.services.blueprint_completeness_service import (
         BlueprintCompletenessService,
     )
@@ -1942,6 +1947,12 @@ def _seed_solution_blueprints(org_id, solutions) -> dict:
         "blueprint_links_created": 0,
         "blueprint_relationships_created": 0,
         "blueprint_narratives_written": 0,
+        "blueprint_capabilities_mapped": 0,
+    }
+    business_caps = {
+        c.name: c
+        for c in db.session.query(BusinessCapability)
+        .filter(BusinessCapability.organization_id == org_id)
     }
     elements = _resolve_elements(org_id)
     for name, etype, layer, desc in _BLUEPRINT_NEW_ELEMENTS:
@@ -2027,6 +2038,23 @@ def _seed_solution_blueprints(org_id, solutions) -> dict:
             ))
             existing.add((src.id, tgt.id))
             stats["blueprint_relationships_created"] += 1
+        db.session.flush()
+
+        sol.business_sponsor = sol.business_sponsor or "Chief Operations Officer"
+        sol.technical_lead = sol.technical_lead or "Head of Engineering"
+        mapped = {
+            m.capability_id
+            for m in db.session.query(SolutionCapabilityMapping)
+            .filter(SolutionCapabilityMapping.solution_id == sol.id)
+        }
+        for cap_name in plan["capabilities"]:
+            cap = business_caps.get(cap_name)
+            if cap is not None and cap.id not in mapped:
+                db.session.add(SolutionCapabilityMapping(
+                    solution_id=sol.id, capability_id=cap.id, support_level="full",
+                    notes="Capability this solution serves, from the demonstration estate.",
+                ))
+                stats["blueprint_capabilities_mapped"] += 1
         db.session.flush()
 
         # Score the blueprint, then let the facts decide the governance

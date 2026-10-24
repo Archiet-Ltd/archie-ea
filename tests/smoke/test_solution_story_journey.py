@@ -130,7 +130,7 @@ def test_the_architect_opens_the_solution_and_reads_its_story(browser, live_serv
             # Compliance is the same figure, and governance follows from every section being ready.
             compliance = re.search(r"Compliance\s+(\d+)%", body, re.I)
             assert compliance and int(compliance.group(1)) == mean
-            assert "Proposed to the ARB" in body
+            assert re.search(r"Governance status\s+Proposed", body, re.I), body[:400]
         else:
             # Below the desktop width the rail is folded away: the section strip carries the figures.
             chips = page.locator("div.sticky button[title*='%']")
@@ -219,7 +219,7 @@ def test_the_heat_map_is_the_right_way_up_and_plots_every_risk(browser, live_ser
 
 
 @pytest.mark.parametrize("width", [1440, 390])
-def test_the_heat_map_screens(browser, live_server, demo_org, width):
+def test_the_heat_map_reads_in_both_themes_and_the_overview_is_captured(browser, live_server, demo_org, width):
     facts = _facts(demo_org, SOLUTION)
     for dark in (False, True):
         context, page, errors = _open(browser, live_server, demo_org, width, dark=dark)
@@ -238,6 +238,12 @@ def test_the_heat_map_screens(browser, live_server, demo_org, width):
             }
             assert len(colours) == 4, colours
             _shot(page, "heat-map", width, "dark" if dark else "light")
+            page.goto("%s/solutions/%d" % (live_server, facts["solution_id"]),
+                      wait_until="networkidle", timeout=PAGE_TIMEOUT)
+            if dark:
+                page.evaluate("document.documentElement.classList.add('dark')")
+            assert "Field Calibration Platform" in page.inner_text("body")
+            _shot(page, "solution-overview", width, "dark" if dark else "light")
             assert not errors, errors
         finally:
             context.close()

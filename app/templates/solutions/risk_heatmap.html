@@ -67,7 +67,7 @@
         {% call card.card_content() %}
         <div class="overflow-x-auto">
             <div class="flex gap-2 min-w-[22rem]">
-                <div class="grid gap-1 shrink-0 w-16 text-right text-xs font-medium leading-tight text-muted-foreground" aria-hidden="true">
+                <div class="grid content-start gap-1 shrink-0 w-16 text-right text-xs font-medium leading-tight text-muted-foreground" aria-hidden="true">
                     {% for n, name in levels|reverse %}<span class="h-16 flex items-center justify-end">{{ n }} {{ name }}</span>{% endfor %}
                 </div>
                 <div class="flex-1">
