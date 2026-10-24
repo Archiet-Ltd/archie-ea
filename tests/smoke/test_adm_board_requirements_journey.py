@@ -233,6 +233,30 @@ def test_the_cycle_in_the_header_counts_each_phase_and_filters_the_board(browser
         context.close()
 
 
+@pytest.mark.parametrize("width", [1440, 390])
+def test_the_cycle_labels_are_readable_and_a_focused_phase_is_named(browser, live_server, demo_architect, width):
+    _assert_signed_in_as_enterprise_architect(demo_architect)
+    context, page = _open(browser, live_server, demo_architect, width)
+    try:
+        ring = page.get_by_test_id("adm-cycle")
+        expect(ring).to_be_visible(timeout=PAGE_TIMEOUT)
+        sizes = ring.locator("svg text").evaluate_all(
+            "els => els.map(e => [e.textContent.trim(), parseFloat(getComputedStyle(e).fontSize)"
+            " * e.ownerSVGElement.getScreenCTM().a])")
+        assert len(sizes) == 9 * 2 + 2, sizes
+        small = [pair for pair in sizes if pair[1] < 12]
+        assert not small, "cycle labels under 12 px: %r" % small
+        assert ring.locator("svg").bounding_box()["width"] >= 239
+        expect(ring.get_by_test_id("adm-cycle-requirements")).to_contain_text("Requirements")
+        ring.get_by_test_id("adm-cycle-phase-D").focus()
+        expect(ring.get_by_test_id("adm-cycle-tip")).to_have_text("D: Technology Architecture")
+        page.get_by_test_id("adm-cycle-phase-B").hover()
+        expect(ring.get_by_test_id("adm-cycle-tip")).to_have_text("B: Business Architecture")
+        _shot(page, "cycle-large", width)
+    finally:
+        context.close()
+
+
 def test_at_390_the_requirements_open_in_a_sheet(browser, live_server, demo_architect):
     _assert_signed_in_as_enterprise_architect(demo_architect)
     context, page = _open(browser, live_server, demo_architect, 390)
