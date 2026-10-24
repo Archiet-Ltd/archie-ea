@@ -28,7 +28,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 TOKENS = ROOT / "app/static/css/shadcn_tokens.css"
 
-RAW_BLUES = re.compile(r"#(?:2563eb|135fbc)\b", re.I)
+RAW_BLUES = re.compile(r"#(?:2563eb|135fbc)\b|rgba?\(\s*(?:37,\s*99,\s*235|29,\s*78,\s*216)\b", re.I)
 # The token file and the logo are the only places a brand blue may be written out.
 RAW_EXEMPT = (
     "app/static/css/shadcn_tokens.css",

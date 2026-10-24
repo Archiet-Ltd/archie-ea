@@ -29,6 +29,46 @@
     const fetch = ArchieChat.transport.apiFetch;
 
     const messagesContainer = document.getElementById('messages-container');
+
+    /* "Work them out now" on an answer that has no indirect connections yet: work them
+       out, then ask the same question again and draw the answer in place of the old one
+       (without saving a second turn to the conversation). */
+    if (messagesContainer) {
+        messagesContainer.addEventListener('click', async (event) => {
+            const button = event.target.closest('[data-recompute-button]');
+            if (!button) return;
+            const holder = button.closest('[data-answer-cards]');
+            const notice = button.parentElement;
+            const say = (text) => {
+                let line = notice.querySelector('[data-recompute-line]');
+                if (!line) {
+                    line = document.createElement('p');
+                    line.setAttribute('data-recompute-line', '');
+                    line.setAttribute('role', 'status');
+                    line.className = 'mt-2 text-sm text-muted-foreground';
+                    notice.appendChild(line);
+                }
+                line.textContent = text;
+            };
+            button.disabled = true;
+            say('Working them out…');
+            try {
+                await ArchieChat.transport.recomputeConnections();
+                const again = await ArchieChat.transport.askEstate(holder.getAttribute('data-question') || '', { remember: false });
+                if (again.found && window.DOMPurify) {
+                    const fresh = document.createElement('div');
+                    fresh.innerHTML = DOMPurify.sanitize(again.html);
+                    holder.replaceWith(fresh.firstElementChild);
+                    if (window.lucide) lucide.createIcons();
+                }
+            } catch (err) {
+                button.disabled = false;
+                say(err && err.status === 409
+                    ? 'They are already being worked out. Try again in a moment.'
+                    : 'We could not work them out just now.');
+            }
+        });
+    }
     const chatForm = document.getElementById('chat-form');
     const userInput = document.getElementById('user-input');
     const domainSelector = document.getElementById('domain-selector');
@@ -254,9 +294,8 @@
         const iconElement = document.getElementById('domain-icon');
         iconElement.innerHTML = `<i data-lucide="${config.icon}" class="h-5 w-5"></i>`;
 
-        // Update colors using safe class mapping
-        const bgClass = getColorClass(config.color || 'primary', 'bg');
-        iconElement.className = `flex h-9 w-9 items-center justify-center rounded-lg ${bgClass} text-primary-foreground transition-all duration-300`; // token-migration-ok
+        // The icon is read by assistive technology only; showing it put a coloured tile on its own row above the toolbar.
+        iconElement.className = 'sr-only';
 
         // Re-initialize lucide icons
         lucide.createIcons();
@@ -376,6 +415,14 @@
         try {
             const estate = await ArchieChat.transport.askEstate(message);
             if (estate.found) {
+                // The answer is kept in the conversation like any other: remember the
+                // thread it went to and refresh the history rail.
+                if (estate.thread_id) {
+                    const _wasNew = estate.thread_id !== window.__threadId;
+                    window.__threadId = estate.thread_id;
+                    try { sessionStorage.setItem('archie_chat_thread_id', estate.thread_id); } catch (e) { /* swallow-ok: private-browsing storage denial; the server-saved thread and current page still work, only reload restoration is unavailable */ }
+                    if (_wasNew && window.loadSessionList) window.loadSessionList();
+                }
                 { const _l = document.getElementById(loadingId); if (_l) _l.remove(); }
                 appendAnswerCards(estate.html);
                 return;

@@ -90,14 +90,17 @@ def test_try_sample_company_loads_and_removes_cleanly(browser, live_server, seed
         # Dashboard shows guided mode with "Try the sample company"
         page.goto(live_server + "/dashboard/overview", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
         expect(page.locator('[data-testid="guided-setup"]')).to_be_visible(timeout=PAGE_TIMEOUT)
-        expect(page.get_by_text("Try the sample company")).to_be_visible(timeout=PAGE_TIMEOUT)
+        expect(page.get_by_test_id("first-action-sample")).to_be_visible(timeout=PAGE_TIMEOUT)
+        # One sample control on the whole screen, inside the first card
+        assert page.get_by_text("Load sample").count() == 0
+        assert page.locator('[data-testid="first-fold"] [data-testid="first-action-sample"]').count() == 1
 
         # Control: seeded org has its elements unchanged
         seeded_count_before = _count_elements(live_server, page, seeded_org_id)
         assert seeded_count_before > 0, "Seeded org should have elements"
 
         # Click "Load sample"
-        sample_link = page.get_by_role("button", name="Load sample").first
+        sample_link = page.get_by_test_id("first-action-sample")
         sample_link.click()
         # the click posts and the first screen reloads with the sample bar (the start page matches the same address)
         expect(page.locator('[data-testid="sample-company-indicator"]')).to_be_visible(timeout=PAGE_TIMEOUT * 2)
@@ -137,7 +140,9 @@ def test_try_sample_company_loads_and_removes_cleanly(browser, live_server, seed
 
         # Ask no longer shows the sample answer
         page.goto(live_server + "/ai-chat", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
-        expect(page.get_by_text("Payments service", exact=False)).not_to_be_visible()
+        # (the chat's example question names a service as a suggestion; it is not sample data)
+        expect(page.get_by_test_id("estate-answer")).to_have_count(0)
+        expect(page.locator("#chat-messages, [data-testid='chat-messages']").get_by_text("Payments service", exact=False)).to_have_count(0)
 
         # Control: seeded org elements unchanged
         seeded_count_after = _count_elements(live_server, page, seeded_org_id)
@@ -168,7 +173,7 @@ def test_load_sample_twice_is_idempotent(browser, live_server, seeded):
         page.goto(live_server + "/dashboard/overview", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
 
         # First load
-        sample_link = page.get_by_role("button", name="Load sample").first
+        sample_link = page.get_by_test_id("first-action-sample")
         sample_link.click()
         # the click posts and the first screen reloads with the sample bar (the start page matches the same address)
         expect(page.locator('[data-testid="sample-company-indicator"]')).to_be_visible(timeout=PAGE_TIMEOUT * 2)
@@ -235,12 +240,10 @@ def test_viewer_sees_explanation_not_button(browser, live_server, seeded):
         page.goto(live_server + "/dashboard/overview", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
         expect(page.locator('[data-testid="guided-setup"]')).to_be_visible(timeout=PAGE_TIMEOUT)
 
-        # Sees the step title
-        expect(page.get_by_text("Try the sample company")).to_be_visible(timeout=PAGE_TIMEOUT)
-
-        # Sees explanation, not "Load sample"
-        expect(page.get_by_text("An architect or administrator can load the sample")).to_be_visible(timeout=PAGE_TIMEOUT)
-        expect(page.get_by_role("button", name="Load sample")).not_to_be_visible()
+        # A person who cannot load it is offered no sample control at all, and no dead step
+        expect(page.get_by_test_id("first-action-sample")).to_have_count(0)
+        expect(page.get_by_text("Load sample")).to_have_count(0)
+        expect(page.get_by_text("Try the sample company")).to_have_count(0)
 
     finally:
         context.close()

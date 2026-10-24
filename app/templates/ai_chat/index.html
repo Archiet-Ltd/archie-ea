@@ -48,7 +48,7 @@
     {% endif %}
 </div>
 {% endif %}
-    <header class="shrink-0 border-b border-border bg-background px-4 py-3 lg:px-6">
+    <header class="relative shrink-0 border-b border-border bg-background px-4 py-3 lg:px-6">
         {# JS (updateDomainUI / updatePersonaUI) writes the active assistant and scope into these,
            and a screen-reader user still hears which one is active. #}
         <div id="domain-icon" class="sr-only" aria-hidden="true"><i data-lucide="bot" class="h-5 w-5" aria-hidden="true"></i></div>
@@ -68,7 +68,11 @@
                     'analysts': 'Specialist roles',
                     'executives': 'Executive roles'
                 } %}
-                {% call native_select(id='persona-selector', aria_label='Assistant', size='sm', class='w-40 max-w-full font-medium sm:w-56') %}
+                {# On a phone the two selects live in the sheet the Settings button opens, so the
+                   toolbar is one line and the answer has the screen. #}
+                <div data-testid="chat-scope-controls" :class="showAdvanced ? 'flex' : 'hidden sm:flex'"
+                     class="flex-col gap-2 rounded-lg border border-border bg-card p-3 max-sm:absolute max-sm:inset-x-4 max-sm:top-full max-sm:z-50 max-sm:mt-2 sm:flex-row sm:items-center sm:rounded-none sm:border-0 sm:bg-transparent sm:p-0">
+                {% call native_select(id='persona-selector', aria_label='Assistant', size='sm', class='w-full font-medium sm:w-56') %}
                     {% for category, persona_keys in persona_config.categories.items() %}
                     <optgroup label="{{ persona_category_labels.get(category, category | replace('_', ' ') | title) }}">
                         {% for persona_key in persona_keys %}
@@ -80,7 +84,7 @@
                     </optgroup>
                     {% endfor %}
                 {% endcall %}
-                {{ native_select(id='domain-selector', aria_label='Looking at', size='sm', class='w-36 max-w-full sm:w-44', options=[
+                {{ native_select(id='domain-selector', aria_label='Looking at', size='sm', class='w-full sm:w-44', options=[
                     ('general', 'Whole portfolio'),
                     ('architecture', 'Architecture'),
                     ('data_architecture', 'Data architecture'),
@@ -91,6 +95,7 @@
                     ('compliance', 'Architecture principles'),
                     ('smart_search', 'Everything (search)')
                 ]) }}
+                </div>
             </div>
 
             <div class="flex shrink-0 items-center gap-2">
@@ -102,7 +107,7 @@
                 <div class="relative">
                     {{ button(text='Settings', variant='outline', icon='sliders-horizontal', aria_label='Toggle advanced settings', attrs_dict={'@click': 'showAdvanced = !showAdvanced', ':aria-expanded': 'showAdvanced.toString()', 'aria-haspopup': 'true', 'title': 'Role, model settings'}) }}
                     <div x-show="showAdvanced" x-cloak @click.outside="showAdvanced = false" @keydown.escape.window="showAdvanced = false"
-                         class="absolute right-0 z-50 mt-2 w-64">
+                         class="absolute right-0 z-50 mt-2 w-64 max-sm:fixed max-sm:inset-x-4 max-sm:bottom-4 max-sm:right-auto max-sm:mt-0 max-sm:w-auto">
                         {% call card(class='p-3') %}
                             <div id="model-selector-wrap" class="hidden space-y-1.5">
                                 <label for="model-selector" class="block text-xs font-medium text-muted-foreground">AI model</label>
