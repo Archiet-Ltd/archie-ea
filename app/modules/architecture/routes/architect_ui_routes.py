@@ -451,11 +451,11 @@ def load_sample_company():
 
     Imports app/data/sample_company/sample-company.oef.xml into the active
     organisation. Idempotent: a second press says it is already loaded and
-    redirects to the payments service answer. Only an Architect or
+    redirects to the first screen. Only an Architect or
     Administrator can load it; a Viewer sees an explanation instead.
 
-    After import, redirects to the answer for the payments service (showing
-    what breaks if it fails). Returns JSON {"already_loaded": true} or
+    After import, redirects to the first screen, which now shows the sample
+    company's figures. Returns JSON {"already_loaded": true} or
     {"success": true, "redirect": "..."} depending on state.
     """
     import os
@@ -472,7 +472,7 @@ def load_sample_company():
 
     if sample_marker:
         # Sample already loaded, redirect to the answer
-        answer_url = url_for("intelligence_ui.ask", q="What breaks if the payments service fails?")
+        answer_url = url_for("dashboard.overview")
 
         if wants_json:
             return jsonify({"already_loaded": True, "redirect": answer_url}), 200
@@ -516,16 +516,9 @@ def load_sample_company():
         flash(error, "error")
         return redirect(url_for("dashboard.overview"))
 
-    # Find the payments service element that was just imported
-    payments_element = ArchiMateElement.query.filter(
-        ArchiMateElement.name == "Payments service",
-        ArchiMateElement.type == "ApplicationComponent"
-    ).first()
-
-    if payments_element:
-        answer_url = url_for("intelligence_ui.ask", q="What breaks if the payments service fails?")
-    else:
-        answer_url = url_for("intelligence_ui.ask")
+    # The first screen now shows the loaded sample: its counts, applications and the
+    # "You are looking at the sample company" bar with the way to remove it.
+    answer_url = url_for("dashboard.overview")
 
     if wants_json:
         return jsonify({

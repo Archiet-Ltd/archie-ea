@@ -34,11 +34,63 @@ from app.models.adm_kanban import KanbanCard
 from app.models.application_portfolio import ApplicationComponent
 from app.models.audit_log import AuditLog
 from app.models.project_models import Project
-from app.models.solution_architect_models import SolutionRequirement
+from app.models.solution_architect_models import RequirementType, SolutionRequirement
 from app.models.system_architecture import SystemBoundary
 from app.models.vendor.vendor_organization import EnterpriseInitiative
 from app.utils.pagination import safe_int_arg
 from app.utils.route_guards import require_entity
+
+
+def _may_change_requirements(action):
+    """Whether the signed-in person may ``action`` ("edit" or "delete") a requirement.
+
+    The same permission matrix the rest of the product reads
+    (``app.core.auth.permissions.can``): the motivation-element row that covers
+    requirements, or the persona an administrator assigned (enterprise,
+    business and solution architects edit the model and its solutions). The
+    old ``require_roles("admin", "architect")`` read only the platform role, so
+    an enterprise architect whose platform role carried no write permission
+    could open the backlog and was refused on every save.
+    """
+    from app.core.auth.permissions import can
+
+    if can(current_user, action, "motivation_element"):
+        return True
+    return can(current_user, "edit", "archimate") or can(current_user, "edit", "solution")
+
+
+def _may_override_solution_owner():
+    """Organisation administrators and the personas that see every solution
+    (enterprise architect, CTO) may change a requirement of a solution they
+    did not create; its other editors only their own."""
+    from app.core.auth.permissions import can
+
+    return bool(is_active_org_admin()) or can(current_user, "view_all", "solution")
+
+
+def require_requirement_editor(action="edit"):
+    """Guard a requirement write route with the permission matrix.
+
+    Anonymous callers get 401; a signed-in person the matrix refuses gets a 403
+    whose body is a sentence the page shows as it is.
+    """
+    from functools import wraps
+
+    def decorator(f):
+        @wraps(f)
+        def wrapper(*args, **kwargs):
+            if not current_user.is_authenticated:
+                return jsonify({"success": False, "error": "Sign in to change requirements."}), 401
+            if not _may_change_requirements(action):
+                verb = "delete" if action == "delete" else "change"
+                return jsonify({
+                    "success": False,
+                    "error": "Your role can read requirements but not %s them. "
+                             "Ask an architect or an administrator." % verb,
+                }), 403
+            return f(*args, **kwargs)
+        return wrapper
+    return decorator
 
 # Module-level logger. Nine call sites in this file referenced `logger` — all inside
 # `except` blocks — but it was never bound at module scope: the only
@@ -402,12 +454,26 @@ def get_projects():
 
 @enterprise_api_bp.route("/requirements", methods=["POST"])
 @login_required
+@require_requirement_editor("edit")
 def create_requirement():
     """Manually create a new requirement."""
     data = request.get_json() or {}
-    name = (data.get('requirement_name') or '').strip()
+    name = (data.get('name') or '').strip()
     if not name:
-        return jsonify({"error": "requirement_name is required"}), 400
+        return jsonify({"error": "Give the requirement a name."}), 400
+    if len(name) > 200:
+        return jsonify({"error": "The requirement name must be 200 characters or fewer."}), 400
+    type_value = (data.get('requirement_type') or 'functional').strip().lower()
+    try:
+        req_kind = RequirementType(type_value)
+    except ValueError:
+        return jsonify({"error": "The requirement type must be functional, quality or constraint."}), 400
+    try:
+        priority = int(data.get('priority') if data.get('priority') not in (None, '') else 3)
+    except (TypeError, ValueError):
+        return jsonify({"error": "The priority must be a number from 1 (highest) to 5."}), 400
+    if not 1 <= priority <= 5:
+        return jsonify({"error": "The priority must be a number from 1 (highest) to 5."}), 400
 
     layer = data.get('layer') or None
     template_id = data.get('template_id') or None
@@ -439,11 +505,12 @@ def create_requirement():
     req = SolutionRequirement(
         solution_id=data.get('solution_id'),
         capability_id=data.get('capability_id'),
-        requirement_name=name,
-        description=data.get('description') or None,
-        requirement_type=data.get('requirement_type') or 'functional',
+        name=name,
+        description=(data.get('description') or '').strip(),
+        requirement_type=req_kind,
         moscow_priority=data.get('moscow_priority') or 'SHOULD',
-        priority=data.get('priority') or 'medium',
+        priority=priority,
+        status='Draft',
         acceptance_criteria=data.get('acceptance_criteria') or None,
         story_points=data.get('story_points') or None,
         epic_parent_id=data.get('epic_parent_id') or None,
@@ -468,14 +535,19 @@ def create_requirement():
     compliance_tags = data.get('compliance_tags', [])
     if compliance_tags and isinstance(compliance_tags, list):
         req.compliance_tags = compliance_tags
-    db.session.add(req)
-    sync_archimate_element(req)
-    db.session.commit()
+    try:
+        db.session.add(req)
+        sync_archimate_element(req)
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        logger.exception("Could not create requirement")
+        return jsonify({"error": "The requirement could not be saved. Check the fields and try again."}), 500
     return jsonify({"success": True, "requirement": {
         "id": req.id,
-        "requirement_name": req.requirement_name,
+        "name": req.name,
         "description": req.description,
-        "requirement_type": req.requirement_type,
+        "requirement_type": req.requirement_type.value if req.requirement_type else None,
         "moscow_priority": req.moscow_priority,
         "priority": req.priority,
         "acceptance_criteria": req.acceptance_criteria,
@@ -483,6 +555,26 @@ def create_requirement():
         "capability_id": req.capability_id,
         "created_at": req.created_at.isoformat() if hasattr(req, 'created_at') and req.created_at else None,
     }}), 201
+
+
+@enterprise_api_bp.route("/requirements/<int:req_id>", methods=["DELETE"])
+@login_required
+@require_requirement_editor('delete')
+def delete_requirement(req_id):
+    """Remove a requirement from the backlog (soft delete: the row is kept, marked deleted)."""
+    req = SolutionRequirement.query.filter(
+        SolutionRequirement.id == req_id, SolutionRequirement.deleted_at.is_(None)
+    ).first()
+    if req is None:
+        return jsonify({"success": False, "error": "Requirement not found"}), 404
+    if req.solution_id:
+        from app.models.solution_models import Solution
+        sol = Solution.query.get(req.solution_id)
+        if sol and sol.created_by_id != current_user.id and not _may_override_solution_owner():
+            return jsonify({"success": False, "error": "Forbidden: you do not own this solution"}), 403
+    req.soft_delete(current_user.id)
+    db.session.commit()
+    return jsonify({"success": True, "id": req_id})
 
 
 @enterprise_api_bp.route('/requirements/suggest-layer', methods=['GET'])
@@ -726,7 +818,7 @@ def generate_requirement_test_cases(req_id):
 
 @enterprise_api_bp.route("/requirements/<int:req_id>/dod", methods=["PATCH"])
 @login_required
-@require_roles("admin", "architect")
+@require_requirement_editor('edit')
 def update_requirement_dod(req_id):
     """Update the DoD checklist and auto-compute dod_complete."""
     from app.models.solution_architect_models import SolutionRequirement
@@ -1256,7 +1348,7 @@ def get_requirement_count(solution_id):
 
 @enterprise_api_bp.route("/requirements/<int:req_id>/status", methods=["PATCH"])
 @login_required
-@require_roles("admin", "architect")
+@require_requirement_editor('edit')
 def patch_requirement_status(req_id):
     """
     Update requirement lifecycle status.
@@ -1273,7 +1365,7 @@ def patch_requirement_status(req_id):
     if req.solution_id:
         from app.models.solution_models import Solution
         sol = Solution.query.get(req.solution_id)
-        if sol and sol.created_by_id != current_user.id and not is_active_org_admin():
+        if sol and sol.created_by_id != current_user.id and not _may_override_solution_owner():
             return jsonify({"success": False, "error": "Forbidden: you do not own this solution"}), 403
 
     data = request.get_json() or {}
@@ -1326,7 +1418,7 @@ def _log_req_change(req, field_name, old_value, new_value, user_id):
 
 @enterprise_api_bp.route("/requirements/<int:req_id>/enrich", methods=["PATCH"])
 @login_required
-@require_roles("admin", "architect")
+@require_requirement_editor('edit')
 def enrich_requirement(req_id):
     """
     BA enrichment — update acceptance criteria, assumptions, dependencies.
@@ -1342,7 +1434,7 @@ def enrich_requirement(req_id):
     if req.solution_id:
         from app.models.solution_models import Solution
         sol = Solution.query.get(req.solution_id)
-        if sol and sol.created_by_id != current_user.id and not is_active_org_admin():
+        if sol and sol.created_by_id != current_user.id and not _may_override_solution_owner():
             return jsonify({"success": False, "error": "Forbidden: you do not own this solution"}), 403
 
     data = request.get_json() or {}
@@ -1623,7 +1715,7 @@ def defer_requirement(req_id):
 
 @enterprise_api_bp.route("/requirements/<int:req_id>/score", methods=["PATCH"])
 @login_required
-@require_roles("admin", "architect")
+@require_requirement_editor('edit')
 def score_requirement(req_id):
     """Update prioritisation scoring fields on a requirement."""
     req = SolutionRequirement.query.get_or_404(req_id)
@@ -2162,7 +2254,7 @@ def sync_all_requirements_from_jira():
 
 @enterprise_api_bp.route("/requirements/<int:req_id>/link-work-package", methods=["PATCH"])
 @login_required
-@require_roles("admin", "architect")
+@require_requirement_editor('edit')
 def link_work_package(req_id):
     """Link or unlink a requirement to a kanban work package (REQ-013)."""
     req = SolutionRequirement.query.get_or_404(req_id)

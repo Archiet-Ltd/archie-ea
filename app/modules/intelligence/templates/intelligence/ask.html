@@ -48,12 +48,12 @@
     {'key': 'accountability', 'before': "Who's accountable for", 'blank': '___', 'after': ', and can they take on more?'}
 ] %}
 {% macro _ps_actions() %}
-<a href="{{ url_for('intelligence_ui.twin_map') }}"
+<a href="{{ url_for('archimate.composer_page') }}"
    class="inline-flex h-8 items-center justify-center rounded-md border border-input bg-background px-3 text-13 font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-    <i data-lucide="network" class="mr-2 h-4 w-4" aria-hidden="true"></i>Twin map
+    <i data-lucide="network" class="mr-2 h-4 w-4" aria-hidden="true"></i>Open in the Composer
 </a>
 {% endmacro %}
-<div class="p-6 space-y-6" x-data="askSurface()" data-twin-map-url="{{ url_for('intelligence_ui.twin_map') }}"
+<div class="p-6 space-y-6" x-data="askSurface()" data-composer-url="{{ url_for('archimate.composer_page') }}"
      data-rationalization-planning-url-base="{{ url_for('unified_applications.rationalization_planning', app_id=0) }}">
     {{ page_shell(
         title='Ask',
@@ -106,7 +106,7 @@
                 <div class="flex basis-full flex-wrap items-center gap-3">
                     {{ derived_note('node.derived') }}
                     {{ why_button('node.key') }}
-                    <a :href="twinMapHref(node)" class="inline-flex h-8 items-center justify-center rounded-md px-2 text-13 font-medium text-muted-foreground transition-colors hover:bg-muted/50 hover:text-info">View on twin map</a>
+                    <a :href="composerHref(node)" class="inline-flex h-8 items-center justify-center rounded-md px-2 text-13 font-medium text-muted-foreground transition-colors hover:bg-muted/50 hover:text-info">Open in the Composer</a>
                 </div>
                 <div class="basis-full text-xs text-muted-foreground">{{ stale_line('node.staleLine') }}</div>
                 <ul class="basis-full space-y-1 text-xs text-muted-foreground" data-citations aria-label="Where this was read from">

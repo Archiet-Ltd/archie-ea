@@ -562,6 +562,25 @@ function appPortfolio() {
       const url = routes[normalizedType] || `/applications/${id}`;
       window.location.href = url;
     },
+
+    // ── Single delete ──────────────────────────────────────────────────────
+    // The row menu's Delete asks first, then posts to the same delete route
+    // the old inline form did (CSRF token from the page's meta tag).
+    async deleteApplication(url, name) {
+      const ok = await Platform.modal.confirm('Delete ' + name + '? This cannot be undone.');
+      if (!ok) return;
+      const meta = document.querySelector('meta[name=csrf-token]');
+      const form = document.createElement('form');
+      form.method = 'POST';
+      form.action = url;
+      const token = document.createElement('input');
+      token.type = 'hidden';
+      token.name = 'csrf_token';
+      token.value = meta ? meta.content : '';
+      form.appendChild(token);
+      document.body.appendChild(form);
+      form.submit();
+    },
   };
 }
 

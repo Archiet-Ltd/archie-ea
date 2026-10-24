@@ -1076,7 +1076,7 @@ function composerApp() {
                     { name: 'dot', args: { color: '#dde1e6', thickness: 1 } },
                     { name: 'dot', args: { color: '#c8cdd3', thickness: 1, scaleFactor: 5 } },
                 ],
-                background: { color: '#fafbfc' },
+                background: { color: 'transparent' },
 
                 interactive: function(cellView) {
                     if (self.mode === 'view') return { elementMove: false, addLinkFromMagnet: false };
@@ -3137,7 +3137,12 @@ function composerApp() {
                     ids: elements.map(function(e) { return e.id; }),
                     hasDerived: relationships.some(function(r) { return r.kind === 'derived'; }),
                     empty: relationships.length === 0,
-                    saving: false
+                    saving: false,
+                    rows: rows.map(function(r) {
+                        return { key: r.key, elementId: r.elementId, from: r.fromName, name: r.name,
+                                 relation: r.relationType, kind: r.kindLabel, depth: r.depth };
+                    }),
+                    listOpen: false
                 };
 
                 let centre = loaded.cellMap[elementId];
@@ -3155,6 +3160,17 @@ function composerApp() {
                 self.$nextTick(function() { if (window.lucide) lucide.createIcons(); });
             })
             .catch(function(err) { UndoStack.resume(); fail(err); });
+        },
+
+        /* A row of the connections list opens the same details the drawn element opens. */
+        openFocusConnection: function(elementId) {
+            let self = this;
+            let cell = self.graph.getElements().filter(function(c) {
+                return String(c.get('elementId')) === String(elementId);
+            })[0];
+            if (!cell) return;
+            let view = self.paper.findViewByModel(cell);
+            if (view) self.paper.trigger('element:pointerclick', view, {});
         },
 
         saveFocusView: function() {
