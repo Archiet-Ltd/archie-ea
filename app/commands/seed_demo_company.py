@@ -1922,9 +1922,10 @@ def _seed_solution_blueprints(org_id, solutions) -> dict:
     back from the blueprint's own scoring. Idempotent: an element keeps the
     description it has, a link or relationship already present is not doubled,
     and a narrative an architect has edited is not overwritten."""
-    from app.models import ArchiMateElement, ArchiMateRelationship
+    from app.models import ArchiMateRelationship
     from app.models.archimate_core import ArchitectureModel
-    from app.models.solution_models import SolutionArchiMateElement
+    from app.services.archimate_backbone import create_backbone_element
+    from app.models.solution_models import SolutionArchiMateElement as SolutionElementLink
     from app.modules.solutions_strategic.v2.services.blueprint_completeness_service import (
         BlueprintCompletenessService,
     )
@@ -1940,12 +1941,10 @@ def _seed_solution_blueprints(org_id, solutions) -> dict:
     for name, etype, layer, desc in _BLUEPRINT_NEW_ELEMENTS:
         if name in elements:
             continue
-        el = ArchiMateElement(
-            name=name, type=etype, layer=layer, description=desc,
+        elements[name] = create_backbone_element(
+            element_type=etype, layer=layer, name=name, description=desc,
             organization_id=org_id,
         )
-        db.session.add(el)
-        elements[name] = el
         stats["blueprint_elements_created"] += 1
     for name, desc in _BLUEPRINT_DESCRIPTIONS.items():
         el = elements.get(name)
@@ -1982,8 +1981,8 @@ def _seed_solution_blueprints(org_id, solutions) -> dict:
 
         linked = {
             row.element_id: row
-            for row in db.session.query(SolutionArchiMateElement)
-            .filter(SolutionArchiMateElement.solution_id == sol.id)
+            for row in db.session.query(SolutionElementLink)
+            .filter(SolutionElementLink.solution_id == sol.id)
         }
         for names in plan["links"].values():
             for name in names:
@@ -1998,7 +1997,7 @@ def _seed_solution_blueprints(org_id, solutions) -> dict:
                     if row.spec_data is None and spec is not None:
                         row.spec_data = spec
                     continue
-                linked[el.id] = SolutionArchiMateElement(
+                linked[el.id] = SolutionElementLink(
                     solution_id=sol.id, layer_type=(el.layer or "").lower() or None,
                     element_id=el.id, element_table="archimate_elements",
                     element_name=el.name, element_role="primary", spec_data=spec,

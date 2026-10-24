@@ -27909,9 +27909,14 @@
     "breadcrumb",
     "button",
     "card",
+    "dialog",
     "empty",
+    "field",
+    "input",
     "page-header",
-    "progress"
+    "progress",
+    "select",
+    "table"
    ],
    "controls": {
     "button": 4,
@@ -27935,7 +27940,13 @@
     }
    },
    "spec": null,
-   "status": "mapped"
+   "status": "mapped",
+   "extra_macros": [
+    "components/form_field.html",
+    "components/input.html",
+    "components/select.html",
+    "components/table.html"
+   ]
   },
   "app/templates/solutions/sad_document.html": {
    "allowed_macros": [
