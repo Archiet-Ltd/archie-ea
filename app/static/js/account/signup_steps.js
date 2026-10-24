@@ -44,9 +44,11 @@
     function paint(sources) {
         (sources || []).forEach(function (row) {
             var line = root.querySelector('[data-source="' + row.key + '"]');
-            if (!line) return;
+            if (!line || row.state === 'not_given') return;
             line.textContent = row.text;
             line.setAttribute('data-state', row.state);
+            line.classList.toggle('text-destructive-emphasis', row.state === 'failed');
+            line.classList.toggle('text-muted-foreground', row.state !== 'failed');
         });
     }
 
@@ -62,11 +64,10 @@
         }, 3000);
     }
 
-    function give(name, url, body, button, done) {
+    function give(name, url, body, button) {
         busy(button, true);
         say(name, 'Connecting…', false);
         post(url, body).then(function (result) {
-            say(name, done, false);
             paint(result.sources);
             poll();
         }).catch(function (error) {
@@ -86,16 +87,14 @@
         if (!button) return;
         var action = button.getAttribute('data-action');
         if (action === 'github') {
-            give('github', URLS.github, { organization: value('welcome-github-org'), token: value('welcome-github-token') },
-                button, 'Connected. Reading your repositories in the background; carry on.');
+            give('github', URLS.github, { organization: value('welcome-github-org'), token: value('welcome-github-token') }, button);
         } else if (action === 'jira') {
             give('jira', URLS.jira, {
                 instance_url: value('welcome-jira-url'), email: value('welcome-jira-email'), token: value('welcome-jira-token')
-            }, button, 'Connected. Reading your issues in the background; carry on.');
+            }, button);
         } else if (action === 'website') {
             var consent = document.getElementById('welcome-website-consent');
-            give('website', URLS.website, { url: value('welcome-website'), consent: !!(consent && consent.checked) },
-                button, 'Saved. We will read this site soon.');
+            give('website', URLS.website, { url: value('welcome-website'), consent: !!(consent && consent.checked) }, button);
         } else if (action === 'continue') {
             busy(button, true);
             post(URLS.choices, chosen()).then(function () {

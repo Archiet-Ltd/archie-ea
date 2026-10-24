@@ -240,8 +240,8 @@ def _source_state(org_id: int, task: str, label: str, done_text) -> Dict[str, An
         reason = result.get("error") or job.error or "The read did not finish."
         return {"state": "failed", "text": "%s could not be read: %s" % (label, reason)}
     if job.status == JobStatus.IN_PROGRESS.value:
-        return {"state": "reading", "text": "Reading %s now." % label}
-    return {"state": "waiting", "text": "%s is queued and starts in a moment." % label}
+        return {"state": "reading", "text": "Reading %s now. This takes a few minutes; carry on." % label}
+    return {"state": "waiting", "text": "%s is connected. Reading starts in a moment; carry on." % label}
 
 
 def sources(org) -> List[Dict[str, Any]]:

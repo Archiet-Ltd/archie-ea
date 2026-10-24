@@ -16,7 +16,7 @@
             <div class="space-y-3" data-testid="signup-website">
                 <h2 class="text-sm font-semibold">Company website</h2>
                 <div class="space-y-1.5">
-                    {% call label(for='welcome-website') %}Company website{% endcall %}
+                    {% call label(for='welcome-website') %}Website address{% endcall %}
                     {{ input(id='welcome-website', placeholder='acme.com', value=((org.settings or {}).get('onboarding', {}).get('website', {}).get('url') or '')) }}
                 </div>
                 {{ checkbox(id='welcome-website-consent', label='You may read this website', description='We keep the address and your permission now, and read the site soon. Nothing from it is in your model yet.') }}
