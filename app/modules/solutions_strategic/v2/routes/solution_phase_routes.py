@@ -163,9 +163,9 @@ def get_solution_risks(solution_id):
     Solution.query.get_or_404(solution_id)
     from datetime import datetime as _datetime
 
-    from app.models.solution_lifecycle_models import SolutionRisk
     from app.services import risk_service
 
+    canonical, legacy = risk_service.solution_risk_sources(solution_id)
     canonical_rows = [
         (risk.created_at or _datetime.min, _solution_risk_dict(
             risk,
@@ -176,14 +176,9 @@ def get_solution_risks(solution_id):
             mitigation=risk.mitigation_plan,
             owner=risk.owner,
         ))
-        for risk in risk_service.risks_linked_to("solution", solution_id)
+        for risk in canonical
     ]
-    legacy_rows = [
-        (risk.created_at or _datetime.min, risk.to_dict())
-        for risk in SolutionRisk.query.filter_by(solution_id=solution_id)
-        .filter(SolutionRisk.retired_into_risk_id.is_(None))
-        .all()
-    ]
+    legacy_rows = [(risk.created_at or _datetime.min, risk.to_dict()) for risk in legacy]
     rows = sorted(canonical_rows + legacy_rows, key=lambda pair: pair[0], reverse=True)
     return jsonify({"success": True, "data": [row[1] for row in rows]})
 
