@@ -93,8 +93,7 @@
             <option value="low">Low</option>
         {% endcall %}
         {{ button(text='Gap Analysis', variant='outline', size='sm', href=url_for('adm_kanban_view.gap_analysis'), attrs_dict={'title': 'Gap Analysis — ArchiMate Gaps and closing WorkPackages'}) }}
-        {{ button(text='Plateau Roadmap', variant='outline', size='sm', href=url_for('adm_kanban_view.plateau_roadmap'), attrs_dict={'title': 'Plateau Roadmap — Architecture transition states'}) }}
-        {{ button(text='Roadmap', variant='outline', size='sm', icon='calendar-range', href=url_for('adm_kanban_view.adm_roadmap_timeline')) }}
+        {{ button(text='Roadmap', variant='outline', size='sm', icon='calendar-range', href=url_for('genome_roadmap.index')) }}
         {{ button(text='Requirements', variant='outline', size='sm', icon='list-checks', aria_label='Show or hide the requirements', on_click='openRequirements()', attrs_dict={'data-testid': 'adm-req-toggle'}) }}
         {{ button(text='Sprint Planning', variant='default', size='sm', icon='calendar-clock', aria_label='Open Sprint Planning panel', on_click="$dispatch('open-sprint-panel')", attrs_dict={'title': 'Sprint Planning — manage sprints and assign cards'}) }}
     </div>
@@ -105,7 +104,7 @@
     <div x-show="!loading && !error && phases.length > 0" x-cloak
          class="flex flex-wrap items-center gap-4 rounded-lg border border-border bg-card p-3" data-testid="adm-cycle-header">
         {{ adm_cycle() }}
-        <div class="min-w-0 flex-1 space-y-1">
+        <div class="min-w-48 flex-1 space-y-1">
             <h2 class="text-sm font-semibold text-foreground">The ADM cycle</h2>
             <p class="text-sm text-muted-foreground">Each circle counts the cards in that phase, and the centre counts the requirements that drive them. Choose a phase to show only its lane.</p>
             <div x-show="phaseFilter" x-cloak class="flex flex-wrap items-center gap-2 text-sm">

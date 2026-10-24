@@ -5,8 +5,9 @@ IMPLEMENTATION domain. It reads directly from the populated
 implementation-and-migration stores for ONE organization:
 
     plateaus       (Plateau, TenantMixin)        -- time-phased architecture states
-    work_packages  (WorkPackage, TenantMixin)    -- the units of change
-    gap_work_packages (secondary)                -- the gaps a work package closes
+    unified_work_packages (UnifiedWorkPackage)   -- the units of change, the one store
+    relationships from a work package's element  -- its plateau and the gaps it closes
+                                                    (read through work_package_service)
 
 and each store's ``archimate_element_id`` link, and assembles a validated dict:
 
@@ -103,7 +104,11 @@ def _provenance(element_id, expected_type: str, element_types: dict, label: str)
 
 def _date_iso(value):
     """ISO string for a date/datetime, or None. Deterministic and JSON-safe."""
-    return value.isoformat() if value is not None else None
+    if value is None:
+        return None
+    if hasattr(value, "date"):  # a datetime column: the roadmap works in days
+        value = value.date()
+    return value.isoformat()
 
 
 def build_roadmap_slice(org_id: int) -> dict:
@@ -121,7 +126,8 @@ def build_roadmap_slice(org_id: int) -> dict:
         SliceProvenanceError: if any plateau or work package carries an
             archimate_element_id that does not resolve to a real element.
     """
-    from app.models.implementation_migration import Plateau, WorkPackage
+    from app.models.implementation_migration import Plateau
+    from app.services import work_package_service
 
     # --- Read the stores, org-scoped and deterministically ordered. ---
     plateaus = (
@@ -133,15 +139,11 @@ def build_roadmap_slice(org_id: int) -> dict:
         )
         .all()
     )
-    work_packages = (
-        db.session.query(WorkPackage)
-        .filter(WorkPackage.organization_id == org_id)
-        .order_by(
-            WorkPackage.sequence_order.asc().nullslast(),
-            WorkPackage.id.asc(),
-        )
-        .all()
-    )
+    # The one work package store, and the one reader of its plateau and gap links.
+    work_packages = work_package_service.query_for(org_id).order_by(
+        work_package_service.UnifiedWorkPackage.id.asc()
+    ).all()
+    links = work_package_service.plateau_and_gap_links(work_packages, org_id)
 
     element_types = _element_type_by_id()
     plateau_ids = {p.id for p in plateaus}
@@ -162,15 +164,11 @@ def build_roadmap_slice(org_id: int) -> dict:
 
     work_package_dicts = []
     for w in work_packages:
-        # The gaps this change closes — traceability that sells the domain
-        # (ADR 0010: "change -> gap it closes"). Ordered for determinism.
-        try:
-            closed_gap_ids = sorted(g.id for g in w.gaps)
-        except Exception:
-            closed_gap_ids = []
+        mine = links.get(w.id, {})
         # A plateau assignment only counts if the plateau is in this org's set
         # (defence against cross-store drift, mirroring the coverage slice).
-        plateau_id = w.plateau_id if w.plateau_id in plateau_ids else None
+        linked = [pid for pid in mine.get("plateau_ids", []) if pid in plateau_ids]
+        plateau_id = linked[0] if linked else None
         work_package_dicts.append(
             {
                 "id": w.id,
@@ -179,9 +177,18 @@ def build_roadmap_slice(org_id: int) -> dict:
                 "status": w.status,
                 "priority": w.priority,
                 "start_date": _date_iso(w.start_date),
-                "target_date": _date_iso(w.target_date),
-                "percent_complete": w.percent_complete or 0,
-                "closed_gap_ids": closed_gap_ids,
+                "target_date": _date_iso(w.end_date),
+                "percent_complete": int(w.progress_percentage or 0),
+                "application_component_id": w.application_component_id,
+                "capability_id": w.capability_id,
+                "enterprise_initiative_id": w.enterprise_initiative_id,
+                "goal_id": w.goal_id,
+                "togaf_phase": w.togaf_phase,
+                "element_type": w.element_type,
+                "context": w.context,
+                "context_id": w.context_id,
+                "programme_id": w.enterprise_initiative_id,
+                "closed_gap_ids": sorted(mine.get("gap_ids", [])),
                 "provenance": _provenance(
                     w.archimate_element_id, _WORK_PACKAGE_TYPE, element_types,
                     f"WorkPackage {w.id} ({w.name!r})",
