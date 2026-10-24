@@ -32,7 +32,21 @@ _CONTROLLED_MODELS = [
         "architecture_review_board",
     ),
     ("app.models.user", "User", "user"),
+    # The model itself: every create, update and delete of an element or a
+    # relationship, who owns an application, and the capability store.
+    ("app.models.archimate_core", "ArchiMateElement", "archimate_elements"),
+    ("app.models.archimate_core", "ArchiMateRelationship", "archimate_relationships"),
+    ("app.models.application_owner", "ApplicationOwner", "application_owners"),
+    ("app.models.enterprise_intelligence", "ApplicationOwnership", "application_ownership"),
+    ("app.models.unified_capability", "UnifiedCapability", "unified_capabilities"),
+    ("app.models.business_capabilities", "BusinessCapability", "business_capability"),
 ]
+
+# Columns the database or the ORM stamps on every write; a change to only
+# these is not a change a person made.
+_BOOKKEEPING_COLUMNS = frozenset(
+    ["updated_at", "modified_at", "recorded_at", "valid_from", "valid_to", "superseded_at"]
+)
 
 _EXCLUDED_COLUMNS = frozenset(
     ["password_hash", "token", "secret", "api_key", "fernet_key"]
@@ -72,7 +86,7 @@ def _json_safe(value):
     return str(value)
 
 
-def _write_audit(connection, action, table_label, record_id, old_value=None, new_value=None):
+def _write_audit(connection, action, table_label, record_id, old_value=None, new_value=None, target=None):
     """Insert one audit row using the flush's own connection.
 
     Mapper events (after_insert/update/delete) fire mid-flush, so we must NOT use
@@ -82,7 +96,22 @@ def _write_audit(connection, action, table_label, record_id, old_value=None, new
     """
     from app.models.audit_log import chain_insert
 
+    from app.services.change_source import current_change_context
+
     user_id, org_id, ip, ua = _get_request_context()
+    context = current_change_context()
+    if user_id is None:
+        user_id = context["user_id"]
+    # The row's own organisation wins over the request's: an importer or a
+    # connector writes for the organisation it was run for.
+    owner_org = getattr(target, "organization_id", None) if target is not None else None
+    if owner_org is not None:
+        org_id = owner_org
+    label = None
+    for attr in ("name", "title"):
+        label = getattr(target, attr, None) if target is not None else None
+        if label:
+            break
     # Sealed into the organisation's integrity chain like every other entry.
     chain_insert(
         connection,
@@ -95,6 +124,11 @@ def _write_audit(connection, action, table_label, record_id, old_value=None, new
         organization_id=org_id,
         ip_address=ip,
         user_agent=ua,
+        extra_json={
+            "source": context["source"],
+            "correlation_id": context["correlation_id"],
+            "label": _json_safe(label),
+        },
     )
 
 
@@ -114,7 +148,7 @@ def _make_after_insert(table_label: str):
             record_id = getattr(target, "id", None)
             _write_audit(
                 connection, "create", table_label, record_id,
-                new_value=_column_snapshot(target),
+                new_value=_column_snapshot(target), target=target,
             )
         except Exception:
             logger.debug("audit after_insert failed for %s", table_label, exc_info=True)
@@ -135,6 +169,8 @@ def _make_after_update(table_label: str):
                     key = attr.key
                     if key in _EXCLUDED_COLUMNS:
                         continue
+                    if key in _BOOKKEEPING_COLUMNS:
+                        continue
                     old_val[key] = _json_safe(hist.deleted[0] if hist.deleted else None)
                     new_val[key] = _json_safe(hist.added[0] if hist.added else None)
 
@@ -143,7 +179,7 @@ def _make_after_update(table_label: str):
 
             _write_audit(
                 connection, "update", table_label, record_id,
-                old_value=old_val, new_value=new_val,
+                old_value=old_val, new_value=new_val, target=target,
             )
         except Exception:
             logger.debug("audit after_update failed for %s", table_label, exc_info=True)
@@ -157,7 +193,7 @@ def _make_after_delete(table_label: str):
             record_id = getattr(target, "id", None)
             _write_audit(
                 connection, "delete", table_label, record_id,
-                old_value=_column_snapshot(target),
+                old_value=_column_snapshot(target), target=target,
             )
         except Exception:
             logger.debug("audit after_delete failed for %s", table_label, exc_info=True)
