@@ -119,7 +119,7 @@
                         {{ dropdown_menu(trigger_icon='more-horizontal', trigger_icon_only=true, trigger_size='sm', trigger_variant='ghost',
                                          trigger_class='shrink-0', trigger_aria_label='Move epic', trigger_testid='card-actions',
                                          trigger_attrs_dict={':aria-label': '`Move ${card.name} to a different column`', ':disabled': 'moving === card.id'},
-                                         menu_width='w-48', class='shrink-0',
+                                         menu_width='w-48', class='shrink-0', subject_attr='data-card-id',
                                          items=[{'header': 'Move to'}] + move_items) }}
                         {% endif %}
                     </div>
