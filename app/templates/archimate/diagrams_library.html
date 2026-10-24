@@ -24,9 +24,7 @@
 <div class="space-y-4" data-testid="diagrams-library-page">
     <form method="get" class="flex flex-wrap items-center gap-3" data-testid="diagrams-filter-form">
         <div class="flex-1 min-w-[200px] max-w-sm">
-            <input type="search" name="q" value="{{ q or '' }}" placeholder="Search diagram name…"
-                   class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                   aria-label="Search diagrams by name">
+            {{ input(name='q', type='search', placeholder='Search diagram name…', value=q or '', size='sm', aria_label='Search diagrams by name') }}
         </div>
         {% call native_select(name='solution_id', size='sm', aria_label='Filter by solution', attrs_dict={'onchange': 'this.form.submit()'}) %}
             <option value="">All solutions</option>

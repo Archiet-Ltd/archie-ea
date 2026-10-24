@@ -46,9 +46,7 @@
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <div>
                 {% call label(for='diagram-file') %}Diagram export{% endcall %}
-                <input id="diagram-file" type="file" accept=".json,.lucid,.vsdx"
-                       @change="file = $event.target.files[0]; report = null; committed = false"
-                       class="mt-1.5 flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-muted-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50">
+                {{ input(id='diagram-file', type='file', accept='.json,.lucid,.vsdx', class='file:text-foreground', attrs_dict={'@change': "file = $event.target.files[0]; report = null; committed = false"}) }}
             </div>
 
             <div>
@@ -91,25 +89,13 @@
         </div>
 
         <div class="mt-4 rounded-md border border-border bg-muted/20 px-3 py-2">
-            <label class="flex items-start gap-2 text-sm text-foreground cursor-pointer">
-                <input type="checkbox" x-model="aiAssist" class="mt-0.5 h-4 w-4 shrink-0 rounded border-input accent-primary text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
-                <span>
-                    <span class="font-medium">Ask AI to fill the gaps</span>
-                    <span class="block text-xs text-muted-foreground mt-0.5">
-                        After the deterministic import, an AI pass proposes a type for
-                        shapes it could not recognise and recovers relationships it had
-                        to drop. Suggestions appear below the preview — nothing is saved
-                        until you tick it and press Import. Needs an LLM key configured;
-                        if none is set, the import still runs and this is simply skipped.
-                    </span>
-                </span>
-            </label>
+            {{ checkbox(id='ai-assist', attrs_dict={'x-model': 'aiAssist'}, label='Ask AI to fill the gaps', description='After the deterministic import, an AI pass proposes a type for shapes it could not recognise and recovers relationships it had to drop. Suggestions appear below the preview — nothing is saved until you tick it and press Import. Needs an LLM key configured; if none is set, the import still runs and this is simply skipped.') }}
         </div>
 
         <div class="mt-6 flex flex-wrap items-center gap-3">
-            {{ button(text='Preview', variant='outline', on_click='preview()', disabled='!file || busy', attrs_dict={'x-show': "!busy || mode !== 'preview'"}) }}
+            {{ button(text='Preview', variant='outline', on_click='preview()', attrs_dict={'x-show': "!busy || mode !== 'preview'", ':disabled': '!file || busy'}) }}
             <span x-show="busy && mode === 'preview'" x-cloak>{{ button(text='Reading…', variant='outline', disabled=true) }}</span>
-            {{ button(text='Import', variant='primary', on_click='commit()', disabled='!report || busy || committed', attrs_dict={'x-show': "!busy || mode !== 'commit'"}) }}
+            {{ button(text='Import', variant='primary', on_click='commit()', attrs_dict={'x-show': "!busy || mode !== 'commit'", ':disabled': '!report || busy || committed'}) }}
             <span x-show="busy && mode === 'commit'" x-cloak>{{ button(text='Importing…', variant='primary', disabled=true) }}</span>
             <span x-show="error" x-cloak class="text-sm text-destructive-emphasis" x-text="error"></span>
             <template x-if="committed && report && report.composer_url">
@@ -184,7 +170,7 @@
                             <template x-for="(s, i) in report.suggestions.retype" :key="'rt'+i">
                                 <tr class="border-b transition-colors hover:bg-muted/50">
                                     <td class="p-2 w-8">
-                                        <input aria-label="Accept retype suggestion" type="checkbox" x-model="s.accepted" class="mt-0.5 h-4 w-4 shrink-0 rounded border-input accent-primary text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
+                                        {{ checkbox(attrs_dict={'x-model': 's.accepted', 'aria-label': 'Accept retype suggestion'}) }}
                                     </td>
                                     <td class="p-2 text-foreground text-sm" x-text="s.name"></td>
                                     <td class="p-2">
@@ -207,7 +193,7 @@
                             <template x-for="(s, i) in report.suggestions.relationships" :key="'rl'+i">
                                 <tr class="border-b transition-colors hover:bg-muted/50">
                                     <td class="p-2 w-8">
-                                        <input aria-label="Accept relationship suggestion" type="checkbox" x-model="s.accepted" class="mt-0.5 h-4 w-4 shrink-0 rounded border-input accent-primary text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
+                                        {{ checkbox(attrs_dict={'x-model': 's.accepted', 'aria-label': 'Accept relationship suggestion'}) }}
                                     </td>
                                     <td class="p-2 text-foreground text-sm" x-text="s.source_name"></td>
                                     <td class="p-2">

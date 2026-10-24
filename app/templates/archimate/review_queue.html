@@ -73,16 +73,8 @@
                 </div>
                 <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-muted text-muted-foreground shrink-0" x-text="s.source_method"></span>
                 <div class="flex items-center gap-1 shrink-0">
-                    <button type="button" @click="acceptSuggestion(s.id)" :disabled="processing"
-                            class="inline-flex items-center justify-center h-7 w-7 rounded-md bg-primary/10 text-primary hover:bg-primary/20 disabled:opacity-50"
-                            title="Accept" aria-label="Accept">
-                        <i data-lucide="check" class="h-4 w-4"></i>
-                    </button>
-                    <button type="button" @click="rejectSuggestion(s.id)" :disabled="processing"
-                            class="inline-flex items-center justify-center h-7 w-7 rounded-md bg-destructive/10 text-destructive-emphasis hover:bg-destructive/20 disabled:opacity-50"
-                            title="Reject" aria-label="Reject">
-                        <i data-lucide="x" class="h-4 w-4"></i>
-                    </button>
+                    {{ button(icon='check', variant='ghost', size='icon-sm', aria_label='Accept', class='rounded-md bg-primary/10 text-primary hover:bg-primary/20 disabled:opacity-50', attrs_dict={'@click': 'acceptSuggestion(s.id)', ':disabled': 'processing'}) }}
+                    {{ button(icon='x', variant='ghost', size='icon-sm', aria_label='Reject', class='rounded-md bg-destructive/10 text-destructive-emphasis hover:bg-destructive/20 disabled:opacity-50', attrs_dict={'@click': 'rejectSuggestion(s.id)', ':disabled': 'processing'}) }}
                 </div>
             </div>
         </template>
