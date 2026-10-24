@@ -3,9 +3,9 @@
    white RGB triplet; renders identically in the only reachable theme (light: --background is 0 0% 100%,
    same white the old fallback always produced since --background-rgb was never actually declared anywhere);
    no dark-mode toggle exists yet to reach the branch where the two differ #}
-{% macro dialog(trigger_text='Open', title='', description='') %}
+{% macro dialog(trigger_text='Open', title='', description='', trigger_label=none) %}
     <div x-data="{ dialogOpen: false }">
-        <button type="button" @click="dialogOpen = true" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center" aria-label="Open">
+        <button type="button" @click="dialogOpen = true" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center" aria-label="{{ trigger_label or 'Open' }}">
             {{ trigger_text }}
         </button>
         
