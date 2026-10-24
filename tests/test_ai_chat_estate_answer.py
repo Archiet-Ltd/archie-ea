@@ -105,6 +105,7 @@ def test_an_estate_answer_is_kept_in_the_conversation_history(client, login_as, 
     owner = _architect(org, "chat-hist-a@example.com")
     outsider = _architect(other, "chat-hist-b@example.com")
     _load(client, login_as, owner)
+    assert _history(client) == []  # the rail was read once before any answer, as the page does on load
     body = _ask(client, QUESTION).get_json()
     assert body["thread_id"]
     threads = _history(client)
@@ -116,10 +117,7 @@ def test_an_estate_answer_is_kept_in_the_conversation_history(client, login_as, 
     # A second question in the same conversation joins it rather than starting another.
     again = client.post("/ai-chat/estate-answer", json={"message": QUESTION, "thread_id": body["thread_id"]}).get_json()
     assert again["thread_id"] == body["thread_id"]
-    kept = db.session.execute(
-        db.text("SELECT count(*) FROM conversation_messages WHERE thread_id = :t"), {"t": body["thread_id"]}
-    ).scalar()
-    assert kept == 4
+    assert len(client.get("/ai-chat/threads/" + body["thread_id"]).get_json()["messages"]) == 4
     # Nobody else sees it.
     login_as(client, outsider)
     assert _history(client) == []
