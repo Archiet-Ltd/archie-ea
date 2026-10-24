@@ -294,11 +294,8 @@
                 </div>
             </div>
             <div class="flex items-center justify-between border-t border-border px-4 py-3">
-                {{ button(text='Exit', variant='ghost', size='sm', class='text-xs', on_click='exit()') }}
-                <button type="button" @click="next()"
-                        class="rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:opacity-90 transition-opacity"
-                        x-text="currentIndex === steps.length - 1 ? 'Done' : 'Next'">
-                </button>
+                {{ button(text='Exit', variant='ghost', on_click='exit()') }}
+                {{ button(text='Next', variant='default', on_click='next()', attrs_dict={'x-text': "currentIndex === steps.length - 1 ? 'Done' : 'Next'"}) }}
             </div>
         </div>
     </div>

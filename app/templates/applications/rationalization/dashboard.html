@@ -1,4 +1,6 @@
 {% extends "layouts/admin_base.html" %}
+{# design-block: dashboard #}
+{% import 'components/card.html' as card %}
 {% from 'macros/page_shell.html' import page_shell %}
 {% block title %}Application Rationalization{% endblock %}
 
@@ -46,7 +48,8 @@
     {# The stepper prints a count, a total and a percentage for every stage.
        With no stats it would draw a complete, all-zero pipeline. #}
     {% if stats %}
-    <nav class="mb-8 rounded-xl border bg-card p-4" aria-label="Rationalization pipeline">
+    <nav class="mb-8" aria-label="Rationalization pipeline">
+    {% call card.card(class='p-4') %}
         <div class="flex items-center justify-between">
             {# H7: Plan's 'total' used to be stats.time_scored_count -- a count from
                a different table (ApplicationRationalizationScore) with no subset
@@ -76,6 +79,7 @@
             {% endif %}
             {% endfor %}
         </div>
+    {% endcall %}
     </nav>
     {% endif %}
 

@@ -8,6 +8,7 @@ function vendorAnalysisDetail(analysisId) {
     loadingVendors: false,
     completedSteps: new Set(),
     manualScoreOpen: true,
+    manualScoreRequested: false,
     manualScoreSaving: {},
     reqMatrixOpen: true,
     requirements: [],
@@ -341,6 +342,38 @@ function vendorAnalysisDetail(analysisId) {
         case 'export': return 'Create an analysis before exporting';
         default: return '';
       }
+    },
+
+    unlockHint(tabId) {
+      switch (tabId) {
+        case 'scoring': return 'Unlocks once the analysis has a name and at least one capability, process or value stream is chosen.';
+        case 'comparison': return 'Unlocks once the analysis has been run, because the comparison is built from its vendors.';
+        case 'decision': return 'Unlocks once the analysis has been run and the vendors are ranked.';
+        case 'export': return 'Unlocks once the analysis has been created.';
+        default: return '';
+      }
+    },
+
+    lockedTabs() {
+      const self = this;
+      return this.tabs.filter(function(t) { return self.stepStatus(t.id) === 'locked'; });
+    },
+
+    scoreText(value) {
+      return value ? Number(value).toFixed(1) : 'Not recorded';
+    },
+
+    pluralise(count, one, many) {
+      return count + ' ' + (count === 1 ? one : many);
+    },
+
+    get showScoringRubric() {
+      if (this.comparisonVendors.length === 0) return false;
+      const scored = this.comparisonVendors.some(function(v) { return v.total_score != null; });
+      const rated = this.comparisonVendors.some(function(v) {
+        return Object.values(v.manual_scores || {}).some(function(n) { return n; });
+      });
+      return !scored || rated || this.manualScoreRequested;
     },
 
     attemptSwitchTab(tabId) {
@@ -797,7 +830,7 @@ function vendorAnalysisDetail(analysisId) {
     },
 
     formatCell(value, format) {
-      if (value == null) return 'N/A';
+      if (value == null) return 'Not recorded';
       if (format === 'score') return parseFloat(value).toFixed(1);
       if (format === 'currency') {
         if (window.currencyManager) return window.currencyManager.format(parseFloat(value));

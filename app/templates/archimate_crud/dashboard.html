@@ -1,4 +1,6 @@
+{# design-block: data-table #}
 {% extends 'layouts/admin_base.html' %}
+{% from 'components/disabled_action.html' import disabled_action %}
 {% from 'macros/page_shell.html' import page_shell %}
 
 {% block title %}{{ selected_layer.title }}{% endblock %}
@@ -24,11 +26,15 @@
                 Create element
             </button>
             <div class="hidden h-6 border-l border-input sm:block" aria-hidden="true"></div>
+            {% if can_change_model() %}
             <a href="{{ url_for('architect_ui.import_oef') }}" data-testid="btn-import-oef"
                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center"
                aria-label="Import model file">
                 <i data-lucide="upload" class="h-4 w-4" aria-hidden="true"></i>Import model file
             </a>
+            {% else %}
+            {{ disabled_action('Import model file', 'Only an architect can import model files. Ask an administrator in Team settings.', 'import-oef-reason', icon='upload') }}
+            {% endif %}
             <a href="{{ url_for('architect_ui.export_oef') }}" data-testid="btn-export-oef"
                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center"
                aria-label="Export architecture as Open Exchange Format">

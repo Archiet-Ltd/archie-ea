@@ -629,7 +629,10 @@ _ADMIN_LINKS = [
     # looked fine, and the handler behind the name was dead code. Found by the
     # nav-verified gate: no test had ever exercised that endpoint, and none
     # could. The link now names the handler that actually runs.
-    _link("AI Prompts", "admin.solution_prompts_page", "sparkles"),
+    # The prompts are the platform's own, shared by every organisation, and the
+    # route is @platform_admin_required, so only platform administrators are
+    # shown the link (an organisation administrator got a 403 behind it).
+    _link("AI Prompts", "admin.solution_prompts_page", "sparkles", requires="platform_admin"),
     _link("Governance Gates", "admin.governance_gates", "badge-check", requires="admin"),
     # The organisation's audit trail (query, export in full, verify). It takes
     # Seed Management's place in this zone to hold the link budget; Seed
@@ -1164,7 +1167,11 @@ def link_requires_satisfied(user, requires):
     if requires == "org_admin":
         return bool(getattr(user, "is_org_admin", False))
     if requires == "platform_admin":
-        return bool(getattr(user, "is_platform_admin", False))
+        # The same predicate @platform_admin_required applies, so a link and
+        # the route behind it cannot disagree about who is a platform admin.
+        from app.middleware.tenant_decorators import is_platform_admin
+
+        return bool(is_platform_admin(user))
     if requires == "data_subject_requests":
         try:
             from app.decorators.requires_role import may_handle_data_subject_requests

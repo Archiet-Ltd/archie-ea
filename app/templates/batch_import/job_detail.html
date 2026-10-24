@@ -1,3 +1,4 @@
+{# design-block: record-detail #}
 {% extends 'layouts/admin_base.html' %}
 {% from 'macros/page_shell.html' import page_shell %}
 {% import 'components/card.html' as card %}
@@ -19,7 +20,7 @@
     {{ page_shell(
         title=job.name if job else 'Import Job',
         breadcrumb=[
-            ('Home', url_for('admin.dashboard')),
+            ('Home', home_url()),
             ('Batch Import', url_for('batch_import_view.dashboard')),
             (job.name if job else 'Import Job', None)
         ]

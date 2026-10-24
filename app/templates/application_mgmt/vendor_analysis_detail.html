@@ -68,6 +68,11 @@
       </template>
     </ol>
   </nav>
+  <ul class="space-y-1 text-sm text-muted-foreground" x-show="lockedTabs().length > 0" x-cloak data-testid="locked-steps">
+    <template x-for="tab in lockedTabs()" :key="tab.id">
+      <li><span class="font-medium text-foreground" x-text="tab.label"></span>: <span x-text="unlockHint(tab.id)"></span></li>
+    </template>
+  </ul>
 
   <!-- ============================================================ -->
   <!-- TAB 1: Setup                                                  -->
@@ -512,8 +517,12 @@
         {{ button('Refresh', variant='outline', size='sm', icon='refresh-cw', on_click='loadComparison()') }}
       </div>
 
-      <!-- Vendor Scoring Panel -->
-      <div x-show="comparisonVendors.length > 0" x-cloak>
+      <div x-show="comparisonVendors.length > 0 && !showScoringRubric" x-cloak class="flex justify-end">
+        {{ button('Rate vendors by hand', variant='outline', size='sm', icon='sliders-horizontal', on_click='manualScoreRequested = true; manualScoreOpen = true') }}
+      </div>
+
+      <!-- Vendor Scoring Panel: only where nothing is scored yet, or scores are being entered by hand -->
+      <div x-show="showScoringRubric" x-cloak>
         {% call ui.card() %}
           {% call button(variant='ghost', class='h-auto w-full justify-between rounded-b-none p-4 text-left font-normal', on_click='manualScoreOpen = !manualScoreOpen') %}
             <span class="flex items-center gap-2">
@@ -600,6 +609,9 @@
           
         {% endcall %}
       {% endcall %}
+      <p class="text-sm text-muted-foreground" x-show="comparisonVendors.some(function(v) { return v.tco_total == null || v.license_cost_annual == null || v.support_cost_annual == null; })" x-cloak data-testid="cost-note">
+        Cost figures marked Not recorded were not entered for that vendor, so they are left out of the cost comparison rather than counted as zero.
+      </p>
 
       <!-- Charts -->
       <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -646,7 +658,7 @@
             <span class="flex items-center gap-2">
               <i data-lucide="list-checks" class="h-4 w-4 text-muted-foreground"></i>
               <span class="font-semibold text-foreground">Requirements Matrix</span>
-              <span class="text-xs text-muted-foreground" x-text="'(' + requirements.length + ' requirements)'"></span>
+              <span class="text-xs text-muted-foreground" x-text="'(' + pluralise(requirements.length, 'requirement', 'requirements') + ')'"></span>
             </span>
             <i data-lucide="chevron-down" class="h-4 w-4 text-muted-foreground transition-transform" :class="reqMatrixOpen ? 'rotate-180' : ''"></i>
           {% endcall %}
@@ -936,9 +948,9 @@
                   <span x-text="v.name"></span>
                   <span x-show="idx === 0" x-cloak class="ml-2">{% call badge('success', class='gap-1') %}<i data-lucide="trophy" class="h-3 w-3"></i> Top Ranked{% endcall %}</span>
                 </td>
-                <td class="px-2 align-middle py-3 font-bold" x-text="v.total_score ? v.total_score.toFixed(1) : 'N/A'"></td>
+                <td class="px-2 align-middle py-3 font-bold" x-text="scoreText(v.total_score)"></td>
                 {% for field in ['cost_score', 'capability_score', 'risk_score', 'strategic_fit_score', 'implementation_score'] %}
-                <td class="px-2 align-middle py-3" x-text="v.{{ field }} ? v.{{ field }}.toFixed(1) : 'N/A'"></td>
+                <td class="px-2 align-middle py-3" x-text="scoreText(v.{{ field }})"></td>
                 {% endfor %}
                 <td class="px-2 align-middle py-3" x-text="formatCell(v.tco_total, 'currency')"></td>
               </tr>
@@ -956,7 +968,7 @@
             {% call form_group(id='decision-vendor', label='Selected Vendor') %}
               {% call native_select(id='decision-vendor', aria_label='Selected Vendor', attrs_dict={'x-model': 'decision.vendorId'}, options=[('', '-- Select Recommended Vendor --')]) %}
                 <template x-for="v in rankedVendors" :key="v.id">
-                  <option :value="v.id" x-text="v.name + ' (Score: ' + (v.total_score ? v.total_score.toFixed(1) : 'N/A') + ')'"></option>
+                  <option :value="v.id" x-text="v.name + ' (Score: ' + (scoreText(v.total_score)) + ')'"></option>
                 </template>
               {% endcall %}
             {% endcall %}
