@@ -7,7 +7,7 @@ Provides unified interface for generating architecture elements, requirements,
 UML diagrams, and code using various LLM providers.
 
 DEFAULT PROVIDER: Hugging Face (free, local models)
-- Priority order: huggingface → anthropic → openai → gemini → deepseek → azure
+- Priority order: huggingface → anthropic → openai → gemini → openrouter → nvidia → azure
 - Hugging Face models run locally, no API costs
 - Other providers require API keys and incur costs
 
@@ -41,7 +41,7 @@ DEFAULT PROVIDER ORDER:
 1. anthropic (Claude - requires API key)
 2. openai (GPT - 4 - requires API key)
 3. gemini (requires API key)
-4. deepseek (requires API key)
+4. nvidia (free models; requires API key)
 5. azure (requires API key)
 6. huggingface (free, local models - last due to potential stability issues on some systems)
 
@@ -89,6 +89,8 @@ from app.services.core.cache_service import cache_service
 CACHE_TTL_SECONDS = 3600  # fabricated-ok: named config constant (cache TTL), not displayed data
 DEFAULT_TOKEN_COST_MULTIPLIER = 1000  # fabricated-ok: named config constant (token cost multiplier), not displayed data
 
+from app.modules.ai_chat.services.model_defaults import DEFAULT_MODELS
+
 # Fallback in-memory cache if Redis is not available
 _llm_cache_fallback = {}  # cache-tenancy-ok: the key is a SHA-256 of the full prompt and model, so only a caller sending the identical prompt can read an entry
 _cache_expiry_fallback = {}  # cache-tenancy-ok: expiry times for the prompt-hash keys above; holds no tenant data
@@ -117,11 +119,57 @@ _SENSITIVE_PATTERNS: List[Tuple[re.Pattern, str]] = [
 ]
 
 
+# OpenRouter data-policy setting sent with every request.
+OPENROUTER_PROVIDER_POLICY = {"data_collection": "deny"}
+
+
 def _scrub_prompt(prompt: str) -> str:
     """Replace known sensitive patterns in a prompt string before LLM transmission (ENT-040)."""
     for pattern, replacement in _SENSITIVE_PATTERNS:
         prompt = pattern.sub(replacement, prompt)
     return prompt
+
+
+_REF_MARKER = re.compile(r"(\[ref:[^\]\s]+\])")
+
+
+def scrub_for_transmission(text):
+    """Scrub one string for transmission, leaving ``[ref:<id>]`` citation markers intact."""
+    if not isinstance(text, str) or not text:
+        return text
+    return "".join(
+        part if _REF_MARKER.fullmatch(part) else _scrub_prompt(part)
+        for part in _REF_MARKER.split(text)
+    )
+
+
+def scrub_chat_messages(messages):
+    """A copy of chat *messages* with every outgoing text scrubbed (the chat path).
+
+    Covers plain string content and the text of content blocks (tool results
+    included). Roles, tool-call ids and structure are left alone.
+    """
+    cleaned = []
+    for message in messages or []:
+        if not isinstance(message, dict):
+            cleaned.append(message)
+            continue
+        message = dict(message)
+        content = message.get("content")
+        if isinstance(content, str):
+            message["content"] = scrub_for_transmission(content)
+        elif isinstance(content, list):
+            blocks = []
+            for block in content:
+                if isinstance(block, dict):
+                    block = dict(block)
+                    for key in ("text", "content"):
+                        if isinstance(block.get(key), str):
+                            block[key] = scrub_for_transmission(block[key])
+                blocks.append(block)
+            message["content"] = blocks
+        cleaned.append(message)
+    return cleaned
 
 
 class LLMService:
@@ -169,9 +217,9 @@ class LLMService:
             "models": [],  # NO HARDCODED MODELS - Database only
             "base_url": None,  # Set via environment variable
         },
-        "deepseek": {
+        "nvidia": {
             "models": [],  # NO HARDCODED MODELS - Database only
-            "base_url": "https://api.deepseek.com/v1",
+            "base_url": "https://integrate.api.nvidia.com/v1",
         },
         "huggingface": {
             "models": [],  # NO HARDCODED MODELS - Database only
@@ -185,7 +233,6 @@ class LLMService:
 
     OPENROUTER_VENDOR_PROVIDER_MAP = {
         "anthropic": "anthropic",
-        "deepseek": "deepseek",
         "google": "gemini",
         "meta": "huggingface",
         "mistralai": "huggingface",
@@ -347,15 +394,13 @@ class LLMService:
             exclude_providers = []
 
         # Provider fallback priority order (used when no preference is set)
-        provider_priority = ["openai", "anthropic", "gemini", "deepseek", "openrouter", "azure", "huggingface"]
+        provider_priority = ["openai", "anthropic", "gemini", "openrouter", "nvidia", "azure", "huggingface"]
 
         # Default models for each provider (used when falling back to .env)
         # Single source of truth - these ids were hardcoded in six places and
         # drifted independently until every Claude id was stale, several to
         # RETIRED models that now 404 (claude-3-sonnet-20240229 went out in  stale-model-ok
         # July 2025).
-        from app.modules.ai_chat.services.model_defaults import DEFAULT_MODELS
-
         default_models = dict(DEFAULT_MODELS)
 
         # Ensure clean transaction state before query
@@ -645,7 +690,7 @@ class LLMService:
         Get the maximum tokens limit for a provider/model combination.
 
         Args:
-            provider: Provider name ('openai', 'anthropic', 'deepseek', etc.)
+            provider: Provider name ('openai', 'anthropic', 'nvidia', etc.)
             model: Optional model name for provider-specific limits
             requested_max: Optional requested max_tokens value to cap
 
@@ -654,7 +699,7 @@ class LLMService:
         """
         # Provider-specific limits
         provider_limits = {
-            "deepseek": 8192,  # DeepSeek max is 8192
+            "nvidia": 8192,
             "openai": 16384,  # GPT - 4 Turbo supports up to 16K
             "anthropic": 32000,  # Claude Opus supports up to 32K
             "gemini": 8192,  # Gemini Pro supports up to 8K
@@ -712,8 +757,8 @@ class LLMService:
             "openai": "OPENAI_API_KEY",
             "anthropic": "ANTHROPIC_API_KEY",
             "gemini": "GEMINI_API_KEY",
-            "deepseek": "DEEPSEEK_API_KEY",
             "openrouter": "OPENROUTER_API_KEY",
+            "nvidia": "NVIDIA_API_KEY",
             "azure": "AZURE_API_KEY",
             "huggingface": "HUGGINGFACE_API_KEY",
         }
@@ -1820,8 +1865,8 @@ Format as JSON: {{"quality_score": 85, "issues": ["issue1", "issue2"], "comments
                     response_text, token_input, token_output, cost = LLMService._call_gemini(
                         prompt, model, api_key, max_tokens=max_tokens, timeout=timeout
                     )
-                elif provider == "deepseek":
-                    response_text, token_input, token_output, cost = LLMService._call_deepseek(
+                elif provider == "nvidia":
+                    response_text, token_input, token_output, cost = LLMService._call_nvidia(
                         prompt, model, api_key, max_tokens=max_tokens, timeout=timeout
                     )
                 elif provider == "huggingface":
@@ -1910,7 +1955,7 @@ Format as JSON: {{"quality_score": 85, "issues": ["issue1", "issue2"], "comments
         # All keys failed for primary provider — try cross-provider fallback
         logger.error(f"❌ All {len(api_keys)} API key(s) failed for {provider}")
 
-        fallback_order = ["openai", "anthropic", "gemini", "deepseek", "openrouter", "huggingface"]
+        fallback_order = ["openai", "anthropic", "gemini", "openrouter", "nvidia", "huggingface"]
         for fallback_provider in fallback_order:
             # Skip providers we've already tried in this call chain to prevent infinite loops
             if fallback_provider in _already_tried:
@@ -1924,8 +1969,8 @@ Format as JSON: {{"quality_score": 85, "issues": ["issue1", "issue2"], "comments
                 "openai": "gpt-4o-mini",
                 "anthropic": "claude-haiku-4-5-20251001",
                 "gemini": "gemini-2.0-flash",
-                "deepseek": "deepseek-chat",
-                "openrouter": "deepseek/deepseek-chat",
+                "nvidia": DEFAULT_MODELS["nvidia"],
+                "openrouter": DEFAULT_MODELS["openrouter"],
                 "huggingface": "meta-llama/Llama-3.1-8B-Instruct",
             }
             try:
@@ -2541,7 +2586,7 @@ Format as JSON: {{"quality_score": 85, "issues": ["issue1", "issue2"], "comments
 
     @staticmethod
     @retry_on_transient_error(max_attempts=3, min_wait=2, max_wait=10)
-    def _call_deepseek(
+    def _call_nvidia(
         prompt: str,
         model: str,
         api_key: str,
@@ -2549,9 +2594,9 @@ Format as JSON: {{"quality_score": 85, "issues": ["issue1", "issue2"], "comments
         timeout: Optional[float] = None,
     ) -> Tuple[str, int, int, float]:
         """
-        Call DeepSeek API with automatic retry on transient failures.
+        Call NVIDIA's hosted free models with automatic retry on transient failures.
 
-        DeepSeek uses OpenAI-compatible API, so we can use the OpenAI client.
+        The API is OpenAI-compatible, so we can use the OpenAI client.
 
         Retries on: Timeout, ConnectionError, RateLimitError
         Max attempts: 3
@@ -2564,18 +2609,18 @@ Format as JSON: {{"quality_score": 85, "issues": ["issue1", "issue2"], "comments
             from openai import OpenAI
 
             # NOTE: the OpenAI client has no request timeout by default, which let a
-            # stalled DeepSeek connection hang a worker indefinitely (see Task 4,
+            # stalled NVIDIA connection hang a worker indefinitely (see Task 4,
             # P0 wave). Bound it explicitly at the client level.
             effective_timeout = timeout if timeout is not None else 60.0
             client = OpenAI(
-                api_key=api_key, base_url="https://api.deepseek.com/v1", timeout=effective_timeout
+                api_key=api_key, base_url="https://integrate.api.nvidia.com/v1", timeout=effective_timeout
             )
 
             # Use model-specific optimal token limits
             if max_tokens is None:
-                max_tokens = 4096  # Default for DeepSeek
+                max_tokens = 4096
 
-            # DeepSeek has a maximum of 8192 tokens - cap any value above that
+            # Cap any value above 8192 tokens
             max_tokens = min(max_tokens, 8192)
 
             # Enforce deterministic output for critical generation tasks
@@ -2597,20 +2642,15 @@ Format as JSON: {{"quality_score": 85, "issues": ["issue1", "issue2"], "comments
             token_input = response.usage.prompt_tokens
             token_output = response.usage.completion_tokens
 
-            # Calculate cost (DeepSeek pricing - approximate, adjust based on actual pricing)
-            # DeepSeek is typically much cheaper than OpenAI/Anthropic
-            cost_per_1k_input = 0.0001  # Very low input cost
-            cost_per_1k_output = 0.0002  # Very low output cost
-            cost = (token_input / DEFAULT_TOKEN_COST_MULTIPLIER * cost_per_1k_input) + (
-                token_output / DEFAULT_TOKEN_COST_MULTIPLIER * cost_per_1k_output
-            )
+            # The hosted models used here are free: no cost is incurred.
+            cost = 0.0
 
             return response_text, token_input, token_output, cost
 
         except ImportError:
             return "OpenAI library not installed. Run: pip install openai", 0, 0, 0.0
         except Exception as e:
-            logger.error(f"DeepSeek API error after retries: {str(e)}")
+            logger.error(f"NVIDIA API error after retries: {str(e)}")
             raise  # Re-raise for retry logic to handle
 
     @staticmethod
@@ -2802,7 +2842,7 @@ Format as JSON: {{"quality_score": 85, "issues": ["issue1", "issue2"], "comments
 
         Args:
             prompt: The prompt text
-            model: Model ID in provider/model format (e.g. "google/gemini-2.5-flash-preview:free")
+            model: Model ID in provider/model format (e.g. "google/gemma-4-31b-it:free")
             api_key: OpenRouter API key
             max_tokens: Maximum response tokens
             timeout: Optional override for the read timeout (seconds) of this
@@ -2829,6 +2869,8 @@ Format as JSON: {{"quality_score": 85, "issues": ["issue1", "issue2"], "comments
             "messages": [{"role": "user", "content": prompt}],
             "max_tokens": max_tokens,
             "temperature": 0.0,
+            # Only endpoints that neither train on nor log prompts.
+            "provider": OPENROUTER_PROVIDER_POLICY,
         }
 
         read_timeout = timeout if timeout is not None else 80
@@ -2923,9 +2965,9 @@ Format as JSON: {{"quality_score": 85, "issues": ["issue1", "issue2"], "comments
                 "name": "Google (Gemini)",
                 "default_models": ["gemini-2.0-flash", "gemini-2.0-flash-lite"]
             },
-            "deepseek": {
-                "name": "DeepSeek",
-                "default_models": ["deepseek-chat", "deepseek-coder"]
+            "nvidia": {
+                "name": "NVIDIA (free models)",
+                "default_models": [DEFAULT_MODELS["nvidia"]]
             },
             "huggingface": {
                 "name": "Hugging Face (Local Models)",
@@ -2933,7 +2975,7 @@ Format as JSON: {{"quality_score": 85, "issues": ["issue1", "issue2"], "comments
             },
             "openrouter": {
                 "name": "OpenRouter (65+ Models)",
-                "default_models": ["google/gemini-2.5-flash-preview:free", "meta-llama/llama-3-8b-instruct:free"]
+                "default_models": ["google/gemma-4-31b-it:free", "nvidia/nemotron-3-super-120b-a12b:free"]
             }
         }
         
@@ -3293,7 +3335,7 @@ def test_api_key(provider: str, api_key: str, model: str | None = None) -> Dict:
     Test if an API key is valid by making a minimal API call.
 
     Args:
-        provider: Provider name ('openai', 'anthropic', 'gemini', 'azure', 'huggingface', 'deepseek', 'custom')
+        provider: Provider name ('openai', 'anthropic', 'gemini', 'azure', 'huggingface', 'nvidia', 'custom')
         api_key: API key to test
         model: Model to use for the test. When None, reads from the DB row for this provider.
                Always prefer passing the configured model explicitly — hardcoded fallbacks go stale.
@@ -3372,12 +3414,12 @@ def test_api_key(provider: str, api_key: str, model: str | None = None) -> Dict:
                 "message": "Azure OpenAI testing not yet implemented. Configure endpoint and deployment name.",
             }
 
-        elif provider == "deepseek":
-            # DeepSeek uses OpenAI-compatible API
+        elif provider == "nvidia":
+            # NVIDIA's hosted models use an OpenAI-compatible API
             from openai import OpenAI
 
-            test_model = _resolve_model("deepseek", model) or "deepseek-chat"
-            client = OpenAI(api_key=api_key, base_url="https://api.deepseek.com/v1")
+            test_model = _resolve_model("nvidia", model) or DEFAULT_MODELS["nvidia"]
+            client = OpenAI(api_key=api_key, base_url="https://integrate.api.nvidia.com/v1")
             response = client.chat.completions.create(
                 model=test_model, messages=[{"role": "user", "content": "test"}], max_tokens=5
             )
@@ -3502,7 +3544,7 @@ def test_api_key(provider: str, api_key: str, model: str | None = None) -> Dict:
                 model_count = len(data.get("data", []))
 
                 # Resolve configured default model for display
-                default_model = _resolve_model("openrouter", model) or "deepseek/deepseek-chat"
+                default_model = _resolve_model("openrouter", model) or DEFAULT_MODELS["openrouter"]
 
                 return {
                     "success": True,
