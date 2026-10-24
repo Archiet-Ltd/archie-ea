@@ -1,0 +1,110 @@
+{# Vendored from flask-basecoat, branch feat/canvases-capability-map, commit 00320cd336755f4aef2c36bfe8d79e4cb1ed5546,
+   flask_basecoat/templates/basecoat/canvas/_frame.html. Adapted only to Entelim macro names (components/canvas/_ui.html maps the library
+   names onto components/*.html); the edit Sheet and its client-side script are left out because Entelim saves on the server. #}
+{# Strategy canvas frame: the parts every canvas shares. Tier C, criteria-v3 1.5.
+
+   A canvas page is the shadcn frame (shell), a toolbar, ONE region marked data-entelim-form that holds the drawing,
+   and the accessible alternative. This file owns everything except the drawing:
+     - toolbar: the canvas name and a ToggleGroup "Canvas view" (Canvas | List);
+     - the marked region: role="region", named, focusable, overflow-x-auto, the drawing at its natural width, so a
+       phone scrolls sideways and never stacks the boxes into one column;
+     - the list route: a Table with one row per note, the same data as the drawing;
+     - one edit Sheet (Field + Textarea, one note per line) shared by every box, and a polite live region;
+     - the credit line.
+   Behaviour is one Alpine flag (view) on the root; saving is server-side.
+
+   Content is passed as data: {'title', 'subtitle', 'boxes': {<box key>: [note, ...]}}. The framework's own wording
+   (box titles, guiding questions, layout) is a constant of each canvas macro, never of the data. #}
+{% import 'components/canvas/_ui.html' as ui with context %}
+
+{#- The marked region plus everything around it. The caller draws the canvas inside the region.
+    columns/rows describe the list route; rows are [box key, box title, note]. -#}
+{% macro frame(id, form, name, data, rows, hint, credit='', width='min-w-240', columns=['Box', 'Note']) -%}
+{%- set drawing = caller() -%}
+<div class="flex flex-col gap-4" data-canvas="{{ id }}" x-data="{ view: 'canvas' }">
+  <div class="flex flex-wrap items-end justify-between gap-3">
+    <div class="flex flex-col gap-1">
+      <h2 class="text-lg font-semibold tracking-tight">{{ data.title }}</h2>
+      <p class="text-sm text-muted-foreground">{{ data.subtitle }}</p>
+    </div>
+    <div class="flex gap-1" role="group" aria-label="{{ name }} view">
+      {{ ui.button(text='Canvas', variant='outline', size='sm', attrs={':aria-pressed': "view === 'canvas'", '@click': "view = 'canvas'", ':class': "view === 'canvas' ? 'bg-muted' : ''"}) }}
+      {{ ui.button(text='List', variant='outline', size='sm', attrs={':aria-pressed': "view === 'list'", '@click': "view = 'list'", ':class': "view === 'list' ? 'bg-muted' : ''"}) }}
+    </div>
+  
+  </div>
+
+  <div class="flex flex-col gap-2" data-canvas-pane="canvas" x-show="view === 'canvas'">
+    <div class="overflow-x-auto rounded-lg" role="region" tabindex="0" aria-label="{{ name }}, scroll horizontally" data-entelim-form="{{ form }}">
+      <div class="{{ width }}">{{ drawing }}</div>
+    </div>
+    <p class="text-xs text-muted-foreground">{{ hint }}</p>
+  </div>
+
+  <div data-canvas-pane="list" x-show="view === 'list'" x-cloak>
+    {% call ui.table_container() %}{% call ui.table(attrs={'aria-label': name ~ ', list view'}) %}
+      {% call ui.table_header() %}{% call ui.table_row() %}
+        {% for c in columns %}{{ ui.table_head(text=c, attrs={'scope': 'col'}) }}{% endfor %}
+      {% endcall %}{% endcall %}
+      {% call ui.table_body(attrs={'data-canvas-rows': ''}) %}
+        {% for r in rows %}
+        {% call ui.table_row(attrs={'data-box': r[0]}) %}
+          {% call ui.table_head(class='font-medium', attrs={'scope': 'row'}) %}{{ r[1] }}{% endcall %}
+          {% for cell in r[2:] %}{{ ui.table_cell(text=cell) }}{% endfor %}
+        {% endcall %}
+        {% endfor %}
+      {% endcall %}
+    {% endcall %}{% endcall %}
+  </div>
+
+  {% if credit %}<p class="text-xs text-muted-foreground">{{ credit }}</p>{% endif %}
+  <p class="sr-only" role="status" aria-live="polite" data-canvas-live></p>
+
+</div>
+{%- endmacro %}
+
+{#- The notes of one box (or sub-area): chips in a list, the edit button's target. -#}
+{% macro notes(key, items, title) -%}
+<ul class="flex flex-col gap-1.5" data-canvas-notes="{{ key }}" data-title="{{ title }}" aria-label="{{ title }} notes">
+  {% for n in items %}<li class="rounded-md border bg-muted px-2 py-1.5 text-sm">{{ n }}</li>{% endfor %}
+</ul>
+{%- endmacro %}
+
+{#- One box: a Card with an icon title, the framework's guiding question and its notes.
+    b = {'key', 'title', 'question', 'icon', 'area' (grid placement classes), 'number' (fill-in order), 'subs': [{'key', 'title', 'question'}]} -#}
+{% macro box(canvas_id, b, boxes) -%}
+{% call ui.card(size='sm', class=b.area ~ ' ' ~ (b.class or '')) %}
+  {% call ui.card_header() %}
+    {% call ui.card_title(class='flex items-center gap-2') %}
+      {% if b.number %}{{ ui.badge(text=b.number, variant='outline', class='size-5 rounded-full px-0') }}{% elif b.icon %}{{ ui.lucide(b.icon, 'size-4 text-muted-foreground') }}{% endif %}
+      <span>{{ b.title }}</span>
+    {% endcall %}
+    {{ ui.card_description(text=b.question, class='text-xs') }}
+  {% endcall %}
+  {% call ui.card_content(class='flex flex-1 flex-col gap-3') %}
+    {{ notes(b.key, boxes.get(b.key) or [], b.title) }}
+    {% for s in (b.subs or []) %}
+    {{ ui.separator() }}
+    <div class="flex flex-col gap-1.5">
+      <span class="text-xs font-medium text-muted-foreground">{{ s.title }}</span>
+      {{ notes(s.key, boxes.get(s.key) or [], s.title) }}
+    </div>
+    {% endfor %}
+  {% endcall %}
+{% endcall %}
+{%- endmacro %}
+
+{#- A canvas that is a grid of boxes. spec = {'id', 'form', 'name', 'grid' (grid classes), 'boxes': [...], 'hint', 'credit', 'width'}. -#}
+{% macro grid_canvas(spec, data, id) -%}
+{%- set boxes = data.boxes or {} -%}
+{%- set rows = [] -%}
+{%- for b in spec.boxes -%}
+  {%- for n in boxes.get(b.key) or ['No notes yet'] %}{% set _ = rows.append([b.key, b.title, n]) %}{% endfor -%}
+  {%- for s in b.subs or [] -%}{%- for n in boxes.get(s.key) or ['No notes yet'] %}{% set _ = rows.append([s.key, s.title, n]) %}{% endfor -%}{%- endfor -%}
+{%- endfor -%}
+{% call frame(id, spec.form, spec.name, data, rows, spec.hint, credit=spec.credit, width=spec.width or 'min-w-240') %}
+  <div class="grid gap-2 rounded-lg border bg-muted/30 p-2 {{ spec.grid }}">
+    {% for b in spec.boxes %}{{ box(id, b, boxes) }}{% endfor %}
+  </div>
+{% endcall %}
+{%- endmacro %}

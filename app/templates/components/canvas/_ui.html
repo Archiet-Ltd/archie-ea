@@ -1,0 +1,27 @@
+{# Maps the macro names the vendored canvas family calls (ui.card, ui.button, ...) onto Entelim's own
+   components. Nothing here draws markup the components do not; it only renames and passes arguments through. #}
+{% import 'components/card.html' as c %}
+{% import 'components/button.html' as b %}
+{% import 'components/badge.html' as bd %}
+{% import 'components/table.html' as t %}
+
+{% macro lucide(name, class='') %}<i data-lucide="{{ name }}" class="{{ class }}" aria-hidden="true"></i>{% endmacro %}
+
+{% macro card(size='default', class='') %}{% set inner = caller() %}{% call c.card(class=class) %}{{ inner }}{% endcall %}{% endmacro %}
+{% macro card_header(class='') %}{% set inner = caller() %}{% call c.card_header(class='p-3 pb-2 ' ~ class) %}{{ inner }}{% endcall %}{% endmacro %}
+{% macro card_title(class='') %}{% set inner = caller() %}{% call c.card_title(class='text-sm ' ~ class) %}{{ inner }}{% endcall %}{% endmacro %}
+{% macro card_description(text='', class='') %}{% call c.card_description(class=class) %}{{ text }}{% endcall %}{% endmacro %}
+{% macro card_action(class='') %}{% set inner = caller() %}{% call c.card_action(class='top-2 right-2 ' ~ class) %}{{ inner }}{% endcall %}{% endmacro %}
+{% macro card_content(class='') %}{% set inner = caller() %}{% call c.card_content(class='p-3 pt-0 ' ~ class) %}{{ inner }}{% endcall %}{% endmacro %}
+
+{% macro badge(text='', variant='default', class='') %}{% call bd.badge(variant=variant, class=class) %}{{ text }}{% endcall %}{% endmacro %}
+{% macro button(text='', variant='default', size='default', class='', type='button', attrs={}) %}{% set inner = caller() if caller is defined else '' %}{% call b.button(variant=variant, size=size, class=class, type=type, attrs_dict=attrs) %}{{ text }}{{ inner }}{% endcall %}{% endmacro %}
+{% macro separator() %}<hr class="border-border">{% endmacro %}
+
+{% macro table_container() %}{% set inner = caller() %}<div class="rounded-lg border">{{ inner }}</div>{% endmacro %}
+{% macro table(attrs={}) %}{% set inner = caller() %}{% call t.table(attrs_dict=attrs) %}{{ inner }}{% endcall %}{% endmacro %}
+{% macro table_header() %}{% set inner = caller() %}{% call t.table_header() %}{{ inner }}{% endcall %}{% endmacro %}
+{% macro table_body(attrs={}) %}{% set inner = caller() %}{% call t.table_body(attrs_dict=attrs) %}{{ inner }}{% endcall %}{% endmacro %}
+{% macro table_row(attrs={}) %}{% set inner = caller() %}{% call t.table_row(attrs_dict=attrs) %}{{ inner }}{% endcall %}{% endmacro %}
+{% macro table_head(text='', class='', attrs={}) %}{% set inner = caller() if caller is defined else '' %}{% call t.table_head(class=class, attrs_dict=attrs) %}{{ text }}{{ inner }}{% endcall %}{% endmacro %}
+{% macro table_cell(text='', class='', attrs={}) %}{% set inner = caller() if caller is defined else '' %}{% call t.table_cell(class=class, attrs_dict=attrs) %}{{ text }}{{ inner }}{% endcall %}{% endmacro %}
