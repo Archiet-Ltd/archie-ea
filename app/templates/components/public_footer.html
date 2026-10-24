@@ -7,6 +7,7 @@
    and public/vs_hub.html.
    smoke-coverage-ok: covered by tests/test_public_nav_journey.py and tests/test_public_site_registry.py.
 #}
+{% from 'components/button.html' import button %}
 {% from 'components/badge.html' import badge %}
 {% set reg = site_registry() %}
 <footer class="border-t border-border bg-background" data-site-footer>
@@ -50,7 +51,7 @@
         <li><a href="{{ action.href }}" class="rounded-md hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">{{ action.label }}</a></li>
         {% endfor %}
         {% endif %}
-        <li><button type="button" data-action="openAnalyticsConsentBanner" class="rounded-md hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">Cookie settings</button></li>
+        <li>{{ button(text='Cookie settings', variant='ghost', size='sm', data_action='openAnalyticsConsentBanner') }}</li>
       </ul>
     </div>
   </div>

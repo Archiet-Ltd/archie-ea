@@ -38,7 +38,7 @@ from app.services.public_pages import (
 MODULE_ICONS = {
     "ai-chat": "message-square",
     "answer-sources": "search",
-    "build-your-model-from-your-tools": "git-branch",
+    "build-your-model-from-your-tools": "unplug",
     "scenario-modelling": "git-compare",
     "software-and-tool-discovery": "search",
     "applications": "app-window",

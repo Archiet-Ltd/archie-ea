@@ -4,7 +4,7 @@ module_label: "Build your model from your tools"
 state: briefed
 cta: waiting_list
 capture_status: not_applicable_not_yet_built
-icon: git-branch
+icon: unplug
 ---
 
 # Build your model from your tools
