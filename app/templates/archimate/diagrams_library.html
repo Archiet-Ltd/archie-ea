@@ -1,6 +1,10 @@
 {% extends 'layouts/admin_base.html' %}
 {% from 'macros/page_shell.html' import page_shell %}
 {% from 'components/empty_state.html' import empty_state %}
+{% from 'components/button.html' import button %}
+{% from 'components/input.html' import input %}
+{% from 'components/select.html' import native_select %}
+{% import 'components/table.html' as table %}
 
 {% block title %}Diagrams{% endblock %}
 
@@ -14,19 +18,18 @@
 
 <div class="space-y-4" data-testid="diagrams-library-page">
     <form method="get" class="flex flex-wrap items-center gap-3" data-testid="diagrams-filter-form">
-        <input type="search" name="q" value="{{ q or '' }}" placeholder="Search diagram name…"
-               class="h-9 flex-1 min-w-[200px] max-w-sm rounded-md border border-input bg-background px-3 text-sm"
-               aria-label="Search diagrams by name">
-        <select name="solution_id" class="h-9 rounded-md border border-input bg-background px-3 text-sm"
-                aria-label="Filter by solution" onchange="this.form.submit()">
+        <div class="flex-1 min-w-[200px] max-w-sm">
+            <input type="search" name="q" value="{{ q or '' }}" placeholder="Search diagram name…"
+                   class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                   aria-label="Search diagrams by name">
+        </div>
+        {% call native_select(name='solution_id', size='sm', aria_label='Filter by solution', attrs_dict={'onchange': 'this.form.submit()'}) %}
             <option value="">All solutions</option>
             {% for sol in solutions %}
             <option value="{{ sol.id }}" {% if selected_solution_id == sol.id %}selected{% endif %}>{{ sol.name }}</option>
             {% endfor %}
-        </select>
-        <button type="submit" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
-            <i data-lucide="search" class="h-4 w-4"></i> Filter
-        </button>
+        {% endcall %}
+        {{ button(text='Filter', icon='search', variant='outline', type='submit') }}
         {% if q or selected_solution_id %}
         <a href="{{ url_for('archimate.diagrams_library') }}" class="text-sm text-muted-foreground hover:text-foreground">Clear</a>
         {% endif %}
@@ -34,36 +37,36 @@
 
     {% if diagrams %}
     <div class="overflow-x-auto rounded-lg border border-border">
-        <table class="dense-table w-full text-sm" data-testid="diagrams-table">
-            <thead class="bg-muted/40 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+        {% call table.table() %}
+            {% call table.table_header() %}
                 <tr>
-                    <th class="px-4 py-2.5">Name</th>
-                    <th class="px-4 py-2.5">Solution</th>
-                    <th class="px-4 py-2.5">Viewpoint</th>
-                    <th class="px-4 py-2.5">Elements</th>
-                    <th class="px-4 py-2.5">Updated</th>
-                    <th class="px-4 py-2.5"></th>
+                    {% call table.table_head() %}Name{% endcall %}
+                    {% call table.table_head() %}Solution{% endcall %}
+                    {% call table.table_head() %}Viewpoint{% endcall %}
+                    {% call table.table_head() %}Elements{% endcall %}
+                    {% call table.table_head() %}Updated{% endcall %}
+                    {% call table.table_head() %}{% endcall %}
                 </tr>
-            </thead>
-            <tbody class="divide-y divide-border">
+            {% endcall %}
+            {% call table.table_body() %}
                 {% for d in diagrams %}
-                <tr data-testid="diagram-row-{{ d.id }}">
-                    <td class="px-4 py-2.5 font-medium text-foreground">{{ d.name }}</td>
-                    <td class="px-4 py-2.5 text-muted-foreground">{{ d.solution_name or '—' }}</td>
-                    <td class="px-4 py-2.5 text-muted-foreground">{{ d.viewpoint_type or '—' }}</td>
-                    <td class="px-4 py-2.5 text-muted-foreground">{{ d.element_count }}</td>
-                    <td class="px-4 py-2.5 text-muted-foreground">{{ d.updated_at[:10] if d.updated_at else '—' }}</td>
-                    <td class="px-4 py-2.5 text-right">
+                <tr data-testid="diagram-row-{{ d.id }}" class="border-b transition-colors hover:bg-muted/50">
+                    {% call table.table_cell() %}<span class="font-medium text-foreground">{{ d.name }}</span>{% endcall %}
+                    {% call table.table_cell() %}<span class="text-muted-foreground">{{ d.solution_name or '—' }}</span>{% endcall %}
+                    {% call table.table_cell() %}<span class="text-muted-foreground">{{ d.viewpoint_type or '—' }}</span>{% endcall %}
+                    {% call table.table_cell() %}<span class="text-muted-foreground">{{ d.element_count }}</span>{% endcall %}
+                    {% call table.table_cell() %}<span class="text-muted-foreground">{{ d.updated_at[:10] if d.updated_at else '—' }}</span>{% endcall %}
+                    {% call table.table_cell(class='text-right') %}
                         <a href="{{ url_for('archimate.composer_page', viewpoint_id=d.id, solution_id=d.solution_id) }}"
-                           class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center"
+                           class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4"
                            data-testid="open-diagram-{{ d.id }}">
                             <i data-lucide="external-link" class="h-3.5 w-3.5"></i> Open
                         </a>
-                    </td>
+                    {% endcall %}
                 </tr>
                 {% endfor %}
-            </tbody>
-        </table>
+            {% endcall %}
+        {% endcall %}
     </div>
     {% else %}
     {{ empty_state(
