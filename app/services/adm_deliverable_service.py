@@ -1,7 +1,7 @@
-"""ADM Deliverable Service — seed data and checklist state management."""
+"""ADM Deliverable Service — the TOGAF checklist and a solution's own deliverables against it."""
 
-from datetime import datetime
-from typing import Any, Dict, List, Optional
+from datetime import date
+from typing import Any, Dict, List
 
 from app import db
 
@@ -149,52 +149,123 @@ def seed_deliverables() -> int:
     return inserted
 
 
-def get_phase_deliverables(
-    phase: str, board_id: Optional[int] = None
-) -> List[Dict[str, Any]]:
-    """Return template deliverables for *phase* with checked state for *board_id*."""
-    from app.models.adm_deliverable import ADMDeliverable, ADMDeliverableCheck
+def _own_deliverables(solution_id: int) -> list:
+    """The deliverables linked to one solution (the canonical store)."""
+    from app.models.implementation_migration import Deliverable
+    from app.models.solution_models import solution_deliverables
 
-    deliverables = ADMDeliverable.query.filter_by(phase=phase, is_template=True).all()
-    result = []
-    for d in deliverables:
-        check = None
-        if board_id is not None:
-            check = ADMDeliverableCheck.query.filter_by(  # model-safety-ok: bounded by phase deliverables (<10 rows)
-                deliverable_id=d.id, board_id=board_id
-            ).first()  # model-safety-ok
-        item = d.to_dict()
-        item["checked"] = check.checked if check else False
-        item["check_id"] = check.id if check else None
-        result.append(item)
-    return result
+    return (
+        db.session.query(Deliverable)
+        .join(
+            solution_deliverables,
+            solution_deliverables.c.deliverable_id == Deliverable.id,
+        )
+        .filter(solution_deliverables.c.solution_id == solution_id)
+        .order_by(Deliverable.id)
+        .all()
+    )
 
 
-def toggle_deliverable(
-    deliverable_id: int, board_id: Optional[int], checked: bool
-) -> Dict[str, Any]:
-    """Persist the checked state of a deliverable on a board.
+def _item(deliverable) -> Dict[str, Any]:
+    status = deliverable.delivery_status or "planned"
+    return {
+        "id": deliverable.id,
+        "name": deliverable.name,
+        "status": status,
+        "complete": status == "completed",
+    }
 
-    Creates the check row on first use. Returns the updated check dict.
+
+def solution_checklist(solution) -> Dict[str, Any]:
+    """A solution's deliverables set against the TOGAF template of its phase.
+
+    Each template item carries the solution's matching deliverable, or None
+    (shown as "Not started"). Deliverables with no template item in this
+    phase come back under ``also_produced``. Completion is read from the
+    deliverable's own status.
     """
-    from app.models.adm_deliverable import ADMDeliverable, ADMDeliverableCheck
+    from app.models.adm_deliverable import ADMDeliverable
 
-    deliverable = ADMDeliverable.query.get(deliverable_id)
+    phase = (solution.adm_phase or "").upper() or None
+    templates = (
+        ADMDeliverable.query.filter_by(phase=phase, is_template=True)
+        .order_by(ADMDeliverable.id)
+        .all()
+        if phase
+        else []
+    )
+    own = _own_deliverables(solution.id)
+    by_template: Dict[int, Any] = {}
+    for d in own:
+        if d.adm_template_id is not None:
+            by_template.setdefault(d.adm_template_id, d)
+    matched = set()
+    checklist = []
+    for t in templates:
+        d = by_template.get(t.id)
+        if d is not None:
+            matched.add(d.id)
+        checklist.append(
+            {
+                "template_id": t.id,
+                "name": t.name,
+                "description": t.description,
+                "deliverable": _item(d) if d is not None else None,
+            }
+        )
+    also = [_item(d) for d in own if d.id not in matched]
+    return {
+        "phase": phase,
+        "checklist": checklist,
+        "also_produced": also,
+        "total": len(own),
+        "complete": sum(1 for d in own if d.delivery_status == "completed"),
+    }
+
+
+def solution_deliverable_counts(solution_ids: List[int]) -> Dict[int, Dict[str, int]]:
+    """Own and complete deliverable counts for several solutions, in one query."""
+    from app.models.implementation_migration import Deliverable
+    from app.models.solution_models import solution_deliverables
+
+    if not solution_ids:
+        return {}
+    rows = (
+        db.session.query(
+            solution_deliverables.c.solution_id,
+            Deliverable.delivery_status,
+            db.func.count(Deliverable.id),
+        )
+        .join(Deliverable, Deliverable.id == solution_deliverables.c.deliverable_id)
+        .filter(solution_deliverables.c.solution_id.in_(solution_ids))
+        .group_by(solution_deliverables.c.solution_id, Deliverable.delivery_status)
+        .all()
+    )
+    counts: Dict[int, Dict[str, int]] = {}
+    for sid, status, n in rows:
+        entry = counts.setdefault(sid, {"total": 0, "complete": 0})
+        entry["total"] += n
+        if status == "completed":
+            entry["complete"] += n
+    return counts
+
+
+def set_complete(deliverable_id: int, complete: bool) -> Dict[str, Any]:
+    """Mark a solution deliverable complete, or take it back to in progress.
+
+    The tick is the deliverable's own status; nothing else records it.
+    """
+    from app.models.implementation_migration import Deliverable
+
+    # A query, not Session.get(): a cached row would skip the tenant fence.
+    deliverable = Deliverable.query.filter_by(id=deliverable_id).first()
     if deliverable is None:
         raise ValueError(f"Deliverable {deliverable_id} not found")
-
-    check = ADMDeliverableCheck.query.filter_by(
-        deliverable_id=deliverable_id, board_id=board_id
-    ).first()
-
-    if check is None:
-        check = ADMDeliverableCheck(
-            deliverable_id=deliverable_id,
-            board_id=board_id,
-        )
-        db.session.add(check)
-
-    check.checked = checked
-    check.checked_at = datetime.utcnow() if checked else None
+    if complete:
+        deliverable.delivery_status = "completed"
+        deliverable.delivered_date = date.today()
+    else:
+        deliverable.delivery_status = "in_progress"
+        deliverable.delivered_date = None
     db.session.commit()
-    return check.to_dict()
+    return _item(deliverable)

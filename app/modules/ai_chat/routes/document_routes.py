@@ -21,6 +21,7 @@ from app.utils.duplicate_guard import find_similar_entities
 from . import unified_ai_chat_bp
 from app.utils.pagination import MAX_PAGE_SIZE, safe_int_arg
 from app.middleware.tenant_decorators import is_platform_admin
+from app.modules.ai_chat.services.failure_messages import ASSISTANT_UNAVAILABLE
 from app.models.archimate_element_types import is_application_kind
 
 logger = logging.getLogger(__name__)
@@ -221,11 +222,7 @@ def upload_document():
                 return jsonify(
                     {
                         "success": False,
-                        "error": (
-                            "Document analysis needs an LLM provider and none is "
-                            "configured. Use Simple Parsing mode (CSV/Excel only), "
-                            "or configure a provider at Admin > API Settings."
-                        ),
+                        "error": ASSISTANT_UNAVAILABLE,
                         "code": "LLM_NOT_CONFIGURED",
                     }
                 ), 503

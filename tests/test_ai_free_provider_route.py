@@ -99,7 +99,7 @@ def test_streamed_chat_request_is_scrubbed_too(captured, monkeypatch):
     monkeypatch.setattr(_FakeCompletions, "create", lambda self, **kw: (self._sink.append(kw), _Stream())[1])
     AgentRunner(user_id=1)._call_llm(
         "nvidia",
-        "nvidia/nemotron-3-super-120b-a12b",
+        "nvidia/nemotron-3-ultra-550b-a55b",
         "key",
         "system",
         [{"role": "user", "content": SENSITIVE_QUESTION}],
@@ -120,7 +120,7 @@ def test_openrouter_requests_exclude_endpoints_that_train_or_log(captured):
 
 def test_nvidia_requests_go_to_nvidia_with_no_openrouter_setting(captured):
     AgentRunner(user_id=1)._call_llm(
-        "nvidia", "nvidia/nemotron-3-super-120b-a12b", "key", "s",
+        "nvidia", "nvidia/nemotron-3-ultra-550b-a55b", "key", "s",
         [{"role": "user", "content": "hi"}], [], base_url="https://integrate.api.nvidia.com/v1",
     )
     assert _sent(captured).get("extra_body") is None
@@ -198,3 +198,82 @@ def test_rate_limit_message_is_plain_and_offers_retry():
     reply = AgentRunner(user_id=1)._fallback("OpenRouter API error: 429 rate limit")
     assert "Retry" in reply["response"]
     assert "billing" not in reply["response"].lower()
+
+
+# --- the fallback actually happens when the first route is out of quota -------
+
+
+class _QuotaExhausted(Exception):
+    def __str__(self):
+        return "Error code: 429 - Rate limit exceeded: free-models-per-day"
+
+
+def _runner_with_routes(monkeypatch, outcomes):
+    """An AgentRunner whose provider calls follow ``outcomes`` (provider -> text or exception)."""
+    from app.modules.ai_chat.services import agent_runner as module
+
+    calls: list = []
+    runner = AgentRunner(user_id=1)
+
+    def fake_call(self, provider, model, api_key, system_prompt, messages, tools, stream=False, base_url=None):
+        calls.append(provider)
+        outcome = outcomes[provider]
+        if isinstance(outcome, Exception):
+            raise outcome
+        return {"text": outcome, "tool_calls": [], "raw": None}
+
+    monkeypatch.setattr(AgentRunner, "_call_llm", fake_call)
+    monkeypatch.setattr(
+        LLMService, "_get_configured_provider",
+        staticmethod(lambda exclude_providers=None, user_id=None: next(
+            (p, m) for p, m in [("openrouter", "google/gemma-4-31b-it:free"), ("nvidia", "nvidia/nemotron-3-ultra-550b-a55b")]
+            if p not in (exclude_providers or [])
+        )),
+    )
+    monkeypatch.setattr(LLMService, "_get_all_api_keys", staticmethod(lambda provider: ["key"]))
+    # The chain lists only providers that have a key. Give the two free routes
+    # one and take every paid and ordering setting away, so the order under test
+    # is the decided one for an organisation with no key of its own.
+    for name in ("OPENAI", "ANTHROPIC", "AZURE", "GEMINI"):
+        monkeypatch.delenv(name + "_API_KEY", raising=False)
+    monkeypatch.delenv("AI_PROVIDER_ORDER", raising=False)
+    monkeypatch.setenv("OPENROUTER_API_KEY", "key")
+    monkeypatch.setenv("NVIDIA_API_KEY", "key")
+    monkeypatch.setattr(module.AgentRunner, "_gate_mode", lambda self: "off", raising=False)
+    return runner, calls
+
+
+def test_chat_falls_back_to_the_next_free_route_when_the_first_is_out_of_quota(app, monkeypatch):
+    # Decided order with no key of the organisation's own: NVIDIA first, then
+    # OpenRouter (the shared OpenRouter allowance runs out daily).
+    runner, calls = _runner_with_routes(
+        monkeypatch, {"nvidia": _QuotaExhausted(), "openrouter": "Answered by the second route."}
+    )
+    with app.test_request_context("/ai-chat/message"):
+        result = runner.run("What depends on our primary database?")
+    assert calls == ["nvidia", "openrouter"]
+    assert "Answered by the second route." in str(result.get("response"))
+    assert not result.get("agent_error")
+
+
+def test_chat_reports_the_failure_when_every_free_route_is_out_of_quota(app, monkeypatch):
+    runner, calls = _runner_with_routes(
+        monkeypatch, {"openrouter": _QuotaExhausted(), "nvidia": _QuotaExhausted()}
+    )
+    with app.test_request_context("/ai-chat/message"):
+        result = runner.run("What depends on our primary database?")
+    assert calls == ["nvidia", "openrouter"]
+    assert "LLM call failed" in str(result.get("error"))
+    assert "busy" in str(result.get("response"))
+
+
+def test_nvidia_default_is_a_model_the_service_serves():
+    """The earlier default is listed by NVIDIA but answers 404, so every fallback turn failed."""
+    assert default_model_for("nvidia") == "nvidia/nemotron-3-ultra-550b-a55b"
+    for path in (
+        "app/modules/ai_chat/services/llm_router.py",
+        "app/modules/admin/routes/admin_routes.py",
+        "app/modules/admin/v2/routes/admin_routes.py",
+        "app/modules/ai_chat/services/model_defaults.py",
+    ):
+        assert '"nvidia/nemotron-3-super-120b-a12b"' not in (ROOT / path).read_text(), path

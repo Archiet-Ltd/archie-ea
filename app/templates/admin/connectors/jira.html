@@ -1,3 +1,4 @@
+{# design-block: settings #}
 {% extends 'layouts/admin_base.html' %}
 {% block title %}Jira ALM Connector{% endblock %}
 {% from 'components/page_header.html' import page_header %}
@@ -8,7 +9,7 @@
         title='Jira ALM Connector',
         description='Configure bidirectional Jira integration — ARB decisions create Jira epics; backlog items are imported as requirements.',
         breadcrumbs=[
-            {'label': 'Admin', 'href': url_for('admin.index')},
+            ({'label': 'Admin', 'href': url_for('admin.index')} if current_user.is_admin() else {'label': 'Workspace'}),
             {'label': 'Jira Connector'}
         ]
     ) }}

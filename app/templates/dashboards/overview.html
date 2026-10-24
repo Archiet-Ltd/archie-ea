@@ -70,9 +70,11 @@
                 {{ button(text='Connect GitHub', href=url_for('m365_connector.github_connect'), icon='github', testid='first-action-connect') }}
                 {% endif %}
                 {% if first_actions.sample %}
-                <form method="post" action="{{ url_for('architect_ui.load_sample_company') }}" data-testid="first-action-sample-form">
+                <form method="post" action="{{ url_for('architect_ui.load_sample_company') }}" data-testid="first-action-sample-form"
+                      x-data="{ busy: false }" @submit="if (busy) { $event.preventDefault() } else { busy = true }">
                     {{ input(type='hidden', name='csrf_token', value=csrf_token()) }}
-                    {{ button(text='See a sample company', type='submit', variant='outline' if first_actions.connect else 'default', testid='first-action-sample') }}
+                    {{ button(text='See a sample company', type='submit', variant='outline' if first_actions.connect else 'default', testid='first-action-sample', attrs_dict={':disabled': 'busy', ':aria-busy': 'busy'}) }}
+                    <p class="mt-2 text-sm text-muted-foreground" role="status" x-show="busy" x-cloak data-testid="first-action-sample-busy">Loading the sample company. This takes a few seconds.</p>
                 </form>
                 {% endif %}
                 {% if not first_actions.connect and not first_actions.sample %}

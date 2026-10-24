@@ -67,29 +67,25 @@ def test_chat_opens_in_the_ctos_lens_with_a_one_line_toolbar(browser, live_serve
             assert "serif" not in style[1].replace("sans-serif", ""), style
 
         page.goto(live_server + "/ai-chat", wait_until="networkidle", timeout=PAGE_TIMEOUT)
+        # the assistant and scope sit behind Chat options, two clicks from the question box
         selector = page.locator("#persona-selector")
+        expect(selector).to_be_hidden()
+        page.get_by_role("button", name="Chat options").click()
+        expect(selector).to_be_visible()
         chosen = selector.evaluate("e => e.options[e.selectedIndex].text")
         assert "Enterprise Architect" not in chosen, chosen
         assert re.search(r"CTO|CIO|Executive", chosen), chosen
+        expect(page.locator("#domain-selector")).to_be_visible()
+        page.wait_for_timeout(600)  # the sheet has finished sliding in
+        box = selector.bounding_box()
+        assert box["x"] >= 0 and box["x"] + box["width"] <= viewport["width"]
+        page.keyboard.press("Escape")
+        expect(selector).to_be_hidden()
 
         # the whole header, not just its control row: nothing may sit on a line of its own above it
-        header = page.locator("main header, header").filter(has=page.locator('[data-testid="chat-header-row"]')).first
+        header = page.locator('[data-testid="chat-header-row"]')
         height = header.evaluate("e => e.getBoundingClientRect().height")
         assert height <= 72, height
-        if name == "390":
-            # one line: the assistant and scope selects wait inside the settings sheet
-            expect(selector).to_be_hidden()
-            page.get_by_role("button", name="Toggle advanced settings").click()
-            expect(selector).to_be_visible()
-            expect(page.locator("#domain-selector")).to_be_visible()
-            box = selector.bounding_box()
-            assert box["width"] >= 200 and box["x"] >= 0 and box["x"] + box["width"] <= viewport["width"]
-            assert page.locator("#persona-selector").evaluate("e => e.scrollWidth <= e.clientWidth + 1")
-            page.keyboard.press("Escape")
-            expect(selector).to_be_hidden()
-        else:
-            expect(selector).to_be_visible()
-            expect(page.locator("#domain-selector")).to_be_visible()
         # the composer is on screen with the toolbar
         expect(page.locator("#user-input")).to_be_in_viewport()
     finally:

@@ -74,3 +74,59 @@ def test_sample_does_not_leak_across_organisations(client, login_as, make_org):
     assert client.post("/architecture/sample-company/load").status_code == 302
     assert _element_count(org1.id) > 0
     assert _element_count(org2.id) == 0
+
+
+def _hold_load_lock(org_id):
+    """Take the lock a running load of ``org_id`` holds, on a connection of its own."""
+    from app.services.sample_company_service import _LOCK_KEY
+
+    conn = db.engine.connect()
+    conn.execute(db.text("SELECT pg_advisory_lock(:k, :o)"), {"k": _LOCK_KEY, "o": org_id})
+    return conn
+
+
+def _release_load_lock(conn, org_id):
+    from app.services.sample_company_service import _LOCK_KEY
+
+    conn.execute(db.text("SELECT pg_advisory_unlock(:k, :o)"), {"k": _LOCK_KEY, "o": org_id})
+    conn.close()
+
+
+def test_a_load_that_cannot_start_says_so_in_plain_words_and_adds_nothing(client, login_as, make_org, monkeypatch):
+    """While one load of an organisation is still working, a second press waits, then asks the
+    person to try again; it never hangs and never imports the file a second time."""
+    from app.services import sample_company_service
+
+    monkeypatch.setattr(sample_company_service, "LOAD_WAIT_SECONDS", 1)
+    org = make_org()
+    architect = _user(org, "architect@example.com", "Architect", "enterprise_architect")
+    login_as(client, architect)
+    holder = _hold_load_lock(org.id)
+    try:
+        response = client.post(
+            "/architecture/sample-company/load", headers={"Accept": "application/json"}
+        )
+    finally:
+        _release_load_lock(holder, org.id)
+    assert response.status_code == 503
+    assert "still loading" in response.get_json()["error"]
+    assert "again" in response.get_json()["error"]
+    assert _element_count(org.id) == 0
+    # once the first load is done the same press loads it
+    assert client.post("/architecture/sample-company/load").status_code == 302
+    assert _element_count(org.id) > 0
+
+
+def test_one_organisation_loading_does_not_hold_up_another(client, login_as, make_org):
+    """The lock is per organisation: org A mid-load, org B loads at once."""
+    org_a, org_b = make_org(), make_org()
+    architect_b = _user(org_b, "b-architect@example.com", "Architect", "enterprise_architect")
+    holder = _hold_load_lock(org_a.id)
+    try:
+        login_as(client, architect_b)
+        response = client.post("/architecture/sample-company/load")
+    finally:
+        _release_load_lock(holder, org_a.id)
+    assert response.status_code == 302
+    assert _element_count(org_b.id) > 0
+    assert _element_count(org_a.id) == 0
