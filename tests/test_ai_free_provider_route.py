@@ -231,17 +231,27 @@ def _runner_with_routes(monkeypatch, outcomes):
         )),
     )
     monkeypatch.setattr(LLMService, "_get_all_api_keys", staticmethod(lambda provider: ["key"]))
+    # The chain lists only providers that have a key. Give the two free routes
+    # one and take every paid and ordering setting away, so the order under test
+    # is the decided one for an organisation with no key of its own.
+    for name in ("OPENAI", "ANTHROPIC", "AZURE", "GEMINI"):
+        monkeypatch.delenv(name + "_API_KEY", raising=False)
+    monkeypatch.delenv("AI_PROVIDER_ORDER", raising=False)
+    monkeypatch.setenv("OPENROUTER_API_KEY", "key")
+    monkeypatch.setenv("NVIDIA_API_KEY", "key")
     monkeypatch.setattr(module.AgentRunner, "_gate_mode", lambda self: "off", raising=False)
     return runner, calls
 
 
-def test_chat_falls_back_to_nvidia_when_openrouter_is_out_of_quota(app, monkeypatch):
+def test_chat_falls_back_to_the_next_free_route_when_the_first_is_out_of_quota(app, monkeypatch):
+    # Decided order with no key of the organisation's own: NVIDIA first, then
+    # OpenRouter (the shared OpenRouter allowance runs out daily).
     runner, calls = _runner_with_routes(
-        monkeypatch, {"openrouter": _QuotaExhausted(), "nvidia": "Answered by the second route."}
+        monkeypatch, {"nvidia": _QuotaExhausted(), "openrouter": "Answered by the second route."}
     )
     with app.test_request_context("/ai-chat/message"):
         result = runner.run("What depends on our primary database?")
-    assert calls == ["openrouter", "nvidia"]
+    assert calls == ["nvidia", "openrouter"]
     assert "Answered by the second route." in str(result.get("response"))
     assert not result.get("agent_error")
 
@@ -252,7 +262,7 @@ def test_chat_reports_the_failure_when_every_free_route_is_out_of_quota(app, mon
     )
     with app.test_request_context("/ai-chat/message"):
         result = runner.run("What depends on our primary database?")
-    assert calls == ["openrouter", "nvidia"]
+    assert calls == ["nvidia", "openrouter"]
     assert "LLM call failed" in str(result.get("error"))
     assert "busy" in str(result.get("response"))
 
