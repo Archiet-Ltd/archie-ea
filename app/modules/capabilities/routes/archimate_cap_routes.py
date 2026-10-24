@@ -830,6 +830,7 @@ def api_relationship_suggestions():
         sort: confidence|layer|type (default: confidence)
     """
     try:
+        from flask_login import current_user
         from app.models.archimate_core import ArchiMateElement, RelationshipSuggestion
 
         status = request.args.get("status", "pending")
@@ -837,19 +838,22 @@ def api_relationship_suggestions():
         limit = min(safe_int_arg('limit', 50, minimum=1, maximum=500), 100)
         org_id = current_user.organization_id
 
-        # Only return suggestions where BOTH source and target elements exist
-        # in the current user's organisation.  Join to archimate_elements twice
-        # and skip any suggestion whose referenced element vanished or belongs
-        # to a different org.
-        src_alias = db.aliased(ArchiMateElement)
-        tgt_alias = db.aliased(ArchiMateElement)
+        # Fetch all pending suggestions in this org — join via archimate_elements
+        # so that only suggestions whose source AND target elements both exist in
+        # the current organisation are returned.  Orphaned suggestions whose
+        # element IDs point to a different org (or no org at all) are silently
+        # excluded.
+        src_org = db.session.query(ArchiMateElement.id).filter(
+            ArchiMateElement.organization_id == org_id
+        ).subquery()
+        tgt_org = db.session.query(ArchiMateElement.id).filter(
+            ArchiMateElement.organization_id == org_id
+        ).subquery()
 
         query = (
             RelationshipSuggestion.query
-            .join(src_alias, src_alias.id == RelationshipSuggestion.source_element_id)
-            .join(tgt_alias, tgt_alias.id == RelationshipSuggestion.target_element_id)
-            .filter(src_alias.organization_id == org_id)
-            .filter(tgt_alias.organization_id == org_id)
+            .filter(RelationshipSuggestion.source_element_id.in_(src_org))
+            .filter(RelationshipSuggestion.target_element_id.in_(tgt_org))
             .filter(RelationshipSuggestion.status == status)
         )
         if status == "pending":
@@ -857,21 +861,38 @@ def api_relationship_suggestions():
         query = query.order_by(RelationshipSuggestion.confidence.desc())
         suggestions = query.limit(limit).all()
 
+        # Eager-load element data to avoid N+1 queries
+        element_ids = set()
+        for s in suggestions:
+            element_ids.add(s.source_element_id)
+            element_ids.add(s.target_element_id)
+
+        elements_by_id = {}
+        if element_ids:
+            elements = ArchiMateElement.query.filter(
+                ArchiMateElement.id.in_(element_ids)
+            ).all()
+            elements_by_id = {e.id: e for e in elements}
+
         result = []
         for s in suggestions:
+            src = elements_by_id.get(s.source_element_id)
+            tgt = elements_by_id.get(s.target_element_id)
+            # Both elements are guaranteed to exist from the subquery filter,
+            # but guard defensively anyway.
             result.append({
                 "id": s.id,
                 "source_element": {
                     "id": s.source_element_id,
-                    "name": s.source_element.name,
-                    "type": s.source_element.type,
-                    "layer": s.source_element.layer,
+                    "name": src.name if src else "Unknown element",
+                    "type": src.type if src else "Unknown",
+                    "layer": src.layer if src else None,
                 },
                 "target_element": {
                     "id": s.target_element_id,
-                    "name": s.target_element.name,
-                    "type": s.target_element.type,
-                    "layer": s.target_element.layer,
+                    "name": tgt.name if tgt else "Unknown element",
+                    "type": tgt.type if tgt else "Unknown",
+                    "layer": tgt.layer if tgt else None,
                 },
                 "relationship_type": s.relationship_type,
                 "confidence": s.confidence,

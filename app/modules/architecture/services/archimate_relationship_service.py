@@ -348,16 +348,22 @@ class ArchiMateRelationshipService:
             .filter_by(status="pending")
             .filter(RelationshipSuggestion.confidence >= min_confidence)
         )
+
         if organization_id is not None:
-            src_alias = db.aliased(ArchiMateElement)
-            tgt_alias = db.aliased(ArchiMateElement)
+            # Only include suggestions where both source and target elements
+            # exist in this organisation.
+            src_org = db.session.query(ArchiMateElement.id).filter(
+                ArchiMateElement.organization_id == organization_id
+            ).subquery()
+            tgt_org = db.session.query(ArchiMateElement.id).filter(
+                ArchiMateElement.organization_id == organization_id
+            ).subquery()
             query = (
                 query
-                .join(src_alias, src_alias.id == RelationshipSuggestion.source_element_id)
-                .join(tgt_alias, tgt_alias.id == RelationshipSuggestion.target_element_id)
-                .filter(src_alias.organization_id == organization_id)
-                .filter(tgt_alias.organization_id == organization_id)
+                .filter(RelationshipSuggestion.source_element_id.in_(src_org))
+                .filter(RelationshipSuggestion.target_element_id.in_(tgt_org))
             )
+
         return (
             query
             .order_by(RelationshipSuggestion.confidence.desc())
