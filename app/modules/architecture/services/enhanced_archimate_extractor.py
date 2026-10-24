@@ -68,7 +68,7 @@ class EnhancedArchiMateExtractor:
             document_text: Source document content
             document_type: Type of document (requirements, regulation, technical_spec)
             context: Additional context for extraction
-            provider: LLM provider to use (e.g., 'deepseek', 'anthropic', 'openai'). If None, uses default.
+            provider: LLM provider to use (e.g., 'openrouter', 'anthropic', 'openai'). If None, uses default.
 
         Returns:
             Enhanced architecture data with quality metrics
@@ -197,7 +197,7 @@ class EnhancedArchiMateExtractor:
                 fallback_provider = None
                 fallback_model = None
 
-                for paid_provider in ["deepseek", "anthropic", "openai", "gemini", "azure"]:
+                for paid_provider in ["anthropic", "openai", "gemini", "azure"]:
                     paid_settings = APISettings.query.filter_by(
                         provider=paid_provider, enabled=True
                     ).first()
@@ -223,7 +223,7 @@ class EnhancedArchiMateExtractor:
                     logger.error("❌ No paid provider available for fallback")
                     raise ValueError(
                         f"Hugging Face failed and no paid provider available. "
-                        f"Error: {e}. Please configure a paid provider (DeepSeek/Claude/GPT - 4) in API Settings."
+                        f"Error: {e}. Please configure a paid provider (Claude/GPT - 4) in API Settings."
                     )
             else:
                 # Re-raise non-Hugging Face errors
