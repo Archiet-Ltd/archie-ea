@@ -3,6 +3,7 @@
 {% from 'components/page_header.html' import page_header %}
 {% from 'components/button.html' import button %}
 {% from 'components/empty_state.html' import empty_state %}
+{% from 'components/input.html' import input %}
 
 {% block title %}Security Control Matrix{% endblock %}
 
@@ -29,8 +30,8 @@
         {% endcall %}
       </div>
       <form method="get" action="{{ url_for('enterprise_genome.security_matrix') }}">
-        {% if org_id is not none %}<input type="hidden" name="org_id" value="{{ org_id }}">{% endif %}
-        <input type="hidden" name="generate" value="1">
+        {% if org_id is not none %}{{ input(name='org_id', type='hidden', value=org_id) }}{% endif %}
+        {{ input(name='generate', type='hidden', value='1') }}
         {{ button(text='Generate control matrix', type='submit') }}
       </form>
     </div>
