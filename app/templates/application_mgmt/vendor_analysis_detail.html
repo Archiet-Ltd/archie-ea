@@ -12,6 +12,7 @@
 {% from "components/confirmation_dialog.html" import confirmation_dialog %}
 {% import "components/card.html" as ui %}
 {% from "components/dense_table.html" import dense_table %}
+{% from "macros/page_shell.html" import page_shell %}
 
 {% block content %}
 {# Parentheses are required. Alpine's stock evaluator invokes a bare registered
@@ -23,29 +24,18 @@
 <div class="space-y-6" x-data="vendorAnalysisDetail()" data-analysis-id='{{ analysis_id | tojson }}'>
 
   <!-- Page Header -->
-  <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-    <div>
-      <nav aria-label="Breadcrumb" class="mb-1">
-        <ol class="flex items-center gap-2 text-sm text-muted-foreground">
-          <li><a href="{{ url_for('main.index') }}" class="hover:text-foreground">Home</a></li>
-          <li aria-hidden="true"><i data-lucide="chevron-right" class="h-3 w-3"></i></li>
-          <li><a href="{{ url_for('application_mgmt.vendor_analysis_list') }}" class="hover:text-foreground">Vendor Analysis</a></li>
-          <li aria-hidden="true"><i data-lucide="chevron-right" class="h-3 w-3"></i></li>
-          <li class="text-foreground" aria-current="page"><span x-text="analysis.name || 'New Analysis'"></span></li>
-        </ol>
-      </nav>
-      <h1 class="text-2xl font-bold text-foreground" x-text="analysis.name || 'New Vendor Options Analysis'"></h1>
-      <p class="text-sm text-muted-foreground mt-1">Multi-criteria vendor evaluation aligned to enterprise capabilities, APQC processes, and value streams</p>
-    </div>
-    <div class="flex items-center gap-2">
+  {% macro _title() %}<span x-text="analysis.name || 'New Vendor Options Analysis'"></span>{% endmacro %}
+  {% macro _actions() %}
       {% for tone in ['success', 'warning', 'info', 'destructive', 'neutral'] %}
       <span x-show="statusTone() === '{{ tone }}'" x-cloak>
         {% call badge(tone) %}<span x-text="analysis.approval_status || analysis.status || 'new'"></span>{% endcall %}
       </span>
       {% endfor %}
       {{ button('Back', variant='outline', href=url_for('application_mgmt.vendor_analysis_list'), icon='arrow-left') }}
-    </div>
-  </div>
+  {% endmacro %}
+  {{ page_shell(title='', title_caller=_title, actions_caller=_actions,
+                breadcrumb=[('Home', url_for('main.index')), ('Vendor Analysis', url_for('application_mgmt.vendor_analysis_list')), ('Options analysis', none)],
+                subtitle='Multi-criteria vendor evaluation aligned to enterprise capabilities, APQC processes, and value streams') }}
 
   <!-- Wizard Progress Indicator -->
   <nav aria-label="Vendor analysis wizard progress">
