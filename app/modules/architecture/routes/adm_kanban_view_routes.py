@@ -24,6 +24,7 @@ from flask import (
 from flask_login import login_required
 
 from app.decorators import admin_required, audit_log
+from app.modules.genome.services.roadmap_links import redirect_to_roadmap
 from app.middleware.tenant_decorators import is_active_org_admin
 from app.models.adm_kanban import create_adm_phases, KanbanCard
 from app.models.archimate_core import ArchiMateElement
@@ -159,67 +160,15 @@ def gap_analysis():
 @adm_kanban_view_bp.route("/plateau-roadmap")
 @login_required
 def plateau_roadmap():
-    """Plateau Roadmap — group cards by their target Plateau, and show each
-    plateau's critical path computed from the one work package store."""
-    try:
-        plateaus = (
-            KanbanCard.query
-            .filter_by(arch_element_type="Plateau")
-            .order_by(KanbanCard.adm_phase_id, KanbanCard.title)
-            .all()
-        )
-        assigned = (
-            KanbanCard.query
-            .filter(KanbanCard.target_plateau_id.isnot(None))
-            .order_by(KanbanCard.target_plateau_id, KanbanCard.title)
-            .all()
-        )
-        plateau_cards: dict = {}
-        for card in assigned:
-            plateau_cards.setdefault(card.target_plateau_id, []).append(card)
-
-        unassigned_count = (
-            KanbanCard.query
-            .filter(
-                KanbanCard.arch_element_type != "Plateau",
-                KanbanCard.target_plateau_id.is_(None),
-            )
-            .count()
-        )
-    except Exception as exc:
-        current_app.logger.error("Plateau roadmap query failed: %s", exc)
-        plateaus, plateau_cards, unassigned_count = [], {}, 0
-
-    # The critical path panel is computed on its own: a failure in it is
-    # logged and the panel is empty; the plateau cards above still show.
-    try:
-        from app.services import work_package_service
-        from app.utils.tenant import current_organization_id
-
-        critical_paths = work_package_service.critical_paths_for_roadmap(
-            current_organization_id()
-        )
-    except Exception as exc:
-        current_app.logger.error("Plateau roadmap critical path failed: %s", exc)
-        from app import db
-
-        db.session.rollback()
-        critical_paths = []
-
-    return render_template(
-        "adm_kanban/plateau_roadmap.html",
-        plateaus=plateaus,
-        plateau_cards=plateau_cards,
-        unassigned_count=unassigned_count,
-        critical_paths=critical_paths,
-    )
+    """The plateau roadmap is the one roadmap, Strategic view (plateaus and the critical path)."""
+    return redirect_to_roadmap("strategic")
 
 
 @adm_kanban_view_bp.route("/roadmap")
 @login_required
 def adm_roadmap_timeline():
-    """ADM Roadmap Timeline — Gantt view of ALL Kanban cards across all boards."""
-    return render_template("adm_kanban/roadmap.html")
+    """The ADM roadmap is the one roadmap, Strategic view."""
+    return redirect_to_roadmap("strategic")
 
 
 @adm_kanban_view_bp.route("/api/elements/search")

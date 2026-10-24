@@ -350,7 +350,7 @@ ARCHITECTURE_TOOLS_SECTION = NavigationSectionV2(
             label="Roadmap Builder",
             icon="map",
             endpoint="strategic_routes.roadmap_index",
-            url_fallback="/strategic/roadmap",
+            url_fallback="/genome/roadmap/",
             order=3,
         ),
         NavigationItemV2(
