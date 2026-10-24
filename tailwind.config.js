@@ -34,7 +34,7 @@ module.exports = {
         'span-10': 'span 10 / span 10',
         'span-18': 'span 18 / span 18',
       },
-      minWidth: { '240': '60rem', '375': '93.75rem' },
+      minWidth: { '240': '60rem' },
       // Pilot type scale (design register: typography). Plain sizes: the line
       // height stays inherited, as it was with the arbitrary text-[Npx] values.
       // The 11px tier is .text-2xs in shadcn_tokens.css (16px line height).

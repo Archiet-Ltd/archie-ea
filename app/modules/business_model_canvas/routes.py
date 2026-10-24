@@ -162,8 +162,8 @@ def value_proposition(canvas_id):
     from app.modules.business_model_canvas import vpc_service
 
     return render_template(
-        "business_model/value_proposition.html", canvas=canvas, boxes=vpc_service.boxes(canvas),
-        segments=vpc_service.segments(canvas),
+        "business_model/detail.html", framework="value_proposition", canvas=canvas,
+        boxes=vpc_service.boxes(canvas), segments=vpc_service.segments(canvas), can_edit=False,
     )
 
 

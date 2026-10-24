@@ -17572,7 +17572,10 @@
    "page_type": "data-table",
    "reason": "Business models list.",
    "tier": "B",
-   "type_changed": false
+   "type_changed": false,
+   "extra_macros": [
+    "components/card.html"
+   ]
   },
   "app/templates/business_model/not_found.html": {
    "allowed_macros": [
@@ -17628,99 +17631,6 @@
    "reason": "Business model not found; Empty with a link back.",
    "tier": "A",
    "type_changed": false
-  },
-  "app/templates/business_model/value_proposition.html": {
-   "allowed_macros": [
-    "components/accessibility_helpers.html",
-    "components/alert.html",
-    "components/avatar.html",
-    "components/badge.html",
-    "components/breadcrumb.html",
-    "components/breadcrumb_nav.html",
-    "components/button.html",
-    "components/canvas_box.html",
-    "components/card.html",
-    "components/checkbox.html",
-    "components/confirmation_dialog.html",
-    "components/data_card.html",
-    "components/dense_table.html",
-    "components/detail_meta.html",
-    "components/dialog.html",
-    "components/dropdown_menu.html",
-    "components/empty_state.html",
-    "components/error_boundary.html",
-    "components/form_field.html",
-    "components/inline_hint.html",
-    "components/input.html",
-    "components/loading_state.html",
-    "components/metrics_card.html",
-    "components/modal.html",
-    "components/page_header.html",
-    "components/progress.html",
-    "components/provenance.html",
-    "components/select.html",
-    "components/skeleton.html",
-    "components/status_badge.html",
-    "components/status_indicator.html",
-    "components/tabs.html",
-    "components/traceability_panel.html",
-    "macros/form_macros.html",
-    "macros/page_shell.html"
-   ],
-   "basis": "rule",
-   "block": "record-detail",
-   "components": [
-    "alert",
-    "badge",
-    "breadcrumb",
-    "button",
-    "canvas-box",
-    "card",
-    "dialog",
-    "empty",
-    "page-header",
-    "tabs"
-   ],
-   "controls": {
-    "link": 3
-   },
-   "extends": [
-    "layouts/admin_base.html"
-   ],
-   "macros": [
-    "components/canvas/index.html",
-    "components/empty_state.html",
-    "components/page_header.html"
-   ],
-   "persona": "business_architect",
-   "reference": {
-    "shadcn": {
-     "name": "shadcn examples: mail (reading pane)",
-     "url": "https://ui.shadcn.com/examples/mail"
-    },
-    "basecoat": {
-     "name": "flask-basecoat examples: product detail",
-     "image": "docs/design/reference/basecoat-product-detail.webp"
-    }
-   },
-   "spec": null,
-   "status": "mapped",
-   "charts": [],
-   "confidence": "high",
-   "frame": "dashboard-01",
-   "inhouse_components": [
-    "canvas-box:Compose",
-    "modal:Replace",
-    "page-header:Replace"
-   ],
-   "original": "gap:G-4",
-   "page_type": "board-canvas",
-   "reason": "Value proposition canvas: the value map and customer profile, read from the business model canvas.",
-   "tier": "C4",
-   "type_changed": true,
-   "extra_macros": [
-    "components/canvas/index.html"
-   ]
   },
   "app/templates/capabilities/capability_fact_sheet.html": {
    "allowed_macros": [
