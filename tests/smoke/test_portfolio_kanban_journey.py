@@ -439,11 +439,14 @@ def test_portfolio_board_viewer_is_read_only(browser, live_server, seeded, db_se
         page.wait_for_load_state("networkidle")
         # The epics are visible (read access), but no move control is shown.
         expect(page.get_by_role("heading", name="Platform Modernization Epic").first).to_be_visible(timeout=PAGE_TIMEOUT)
-        # The "Move to" select is gated on canWrite (x-show), so for a viewer no
-        # select is visible — a hidden node may remain in the DOM, so the test
+        # The "Move to" menu is gated on canWrite (x-show), so for a viewer none
+        # is visible — a hidden node may remain in the DOM, so the test
         # asserts visibility, not DOM presence.
         assert page.locator(".kanban-card [data-testid='card-actions']").count() == 0, "viewer is shown a card actions menu"
         assert page.locator("[data-drag-handle]").count() == 0, "viewer is shown a drag handle"
+        menus = page.locator(".kanban-card [data-kanban-move] button")
+        for i in range(menus.count()):
+            assert not menus.nth(i).is_visible(), "viewer is shown a Move to menu"
         # The board's read-only-ness is also reported by the API it renders from.
         import json
         page.goto(live_server + "/api/safe/portfolio", timeout=PAGE_TIMEOUT)
