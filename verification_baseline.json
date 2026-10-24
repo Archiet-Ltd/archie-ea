@@ -64,6 +64,7 @@
     "unregistered_checks": 33,
     "unrendered_model_fields": 342,
     "untenanted_reads": 2361,
-    "untyped_property_writes": 1
+    "untyped_property_writes": 1,
+    "brand_raw_colour": 53
   }
 }
