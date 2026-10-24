@@ -183,7 +183,10 @@ def test_03_the_trigger_and_ctrl_b_fold_the_sidebar_to_an_icon_rail(walk, seeded
     walk.settle_width(48)
     # Icons only: the labels are gone, every entry still shows its icon.
     expect(walk.entry("systems")).to_be_visible()
-    assert walk.entry("systems").locator("span").first.bounding_box()["width"] < 4
+    button = walk.entry("systems").bounding_box()
+    label = walk.entry("systems").locator("span").first.bounding_box()
+    assert button["width"] == 32, button
+    assert label["x"] >= button["x"] + button["width"] - 1, "the label still shows beside the icon"
     walk.shot("icon-rail")
     # Each icon names itself in a tooltip.
     walk.entry("systems").hover()

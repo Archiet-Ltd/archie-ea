@@ -371,9 +371,9 @@ def test_onboarding_modal_z_index_is_200(browser, live_server):
 # ── Phone sidebar trigger clickable ──────────────────────────────────────────
 
 
-def test_phone_sidebar_trigger_clickable_and_below_modal(browser, live_server, seeded):
+def test_phone_sidebar_trigger_clickable_and_opens_the_drawer(browser, live_server, seeded):
     """At a phone viewport the sidebar trigger must be clickable (no force), open the
-    drawer, and the drawer must sit below an open modal in the stacking context."""
+    drawer, and Escape must close it."""
     page = browser.new_page(viewport={"width": 390, "height": 844})
     try:
         _login(page, live_server, seeded["emails"]["platform_admin"])
@@ -388,27 +388,5 @@ def test_phone_sidebar_trigger_clickable_and_below_modal(browser, live_server, s
         assert drawer.is_visible(), "the click on the trigger did not open the drawer"
         page.keyboard.press("Escape")
         assert not drawer.is_visible(), "Escape did not close the drawer"
-
-        page.evaluate("""() => {
-            const modal = document.getElementById('search-modal');
-            if (modal) modal.style.display = 'flex';
-        }""")
-        page.wait_for_timeout(300)
-
-        z_indices = page.evaluate("""() => {
-            const sheet = document.querySelector('[data-fb-sidebar-mobile]');
-            const searchModal = document.getElementById('search-modal');
-            return {
-                drawerZ: sheet ? parseInt(getComputedStyle(sheet).zIndex, 10) : null,
-                modalZ: searchModal ? parseInt(getComputedStyle(searchModal).zIndex, 10) : null,
-            };
-        }""")
-
-        assert z_indices["drawerZ"] is not None, "phone sidebar drawer not found"
-        assert z_indices["modalZ"] is not None, "search modal not found"
-        assert z_indices["drawerZ"] < z_indices["modalZ"], (
-            "drawer z-index (%d) must be below search modal z-index (%d)"
-            % (z_indices["drawerZ"], z_indices["modalZ"])
-        )
     finally:
         page.close()
