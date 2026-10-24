@@ -2645,7 +2645,10 @@
     }
    },
    "spec": null,
-   "status": "mapped"
+   "status": "mapped",
+   "extra_macros": [
+    "components/company_kind.html"
+   ]
   },
   "app/templates/account/mfa_challenge.html": {
    "allowed_macros": [
@@ -2936,7 +2939,10 @@
     }
    },
    "spec": null,
-   "status": "mapped"
+   "status": "mapped",
+   "extra_macros": [
+    "macros/kanban_board.html"
+   ]
   },
   "app/templates/adm_kanban/gap_analysis.html": {
    "allowed_macros": [
@@ -7357,7 +7363,11 @@
     }
    },
    "spec": "docs/design/specs/application.md",
-   "status": "specified"
+   "status": "specified",
+   "extra_macros": [
+    "components/unified_mapping_modal.html",
+    "macros/nav_macros_shadcn.html"
+   ]
   },
   "app/templates/applications/edit.html": {
    "allowed_macros": [
@@ -7565,7 +7575,12 @@
     }
    },
    "spec": "docs/design/specs/applications-list.md",
-   "status": "specified"
+   "status": "specified",
+   "extra_macros": [
+    "components/card.html",
+    "components/completeness_ring.html",
+    "components/unified_mapping_modal.html"
+   ]
   },
   "app/templates/applications/ownership_coverage.html": {
    "allowed_macros": [
@@ -9266,7 +9281,11 @@
     }
    },
    "spec": "docs/design/specs/element.md",
-   "status": "specified"
+   "status": "specified",
+   "extra_macros": [
+    "components/table.html",
+    "macros/shadcn_compat.html"
+   ]
   },
   "app/templates/archimate_crud/import_oef.html": {
    "allowed_macros": [
@@ -12303,7 +12322,10 @@
     }
    },
    "spec": null,
-   "status": "mapped"
+   "status": "mapped",
+   "extra_macros": [
+    "components/metrics_card.html"
+   ]
   },
   "app/templates/capability_map/error.html": {
    "allowed_macros": [
@@ -12471,7 +12493,11 @@
     }
    },
    "spec": "docs/design/specs/capability-map.md",
-   "status": "specified"
+   "status": "specified",
+   "extra_macros": [
+    "components/roadmap_widget.html",
+    "components/unified_mapping_modal.html"
+   ]
   },
   "app/templates/capability_map/mapping.html": {
    "allowed_macros": [
@@ -14371,7 +14397,13 @@
     }
    },
    "spec": "docs/design/specs/dashboard-overview.md",
-   "status": "specified"
+   "status": "specified",
+   "extra_macros": [
+    "components/company_kind.html",
+    "components/explained_value.html",
+    "components/input.html",
+    "components/table.html"
+   ]
   },
   "app/templates/dashboards/vendor_capability_matrix.html": {
    "allowed_macros": [
@@ -19866,7 +19898,10 @@
     }
    },
    "spec": "docs/design/specs/home.md",
-   "status": "specified"
+   "status": "specified",
+   "extra_macros": [
+    "components/table.html"
+   ]
   },
   "app/templates/market_intelligence/index.html": {
    "allowed_macros": [
@@ -24636,7 +24671,10 @@
     }
    },
    "spec": null,
-   "status": "mapped"
+   "status": "mapped",
+   "extra_macros": [
+    "components/radio_group.html"
+   ]
   },
   "app/templates/value_streams/index.html": {
    "allowed_macros": [

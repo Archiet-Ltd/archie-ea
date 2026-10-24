@@ -21,12 +21,14 @@
 </div>
 {% endmacro %}
 
-{# The impact answer carries no health or maturity signal for an element, so this
-   field reads "not recorded yet" -- never a word the data does not support. #}
+{# Health as the model records it for the row (`node.healthText`): an application's own
+   status, or a capability's computed one. Where the model holds none the field reads
+   "not recorded yet" -- never a word the data does not support. #}
 {% macro health_field() %}
-<div role="group" aria-label="Health: Not recorded yet" class="flex items-center gap-1.5 text-sm">
+<div role="group" class="flex items-center gap-1.5 text-sm" :aria-label="'Health: ' + (node.healthText || 'Not recorded yet')">
     <span class="text-xs text-muted-foreground" aria-hidden="true">Health</span>
-    <span class="inline-flex items-center gap-1 text-muted-foreground">
+    <span x-show="node.healthText" class="font-medium text-foreground" x-text="node.healthText"></span>
+    <span x-show="!node.healthText" class="inline-flex items-center gap-1 text-muted-foreground">
         <i data-lucide="circle-slash" class="h-3 w-3" aria-hidden="true"></i>Not recorded yet
     </span>
 </div>

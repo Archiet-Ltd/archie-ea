@@ -523,7 +523,17 @@
         // An explicit row's edge is the last step of its chain.
         var fromId = derived ? centreId : (chain.length >= 2 ? chain[chain.length - 2] : centreId);
         var owners = row.owners || [];
-        var ownerName = owners.length ? owners.map(function(o) { return o.name; }).join(', ') : null;
+        // One person who holds two roles on a row is named once.
+        var ownerNames = owners.map(function(o) { return o.name; }).filter(function(n, i, all) { return n && all.indexOf(n) === i; });
+        var ownerName = ownerNames.length ? ownerNames.join(', ') : null;
+        var provenance = typeof relation.provenance === 'object' && relation.provenance ? relation.provenance : {};
+        var recordedAt = timeText(provenance.recorded_at);
+        var provenanceText = typeof provenance.text === 'string' && provenance.text && provenance.text !== 'origin not recorded'
+            ? provenance.text.charAt(0).toUpperCase() + provenance.text.slice(1) + (recordedAt ? ' \u00b7 ' + recordedAt : '')
+            : null;
+        if (derived && timeText(relation.computed_at)) {
+            provenanceText = 'Worked out from the model \u00b7 ' + timeText(relation.computed_at);
+        }
         var computed = timeText(relation.computed_at);
         var stale = relation.stale === true;
         // Where an explicit connection came from: the import, or the person who drew it,
@@ -548,6 +558,8 @@
             relationType: relation.type,
             depth: relation.depth,
             ownerName: ownerName,
+            healthText: row.health || null,
+            provenanceText: provenanceText,
             stale: stale,
             staleLine: stale ? (computed ? 'Last worked out ' + computed + ' \u2014 may be out of date.' : STALE_UNDATED) : null,
             origins: originsOf(relation.origins),

@@ -82,20 +82,54 @@ def _item(kind, record_id, name, action, severity, group, second, why, **extra) 
     return row
 
 
+def _bare_name(name: Optional[str]) -> str:
+    """A gap's name without the "Gap:" label some generators put in front of it.
+
+    The row already says it is a gap, so a stored "Gap: Gap: Billing" reads
+    as "Billing" and the sentence names the thing once.
+    """
+    text = (name or "").strip()
+    while text[:4].lower() == "gap:":
+        text = text[4:].strip()
+    return text or _EM_DASH
+
+
 def _gap_rows(organization_id: int) -> List[Dict[str, Any]]:
-    rows = []
+    """One row per gap name and verb.
+
+    The register can hold several open gaps with one name (one per generated
+    pass); each would print the same sentence. They are listed once, ranked by
+    the most severe of them, and the row says how many records it stands for.
+    """
+    best: Dict[Any, Dict[str, Any]] = {}
     for gap, addressed in gap_register_service.open_gaps_with_coverage(organization_id):
+        name = _bare_name(gap.name)
+        key = (name.lower(), bool(addressed))
         sev = _severity_label(gap.severity)
         lead = ("%s severity" % sev) if sev else "Severity not recorded"
         if addressed:
-            action = "Close the %s once its work is done" % gap.name
+            action = "Close the %s once its work is done" % name
             why = "%s; work is linked but the gap is still open." % lead
             group = _GROUP_GAP_COVERED
         else:
-            action = "Convert the %s to a work package" % gap.name
+            action = "Convert the %s to a work package" % name
             why = "%s; no work package addresses it yet." % lead
             group = _GROUP_GAP_UNCOVERED
-        rows.append(_item("gap", gap.id, gap.name, action, gap.severity, group, 0, why, covered=bool(addressed)))
+        row = _item("gap", gap.id, name, action, gap.severity, group, 0, why, covered=bool(addressed))
+        row["_records"] = 1
+        kept = best.get(key)
+        if kept is None:
+            best[key] = row
+            continue
+        kept["_records"] += 1
+        if row["_key"] < kept["_key"]:
+            row["_records"] = kept["_records"]
+            best[key] = row
+    rows = list(best.values())
+    for row in rows:
+        records = row.pop("_records")
+        if records > 1:
+            row["why"] = "%s %d open gap records share this name." % (row["why"], records)
     return rows
 
 

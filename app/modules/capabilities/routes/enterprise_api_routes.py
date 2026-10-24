@@ -28,7 +28,6 @@ from flask_login import current_user, login_required
 from sqlalchemy import or_
 
 from app import db
-from app.decorators import require_roles
 from app.middleware.tenant_decorators import is_active_org_admin
 from app.models.adm_kanban import KanbanCard
 from app.models.application_portfolio import ApplicationComponent

@@ -370,6 +370,23 @@ def _types_for_layer(layer: str) -> list:
     return sorted(LAYER_TYPES.get(layer, set()))
 
 
+# The most elements one viewpoint answer carries.
+VIEWPOINT_ELEMENT_LIMIT = 500
+
+
+def _omitted_note(omitted: int, layer, type_filtered: bool):
+    """One plain sentence for why a viewpoint shows fewer elements than the store holds."""
+    if omitted <= 0:
+        return None
+    count = "%d element%s" % (omitted, "" if omitted == 1 else "s")
+    verb = "is" if omitted == 1 else "are"
+    if layer:
+        return "%s in other layers %s not shown" % (count, verb)
+    if type_filtered:
+        return "%s of other types %s not shown" % (count, verb)
+    return "%s beyond the first %d %s not shown" % (count, VIEWPOINT_ELEMENT_LIMIT, verb)
+
+
 def get_viewpoint_data(viewpoint_id: str, solution_id: int = None, layer: str = None) -> dict:
     """Return elements filtered for this viewpoint, grouped for layout.
 
@@ -438,6 +455,7 @@ def get_viewpoint_data(viewpoint_id: str, solution_id: int = None, layer: str = 
 
     serialised = []
     relationships_out = []
+    store_total = None
 
     try:
         from app.models.archimate_core import ArchiMateElement
@@ -473,8 +491,12 @@ def get_viewpoint_data(viewpoint_id: str, solution_id: int = None, layer: str = 
             if layer_type_names is not None:
                 from app import db as _db
                 query = query.filter(_db.func.lower(ArchiMateElement.type).in_(layer_type_names))
-            elements = query.limit(500).all()
+            elements = query.limit(VIEWPOINT_ELEMENT_LIMIT).all()
             element_ids = [e.id for e in elements]
+            # What the rest of the product counts for this organisation (the
+            # dashboard's element figure reads the same rows), so a viewpoint
+            # that shows fewer can say how many it left out and why.
+            store_total = ArchiMateElement.query.count()
         else:
             # Get solution's element IDs (junction + fallback)
             from app.models.solution_models import SolutionArchiMateElement
@@ -614,7 +636,7 @@ def get_viewpoint_data(viewpoint_id: str, solution_id: int = None, layer: str = 
         if el['layer'] not in grouped:
             grouped[el['layer']] = grouped.get(el['layer'], []) + [el]
 
-    return {
+    result = {
         'viewpoint_id': viewpoint_id,
         'viewpoint_name': vp['name'],
         'layer_order': layer_order,
@@ -623,3 +645,10 @@ def get_viewpoint_data(viewpoint_id: str, solution_id: int = None, layer: str = 
         'relationships': relationships_out,
         'total': len(serialised),
     }
+    if store_total is not None:
+        result['store_total'] = store_total
+        result['omitted'] = store_total - len(serialised)
+        result['omitted_note'] = _omitted_note(
+            store_total - len(serialised), layer, bool(allowed_types)
+        )
+    return result

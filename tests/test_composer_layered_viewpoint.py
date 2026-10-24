@@ -662,3 +662,35 @@ def test_health_scorecard_agrees_with_dashboard_card_and_composer_on_technology_
         "Equipment must be counted as technology, not fall through to "
         f"'other': {scorecard_metrics['archimate_by_layer']}"
     )
+
+
+def test_layered_viewpoint_states_what_it_leaves_out(app, db_session, make_org, tenant_ctx, monkeypatch):
+    """The layered viewpoint reports how many elements the organisation holds and,
+    when it shows fewer, how many it left out and why; another organisation's
+    elements are never in either figure."""
+    from app.models.archimate_core import ArchiMateElement
+    from app.services import archimate_viewpoint_service as svc
+
+    org, other = make_org("vp-omit-a"), make_org("vp-omit-b")
+    db_session.add_all(
+        [ArchiMateElement(name=f"Own {i}", type="ApplicationComponent", layer="application",
+                          organization_id=org.id) for i in range(4)]
+        + [ArchiMateElement(name=f"Foreign {i}", type="Goal", layer="motivation",
+                            organization_id=other.id) for i in range(3)]
+    )
+    db_session.flush()
+
+    with tenant_ctx(org.id):
+        full = svc.get_viewpoint_data("layered", solution_id=None)
+        assert (full["total"], full["store_total"], full["omitted"]) == (4, 4, 0)
+        assert full["omitted_note"] is None
+
+        monkeypatch.setattr(svc, "VIEWPOINT_ELEMENT_LIMIT", 3)
+        capped = svc.get_viewpoint_data("layered", solution_id=None)
+        assert (capped["total"], capped["store_total"], capped["omitted"]) == (3, 4, 1)
+        assert capped["omitted_note"] == "1 element beyond the first 3 is not shown"
+
+        monkeypatch.setattr(svc, "VIEWPOINT_ELEMENT_LIMIT", 500)
+        goals = svc.get_viewpoint_data("layered", solution_id=None, layer="motivation")
+        assert (goals["total"], goals["store_total"]) == (0, 4)
+        assert goals["omitted_note"] == "4 elements in other layers are not shown"
