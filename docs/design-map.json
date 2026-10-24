@@ -4760,6 +4760,8 @@
     "layouts/admin_base.html"
    ],
    "extra_macros": [
+    "components/drawer.html",
+    "macros/adm_cycle.html",
     "macros/kanban_board.html"
    ],
    "macros": [
