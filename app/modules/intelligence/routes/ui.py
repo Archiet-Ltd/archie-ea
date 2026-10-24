@@ -1,15 +1,14 @@
-"""Ask, Value streams at risk and Traceability: the pages of the
-intelligence module's user interface.
+"""Value streams at risk and Traceability: the pages of the intelligence
+module's user interface. The old Ask address redirects into the AI chat.
 
-Ask and Value streams at risk only render a page shell. Their data
-is fetched in the browser from endpoints that already exist: element search
-from the ArchiMate picker endpoint, the impact answer and the
-value-streams-at-risk answer from the intelligence API, so those pages carry
-no query of their own and no way to read another tenant's rows. Traceability
+Value streams at risk only renders a page shell. Its data
+is fetched in the browser from endpoints that already exist: the
+value-streams-at-risk answer from the intelligence API, so that page carries
+no query of its own and no way to read another tenant's rows. Traceability
 renders its answer on the server from the traceability check service, which
 reads the same tenant-fenced walk as the impact answer.
 
-The provenance drawer is not a route. It opens over either page.
+The provenance drawer is not a route. It opens over those pages.
 """
 
 from __future__ import annotations
@@ -71,33 +70,18 @@ def _workspace_is_empty() -> bool | None:
     ) == 0
 
 
-def _derivation_status():
-    """The tenant's worked-out connection state for the Ask page, or ``None``
-    when it could not be read (the page then says so rather than showing
-    counts of zero)."""
-    org_id = getattr(g, "current_org_id", None)
-    if org_id is None:
-        return None
-    try:
-        from app.modules.intelligence.services.derived_facts import derivation_status
-
-        return derivation_status(int(org_id))
-    except Exception:
-        current_app.logger.warning("[MODULE] intelligence: derivation status unavailable")
-        return None
-
-
 @intelligence_ui.route("/ask", methods=["GET"])
 @login_required
 def ask():
-    """Ask a plain business question about what depends on a chosen element."""
-    workspace_is_empty = _workspace_is_empty()
-    return render_template(
-        "intelligence/ask.html",
-        workspace_counts_available=workspace_is_empty is not None,
-        workspace_is_empty=workspace_is_empty,
-        derivation_status=_derivation_status(),
-    )
+    """Old address of the Ask page; questions are asked in the AI chat.
+
+    Bookmarks and old links keep working: ``q`` (optional) goes across to the
+    chat's question box, so the person lands where they can ask it.
+    """
+    question = (request.args.get("q") or "").strip()[:2000]
+    if question:
+        return redirect(url_for("unified_ai_chat.index", q=question), code=302)
+    return redirect(url_for("unified_ai_chat.index"), code=302)
 
 
 @intelligence_ui.route("/twin-map", methods=["GET"])

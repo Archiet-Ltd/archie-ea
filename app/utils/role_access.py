@@ -554,10 +554,11 @@ def _link(label, endpoint, icon, requires=None, query_params=None):
     return d
 
 
-# The way in to the Ask page, first in every persona's My work so it sits in the
-# same place for everyone. One shared definition: the label, endpoint and icon
-# cannot drift apart between personas.
-_ASK_LINK = _link("Ask a question", "intelligence_ui.ask", "search")
+# The way in to asking a question, first in every persona's My work so it sits in
+# the same place for everyone. Questions are asked in the AI chat, so this opens
+# the chat. One shared definition: the label, endpoint and icon cannot drift apart
+# between personas.
+_ASK_LINK = _link("Ask a question", "unified_ai_chat.index", "message-square")
 
 # Approval Inbox — one queue for every pending change proposal.
 # Shared definition so the label, endpoint and icon cannot drift apart between
@@ -665,7 +666,6 @@ _MY_WORK_LINKS = {
         _link("Architecture Journey", "architecture_journey.index", "compass"),
         _APPROVAL_INBOX_LINK,
         _link("Solutions", "solution_design.list_solutions", "wrench"),
-        _link("AI Chat", "unified_ai_chat.index", "message-square"),
         _link("ADM Kanban", "adm_kanban_view.index", "kanban"),
         # Fix round: Programmes was reachable from nowhere in the sidebar.
         # A solution architect whose job is to take designs through

@@ -66,6 +66,22 @@
         });
     }
 
+    /* A question about the organisation's own estate is answered from its recorded
+       connections, as cited cards, before the model is asked. Resolves to the
+       answer ({found: true, html, page_url}) or {found: false}; rejects when the
+       answer could not be worked out, so the chat shows an error rather than
+       handing a grounded question to a model. */
+    async function askEstate(message) {
+        var resp = await apiFetch('/ai-chat/estate-answer', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ message: message })
+        });
+        var data = await resp.json().catch(function () { return {}; });
+        if (!resp.ok || data.success === false) throw new Error(data.error || 'estate answer ' + resp.status);
+        return data;
+    }
+
     var _controller = null;
 
     /* No SSE event — not even a keepalive — for this long means the
@@ -335,6 +351,7 @@
         jsonHeaders: jsonHeaders,
         isProviderConfigurationFault: isProviderConfigurationFault,
         sendMessage: sendMessage,
+        askEstate: askEstate,
         streamMessage: streamMessage,
         abort: abort,
         isStreaming: isStreaming,

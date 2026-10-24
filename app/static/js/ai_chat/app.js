@@ -45,7 +45,7 @@
        sees — assigning state.currentDomain here is visible to render.js. */
     const state = ArchieChat.state;
     const {
-        getColorClass, appendMessage, appendSystemMessage, appendError,
+        getColorClass, appendMessage, appendSystemMessage, appendError, appendAnswerCards,
         beginStreamedMessage, updateStreamedMessage, finaliseStreamedMessage
     } = ArchieChat.render;
     const {
@@ -285,6 +285,14 @@
        it is also an accessibility defect: the chat could not be submitted from
        the keyboard at all. */
     userInput.addEventListener('keydown', handleEnter);
+    /* Escape clears what has been typed. */
+    userInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && userInput.value) {
+            e.preventDefault();
+            userInput.value = '';
+            userInput.style.height = 'auto';
+        }
+    });
 
     /* Send and Stop swap places while a turn is in flight. Salvaged from
        ai_chat.js, the 169 KB file no template loads: #stop-btn has been in the
@@ -362,6 +370,21 @@
         messagesContainer.appendChild(loadingDiv);
         messagesContainer.scrollTop = messagesContainer.scrollHeight;
         lucide.createIcons();
+
+        // A question that names something in the organisation's records is answered
+        // from those records, as cited cards, before any model is asked.
+        try {
+            const estate = await ArchieChat.transport.askEstate(message);
+            if (estate.found) {
+                { const _l = document.getElementById(loadingId); if (_l) _l.remove(); }
+                appendAnswerCards(estate.html);
+                return;
+            }
+        } catch (_estateErr) {
+            { const _l = document.getElementById(loadingId); if (_l) _l.remove(); }
+            appendError('We could not answer that just now.', () => _retryTurn(message, timestamp));
+            return;
+        }
 
         const startTime = performance.now();
         // Shared payload. thread_id keeps multi-turn chats in one conversation.
@@ -940,16 +963,14 @@
 
     function openCreateSolutionModal() { openCreateSolutionModalWithMessage(''); }
     function openCreateSolutionModalWithMessage(message) {
-        let modal = document.getElementById('ai-chat-create-solution-modal');
-        if (modal) modal.classList.remove('hidden');
+        if (window.Platform && Platform.modal) Platform.modal.open('ai-chat-create-solution-modal');
         const briefEl = document.getElementById('ai-chat-solution-brief');
         if (briefEl && typeof message === 'string' && message.trim()) briefEl.value = message.trim();
         const titleEl = document.getElementById('ai-chat-solution-title');
         if (titleEl) titleEl.focus();
     }
     function closeCreateSolutionModal() {
-        let modal = document.getElementById('ai-chat-create-solution-modal');
-        if (modal) modal.classList.add('hidden');
+        if (window.Platform && Platform.modal) Platform.modal.close('ai-chat-create-solution-modal');
     }
 
     // Wire the button

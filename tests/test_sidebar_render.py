@@ -180,12 +180,12 @@ def test_platform_admin_hits_the_link_budget_exactly(app, db_session, make_org):
 def test_ask_link_renders_first_under_my_work_and_the_twin_map_has_none(
     app, db_session, make_org, role, label
 ):
-    """One front door to the Ask page, under My work, before that persona's own
-    links; the Twin map is reached from the Ask page and has no link of its own."""
+    """One front door to asking a question, under My work, before that persona's own
+    links; it opens the AI chat, where questions are asked."""
     sidebar_html = _sidebar_html(app, db_session, make_org, role, label)
-    ask = sidebar_html.find('href="/intelligence/ask"')
+    ask = sidebar_html.find('href="/ai-chat"')
     assert ask != -1, f"{role}: no Ask a question link in the rendered sidebar"
-    assert sidebar_html.count('href="/intelligence/ask"') == 1
+    assert sidebar_html.count('href="/ai-chat"') == 1
     my_work = sidebar_html.find("My work")
     library = sidebar_html.find("Library", my_work)
     assert my_work != -1 and library != -1 and my_work < ask < library

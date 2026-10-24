@@ -119,22 +119,6 @@ def _rendered_templates(app):
 # --- the routes -------------------------------------------------------------
 
 
-@pytest.mark.parametrize("path,template", [
-    ("/intelligence/ask", "intelligence/ask.html"),
-])
-def test_page_renders_for_a_signed_in_user_with_its_own_template(
-    app, db_session, make_org, client, login_as, path, template
-):
-    org = make_org("ui-render")
-    user = _user(db_session, org.id)
-    seen, stop = _rendered_templates(app)
-    try:
-        login_as(client, user)
-        response = client.get(path)
-    finally:
-        stop()
-    assert response.status_code == 200
-    assert template in seen
 
 
 @pytest.mark.parametrize("path", PAGES)
@@ -167,18 +151,6 @@ def test_the_read_only_pages_are_the_only_routes_this_blueprint_serves(app):
     assert not [r for r in rules if r.startswith("/api/")]
 
 
-def test_pages_have_a_breadcrumb_and_the_page_shell_wrapper(
-    app, db_session, make_org, client, login_as
-):
-    org = make_org("ui-shell")
-    user = _user(db_session, org.id)
-    for path, title in (("/intelligence/ask", "Ask"),):
-        login_as(client, user)
-        html = client.get(path).get_data(as_text=True)
-        assert 'aria-label="Breadcrumb"' in html
-        assert f'<h1 class="text-3xl font-bold tracking-[-0.02em] text-foreground">{title}</h1>' in html
-        assert "p-6 space-y-6" in html
-        assert "container mx-auto" not in _main_html(html)
 
 
 def test_twin_map_address_redirects_to_the_composer_on_the_same_element(
@@ -261,97 +233,14 @@ def _patch_counts(monkeypatch, counts):
         )
 
 
-@pytest.mark.parametrize("path", PAGES)
-def test_an_empty_workspace_shows_the_setup_state_instead_of_the_picker(
-    app, db_session, make_org, client, login_as, monkeypatch, path
-):
-    _patch_counts(monkeypatch, {"applications": 0, "elements": 0, "capabilities": 0, "vendors": 0})
-    org = make_org("ui-empty")
-    user = _user(db_session, org.id)
-    login_as(client, user)
-    html = _main_html(client.get(path).get_data(as_text=True))
-    text = _visible_text(html)
-    assert "Nothing is modelled yet" in text
-    assert "Add your systems and teams, and this is where you will ask questions about them." in text
-    assert "Set up your workspace" in text
-    assert 'href="/dashboard/overview"' in html
-    assert 'role="combobox"' not in html
-    assert 'role="status"' in html
-    assert not re.search(r"connector", text, re.I)
-    assert "onboarding" not in html.lower()
 
 
-@pytest.mark.parametrize("path", PAGES)
-def test_the_gate_reads_counts_taken_now_not_a_cached_empty_workspace(
-    app, db_session, make_org, client, login_as, path
-):
-    """A new organisation opens a page while empty, then models its first
-    element: the very next Ask or Twin map page must see it."""
-    org = make_org("ui-fresh-counts")
-    user = _user(db_session, org.id)
-    login_as(client, user)
-    # Open the page first, as the new organisation would, so any count read
-    # before the element exists has had its chance to be kept and reused.
-    assert client.get(path).status_code == 200
-    from app.models.archimate_core import ArchiMateElement
-
-    db_session.add(ArchiMateElement(
-        name="Fresh element %s" % uuid.uuid4().hex[:6], type="ApplicationComponent",
-        layer="application", organization_id=org.id,
-    ))
-    db_session.flush()
-    html = _main_html(client.get(path).get_data(as_text=True))
-    assert 'role="combobox"' in html
-    assert "Nothing is modelled yet" not in html
 
 
-@pytest.mark.parametrize("path", PAGES)
-@pytest.mark.parametrize("counts", [
-    {"applications": 1, "elements": 0, "capabilities": 0, "vendors": 0},
-    {"applications": 0, "elements": 5, "capabilities": 0, "vendors": 0},
-    {"applications": 0, "elements": 0, "capabilities": 2, "vendors": 0},
-])
-def test_a_populated_workspace_shows_the_picker_and_no_setup_state(
-    app, db_session, make_org, client, login_as, monkeypatch, path, counts
-):
-    _patch_counts(monkeypatch, counts)
-    org = make_org("ui-populated")
-    user = _user(db_session, org.id)
-    login_as(client, user)
-    html = _main_html(client.get(path).get_data(as_text=True))
-    assert 'role="combobox"' in html
-    assert "Nothing is modelled yet" not in html
 
 
-@pytest.mark.parametrize("path", PAGES)
-def test_global_vendor_counts_do_not_hide_the_empty_workspace_state(
-    app, db_session, make_org, client, login_as, monkeypatch, path
-):
-    _patch_counts(monkeypatch, {"applications": 0, "elements": 0, "capabilities": 0, "vendors": 3})
-    org = make_org("ui-vendors-only")
-    user = _user(db_session, org.id)
-    login_as(client, user)
-    html = _main_html(client.get(path).get_data(as_text=True))
-    text = _visible_text(html)
-    assert "Nothing is modelled yet" in text
-    assert 'role="combobox"' not in html
 
 
-@pytest.mark.parametrize("path", PAGES)
-def test_unreadable_counts_never_read_as_an_empty_workspace(
-    app, db_session, make_org, client, login_as, monkeypatch, path
-):
-    """The shell answers a failed count with zeros; the pages must not take that
-    for an empty workspace."""
-    _patch_counts(monkeypatch, RuntimeError("counts unavailable"))
-    org = make_org("ui-counts-down")
-    user = _user(db_session, org.id)
-    login_as(client, user)
-    response = client.get(path)
-    assert response.status_code == 200
-    html = _main_html(response.get_data(as_text=True))
-    assert 'role="combobox"' in html
-    assert "Nothing is modelled yet" not in html
 
 
 def test_unknown_organisation_makes_workspace_counts_unavailable(app):
@@ -376,19 +265,6 @@ FORBIDDEN_SHAPES = re.compile(
 )
 
 
-@pytest.mark.parametrize("path", PAGES)
-def test_page_text_carries_no_status_labels_paths_or_ids_outside_full_detail(
-    app, db_session, make_org, client, login_as, path
-):
-    org = make_org("ui-copy")
-    user = _user(db_session, org.id)
-    login_as(client, user)
-    html = _main_html(client.get(path).get_data(as_text=True))
-    html = re.sub(r"<[^>]*data-full-detail-region[^>]*>.*?</dl>\s*</div>", "", html, flags=re.S)
-    text = _visible_text(html)
-    assert text, "the page rendered no text at all"
-    assert STATUS_LABELS.findall(text) == []
-    assert FORBIDDEN_SHAPES.findall(text) == []
 
 
 def test_script_strings_carry_no_status_labels():
@@ -899,33 +775,3 @@ def test_nav_counts_cache_evicts_two_orgs_in_one_flush(
     assert after_b["capabilities"] == 1
 
 
-def test_ask_page_updates_after_element_write(
-    app, db_session, make_org, client, login_as
-):
-    """A signed-in user on an empty organisation sees the empty-workspace gate.
-    After adding one element through the ORM and flushing, the next GET shows
-    the populated page body."""
-    from app.models.archimate_core import ArchiMateElement
-
-    org = make_org("ui-flush-test")
-    user = _user(db_session, org.id)
-    login_as(client, user)
-
-    # First read: empty workspace gate.
-    html = client.get("/intelligence/ask").get_data(as_text=True)
-    main = _main_html(html)
-    text = _visible_text(main)
-    assert "Nothing is modelled yet" in text
-
-    # Write one element through the ORM and flush.
-    db_session.add(ArchiMateElement(
-        name="Route-Test Element",
-        type="ApplicationComponent",
-        organization_id=org.id,
-    ))
-    db_session.flush()
-
-    # Second read: populated page with combobox and no gate text.
-    html = client.get("/intelligence/ask").get_data(as_text=True)
-    assert 'role="combobox"' in html
-    assert "Nothing is modelled yet" not in html

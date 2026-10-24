@@ -215,38 +215,9 @@
     // ==========================================================================
 
     function switchSidebarTab(tab) {
-        // 'history' was missing, so choosing another tab never hid the Chats
-        // panel. The [id^="tab-"] reset below already covered all four.
-        const panels = ['context', 'query', 'alerts', 'history'];
-
-        // Hide all panels
-        panels.forEach(panelName => {
-            const panel = document.getElementById('panel-' + panelName);
-            if (panel) {
-                panel.classList.add('hidden');
-                panel.style.display = '';
-            }
-        });
-
-        // Reset all tab styles — remove active state including white background
-        document.querySelectorAll('[id^="tab-"]').forEach(t => {
-            t.classList.remove('border-b-2', 'border-primary', 'text-primary', 'bg-background');
-            t.classList.add('text-muted-foreground');
-        });
-
-        // Show selected panel and style active tab
-        const selectedPanel = document.getElementById('panel-' + tab);
-        const selectedTab = document.getElementById('tab-' + tab);
-
-        if (selectedPanel) {
-            selectedPanel.classList.remove('hidden');
-            selectedPanel.style.display = 'flex';
-        }
-
-        if (selectedTab) {
-            selectedTab.classList.add('border-b-2', 'border-primary', 'text-primary', 'bg-background');
-            selectedTab.classList.remove('text-muted-foreground');
-        }
+        // The tab strip and its panels are driven by the page's Alpine state
+        // (ai_chat/index.html listens for this event).
+        window.dispatchEvent(new CustomEvent('chat-tab', { detail: tab }));
 
         // Load data for specific tabs
         if (tab === 'alerts') {

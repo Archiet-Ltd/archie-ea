@@ -1,0 +1,80 @@
+{# design-block: chat #}
+{% from 'components/card.html' import card, card_header, card_title, card_description, card_content, card_footer %}
+{% from 'components/badge.html' import badge %}
+{% from 'components/button.html' import button %}
+{% from 'components/empty_state.html' import empty_state %}
+{# One stored answer drawn as cards in the chat: a card for the answer, then one card per
+   connection with where it was read from, its health and its owner. Names come from the
+   stored answer's own element map. The card for a connection opens that element in the
+   Composer; the answer card opens the answer at its permanent address. #}
+{% set kind = answer.question_kind %}
+{% set shown_limit = 25 %}
+{% macro name_of(element_id) -%}
+{%- set known = answer.elements.get(element_id | string) -%}{{ known.name if known else '—' }}
+{%- endmacro %}
+{% macro source_text(row) -%}
+{%- set relation = row.relation or {} -%}
+{%- if relation.kind == 'derived' -%}Worked out from the model
+{%- elif relation.origins and relation.origins.values() | list | selectattr('repository') | list -%}
+{%- set o = (relation.origins.values() | list | selectattr('repository') | list)[0] -%}{{ o.repository }}{% if o.file %} · {{ o.file }}{% endif %}{% if o.commit %} @ {{ o.commit[:7] }}{% endif %}
+{%- elif relation.provenance and relation.provenance.text and relation.provenance.text != 'origin not recorded' -%}{{ relation.provenance.text[:1] | upper }}{{ relation.provenance.text[1:] }}
+{%- else -%}Source not recorded{%- endif -%}
+{%- endmacro %}
+{% if kind == 'risk_propagation' %}
+    {% set heading = 'Risks that reach ' ~ name_of(answer.params.element_id) %}
+{% elif kind == 'set_impact' %}
+    {% set heading = 'What breaks if these fail together' %}
+{% else %}
+    {% set heading = 'What breaks if ' ~ name_of(answer.params.element_id) ~ ' fails' %}
+{% endif %}
+{% set total = answer.summary.total %}
+<div class="space-y-3" data-answer-cards data-answer-address="{{ answer.address }}" data-answer-kind="{{ kind }}">
+    {% call card() %}
+        {% call card_header() %}
+            {% call card_title(class='text-base') %}{{ heading }}{% endcall %}
+            {% call card_description() %}
+                {% if total %}{{ total }} connection{{ '' if total == 1 else 's' }} in your records,
+                {% if answer.truth_class == 'derived' %}some worked out from recorded links{% else %}all recorded by people{% endif %}.
+                {% else %}Nothing is recorded as connected to this yet.{% endif %}
+            {% endcall %}
+        {% endcall %}
+        {% call card_footer(class='flex-wrap gap-2') %}
+            {{ button(text='Open this answer', variant='outline', size='sm', href=answer.page_url, icon='external-link', testid='answer-open') }}
+        {% endcall %}
+    {% endcall %}
+
+    {% if not answer.rows %}
+        {{ empty_state(icon='search', title='Nothing is recorded as depending on this yet', description='No connections lead from here. Nothing is missing: there is simply nothing recorded.', padding='py-6') }}
+    {% endif %}
+
+    {% for row in answer.rows[:shown_limit] %}
+    {% set relation = row.relation or {} %}
+    {% set element = answer.elements.get(row.element_id | string) or {} %}
+    {% set owner_names = (row.owners or []) | map(attribute='name') | select | unique | list %}
+    {% call card(class='p-4') %}
+        <div class="flex flex-wrap items-center justify-between gap-2" data-answer-row>
+            <a class="min-w-0 break-words text-sm font-semibold text-foreground underline-offset-4 hover:underline"
+               href="{{ composer_url }}?element={{ row.element_id }}">{{ name_of(row.element_id) }}</a>
+            <div class="flex flex-wrap items-center gap-2">
+                {% if element.type %}{% call badge('neutral') %}{{ element.type }}{% endcall %}{% endif %}
+                {% if row.health %}
+                    {% call badge('success' if row.health == 'Healthy' else ('warning' if row.health == 'Warning' else 'danger')) %}<span aria-label="Health: {{ row.health }}">{{ row.health }}</span>{% endcall %}
+                {% else %}
+                    {% call badge('neutral') %}Health not recorded{% endcall %}
+                {% endif %}
+            </div>
+        </div>
+        <dl class="mt-2 grid gap-1 text-xs text-muted-foreground">
+            <div class="flex gap-1"><dt>Owner:</dt><dd class="text-foreground"{% if owner_names %} aria-label="Owner: {{ owner_names | join(', ') }}"{% endif %}>{{ owner_names | join(', ') or 'No owner recorded' }}</dd></div>
+            <div class="flex gap-1"><dt>Source:</dt><dd class="text-foreground" data-citation>{{ source_text(row) }}</dd></div>
+        </dl>
+    {% endcall %}
+    {% endfor %}
+
+    {% if answer.rows | length > shown_limit %}
+    <p class="text-sm text-muted-foreground" data-answer-more>
+        Showing {{ shown_limit }} of {{ answer.rows | length }}.
+        <a class="underline underline-offset-4" href="{{ answer.page_url }}">See every connection</a>
+    </p>
+    {% endif %}
+</div>

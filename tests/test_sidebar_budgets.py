@@ -164,15 +164,15 @@ def test_every_endpoint_is_a_dotted_string():
 
 
 def test_ask_link_is_first_in_every_personas_my_work_and_is_the_same_link():
-    """One front door to the Ask page, in the same place for every persona."""
+    """One front door to asking a question, in the same place for every persona. Questions are asked in the AI chat."""
     for role in SIDEBAR_ZONES:
         my_work = next(z for z in SIDEBAR_ZONES[role] if z["zone"] == "my_work")["links"]
         assert my_work[0] == {
             "label": "Ask a question",
-            "endpoint": "intelligence_ui.ask",
-            "icon": "search",
+            "endpoint": "unified_ai_chat.index",
+            "icon": "message-square",
         }, f"{role}: the Ask link is not first in My work"
-        assert [link["endpoint"] for link in _all_links(role)].count("intelligence_ui.ask") == 1
+        assert [link["endpoint"] for link in _all_links(role)].count("unified_ai_chat.index") == 1
 
 
 def test_twin_map_has_no_sidebar_link_of_its_own():
@@ -199,7 +199,7 @@ def test_solution_architect_my_work_membership():
         # shared by every persona with GENERAL permission.
         "Approval Inbox",
         "Solutions",
-        "AI Chat",
+        # "AI Chat" is no longer a link of its own: "Ask a question" above opens the chat.
         "ADM Kanban",
         # 31 Aug 2026: the ARB dashboard was reachable from no persona's
         # sidebar, though the solution architect is the role that takes work

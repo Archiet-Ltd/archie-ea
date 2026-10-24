@@ -14,6 +14,7 @@ Sub-modules:
 - analytics_routes:       Analytics, NL query, recommendations
 - legacy_compat:          Legacy redirects, error handlers, health endpoint
 - generate_routes:        Structured deliverable generator (solution analysis, SAD, visual, roadmap, risk, org, benefit, feasibility, full-package)
+- estate_answer_routes:   Cited answer cards for estate questions
 - approval_routes:        CRUD approval API (GET pending, POST approve/reject) for approval_modal.js
 """
 
@@ -38,6 +39,7 @@ from . import (  # noqa: F401, E402
     metrics_routes,
     page_guide_routes,
     agent_oversight_routes,
+    estate_answer_routes,
 )
 
 from .run_record_routes import register_run_record_routes

@@ -607,6 +607,24 @@
         return div;
     }
 
+    /* The cited answer cards for an estate question. The HTML is drawn on the
+       server from the stored answer; it is sanitised again here because it is
+       inserted as markup. */
+    function appendAnswerCards(html) {
+        var div = document.createElement('div');
+        div.className = 'flex gap-4';
+        div.setAttribute('data-testid', 'estate-answer');
+        div.innerHTML = avatarHtml() +
+            '<div class="min-w-0 max-w-3xl flex-1">' +
+              (window.DOMPurify ? DOMPurify.sanitize(html) : '') +
+            '</div>';
+        var container = messages();
+        if (container) container.appendChild(div);
+        scrollToBottom();
+        if (window.lucide) lucide.createIcons();
+        return div;
+    }
+
     // ------------------------------------------------------- streamed answer
 
     /* The bubble tokens stream into. The caret is a SIBLING of the prose
@@ -691,6 +709,7 @@
         renderAnswerFooter: renderAnswerFooter,
         appendSystemMessage: appendSystemMessage,
         appendError: appendError,
+        appendAnswerCards: appendAnswerCards,
         beginStreamedMessage: beginStreamedMessage,
         updateStreamedMessage: updateStreamedMessage,
         finaliseStreamedMessage: finaliseStreamedMessage,
