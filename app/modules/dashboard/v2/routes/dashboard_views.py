@@ -481,6 +481,49 @@ def overview():
         logger.warning("ENH-002: lifecycle distribution unavailable: %s", exc)
         db.session.rollback()
 
+    # Records added per day over the last 90 days: applications and model elements,
+    # counted from their created_at (applications) and recorded_at (elements) dates. None when the query fails, so the chart
+    # says it could not be drawn instead of drawing a flat line.
+    activity_series = None
+    activity_undated = 0
+    try:
+        from app.models.archimate_core import ArchiMateElement
+
+        activity_undated = (
+            db.session.query(db.func.count(ArchiMateElement.id))
+            .filter(ArchiMateElement.recorded_at.is_(None))
+            .scalar()
+        ) or 0
+
+        today = _dt.datetime.utcnow().date()
+        first_day = today - _dt.timedelta(days=89)
+        per_day = {}
+        for key, column, model in (
+            ("applications", ApplicationComponent.created_at, ApplicationComponent),
+            ("elements", ArchiMateElement.recorded_at, ArchiMateElement),
+        ):
+            day = db.func.date(column)
+            for when, count in (
+                db.session.query(day, db.func.count(model.id))
+                .filter(column >= first_day)
+                .group_by(day)
+                .all()
+            ):
+                per_day.setdefault(str(when), {})[key] = count
+        activity_series = []
+        for offset in range(90):
+            d = first_day + _dt.timedelta(days=offset)
+            row = per_day.get(d.isoformat(), {})
+            activity_series.append({
+                "date": d.isoformat(),
+                "label": d.strftime("%b ") + str(d.day),
+                "applications": row.get("applications", 0),
+                "elements": row.get("elements", 0),
+            })
+    except Exception as exc:
+        logger.warning("activity series unavailable: %s", exc)
+        db.session.rollback()
+
     # ENH-002: Solution pipeline by ADM phase
     solution_pipeline = []
     try:
@@ -833,6 +876,8 @@ def overview():
         persona_metrics=persona_metrics,
         capability_health=capability_health,
         lifecycle_distribution=lifecycle_distribution,
+        activity_series=activity_series,
+        activity_undated=activity_undated,
         solution_pipeline=solution_pipeline,
         health_score=health_score,
         health_score_text=format_health_score(health_score),
