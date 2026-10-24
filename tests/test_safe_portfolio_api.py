@@ -312,3 +312,48 @@ def test_portfolio_empty_columns_name_the_next_step(app, client, test_user, view
     with tenant_ctx(epic_element.organization_id):
         html = client.get("/safe/portfolio/").get_data(as_text=True)
         assert "Someone with edit access moves an epic here from Funnel when its business case is ready." in html
+
+
+def _make_user(db_session, org, first_name):
+    user = User(
+        first_name=first_name,
+        last_name="Owner",
+        email=f"{first_name.lower()}_{org.id}@test.example",
+        organization_id=org.id,
+        enterprise_role="Architect",
+        confirmed=True,
+    )
+    user.password = "TestPassword123!"
+    db_session.add(user)
+    db_session.flush()
+    return user
+
+
+def test_epic_owner_is_never_a_user_of_another_organisation(db_session, make_org, tenant_ctx):
+    """An epic of organisation A names its creator only when the creator belongs to A."""
+    from app.modules.safe_portfolio.routes import _get_epics
+
+    org_a, org_b = make_org("a"), make_org("b")
+    own = _make_user(db_session, org_a, "Alice")
+    foreign = _make_user(db_session, org_b, "Bob")
+    for name, creator in (("Epic by own user", own), ("Epic by foreign user", foreign)):
+        element = ArchiMateElement(
+            name=name,
+            type="WorkPackage",
+            organization_id=org_a.id,
+            source_kind="manual",
+            source_ref=str(creator.id),
+        )
+        db_session.add(element)
+        db_session.flush()
+        set_kind(element, "Epic", framework_id="safe", source="test")
+        set_wsjf_components(
+            element, business_value=5, time_criticality=5, risk_reduction=5, job_size=5, source="test"
+        )
+    db_session.flush()
+
+    with tenant_ctx(org_a.id):
+        owners = {e["name"]: e["owner_name"] for e in _get_epics()}
+
+    assert owners["Epic by own user"] == "Alice Owner"
+    assert owners["Epic by foreign user"] is None
