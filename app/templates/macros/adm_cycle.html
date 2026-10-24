@@ -8,7 +8,7 @@
     ('A', 'A', 120, 64), ('B', 'B', 176.6, 87.4), ('C', 'C', 200, 144), ('D', 'D', 176.6, 200.6),
     ('E', 'E', 120, 224), ('F', 'F', 63.4, 200.6), ('G', 'G', 40, 144), ('H', 'H', 63.4, 87.4)
 ] -%}
-<div class="relative shrink-0" data-testid="adm-cycle">
+<div class="shrink-0" data-testid="adm-cycle">
     <svg viewBox="0 0 240 246" class="h-auto w-60 max-w-none" role="group" aria-label="ADM cycle: cards in each phase. Choose a phase to show only its lane.">
         <circle cx="120" cy="144" r="80" fill="none" class="stroke-border" stroke-width="1.5"></circle>
         <line x1="120" y1="39" x2="120" y2="45" class="stroke-border" stroke-width="1.5"></line>
@@ -35,8 +35,9 @@
             <text x="120" y="162" text-anchor="middle" font-size="16" font-weight="600" class="fill-foreground" x-text="requirementTotal()"></text>
         </g>
     </svg>
-    <div x-show="cycleTip" x-cloak role="tooltip" data-testid="adm-cycle-tip"
-         class="pointer-events-none absolute inset-x-0 top-0 z-10 mx-auto w-fit max-w-full rounded-md border border-border bg-popover px-2 py-1 text-xs text-popover-foreground"
+    <div role="tooltip" data-testid="adm-cycle-tip"
+         :class="cycleTip ? '' : 'invisible'"
+         class="pointer-events-none mx-auto mt-1 h-7 w-fit max-w-full rounded-md border border-border bg-popover px-2 py-1 text-xs text-popover-foreground"
          x-text="cycleTip ? cycleName(cycleTip) : ''"></div>
     <ol class="sr-only">
         {% for code, short, x, y in nodes %}<li x-text="cycleLabel('{{ code }}')"></li>{% endfor %}
