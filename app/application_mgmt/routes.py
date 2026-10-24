@@ -2304,9 +2304,14 @@ def render_application_detail(id):
     try:
         from app.models.application_owner import ApplicationOwner
 
-        owner_rows = ApplicationOwner.get_display_rows_for_application(
-            app_obj.id, getattr(g, "current_org_id", None)
-        )
+        owner_rows = [
+            dict(row, remove_url=url_for(
+                "unified_applications.remove_owner", app_id=app_obj.id, owner_id=row["id"],
+            ))
+            for row in ApplicationOwner.get_display_rows_for_application(
+                app_obj.id, getattr(g, "current_org_id", None)
+            )
+        ]
     except Exception:
         logger.exception("Could not load owner rows for application %s", app_obj.id)
         db.session.rollback()

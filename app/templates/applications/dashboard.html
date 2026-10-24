@@ -432,36 +432,18 @@
           {{ edit_row('Support Team', 'supportLevel', app.support_team) }}
           {% else %}
           {% set owner_rows = owner_rows | default([]) %}
+          {% set can_edit = can('assign', 'owner') or can('edit', 'application') %}
+          {# The owner shows once: the text fields that repeat a named owner are left out. #}
+          {% set text_owner = None if owner_rows else (app.application_owner or app.business_owner or app.technical_owner) %}
+          {% set named = (owner_rows | map(attribute='user_name') | map('lower') | list) + ([text_owner | lower] if text_owner else []) %}
           {% set has_any_owner = owner_rows or app.application_owner or app.business_owner or app.technical_owner or app.technical_lead or app.product_manager or app.development_team or app.support_team %}
-          {% if has_any_owner %}
-          {% if owner_rows %}
-          <div class="flex items-start justify-between gap-4" data-testid="application-owner">
-            <span class="text-muted-foreground">Owner</span>
-            <span class="text-right font-medium">{{ owner_rows | map(attribute='user_name') | select | join(', ') }}</span>
+          <div {% if owner_rows %}data-testid="application-owner"{% elif not has_any_owner %}data-testid="application-owner-empty"{% endif %}>
+            {% set rows = owner_rows %}{% set assign_url = owner_assign_url %}{% set legacy_text = text_owner %}{% set assign_link = none %}
+            {% include 'partials/owner_step.html' with context %}
           </div>
-          {% endif %}
-          {{ detail_row('Application Owner', app.application_owner) }}
-          {{ detail_row('Business Owner', app.business_owner) }}
-          {{ detail_row('Technical Owner', app.technical_owner) }}
-          {{ detail_row('Technical Lead', app.technical_lead) }}
-          {{ detail_row('Product Manager', app.product_manager) }}
-          {{ detail_row('Development Team', app.development_team) }}
-          {{ detail_row('Support Team', app.support_team) }}
-          {% else %}
-          <div class="py-3" data-testid="application-owner-empty">
-            <p class="text-sm text-muted-foreground">No owner recorded.</p>
-            {% if (can('assign', 'owner') or can('edit', 'application')) and owner_assign_url %}
-            <div class="mt-3 space-y-2" data-owner-picker data-owners-url="{{ owner_assign_url }}">
-              <p class="text-sm font-medium text-foreground">Assign owner</p>
-              <div class="relative">
-                {{ input(type="text", placeholder="Search by name", class='h-9 transition-colors', attrs_dict={'data-owner-search': "", 'autocomplete': "off"}) }}
-                <div data-owner-results class="hidden absolute z-10 mt-1 w-full rounded-md border border-border bg-card max-h-48 overflow-y-auto"></div>
-              </div>
-              {% call button(variant='outline', disabled=true, class='px-3', attrs_dict={'data-owner-save': ""}) %}Save owner{% endcall %}
-            </div>
-            {% endif %}
-          </div>
-          {% endif %}
+          {% for label, value in [('Application Owner', app.application_owner), ('Business Owner', app.business_owner), ('Technical Owner', app.technical_owner), ('Technical Lead', app.technical_lead), ('Product Manager', app.product_manager), ('Development Team', app.development_team), ('Support Team', app.support_team)] %}
+          {% if not value or (value | lower) not in named %}{{ detail_row(label, value) }}{% endif %}
+          {% endfor %}
           {% endif %}
         </div>
       </div>

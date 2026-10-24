@@ -11,13 +11,14 @@ from flask import (
     abort,
     current_app,
     flash,
+    g,
     jsonify,
     redirect,
     render_template,
     request,
     url_for,
 )
-from flask_login import login_required
+from flask_login import current_user, login_required
 from sqlalchemy import or_
 
 from app import db
@@ -508,6 +509,8 @@ def _element_owner_target(element, element_type, organization_id):
             archimate_element_id=element.id, organization_id=organization_id,
         ).first()
         return ("application", component.id) if component is not None else None
+    if element_type == "BusinessProcess" and isinstance(element, BusinessProcess):
+        return ("business_process", element.id)
     if element_type == "Capability":
         # Capability owners are recorded on the unified capability this row
         # projects into (by provenance), never on the source row's own id.
@@ -544,7 +547,95 @@ def _element_owner_url(element, element_type, organization_id):
         return url_for("unified_applications.add_owner", app_id=target_id)
     if kind == "capability":
         return url_for("capability_map.api_set_capability_owner", capability_id=target_id)
+    if kind == "business_process":
+        return url_for("archimate_crud.process_set_owner", process_id=target_id)
     return url_for("ai_systems_genome.ai_system_set_owner", element_id=target_id)
+
+
+def _element_owner_remove_urls(element, element_type, organization_id, owner_rows):
+    """Owner rows with the address that clears each one, from the same target the picker saves on."""
+    target = _element_owner_target(element, element_type, organization_id)
+    if target is None:
+        return owner_rows
+    kind, target_id = target
+    endpoints = {
+        "application": ("unified_applications.remove_owner", "app_id"),
+        "capability": ("capability_map.api_delete_capability_owner", "capability_id"),
+        "ai_system": ("ai_systems_genome.ai_system_delete_owner", "element_id"),
+        "business_process": ("archimate_crud.process_delete_owner", "process_id"),
+    }
+    endpoint, key = endpoints[kind]
+    return [
+        dict(row, remove_url=url_for(endpoint, owner_id=row["id"], **{key: target_id}))
+        for row in owner_rows
+    ]
+
+
+@archimate_crud.route("/business-process/<int:process_id>/owners", methods=["POST"])
+@login_required
+def process_set_owner(process_id):
+    """Record an owner for a business process (a new primary replaces the old)."""
+    from app.core.auth.permissions import can
+    from app.services.element_ownership_service import set_element_owner
+
+    org_id = g.current_org_id
+    if not (can(current_user, "assign", "owner") or can(current_user, "edit", "application")):
+        return jsonify({"message": "You cannot assign owners"}), 403
+    data = request.get_json(silent=True) or {}
+    if not data.get("user_id"):
+        return jsonify({"message": "user_id is required"}), 400
+    try:
+        record = set_element_owner(
+            element_type="business_process",
+            element_id=process_id,
+            user_id=data["user_id"],
+            organization_id=org_id,
+            ownership_type=data.get("ownership_type", "primary"),
+            assigned_by=current_user.id,
+            replace_primary=bool(data.get("replace")),
+        )
+    except ValueError as exc:  # includes CrossOrganisationElementOwner
+        db.session.rollback()
+        return jsonify({"message": str(exc)}), 400
+    _mirror_process_owner(process_id, org_id)
+    return jsonify({"owner": record.to_dict()}), 201
+
+
+@archimate_crud.route(
+    "/business-process/<int:process_id>/owners/<int:owner_id>", methods=["DELETE"]
+)
+@login_required
+def process_delete_owner(process_id, owner_id):
+    """Clear one owner of a business process."""
+    from app.core.auth.permissions import can
+    from app.models.application_owner import ApplicationOwner
+
+    org_id = g.current_org_id
+    if not (can(current_user, "assign", "owner") or can(current_user, "edit", "application")):
+        return jsonify({"message": "You cannot assign owners"}), 403
+    record = ApplicationOwner.query.filter_by(
+        id=owner_id, element_type="business_process", element_id=process_id,
+        organization_id=org_id,
+    ).first()
+    if record is None:
+        return jsonify({"message": "Owner record not found"}), 404
+    db.session.delete(record)
+    db.session.commit()
+    _mirror_process_owner(process_id, org_id)
+    return "", 204
+
+
+def _mirror_process_owner(process_id, org_id):
+    """Keep the process's owner text equal to its recorded primary owner (the owner record is the authority)."""
+    from app.models.application_owner import ApplicationOwner
+
+    process = BusinessProcess.query.filter_by(id=process_id, organization_id=org_id).first()
+    if process is None:
+        return
+    rows = ApplicationOwner.get_display_rows_for_element("business_process", process_id, org_id)
+    named = [r["user_name"] for r in rows if r["ownership_type"] == "primary" and r["user_name"] != "—"]
+    process.process_owner = named[0] if named else None
+    db.session.commit()
 
 
 def _get_display_fields(element, model_class):
@@ -1366,9 +1457,17 @@ def detail_element(layer, element_type, element_id):
     # Auto-discover displayable fields from the model
     all_fields = _get_display_fields(element, model_class)
     display_fields = [f for f in all_fields if not f["technical"]]
+    # These two are the element's own dates; the owner's assignment date is
+    # shown with the owner, so the labels say whose date each is.
+    for field in display_fields:
+        if field["label"] in ("Valid from", "Recorded at"):
+            field["label"] = "Element " + field["label"][0].lower() + field["label"][1:]
     technical_fields = [f for f in all_fields if f["technical"]]
     external_links = CrosswalkService.get_links_for_element(ae_id or element.id)
-    owner_rows = _element_owner_rows(element, element_type, getattr(element, "organization_id", None))
+    owner_rows = _element_owner_remove_urls(
+        element, element_type, getattr(element, "organization_id", None),
+        _element_owner_rows(element, element_type, getattr(element, "organization_id", None)),
+    )
     owner_assign_url = _element_owner_url(
         element, element_type, getattr(element, "organization_id", None)
     )
@@ -1382,6 +1481,13 @@ def detail_element(layer, element_type, element_id):
     has_owner_field = (
         owner_assign_url is not None or element_type == "Capability" or bool(owner_rows)
     )
+    # A business process written before the owner record existed keeps its owner as text.
+    legacy_owner_text = (
+        getattr(element, "process_owner", None) if element_type == "BusinessProcess" else None
+    )
+    if element_type == "BusinessProcess":
+        # The Owner row above is the one place the owner is shown.
+        display_fields = [f for f in display_fields if f["label"] != "Process owner"]
 
     # The external-identifiers help names only connectors this organisation
     # can use today, read from the one connector registry. When none are live
@@ -1406,6 +1512,7 @@ def detail_element(layer, element_type, element_id):
         display_fields=display_fields,
         technical_fields=technical_fields,
         owner_rows=owner_rows,
+        legacy_owner_text=legacy_owner_text,
         has_owner_field=has_owner_field,
         owner_assign_url=owner_assign_url,
         owner_assign_link=owner_assign_link,

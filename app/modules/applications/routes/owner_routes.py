@@ -82,6 +82,7 @@ def add_owner(app_id: int):
             ownership_type=ownership_type,
             assigned_by=current_user.id,
             refuse_duplicate=True,
+            replace_primary=bool(data.get("replace")),
         )
     except CrossOrganisationElementOwner:
         return jsonify({
