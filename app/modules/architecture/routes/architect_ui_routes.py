@@ -459,6 +459,7 @@ def load_sample_company():
     {"success": true, "redirect": "..."} depending on state.
     """
     import os
+    from app.services import sample_company_service
     from app.services.archimate_import_service import ArchiMateImportService, ImportRequestError
 
     wants_json = request.headers.get("Accept", "").startswith("application/json") or request.is_json
@@ -501,12 +502,14 @@ def load_sample_company():
         flash(error, "error")
         return redirect(url_for("dashboard.overview"))
 
+    elements_before = ArchiMateElement.query.count()
+
     # Import the sample
     try:
         result = ArchiMateImportService().import_xml(
             xml_content,
             strategy="skip_duplicates",
-            source_label="sample-company.oef.xml",
+            source_label=sample_company_service.SOURCE_LABEL,
             promote_top_level=False,
         )
     except ImportRequestError as exc:
@@ -518,13 +521,12 @@ def load_sample_company():
 
     # The elements alone count no applications and score no health; add the
     # applications, owners, costs, capabilities and risks a real estate carries.
-    from app.services import sample_company_service
-
     point = sample_company_service.find_restore_point(g.current_org_id)
     if point is not None:
         try:
             sample_company_service.add_working_data(g.current_org_id, current_user, point)
             db.session.commit()
+            sample_company_service.work_out_connections(g.current_org_id)
         except Exception:
             db.session.rollback()
             current_app.logger.exception("sample company working data not added")
@@ -537,16 +539,19 @@ def load_sample_company():
     # The first screen now shows the loaded sample: its counts, applications and the
     # "You are looking at the sample company" bar with the way to remove it.
     answer_url = url_for("dashboard.overview")
+    # Everything the load put in the model, as the first screen counts it: the
+    # file's elements and the ones the added capabilities and applications mirror.
+    created = ArchiMateElement.query.count() - elements_before
 
     if wants_json:
         return jsonify({
             "success": True,
             "redirect": answer_url,
-            "elements_created": result.get("created", 0),
+            "elements_created": created,
             "relationships_created": result.get("relationships_created", 0)
         }), 200
 
-    flash(f"Sample company loaded: {result.get('created', 0)} elements created.", "success")
+    flash(f"Sample company loaded: {created} elements created.", "success")
     return redirect(answer_url)
 
 
@@ -565,6 +570,7 @@ def remove_sample_company():
     if result is None:
         flash("There is no sample company to remove.", "info")
     else:
+        sample_company_service.work_out_connections(g.current_org_id)
         flash("Sample company removed.", "success")
     return redirect(url_for("dashboard.overview")), 303
 

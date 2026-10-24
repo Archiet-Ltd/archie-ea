@@ -23,6 +23,8 @@ from sqlalchemy.orm.attributes import flag_modified
 from app import db
 
 SAMPLE_MODEL_NAME = "Sample company"
+# Written on every relationship and element the file brings in, so the first answer cites it.
+SOURCE_LABEL = "Sample company"
 _ROWS_KEY = "sample_rows"
 
 # (element name in the file or None, application name, lifecycle code,
@@ -112,6 +114,30 @@ def _remember(log, rows: List[Dict[str, Any]], mirrors: List[int]) -> None:
     flag_modified(log, "snapshot_data")
 
 
+def _cite(org_id: int, mirrored_elements: List[int], relationships_before: set, recorded_at) -> None:
+    """Give what the added rows brought into the model the file's own source.
+
+    The mirrored elements and the links drawn from the capability mappings are
+    written by the model's own sync, which records no origin; without this the
+    first answer reads "Source not recorded" beside them.
+    """
+    from app.models.archimate_core import ArchiMateElement, ArchiMateRelationship
+
+    when = recorded_at or _dt.datetime.utcnow()
+    db.session.flush()
+    if mirrored_elements:
+        for element in ArchiMateElement.query.filter(
+            ArchiMateElement.id.in_(mirrored_elements), ArchiMateElement.organization_id == org_id,
+            ArchiMateElement.source_kind.is_(None),
+        ):
+            element.source_kind, element.source_label, element.source_recorded_at = "import", SOURCE_LABEL, when
+    for rel in ArchiMateRelationship.query.filter(
+        ArchiMateRelationship.organization_id == org_id, ArchiMateRelationship.source_kind.is_(None),
+    ):
+        if rel.id not in relationships_before:
+            rel.source_kind, rel.source_label, rel.source_recorded_at = "import", SOURCE_LABEL, when
+
+
 def add_working_data(org_id: int, user, log) -> Dict[str, int]:
     """Add applications, owners, costs, capabilities and risks to ``org_id``.
 
@@ -121,7 +147,7 @@ def add_working_data(org_id: int, user, log) -> Dict[str, int]:
     from app.models.application_capability import ApplicationCapabilityMapping
     from app.models.application_owner import ApplicationOwner
     from app.models.application_portfolio import ApplicationComponent
-    from app.models.archimate_core import ArchiMateElement
+    from app.models.archimate_core import ArchiMateElement, ArchiMateRelationship
     from app.models.business_capabilities import BusinessCapability
     from app.models.risk import Risk, RiskStatus
     from app.models.solution_models import Solution
@@ -130,6 +156,10 @@ def add_working_data(org_id: int, user, log) -> Dict[str, int]:
     elements = {
         e.name: e
         for e in ArchiMateElement.query.filter(ArchiMateElement.organization_id == org_id).all()
+    }
+    relationships_before = {
+        rid for (rid,) in db.session.query(ArchiMateRelationship.id)
+        .filter(ArchiMateRelationship.organization_id == org_id)
     }
     owner_name = _display_name(user)
     noted: List[Dict[str, Any]] = []
@@ -250,6 +280,7 @@ def add_working_data(org_id: int, user, log) -> Dict[str, int]:
         db.session.flush()
         note("solutions", solution)
 
+    _cite(org_id, mirrors, relationships_before, log.started_at)
     _remember(log, noted, mirrors)
     return {"applications": len(applications), "capabilities": len(capabilities), "risks": len(_RISKS),
             "solutions": len(_SOLUTIONS)}
@@ -302,3 +333,21 @@ def remove(org_id: int, user_id: int) -> Optional[Dict[str, Any]]:
             db.session.delete(row)
     db.session.flush()
     return import_restore_service.restore(org_id, user_id, log.id, [])
+
+
+def work_out_connections(org_id: int) -> None:
+    """Work out the indirect connections now, so the first answer is complete.
+
+    Uses the one derivation runner; it also prunes what no longer applies, so it
+    is run again after a removal.
+    """
+    from flask import current_app
+
+    from app.modules.intelligence.services.derivation_runner import DerivationRunner
+
+    try:
+        DerivationRunner().run_and_persist(org_id, trigger="on_demand")
+    except Exception:
+        # The answer then offers "Work them out now"; the load itself stands.
+        db.session.rollback()
+        current_app.logger.exception("sample company connections not worked out")
