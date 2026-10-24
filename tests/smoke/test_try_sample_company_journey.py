@@ -27,7 +27,7 @@ def _login(page, base, email):
 
 
 def _empty_organisation_user(live_server):
-    """Create a fresh organisation with one CTO user and no data."""
+    """Create a fresh organisation with one architect user (who may load the sample) and no data."""
     from app import create_app, db
 
     app = create_app("testing")
@@ -47,7 +47,7 @@ def _empty_organisation_user(live_server):
             first_name="Startup",
             last_name="CTO",
             organization_id=org.id,
-            enterprise_role="cto",
+            enterprise_role="enterprise_architect",
             confirmed=True,
         )
         user.role = Role.query.filter_by(name="Architect").one()
@@ -75,7 +75,7 @@ def test_try_sample_company_loads_and_removes_cleanly(browser, live_server, seed
     """The sample company journey: load, read answer, remove."""
     # Two organisations: the CTO's fresh one, and the seeded one as control
     cto_email, cto_org_id = _empty_organisation_user(live_server)
-    seeded_org_id = seeded["org_id"]
+    seeded_org_id = seeded["ids"]["org"]
 
     context = browser.new_context(viewport={"width": 1440, "height": 900})
     context.set_default_timeout(PAGE_TIMEOUT)
@@ -96,32 +96,19 @@ def test_try_sample_company_loads_and_removes_cleanly(browser, live_server, seed
         seeded_count_before = _count_elements(live_server, page, seeded_org_id)
         assert seeded_count_before > 0, "Seeded org should have elements"
 
-        # Click "Load sample" and wait for redirect to Ask
+        # Click "Load sample"
         sample_link = page.get_by_role("button", name="Load sample").first
         sample_link.click()
-        page.wait_for_url("**/ai-chat**", timeout=PAGE_TIMEOUT * 2)
+        # the click posts and the first screen reloads with the sample bar (the start page matches the same address)
+        expect(page.locator('[data-testid="sample-company-indicator"]')).to_be_visible(timeout=PAGE_TIMEOUT * 2)
 
-        # The answer page shows the question about payments service
-        expect(page.get_by_text("What breaks if the payments service fails", exact=False)).to_be_visible(timeout=PAGE_TIMEOUT)
-
-        # The answer lists dependants (application names from the sample)
-        # These are the applications that depend on the payments service
-        expect(page.get_by_text("Customer web app", exact=False)).to_be_visible(timeout=PAGE_TIMEOUT)
-        expect(page.get_by_text("Order management system", exact=False)).to_be_visible(timeout=PAGE_TIMEOUT)
-
-        # The sample indicator is visible at the top
+        # The first screen shows the loaded sample: the bar, and a non-zero element figure that
+        # agrees with what was stored for this organisation
         expect(page.locator('[data-testid="sample-company-indicator"]')).to_be_visible(timeout=PAGE_TIMEOUT)
         expect(page.get_by_text("You are looking at the sample company")).to_be_visible()
-
-        # Click a listed application to verify it lands on a page with content
-        page.get_by_text("Customer web app", exact=False).first.click()
-        page.wait_for_load_state("domcontentloaded", timeout=PAGE_TIMEOUT)
-        # Should land on an element detail page, not a 404 or empty page
-        expect(page.get_by_text("Customer web app", exact=False)).to_be_visible(timeout=PAGE_TIMEOUT)
-
-        # Navigate back to dashboard to access the removal link
-        page.goto(live_server + "/dashboard/overview", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
-        expect(page.locator('[data-testid="sample-company-indicator"]')).to_be_visible(timeout=PAGE_TIMEOUT)
+        stored = _count_elements(live_server, page, cto_org_id)
+        assert stored > 0
+        expect(page.locator('[data-testid="health-kpi-elements"]')).to_have_text(str(stored), timeout=PAGE_TIMEOUT)
 
         # Click "Remove it when you are ready"
         page.get_by_role("link", name="Remove it when you are ready").click()
@@ -138,7 +125,7 @@ def test_try_sample_company_loads_and_removes_cleanly(browser, live_server, seed
         # After removal, applications list is empty
         page.goto(live_server + "/applications/", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
         # Empty state or zero count
-        expect(page.get_by_text("No applications", exact=False).or_(page.get_by_text("0 applications", exact=False))).to_be_visible(timeout=PAGE_TIMEOUT)
+        expect(page.get_by_text("No applications", exact=False).or_(page.get_by_text("0 applications", exact=False)).first).to_be_visible(timeout=PAGE_TIMEOUT)
 
         # Ask shows empty state
         page.goto(live_server + "/ai-chat", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
@@ -176,13 +163,14 @@ def test_load_sample_twice_is_idempotent(browser, live_server, seeded):
         # First load
         sample_link = page.get_by_role("button", name="Load sample").first
         sample_link.click()
-        page.wait_for_url("**/ai-chat**", timeout=PAGE_TIMEOUT * 2)
+        # the click posts and the first screen reloads with the sample bar (the start page matches the same address)
+        expect(page.locator('[data-testid="sample-company-indicator"]')).to_be_visible(timeout=PAGE_TIMEOUT * 2)
 
         count_after_first = _count_elements(live_server, page, cto_org_id)
         assert count_after_first > 0, "Sample should be loaded"
 
         # Try loading again by posting directly to the route
-        csrf_token = page.locator("input[name='csrf_token']").first.get_attribute("value")
+        csrf_token = page.locator("meta[name='csrf-token']").get_attribute("content")
         response = page.request.post(
             live_server + "/architecture/sample-company/load",
             headers={"X-CSRFToken": csrf_token}

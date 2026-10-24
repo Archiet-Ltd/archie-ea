@@ -105,10 +105,19 @@ def test_load_sample_is_a_real_click_and_lands_on_content(browser, live_server, 
     try:
         page.goto(live_server + "/dashboard/overview", wait_until="networkidle", timeout=PAGE_TIMEOUT)
         page.get_by_role("button", name="Load sample").click()
-        page.wait_for_url("**/intelligence/ask**", timeout=PAGE_TIMEOUT * 2)
+        # the click posts and the first screen reloads with the sample bar (the start page matches the same address)
+        expect(page.locator('[data-testid="sample-company-indicator"]')).to_be_visible(timeout=PAGE_TIMEOUT * 2)
         expect(page.get_by_text("405", exact=False)).to_have_count(0)
         expect(page.locator('[data-testid="sample-company-indicator"]')).to_be_visible(timeout=PAGE_TIMEOUT)
         expect(page.get_by_text("You are looking at the sample company")).to_be_visible()
+        # the first screen is populated: its element figure is the count stored for this organisation
+        from app import create_app
+        from app.models.archimate_core import ArchiMateElement
+
+        with create_app("testing").app_context():
+            stored = ArchiMateElement.query.filter(ArchiMateElement.organization_id == org_id).count()
+        assert stored > 0
+        expect(page.locator('[data-testid="health-kpi-elements"]')).to_have_text(str(stored), timeout=PAGE_TIMEOUT)
         # the link beside it lands on a page listing what was loaded
         page.get_by_role("link", name="Remove it when you are ready").click()
         page.wait_for_url("**/restore-points/**", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT * 3)
