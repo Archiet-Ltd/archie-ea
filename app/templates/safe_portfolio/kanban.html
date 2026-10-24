@@ -2,7 +2,7 @@
 {% extends "layouts/admin_base.html" %}
 {% from 'macros/page_shell.html' import page_shell %}
 {% from 'macros/kanban_board.html' import kanban_board %}
-{% from 'components/select.html' import native_select %}
+{% from 'components/dropdown_menu.html' import dropdown_menu %}
 {% from 'components/badge.html' import badge %}
 {% from 'components/button.html' import button %}
 {% from 'components/input.html' import input %}
@@ -12,6 +12,10 @@
 {% block title %}SAFe Portfolio Kanban{% endblock %}
 
 {% block content %}
+{% set move_items = [] %}
+{% for state in kanban_states %}
+{% set _ = move_items.append({'text': state, 'onclick': "moveCardTo(card, '" ~ state ~ "')", 'aria_label': 'Move to ' ~ state}) %}
+{% endfor %}
 <div class="p-6 space-y-6">
     {% macro _page_actions() %}
         {% if can_write %}
@@ -77,7 +81,7 @@
         {% endif %}
         <p class="text-xs text-muted-foreground mb-3">
             Each card shows its WSJF score (Weighted Shortest Job First): Business Value, Time Criticality and Risk Reduction added together, divided by Job Size.
-            {% if can_write %}Drag a card to a new column, use its "Move to" menu, or focus it and press the left or right arrow key.{% endif %} The board scrolls sideways when the columns do not fit.
+            {% if can_write %}Drag a card to a new column, use the card's menu, or focus it and press the left or right arrow key.{% endif %} The board scrolls sideways when the columns do not fit.
         </p>
 
         {% call(state) kanban_board(
@@ -86,6 +90,7 @@
                 empty_hints=empty_hints,
                 can_write=can_write,
                 stage_group=stage_group,
+                lane=true,
                 region_label='Portfolio Kanban board, scrolls horizontally') %}
             {% set group = stage_group.get(state) %}
             <template x-for="card in columnCards('{{ state }}')" :key="card.id">
@@ -93,7 +98,7 @@
                      tabindex="0"
                      role="group"
                      :aria-label="`${card.name}, ${card.state}${canWrite ? '. Arrow left or right moves it to the next column.' : ''}`"
-                     class="kanban-card bg-card border rounded-lg p-3 transition-colors"
+                     class="kanban-card bg-card flex flex-col gap-2 rounded-lg border p-2.5 transition-colors"
                      :data-card-id="card.id"
                      x-data="{ expanded: false }"
                      :class="{
@@ -107,26 +112,44 @@
                      @dragend="onDragEnd()"
                      @keydown="onCardKey($event, card)">
 
-                    <div class="flex items-start justify-between gap-2 mb-2">
-                        {% call badge(variant='info') %}<span x-text="`WSJF: ${card.wsjf_score}`" title="Weighted Shortest Job First priority score"></span>{% endcall %}
-                        <span class="text-xs text-muted-foreground font-mono" x-text="card.id"></span>
+                    <div class="flex items-start justify-between gap-2">
+                        {% if can_write %}<i data-lucide="grip-vertical" class="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" data-drag-handle aria-hidden="true"></i>{% endif %}
+                        <h3 class="min-w-0 flex-1 text-sm font-medium leading-snug text-foreground line-clamp-2" x-text="card.name"></h3>
+                        {% if can_write %}
+                        {{ dropdown_menu(trigger_icon='more-horizontal', trigger_icon_only=true, trigger_size='sm', trigger_variant='ghost',
+                                         trigger_class='shrink-0', trigger_aria_label='Move epic', trigger_testid='card-actions',
+                                         trigger_attrs_dict={':aria-label': '`Move ${card.name} to a different column`', ':disabled': 'moving === card.id'},
+                                         menu_width='w-48', class='shrink-0',
+                                         items=[{'header': 'Move to'}] + move_items) }}
+                        {% endif %}
                     </div>
 
-                    <h3 class="text-sm font-medium text-foreground line-clamp-2 mb-2" x-text="card.name"></h3>
-
-                    <div class="flex flex-wrap items-center gap-1 mb-2">
-                        {% call badge(variant='info' if group == 'discovery' else 'success' if group == 'execution' else 'neutral') %}{{ 'Discovery' if group == 'discovery' else 'Execution' if group == 'execution' else 'Done' }}{% endcall %}
+                    <div class="flex flex-wrap items-center gap-1.5">
+                        {% call badge(variant='info') %}<span x-text="`WSJF: ${card.wsjf_score}`" title="Weighted Shortest Job First priority score"></span>{% endcall %}
                         <template x-if="isTopCard(card)">
                             {% call badge(variant='success') %}<i data-lucide="star" class="h-3 w-3 mr-1" aria-hidden="true"></i>Top WSJF{% endcall %}
                         </template>
+                        {% call button(variant='ghost', size='icon-xs', class='ml-auto shrink-0 text-primary', on_click="expanded = !expanded",
+                                       attrs_dict={':aria-expanded': 'expanded', ':aria-label': "`${expanded ? 'Hide' : 'Show'} WSJF factors for ${card.name}`", ':title': "expanded ? 'Hide WSJF factors' : 'Show WSJF factors'"}) %}
+                            <i data-lucide="chevron-right" class="h-3 w-3 transition-transform" :class="{ 'rotate-90': expanded }" aria-hidden="true"></i>
+                        {% endcall %}
                     </div>
 
-                    {% call button(variant='ghost', size='xs', class='w-full justify-start gap-1 mb-2 text-primary', on_click="expanded = !expanded") %}
-                        <i data-lucide="chevron-right" class="h-3 w-3 transition-transform" :class="{ 'rotate-90': expanded }" aria-hidden="true"></i>
-                        <span x-text="expanded ? 'Hide details' : 'Show WSJF factors'"></span>
-                    {% endcall %}
+                    <template x-if="card.owner_name || card.updated_at || card.created_at">
+                        <div class="flex items-center gap-1 text-xs text-muted-foreground">
+                            <template x-if="card.owner_name">
+                                {% call avatar(size='sm', class='h-6 w-6 text-xs') %}<span :title="card.owner_name" x-text="card.owner_name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()"></span>{% endcall %}
+                            </template>
+                            <template x-if="card.updated_at || card.created_at">
+                                <span class="flex items-center gap-1">
+                                    <i data-lucide="calendar" class="h-3 w-3" aria-hidden="true"></i>
+                                    <span x-text="card.updated_at || card.created_at"></span>
+                                </span>
+                            </template>
+                        </div>
+                    </template>
 
-                    <div x-show="expanded" x-collapse class="border-t border-border pt-2 mb-2">
+                    <div x-show="expanded" x-collapse class="border-t border-border pt-2">
                         <dl class="text-xs space-y-1">
                             <div class="flex justify-between gap-2">
                                 <dt class="text-muted-foreground">Business Value</dt>
@@ -145,32 +168,6 @@
                                 <dd class="text-foreground font-medium" x-text="card.job_size"></dd>
                             </div>
                         </dl>
-                    </div>
-
-                    <div class="flex items-center justify-between gap-2 text-xs text-muted-foreground">
-                        <div class="flex items-center gap-1">
-                            <i data-lucide="calendar" class="h-3 w-3" aria-hidden="true"></i>
-                            <span x-text="card.updated_at || card.created_at || '—'"></span>
-                        </div>
-                        <template x-if="card.owner_name">
-                            <span class="flex items-center justify-center h-6 w-6 rounded-full bg-muted text-xs font-medium"
-                                  :title="card.owner_name"
-                                  x-text="card.owner_name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()">
-                            </span>
-                        </template>
-                    </div>
-
-                    <div x-show="canWrite" class="border-t border-border pt-2 mt-2">
-                        {% call native_select(size='xs', class='w-full', attrs_dict={
-                            ':id': '`move-${card.id}`',
-                            ':aria-label': '`Move ${card.name} to a different column`',
-                            '@change': 'moveCard(card, $event.target)',
-                            ':disabled': 'moving === card.id'}) %}
-                            <option value="">Move to...</option>
-                            {% for state in kanban_states %}
-                            <option value="{{ state }}" :selected="card.state === '{{ state }}'">{{ state }}</option>
-                            {% endfor %}
-                        {% endcall %}
                     </div>
                 </div>
             </template>
