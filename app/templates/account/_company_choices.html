@@ -1,0 +1,20 @@
+{# The industry and the frameworks a company works with: sign-up step 2 and Settings share these fields. #}
+<div class="space-y-1.5" data-testid="signup-industry">
+    {% call label(for='welcome-industry') %}Your industry{% endcall %}
+    {% call native_select(id='welcome-industry', name='industry', class='w-full') %}
+        <option value="">Not sure yet</option>
+        {% for key, name, model in industries %}
+        <option value="{{ key }}"{% if chosen.industry == key %} selected{% endif %}>{{ name }}</option>
+        {% endfor %}
+    {% endcall %}
+</div>
+<fieldset class="space-y-3" data-testid="signup-frameworks">
+    <legend class="text-sm font-semibold">Frameworks you already work with</legend>
+    <div class="grid gap-3 sm:grid-cols-2">
+        {% for key, name, note in frameworks %}
+        {% call card(class='p-3') %}
+            {{ checkbox(id='welcome-framework-' ~ key, value=key, label=name, description=note, checked=(key in chosen.frameworks), attrs_dict={'data-framework': ''}) }}
+        {% endcall %}
+        {% endfor %}
+    </div>
+</fieldset>

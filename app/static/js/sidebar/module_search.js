@@ -1,5 +1,6 @@
 /*
- * Sidebar "Search navigation..." -> every page the user may open, link-level, zone-labelled.
+ * The sidebar's search box ("Search or ask...") -> every page the user may open, labelled with the
+ * sidebar entry it sits under, and (with includeRecords) the records that match.
  *
  * The box used to filter whole zones (a hit on one label kept every link in that zone) and had no spelling
  * tolerance. It now asks /api/sidebar/search, which matches spelling-blind (en-GB/en-US variants fold both
@@ -23,11 +24,13 @@
         var fetchJson = options.fetchJson;
         var onChange = options.onChange;
         var delay = options.delay === undefined ? DEFAULT_DELAY_MS : options.delay;
+        // The sidebar's one search box also lists records (applications, capabilities ...).
+        var includeRecords = !!options.includeRecords;
         var timer = null;
         var latest = 0;
 
-        function publish(query, results, loading, error) {
-            onChange({ query: query, results: results, loading: loading, error: error });
+        function publish(query, results, loading, error, records) {
+            onChange({ query: query, results: results, loading: loading, error: error, records: records || [] });
         }
 
         function search(raw) {
@@ -44,10 +47,16 @@
                     .then(function () { return fetchJson(query); })
                     .then(function (body) {
                         if (ticket !== latest) return;
-                        var modules = ((body && body.results) || [])
+                        var hits = (body && body.results) || [];
+                        var modules = hits
                             .filter(function (hit) { return hit.type === 'module'; })
-                            .map(function (hit) { return { name: hit.name, url: hit.url, zone: hit.zone || 'All modules' }; });
-                        publish(query, modules, false, false);
+                            .map(function (hit) { return { name: hit.name, url: hit.url, zone: hit.zone || '' }; });
+                        var records = includeRecords
+                            ? hits
+                                .filter(function (hit) { return hit.type !== 'module' && hit.url; })
+                                .map(function (hit) { return { name: hit.name, url: hit.url, type: String(hit.type || '').replace(/_/g, ' ') }; })
+                            : [];
+                        publish(query, modules, false, false, records);
                     })
                     .catch(function () {
                         if (ticket !== latest) return;

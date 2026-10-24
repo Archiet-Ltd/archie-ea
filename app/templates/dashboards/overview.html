@@ -24,6 +24,21 @@
 <script src="{{ url_for('static', filename='js/dashboard/company_kind.js') }}"></script>
 {% endblock %}
 {% block content %}
+{% if signup_sources %}
+<div class="mb-6" data-testid="signup-sources">
+{% call card() %}
+    {% call card_header() %}
+        {% call card_title() %}Your sources{% endcall %}
+        {% call card_description() %}What you gave {{ config.APP_NAME }} when you signed up, and how far it has got. This updates when you reload.{% endcall %}
+    {% endcall %}
+    {% call card_content(class='space-y-2') %}
+        {% for row in signup_sources %}
+        <p class="text-sm" data-testid="signup-source-{{ row.key }}" data-state="{{ row.state }}"><span class="font-medium">{{ row.label }}.</span> <span class="text-muted-foreground">{{ row.text }}</span></p>
+        {% endfor %}
+    {% endcall %}
+{% endcall %}
+</div>
+{% endif %}
 {% macro question_box() %}
 <form method="get" action="/ai-chat" class="flex flex-col gap-2 sm:flex-row" data-testid="first-question-form">
     {{ input(name='q', type='text', placeholder='Ask anything, for example: what breaks if our payments service fails?', aria_label='Ask a question about your company', class='sm:flex-1', attrs_dict={'data-testid': 'first-question-input', 'maxlength': '2000', 'autocomplete': 'off'}) }}
