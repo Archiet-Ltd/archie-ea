@@ -17,7 +17,7 @@
 
   {{ page_header(
     title=application.name ~ ' Roadmap',
-    description='Tactical application transformation planning with full work-package CRUD',
+    description='Plan and track the work that changes this application',
     breadcrumbs=[
       {'label': 'Applications', 'href': url_for('unified_applications.application_list')},
       {'label': application.name, 'href': url_for('unified_applications.application_detail', id=application.id)},
@@ -30,7 +30,7 @@
   ) }}
 
   {# Summary stat cards #}
-  <div class="grid grid-cols-1 gap-4 md:grid-cols-4">
+  <div class="grid grid-cols-2 gap-4 lg:grid-cols-4">
     {% call card() %}
       {% call card_header() %}
         <p class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Total</p>
@@ -73,7 +73,7 @@
     {% call card_content() %}
       <div class="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <p class="text-sm text-muted-foreground">
-          Create, update, and delete roadmap work packages for this application.
+          Plan and manage the work packages that change this application.
         </p>
         <div class="flex items-center gap-2">
           <label for="roadmap-filter" class="text-sm font-medium text-muted-foreground">Status</label>
