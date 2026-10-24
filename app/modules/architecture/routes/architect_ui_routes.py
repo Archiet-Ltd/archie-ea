@@ -443,6 +443,104 @@ def _user_labels(user_ids, org_id):
     return {u.id: u.email for u in rows}
 
 
+@architect_ui_bp.route("/architecture/sample-company/load", methods=["POST"])
+@login_required
+@require_permission("create", "relationship")
+def load_sample_company():
+    """Load the sample company into the current organisation.
+
+    Imports app/data/sample_company/sample-company.oef.xml into the active
+    organisation. Idempotent: a second press says it is already loaded and
+    redirects to the payments service answer. Only an Architect or
+    Administrator can load it; a Viewer sees an explanation instead.
+
+    After import, redirects to the answer for the payments service (showing
+    what breaks if it fails). Returns JSON {"already_loaded": true} or
+    {"success": true, "redirect": "..."} depending on state.
+    """
+    import os
+    from flask import g
+    from app.services.archimate_import_service import ArchiMateImportService, ImportRequestError
+
+    wants_json = request.headers.get("Accept", "").startswith("application/json") or request.is_json
+
+    # Check if sample is already loaded (by looking for the model name)
+    from app.models.archimate_core import ArchiMateElement
+    sample_marker = ArchiMateElement.query.filter(
+        ArchiMateElement.name == "Payments service",
+        ArchiMateElement.type == "ApplicationComponent"
+    ).first()
+
+    if sample_marker:
+        # Find the element to link to
+        payments_element_id = sample_marker.id
+        answer_url = url_for("intelligence_ui.ask", q="What breaks if the payments service fails?")
+
+        if wants_json:
+            return jsonify({"already_loaded": True, "redirect": answer_url}), 200
+        flash("The sample company is already loaded.", "info")
+        return redirect(answer_url)
+
+    # Load the sample file
+    sample_path = os.path.join(
+        current_app.root_path, "data", "sample_company", "sample-company.oef.xml"
+    )
+
+    if not os.path.exists(sample_path):
+        error = "Sample company file not found."
+        if wants_json:
+            return jsonify({"success": False, "error": error}), 404
+        flash(error, "error")
+        return redirect(url_for("dashboard.overview"))
+
+    try:
+        with open(sample_path, "r", encoding="utf-8") as f:
+            xml_content = f.read()
+    except Exception as exc:
+        error = f"Could not read sample company file: {exc}"
+        if wants_json:
+            return jsonify({"success": False, "error": error}), 500
+        flash(error, "error")
+        return redirect(url_for("dashboard.overview"))
+
+    # Import the sample
+    try:
+        result = ArchiMateImportService().import_xml(
+            xml_content,
+            strategy="skip_duplicates",
+            source_label="sample-company.oef.xml",
+            promote_top_level=False,
+        )
+    except ImportRequestError as exc:
+        error = f"Could not import sample company: {exc}"
+        if wants_json:
+            return jsonify({"success": False, "error": error}), 500
+        flash(error, "error")
+        return redirect(url_for("dashboard.overview"))
+
+    # Find the payments service element that was just imported
+    payments_element = ArchiMateElement.query.filter(
+        ArchiMateElement.name == "Payments service",
+        ArchiMateElement.type == "ApplicationComponent"
+    ).first()
+
+    if payments_element:
+        answer_url = url_for("intelligence_ui.ask", q="What breaks if the payments service fails?")
+    else:
+        answer_url = url_for("intelligence_ui.ask")
+
+    if wants_json:
+        return jsonify({
+            "success": True,
+            "redirect": answer_url,
+            "elements_created": result.get("created", 0),
+            "relationships_created": result.get("relationships_created", 0)
+        }), 200
+
+    flash(f"Sample company loaded: {result.get('created', 0)} elements created.", "success")
+    return redirect(answer_url)
+
+
 @architect_ui_bp.route("/architecture/import/oef/restore-points", methods=["GET"])
 @login_required
 def import_restore_points():

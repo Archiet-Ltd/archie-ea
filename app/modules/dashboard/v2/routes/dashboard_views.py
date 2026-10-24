@@ -652,6 +652,16 @@ def overview():
                 "href": safe_url_for_with_fallback("unified_low_priority.capability_map_capabilities", FALLBACK_HREF),
                 "cta": "View capabilities",
             }
+        # Check if sample company is loaded
+        from app.models.archimate_core import ArchiMateElement
+        try:
+            sample_loaded = ArchiMateElement.query.filter(
+                ArchiMateElement.name == "Payments service",
+                ArchiMateElement.type == "ApplicationComponent"
+            ).first() is not None
+        except Exception:
+            sample_loaded = False
+
         guided_steps = [
             {
                 "title": "Import applications",
@@ -672,6 +682,33 @@ def overview():
                 **capability_step,
             },
         ]
+
+        # Add the sample company step if not yet loaded and no applications exist
+        if not sample_loaded and applications_count == 0:
+            try:
+                _can_load_sample = bool(current_user.enterprise_role in (
+                    "enterprise_architect", "solution_architect", "platform_admin"
+                )) or bool(current_user.is_admin())
+            except Exception:
+                _can_load_sample = False
+
+            if _can_load_sample:
+                sample_step = {
+                    "title": "Try the sample company",
+                    "description": "See a working answer in under a minute, without connecting anything yet.",
+                    "href": safe_url_for_with_fallback("architect_ui.load_sample_company", FALLBACK_HREF),
+                    "cta": "Load sample",
+                    "done": False,
+                }
+            else:
+                sample_step = {
+                    "title": "Try the sample company",
+                    "description": "An architect or administrator can load the sample.",
+                    "href": FALLBACK_HREF,
+                    "cta": "View",
+                    "done": False,
+                }
+            guided_steps.insert(0, sample_step)
         try:
             _can_invite = bool(current_user.is_admin())
         except Exception:
