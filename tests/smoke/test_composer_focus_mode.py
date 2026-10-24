@@ -250,15 +250,18 @@ def test_the_connections_list_names_every_neighbour_and_opens_it(browser, live_s
 
 
 @pytest.mark.smoke
-def test_leaving_the_unsaved_view_triggers_the_unsaved_changes_prompt(browser, live_server, seeded, graph):
+def test_leaving_the_unsaved_view_prompts_only_after_the_person_changes_it(browser, live_server, seeded, graph):
     centre = graph["service"]
     context, page = _open(browser, live_server, seeded, "?element=%s&depth=1&derived=1" % centre)
     try:
         _wait_loaded(page)
-        prevented = page.evaluate(
-            "() => { const e = new Event('beforeunload', {cancelable: true}); window.dispatchEvent(e); return e.defaultPrevented; }"
-        )
-        assert prevented is True
+        probe = "() => { const e = new Event('beforeunload', {cancelable: true}); window.dispatchEvent(e); return e.defaultPrevented; }"
+        assert page.evaluate(probe) is False, "a view opened to look at must not prompt on leaving"
+        page.wait_for_timeout(3500)
+        page.evaluate(
+            """(s) => { const a = Alpine.$data(document.querySelector(s));
+                const c = a.graph.getElements()[0]; c.position(c.position().x + 40, c.position().y + 40); }""", APP)
+        assert page.evaluate(probe) is True, "moving an element is a change: leaving must prompt"
     finally:
         context.close()
 

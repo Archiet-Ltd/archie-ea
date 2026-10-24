@@ -624,6 +624,7 @@ function composerApp() {
         layoutDropdownOpen: false,
         analyzeDropdownOpen: false,
         exportDropdownOpen: false,
+        toolbarFolded: false, /* trailing actions live in the pinned overflow while the bar is narrower than its content */
         moreDropdownOpen: false, /* CMP-063: overflow dropdown for narrow viewports */
         showShortcutsModal: false, /* CMP-070: keyboard shortcut help modal */
 
@@ -2423,10 +2424,16 @@ function composerApp() {
             });
 
             /* ── Dirty state tracking ── */
-            this.graph.on('change:position', function() { self.viewpointDirty = true; });
-            this.graph.on('change:size', function() { self.viewpointDirty = true; });
-            this.graph.on('add', function() { self.viewpointDirty = true; });
-            this.graph.on('remove', function() { self.viewpointDirty = true; });
+            /* A neighbourhood opened to look at is dirty (so Save is offered) but not
+               edited: only a change after the drawing has settled counts as the person's. */
+            let markDirty = function() {
+                self.viewpointDirty = true;
+                if (self.focusView && Date.now() > (self._focusFitUntil || 0)) self._focusViewEdited = true;
+            };
+            this.graph.on('change:position', markDirty);
+            this.graph.on('change:size', markDirty);
+            this.graph.on('add', markDirty);
+            this.graph.on('remove', markDirty);
 
             /* ── Mini-map: update on graph/paper changes ── */
             let mmUpdate = function() { self._scheduleMiniMapUpdate(); };
@@ -2472,8 +2479,10 @@ function composerApp() {
             this.graph.on('change:relType', relMatrixRefresh);
             this.graph.on('change:elName', relMatrixRefresh);
 
+            this._watchToolbarFit();
+
             window.addEventListener('beforeunload', function(e) {
-                if (self.viewpointDirty && (self.currentSavedVpId || self.focusView)) {
+                if (self.viewpointDirty && (self.currentSavedVpId || (self.focusView && self._focusViewEdited))) {
                     e.preventDefault();
                     e.returnValue = '';
                 }
@@ -3127,6 +3136,8 @@ function composerApp() {
                 self.mode = 'edit';
                 self.viewpointLoading = false;
                 self.viewpointDirty = true;
+                self._focusViewEdited = false;
+                self._focusFitUntil = Date.now() + 3000;
                 self.focusView = {
                     name: centreName || ('Element #' + elementId),
                     depth: depth,
@@ -3161,6 +3172,39 @@ function composerApp() {
                 });
             })
             .catch(function(err) { UndoStack.resume(); fail(err); });
+        },
+
+        /* Fold the trailing toolbar actions into the pinned overflow whenever the bar is
+           narrower than its content. Each check unfolds, measures and refolds inside one
+           microtask, so nothing is painted between and no hysteresis is needed. */
+        _watchToolbarFit: function() {
+            let self = this;
+            let row = document.querySelector('nav.composer-toolbar-row');
+            let bar = row && row.querySelector('.composer-toolbar');
+            if (!row || !bar) return;
+            let pending = false;
+            let check = function() {
+                if (pending) return;
+                pending = true;
+                self.toolbarFolded = false;
+                self.$nextTick(function() {
+                    pending = false;
+                    self.toolbarFolded = bar.scrollWidth > bar.clientWidth + 1;
+                });
+            };
+            if (typeof ResizeObserver !== 'undefined') new ResizeObserver(check).observe(row);
+            /* Icons, badges and mode-only controls arrive after the first measurement. */
+            if (typeof MutationObserver !== 'undefined') {
+                let queued = false;
+                new MutationObserver(function() {
+                    if (queued) return;
+                    queued = true;
+                    window.requestAnimationFrame(function() { queued = false; check(); });
+                }).observe(bar, { childList: true, subtree: true });
+            }
+            this.$watch('mode', check);
+            window.addEventListener('load', check);
+            check();
         },
 
         /* Keep the focus drawing fitted while the canvas settles. A panel that is still

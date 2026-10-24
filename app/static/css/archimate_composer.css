@@ -214,6 +214,11 @@ nav[aria-label="Composer toolbar"] { margin-bottom: 0 !important; }
    At 1920px with sidebar (240px), usable toolbar width is ~1680px. With all primary buttons,
    secondary items (Layout, Style, Analyze, Present, Export) overflow. Show "More" dropdown instead. */
 .toolbar-overflow-more { display: none; }
+/* Row: the bar shrinks, the pinned overflow (folded menu + More) never leaves the screen. */
+nav[aria-label="Composer toolbar"].composer-toolbar-row { display: flex; align-items: stretch; background: hsl(var(--card)); border-bottom: 1px solid hsl(var(--border)); }
+.composer-toolbar-row .composer-toolbar { flex: 1 1 auto; min-width: 0; border-bottom: 0; }
+.composer-toolbar-pinned { display: flex; align-items: center; gap: 2px; flex: 0 0 auto; padding: 6px 8px 6px 0; background: hsl(var(--card)); }
+.toolbar-fold-group { display: contents; }
 @media (max-width: 1919px) {
     .toolbar-overflow-secondary { display: none !important; }
     .toolbar-overflow-more { display: block; }
@@ -223,6 +228,7 @@ nav[aria-label="Composer toolbar"] { margin-bottom: 0 !important; }
 @media (min-width: 1920px) {
     .toolbar-overflow-secondary { display: inline-flex; }
     .toolbar-overflow-more { display: none !important; }
+    .toolbar-overflow-more.toolbar-overflow-more-on { display: block !important; }
 }
 .toolbar-btn {
     display: inline-flex; align-items: center; gap: 5px;
@@ -389,6 +395,13 @@ nav[aria-label="Composer toolbar"] { margin-bottom: 0 !important; }
 
 /* ── Dimmed elements (neighbor focus) ────────────────────── */
 .joint-element.dimmed { opacity: 0.12 !important; transition: opacity 0.25s; }
+/* Connection words read the canvas token, not a fixed white: the box masks the line behind it in
+   either theme, with the muted tint the canvas carries laid over the page background. */
+.composer-canvas-bg .joint-link g.label rect {
+    fill: color-mix(in srgb, hsl(var(--muted)) 30%, hsl(var(--background)));
+    stroke: hsl(var(--border));
+}
+.composer-canvas-bg .joint-link g.label text { fill: hsl(var(--foreground)); }
 .joint-link.dimmed { opacity: 0.06 !important; transition: opacity 0.25s; }
 .joint-element.highlighted { opacity: 1 !important; }
 .joint-link.highlighted { opacity: 1 !important; }
@@ -543,6 +556,7 @@ z-index: 45;
     height: 100vh !important;
 }
 .composer-presentation-active .composer-toolbar,
+.composer-presentation-active .composer-toolbar-pinned,
 .composer-presentation-active .composer-sidebar { display: none !important; }
 .presentation-controls {
     position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
