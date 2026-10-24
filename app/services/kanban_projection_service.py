@@ -8,6 +8,7 @@ The source entity IS the card.
 """
 
 import logging
+from datetime import date
 from typing import Any, Collection, Dict, List, Optional
 
 from flask import url_for
@@ -44,13 +45,13 @@ ADM_PHASES = [
     {"code": "PRELIM", "label": "Preliminary", "order": 0},
     {"code": "A", "label": "Architecture Vision", "order": 1},
     {"code": "B", "label": "Business Architecture", "order": 2},
-    {"code": "C", "label": "IS Architecture", "order": 3},
+    {"code": "C", "label": "Information Systems Architectures", "order": 3},
     {"code": "D", "label": "Technology Architecture", "order": 4},
-    {"code": "E", "label": "Opportunities & Solutions", "order": 5},
+    {"code": "E", "label": "Opportunities and Solutions", "order": 5},
     {"code": "F", "label": "Migration Planning", "order": 6},
-    {"code": "G", "label": "Impl. Governance", "order": 7},
-    {"code": "H", "label": "Change Management", "order": 8},
-    {"code": "REQ", "label": "Requirements Mgmt", "order": 9},
+    {"code": "G", "label": "Implementation Governance", "order": 7},
+    {"code": "H", "label": "Architecture Change Management", "order": 8},
+    {"code": "REQ", "label": "Requirements Management", "order": 9},
 ]
 
 for _phase in ADM_PHASES:
@@ -79,23 +80,17 @@ _DEPLOY_COLUMN_MAP = {
 
 # ADM Deliverable document_status -> kanban column
 _DELIVERABLE_COLUMN_MAP = {
-    "draft": "proposed",
+    "planned": "proposed",
     "in_progress": "under_development",
-    "review": "review",
-    "approved": "approved",
-    "implementing": "implementing",
-    "published": "done",
-    "archived": "done",
+    "delayed": "under_development",
+    "completed": "done",
 }
 
-# Reverse map: column -> document_status (for move)
-_COLUMN_TO_DOC_STATUS = {
-    "proposed": "draft",
+# Reverse map: column -> Deliverable.delivery_status (for move)
+_COLUMN_TO_DELIVERY_STATUS = {
+    "proposed": "planned",
     "under_development": "in_progress",
-    "review": "review",
-    "approved": "approved",
-    "implementing": "implementing",
-    "done": "published",
+    "done": "completed",
 }
 
 # KanbanCard status -> kanban column
@@ -115,13 +110,6 @@ _COLUMN_TO_TASK_STATUS = {
     "approved": "done",
     "implementing": "in_progress",
     "done": "done",
-}
-
-# Primary deliverable codes (get "critical" priority, others get "high")
-_PRIMARY_DELIVERABLE_CODES = {
-    "DEL-PRELIM-001", "DEL-A-001", "DEL-B-001", "DEL-C-001",
-    "DEL-D-001", "DEL-E-001", "DEL-F-001", "DEL-G-001",
-    "DEL-H-001", "DEL-REQ-001",
 }
 
 # H-03: valid ADM phase codes, for normalizing whatever a source entity happens
@@ -511,13 +499,28 @@ class KanbanProjectionService:
         except Exception as exc:
             self.logger.debug("Could not compute days_in_column for solution %s: %s", sol.id, exc)
 
-        # Link URL
+        # Link URL: only for a solution the signed-in person may open. The solution
+        # page refuses everyone else, and a link that lands on a refusal is worse
+        # than no link.
+        link_url = None
         try:
-            link_url = url_for(
-                "solution_design.view_solution", solution_id=sol.id
+            from app.modules.solutions_strategic.v2.routes.solution_design_routes import (
+                _check_solution_access,
             )
+
+            if _check_solution_access(sol):
+                try:
+                    link_url = url_for(
+                        "solution_design.view_solution", solution_id=sol.id
+                    )
+                except Exception:
+                    link_url = f"/solutions/{sol.id}"
         except Exception:
-            link_url = f"/solutions/{sol.id}"
+            self.logger.debug("Could not check access to solution %s", sol.id, exc_info=True)
+
+        from app.services.adm_deliverable_service import solution_deliverable_counts
+
+        own = solution_deliverable_counts([sol.id]).get(sol.id, {})
 
         return {
             "id": f"solution:{sol.id}",
@@ -550,6 +553,8 @@ class KanbanProjectionService:
                 "artifact_total": artifact_total,
                 "phase_gate": phase_gate,
                 "days_in_column": days_in_column,
+                "deliverables_total": own.get("total", 0),
+                "deliverables_complete": own.get("complete", 0),
             },
             "link_url": link_url,
             "link_label": "Open Solution",
@@ -621,70 +626,65 @@ class KanbanProjectionService:
     def _project_deliverables(
         self, phase: Optional[str] = None
     ) -> List[Dict[str, Any]]:
-        """Query ADMDeliverable records and project to card dicts."""
-        from app.models.adm_deliverable import ADMDeliverable
+        """Project the deliverables of the board's solutions (the canonical store)."""
+        from app.models.implementation_migration import Deliverable
+        from app.models.solution_models import Solution, solution_deliverables
 
-        query = ADMDeliverable.query
-
+        query = (
+            db.session.query(Deliverable, Solution)
+            .join(
+                solution_deliverables,
+                solution_deliverables.c.deliverable_id == Deliverable.id,
+            )
+            .join(Solution, Solution.id == solution_deliverables.c.solution_id)
+            .filter(*self._board_solution_filters())
+        )
         if phase and phase != "all":
-            query = query.filter(ADMDeliverable.phase == phase)
+            query = query.filter(Solution.adm_phase == phase)
 
         phase_order = {item["code"]: item["order"] for item in ADM_PHASES}
-        deliverables = query.all()
-        deliverables.sort(
-            key=lambda deliv: (
-                phase_order.get(getattr(deliv, "phase", None), 999),
-                getattr(deliv, "id", 0),
+        rows = query.all()
+        rows.sort(
+            key=lambda row: (
+                phase_order.get(normalize_phase_code(row[1].adm_phase), 999),
+                row[1].id,
+                row[0].id,
             )
         )
         cards = []
-        for deliv in deliverables:
+        for deliv, sol in rows:
             try:
-                cards.append(self._project_one_deliverable(deliv))
+                cards.append(self._project_one_deliverable(deliv, sol))
             except Exception:
                 self.logger.warning(
                     f"Failed to project deliverable {deliv.id}", exc_info=True
                 )
         return cards
 
-    def _project_one_deliverable(self, deliv) -> Dict[str, Any]:
-        """Project a single ADMDeliverable into a unified card dict."""
-        phase_code = normalize_phase_code(getattr(deliv, "phase", None))
-        doc_status = getattr(deliv, "document_status", None) or "draft"
-        column = _DELIVERABLE_COLUMN_MAP.get(doc_status, "proposed")
-
-        deliverable_code = getattr(deliv, "deliverable_code", None)
-        is_primary = deliverable_code in _PRIMARY_DELIVERABLE_CODES
-        priority = "critical" if is_primary else "high"
-
-        elements = getattr(deliv, "archimate_elements", None) or []
-
-        # Build a readable type label from deliverable_type
-        type_label = (getattr(deliv, "deliverable_type", None) or "other").replace(
-            "_", " "
-        ).title()
-
+    def _project_one_deliverable(self, deliv, sol) -> Dict[str, Any]:
+        """Project a solution's deliverable into a unified card dict."""
+        status = deliv.delivery_status or "planned"
+        type_label = (deliv.deliverable_type or "other").replace("_", " ").title()
+        template = getattr(deliv, "adm_template", None)
         return {
             "id": f"deliverable:{deliv.id}",
             "card_type": "deliverable",
             "entity_id": deliv.id,
             "title": deliv.name or "Untitled Deliverable",
-            "subtitle": (deliv.description or "")[:120],
-            "phase": phase_code,
-            "column": column,
-            "priority": priority,
+            "subtitle": "For " + (sol.name or "Untitled Solution"),
+            "phase": normalize_phase_code(sol.adm_phase),
+            "column": _DELIVERABLE_COLUMN_MAP.get(status, "proposed"),
+            "priority": "high",
             "owner": None,
-            "owner_id": getattr(deliv, "created_by_id", None),
-            "due_date": None,
+            "owner_id": deliv.assigned_user_id,
+            "due_date": deliv.target_date.isoformat() if deliv.target_date else None,
             "blocker_count": 0,
             "blockers": [],
             "meta": {
                 "deliverable_type_label": type_label,
-                "archimate_viewpoint": getattr(deliv, "archimate_viewpoint", None),
-                "archimate_elements": elements,
-                "element_count": len(elements),
-                "document_status": doc_status,
-                "document_version": getattr(deliv, "document_version", None) or "0.1",
+                "checklist_item": template.name if template else None,
+                "solution_id": sol.id,
+                "delivery_status": status,
             },
             "link_url": None,
             "link_label": "Deliverable",
@@ -693,24 +693,20 @@ class KanbanProjectionService:
     # -- Deliverable Move ----------------------------------------------
 
     def _move_deliverable(self, entity_id: int, to_column: str) -> Dict[str, Any]:
-        """Update an ADMDeliverable's document_status based on target column."""
-        from app.models.adm_deliverable import ADMDeliverable
+        """Set a deliverable's delivery_status from the column it is moved to."""
+        from app.models.implementation_migration import Deliverable
+        from app.models.solution_models import Solution, solution_deliverables
 
-        deliv = db.session.get(ADMDeliverable, entity_id)
+        deliv = Deliverable.query.filter_by(id=entity_id).first()
         if not deliv:
             return {"success": False, "error": "Deliverable not found"}
 
-        new_status = _COLUMN_TO_DOC_STATUS.get(to_column)
+        new_status = _COLUMN_TO_DELIVERY_STATUS.get(to_column)
         if new_status is None:
             return {"success": False, "error": f"Cannot map column {to_column}"}
 
-        if not hasattr(deliv, "document_status"):
-            return {
-                "success": False,
-                "error": "Deliverable status updates are unavailable for the current deliverable model",
-            }
-
-        deliv.document_status = new_status
+        deliv.delivery_status = new_status
+        deliv.delivered_date = date.today() if new_status == "completed" else None
 
         try:
             db.session.commit()
@@ -721,7 +717,13 @@ class KanbanProjectionService:
             )
             return {"success": False, "error": "Database error"}
 
-        return {"success": True, "card": self._project_one_deliverable(deliv)}
+        sol = (
+            db.session.query(Solution)
+            .join(solution_deliverables, solution_deliverables.c.solution_id == Solution.id)
+            .filter(solution_deliverables.c.deliverable_id == deliv.id)
+            .first()
+        )
+        return {"success": True, "card": self._project_one_deliverable(deliv, sol)}
 
     # -- KanbanCard Projection -----------------------------------------
 

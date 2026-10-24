@@ -346,6 +346,25 @@ CAPABILITY_EDITOR_ROLES: Set[str] = {
 }
 
 
+# The architects who bring a source in. Not platform_admin: that is the stored
+# default persona of legacy accounts and grants nothing by itself (see
+# role_required), so administrators come in through is_admin() instead.
+CONNECTION_ARCHITECT_ROLES: Set[str] = CAPABILITY_EDITOR_ROLES - {ROLE_PLATFORM_ADMIN}
+
+
+def may_use_connections(user) -> bool:
+    """True when the user is one of the architects who bring a source in, by
+    their assigned persona. Administrators are answered by ``is_admin()``."""
+    if not user:
+        return False
+    try:
+        # The stored persona, not get_user_role(): that falls back to the
+        # solution architect for a person with none, which must grant nothing.
+        return getattr(user, "enterprise_role", None) in CONNECTION_ARCHITECT_ROLES
+    except Exception:  # noqa: BLE001 - a nav gate must not be able to 500 a page
+        return False
+
+
 def can_edit_capabilities(user) -> bool:
     """True when the user's enterprise_role owns the capability model.
 
@@ -510,12 +529,15 @@ def get_all_roles_with_access(section: str) -> List[str]:
 # agent) is a new, genuinely needed platform_admin-only screen, not a
 # duplicate of anything already in the Admin zone. No fold is available for
 # the same reason as above; taking the budget 32 -> 33.
-SIDEBAR_LINK_BUDGET = 33
+# Workspace (24 Oct 2026): Connections and Billing, one lasting place for the two
+# setup pages an administrator needs from any screen; taking the budget 33 -> 35.
+SIDEBAR_LINK_BUDGET = 35
 
 _ZONE_TITLES = {
     "home": "Home",
     "my_work": "My work",
     "library": "Library",
+    "workspace": "Workspace",
     "governance": "Governance",
     "admin": "Admin",
 }
@@ -567,6 +589,15 @@ _ASK_LINK = _link("Ask a question", "unified_ai_chat.index", "message-square")
 _APPROVAL_INBOX_LINK = _link(
     "Approval Inbox", "unified_ai_chat.approval_inbox", "inbox", requires="general"
 )
+
+# Workspace: the organisation's own setup, in the same place for everyone who may use
+# it. Billing is @admin_required, so its link carries requires="admin". Connections is
+# open to the architects who bring a source in (requires="connections"), and a person
+# the route would refuse never sees either link.
+_WORKSPACE_LINKS = [
+    _link("Connections", "m365_connector.connectors_index", "plug", requires="connections"),
+    _link("Billing", "billing.billing_index", "credit-card", requires="admin"),
+]
 
 _HOME_LINKS = [
     _link("Dashboard Overview", "dashboard.overview", "layout-dashboard"),
@@ -1058,6 +1089,8 @@ def _build_zones(role: str) -> List[Dict]:
     zones = [
         _zone("home", home_links),
         _zone("my_work", [_ASK_LINK] + _MY_WORK_LINKS[role]),
+        # Above Library, so the group is on screen without scrolling the sidebar.
+        _zone("workspace", _WORKSPACE_LINKS),
         _zone("library", library_links),
     ]
     if role in _BOARD_ROLES:
@@ -1162,6 +1195,13 @@ def link_requires_satisfied(user, requires):
     if requires == "admin":
         try:
             return bool(user.is_admin())
+        except Exception:  # anonymous / unexpected user object
+            return False
+    if requires == "connections":
+        # Whoever may bring a source in: the architects who author the model,
+        # and administrators. The same predicate as the Connections routes.
+        try:
+            return may_use_connections(user) or bool(user.is_admin())
         except Exception:  # anonymous / unexpected user object
             return False
     if requires == "org_admin":

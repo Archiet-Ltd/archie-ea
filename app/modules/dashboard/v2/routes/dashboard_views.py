@@ -729,7 +729,7 @@ def overview():
             },
         ]
 
-        # Add the sample company step if not yet loaded and no applications exist
+        # The sample company is offered once, inside the first card (first_actions), not again as a checklist step
         if not sample_loaded and applications_count == 0:
             try:
                 _can_load_sample = bool(current_user.enterprise_role in (
@@ -738,36 +738,20 @@ def overview():
             except Exception:
                 _can_load_sample = False
 
-            if _can_load_sample:
-                sample_step = {
-                    "title": "Try the sample company",
-                    "description": "See a populated workspace in under a minute, without connecting anything yet.",
-                    "href": safe_url_for_with_fallback("architect_ui.load_sample_company", FALLBACK_HREF),
-                    "cta": "Load sample",
-                    "post": True,
-                    "done": False,
-                }
-            else:
-                sample_step = {
-                    "title": "Try the sample company",
-                    "description": "An architect or administrator can load the sample.",
-                    "href": FALLBACK_HREF,
-                    "cta": "View",
-                    "done": False,
-                }
-            guided_steps.insert(0, sample_step)
             first_actions["sample"] = _can_load_sample
         # Same test the connector pages apply, so the link is only shown to
         # someone it opens for.
         try:
             from app.middleware.tenant_decorators import is_platform_admin
             from app.services.rbac_service import rbac_service
+            from app.utils.role_access import may_use_connections
 
             first_actions["connect"] = bool(
                 'm365_connector.github_connect' in current_app.view_functions
                 and (
                     is_platform_admin(current_user)
                     or rbac_service.is_org_admin(current_user, g.current_org_id)
+                    or may_use_connections(current_user)
                 )
             )
         except Exception:

@@ -142,7 +142,7 @@ def _register(page, base):
 SIGNED_IN_PATH = [
     ("dashboard", "/dashboard/overview"),
     ("import", "/architecture/import/oef"),
-    ("ask", "/intelligence/ask"),
+    ("ask", "/ai-chat"),
     ("composer", "/archimate/composer"),
 ]
 

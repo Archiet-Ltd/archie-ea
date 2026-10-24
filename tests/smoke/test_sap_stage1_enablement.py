@@ -75,11 +75,8 @@ def test_adm_kanban_shows_sap_activate_stage(browser, live_server, seeded):
         response = page.goto(live_server + '/adm-kanban/v2', timeout=PAGE_TIMEOUT)
         assert response.status == 200
         page.wait_for_timeout(1500)
-        # The swimlane view (default) only renders phase rows once cards exist;
-        # the flat-columns phase-pill row renders unconditionally from the same
-        # phases list, so switch there to check the label independent of data.
-        page.get_by_title('Flat Kanban columns').click()
-        page.wait_for_timeout(1500)
+        # Each ADM phase lane carries its SAP Activate stage in the lane header.
+        page.wait_for_selector('[data-testid="adm-lane"]', timeout=PAGE_TIMEOUT)
         activate_labels = page.locator('text=/Activate: (Prepare|Explore|Realize|Deploy|Run)/')
         expect(activate_labels.first).to_be_visible(timeout=PAGE_TIMEOUT)
         assert activate_labels.count() >= 1, (

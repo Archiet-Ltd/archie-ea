@@ -631,8 +631,8 @@ class AgentRunner:
             )
 
         # Verify provider supports tool use
-        # openrouter and deepseek use OpenAI-compatible API with tool calling
-        OPENAI_COMPAT_PROVIDERS = {"openrouter", "deepseek"}
+        # openrouter and nvidia use OpenAI-compatible API with tool calling
+        OPENAI_COMPAT_PROVIDERS = {"openrouter", "nvidia"}
         if provider not in ("anthropic", "openai") and provider not in OPENAI_COMPAT_PROVIDERS:
             logger.info(
                 "AgentRunner: provider '%s' does not support tool use — falling back to text mode",
@@ -646,7 +646,7 @@ class AgentRunner:
         # Resolve base_url for OpenAI-compatible third-party providers
         _PROVIDER_BASE_URLS = {
             "openrouter": "https://openrouter.ai/api/v1",
-            "deepseek": "https://api.deepseek.com/v1",
+            "nvidia": "https://integrate.api.nvidia.com/v1",
         }
         base_url = _PROVIDER_BASE_URLS.get(provider)
 
@@ -674,23 +674,34 @@ class AgentRunner:
         # Records the read tools actually returned this turn, for citation.
         sources = []
 
+        tried_providers: set = set()
         for iteration in range(MAX_ITERATIONS):
             # Call LLM
             self._held_tokens = []
-            try:
-                llm_resp = self._call_llm(
-                    provider, model, api_key, system_prompt, messages, tool_schemas,
-                    stream=stream_mode,
-                    base_url=base_url,
-                )
-            except Exception as e:
-                self._release_held_tokens(False)
-                logger.exception("AgentRunner LLM call failed (iteration %d)", iteration)
-                return self._finalize(
-                    self._fallback(f"LLM call failed: {e}"),
-                    user_message=user_message, domain=domain, context=context,
-                    persona=persona, model_used=model,
-                )
+            while True:
+                try:
+                    llm_resp = self._call_llm(
+                        provider, model, api_key, system_prompt, messages, tool_schemas,
+                        stream=stream_mode,
+                        base_url=base_url,
+                    )
+                    break
+                except Exception as e:
+                    self._release_held_tokens(False)
+                    logger.exception("AgentRunner LLM call failed (iteration %d)", iteration)
+                    # A route that is out of quota or down hands the turn to the
+                    # next configured route (OpenRouter, then NVIDIA).
+                    tried_providers.add(provider)
+                    alternate = self._alternate_route(e, tried_providers, LLMService)
+                    if alternate is None:
+                        return self._finalize(
+                            self._fallback(f"LLM call failed: {e}"),
+                            user_message=user_message, domain=domain, context=context,
+                            persona=persona, model_used=model,
+                        )
+                    provider, model, api_key = alternate
+                    base_url = _PROVIDER_BASE_URLS.get(provider)
+                    tool_schemas = self._build_tool_schemas(provider, TOOL_SCHEMAS)
 
             # Text-only response — we're done
             if not llm_resp.get("tool_calls"):
@@ -1011,7 +1022,18 @@ class AgentRunner:
         """
         Call the LLM with tool schemas.  Returns normalised dict:
           {"text": str|None, "tool_calls": list, "raw": raw_response}
+
+        Everything that leaves for the provider (instructions, history, tool
+        results) is scrubbed of email addresses, phone numbers and credentials
+        first.
         """
+        from app.modules.ai_chat.services.llm_service_impl import (
+            scrub_chat_messages,
+            scrub_for_transmission,
+        )
+
+        system_prompt = scrub_for_transmission(system_prompt)
+        messages = scrub_chat_messages(messages)
         if provider == "anthropic":
             if stream:
                 return self._call_anthropic_streaming(model, api_key, system_prompt, messages, tools)
@@ -1098,6 +1120,15 @@ class AgentRunner:
 
         return {"text": text, "tool_calls": tool_calls, "raw": final}
 
+    @staticmethod
+    def _provider_extra_body(provider_name: str) -> Optional[dict]:
+        """OpenRouter's data-policy setting: only endpoints that neither train on nor log prompts."""
+        if provider_name == "openrouter":
+            from app.modules.ai_chat.services.llm_service_impl import OPENROUTER_PROVIDER_POLICY
+
+            return {"provider": dict(OPENROUTER_PROVIDER_POLICY)}
+        return None
+
     def _call_openai(self, model, api_key, system_prompt, messages, tools, base_url=None) -> dict:
         from openai import OpenAI
         from app.modules.ai_chat.services.llm_service_impl import LLMService
@@ -1105,8 +1136,8 @@ class AgentRunner:
         provider_name = "openai"
         if base_url and "openrouter.ai" in base_url:
             provider_name = "openrouter"
-        elif base_url and "api.deepseek.com" in base_url:
-            provider_name = "deepseek"
+        elif base_url and "integrate.api.nvidia.com" in base_url:
+            provider_name = "nvidia"
         LLMService._guard_provider_call(provider_name, model, prompt=system_prompt)
         client = OpenAI(api_key=api_key, base_url=base_url, timeout=90.0)
         full_messages = [{"role": "system", "content": system_prompt}] + messages
@@ -1121,6 +1152,7 @@ class AgentRunner:
             tool_choice="auto",
             temperature=0.0,
             max_completion_tokens=_token_limit,
+            extra_body=self._provider_extra_body(provider_name),
         )
 
         msg = response.choices[0].message
@@ -1142,8 +1174,8 @@ class AgentRunner:
         provider_name = "openai"
         if base_url and "openrouter.ai" in base_url:
             provider_name = "openrouter"
-        elif base_url and "api.deepseek.com" in base_url:
-            provider_name = "deepseek"
+        elif base_url and "integrate.api.nvidia.com" in base_url:
+            provider_name = "nvidia"
         LLMService._guard_provider_call(provider_name, model, prompt=system_prompt)
         client = OpenAI(api_key=api_key, base_url=base_url, timeout=90.0)
         full_messages = [{"role": "system", "content": system_prompt}] + messages
@@ -1161,6 +1193,7 @@ class AgentRunner:
             temperature=0.0,
             max_completion_tokens=_token_limit,
             stream=True,
+            extra_body=self._provider_extra_body(provider_name),
         ) as stream:
             for chunk in stream:
                 delta = chunk.choices[0].delta
@@ -1405,6 +1438,31 @@ class AgentRunner:
     # Fallbacks                                                           #
     # ------------------------------------------------------------------ #
 
+    @staticmethod
+    def _alternate_route(error: Exception, tried: set, llm_service) -> Optional[tuple]:
+        """The next configured route to try after ``error``, or None.
+
+        Only a route that is out of quota, rate limited, down or timing out
+        hands over; a refused request would be refused by every route.
+        """
+        import re as _re
+
+        text = str(error).lower()
+        status = _re.search(r"\b(4\d\d|5\d\d)\b", text)
+        transient = (status and status.group(1) in ("402", "429") or bool(status and status.group(1).startswith("5"))) or any(
+            t in text for t in ("rate limit", "quota", "timed out", "timeout", "connection")
+        )
+        if not transient:
+            return None
+        try:
+            provider, model = llm_service._get_configured_provider(exclude_providers=sorted(tried))
+            keys = llm_service._get_all_api_keys(provider)
+        except Exception:
+            return None
+        if not keys or provider in tried or provider not in ("anthropic", "openai", "openrouter", "nvidia"):
+            return None
+        return provider, model, keys[0]
+
     def _fallback(self, reason: str) -> dict:
         reason_l = (reason or "").lower()
         if any(t in reason_l for t in ("no api key", "not configured", "no provider", "no keys")):
@@ -1417,9 +1475,8 @@ class AgentRunner:
             for t in ("quota", "insufficient", "rate limit", "429", "billing", "exceeded")
         ):
             msg = (
-                "The AI provider rejected the request (rate limit or quota exceeded). "
-                "Check the provider's plan/billing, or switch providers in "
-                "Admin → API Settings."
+                "The AI service is busy right now (its free usage limit was reached). "
+                "Wait a minute, then press Retry."
             )
         else:
             msg = (

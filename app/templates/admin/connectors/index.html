@@ -1,3 +1,4 @@
+{# design-block: settings #}
 {% extends 'layouts/admin_base.html' %}
 {% block title %}Connectors{% endblock %}
 {% from 'components/page_header.html' import page_header %}
@@ -8,7 +9,7 @@
         title='Connectors',
         description='Every connector of your organisation: health, last synchronisation, and the change queue each edit goes through.',
         breadcrumbs=[
-            {'label': 'Admin', 'href': url_for('admin.index')},
+            ({'label': 'Admin', 'href': url_for('admin.index')} if current_user.is_admin() else {'label': 'Workspace'}),
             {'label': 'Connectors'}
         ]
     ) }}

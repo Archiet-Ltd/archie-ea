@@ -110,7 +110,7 @@ def test_load_sample_is_a_real_click_and_lands_on_content(browser, live_server, 
     context, page, errors = _new_page(browser, live_server, email, {"width": 1440, "height": 900})
     try:
         page.goto(live_server + "/dashboard/overview", wait_until="networkidle", timeout=PAGE_TIMEOUT)
-        page.get_by_role("button", name="Load sample").click()
+        page.get_by_test_id("first-action-sample").click()
         # the click posts and the first screen reloads with the sample bar (the start page matches the same address)
         expect(page.locator('[data-testid="sample-company-indicator"]')).to_be_visible(timeout=PAGE_TIMEOUT * 2)
         expect(page.get_by_text("405", exact=False)).to_have_count(0)
