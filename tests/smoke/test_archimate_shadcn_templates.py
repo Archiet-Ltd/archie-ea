@@ -28,6 +28,24 @@ def _login(page, base, email):
     page.wait_for_url(lambda u: "/account/login" not in u, timeout=PAGE_TIMEOUT)
 
 
+def _assert_persona_is_enterprise_architect(seeded):
+    """The signed-in role is the persona the brief names (enterprise_architect),
+    not an administrator or a platform role. Without this, a journey that would
+    pass only because the admin can reach every page slips through."""
+    from app import create_app, db
+    from app.models.user import User
+
+    app = create_app("testing")
+    with app.app_context():
+        email = seeded["emails"]["enterprise_architect"]
+        user = User.query.filter_by(email=email).first()
+        assert user is not None, "enterprise_architect user missing from seed"
+        assert user.enterprise_role == "enterprise_architect"
+        assert user.is_platform_admin is False
+        assert user.is_org_admin is False
+        db.session.remove()
+
+
 @pytest.mark.smoke
 def test_import_diagram_page_loads_as_enterprise_architect(browser, live_server, seeded):
     """The import diagram landing page renders with its form controls.
@@ -36,6 +54,7 @@ def test_import_diagram_page_loads_as_enterprise_architect(browser, live_server,
     shows a title, the file upload control, the fallback type select, and the
     Preview and Import buttons. Every link on the page lands on a page with content.
     """
+    _assert_persona_is_enterprise_architect(seeded)
     email = seeded["emails"]["enterprise_architect"]
     context = browser.new_context(ignore_https_errors=True, viewport={"width": 1440, "height": 900})
     page = context.new_page()
@@ -82,6 +101,7 @@ def test_review_queue_page_loads_as_enterprise_architect(browser, live_server, s
     shows the page_shell title, the bulk-action buttons, and the sort select.
     The queue loads (or shows an empty state) without error.
     """
+    _assert_persona_is_enterprise_architect(seeded)
     email = seeded["emails"]["enterprise_architect"]
     context = browser.new_context(ignore_https_errors=True, viewport={"width": 1440, "height": 900})
     page = context.new_page()
@@ -102,8 +122,9 @@ def test_review_queue_page_loads_as_enterprise_architect(browser, live_server, s
     # The sort select has the expected options
     sort_select = page.locator("select[aria-label='Sort By']")
     expect(sort_select).to_be_visible(timeout=PAGE_TIMEOUT)
-    expect(sort_select.locator("option[value='confidence']")).to_be_visible()
-    expect(sort_select.locator("option[value='layer']")).to_be_visible()
+    expect(sort_select.locator("option[value='confidence']")).to_have_text("Sort: Confidence")
+    expect(sort_select.locator("option[value='layer']")).to_have_text("Sort: Layer")
+    expect(sort_select.locator("option[value='type']")).to_have_text("Sort: Type")
 
     # The page renders as enterprise_architect, verify role is not platform admin
     # by checking the user does not see admin-only UI elements
@@ -119,6 +140,7 @@ def test_diagrams_library_page_loads_as_enterprise_architect(browser, live_serve
     The page shows the title, search/filter controls, and either the diagrams
     table or the empty state.
     """
+    _assert_persona_is_enterprise_architect(seeded)
     email = seeded["emails"]["enterprise_architect"]
     context = browser.new_context(ignore_https_errors=True, viewport={"width": 1440, "height": 900})
     page = context.new_page()
@@ -127,7 +149,7 @@ def test_diagrams_library_page_loads_as_enterprise_architect(browser, live_serve
     page.goto(live_server + "/archimate/diagrams", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
 
     # The page has the expected title
-    expect(page.get_by_role("heading", name=re.compile(r"Diagrams", re.I))).to_be_visible(timeout=PAGE_TIMEOUT)
+    expect(page.get_by_role("heading", name=re.compile(r"^Diagrams$"))).to_be_visible(timeout=PAGE_TIMEOUT)
 
     # The search input is present
     expect(page.locator("input[aria-label='Search diagrams by name']")).to_be_visible(timeout=PAGE_TIMEOUT)

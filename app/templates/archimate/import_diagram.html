@@ -14,14 +14,6 @@
 {# shadcn-reference: gap:G-6 @e55b60b #}
 <meta name="shadcn-nearest" content="dashboard-01">
 {% endblock %}
-{% from 'components/button.html' import button %}
-{% from 'components/input.html' import input, label %}
-{% from 'components/select.html' import native_select %}
-{% from 'components/checkbox.html' import checkbox %}
-{% import 'components/card.html' as card %}
-{% import 'components/table.html' as table %}
-
-{% block title %}Import a diagram{% endblock %}
 
 {% block content %}
 <div x-data="diagramImport()" x-cloak>
@@ -47,7 +39,7 @@
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <div>
                 {% call label(for='diagram-file') %}Diagram export{% endcall %}
-                {{ input(id='diagram-file', type='file', accept='.json,.lucid,.vsdx', class='file:text-foreground', attrs_dict={'@change': "file = $event.target.files[0]; report = null; committed = false"}) }}
+                {{ input(id='diagram-file', type='file', class='file:text-foreground', attrs_dict={'accept': '.json,.lucid,.vsdx', '@change': "file = $event.target.files[0]; report = null; committed = false"}) }}
             </div>
 
             <div>
