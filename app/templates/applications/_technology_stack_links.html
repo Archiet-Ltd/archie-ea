@@ -1,10 +1,10 @@
 {# The application's technology stack: the nodes and system software it runs on.
 
    Each row is an ArchiMate realization relationship read back from the server,
-   so the impact answer on the Twin map follows the same link. Requires
+   so the impact answer in the Composer follows the same link. Requires
    intelligence/core.js, intelligence/picker.js and
    applications/technology_links.js on the page. #}
-{% if 'intelligence_ui.twin_map' in flask.current_app.view_functions %}
+{% if 'archimate.composer_page' in flask.current_app.view_functions %}
 {% from 'intelligence/_entity_picker.html' import entity_picker with context %}
 <section data-slot="card" class="rounded-lg border border-border bg-card"
          x-data="technologyLinks({{ app.id }})" data-technology-links
@@ -34,7 +34,7 @@
             <span class="ml-2 text-xs text-muted-foreground" x-text="link.type_label"></span>
           </div>
           <div class="flex shrink-0 items-center gap-2">
-            <a :href="'{{ url_for('intelligence_ui.twin_map') }}?element=' + link.element_id"
+            <a :href="'{{ url_for('archimate.composer_page') }}?element=' + link.element_id"
                class="inline-flex h-8 items-center rounded-md px-2 text-xs font-medium text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
               What depends on it
             </a>

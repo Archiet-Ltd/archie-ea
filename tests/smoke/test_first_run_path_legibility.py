@@ -143,7 +143,7 @@ SIGNED_IN_PATH = [
     ("dashboard", "/dashboard/overview"),
     ("import", "/architecture/import/oef"),
     ("ask", "/intelligence/ask"),
-    ("twin-map", "/intelligence/twin-map"),
+    ("composer", "/archimate/composer"),
 ]
 
 
