@@ -5,6 +5,7 @@
 {% from 'components/select.html' import native_select %}
 {% from 'components/checkbox.html' import checkbox %}
 {% from 'components/modal.html' import modal %}
+{% from 'components/confirmation_dialog.html' import confirmation_dialog %}
 {% from 'components/dense_table.html' import dense_table %}
 {% from 'components/badge.html' import badge %}
 {% from 'components/form_field.html' import form_group %}
@@ -62,7 +63,7 @@
                 {% endfor %}
             {% endcall %}
             {% endcall %}
-            <span class="ml-auto text-sm text-muted-foreground" x-text="filtered.length + ' requirements'"></span>
+            <span class="ml-auto text-sm text-muted-foreground" x-text="filtered.length + (filtered.length === 1 ? ' requirement' : ' requirements')"></span>
             {% call button(variant='default', class='gap-2 justify-center', aria_label='Add requirement', attrs_dict={'@click': "createError = ''; showCreateModal = true"}) %}
                 <i data-lucide="plus" class="h-4 w-4" aria-hidden="true"></i>
                 Add Requirement
@@ -189,7 +190,7 @@
                                     <option value="Implemented">Implemented</option>
                                 {% endcall %}
                             </td>
-                            <td class="px-4 py-3 text-xs text-muted-foreground" x-text="req.owner || '—'"></td>
+                            <td class="px-4 py-3 text-xs text-muted-foreground" x-text="req.owner || 'No owner'"></td>
                             <td class="px-4 py-3">
                                 <span x-show="req.dod_checklist && req.dod_checklist.length > 0" x-cloak
                                       x-cloak
@@ -356,7 +357,7 @@
                         <div>
                             <label class="block text-sm font-medium mb-1.5" :for="'req-owner-' + activeReq.id">Owner</label>
                             {% call native_select(size='sm', class='w-full', aria_label='Requirement owner', attrs_dict={':id': "'req-owner-' + activeReq.id", 'x-model': 'activeReq.owner'}) %}
-                                <option value="">— no owner —</option>
+                                <option value="">No owner</option>
                                 <template x-for="u in usersList" :key="u.id">
                                     <option :value="u.name" x-text="u.name"></option>
                                 </template>
@@ -369,7 +370,7 @@
                                 <label class="block text-sm font-medium" :for="'req-ac-' + activeReq.id">Acceptance Criteria</label>
                                 {% call button(variant='outline', class='justify-center', attrs_dict={'@click': 'generateAC()', ':disabled': 'acGenerating', 'title': 'Auto-generate BDD acceptance criteria with AI'}) %}
                                     <template x-if="!acGenerating">
-                                        <span>✨ Generate AC</span>
+                                        <span class="flex items-center gap-1"><i data-lucide="sparkles" class="h-3.5 w-3.5" aria-hidden="true"></i> Generate AC</span>
                                     </template>
                                     <template x-if="acGenerating">
                                         <span class="flex items-center gap-1"><i data-lucide="loader-2" class="h-3 w-3 animate-spin" aria-hidden="true"></i> Generating…</span>
@@ -432,7 +433,7 @@
                             <div class="grid grid-cols-1 gap-3">
                                 <div>
                                     <label class="block text-xs font-medium mb-1" :for="'req-driver-' + activeReq.id">Driver <span class="text-muted-foreground font-normal">(what's forcing this)</span></label>
-                                    {% call native_select(size='xs', class='w-full', aria_label='Driver id', attrs_dict={':id': "'req-driver-' + activeReq.id", 'x-model': 'activeReq.driver_id'}) %}
+                                    {% call native_select(size='sm', class='w-full', aria_label='Driver id', attrs_dict={':id': "'req-driver-' + activeReq.id", 'x-model': 'activeReq.driver_id'}) %}
                                         <option :value="null">— no driver linked —</option>
                                         <template x-for="d in motivationData.drivers" :key="d.id">
                                             <option :value="d.id" x-text="d.name"></option>
@@ -441,7 +442,7 @@
                                 </div>
                                 <div>
                                     <label class="block text-xs font-medium mb-1" :for="'req-goal-' + activeReq.id">Goal <span class="text-muted-foreground font-normal">(what outcome this achieves)</span></label>
-                                    {% call native_select(size='xs', class='w-full', aria_label='Goal id', attrs_dict={':id': "'req-goal-' + activeReq.id", 'x-model': 'activeReq.goal_id'}) %}
+                                    {% call native_select(size='sm', class='w-full', aria_label='Goal id', attrs_dict={':id': "'req-goal-' + activeReq.id", 'x-model': 'activeReq.goal_id'}) %}
                                         <option :value="null">— no goal linked —</option>
                                         <template x-for="g in motivationData.goals" :key="g.id">
                                             <option :value="g.id" x-text="g.name"></option>
@@ -450,7 +451,7 @@
                                 </div>
                                 <div>
                                     <label class="block text-xs font-medium mb-1" :for="'req-stakeholder-' + activeReq.id">Stakeholder <span class="text-muted-foreground font-normal">(who owns this need)</span></label>
-                                    {% call native_select(size='xs', class='w-full', aria_label='Stakeholder id', attrs_dict={':id': "'req-stakeholder-' + activeReq.id", 'x-model': 'activeReq.stakeholder_id'}) %}
+                                    {% call native_select(size='sm', class='w-full', aria_label='Stakeholder id', attrs_dict={':id': "'req-stakeholder-' + activeReq.id", 'x-model': 'activeReq.stakeholder_id'}) %}
                                         <option :value="null">— no stakeholder linked —</option>
                                         <template x-for="s in motivationData.stakeholders" :key="s.id">
                                             <option :value="s.id" x-text="s.name"></option>
@@ -462,7 +463,7 @@
                                 <div>
                                     <label class="block text-xs font-medium mb-1" :for="'req-archimate-req-' + activeReq.id">ArchiMate Requirement <span class="text-muted-foreground font-normal">(formal requirement element)</span></label>
                                     <div class="relative">
-                                        {{ input(type='text', aria_label='Search ArchiMate requirements', size='xs', attrs_dict={':id': "'req-archimate-req-' + activeReq.id", 'x-model': 'archiReqSearch', '@input.debounce.300ms': 'searchArchiReqs()', '@focus': 'archiReqDropdownOpen = true', ':placeholder': "activeReq.archimate_name || 'Search ArchiMate requirements…'"}) }}
+                                        {{ input(type='text', aria_label='Search ArchiMate requirements', size='sm', attrs_dict={':id': "'req-archimate-req-' + activeReq.id", 'x-model': 'archiReqSearch', '@input.debounce.300ms': 'searchArchiReqs()', '@focus': 'archiReqDropdownOpen = true', ':placeholder': "activeReq.archimate_name || 'Search ArchiMate requirements…'"}) }}
                                         <div x-show="archiReqDropdownOpen && archiReqError" x-cloak class="absolute z-50 w-full mt-1 rounded-md border border-border bg-popover px-3 py-1.5 text-xs text-destructive-emphasis" x-text="archiReqError" @click.outside="archiReqDropdownOpen = false"></div>
                                         <div x-show="archiReqDropdownOpen && !archiReqError && archiReqResults.length > 0" x-cloak class="absolute z-50 w-full mt-1 max-h-40 overflow-y-auto rounded-md border bg-popover" @click.outside="archiReqDropdownOpen = false">
                                             <template x-for="elem in archiReqResults" :key="elem.id">
@@ -496,7 +497,7 @@
                                 </template>
                             </p>
                             <div class="flex items-center gap-2">
-                                {{ input(type='number', placeholder='Work package ID', aria_label='Work package ID', size='xs', class='w-40', attrs_dict={'min': '1', 'x-model.number': 'activeReq.work_package_id', ':id': "'req-wp-' + activeReq.id"}) }}
+                                {{ input(type='number', placeholder='Work package ID', aria_label='Work package ID', size='sm', class='w-40', attrs_dict={'min': '1', 'x-model.number': 'activeReq.work_package_id', ':id': "'req-wp-' + activeReq.id"}) }}
                                 {% call button(variant='outline', class='justify-center', attrs_dict={'@click': 'linkWorkPackage(activeReq)'}) %}Link{% endcall %}
                                 {% call button(variant='outline', class='justify-center', attrs_dict={'x-show': 'activeReq.work_package_id', '@click': 'activeReq.work_package_id = null; linkWorkPackage(activeReq)'}) %}Unlink{% endcall %}
                             </div>
@@ -512,11 +513,11 @@
                         <div class="grid grid-cols-2 gap-4">
                             <div>
                                 <label class="block text-xs font-medium mb-1" :for="'req-sp-' + activeReq.id">Story Points <span class="text-muted-foreground font-normal">(Fibonacci)</span></label>
-                                {{ input(type='number', placeholder='e.g. 3', size='xs', attrs_dict={':id': "'req-sp-' + activeReq.id", 'min': '1', 'max': '89', 'x-model.number': 'activeReq.story_points'}) }}
+                                {{ input(type='number', placeholder='e.g. 3', size='sm', attrs_dict={':id': "'req-sp-' + activeReq.id", 'min': '1', 'max': '89', 'x-model.number': 'activeReq.story_points'}) }}
                             </div>
                             <div>
                                 <label class="block text-xs font-medium mb-1" :for="'req-epic-' + activeReq.id">Parent Epic ID</label>
-                                {{ input(type='number', placeholder='Parent Epic ID (optional)', aria_label='Parent Epic ID (optional)', size='xs', attrs_dict={':id': "'req-epic-' + activeReq.id", 'x-model.number': 'activeReq.epic_parent_id'}) }}
+                                {{ input(type='number', placeholder='Parent Epic ID (optional)', aria_label='Parent Epic ID (optional)', size='sm', attrs_dict={':id': "'req-epic-' + activeReq.id", 'x-model.number': 'activeReq.epic_parent_id'}) }}
                             </div>
                         </div>
                         <div class="flex items-center gap-3">
@@ -539,7 +540,7 @@
                                 </template>
                             </div>
                             <div class="flex gap-2">
-                                {{ input(type='text', placeholder='Add DoD item...', aria_label='Add DoD item...', size='xs', class='flex-1 flex-1', attrs_dict={'x-model': 'newDodItem', '@keydown.enter.prevent': 'addDodItem()'}) }}
+                                {{ input(type='text', placeholder='Add DoD item...', aria_label='Add DoD item...', size='sm', class='flex-1 flex-1', attrs_dict={'x-model': 'newDodItem', '@keydown.enter.prevent': 'addDodItem()'}) }}
                                 {% call button(variant='outline', attrs_dict={'@click': 'addDodItem()'}) %}
                                     Add
                                 {% endcall %}
@@ -557,7 +558,7 @@
                             <!-- MoSCoW -->
                             <div>
                                 <label class="text-xs font-medium text-muted-foreground">MoSCoW</label>
-                                {% call native_select(size='xs', class='w-full', aria_label='MoSCoW', attrs_dict={'x-model': 'activeReq.moscow_priority'}) %}
+                                {% call native_select(size='sm', class='w-full', aria_label='MoSCoW', attrs_dict={'x-model': 'activeReq.moscow_priority'}) %}
                                     <option value="">— unset —</option>
                                     <option value="MUST">Must Have</option>
                                     <option value="SHOULD">Should Have</option>
@@ -568,7 +569,7 @@
                             <!-- Story Points -->
                             <div>
                                 <label class="text-xs font-medium text-muted-foreground">Story Points</label>
-                                {{ input(type='number', placeholder='Fibonacci: 1,2,3,5,8...', aria_label='Story Points', size='xs', class='mt-1', attrs_dict={'x-model.number': 'activeReq.story_points', 'min': '1', 'max': '89'}) }}
+                                {{ input(type='number', placeholder='Fibonacci: 1,2,3,5,8...', aria_label='Story Points', size='sm', class='mt-1', attrs_dict={'x-model.number': 'activeReq.story_points', 'min': '1', 'max': '89'}) }}
                             </div>
                             <!-- RICE -->
                             <div class="col-span-2">
@@ -576,19 +577,19 @@
                                 <div class="grid grid-cols-4 gap-1">
                                     <div>
                                         <label class="text-xs text-muted-foreground">Reach</label>
-                                        {{ input(type='number', placeholder='500', aria_label='Reach', size='xs', attrs_dict={'x-model.number': 'activeReq.rice_reach'}) }}
+                                        {{ input(type='number', placeholder='500', aria_label='Reach', size='sm', attrs_dict={'x-model.number': 'activeReq.rice_reach'}) }}
                                     </div>
                                     <div>
                                         <label class="text-xs text-muted-foreground">Impact</label>
-                                        {{ input(type='number', placeholder='2', aria_label='Impact', size='xs', attrs_dict={'x-model.number': 'activeReq.rice_impact'}) }}
+                                        {{ input(type='number', placeholder='2', aria_label='Impact', size='sm', attrs_dict={'x-model.number': 'activeReq.rice_impact'}) }}
                                     </div>
                                     <div>
                                         <label class="text-xs text-muted-foreground">Confidence%</label>
-                                        {{ input(type='number', placeholder='80', aria_label='Confidence%', size='xs', attrs_dict={'x-model.number': 'activeReq.rice_confidence'}) }}
+                                        {{ input(type='number', placeholder='80', aria_label='Confidence%', size='sm', attrs_dict={'x-model.number': 'activeReq.rice_confidence'}) }}
                                     </div>
                                     <div>
                                         <label class="text-xs text-muted-foreground">Effort</label>
-                                        {{ input(type='number', placeholder='10', aria_label='Effort', size='xs', attrs_dict={'x-model.number': 'activeReq.rice_effort'}) }}
+                                        {{ input(type='number', placeholder='10', aria_label='Effort', size='sm', attrs_dict={'x-model.number': 'activeReq.rice_effort'}) }}
                                     </div>
                                 </div>
                             </div>
@@ -598,11 +599,11 @@
                                 <div class="grid grid-cols-2 gap-1">
                                     <div>
                                         <label class="text-xs text-muted-foreground">Cost of Delay (1-21)</label>
-                                        {{ input(type='number', placeholder='8', aria_label='Cost of Delay (1-21)', size='xs', attrs_dict={'x-model.number': 'activeReq.wsjf_cost_of_delay', 'min': '1', 'max': '21'}) }}
+                                        {{ input(type='number', placeholder='8', aria_label='Cost of Delay (1-21)', size='sm', attrs_dict={'x-model.number': 'activeReq.wsjf_cost_of_delay', 'min': '1', 'max': '21'}) }}
                                     </div>
                                     <div>
                                         <label class="text-xs text-muted-foreground">Job Duration (1-21)</label>
-                                        {{ input(type='number', placeholder='5', aria_label='Job Duration (1-21)', size='xs', attrs_dict={'x-model.number': 'activeReq.wsjf_job_duration', 'min': '1', 'max': '21'}) }}
+                                        {{ input(type='number', placeholder='5', aria_label='Job Duration (1-21)', size='sm', attrs_dict={'x-model.number': 'activeReq.wsjf_job_duration', 'min': '1', 'max': '21'}) }}
                                     </div>
                                 </div>
                             </div>
@@ -653,7 +654,7 @@
                     <!-- Actions -->
                     <p x-show="deleteError" x-cloak role="alert" class="mt-4 text-sm text-destructive-emphasis" x-text="deleteError"></p>
                     <div class="flex justify-end gap-3 mt-6">
-                        {% call button(variant='destructive', class='justify-center mr-auto', attrs_dict={'@click': 'deleteRequirement()', ':disabled': 'deleting', 'x-text': "confirmDelete ? 'Confirm delete' : 'Delete requirement'"}) %}{% endcall %}
+                        {% call button(variant='destructive', class='justify-center mr-auto', attrs_dict={'@click': 'askDelete()', ':disabled': 'deleting'}) %}Delete requirement{% endcall %}
                         {% call button(variant='outline', class='justify-center', attrs_dict={'@click': 'activeReq = null'}) %}Cancel{% endcall %}
                         {% call button(variant='default', class='justify-center', attrs_dict={'@click': 'saveDetail()', ':disabled': 'saving'}) %}
                             <template x-if="saving">
@@ -665,6 +666,11 @@
                 </div>
             </template>
     {% endcall %}
+    {{ confirmation_dialog(id='delete-requirement', title='Delete this requirement?',
+        message='It leaves the backlog for everyone in your organisation. Its history is kept.',
+        confirm_text='Delete requirement', cancel_text='Keep it',
+        confirm_label='Delete requirement', cancel_label='Keep it', stop_clicks=false,
+        button_class='inline-flex h-9 items-center justify-center rounded-md border border-input bg-background px-4 text-sm font-medium text-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring') }}
 </div>
 {% endblock %}
 
@@ -693,7 +699,6 @@ function requirementsBacklog() {
         creating: false,
         createError: '',
         deleting: false,
-        confirmDelete: false,
         deleteError: '',
         newReq: { name: '', description: '', requirement_type: 'functional', moscow_priority: 'MUST', priority: 3, solution_id: null, capability_id: null, story_points: null, epic_parent_id: null, layer: '', template_id: null },
         // Template picker state (added for RRT-003)
@@ -726,24 +731,32 @@ function requirementsBacklog() {
             else Platform.modal.close(id);
         },
 
+        askDelete() {
+            if (!this.activeReq || this.deleting) return;
+            this.deleteError = '';
+            window.dispatchEvent(new CustomEvent('open-confirm-delete-requirement', {
+                detail: { callback: () => this.deleteRequirement() },
+            }));
+        },
+
         async deleteRequirement() {
             if (!this.activeReq || this.deleting) return;
-            if (!this.confirmDelete) { this.confirmDelete = true; return; }
             this.deleting = true;
             this.deleteError = '';
+            const req = this.activeReq;
             try {
-                const id = this.activeReq.id;
-                const d = await Platform.fetch(`/api/enterprise/requirements/${id}`, { method: 'DELETE', silent: true });
+                const d = await Platform.fetch(`/api/enterprise/requirements/${req.id}`, { method: 'DELETE', silent: true });
                 if (!d.success) throw new Error(d.error || 'The requirement could not be deleted.');
-                this.all = this.all.filter(x => x.id !== id);
+                this.all = this.all.filter(x => x.id !== req.id);
                 this.applyFilters();
                 if (this.showEpicTree) this.loadEpics();
                 this.activeReq = null;
+                Platform.toast.success('Deleted "' + req.name + '".');
             } catch (e) {
                 this.deleteError = e.message || 'The requirement could not be deleted.';
+                Platform.toast.error(this.deleteError);
             } finally {
                 this.deleting = false;
-                this.confirmDelete = false;
             }
         },
 
@@ -903,7 +916,6 @@ function requirementsBacklog() {
         },
 
         openDetail(req) {
-            this.confirmDelete = false;
             this.deleteError = '';
             this.activeReq = { ...req };
             this.acGenerating = false;
@@ -1120,6 +1132,7 @@ function requirementsBacklog() {
                     Platform.toast.error(d2.error || 'Could not save changes.');
                     return;
                 }
+                Platform.toast.success('Saved "' + this.activeReq.name + '".');
                 this.activeReq = null;
             } catch (e) {
                 Platform.toast.error(e.message || 'Could not save changes.');
