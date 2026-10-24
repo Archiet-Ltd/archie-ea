@@ -15,7 +15,7 @@ row exists, which it never does on a fresh database, so the widget renders a len
 that can only ever fail.
 #}
 
-{% macro archimate_gantt_widget(data_endpoint, title='Implementation Roadmap', subtitle='', container_id='archimate-gantt') %}
+{% macro archimate_gantt_widget(data_endpoint, title='Implementation Roadmap', subtitle='', container_id='archimate-gantt', show_export=true) %}
 <script>
 (function() {
     const containerId = '{{ container_id }}';
@@ -118,7 +118,7 @@ that can only ever fail.
                             <div class="flex items-center gap-2">
                                 <i data-lucide="package" class="w-4 h-4 text-primary"></i>
                                 <span class="font-medium text-foreground truncate">${escapeHtml(item.name || 'Untitled')}</span>
-                                <span class="px-2 py-0.5 text-xs rounded-full ${statusClass} text-primary-foreground">${escapeHtml(item.status || 'planned')}</span>
+                                <span class="px-2 py-0.5 text-xs rounded-full ${statusClass} text-primary-foreground">${escapeHtml((item.status || 'planned').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()))}</span>
                             </div>
                             <div class="flex items-center gap-4 mt-1 text-xs text-muted-foreground">
                                 <span>${startDate} - ${endDate}</span>
@@ -222,8 +222,9 @@ that can only ever fail.
                 <button type="button" @click="collapseAllArchimateRows{{ container_id }}()" class="px-3 py-1.5 text-sm font-medium text-muted-foreground hover:bg-accent rounded-md transition-all" aria-label="Collapse all rows">
                     <i data-lucide="chevrons-up" class="w-4 h-4 inline mr-1"></i>Collapse All
                 </button>
+                {% if show_export %}
                 <div class="relative">
-                    <button type="button" @click="$el.nextElementSibling.classList.toggle('hidden')" class="px-4 py-2 bg-success text-primary-foreground rounded-md hover:bg-success text-sm font-medium flex items-center" aria-label="Export options">
+                    <button type="button" @click="$el.nextElementSibling.classList.toggle('hidden')" class="px-4 py-2 border border-input bg-background text-foreground rounded-md hover:bg-muted/50 text-sm font-medium flex items-center" aria-label="Export options">
                         <i data-lucide="download" class="w-4 h-4 mr-1"></i>Export
                     </button>
                     <div class="hidden absolute right-0 mt-2 w-48 bg-card rounded-md z-50 border border-border">
@@ -231,6 +232,7 @@ that can only ever fail.
                         <button type="button" @click="exportArchimateGantt{{ container_id }}('csv')" class="w-full text-left px-4 py-2 text-sm hover:bg-accent" aria-label="Export as CSV">Export as CSV</button>
                     </div>
                 </div>
+            {% endif %}
             </div>
         </div>
     </div>
