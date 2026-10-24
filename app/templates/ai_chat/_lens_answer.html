@@ -1,0 +1,181 @@
+{# design-block: chat #}
+{% from 'components/card.html' import card, card_header, card_title, card_description %}
+{% from 'components/badge.html' import badge %}
+{% from 'components/button.html' import button %}
+{% from 'components/empty_state.html' import empty_state %}
+{# One lens answer drawn as cards in the chat: a heading card that says what was asked of
+   which element, then a card per record the lens returned, or a plain sentence saying why
+   there is none. Every figure arrives already redacted for the signed-in person by the API
+   read it came from; a missing value says so rather than showing a blank or a zero. #}
+{% set name = element.name %}
+{% set headings = {
+    'strategy': 'What we are trying to achieve at ' ~ name ~ ', and how it is tracking',
+    'risk': 'What could hurt ' ~ name ~ ', and what it touches',
+    'portfolio': 'Rationalisation status of ' ~ name,
+    'programme': 'What is changing at ' ~ name ~ ', and whether it is on track',
+    'accountability': 'Who is accountable for ' ~ name,
+    'data': 'What data ' ~ name ~ ' holds or produces, who stewards it and where it flows',
+    'compliance': 'Which regulations and controls apply to ' ~ name ~ ', and which have no evidence',
+} %}
+{% macro reached(rows) -%}
+{{ rows | length }} connection{{ '' if rows | length == 1 else 's' }} reached
+{%- endmacro %}
+{% macro restricted_or(figure_label, value, reason, restricted_reason) -%}
+{%- if value is not none -%}{{ figure_label }}: {{ '%.1f' | format(value) }}%
+{%- elif reason == restricted_reason -%}Restricted to roles with budget authority
+{%- else -%}Not costed{%- endif -%}
+{%- endmacro %}
+<div class="space-y-3" data-lens-cards data-lens="{{ lens }}">
+    {% call card() %}
+        {% call card_header() %}
+            {% call card_title(class='text-base') %}{{ headings[lens] }}{% endcall %}
+        {% endcall %}
+    {% endcall %}
+
+    {% if data is none %}
+        {{ empty_state(icon='circle-alert', title='We could not look that up just now', description='Ask again in a moment.', padding='py-6') }}
+
+    {% elif lens == 'strategy' %}
+        {% for item in data.initiatives %}
+        {% call card(class='p-4') %}
+            <div data-lens-row>
+                <div class="flex flex-wrap items-start justify-between gap-2">
+                    <h3 class="min-w-0 break-words text-sm font-semibold text-foreground">{{ item.name }}</h3>
+                    {% call badge('neutral') %}{{ item.status or 'Status not recorded' }}{% endcall %}
+                </div>
+                <p class="mt-1 text-sm text-muted-foreground">{{ item.completion_percentage if item.completion_percentage is not none else '—' }}% complete{% if item.health_status %} — {{ item.health_status }}{% endif %}</p>
+                <p class="mt-1 text-sm text-foreground">{{ item.executive_sponsor or 'No sponsor recorded' }}</p>
+                <p class="mt-1 text-sm text-foreground">{{ restricted_or('Budget variance', item.budget_variance_pct, item.budget_reason, 'financial_data_restricted') }}</p>
+                {% for metric in item.success_metrics or [] %}
+                <p class="mt-1 text-sm text-foreground">{{ metric.metric_name }}: {{ metric.actual_value or '—' }} / {{ metric.target_value or '—' }}{% if metric.status %} ({{ metric.status }}){% endif %}</p>
+                {% endfor %}
+                <p class="mt-2 text-sm text-foreground">{{ reached(item.affected_rows or []) }}</p>
+            </div>
+        {% endcall %}
+        {% else %}
+            {{ empty_state(icon='target', title='No initiatives recorded against this element', description='Nothing is missing from this answer: no initiative is linked to ' ~ name ~ ' yet.', padding='py-6') }}
+        {% endfor %}
+
+    {% elif lens == 'programme' %}
+        {% for item in data.work_packages %}
+        {% call card(class='p-4') %}
+            <div data-lens-row>
+                <div class="flex flex-wrap items-start justify-between gap-2">
+                    <h3 class="min-w-0 break-words text-sm font-semibold text-foreground">{{ item.name }}</h3>
+                    {% call badge('neutral') %}{{ item.status or 'Status not recorded' }}{% endcall %}
+                </div>
+                <p class="mt-1 text-sm text-muted-foreground">{{ item.progress_percentage if item.progress_percentage is not none else '—' }}% complete{% if item.is_overdue %} — overdue{% endif %}</p>
+                <p class="mt-1 text-sm text-foreground">{{ item.owner or 'No owner recorded' }}</p>
+                <p class="mt-1 text-sm text-foreground">{{ restricted_or('Cost variance', item.cost_variance_pct, item.cost_reason, 'financial_data_restricted') }}</p>
+                <p class="mt-2 text-sm text-foreground">{{ reached(item.affected_rows or []) }}</p>
+            </div>
+        {% endcall %}
+        {% else %}
+            {{ empty_state(icon='target', title='No work packages recorded against this element', description='Nothing is missing from this answer: no work package is linked to ' ~ name ~ ' yet.', padding='py-6') }}
+        {% endfor %}
+
+    {% elif lens == 'risk' %}
+        {% for item in data.risks %}
+        {% call card(class='p-4') %}
+            <div data-lens-row>
+                <div class="flex flex-wrap items-start justify-between gap-2">
+                    <h3 class="min-w-0 break-words text-sm font-semibold text-foreground">{{ item.title }}</h3>
+                    {% call badge('neutral') %}{{ item.risk_level or 'Level not recorded' }}{% endcall %}
+                </div>
+                <p class="mt-1 text-sm text-muted-foreground">Likelihood {{ item.likelihood }} x Impact {{ item.impact }} = {{ item.risk_score }}</p>
+                <p class="mt-1 text-sm text-foreground">{{ item.owner or 'No owner recorded' }}</p>
+                {% if item.mitigation_plan %}<p class="mt-1 text-sm text-muted-foreground">{{ item.mitigation_plan }}</p>{% endif %}
+                <p class="mt-2 text-sm text-foreground">{{ reached(item.affected_rows or []) }}</p>
+            </div>
+        {% endcall %}
+        {% else %}
+            {{ empty_state(icon='shield', title='No risks recorded against this element', description='Nothing is missing from this answer: no risk is linked to ' ~ name ~ ' yet.', padding='py-6') }}
+        {% endfor %}
+
+    {% elif lens == 'portfolio' %}
+        {% if planning_url %}
+        {% call card(class='p-4') %}
+            <div data-lens-row data-lens-portfolio>
+                <p class="text-sm text-muted-foreground">Rationalisation status, cost and ownership for this application.</p>
+                <div class="mt-3">{{ button(text='Open rationalisation planning', variant='outline', size='sm', href=planning_url, icon='external-link', testid='lens-open-planning') }}</div>
+            </div>
+        {% endcall %}
+        {% else %}
+            {{ empty_state(icon='layers', title='This is not something the rationalisation view tracks', description=name ~ ' is not an application, so it has no rationalisation record to open.', padding='py-6') }}
+        {% endif %}
+
+    {% elif lens == 'accountability' %}
+        {% for item in data.owners %}
+        {% call card(class='p-4') %}
+            <div data-lens-row>
+                <div class="flex flex-wrap items-start justify-between gap-2">
+                    <h3 class="min-w-0 break-words text-sm font-semibold text-foreground">{{ item.ownership_type or 'Ownership' }}</h3>
+                    {% if item.organization_unit and item.organization_unit.name %}{% call badge('neutral') %}{{ item.organization_unit.name }}{% endcall %}{% endif %}
+                </div>
+                <p class="mt-1 text-sm text-foreground">{{ item.primary_contact or 'No contact recorded' }}</p>
+                {% if item.start_date %}<p class="mt-1 text-sm text-muted-foreground">Since {{ item.start_date }}</p>{% endif %}
+            </div>
+        {% endcall %}
+        {% else %}
+            {{ empty_state(icon='users', title='Ownership data is not yet connected', description='No owner is recorded for ' ~ name ~ ' or anything it affects.', padding='py-6') }}
+        {% endfor %}
+        <p class="text-sm text-muted-foreground">Capacity and availability data is not yet connected.</p>
+
+    {% elif lens == 'data' %}
+        {% if not data.data_objects and not data.flows %}
+            {{ empty_state(icon='database', title='No data objects or data flows are recorded for this element yet', description='Nothing is missing from this answer: none is linked to ' ~ name ~ ' yet.', padding='py-6') }}
+        {% else %}
+            {% for item in data.data_objects %}
+            {% call card(class='p-4') %}
+                <div data-lens-row>
+                    <div class="flex flex-wrap items-start justify-between gap-2">
+                        <h3 class="min-w-0 break-words text-sm font-semibold text-foreground">{{ item.name }}</h3>
+                        {% if item.data_classification %}{% call badge('neutral') %}{{ item.data_classification }}{% endcall %}{% endif %}
+                    </div>
+                    <p class="mt-1 text-sm text-foreground"><span class="text-muted-foreground">Steward: </span>{{ item.steward or 'Not recorded' }}</p>
+                    <p class="mt-1 text-sm text-foreground"><span class="text-muted-foreground">Owner: </span>{{ item.owner or 'Not recorded' }}</p>
+                    {% if item.contains_pii %}<p class="mt-1 text-sm text-muted-foreground">Contains personal data</p>{% endif %}
+                    {% if item.retention_period_days is not none %}<p class="mt-1 text-sm text-muted-foreground">Retained for {{ item.retention_period_days }} days</p>{% endif %}
+                </div>
+            {% endcall %}
+            {% else %}
+                <p class="text-sm text-muted-foreground">No data objects are recorded for this element.</p>
+            {% endfor %}
+            <h3 class="text-sm font-semibold text-foreground">Where it flows</h3>
+            {% for flow in data.flows %}
+                <p class="text-sm text-foreground" data-lens-flow><span class="font-medium">{{ 'Flows to ' if flow.direction == 'out' else 'Comes from ' }}</span>{{ flow.other_element_name or '—' }}{% set detail = [flow.lineage_type, flow.frequency] | select | join(', ') %}{% if detail %} <span class="text-muted-foreground">({{ detail }})</span>{% endif %}</p>
+            {% else %}
+                <p class="text-sm text-muted-foreground">No data flows are recorded for this element.</p>
+            {% endfor %}
+        {% endif %}
+
+    {% elif lens == 'compliance' %}
+        {% if not data.controls and not data.open_violations %}
+            {{ empty_state(icon='shield-check', title='No compliance controls are recorded for this element yet', description='Nothing is missing from this answer: no control is mapped to ' ~ name ~ ' yet.', padding='py-6') }}
+        {% else %}
+            {% for item in data.controls %}
+            {% call card(class='p-4') %}
+                <div data-lens-row>
+                    <div class="flex flex-wrap items-start justify-between gap-2">
+                        <h3 class="min-w-0 break-words text-sm font-semibold text-foreground">{% if item.code %}{{ item.code }}: {% endif %}{{ item.name }}</h3>
+                        {% if item.framework_name %}{% call badge('neutral') %}{{ item.framework_name }}{% endcall %}{% endif %}
+                    </div>
+                    <p class="mt-1 text-sm text-foreground"><span class="text-muted-foreground">Status: </span>{{ item.implementation_status or 'Not recorded' }}</p>
+                    {% if item.no_evidence %}<p class="mt-1 text-sm text-destructive">No evidence recorded and not verified</p>
+                    {% elif item.evidence_url_recorded %}<p class="mt-1 text-sm text-muted-foreground">Evidence recorded</p>{% endif %}
+                    {% if item.verified_date %}<p class="mt-1 text-sm text-muted-foreground">Verified {{ item.verified_date }}</p>{% endif %}
+                </div>
+            {% endcall %}
+            {% else %}
+                <p class="text-sm text-muted-foreground">No compliance controls are recorded for this element.</p>
+            {% endfor %}
+            <h3 class="text-sm font-semibold text-foreground">Open policy violations</h3>
+            {% for violation in data.open_violations %}
+                <p class="text-sm text-foreground" data-lens-violation>{{ violation.policy_name or 'Unnamed policy' }}{% if violation.severity %} <span class="text-muted-foreground">({{ violation.severity }})</span>{% endif %}</p>
+            {% else %}
+                <p class="text-sm text-muted-foreground">No open policy violations are recorded for this element.</p>
+            {% endfor %}
+            <p class="text-sm text-muted-foreground">{% if data.last_scan_at %}Last policy scan: {{ data.last_scan_at | format_datetime }}{% else %}No policy scan is recorded for this element.{% endif %}</p>
+        {% endif %}
+    {% endif %}
+</div>

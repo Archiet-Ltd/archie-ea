@@ -376,6 +376,14 @@
         try {
             const estate = await ArchieChat.transport.askEstate(message);
             if (estate.found) {
+                // The answer is kept in the conversation like any other: remember the
+                // thread it went to and refresh the history rail.
+                if (estate.thread_id) {
+                    const _wasNew = estate.thread_id !== window.__threadId;
+                    window.__threadId = estate.thread_id;
+                    try { sessionStorage.setItem('archie_chat_thread_id', estate.thread_id); } catch (e) { /* swallow-ok: private-browsing storage denial; the server-saved thread and current page still work, only reload restoration is unavailable */ }
+                    if (_wasNew && window.loadSessionList) window.loadSessionList();
+                }
                 { const _l = document.getElementById(loadingId); if (_l) _l.remove(); }
                 appendAnswerCards(estate.html);
                 return;

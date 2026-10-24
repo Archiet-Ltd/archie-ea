@@ -75,7 +75,7 @@
         var resp = await apiFetch('/ai-chat/estate-answer', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ message: message })
+            body: JSON.stringify({ message: message, thread_id: window.__threadId || null })
         });
         var data = await resp.json().catch(function () { return {}; });
         if (!resp.ok || data.success === false) throw new Error(data.error || 'estate answer ' + resp.status);

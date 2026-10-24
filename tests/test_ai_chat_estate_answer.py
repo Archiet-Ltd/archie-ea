@@ -94,3 +94,96 @@ def test_the_sidebar_question_link_opens_the_chat(app):
         assert my_work[0]["endpoint"] == "unified_ai_chat.index"
         every = [link["endpoint"] for z in zones for link in z["links"]]
         assert every.count("unified_ai_chat.index") == 1, role
+
+
+def _history(client):
+    return client.get("/ai-chat/threads").get_json()["threads"]
+
+
+def test_an_estate_answer_is_kept_in_the_conversation_history(client, login_as, make_org):
+    org, other = make_org(), make_org()
+    owner = _architect(org, "chat-hist-a@example.com")
+    outsider = _architect(other, "chat-hist-b@example.com")
+    _load(client, login_as, owner)
+    body = _ask(client, QUESTION).get_json()
+    assert body["thread_id"]
+    threads = _history(client)
+    assert [t["id"] for t in threads] == [body["thread_id"]]
+    saved = client.get("/ai-chat/threads/" + body["thread_id"]).get_json()["messages"]
+    assert [m["role"] for m in saved] == ["user", "assistant"]
+    assert saved[0]["content"] == QUESTION
+    assert "connections. [Open this answer](" + body["page_url"] + ")" in saved[1]["content"]
+    # A second question in the same conversation joins it rather than starting another.
+    again = client.post("/ai-chat/estate-answer", json={"message": QUESTION, "thread_id": body["thread_id"]}).get_json()
+    assert again["thread_id"] == body["thread_id"]
+    kept = db.session.execute(
+        db.text("SELECT count(*) FROM conversation_messages WHERE thread_id = :t"), {"t": body["thread_id"]}
+    ).scalar()
+    assert kept == 4
+    # Nobody else sees it.
+    login_as(client, outsider)
+    assert _history(client) == []
+    assert client.get("/ai-chat/threads/" + body["thread_id"]).status_code == 404
+
+
+def _seed_initiative(org, name):
+    from app.models.archimate_core import ArchiMateElement
+    from app.models.enterprise_intelligence import PortfolioInitiative
+
+    element = ArchiMateElement.query.filter_by(organization_id=org.id, name="Payments service").first()
+    db.session.add(PortfolioInitiative(
+        organization_id=org.id, name=name, archimate_element_id=element.id, status="Active",
+        completion_percentage=45, total_budget=200000.0, spent_to_date=180000.0,
+    ))
+    db.session.commit()
+
+
+STRATEGY = "What are we trying to achieve at Payments service and how is it tracking"
+
+
+def test_the_strategy_question_is_answered_in_the_chat_for_its_own_organisation_only(client, login_as, make_org):
+    from app.models.user import User
+
+    org, other = make_org(), make_org()
+    architect = _architect(org, "chat-lens-a@example.com")
+    outsider = _architect(other, "chat-lens-b@example.com")
+    _load(client, login_as, architect)
+    _seed_initiative(org, "Payments modernisation")
+    body = _ask(client, STRATEGY).get_json()
+    assert body["found"] is True and body["lens"] == "strategy"
+    html = body["html"]
+    assert "Payments modernisation" in html and "45% complete" in html
+    # An architect has no budget authority: the figure is withheld, not shown.
+    assert architect.enterprise_role == "enterprise_architect"
+    assert "Restricted to roles with budget authority" in html and "Budget variance" not in html
+    assert "1 initiative recorded" in client.get("/ai-chat/threads/" + body["thread_id"]).get_json()["messages"][1]["content"]
+    # A person with budget authority sees it.
+    architect.enterprise_role = "cto"
+    db.session.commit()
+    assert User.query.get(architect.id).enterprise_role == "cto"
+    assert "Budget variance" in _ask(client, STRATEGY).get_json()["html"]
+    # The other organisation has its own Payments service and none of this.
+    _load(client, login_as, outsider)
+    theirs = _ask(client, STRATEGY).get_json()
+    assert theirs["found"] is True
+    assert "Payments modernisation" not in theirs["html"]
+    assert "No initiatives recorded against this element" in theirs["html"]
+
+
+def test_every_lens_question_is_answered_with_cards_or_a_plain_empty_state(client, login_as, make_org):
+    org = make_org()
+    architect = _architect(org, "chat-lens-c@example.com")
+    _load(client, login_as, architect)
+    asked = {
+        "risk": "What could hurt Payments service and what does it touch",
+        "portfolio": "What is the rationalisation status of Payments service",
+        "programme": "What's changing at Payments service and is it on track",
+        "accountability": "Who's accountable for Payments service",
+        "data": "What data does Payments service hold or produce and where does it flow",
+        "compliance": "Which regulations and controls apply to Payments service",
+    }
+    for lens, question in asked.items():
+        body = _ask(client, question).get_json()
+        assert body["found"] is True and body["lens"] == lens, lens
+        assert "data-lens-cards" in body["html"] and "Payments service" in body["html"]
+        assert "We could not look that up" not in body["html"], lens
