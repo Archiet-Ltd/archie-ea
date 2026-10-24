@@ -61,11 +61,7 @@
                     {% call table.table_cell() %}<span class="text-muted-foreground">{{ d.element_count }}</span>{% endcall %}
                     {% call table.table_cell() %}<span class="text-muted-foreground">{{ d.updated_at[:10] if d.updated_at else '—' }}</span>{% endcall %}
                     {% call table.table_cell(class='text-right') %}
-                        <a href="{{ url_for('archimate.composer_page', viewpoint_id=d.id, solution_id=d.solution_id) }}"
-                           class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4"
-                           data-testid="open-diagram-{{ d.id }}">
-                            <i data-lucide="external-link" class="h-3.5 w-3.5"></i> Open
-                        </a>
+                        {{ button(text='Open', icon='external-link', icon_position='left', variant='outline', size='sm', href=url_for('archimate.composer_page', viewpoint_id=d.id, solution_id=d.solution_id), testid='open-diagram-' ~ d.id) }}
                     {% endcall %}
                 </tr>
                 {% endfor %}
