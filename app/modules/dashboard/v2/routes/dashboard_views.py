@@ -523,19 +523,53 @@ def overview():
     # cannot tell them apart.
     health_score = None
     health_components = {}
+    health_unavailable = []
     try:
         # The executive-summary API uses this same tenant-scoped computation.
         # Do not derive an identically labelled score from different measures
         # (maturity_current, risk-documentation coverage, or ARB/solution counts).
         from app.modules.dashboard.v2.services.executive_dashboard_service import ExecutiveDashboardService
+        from datetime import datetime
         health = ExecutiveDashboardService()._get_health_score()
         components = health["components"]
         health_score = health["composite_score"]
+        health_unavailable = health.get("unavailable_components", [])
+
+        # Enrich each component with basis, source, as_of per brief council-07
+        as_of = datetime.utcnow().strftime("%d %b %Y")
         health_components = {
-            "phase_maturity": components["phase_maturity"],
-            "risk_health": components["risk_posture"],
-            "capability_coverage": components["capability_coverage"],
-            "governance": components["governance"],
+            "phase_maturity": {
+                "key": "phase_maturity",
+                "label": "Phase Maturity",
+                "value": components["phase_maturity"],
+                "basis": "Share of solutions with a recorded ADM phase that are in phase C or later" if components["phase_maturity"] is not None else "No solutions with recorded ADM phases yet",
+                "source": "Solution pipeline",
+                "as_of": as_of,
+            },
+            "risk_health": {
+                "key": "risk_health",
+                "label": "Risk Posture",
+                "value": components["risk_posture"],
+                "basis": "Inverse of high/critical risk ratio" if components["risk_posture"] is not None else "No risks recorded yet. Record a risk in the register to measure this.",
+                "source": "Risk register",
+                "as_of": as_of,
+            },
+            "capability_coverage": {
+                "key": "capability_coverage",
+                "label": "Capability Coverage",
+                "value": components["capability_coverage"],
+                "basis": "Percentage of L1 capabilities with at least one mapped application" if components["capability_coverage"] is not None else "No capability mappings yet. Map an application to a capability to measure this.",
+                "source": "Capability map",
+                "as_of": as_of,
+            },
+            "governance": {
+                "key": "governance",
+                "label": "Governance",
+                "value": components["governance"],
+                "basis": "ARB presence, timeliness and approval rate" if components["governance"] is not None else "No ARB activity yet. Submit an item for review to measure this.",
+                "source": "ARB pipeline",
+                "as_of": as_of,
+            },
         }
     except Exception as exc:
         logger.warning("ENH-002: health score computation failed: %s", exc)
@@ -543,6 +577,7 @@ def overview():
         # score of 0, which reads as a measured verdict on the estate.
         health_score = None
         health_components = {}
+        health_unavailable = []
 
     # Data Coverage strip — real per-field coverage of the application portfolio.
     # Single aggregate query; percentages match DATA_REALITY.md definitions.
@@ -697,6 +732,15 @@ def overview():
                 }
             )
 
+    # Council-07: Priority actions list
+    priority_actions = {"rows": [], "total": 0, "rule": ""}
+    try:
+        from app.services.priority_action_service import prioritised_actions, limit_for
+        limit = limit_for(request.args)
+        priority_actions = prioritised_actions(g.current_org_id, limit=limit)
+    except Exception as exc:
+        logger.warning("priority actions unavailable: %s", exc)
+
     # PROG-019: AI-governance alerts — cheap read of the latest EA briefing only
     # (never re-runs the expensive stewardship review on a dashboard load).
     governance_alerts = None
@@ -730,12 +774,14 @@ def overview():
         health_score=health_score,
         health_score_text=format_health_score(health_score),
         health_components=health_components,
+        health_unavailable=health_unavailable,
         enterprise_role=enterprise_role,
         data_coverage=data_coverage,
         governance_alerts=governance_alerts,
         dashboard_mode=dashboard_mode,
         guided_steps=guided_steps,
         capability_mapping_count=capability_mapping_count,
+        priority_actions=priority_actions,
     )
 
 
