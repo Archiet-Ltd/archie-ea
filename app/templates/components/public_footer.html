@@ -1,62 +1,57 @@
-{# Shared public marketing footer — reused by main/index.html and public/page.html
-   so every public page (home, vision, modules, comparisons, use-cases, dogfood,
-   and the site pages below) links to the same set of pages. Do not duplicate
-   this markup in a page template; extend this file instead.
+{# Shared public footer: a complete map of the site, read from the same registry as the
+   navbar (site_registry(), content/site/registry.yml), so it cannot list a page the
+   navbar lacks or use a different label. Row one is the Product menu, group for group,
+   then Coming soon; row two mirrors Solutions, Roles, Compare, Resources, Pricing and
+   Legal. Do not write a link into this file; add it to the registry.
+   Included by main/index.html, public/page.html, public/hub_index.html, public/pricing.html
+   and public/vs_hub.html.
+   smoke-coverage-ok: covered by tests/test_public_nav_journey.py and tests/test_public_site_registry.py.
 #}
-<footer class="border-t border-border bg-card">
-  <div class="mx-auto max-w-7xl px-4 sm:px-6 py-12 sm:py-16">
-    <div class="grid sm:grid-cols-2 md:grid-cols-5 gap-8 mb-8">
-      <div class="space-y-4">
+{% from 'components/badge.html' import badge %}
+{% set reg = site_registry() %}
+<footer class="border-t border-border bg-background" data-site-footer>
+  <div class="mx-auto max-w-7xl px-4 py-12 sm:px-6 sm:py-16">
+    <div class="mb-8">
+      <a href="{{ url_for('main.index') }}" class="inline-flex rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Entelim home">
         <img src="{{ url_for('static', filename='brand/entelim-logo.svg') }}" alt="Entelim" class="h-6">
-        <ul class="space-y-2 text-sm text-muted-foreground">
-          <li><a href="/features" class="hover:text-foreground transition-colors">Features</a></li>
-          <li><a href="/pricing" class="hover:text-foreground transition-colors">Pricing</a></li>
-          <li><a href="{{ url_for('account.login') }}" class="hover:text-foreground transition-colors">Sign in</a></li>
-          <li><a href="{{ url_for('account.register') }}" class="hover:text-foreground transition-colors">Sign up</a></li>
-        </ul>
-      </div>
-      <div class="space-y-4">
-        <h3 class="font-semibold text-foreground">Explore</h3>
-        <ul class="space-y-2 text-sm text-muted-foreground">
-          <li><a href="/use-cases" class="hover:text-foreground transition-colors">Use cases</a></li>
-          <li><a href="/roles" class="hover:text-foreground transition-colors">Roles</a></li>
-          <li><a href="/connectors" class="hover:text-foreground transition-colors">Connectors</a></li>
-          <li><a href="/vs" class="hover:text-foreground transition-colors">Compare</a></li>
-          <li><a href="/architecture-health-check" class="hover:text-foreground transition-colors">Architecture health check</a></li>
-          <li><a href="/team-annual-onboarding" class="hover:text-foreground transition-colors">Team annual plan with onboarding</a></li>
-        </ul>
-      </div>
-      <div class="space-y-4">
-        <h3 class="font-semibold text-foreground">Licensing</h3>
-        <ul class="space-y-2 text-sm text-muted-foreground">
-          <li><span class="public-footer-plain">AGPL-3.0</span></li>
-        </ul>
-      </div>
-      <div class="space-y-4">
-        <h3 class="font-semibold text-foreground">Company</h3>
-        <ul class="space-y-2 text-sm text-muted-foreground">
-          <li><a href="/about" class="hover:text-foreground transition-colors">About</a></li>
-          <li><a href="/contact" class="hover:text-foreground transition-colors">Contact</a></li>
-          <li><span class="public-footer-plain">Archiet Ltd</span></li>
-        </ul>
-      </div>
-      <div class="space-y-4">
-        <h3 class="font-semibold text-foreground">Legal</h3>
-        <ul class="space-y-2 text-sm text-muted-foreground">
-          <li><a href="/security" class="hover:text-foreground transition-colors">Security</a></li>
-          {% for link in legal_links %}
-          <li><a href="{{ link.href }}" class="hover:text-foreground transition-colors" data-legal-link="{{ link.slug }}">{{ link.label }}</a></li>
-          {% endfor %}
-        </ul>
-      </div>
+      </a>
     </div>
-    <div class="border-t border-border pt-8">
-      <p class="text-sm text-muted-foreground text-center">
-        Entelim is licensed under AGPL-3.0. Made by Archiet Ltd.
-      </p>
-      <p class="text-sm text-muted-foreground text-center mt-2">
-        <a href="#" data-action="openAnalyticsConsentBanner" class="underline hover:text-foreground">Cookie settings</a>
-      </p>
+
+    <nav aria-label="Site map" class="space-y-10">
+      {% for row in reg.footer.rows %}
+      <div class="grid grid-cols-2 gap-8 md:grid-cols-4" data-footer-row="{{ row.id }}">
+        {% for column in row.columns %}
+        <div data-footer-column="{{ column.id }}"{% if column.id == 'coming-soon' %} data-availability="early_access"{% endif %}>
+          <h2 class="text-sm font-semibold text-foreground">{{ column.label }}</h2>
+          <ul class="mt-3 space-y-1 text-sm text-muted-foreground">
+            {% for item in column['items'] %}
+            <li class="py-1">
+              <a href="{{ item.href }}" class="inline-flex flex-wrap items-center gap-2 rounded-md hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                 data-label="{{ item.label }}"
+                 {% if item.legal_slug %}data-legal-link="{{ item.legal_slug }}"{% endif %}
+                 {% if item.coming_soon %}data-availability="early_access"{% endif %}>
+                {{ item.label }}
+                {%- if item.coming_soon %} {% call badge('outline') %}Coming soon{% endcall %}{% endif %}
+              </a>
+            </li>
+            {% endfor %}
+          </ul>
+        </div>
+        {% endfor %}
+      </div>
+      {% endfor %}
+    </nav>
+
+    <div class="mt-10 flex flex-col gap-4 border-t border-border pt-8 md:flex-row md:items-center md:justify-between">
+      <p class="text-sm text-muted-foreground">Entelim is licensed under AGPL-3.0. Made by Archiet Ltd.</p>
+      <ul class="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-muted-foreground">
+        {% if not current_user.is_authenticated %}
+        {% for action in reg.actions if action.id in ('sign-in', 'start-free') %}
+        <li><a href="{{ action.href }}" class="rounded-md hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">{{ action.label }}</a></li>
+        {% endfor %}
+        {% endif %}
+        <li><button type="button" data-action="openAnalyticsConsentBanner" class="rounded-md hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">Cookie settings</button></li>
+      </ul>
     </div>
   </div>
 </footer>

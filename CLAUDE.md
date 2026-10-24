@@ -521,6 +521,7 @@ to reconfirm the count before trusting it:**
 | `design-tokens` | raw Tailwind colours (DESIGN.md rule) | ratchet @ 0 |
 | `composer-url-params` | a literal composer link carrying a param the composer doesn't read | ratchet @ 0 |
 | `crosswalk-writer-gated` | a write to `external_identity_crosswalk` with no allowlist gate on its call path | must be 0 |
+| `public-shell` | the public navbar, menus and footer reading one registry, tokens and Lucide icons only, no literal links, accessible disclosure menus | must be 0 |
 | `raw-fetch-sites` | `fetch()` bypassing `Platform.fetch` | ratchet @ 0 |
 | `design-tokens-extended` | raw colours outside the core banned families | ratchet @ 0 |
 | `shell-conformance` | a page off the platform shell (header macro/width) | ratchet @ 3 |

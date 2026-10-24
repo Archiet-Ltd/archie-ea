@@ -250,6 +250,10 @@
   margin: 1.5rem auto 0; max-width: 48rem; font-size: 1.125rem; line-height: 2rem;
   color: hsl(var(--muted-foreground)); text-wrap: balance;
 }
+/* Role pages: their headlines are sentences, so the home scale steps down one size. */
+.public-site .home-display--compact { font-size: 2.25rem; line-height: 1.1; }
+@media (min-width: 640px) { .public-site .home-display--compact { font-size: 3rem; } }
+@media (min-width: 1024px) { .public-site .home-display--compact { font-size: 3.25rem; } }
 @media (min-width: 640px) {
   .public-site .home-display { font-size: 3.75rem; }
   .public-site .home-lead { font-size: 1.25rem; }
