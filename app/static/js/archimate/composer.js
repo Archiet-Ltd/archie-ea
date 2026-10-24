@@ -3119,9 +3119,6 @@ function composerApp() {
                    top-down order the Twin Map reads, so a chain from the centre up to a
                    Strategy or Goal element can be followed along the drawn connections. */
                 applyLayerBanding(self.graph);
-                self.paper.scaleContentToFit({ padding: 40, maxScale: 1 });
-                self.zoomPercent = Math.round(self.paper.scale().sx * 100);
-                self._scheduleMiniMapUpdate();
                 self.componentsPanelOpen = false;
                 UndoStack.resume();
                 UndoStack.clear();
@@ -3157,9 +3154,38 @@ function composerApp() {
                     self._applyNeighborFocus(centre);
                 }
                 self.statusText = relationships.length === 0 ? 'No connections at this depth' : 'Neighbourhood loaded';
-                self.$nextTick(function() { if (window.lucide) lucide.createIcons(); });
+                /* Fit once the card is on screen, so the drawing sits below it. */
+                self.$nextTick(function() {
+                    if (window.lucide) lucide.createIcons();
+                    self._fitFocusViewWhileSettling();
+                });
             })
             .catch(function(err) { UndoStack.resume(); fail(err); });
+        },
+
+        /* Keep the focus drawing fitted while the canvas settles. A panel that is still
+           closing leaves the canvas a few dozen pixels wide on a phone; a fit made then
+           shrinks the drawing to nothing, so every size change in the first three seconds
+           refits (and re-spreads the connection words) once it has been still for a moment. */
+        _fitFocusViewWhileSettling: function() {
+            let self = this;
+            let el = document.getElementById('composer-canvas');
+            if (!el) return;
+            let fit = function() {
+                if (!self.focusView) return;
+                self.fitCanvas();
+                ComposerRenderer.separateLabels(self.paper, self.graph);
+            };
+            self._focusFitUntil = Date.now() + 3000;
+            fit();
+            if (self._focusFitObserver || typeof ResizeObserver === 'undefined') return;
+            let timer = null;
+            self._focusFitObserver = new ResizeObserver(function() {
+                if (Date.now() > self._focusFitUntil) return;
+                window.clearTimeout(timer);
+                timer = window.setTimeout(fit, 80);
+            });
+            self._focusFitObserver.observe(el);
         },
 
         /* A row of the connections list opens the same details the drawn element opens. */
@@ -4118,6 +4144,13 @@ function composerApp() {
                 || this.commentPanelOpen
                 || this.auditPanelOpen;
             let rightPadding = rightPanelOpen ? 40 + 320 : 40;
+            /* The unsaved-view card floats over the top of the canvas: fit below it. */
+            let topPadding = 40;
+            let card = this.focusView ? document.getElementById('composer-focus-banner') : null;
+            let canvasEl = document.getElementById('composer-canvas');
+            if (card && canvasEl && card.offsetHeight) {
+                topPadding = Math.max(40, Math.round(card.getBoundingClientRect().bottom - canvasEl.getBoundingClientRect().top) + 16);
+            }
             /* CMP-05: fit was unreliable in the narrow side-panel — it zoomed to
                150% with the element half off the left edge. Two causes fixed:
                (1) maxScale 1.5 let a small selection zoom IN past the viewport;
@@ -4126,7 +4159,7 @@ function composerApp() {
                useModelGeometry reads the model bboxes instead, which are always
                current. */
             this.paper.scaleContentToFit({
-                padding: { top: 40, bottom: 40, left: 40, right: rightPadding },
+                padding: { top: topPadding, bottom: 40, left: 40, right: rightPadding },
                 maxScale: 1,
                 minScale: 0.1,
                 useModelGeometry: true
