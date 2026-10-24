@@ -163,12 +163,9 @@
 function implementationPlanningDashboard() {
     return {
         viewMode: 'gantt',
-        showExportModal: false,
-        exportFormat: 'csv',
         exportOptions: {
             workPackages: true,
-            gaps: true,
-            deliverables: false
+            gaps: true
         },
         workPackages: [],
         criticalGaps: [],
