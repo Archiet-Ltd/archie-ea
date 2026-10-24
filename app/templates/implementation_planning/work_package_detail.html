@@ -27,7 +27,14 @@
             </div>
             <div>
                 <dt class="text-muted-foreground">Owner</dt>
-                <dd class="font-medium" data-testid="wp-owner">{{ owner_name or work_package.assigned_to or '—' }}</dd>
+                <dd class="font-medium" data-testid="wp-owner">
+                    {% if owner_name or work_package.assigned_to %}
+                        {{ owner_name or work_package.assigned_to }}
+                    {% else %}
+                        <span class="text-muted-foreground">No owner yet</span>
+                        <a href="{{ url_for('implementation_planning.edit_work_package', work_package_id=work_package.id) }}" class="text-primary hover:underline text-xs ml-1" data-testid="wp-assign-owner">Assign owner</a>
+                    {% endif %}
+                </dd>
             </div>
             <div>
                 <dt class="text-muted-foreground">Progress</dt>
@@ -43,9 +50,11 @@
             <div>
                 <dt class="text-muted-foreground">Dates</dt>
                 <dd class="font-medium" data-testid="wp-dates">
-                    {{ work_package.start_date.date().isoformat() if work_package.start_date else '—' }}
-                    to
-                    {{ work_package.end_date.date().isoformat() if work_package.end_date else '—' }}
+                    {% if work_package.start_date and work_package.end_date %}
+                        {{ work_package.start_date.date().isoformat() }} to {{ work_package.end_date.date().isoformat() }}
+                    {% else %}
+                        <span class="text-muted-foreground">No dates set</span>
+                    {% endif %}
                 </dd>
             </div>
         </dl>
@@ -71,7 +80,7 @@
                     {% endif %}
                 </li>
                 {% else %}
-                <li class="py-2 text-sm text-muted-foreground" data-testid="wp-no-gaps">—</li>
+                <li class="py-2 text-sm text-muted-foreground" data-testid="wp-no-gaps">No gap is linked yet</li>
                 {% endfor %}
             </ul>
 
