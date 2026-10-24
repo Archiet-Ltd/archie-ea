@@ -1,10 +1,17 @@
 {% extends 'layouts/admin_base.html' %}
 {% block title %}Vendor Options Analysis{% endblock %}
 
-{% from "components/page_header.html" import page_header %}
-{% from "components/status_badge.html" import status_badge %}
+{% from "components/button.html" import button %}
+{% from "components/badge.html" import badge %}
+{% from "components/input.html" import input, textarea %}
+{% from "components/checkbox.html" import checkbox %}
+{% from "components/select.html" import native_select %}
+{% from "components/form_field.html" import form_group %}
+{% from "components/tabs.html" import tabs_list, tabs_trigger %}
 {% from "components/skeleton.html" import skeleton_table %}
 {% from "components/confirmation_dialog.html" import confirmation_dialog %}
+{% import "components/card.html" as ui %}
+{% import "components/table.html" as tbl %}
 
 {% block content %}
 {# Parentheses are required. Alpine's stock evaluator invokes a bare registered
@@ -18,28 +25,25 @@
   <!-- Page Header -->
   <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
     <div>
-      <div class="flex items-center gap-2 text-sm text-muted-foreground mb-1">
-        <a href="{{ url_for('main.index') }}" class="hover:text-foreground">Home</a>
-        <i data-lucide="chevron-right" class="h-3 w-3"></i>
-        <a href="{{ url_for('application_mgmt.vendor_analysis_list') }}" class="hover:text-foreground">Vendor Analysis</a>
-        <i data-lucide="chevron-right" class="h-3 w-3"></i>
-        <span class="text-foreground" x-text="analysis.name || 'New Analysis'"></span>
-      </div>
+      <nav aria-label="Breadcrumb" class="mb-1">
+        <ol class="flex items-center gap-2 text-sm text-muted-foreground">
+          <li><a href="{{ url_for('main.index') }}" class="hover:text-foreground">Home</a></li>
+          <li aria-hidden="true"><i data-lucide="chevron-right" class="h-3 w-3"></i></li>
+          <li><a href="{{ url_for('application_mgmt.vendor_analysis_list') }}" class="hover:text-foreground">Vendor Analysis</a></li>
+          <li aria-hidden="true"><i data-lucide="chevron-right" class="h-3 w-3"></i></li>
+          <li class="text-foreground" aria-current="page"><span x-text="analysis.name || 'New Analysis'"></span></li>
+        </ol>
+      </nav>
       <h1 class="text-2xl font-bold text-foreground" x-text="analysis.name || 'New Vendor Options Analysis'"></h1>
       <p class="text-sm text-muted-foreground mt-1">Multi-criteria vendor evaluation aligned to enterprise capabilities, APQC processes, and value streams</p>
     </div>
     <div class="flex items-center gap-2">
-      <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-xs font-medium border"
-        :class="{
-          'bg-success/10 text-success-emphasis border-success/30': analysis.approval_status === 'approved',
-          'bg-warning/10 text-warning-emphasis border-warning/30': analysis.status === 'draft' || analysis.status === 'running',
-          'bg-primary/10 text-primary border-primary/30': analysis.status === 'completed' && !analysis.approval_status,
-          'bg-destructive/10 text-destructive-emphasis border-destructive/30': analysis.approval_status === 'rejected'
-        }"
-        x-text="analysis.approval_status || analysis.status || 'new'"></span>
-      <a href="{{ url_for('application_mgmt.vendor_analysis_list') }}" class="px-3 py-2 border border-border rounded-md text-sm hover:bg-muted">
-        <i data-lucide="arrow-left" class="h-4 w-4 inline mr-1"></i> Back
-      </a>
+      {% for tone in ['success', 'warning', 'info', 'destructive', 'neutral'] %}
+      <span x-show="statusTone() === '{{ tone }}'" x-cloak>
+        {% call badge(tone) %}<span x-text="analysis.approval_status || analysis.status || 'new'"></span>{% endcall %}
+      </span>
+      {% endfor %}
+      {{ button('Back', variant='outline', href=url_for('application_mgmt.vendor_analysis_list'), icon='arrow-left') }}
     </div>
   </div>
 
@@ -48,37 +52,22 @@
     <ol class="flex items-center w-full" role="list">
       <template x-for="(tab, idx) in tabs" :key="tab.id">
         <li class="flex items-center" :class="idx < tabs.length - 1 ? 'flex-1' : ''">
-          <button @click="attemptSwitchTab(tab.id)" type="button"
-            class="flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium transition-all whitespace-nowrap focus:outline-none focus:ring-2 focus:ring-primary/50"
-            :class="{
-              'text-success-emphasis': stepStatus(tab.id) === 'completed' && activeTab !== tab.id,
-              'text-primary bg-primary/5 ring-1 ring-primary/20': stepStatus(tab.id) === 'current',
-              'text-muted-foreground hover:text-foreground hover:bg-muted/50': stepStatus(tab.id) === 'available',
-              'text-muted-foreground/50 cursor-not-allowed': stepStatus(tab.id) === 'locked'
-            }"
-            :disabled="stepStatus(tab.id) === 'locked'"
-            :aria-current="activeTab === tab.id ? 'step' : false"
-            :aria-disabled="stepStatus(tab.id) === 'locked'"
-            :aria-label="tab.label + ' - Step ' + (idx + 1) + ' of ' + tabs.length">
-            <span class="flex items-center justify-center h-7 w-7 rounded-full text-xs font-bold shrink-0 border transition-colors"
-              :class="{
-                'bg-success/10 border-success/30 text-success-emphasis': stepStatus(tab.id) === 'completed' && activeTab !== tab.id,
-                'bg-primary border-primary text-primary-foreground': stepStatus(tab.id) === 'current',
-                'bg-muted border-border text-muted-foreground': stepStatus(tab.id) === 'available',
-                'bg-muted/50 border-border/50 text-muted-foreground/50': stepStatus(tab.id) === 'locked'
-              }">
-              <template x-if="stepStatus(tab.id) === 'completed' && activeTab !== tab.id">
-                <i data-lucide="check" class="h-3.5 w-3.5"></i>
-              </template>
-              <template x-if="stepStatus(tab.id) === 'locked'">
-                <i data-lucide="lock" class="h-3 w-3"></i>
-              </template>
-              <template x-if="(stepStatus(tab.id) !== 'completed' && stepStatus(tab.id) !== 'locked') || activeTab === tab.id">
-                <span x-text="idx + 1"></span>
-              </template>
+          {% call button(variant='ghost', size='lg', class='gap-2 px-3 group data-[state=current]:bg-primary/5 data-[state=current]:text-primary data-[state=completed]:text-success-emphasis data-[state=locked]:text-muted-foreground/50 data-[state=locked]:cursor-not-allowed',
+              on_click='attemptSwitchTab(tab.id)',
+              attrs_dict={
+                ':data-state': 'stepStatus(tab.id)',
+                ':disabled': "stepStatus(tab.id) === 'locked'",
+                ':aria-current': "activeTab === tab.id ? 'step' : false",
+                ':aria-disabled': "stepStatus(tab.id) === 'locked'",
+                ':aria-label': "tab.label + ' - Step ' + (idx + 1) + ' of ' + tabs.length"
+              }) %}
+            <span class="flex items-center justify-center h-7 w-7 rounded-full text-xs font-bold shrink-0 border border-border bg-muted text-muted-foreground group-data-[state=current]:bg-primary group-data-[state=current]:border-primary group-data-[state=current]:text-primary-foreground group-data-[state=completed]:bg-success/10 group-data-[state=completed]:border-success/30 group-data-[state=completed]:text-success-emphasis">
+              <span x-show="stepStatus(tab.id) === 'completed' && activeTab !== tab.id" x-cloak><i data-lucide="check" class="h-3.5 w-3.5"></i></span>
+              <span x-show="stepStatus(tab.id) === 'locked'" x-cloak><i data-lucide="lock" class="h-3 w-3"></i></span>
+              <span x-show="(stepStatus(tab.id) !== 'completed' && stepStatus(tab.id) !== 'locked') || activeTab === tab.id" x-cloak x-text="idx + 1"></span>
             </span>
             <span class="hidden sm:inline" x-text="tab.label"></span>
-          </button>
+          {% endcall %}
           <template x-if="idx < tabs.length - 1">
             <div class="flex-1 mx-1 hidden sm:block">
               <div class="h-px transition-colors"
@@ -98,501 +87,316 @@
     <div class="space-y-6">
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <!-- Left: Analysis Identity -->
-        <div class="rounded-lg border border-border bg-card p-6 space-y-4">
-          <h3 class="text-lg font-semibold text-foreground">Analysis Identity</h3>
-          <div>
-            <label for="analysis-name" class="block text-sm font-medium text-foreground/80 mb-1">Analysis Name <span class="text-destructive-emphasis">*</span></label>
-            <input type="text" id="analysis-name" x-model="form.name"
-              class="w-full px-3 py-2 border border-border rounded-md bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-              placeholder="e.g., ERP Platform Selection Q2 2026"
-              aria-required="true">
-          </div>
-          <div>
-            <label class="block text-sm font-medium text-foreground/80 mb-1">Strategic Priority</label>
-            <select x-model="form.priority" class="w-full px-3 py-2 border border-border rounded-md bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary" aria-label="Strategic Priority">
-              <option value="critical">Mission Critical</option>
-              <option value="high">High Priority</option>
-              <option value="medium">Medium Priority</option>
-              <option value="low">Strategic Enhancement</option>
-            </select>
-          </div>
-          <div>
-            <label for="analysis-description" class="block text-sm font-medium text-foreground/80 mb-1">Description</label>
-            <textarea id="analysis-description" x-model="form.description" rows="2"
-              class="w-full px-3 py-2 border border-border rounded-md bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-              placeholder="Brief objective for this vendor evaluation..."></textarea>
-          </div>
-        </div>
+        {% call ui.card() %}
+          {% call ui.card_header() %}
+            <h3 class="text-lg font-semibold text-foreground">Analysis Identity</h3>
+          {% endcall %}
+          {% call ui.card_content(class='space-y-4') %}
+            {% call form_group(id='analysis-name', label='Analysis Name', required=true) %}
+              {{ input(id='analysis-name', name='analysis-name', placeholder='e.g., ERP Platform Selection Q2 2026', required=true, attrs_dict={'x-model': 'form.name'}) }}
+            {% endcall %}
+            {% call form_group(id='analysis-priority', label='Strategic Priority') %}
+              {{ native_select(id='analysis-priority', aria_label='Strategic Priority', attrs_dict={'x-model': 'form.priority'}, options=[
+                ('critical', 'Mission Critical'), ('high', 'High Priority'), ('medium', 'Medium Priority'), ('low', 'Strategic Enhancement')]) }}
+            {% endcall %}
+            {% call form_group(id='analysis-description', label='Description') %}
+              {{ textarea(id='analysis-description', rows=2, placeholder='Brief objective for this vendor evaluation...', attrs_dict={'x-model': 'form.description'}) }}
+            {% endcall %}
+          {% endcall %}
+        {% endcall %}
 
         <!-- Right: Analysis Parameters -->
-        <div class="rounded-lg border border-border bg-card p-6 space-y-4">
-          <div class="flex items-center justify-between">
-            <h3 class="text-lg font-semibold text-foreground">Analysis Parameters</h3>
-            <span class="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">Influence scoring context</span>
-          </div>
-          <div class="grid grid-cols-2 gap-4">
-            <div>
-              <label class="block text-sm font-medium text-foreground/80 mb-1">Organization Size</label>
-              <select x-model="form.orgSize" class="w-full px-3 py-2 border border-border rounded-md bg-background text-foreground" aria-label="Organization Size">
-                <option value="smb">SMB</option>
-                <option value="midmarket">Mid-Market</option>
-                <option value="enterprise">Enterprise</option>
-              </select>
+        {% call ui.card() %}
+          {% call ui.card_header() %}
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <h3 class="text-lg font-semibold text-foreground">Analysis Parameters</h3>
+              {% call badge('neutral') %}Influence scoring context{% endcall %}
             </div>
-            <div>
-              <label class="block text-sm font-medium text-foreground/80 mb-1">Industry Vertical</label>
-              <select x-model="form.industry" class="w-full px-3 py-2 border border-border rounded-md bg-background text-foreground" aria-label="Industry Vertical">
-                <option value="">-- Select --</option>
-                <option value="financial">Financial Services</option>
-                <option value="healthcare">Healthcare</option>
-                <option value="retail">Retail</option>
-                <option value="manufacturing">Manufacturing</option>
-                <option value="technology">Technology</option>
-                <option value="energy">Energy &amp; Utilities</option>
-                <option value="government">Government</option>
-                <option value="telecom">Telecommunications</option>
-                <option value="other">Other</option>
-              </select>
+          {% endcall %}
+          {% call ui.card_content(class='space-y-4') %}
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {% call form_group(id='analysis-org-size', label='Organization Size') %}
+                {{ native_select(id='analysis-org-size', aria_label='Organization Size', attrs_dict={'x-model': 'form.orgSize'}, options=[
+                  ('smb', 'SMB'), ('midmarket', 'Mid-Market'), ('enterprise', 'Enterprise')]) }}
+              {% endcall %}
+              {% call form_group(id='analysis-industry', label='Industry Vertical') %}
+                {{ native_select(id='analysis-industry', aria_label='Industry Vertical', attrs_dict={'x-model': 'form.industry'}, options=[
+                  ('', '-- Select --'), ('financial', 'Financial Services'), ('healthcare', 'Healthcare'), ('retail', 'Retail'),
+                  ('manufacturing', 'Manufacturing'), ('technology', 'Technology'), ('energy', 'Energy & Utilities'),
+                  ('government', 'Government'), ('telecom', 'Telecommunications'), ('other', 'Other')]) }}
+              {% endcall %}
+              {% call form_group(id='analysis-horizon', label='Evaluation Horizon') %}
+                {{ native_select(id='analysis-horizon', aria_label='Evaluation Horizon', attrs_dict={'x-model': 'form.timeHorizon'}, options=[
+                  ('12months', '12 months'), ('24months', '24 months'), ('36months', '36 months'), ('60months', '5 years')]) }}
+              {% endcall %}
+              {% call form_group(id='analysis-scope', label='Deployment Scope') %}
+                {{ native_select(id='analysis-scope', aria_label='Deployment Scope', attrs_dict={'x-model': 'form.scope'}, options=[
+                  ('enterprise', 'Enterprise-wide'), ('division', 'Division Level'), ('department', 'Department Level'), ('capability', 'Capability-specific')]) }}
+              {% endcall %}
             </div>
-            <div>
-              <label class="block text-sm font-medium text-foreground/80 mb-1">Evaluation Horizon</label>
-              <select x-model="form.timeHorizon" class="w-full px-3 py-2 border border-border rounded-md bg-background text-foreground" aria-label="Evaluation Horizon">
-                <option value="12months">12 months</option>
-                <option value="24months">24 months</option>
-                <option value="36months">36 months</option>
-                <option value="60months">5 years</option>
-              </select>
-            </div>
-            <div>
-              <label class="block text-sm font-medium text-foreground/80 mb-1">Deployment Scope</label>
-              <select x-model="form.scope" class="w-full px-3 py-2 border border-border rounded-md bg-background text-foreground" aria-label="Deployment Scope">
-                <option value="enterprise">Enterprise-wide</option>
-                <option value="division">Division Level</option>
-                <option value="department">Department Level</option>
-                <option value="capability">Capability-specific</option>
-              </select>
-            </div>
-          </div>
-          <p class="text-xs text-muted-foreground pt-1">Domain and value stream context is set through the Architecture Framework Selection below.</p>
-        </div>
+            <p class="text-xs text-muted-foreground pt-1">Domain and value stream context is set through the Architecture Framework Selection below.</p>
+          {% endcall %}
+        {% endcall %}
       </div>
 
       <!-- Architecture Framework Selection -->
-      <div class="rounded-lg border border-border bg-card p-6">
-        <div class="flex items-center justify-between mb-4">
-          <div>
-            <h3 class="text-lg font-semibold text-foreground">Architecture Framework Selection</h3>
-            <p class="text-sm text-muted-foreground mt-1">Choose how to scope vendor evaluation -- by business capabilities, APQC processes, or value streams</p>
-          </div>
-        </div>
-
-        <!-- Mode Toggle -->
-        <div class="flex flex-wrap items-center gap-1 p-1 bg-muted rounded-lg w-fit mb-6" role="tablist" aria-label="Selection framework">
-          <button @click="switchSelectionMode('capabilities')" type="button" role="tab"
-            :aria-selected="selectionMode === 'capabilities'"
-            class="px-4 py-2 rounded-md text-sm font-medium transition-all"
-            :class="selectionMode === 'capabilities' ? 'bg-background text-foreground' : 'text-muted-foreground hover:text-foreground'">
-            <i data-lucide="layers" class="h-4 w-4 inline mr-1.5"></i>Capabilities
-          </button>
-          <button @click="switchSelectionMode('processes')" type="button" role="tab"
-            :aria-selected="selectionMode === 'processes'"
-            class="px-4 py-2 rounded-md text-sm font-medium transition-all"
-            :class="selectionMode === 'processes' ? 'bg-background text-foreground' : 'text-muted-foreground hover:text-foreground'">
-            <i data-lucide="workflow" class="h-4 w-4 inline mr-1.5"></i>APQC Processes
-          </button>
-          <button @click="switchSelectionMode('valuestreams')" type="button" role="tab"
-            :aria-selected="selectionMode === 'valuestreams'"
-            class="px-4 py-2 rounded-md text-sm font-medium transition-all"
-            :class="selectionMode === 'valuestreams' ? 'bg-background text-foreground' : 'text-muted-foreground hover:text-foreground'">
-            <i data-lucide="git-branch" class="h-4 w-4 inline mr-1.5"></i>Value Streams
-          </button>
-        </div>
-
-        <!-- Capability Selection Panel -->
-        <div x-show="selectionMode === 'capabilities'" x-cloak>
-          <!-- Capability Type Sub-tabs (ArchiMate layers) -->
-          <div class="flex flex-wrap items-center gap-2 mb-4">
-            <span class="text-xs font-medium text-muted-foreground uppercase tracking-wide mr-1">ArchiMate Layer:</span>
-            <template x-for="ct in capabilityTypes" :key="ct.value">
-              <button @click="capabilityType = ct.value; reloadL1Capabilities()" type="button"
-                class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-all"
-                :class="capabilityType === ct.value
-                  ? 'bg-primary/10 text-primary border-primary/30'
-                  : 'bg-background text-muted-foreground border-border hover:border-primary/30 hover:text-foreground'">
-                <span class="h-2 w-2 rounded-full" :class="ct.color"></span>
-                <span x-text="ct.label"></span>
-              </button>
-            </template>
+      {% call ui.card() %}
+        {% call ui.card_header() %}
+          <h3 class="text-lg font-semibold text-foreground">Architecture Framework Selection</h3>
+          <p class="text-sm text-muted-foreground">Choose how to scope vendor evaluation -- by business capabilities, APQC processes, or value streams</p>
+        {% endcall %}
+        {% call ui.card_content() %}
+          <!-- Mode Toggle -->
+          <div class="mb-6 overflow-x-auto">
+            {% call tabs_list(class='h-auto flex-wrap justify-start gap-1') %}
+              {% call tabs_trigger(value='capabilities', click="switchSelectionMode('capabilities')", selected="selectionMode === 'capabilities'", class='px-4 py-2 gap-1.5') %}<i data-lucide="layers" class="h-4 w-4"></i>Capabilities{% endcall %}
+              {% call tabs_trigger(value='processes', click="switchSelectionMode('processes')", selected="selectionMode === 'processes'", class='px-4 py-2 gap-1.5') %}<i data-lucide="workflow" class="h-4 w-4"></i>APQC Processes{% endcall %}
+              {% call tabs_trigger(value='valuestreams', click="switchSelectionMode('valuestreams')", selected="selectionMode === 'valuestreams'", class='px-4 py-2 gap-1.5') %}<i data-lucide="git-branch" class="h-4 w-4"></i>Value Streams{% endcall %}
+            {% endcall %}
           </div>
 
-          <!-- L1 / L2 / L3 Searchable Panels -->
-          <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-            <!-- L1 Strategic -->
-            <div>
-              <div class="flex items-center justify-between mb-1">
-                <label class="block text-sm font-medium text-foreground/80">L1 Strategic <span class="text-destructive-emphasis">*</span></label>
-                <span class="text-xs text-muted-foreground" x-text="selectedL1.length + ' selected'"></span>
-              </div>
-              <div class="relative mb-1">
-                <i data-lucide="search" class="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground"></i>
-                <input type="text" x-model="capSearchL1" placeholder="Filter L1..."
-                  class="w-full pl-8 pr-3 py-2 border border-border rounded-md bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-                  aria-label="Search L1 capabilities">
-              </div>
-              <div class="border border-border rounded-md bg-background max-h-48 overflow-y-auto" role="listbox" aria-label="L1 capabilities" x-ref="l1Panel">
-                <template x-if="loadingL1">
-                  <div class="p-4 text-center text-muted-foreground text-sm"><i data-lucide="loader-2" class="h-4 w-4 inline animate-spin mr-1"></i> Loading...</div>
-                </template>
-                <template x-if="!loadingL1 && capOptionsL1.length === 0">
-                  <div class="p-4 text-center text-muted-foreground text-sm">No capabilities found</div>
-                </template>
-                <template x-for="cap in filteredL1" :key="cap.id">
-                  <label class="flex items-start gap-2 px-3 py-2 hover:bg-muted/50 cursor-pointer border-b border-border/50 last:border-0 transition-colors">
-                    <input type="checkbox" :value="cap.id" :checked="isCapSelected(cap, 'L1')"
-                      @change="toggleCapability(cap, 'L1', $event.target.checked)"
-                      class="mt-0.5 rounded border-border">
-                    <div class="flex-1 min-w-0">
-                      <p class="text-sm font-medium text-foreground leading-tight" x-text="cap.name"></p>
-                      <p x-show="cap.description" x-cloak class="text-xs text-muted-foreground mt-0.5 line-clamp-2" x-text="cap.description"></p>
-                    </div>
-                    <span x-show="cap.specialization_type" x-cloak class="shrink-0 px-1.5 py-0.5 text-xs font-medium rounded border"
-                      :class="archimateLayerClass(cap.specialization_type)" x-text="(cap.specialization_type || '').substring(0, 3)"></span>
-                  </label>
-                </template>
-              </div>
-            </div>
-
-            <!-- L2 Tactical -->
-            <div>
-              <div class="flex items-center justify-between mb-1">
-                <label class="block text-sm font-medium text-foreground/80">L2 Tactical</label>
-                <span class="text-xs text-muted-foreground" x-text="selectedL2.length + ' selected'"></span>
-              </div>
-              <div class="relative mb-1">
-                <i data-lucide="search" class="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground"></i>
-                <input type="text" x-model="capSearchL2" placeholder="Filter L2..."
-                  class="w-full pl-8 pr-3 py-2 border border-border rounded-md bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-                  aria-label="Search L2 capabilities">
-              </div>
-              <div class="border border-border rounded-md bg-background max-h-48 overflow-y-auto" role="listbox" aria-label="L2 capabilities">
-                <template x-if="loadingL2">
-                  <div class="p-4 text-center text-muted-foreground text-sm"><i data-lucide="loader-2" class="h-4 w-4 inline animate-spin mr-1"></i> Loading...</div>
-                </template>
-                <template x-if="!loadingL2 && selectedL1.length === 0">
-                  <div class="p-4 text-center text-muted-foreground text-sm">Select L1 capabilities first</div>
-                </template>
-                <template x-if="!loadingL2 && selectedL1.length > 0 && capOptionsL2.length === 0">
-                  <div class="p-4 text-center text-muted-foreground text-sm">No L2 capabilities found</div>
-                </template>
-                <template x-for="cap in filteredL2" :key="cap.id">
-                  <label class="flex items-start gap-2 px-3 py-2 hover:bg-muted/50 cursor-pointer border-b border-border/50 last:border-0 transition-colors">
-                    <input type="checkbox" :value="cap.id" :checked="isCapSelected(cap, 'L2')"
-                      @change="toggleCapability(cap, 'L2', $event.target.checked)"
-                      class="mt-0.5 rounded border-border">
-                    <div class="flex-1 min-w-0">
-                      <p class="text-sm font-medium text-foreground leading-tight" x-text="cap.name"></p>
-                      <p x-show="cap.description" x-cloak class="text-xs text-muted-foreground mt-0.5 line-clamp-2" x-text="cap.description"></p>
-                    </div>
-                  </label>
-                </template>
-              </div>
-            </div>
-
-            <!-- L3 Operational -->
-            <div>
-              <div class="flex items-center justify-between mb-1">
-                <label class="block text-sm font-medium text-foreground/80">L3 Operational</label>
-                <span class="text-xs text-muted-foreground" x-text="selectedL3.length + ' selected'"></span>
-              </div>
-              <div class="relative mb-1">
-                <i data-lucide="search" class="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground"></i>
-                <input type="text" x-model="capSearchL3" placeholder="Filter L3..."
-                  class="w-full pl-8 pr-3 py-2 border border-border rounded-md bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-                  aria-label="Search L3 capabilities">
-              </div>
-              <div class="border border-border rounded-md bg-background max-h-48 overflow-y-auto" role="listbox" aria-label="L3 capabilities">
-                <template x-if="loadingL3">
-                  <div class="p-4 text-center text-muted-foreground text-sm"><i data-lucide="loader-2" class="h-4 w-4 inline animate-spin mr-1"></i> Loading...</div>
-                </template>
-                <template x-if="!loadingL3 && selectedL2.length === 0">
-                  <div class="p-4 text-center text-muted-foreground text-sm">Select L2 capabilities first</div>
-                </template>
-                <template x-if="!loadingL3 && selectedL2.length > 0 && capOptionsL3.length === 0">
-                  <div class="p-4 text-center text-muted-foreground text-sm">No L3 capabilities found</div>
-                </template>
-                <template x-for="cap in filteredL3" :key="cap.id">
-                  <label class="flex items-start gap-2 px-3 py-2 hover:bg-muted/50 cursor-pointer border-b border-border/50 last:border-0 transition-colors">
-                    <input type="checkbox" :value="cap.id" :checked="isCapSelected(cap, 'L3')"
-                      @change="toggleCapability(cap, 'L3', $event.target.checked)"
-                      class="mt-0.5 rounded border-border">
-                    <div class="flex-1 min-w-0">
-                      <p class="text-sm font-medium text-foreground leading-tight" x-text="cap.name"></p>
-                      <p x-show="cap.description" x-cloak class="text-xs text-muted-foreground mt-0.5 line-clamp-2" x-text="cap.description"></p>
-                    </div>
-                  </label>
-                </template>
-              </div>
-            </div>
-          </div>
-
-          <!-- Selected Capabilities Chips -->
-          <div x-show="allCapabilities.length > 0" x-cloak class="bg-muted/50 rounded-lg p-4">
-            <div class="flex items-center justify-between mb-2">
-              <p class="text-sm font-medium text-foreground">
-                <span x-text="allCapabilities.length"></span> capabilities selected
-              </p>
-              <button type="button" @click="clearCapabilities()" class="text-xs text-destructive-emphasis hover:text-destructive-emphasis/80">Clear All</button>
-            </div>
-            <div class="flex flex-wrap gap-1.5">
-              <template x-for="cap in allCapabilities" :key="cap.id + '-' + cap._level">
-                <span class="inline-flex items-center gap-1 px-2 py-1 bg-primary/10 text-info-emphasis rounded text-xs font-medium group">
-                  <span class="px-1 py-0 bg-primary/20 rounded text-xs font-bold" x-text="cap._level || 'L?'"></span>
-                  <span x-text="cap.name"></span>
-                  <button type="button" @click="removeCapability(cap)" class="ml-0.5 opacity-0 group-hover:opacity-100 transition-opacity" aria-label="Remove capability">
-                    <i data-lucide="x" class="h-3 w-3"></i>
-                  </button>
-                </span>
+          <!-- Capability Selection Panel -->
+          <div x-show="selectionMode === 'capabilities'" x-cloak>
+            <!-- Capability Type Sub-tabs (ArchiMate layers) -->
+            <div class="flex flex-wrap items-center gap-2 mb-4">
+              <span class="text-xs font-medium text-muted-foreground uppercase tracking-wide mr-1">ArchiMate Layer:</span>
+              <template x-for="ct in capabilityTypes" :key="ct.value">
+                {% call button(variant='outline', size='xs', class='rounded-full gap-1.5 aria-pressed:bg-primary/10 aria-pressed:text-primary aria-pressed:border-primary/30',
+                    on_click='capabilityType = ct.value; reloadL1Capabilities()',
+                    attrs_dict={':aria-pressed': 'capabilityType === ct.value'}) %}
+                  <span class="h-2 w-2 rounded-full" :class="ct.color"></span>
+                  <span x-text="ct.label"></span>
+                {% endcall %}
               </template>
             </div>
-          </div>
-        </div>
 
-        <!-- APQC Process Selection Panel -->
-        <div x-show="selectionMode === 'processes'" x-cloak>
-          <p class="text-sm text-muted-foreground mb-4">Select APQC Process Classification Framework (PCF) processes to discover vendors that support them</p>
-          <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-            <!-- L1 Category -->
-            <div>
-              <div class="flex items-center justify-between mb-1">
-                <label class="block text-sm font-medium text-foreground/80">L1 Category <span class="text-destructive-emphasis">*</span></label>
-                <span class="text-xs text-muted-foreground" x-text="procSelectedL1.length + ' selected'"></span>
+            <!-- L1 / L2 / L3 Searchable Panels -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+              {% for lvl in [
+                {'n': 'L1', 'title': 'L1 Strategic', 'required': true, 'prev': none, 'loading': 'loadingL1', 'opts': 'capOptionsL1', 'sel': 'selectedL1', 'search': 'capSearchL1', 'filtered': 'filteredL1', 'first_msg': '', 'empty_msg': 'No capabilities found'},
+                {'n': 'L2', 'title': 'L2 Tactical', 'required': false, 'prev': 'selectedL1', 'loading': 'loadingL2', 'opts': 'capOptionsL2', 'sel': 'selectedL2', 'search': 'capSearchL2', 'filtered': 'filteredL2', 'first_msg': 'Select L1 capabilities first', 'empty_msg': 'No L2 capabilities found'},
+                {'n': 'L3', 'title': 'L3 Operational', 'required': false, 'prev': 'selectedL2', 'loading': 'loadingL3', 'opts': 'capOptionsL3', 'sel': 'selectedL3', 'search': 'capSearchL3', 'filtered': 'filteredL3', 'first_msg': 'Select L2 capabilities first', 'empty_msg': 'No L3 capabilities found'}
+              ] %}
+              <div>
+                <div class="flex items-center justify-between mb-1">
+                  <span class="block text-sm font-medium text-muted-foreground" id="cap-{{ lvl.n|lower }}-label">{{ lvl.title }}{% if lvl.required %} <span class="text-destructive-emphasis" aria-hidden="true">*</span>{% endif %}</span>
+                  <span class="text-xs text-muted-foreground" x-text="{{ lvl.sel }}.length + ' selected'"></span>
+                </div>
+                <div class="relative mb-1">
+                  <i data-lucide="search" class="absolute left-2.5 top-3 h-3.5 w-3.5 text-muted-foreground"></i>
+                  {{ input(placeholder='Filter ' ~ lvl.n ~ '...', class='pl-8', aria_label='Search ' ~ lvl.n ~ ' capabilities', attrs_dict={'x-model': lvl.search}) }}
+                </div>
+                <div class="border border-border rounded-md bg-background max-h-48 overflow-y-auto" role="listbox" aria-label="{{ lvl.n }} capabilities"{% if lvl.n == 'L1' %} x-ref="l1Panel"{% endif %}>
+                  <template x-if="{{ lvl.loading }}">
+                    <div class="p-4 text-center text-muted-foreground text-sm"><i data-lucide="loader-2" class="h-4 w-4 inline animate-spin mr-1"></i> Loading...</div>
+                  </template>
+                  {% if lvl.prev %}
+                  <template x-if="!{{ lvl.loading }} && {{ lvl.prev }}.length === 0">
+                    <div class="p-4 text-center text-muted-foreground text-sm">{{ lvl.first_msg }}</div>
+                  </template>
+                  <template x-if="!{{ lvl.loading }} && {{ lvl.prev }}.length > 0 && {{ lvl.opts }}.length === 0">
+                    <div class="p-4 text-center text-muted-foreground text-sm">{{ lvl.empty_msg }}</div>
+                  </template>
+                  {% else %}
+                  <template x-if="!{{ lvl.loading }} && {{ lvl.opts }}.length === 0">
+                    <div class="p-4 text-center text-muted-foreground text-sm">{{ lvl.empty_msg }}</div>
+                  </template>
+                  {% endif %}
+                  <template x-for="cap in {{ lvl.filtered }}" :key="cap.id">
+                    <label class="flex items-start gap-2 px-3 py-2 hover:bg-muted/50 cursor-pointer border-b border-border/50 last:border-0 transition-colors">
+                      {{ checkbox(attrs_dict={':value': 'cap.id', ':checked': "isCapSelected(cap, '" ~ lvl.n ~ "')", '@change': "toggleCapability(cap, '" ~ lvl.n ~ "', $event.target.checked)"}) }}
+                      <div class="flex-1 min-w-0">
+                        <p class="text-sm font-medium text-foreground leading-tight" x-text="cap.name"></p>
+                        <p x-show="cap.description" x-cloak class="text-xs text-muted-foreground mt-0.5 line-clamp-2" x-text="cap.description"></p>
+                      </div>
+                      {% if lvl.n == 'L1' %}
+                      <span x-show="cap.specialization_type" x-cloak class="shrink-0 px-1.5 py-0.5 text-xs font-medium rounded border"
+                        :class="archimateLayerClass(cap.specialization_type)" x-text="(cap.specialization_type || '').substring(0, 3)"></span>
+                      {% endif %}
+                    </label>
+                  </template>
+                </div>
               </div>
-              <div class="relative mb-1">
-                <i data-lucide="search" class="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground"></i>
-                <input type="text" x-model="procSearchL1" placeholder="Filter L1..."
-                  class="w-full pl-8 pr-3 py-2 border border-border rounded-md bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-                  aria-label="Search L1 APQC processes">
-              </div>
-              <div class="border border-border rounded-md bg-background max-h-48 overflow-y-auto" role="listbox" aria-label="L1 APQC processes">
-                <template x-if="loadingProcL1">
-                  <div class="p-4 text-center text-muted-foreground text-sm"><i data-lucide="loader-2" class="h-4 w-4 inline animate-spin mr-1"></i> Loading...</div>
-                </template>
-                <template x-if="!loadingProcL1 && procOptionsL1.length === 0">
-                  <div class="p-4 text-center text-muted-foreground text-sm">No APQC processes found</div>
-                </template>
-                <template x-for="proc in filteredProcL1" :key="proc.id">
-                  <label class="flex items-start gap-2 px-3 py-2 hover:bg-muted/50 cursor-pointer border-b border-border/50 last:border-0 transition-colors">
-                    <input type="checkbox" :value="proc.id" :checked="isProcSelected(proc, 'L1')"
-                      @change="toggleProcess(proc, 'L1', $event.target.checked)"
-                      class="mt-0.5 rounded border-border">
-                    <div class="flex-1 min-w-0">
-                      <p class="text-sm font-medium text-foreground leading-tight">
-                        <span class="text-muted-foreground font-mono mr-1" x-text="proc.process_code || ''"></span>
-                        <span x-text="proc.process_name || proc.name || ''"></span>
-                      </p>
-                    </div>
-                  </label>
-                </template>
-              </div>
+              {% endfor %}
             </div>
 
-            <!-- L2 Process Group -->
-            <div>
-              <div class="flex items-center justify-between mb-1">
-                <label class="block text-sm font-medium text-foreground/80">L2 Process Group</label>
-                <span class="text-xs text-muted-foreground" x-text="procSelectedL2.length + ' selected'"></span>
+            <!-- Selected Capabilities Chips -->
+            <div x-show="allCapabilities.length > 0" x-cloak class="bg-muted/50 rounded-lg p-4">
+              <div class="flex items-center justify-between mb-2">
+                <p class="text-sm font-medium text-foreground">
+                  <span x-text="allCapabilities.length"></span> capabilities selected
+                </p>
+                {{ button('Clear All', variant='ghost', size='xs', class='text-destructive-emphasis hover:text-destructive-emphasis', on_click='clearCapabilities()') }}
               </div>
-              <div class="relative mb-1">
-                <i data-lucide="search" class="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground"></i>
-                <input type="text" x-model="procSearchL2" placeholder="Filter L2..."
-                  class="w-full pl-8 pr-3 py-2 border border-border rounded-md bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-                  aria-label="Search L2 APQC processes">
-              </div>
-              <div class="border border-border rounded-md bg-background max-h-48 overflow-y-auto" role="listbox" aria-label="L2 APQC processes">
-                <template x-if="loadingProcL2">
-                  <div class="p-4 text-center text-muted-foreground text-sm"><i data-lucide="loader-2" class="h-4 w-4 inline animate-spin mr-1"></i> Loading...</div>
-                </template>
-                <template x-if="!loadingProcL2 && procSelectedL1.length === 0">
-                  <div class="p-4 text-center text-muted-foreground text-sm">Select L1 categories first</div>
-                </template>
-                <template x-if="!loadingProcL2 && procSelectedL1.length > 0 && procOptionsL2.length === 0">
-                  <div class="p-4 text-center text-muted-foreground text-sm">No L2 processes found</div>
-                </template>
-                <template x-for="proc in filteredProcL2" :key="proc.id">
-                  <label class="flex items-start gap-2 px-3 py-2 hover:bg-muted/50 cursor-pointer border-b border-border/50 last:border-0 transition-colors">
-                    <input type="checkbox" :value="proc.id" :checked="isProcSelected(proc, 'L2')"
-                      @change="toggleProcess(proc, 'L2', $event.target.checked)"
-                      class="mt-0.5 rounded border-border">
-                    <div class="flex-1 min-w-0">
-                      <p class="text-sm font-medium text-foreground leading-tight">
-                        <span class="text-muted-foreground font-mono mr-1" x-text="proc.process_code || ''"></span>
-                        <span x-text="proc.process_name || proc.name || ''"></span>
-                      </p>
-                    </div>
-                  </label>
-                </template>
-              </div>
-            </div>
-
-            <!-- L3 Process -->
-            <div>
-              <div class="flex items-center justify-between mb-1">
-                <label class="block text-sm font-medium text-foreground/80">L3 Process</label>
-                <span class="text-xs text-muted-foreground" x-text="procSelectedL3.length + ' selected'"></span>
-              </div>
-              <div class="relative mb-1">
-                <i data-lucide="search" class="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground"></i>
-                <input type="text" x-model="procSearchL3" placeholder="Filter L3..."
-                  class="w-full pl-8 pr-3 py-2 border border-border rounded-md bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-                  aria-label="Search L3 APQC processes">
-              </div>
-              <div class="border border-border rounded-md bg-background max-h-48 overflow-y-auto" role="listbox" aria-label="L3 APQC processes">
-                <template x-if="loadingProcL3">
-                  <div class="p-4 text-center text-muted-foreground text-sm"><i data-lucide="loader-2" class="h-4 w-4 inline animate-spin mr-1"></i> Loading...</div>
-                </template>
-                <template x-if="!loadingProcL3 && procSelectedL2.length === 0">
-                  <div class="p-4 text-center text-muted-foreground text-sm">Select L2 processes first</div>
-                </template>
-                <template x-if="!loadingProcL3 && procSelectedL2.length > 0 && procOptionsL3.length === 0">
-                  <div class="p-4 text-center text-muted-foreground text-sm">No L3 processes found</div>
-                </template>
-                <template x-for="proc in filteredProcL3" :key="proc.id">
-                  <label class="flex items-start gap-2 px-3 py-2 hover:bg-muted/50 cursor-pointer border-b border-border/50 last:border-0 transition-colors">
-                    <input type="checkbox" :value="proc.id" :checked="isProcSelected(proc, 'L3')"
-                      @change="toggleProcess(proc, 'L3', $event.target.checked)"
-                      class="mt-0.5 rounded border-border">
-                    <div class="flex-1 min-w-0">
-                      <p class="text-sm font-medium text-foreground leading-tight">
-                        <span class="text-muted-foreground font-mono mr-1" x-text="proc.process_code || ''"></span>
-                        <span x-text="proc.process_name || proc.name || ''"></span>
-                      </p>
-                    </div>
-                  </label>
+              <div class="flex flex-wrap gap-1.5">
+                <template x-for="cap in allCapabilities" :key="cap.id + '-' + cap._level">
+                  {% call badge('info', class='gap-1 font-medium') %}
+                    <span class="font-bold" x-text="cap._level || 'L?'"></span>
+                    <span x-text="cap.name"></span>
+                    {{ button(variant='ghost', size='icon-xs', class='ml-0.5 h-4 w-4', icon='x', aria_label='Remove capability', on_click='removeCapability(cap)') }}
+                  {% endcall %}
                 </template>
               </div>
             </div>
           </div>
 
-          <!-- Selected Process Chips -->
-          <div x-show="allProcesses.length > 0" x-cloak class="bg-muted/50 rounded-lg p-4">
-            <div class="flex items-center justify-between mb-2">
+          <!-- APQC Process Selection Panel -->
+          <div x-show="selectionMode === 'processes'" x-cloak>
+            <p class="text-sm text-muted-foreground mb-4">Select APQC Process Classification Framework (PCF) processes to discover vendors that support them</p>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+              {% for lvl in [
+                {'n': 'L1', 'title': 'L1 Category', 'required': true, 'prev': none, 'loading': 'loadingProcL1', 'opts': 'procOptionsL1', 'sel': 'procSelectedL1', 'search': 'procSearchL1', 'filtered': 'filteredProcL1', 'first_msg': '', 'empty_msg': 'No APQC processes found'},
+                {'n': 'L2', 'title': 'L2 Process Group', 'required': false, 'prev': 'procSelectedL1', 'loading': 'loadingProcL2', 'opts': 'procOptionsL2', 'sel': 'procSelectedL2', 'search': 'procSearchL2', 'filtered': 'filteredProcL2', 'first_msg': 'Select L1 categories first', 'empty_msg': 'No L2 processes found'},
+                {'n': 'L3', 'title': 'L3 Process', 'required': false, 'prev': 'procSelectedL2', 'loading': 'loadingProcL3', 'opts': 'procOptionsL3', 'sel': 'procSelectedL3', 'search': 'procSearchL3', 'filtered': 'filteredProcL3', 'first_msg': 'Select L2 processes first', 'empty_msg': 'No L3 processes found'}
+              ] %}
+              <div>
+                <div class="flex items-center justify-between mb-1">
+                  <span class="block text-sm font-medium text-muted-foreground">{{ lvl.title }}{% if lvl.required %} <span class="text-destructive-emphasis" aria-hidden="true">*</span>{% endif %}</span>
+                  <span class="text-xs text-muted-foreground" x-text="{{ lvl.sel }}.length + ' selected'"></span>
+                </div>
+                <div class="relative mb-1">
+                  <i data-lucide="search" class="absolute left-2.5 top-3 h-3.5 w-3.5 text-muted-foreground"></i>
+                  {{ input(placeholder='Filter ' ~ lvl.n ~ '...', class='pl-8', aria_label='Search ' ~ lvl.n ~ ' APQC processes', attrs_dict={'x-model': lvl.search}) }}
+                </div>
+                <div class="border border-border rounded-md bg-background max-h-48 overflow-y-auto" role="listbox" aria-label="{{ lvl.n }} APQC processes">
+                  <template x-if="{{ lvl.loading }}">
+                    <div class="p-4 text-center text-muted-foreground text-sm"><i data-lucide="loader-2" class="h-4 w-4 inline animate-spin mr-1"></i> Loading...</div>
+                  </template>
+                  {% if lvl.prev %}
+                  <template x-if="!{{ lvl.loading }} && {{ lvl.prev }}.length === 0">
+                    <div class="p-4 text-center text-muted-foreground text-sm">{{ lvl.first_msg }}</div>
+                  </template>
+                  <template x-if="!{{ lvl.loading }} && {{ lvl.prev }}.length > 0 && {{ lvl.opts }}.length === 0">
+                    <div class="p-4 text-center text-muted-foreground text-sm">{{ lvl.empty_msg }}</div>
+                  </template>
+                  {% else %}
+                  <template x-if="!{{ lvl.loading }} && {{ lvl.opts }}.length === 0">
+                    <div class="p-4 text-center text-muted-foreground text-sm">{{ lvl.empty_msg }}</div>
+                  </template>
+                  {% endif %}
+                  <template x-for="proc in {{ lvl.filtered }}" :key="proc.id">
+                    <label class="flex items-start gap-2 px-3 py-2 hover:bg-muted/50 cursor-pointer border-b border-border/50 last:border-0 transition-colors">
+                      {{ checkbox(attrs_dict={':value': 'proc.id', ':checked': "isProcSelected(proc, '" ~ lvl.n ~ "')", '@change': "toggleProcess(proc, '" ~ lvl.n ~ "', $event.target.checked)"}) }}
+                      <div class="flex-1 min-w-0">
+                        <p class="text-sm font-medium text-foreground leading-tight">
+                          <span class="text-muted-foreground font-mono mr-1" x-text="proc.process_code || ''"></span>
+                          <span x-text="proc.process_name || proc.name || ''"></span>
+                        </p>
+                      </div>
+                    </label>
+                  </template>
+                </div>
+              </div>
+              {% endfor %}
+            </div>
+
+            <!-- Selected Process Chips -->
+            <div x-show="allProcesses.length > 0" x-cloak class="bg-muted/50 rounded-lg p-4">
+              <div class="flex items-center justify-between mb-2">
+                <p class="text-sm font-medium text-foreground">
+                  <span x-text="allProcesses.length"></span> processes selected
+                </p>
+                {{ button('Clear All', variant='ghost', size='xs', class='text-destructive-emphasis hover:text-destructive-emphasis', on_click='clearProcesses()') }}
+              </div>
+              <div class="flex flex-wrap gap-1.5">
+                <template x-for="proc in allProcesses" :key="proc.id + '-' + proc._level">
+                  {% call badge('info', class='gap-1 font-medium') %}
+                    <span class="font-mono text-xs" x-text="proc.process_code || ''"></span>
+                    <span x-text="proc.process_name || proc.name || ''"></span>
+                    {{ button(variant='ghost', size='icon-xs', class='ml-0.5 h-4 w-4', icon='x', aria_label='Remove process', on_click='removeProcess(proc)') }}
+                  {% endcall %}
+                </template>
+              </div>
+            </div>
+          </div>
+
+          <!-- Value Stream Selection Panel -->
+          <div x-show="selectionMode === 'valuestreams'" x-cloak>
+            <p class="text-sm text-muted-foreground mb-4">Select value streams and their stages to discover vendors that enable them through mapped capabilities</p>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+              {% call form_group(id='vs-domain', label='Business Domain') %}
+                {% call native_select(id='vs-domain', aria_label='Business Domain', attrs_dict={'x-model': 'vsFilterDomain', '@change': 'loadValueStreamOptions()'}, options=[('', '-- All Domains --')]) %}
+                  <template x-for="d in domains" :key="d.id">
+                    <option :value="d.id" x-text="d.name"></option>
+                  </template>
+                {% endcall %}
+              {% endcall %}
+              {% call form_group(id='vs-stream', label='Value Stream', required=true, help_text='Ctrl/Cmd-click to select multiple') %}
+                {% call native_select(id='vs-stream', aria_label='Value Stream', multiple=true, size=5, attrs_dict={'x-model': 'vsSelectedStream', '@change': 'onValueStreamSelected()'}) %}
+                  <template x-for="vs in vsOptions" :key="vs.id">
+                    <option :value="vs.id" x-text="vs.name"></option>
+                  </template>
+                {% endcall %}
+              {% endcall %}
+            </div>
+            <div x-show="vsSelectedStream.length > 0" x-cloak class="bg-muted/50 rounded-lg p-4">
               <p class="text-sm font-medium text-foreground">
-                <span x-text="allProcesses.length"></span> processes selected
+                Selected value streams will resolve to their mapped capabilities for vendor discovery.
               </p>
-              <button type="button" @click="clearProcesses()" class="text-xs text-destructive-emphasis hover:text-destructive-emphasis/80">Clear All</button>
-            </div>
-            <div class="flex flex-wrap gap-1.5">
-              <template x-for="proc in allProcesses" :key="proc.id + '-' + proc._level">
-                <span class="inline-flex items-center gap-1 px-2 py-1 bg-primary/10 text-info-emphasis rounded text-xs font-medium group">
-                  <span class="font-mono text-xs text-muted-foreground" x-text="proc.process_code || ''"></span>
-                  <span x-text="proc.process_name || proc.name || ''"></span>
-                  <button type="button" @click="removeProcess(proc)" class="ml-0.5 opacity-0 group-hover:opacity-100 transition-opacity" aria-label="Remove process">
-                    <i data-lucide="x" class="h-3 w-3"></i>
-                  </button>
-                </span>
-              </template>
             </div>
           </div>
-        </div>
-
-        <!-- Value Stream Selection Panel -->
-        <div x-show="selectionMode === 'valuestreams'" x-cloak>
-          <p class="text-sm text-muted-foreground mb-4">Select value streams and their stages to discover vendors that enable them through mapped capabilities</p>
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-            <div>
-              <label class="block text-sm font-medium text-foreground/80 mb-1">Business Domain</label>
-              <select x-model="vsFilterDomain" @change="loadValueStreamOptions()"
-                class="w-full px-3 py-2 border border-border rounded-md bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary" aria-label="Business Domain">
-                <option value="">-- All Domains --</option>
-                <template x-for="d in domains" :key="d.id">
-                  <option :value="d.id" x-text="d.name"></option>
-                </template>
-              </select>
-            </div>
-            <div>
-              <label class="block text-sm font-medium text-foreground/80 mb-1">Value Stream <span class="text-destructive-emphasis">*</span></label>
-              <select x-model="vsSelectedStream" @change="onValueStreamSelected()" multiple size="5"
-                class="w-full px-3 py-2 border border-border rounded-md bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary" aria-label="Value Stream">
-                <template x-for="vs in vsOptions" :key="vs.id">
-                  <option :value="vs.id" x-text="vs.name"></option>
-                </template>
-              </select>
-              <p class="text-xs text-muted-foreground mt-1">Ctrl/Cmd-click to select multiple</p>
-            </div>
-          </div>
-          <div x-show="vsSelectedStream.length > 0" x-cloak class="bg-muted/50 rounded-lg p-4">
-            <p class="text-sm font-medium text-foreground mb-2">
-              Selected value streams will resolve to their mapped capabilities for vendor discovery.
-            </p>
-          </div>
-        </div>
-      </div>
+        {% endcall %}
+      {% endcall %}
 
       <!-- Vendor Discovery -->
-      <div class="rounded-lg border border-border bg-card p-6">
-        <div class="flex items-center justify-between mb-4">
-          <div>
-            <h3 class="text-lg font-semibold text-foreground">Vendor Discovery</h3>
-            <p class="text-sm text-muted-foreground mt-0.5">Find vendors that match your selected architecture scope</p>
+      {% call ui.card() %}
+        {% call ui.card_header() %}
+          <div class="flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <h3 class="text-lg font-semibold text-foreground">Vendor Discovery</h3>
+              <p class="text-sm text-muted-foreground mt-0.5">Find vendors that match your selected architecture scope</p>
+            </div>
+            {% call button(class='gap-2', on_click='discoverVendorsUnified()', attrs_dict={':disabled': '!hasSelections() || loadingVendors'}) %}
+              <span x-show="loadingVendors" x-cloak><i data-lucide="loader-2" class="h-4 w-4 animate-spin"></i></span>
+              <span x-show="!loadingVendors" x-cloak><i data-lucide="search" class="h-4 w-4"></i></span>
+              <span x-text="loadingVendors ? 'Searching...' : 'Discover Matching Vendors'"></span>
+            {% endcall %}
           </div>
-          <button type="button" @click="discoverVendorsUnified()" :disabled="!hasSelections() || loadingVendors"
-            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
-            <i data-lucide="loader-2" class="h-4 w-4 animate-spin" x-show="loadingVendors" x-cloak></i>
-            <i data-lucide="search" class="h-4 w-4" x-show="!loadingVendors" x-cloak></i>
-            <span x-text="loadingVendors ? 'Searching...' : 'Discover Matching Vendors'"></span>
-          </button>
-        </div>
-        <!-- Vendor Results -->
-        <div x-show="discoveredVendors.length > 0" x-cloak class="space-y-3" role="group" aria-label="Discovered vendors">
-          <p class="text-sm text-muted-foreground">
-            Found <span class="font-semibold text-foreground" x-text="discoveredVendors.length"></span> vendors.
-            Select which to include in scoring (<span class="font-semibold text-foreground" x-text="selectedVendorIds.size"></span> selected):
-          </p>
-          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-            <template x-for="v in discoveredVendors" :key="v.id">
-              <label class="flex items-start gap-3 p-3 border rounded-lg cursor-pointer transition-all"
-                :class="selectedVendorIds.has(v.id) ? 'border-primary/50 bg-primary/5 ring-1 ring-primary/20' : 'hover:bg-muted/30'">
-                <input type="checkbox" :checked="selectedVendorIds.has(v.id)" :value="v.id"
-                  class="mt-1 rounded border-border" @change="toggleVendor(v, $event.target.checked)">
-                <div class="flex-1 min-w-0">
-                  <p class="font-medium text-foreground text-sm" x-text="v.name"></p>
-                  <p class="text-xs text-muted-foreground mt-0.5">
-                    <span class="font-semibold" x-text="v.supported_capabilities || 0"></span>/<span x-text="v.total_capabilities || 0"></span>
-                    <span x-text="selectionMode === 'capabilities' ? 'capabilities' : selectionMode === 'processes' ? 'processes' : 'capabilities'"></span>
-                    matched
-                    <span class="mx-1">&middot;</span>
-                    <span x-text="v.total_products || 0"></span> products
-                  </p>
-                  <div class="mt-1.5 w-full bg-muted rounded-full h-1.5">
-                    <div class="h-1.5 rounded-full transition-all"
-                      :class="vendorMatchPct(v) >= 80 ? 'bg-success' : vendorMatchPct(v) >= 50 ? 'bg-warning' : 'bg-primary'"
-                      :style="'width:' + vendorMatchPct(v) + '%'"></div>
+        {% endcall %}
+        {% call ui.card_content() %}
+          <!-- Vendor Results -->
+          <div x-show="discoveredVendors.length > 0" x-cloak class="space-y-3" role="group" aria-label="Discovered vendors">
+            <p class="text-sm text-muted-foreground">
+              Found <span class="font-semibold text-foreground" x-text="discoveredVendors.length"></span> vendors.
+              Select which to include in scoring (<span class="font-semibold text-foreground" x-text="selectedVendorIds.size"></span> selected):
+            </p>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+              <template x-for="v in discoveredVendors" :key="v.id">
+                <label class="flex items-start gap-3 p-3 border rounded-lg cursor-pointer transition-all"
+                  :class="selectedVendorIds.has(v.id) ? 'border-primary/50 bg-primary/5' : 'hover:bg-muted/30'">
+                  {{ checkbox(attrs_dict={':checked': 'selectedVendorIds.has(v.id)', ':value': 'v.id', '@change': 'toggleVendor(v, $event.target.checked)'}) }}
+                  <div class="flex-1 min-w-0">
+                    <p class="font-medium text-foreground text-sm" x-text="v.name"></p>
+                    <p class="text-xs text-muted-foreground mt-0.5">
+                      <span class="font-semibold" x-text="v.supported_capabilities || 0"></span>/<span x-text="v.total_capabilities || 0"></span>
+                      <span x-text="selectionMode === 'capabilities' ? 'capabilities' : selectionMode === 'processes' ? 'processes' : 'capabilities'"></span>
+                      matched
+                      <span class="mx-1">&middot;</span>
+                      <span x-text="v.total_products || 0"></span> products
+                    </p>
+                    <progress max="100" class="mt-1.5 block h-1.5 w-full accent-primary data-[tone=high]:accent-success data-[tone=mid]:accent-warning" :value="vendorMatchPct(v)" :data-tone="vendorMatchTone(v)" :aria-label="'Coverage for ' + v.name"></progress>
+                    <p class="text-2xs text-muted-foreground mt-1" x-text="vendorMatchPct(v) + '% coverage'"></p>
                   </div>
-                  <p class="text-2xs text-muted-foreground mt-1" x-text="vendorMatchPct(v) + '% coverage'"></p>
-                </div>
-              </label>
-            </template>
+                </label>
+              </template>
+            </div>
           </div>
-        </div>
-        <!-- Empty / prompt state -->
-        <div x-show="discoveredVendors.length === 0 && !loadingVendors" x-cloak class="text-center py-8 text-muted-foreground">
-          <i data-lucide="building-2" class="h-8 w-8 mx-auto mb-2 opacity-40"></i>
-          <p class="text-sm" x-text="vendorSearchDone
-            ? 'No matching vendors found. You can proceed without pre-selected vendors.'
-            : hasSelections()
-              ? 'Click &quot;Discover Matching Vendors&quot; to find vendors for your selections'
-              : 'Select capabilities, processes, or value streams above to discover matching vendors'"></p>
-        </div>
-      </div>
+          <!-- Empty / prompt state -->
+          <div x-show="discoveredVendors.length === 0 && !loadingVendors" x-cloak class="text-center py-8 text-muted-foreground">
+            <i data-lucide="building-2" class="h-8 w-8 mx-auto mb-2 opacity-40"></i>
+            <p class="text-sm" x-text="vendorSearchDone
+              ? 'No matching vendors found. You can proceed without pre-selected vendors.'
+              : hasSelections()
+                ? 'Click &quot;Discover Matching Vendors&quot; to find vendors for your selections'
+                : 'Select capabilities, processes, or value streams above to discover matching vendors'"></p>
+          </div>
+        {% endcall %}
+      {% endcall %}
 
       <!-- Setup Actions -->
       <div class="flex justify-end gap-3">
-        <button type="button" @click="saveDraft()" class="px-4 py-2 border border-border rounded-md text-sm font-medium hover:bg-muted">
-          <i data-lucide="save" class="h-4 w-4 inline mr-1"></i> Save Draft
-        </button>
-        <button type="button" @click="attemptSwitchTab('scoring')" class="px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm font-medium hover:bg-primary/90">
-          Next: Scoring <i data-lucide="arrow-right" class="h-4 w-4 inline ml-1"></i>
-        </button>
+        {{ button('Save Draft', variant='outline', icon='save', on_click='saveDraft()') }}
+        {{ button('Next: Scoring', icon='arrow-right', icon_position='right', on_click="attemptSwitchTab('scoring')") }}
       </div>
     </div>
   </div>
@@ -603,56 +407,49 @@
   <div x-show="activeTab === 'scoring'" x-cloak>
     <div class="space-y-6">
       <!-- Criteria Weights -->
-      <div class="rounded-lg border border-border bg-card p-6">
-        <div class="flex items-center justify-between mb-2">
+      {% call ui.card() %}
+        {% call ui.card_header() %}
+         <div class="flex flex-wrap items-start justify-between gap-4">
           <div>
             <h3 class="text-lg font-semibold text-foreground">Scoring Criteria Weights</h3>
             <p class="text-sm text-muted-foreground mt-1">Adjust the weight of each scoring dimension. Weights must total 100%.</p>
           </div>
           <div class="flex items-center gap-2">
-            <select aria-label="Apply weighting preset" @change="applyWeightPreset($event.target.value); $event.target.value = ''" class="px-3 py-1.5 border border-border rounded-md bg-background text-foreground text-xs">
-              <option value="">Apply Preset...</option>
-              <option value="balanced">Balanced (Equal)</option>
-              <option value="cost_focused">Cost-Focused</option>
-              <option value="capability_focused">Capability-Focused</option>
-              <option value="risk_averse">Risk-Averse</option>
-              <option value="strategic">Strategic Alignment</option>
-            </select>
-            <button type="button" @click="resetWeights()" class="px-3 py-1.5 text-xs border border-border rounded-md hover:bg-muted text-muted-foreground" title="Reset to defaults" aria-label="Reset scoring weights to defaults">
-              <i data-lucide="rotate-ccw" class="h-3.5 w-3.5 inline"></i>
-            </button>
+            {{ native_select(aria_label='Apply weighting preset', class='h-9 text-xs', attrs_dict={'@change': "applyWeightPreset($event.target.value); $event.target.value = ''"}, options=[
+              ('', 'Apply Preset...'), ('balanced', 'Balanced (Equal)'), ('cost_focused', 'Cost-Focused'),
+              ('capability_focused', 'Capability-Focused'), ('risk_averse', 'Risk-Averse'), ('strategic', 'Strategic Alignment')]) }}
+            {{ button(variant='outline', size='icon', icon='rotate-ccw', aria_label='Reset scoring weights to defaults', on_click='resetWeights()', attrs_dict={'title': 'Reset to defaults'}) }}
           </div>
-        </div>
-        <div class="space-y-4 mt-4">
-          <template x-for="(key, idx) in weightKeys" :key="key">
-            <div class="grid grid-cols-12 gap-4 items-center">
-              <div class="col-span-3">
-                <label class="text-sm font-medium text-foreground" x-text="weightLabels[key]"></label>
-                <p class="text-2xs text-muted-foreground mt-0.5" x-text="weightDescriptions[key]"></p>
+         </div>
+        {% endcall %}
+        {% call ui.card_content() %}
+          <div class="space-y-4">
+            <template x-for="(key, idx) in weightKeys" :key="key">
+              <div class="grid grid-cols-12 gap-4 items-center">
+                <div class="col-span-12 sm:col-span-3">
+                  <p class="text-sm font-medium text-foreground" x-text="weightLabels[key]"></p>
+                  <p class="text-2xs text-muted-foreground mt-0.5" x-text="weightDescriptions[key]"></p>
+                </div>
+                <div class="col-span-9 sm:col-span-7">
+                  {{ input(type='range', attrs_dict={'min': '0', 'max': '100', 'step': '5', ':value': 'weights[key]', '@input': 'weights[key] = parseInt($event.target.value)', ':aria-label': "weightLabels[key] + ' weight'"}) }}
+                </div>
+                <div class="col-span-3 sm:col-span-2 text-right">
+                  <span class="text-sm font-bold tabular-nums" :class="weightTotal === 100 ? 'text-foreground' : 'text-destructive-emphasis'" x-text="weights[key] + '%'"></span>
+                </div>
               </div>
-              <div class="col-span-7">
-                <input type="range" min="0" max="100" step="5"
-                  :value="weights[key]"
-                  @input="weights[key] = parseInt($event.target.value)"
-                  class="w-full accent-primary"
-                  :aria-label="weightLabels[key] + ' weight'">
-              </div>
-              <div class="col-span-2 text-right">
-                <span class="text-sm font-bold tabular-nums" :class="weightTotal === 100 ? 'text-foreground' : 'text-destructive-emphasis'" x-text="weights[key] + '%'"></span>
-              </div>
-            </div>
-          </template>
-        </div>
-        <div class="mt-4 flex items-center gap-2 text-sm" role="status" aria-live="polite">
-          <span :class="weightTotal === 100 ? 'text-success-emphasis' : 'text-destructive-emphasis'" class="font-bold">
-            Total: <span x-text="weightTotal + '%'"></span>
-          </span>
-          <span x-show="weightTotal !== 100" class="text-destructive-emphasis" x-cloak>(must equal 100%)</span>
-          <span x-show="weightTotal === 100" class="text-success-emphasis" x-cloak>
-            <i data-lucide="check-circle" class="h-4 w-4 inline"></i>
-          </span>
-        </div>
-      </div>
+            </template>
+          </div>
+          <div class="mt-4 flex items-center gap-2 text-sm" role="status" aria-live="polite">
+            <span :class="weightTotal === 100 ? 'text-success-emphasis' : 'text-destructive-emphasis'" class="font-bold">
+              Total: <span x-text="weightTotal + '%'"></span>
+            </span>
+            <span x-show="weightTotal !== 100" class="text-destructive-emphasis" x-cloak>(must equal 100%)</span>
+            <span x-show="weightTotal === 100" class="text-success-emphasis" x-cloak>
+              <i data-lucide="check-circle" class="h-4 w-4 inline"></i>
+            </span>
+          </div>
+        {% endcall %}
+      {% endcall %}
 
       <!-- Selected Preview -->
       <div x-show="hasSelections() || selectedVendorIds.size > 0" x-cloak
@@ -664,10 +461,11 @@
             </p>
             <div class="flex flex-wrap gap-1.5">
               <template x-for="cap in allCapabilities.slice(0, 6)" :key="cap.id">
-                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-primary/10 text-info-emphasis border border-primary/20" x-text="cap.name"></span>
+                {% call badge('info', class='font-medium') %}<span x-text="cap.name"></span>{% endcall %}
               </template>
-              <span x-show="allCapabilities.length > 6" x-cloak class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-muted text-muted-foreground"
-                x-text="'+' + (allCapabilities.length - 6) + ' more'"></span>
+              <span x-show="allCapabilities.length > 6" x-cloak>
+                {% call badge('neutral', class='font-medium') %}<span x-text="'+' + (allCapabilities.length - 6) + ' more'"></span>{% endcall %}
+              </span>
             </div>
           </div>
           <div x-show="selectionMode === 'processes' && allProcesses.length > 0" x-cloak>
@@ -676,10 +474,11 @@
             </p>
             <div class="flex flex-wrap gap-1.5">
               <template x-for="proc in allProcesses.slice(0, 6)" :key="proc.id">
-                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-primary/10 text-info-emphasis border border-primary/20" x-text="proc.process_name || proc.name"></span>
+                {% call badge('info', class='font-medium') %}<span x-text="proc.process_name || proc.name"></span>{% endcall %}
               </template>
-              <span x-show="allProcesses.length > 6" x-cloak class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-muted text-muted-foreground"
-                x-text="'+' + (allProcesses.length - 6) + ' more'"></span>
+              <span x-show="allProcesses.length > 6" x-cloak>
+                {% call badge('neutral', class='font-medium') %}<span x-text="'+' + (allProcesses.length - 6) + ' more'"></span>{% endcall %}
+              </span>
             </div>
           </div>
           <div x-show="selectedVendorIds.size > 0" x-cloak>
@@ -688,10 +487,11 @@
             </p>
             <div class="flex flex-wrap gap-1.5">
               <template x-for="v in discoveredVendors.filter(function(dv) { return selectedVendorIds.has(dv.id); }).slice(0, 4)" :key="v.id">
-                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-success/10 text-success-emphasis border border-success/20" x-text="v.name"></span>
+                {% call badge('success', class='font-medium') %}<span x-text="v.name"></span>{% endcall %}
               </template>
-              <span x-show="selectedVendorIds.size > 4" x-cloak class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-muted text-muted-foreground"
-                x-text="'+' + (selectedVendorIds.size - 4) + ' more'"></span>
+              <span x-show="selectedVendorIds.size > 4" x-cloak>
+                {% call badge('neutral', class='font-medium') %}<span x-text="'+' + (selectedVendorIds.size - 4) + ' more'"></span>{% endcall %}
+              </span>
             </div>
           </div>
         </div>
@@ -699,15 +499,12 @@
 
       <!-- Run Analysis Action -->
       <div class="flex justify-between items-center">
-        <button type="button" @click="attemptSwitchTab('setup')" class="px-4 py-2 border border-border rounded-md text-sm hover:bg-muted">
-          <i data-lucide="arrow-left" class="h-4 w-4 inline mr-1"></i> Back to Setup
-        </button>
-        <button type="button" @click="runAnalysis()" :disabled="weightTotal !== 100 || runningAnalysis"
-          class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
-          <i data-lucide="play" class="h-4 w-4" x-show="!runningAnalysis" x-cloak></i>
-          <i data-lucide="loader-2" class="h-4 w-4 animate-spin" x-show="runningAnalysis" x-cloak></i>
+        {{ button('Back to Setup', variant='outline', icon='arrow-left', on_click="attemptSwitchTab('setup')") }}
+        {% call button(class='gap-2', on_click='runAnalysis()', attrs_dict={':disabled': 'weightTotal !== 100 || runningAnalysis'}) %}
+          <span x-show="!runningAnalysis" x-cloak><i data-lucide="play" class="h-4 w-4"></i></span>
+          <span x-show="runningAnalysis" x-cloak><i data-lucide="loader-2" class="h-4 w-4 animate-spin"></i></span>
           <span x-text="runningAnalysis ? 'Running Analysis...' : 'Run Analysis'"></span>
-        </button>
+        {% endcall %}
       </div>
     </div>
   </div>
@@ -722,467 +519,407 @@
     <div x-show="!loadingComparison" x-cloak class="space-y-6">
       <div class="flex items-center justify-between">
         <h3 class="text-lg font-semibold text-foreground">Vendor Comparison Matrix</h3>
-        <button type="button" @click="loadComparison()" class="px-3 py-1.5 text-sm border border-border rounded-md hover:bg-muted">
-          <i data-lucide="refresh-cw" class="h-4 w-4 inline mr-1"></i> Refresh
-        </button>
+        {{ button('Refresh', variant='outline', size='sm', icon='refresh-cw', on_click='loadComparison()') }}
       </div>
 
       <!-- Vendor Scoring Panel -->
-      <div x-show="comparisonVendors.length > 0" x-cloak class="rounded-lg border bg-card">
-        <button @click="manualScoreOpen = !manualScoreOpen" type="button"
-          class="w-full flex items-center justify-between p-4 text-left hover:bg-muted/50 transition-colors">
-          <div class="flex items-center gap-2">
-            <i data-lucide="sliders-horizontal" class="h-4 w-4 text-primary"></i>
-            <h4 class="font-semibold text-foreground">Vendor Scoring</h4>
-            <span class="text-xs text-muted-foreground">(Rate each vendor across risk, strategic fit, and implementation dimensions)</span>
-          </div>
-          <i data-lucide="chevron-down" class="h-4 w-4 text-muted-foreground transition-transform"
-            :class="manualScoreOpen ? 'rotate-180' : ''"></i>
-        </button>
-        <div x-show="manualScoreOpen" x-cloak
-          x-transition:enter="transition ease-out duration-200"
-          x-transition:enter-start="opacity-0 -translate-y-1"
-          x-transition:enter-end="opacity-100 translate-y-0"
-          x-transition:leave="transition ease-in duration-150"
-          x-transition:leave-start="opacity-100 translate-y-0"
-          x-transition:leave-end="opacity-0 -translate-y-1"
-          class="border-t border-border">
-          <div class="p-4 overflow-x-auto">
-            <template x-for="group in manualScoreGroups" :key="group.key">
-              <div class="mb-6 last:mb-0">
-                <div class="flex items-center gap-2 mb-3">
-                  <h5 class="text-sm font-semibold text-foreground" x-text="group.label"></h5>
-                  <span class="text-xs text-muted-foreground" x-text="'(' + group.hint + ')'"></span>
-                </div>
-                <div class="space-y-2">
-                  <template x-for="field in group.fields" :key="field.key">
-                    <div class="grid items-center gap-3" :style="'grid-template-columns: 140px repeat(' + comparisonVendors.length + ', 1fr)'">
-                      <div class="group relative">
-                        <span class="text-xs text-muted-foreground truncate flex items-center gap-1 cursor-help" x-text="field.label" :title="field.rubric || field.label"></span>
-                        <div x-show="field.rubric" x-cloak class="absolute left-0 bottom-full mb-1 w-64 p-2 bg-popover text-popover-foreground text-xs rounded-md border border-border opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-20" x-text="field.rubric"></div>
-                      </div>
-                      <template x-for="v in comparisonVendors" :key="v.id">
-                        <div class="flex items-center gap-1.5">
-                          <div class="flex gap-0.5">
-                            <template x-for="n in 10" :key="n">
-                              <button @click="setManualScore(v.id, field.key, n)"
-                                type="button"
-                                :class="n <= getManualScore(v, field.key) ? 'bg-primary' : 'bg-muted'"
-                                class="w-3.5 h-3.5 rounded-full transition-colors hover:bg-primary/70 focus:outline-none focus:ring-1 focus:ring-primary/50"
-                                :title="field.label + ': ' + n + '/10'"
-                                :aria-label="field.label + ' score ' + n + ' for ' + v.name">
-                              </button>
-                            </template>
-                          </div>
-                          <span class="text-xs font-mono w-5 text-right text-muted-foreground"
-                            x-text="getManualScore(v, field.key) || '—'"></span>
-                          <button x-show="getManualScore(v, field.key) > 0"
-                            @click="clearManualScore(v.id, field.key)"
-                            type="button"
-                            class="text-muted-foreground/50 hover:text-destructive transition-colors"
-                            title="Clear score"
-                            aria-label="Clear score">
-                            <i data-lucide="x" class="h-3 w-3"></i>
-                          </button>
-                          <span x-show="manualScoreSaving[v.id + '_' + field.key] === 'saving'"
-                            class="text-xs text-muted-foreground animate-pulse">...</span>
-                          <span x-show="manualScoreSaving[v.id + '_' + field.key] === 'saved'"
-                            class="text-xs text-success-emphasis">Saved</span>
-                          <span x-show="manualScoreSaving[v.id + '_' + field.key] === 'error'"
-                            class="text-xs text-destructive-emphasis">Error</span>
+      <div x-show="comparisonVendors.length > 0" x-cloak>
+        {% call ui.card() %}
+          {% call button(variant='ghost', class='h-auto w-full justify-between rounded-b-none p-4 text-left font-normal', on_click='manualScoreOpen = !manualScoreOpen') %}
+            <span class="flex items-center gap-2">
+              <i data-lucide="sliders-horizontal" class="h-4 w-4 text-primary"></i>
+              <span class="font-semibold text-foreground">Vendor Scoring</span>
+              <span class="text-xs text-muted-foreground">(Rate each vendor across risk, strategic fit, and implementation dimensions)</span>
+            </span>
+            <i data-lucide="chevron-down" class="h-4 w-4 text-muted-foreground transition-transform" :class="manualScoreOpen ? 'rotate-180' : ''"></i>
+          {% endcall %}
+          <div x-show="manualScoreOpen" x-cloak
+            x-transition:enter="transition ease-out duration-200"
+            x-transition:enter-start="opacity-0 -translate-y-1"
+            x-transition:enter-end="opacity-100 translate-y-0"
+            x-transition:leave="transition ease-in duration-150"
+            x-transition:leave-start="opacity-100 translate-y-0"
+            x-transition:leave-end="opacity-0 -translate-y-1"
+            class="border-t border-border">
+            <div class="p-4 overflow-x-auto">
+              <template x-for="group in manualScoreGroups" :key="group.key">
+                <div class="mb-6 last:mb-0">
+                  <div class="flex items-center gap-2 mb-3">
+                    <h5 class="text-sm font-semibold text-foreground" x-text="group.label"></h5>
+                    <span class="text-xs text-muted-foreground" x-text="'(' + group.hint + ')'"></span>
+                  </div>
+                  <div class="space-y-2">
+                    <template x-for="field in group.fields" :key="field.key">
+                      <div class="flex items-center gap-3">
+                        <div class="group relative w-36 shrink-0">
+                          <span class="text-xs text-muted-foreground truncate flex items-center gap-1 cursor-help" x-text="field.label" :title="field.rubric || field.label"></span>
+                          <div x-show="field.rubric" x-cloak class="absolute left-0 bottom-full mb-1 w-64 p-2 bg-popover text-popover-foreground text-xs rounded-md border border-border opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-20" x-text="field.rubric"></div>
                         </div>
-                      </template>
-                    </div>
-                  </template>
+                        <template x-for="v in comparisonVendors" :key="v.id">
+                          <div class="flex min-w-[17rem] flex-1 items-center gap-1.5">
+                            <div class="flex gap-0.5">
+                              <template x-for="n in 10" :key="n">
+                                {{ button(variant='ghost', size='dot', class='bg-muted hover:bg-primary/70 data-[on=true]:bg-primary', on_click='setManualScore(v.id, field.key, n)',
+                                    attrs_dict={':data-on': 'n <= getManualScore(v, field.key)', ':title': "field.label + ': ' + n + '/10'", ':aria-label': "field.label + ' score ' + n + ' for ' + v.name"}) }}
+                              </template>
+                            </div>
+                            <span class="text-xs font-mono w-5 text-right text-muted-foreground"
+                              x-text="getManualScore(v, field.key) || '—'"></span>
+                            <span x-show="getManualScore(v, field.key) > 0" x-cloak>
+                              {{ button(variant='ghost', size='icon-xs', icon='x', aria_label='Clear score', on_click='clearManualScore(v.id, field.key)', attrs_dict={'title': 'Clear score'}) }}
+                            </span>
+                            <span x-show="manualScoreSaving[v.id + '_' + field.key] === 'saving'"
+                              class="text-xs text-muted-foreground animate-pulse">...</span>
+                            <span x-show="manualScoreSaving[v.id + '_' + field.key] === 'saved'"
+                              class="text-xs text-success-emphasis">Saved</span>
+                            <span x-show="manualScoreSaving[v.id + '_' + field.key] === 'error'"
+                              class="text-xs text-destructive-emphasis">Error</span>
+                          </div>
+                        </template>
+                      </div>
+                    </template>
+                  </div>
                 </div>
-              </div>
-            </template>
+              </template>
+            </div>
           </div>
-        </div>
+        {% endcall %}
       </div>
 
       <!-- Comparison Table -->
-      <div class="rounded-lg border border-border bg-card overflow-x-auto">
-        <table class="dense-table w-full" id="comparison-table">
-          <thead>
-            <tr class="border-b bg-muted/50">
-              <th class="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase sticky left-0 bg-muted/50 z-10">Criteria</th>
+      {% call ui.card(class='overflow-x-auto') %}
+        {% call tbl.table(id='comparison-table') %}
+          {% call tbl.table_header() %}
+            {% call tbl.table_row() %}
+              {% call tbl.table_head(class='sticky left-0 bg-card z-10 text-xs uppercase') %}Criteria{% endcall %}
               <template x-for="v in comparisonVendors" :key="v.id">
-                <th class="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase" x-text="v.name"></th>
+                {% call tbl.table_head(class='text-xs uppercase', attrs_dict={'x-text': 'v.name'}) %}{% endcall %}
               </template>
-            </tr>
-          </thead>
-          <tbody>
+            {% endcall %}
+          {% endcall %}
+          {% call tbl.table_body() %}
             <template x-for="row in comparisonRows" :key="row.key">
-              <tr class="border-b">
-                <td class="px-4 py-3 text-sm font-medium text-foreground sticky left-0 bg-card z-10" x-text="row.label"></td>
+              {% call tbl.table_row() %}
+                {% call tbl.table_cell(class='sticky left-0 bg-card z-10 font-medium text-foreground', attrs_dict={'x-text': 'row.label'}) %}{% endcall %}
                 <template x-for="v in comparisonVendors" :key="v.id">
-                  <td class="px-4 py-3 text-sm text-muted-foreground">
+                  {% call tbl.table_cell(class='text-muted-foreground') %}
                     <span x-text="formatCell(v[row.key], row.format)"></span>
-                  </td>
+                  {% endcall %}
                 </template>
-              </tr>
+              {% endcall %}
             </template>
-          </tbody>
-        </table>
-      </div>
+          {% endcall %}
+        {% endcall %}
+      {% endcall %}
 
       <!-- Charts -->
       <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div class="rounded-lg border border-border bg-card p-4">
-          <h4 class="font-semibold text-foreground mb-3">Score Comparison</h4>
-          <canvas id="score-chart"></canvas>
-        </div>
-        <div class="rounded-lg border border-border bg-card p-4">
-          <h4 class="font-semibold text-foreground mb-3">TCO Comparison</h4>
-          <canvas id="tco-chart"></canvas>
-        </div>
-        <div class="rounded-lg border border-border bg-card p-4">
-          <h4 class="font-semibold text-foreground mb-3">Scoring Dimensions</h4>
-          <canvas id="radar-chart"></canvas>
-        </div>
+        {% for chart_id, chart_title in [('score-chart', 'Score Comparison'), ('tco-chart', 'TCO Comparison'), ('radar-chart', 'Scoring Dimensions')] %}
+        {% call ui.card() %}
+          {% call ui.card_content(class='p-4') %}
+            <h4 class="font-semibold text-foreground mb-3">{{ chart_title }}</h4>
+            <canvas id="{{ chart_id }}"></canvas>
+          {% endcall %}
+        {% endcall %}
+        {% endfor %}
       </div>
 
       <!-- Capability Gap Analysis -->
-      <div x-show="comparisonVendors.length > 0" x-cloak class="rounded-lg border bg-card p-4">
-        <h4 class="font-semibold text-foreground mb-3">Capability Gap Analysis</h4>
-        <p class="text-sm text-muted-foreground mb-3">Coverage scores indicate how well each vendor addresses the selected evaluation criteria</p>
-        <div class="overflow-x-auto">
-          <div class="grid gap-2" :style="'grid-template-columns: repeat(' + Math.min(comparisonVendors.length, 4) + ', minmax(200px, 1fr))'">
-            <template x-for="v in comparisonVendors" :key="v.id">
-              <div class="border border-border rounded-lg p-3">
-                <p class="text-sm font-semibold text-foreground mb-2" x-text="v.name"></p>
-                <div class="space-y-1.5">
-                  <div class="flex items-center justify-between text-xs">
-                    <span class="text-muted-foreground">Capability</span>
-                    <span class="font-medium" :class="(v.capability_score || 0) >= 70 ? 'text-success' : (v.capability_score || 0) >= 40 ? 'text-warning' : 'text-destructive'"
-                      x-text="(v.capability_score || 0).toFixed(0) + '%'"></span>
+      <div x-show="comparisonVendors.length > 0" x-cloak>
+        {% call ui.card() %}
+          {% call ui.card_content(class='p-4') %}
+            <h4 class="font-semibold text-foreground mb-3">Capability Gap Analysis</h4>
+            <p class="text-sm text-muted-foreground mb-3">Coverage scores indicate how well each vendor addresses the selected evaluation criteria</p>
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
+              <template x-for="v in comparisonVendors" :key="v.id">
+                <div class="border border-border rounded-lg p-3">
+                  <p class="text-sm font-semibold text-foreground mb-2" x-text="v.name"></p>
+                  <div class="space-y-1.5">
+                    {% for label, field in [('Capability', 'capability_score'), ('Strategic Fit', 'strategic_fit_score'), ('Risk', 'risk_score'), ('Implementation', 'implementation_score')] %}
+                    <div class="flex items-center justify-between text-xs">
+                      <span class="text-muted-foreground">{{ label }}</span>
+                      <span class="font-medium" :class="(v.{{ field }} || 0) >= 70 ? 'text-success' : (v.{{ field }} || 0) >= 40 ? 'text-warning' : 'text-destructive'"
+                        x-text="(v.{{ field }} || 0).toFixed(0) + '%'"></span>
+                    </div>
+                    {% endfor %}
                   </div>
-                  <div class="flex items-center justify-between text-xs">
-                    <span class="text-muted-foreground">Strategic Fit</span>
-                    <span class="font-medium" :class="(v.strategic_fit_score || 0) >= 70 ? 'text-success' : (v.strategic_fit_score || 0) >= 40 ? 'text-warning' : 'text-destructive'"
-                      x-text="(v.strategic_fit_score || 0).toFixed(0) + '%'"></span>
-                  </div>
-                  <div class="flex items-center justify-between text-xs">
-                    <span class="text-muted-foreground">Risk</span>
-                    <span class="font-medium" :class="(v.risk_score || 0) >= 70 ? 'text-success' : (v.risk_score || 0) >= 40 ? 'text-warning' : 'text-destructive'"
-                      x-text="(v.risk_score || 0).toFixed(0) + '%'"></span>
-                  </div>
-                  <div class="flex items-center justify-between text-xs">
-                    <span class="text-muted-foreground">Implementation</span>
-                    <span class="font-medium" :class="(v.implementation_score || 0) >= 70 ? 'text-success' : (v.implementation_score || 0) >= 40 ? 'text-warning' : 'text-destructive'"
-                      x-text="(v.implementation_score || 0).toFixed(0) + '%'"></span>
-                  </div>
-                </div>
-              </div>
-            </template>
-          </div>
-        </div>
-      </div>
-
-      <!-- Requirements Matrix Panel -->
-      <div x-show="comparisonVendors.length > 0" x-cloak class="rounded-lg border bg-card">
-        <button @click="reqMatrixOpen = !reqMatrixOpen" type="button"
-          class="w-full flex items-center justify-between p-4 text-left hover:bg-muted/50 transition-colors">
-          <div class="flex items-center gap-2">
-            <i data-lucide="list-checks" class="h-4 w-4 text-muted-foreground"></i>
-            <h4 class="font-semibold text-foreground">Requirements Matrix</h4>
-            <span class="text-xs text-muted-foreground" x-text="'(' + requirements.length + ' requirements)'"></span>
-          </div>
-          <i data-lucide="chevron-down" class="h-4 w-4 text-muted-foreground transition-transform"
-            :class="reqMatrixOpen ? 'rotate-180' : ''"></i>
-        </button>
-        <div x-show="reqMatrixOpen" x-cloak
-          x-transition:enter="transition ease-out duration-200"
-          x-transition:enter-start="opacity-0 -translate-y-1"
-          x-transition:enter-end="opacity-100 translate-y-0"
-          x-transition:leave="transition ease-in duration-150"
-          x-transition:leave-start="opacity-100 translate-y-0"
-          x-transition:leave-end="opacity-0 -translate-y-1"
-          class="border-t border-border">
-          <div class="p-4">
-            <!-- Add Requirement Form -->
-            <div class="flex items-end gap-3 mb-4">
-              <div class="flex-1">
-                <label class="block text-xs font-medium text-muted-foreground mb-1">Requirement Name</label>
-                <input type="text" x-model="newReqName" placeholder="e.g. SSO Support"
-                  class="w-full px-3 py-1.5 text-sm border border-border rounded-md bg-background text-foreground"
-                  @keydown.enter="addRequirement()" aria-label="Requirement Name">
-              </div>
-              <div class="w-32">
-                <label class="block text-xs font-medium text-muted-foreground mb-1">Importance</label>
-                <select x-model="newReqImportance"
-                  class="w-full px-2 py-1.5 text-sm border border-border rounded-md bg-background text-foreground" aria-label="Importance">
-                  <option value="critical">Critical</option>
-                  <option value="high">High</option>
-                  <option value="medium" selected>Medium</option>
-                  <option value="low">Low</option>
-                </select>
-              </div>
-              <div class="w-24">
-                <label class="block text-xs font-medium text-muted-foreground mb-1">Must Have</label>
-                <label class="flex items-center gap-1.5 h-[34px]">
-                  <input type="checkbox" x-model="newReqMustHave" class="rounded border-border">
-                  <span class="text-xs text-muted-foreground">Required</span>
-                </label>
-              </div>
-              <button type="button" @click="addRequirement()" :disabled="!newReqName.trim()"
-                class="px-3 py-1.5 text-sm bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50 whitespace-nowrap">
-                <i data-lucide="plus" class="h-3.5 w-3.5 inline mr-1"></i> Add
-              </button>
-            </div>
-
-            <!-- Matrix Table -->
-            <div x-show="requirements.length > 0" class="overflow-x-auto">
-              <table class="dense-table w-full text-sm">
-                <thead>
-                  <tr class="border-b bg-muted/50">
-                    <th class="px-3 py-2 text-left text-xs font-medium text-muted-foreground uppercase w-48">Requirement</th>
-                    <th class="px-3 py-2 text-left text-xs font-medium text-muted-foreground uppercase w-20">Importance</th>
-                    <template x-for="v in comparisonVendors" :key="v.id">
-                      <th class="px-3 py-2 text-center text-xs font-medium text-muted-foreground uppercase min-w-[100px]" x-text="v.name"></th>
-                    </template>
-                    <th class="px-3 py-2 text-center text-xs font-medium text-muted-foreground uppercase w-16">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <template x-for="req in requirements" :key="req.id">
-                    <tr class="border-b hover:bg-muted/30">
-                      <td class="px-3 py-2">
-                        <div class="flex items-center gap-1.5">
-                          <span x-show="editingReqId !== req.id" class="text-foreground font-medium cursor-pointer hover:text-primary"
-                            @click="startEditReq(req)" x-text="req.capability_name"></span>
-                          <input x-show="editingReqId === req.id" type="text" x-model="editingReqName"
-                            @keydown.enter="saveEditReq(req.id)" @keydown.escape="cancelEditReq()"
-                            @blur="saveEditReq(req.id)"
-                            class="px-2 py-0.5 text-sm border border-primary rounded bg-background text-foreground w-full" aria-label="Editing Req Name">
-                          <span x-show="req.must_have" class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-destructive/10 text-destructive-emphasis border border-destructive/30">MUST</span>
-                        </div>
-                      </td>
-                      <td class="px-3 py-2">
-                        <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium"
-                          :class="{
-                            'bg-destructive/10 text-destructive-emphasis border border-destructive/30': req.importance === 'critical',
-                            'bg-warning/10 text-warning-emphasis border border-warning/30': req.importance === 'high',
-                            'bg-primary/10 text-primary border border-primary/30': req.importance === 'medium',
-                            'bg-muted text-muted-foreground border border-border': req.importance === 'low'
-                          }" x-text="req.importance"></span>
-                      </td>
-                      <template x-for="v in comparisonVendors" :key="v.id">
-                        <td class="px-3 py-2 text-center">
-                          <div class="flex items-center justify-center gap-0.5">
-                            <button type="button" @click="cycleFulfillment(req.id, v.id)"
-                              class="w-7 h-7 rounded-md flex items-center justify-center transition-colors border"
-                              :class="{
-                                'bg-success/15 border-success/40 text-success-emphasis hover:bg-success/25': getFulfillment(req, v.id) === 'met',
-                                'bg-warning/15 border-warning/40 text-warning-emphasis hover:bg-warning/25': getFulfillment(req, v.id) === 'partial',
-                                'bg-destructive/15 border-destructive/40 text-destructive-emphasis hover:bg-destructive/25': getFulfillment(req, v.id) === 'not_met',
-                                'bg-muted/50 border-border text-muted-foreground hover:bg-muted': !getFulfillment(req, v.id)
-                              }"
-                              :title="getFulfillmentLabel(req, v.id)">
-                              <template x-if="getFulfillment(req, v.id) === 'met'">
-                                <i data-lucide="check" class="h-4 w-4"></i>
-                              </template>
-                              <template x-if="getFulfillment(req, v.id) === 'partial'">
-                                <i data-lucide="minus" class="h-4 w-4"></i>
-                              </template>
-                              <template x-if="getFulfillment(req, v.id) === 'not_met'">
-                                <i data-lucide="x" class="h-4 w-4"></i>
-                              </template>
-                              <template x-if="!getFulfillment(req, v.id)">
-                                <i data-lucide="circle" class="h-3.5 w-3.5"></i>
-                              </template>
-                            </button>
-                          </div>
-                        </td>
-                      </template>
-                      <td class="px-3 py-2 text-center">
-                        <button type="button" @click="deleteRequirement(req.id)" class="text-muted-foreground hover:text-destructive-emphasis transition-colors" title="Delete requirement" aria-label="Delete requirement">
-                          <i data-lucide="trash-2" class="h-3.5 w-3.5"></i>
-                        </button>
-                      </td>
-                    </tr>
-                  </template>
-                </tbody>
-              </table>
-            </div>
-
-            <!-- Empty State -->
-            <div x-show="requirements.length === 0" class="text-center py-8 text-muted-foreground">
-              <i data-lucide="list-checks" class="h-8 w-8 mx-auto mb-2 opacity-40"></i>
-              <p class="text-sm">No requirements defined yet. Add requirements above to build the feature matrix.</p>
-            </div>
-
-            <!-- Summary Row -->
-            <div x-show="requirements.length > 0 && comparisonVendors.length > 0" class="mt-3 pt-3 border-t border-border">
-              <div class="flex items-center gap-4 text-xs text-muted-foreground">
-                <span class="font-medium">Coverage:</span>
-                <template x-for="v in comparisonVendors" :key="v.id">
-                  <span>
-                    <span class="font-medium text-foreground" x-text="v.name"></span>:
-                    <span x-text="getVendorCoverage(v.id)"></span>
-                  </span>
-                </template>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Scenario Comparison Panel -->
-      <div x-show="comparisonVendors.length > 0" x-cloak class="rounded-lg border bg-card">
-        <button @click="scenarioOpen = !scenarioOpen; if (scenarioOpen && scenarios.length === 0) loadScenarios();" type="button"
-          class="w-full flex items-center justify-between p-4 text-left hover:bg-muted/50 transition-colors">
-          <div class="flex items-center gap-2">
-            <i data-lucide="git-compare" class="h-4 w-4 text-muted-foreground"></i>
-            <h4 class="font-semibold text-foreground">Scenario Comparison</h4>
-            <span class="text-xs text-muted-foreground" x-text="'(' + scenarios.length + ' scenarios)'"></span>
-          </div>
-          <i data-lucide="chevron-down" class="h-4 w-4 text-muted-foreground transition-transform"
-            :class="scenarioOpen ? 'rotate-180' : ''"></i>
-        </button>
-        <div x-show="scenarioOpen" x-cloak
-          x-transition:enter="transition ease-out duration-200"
-          x-transition:enter-start="opacity-0 -translate-y-1"
-          x-transition:enter-end="opacity-100 translate-y-0"
-          x-transition:leave="transition ease-in duration-150"
-          x-transition:leave-start="opacity-100 translate-y-0"
-          x-transition:leave-end="opacity-0 -translate-y-1"
-          class="border-t border-border">
-          <div class="p-4 space-y-4">
-            <!-- Action buttons -->
-            <div class="flex flex-wrap items-end gap-3">
-              <div class="flex-1 min-w-[200px] max-w-xs">
-                <label class="text-xs font-medium text-muted-foreground mb-1 block">Save Current Weights as Scenario</label>
-                <div class="flex gap-2">
-                  <input type="text" x-model="saveScenarioName" placeholder="e.g. Baseline" class="flex-1 px-3 py-1.5 text-sm border border-border rounded-md bg-background text-foreground" aria-label="Save Current Weights as Scenario">
-                  <button type="button" @click="saveCurrentAsScenario()" :disabled="!saveScenarioName.trim()" class="px-3 py-1.5 text-sm bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed">
-                    <i data-lucide="save" class="h-3.5 w-3.5 inline mr-1"></i>Save
-                  </button>
-                </div>
-              </div>
-              <button type="button" @click="showNewScenarioForm = !showNewScenarioForm" class="px-3 py-1.5 text-sm border border-border rounded-md hover:bg-muted">
-                <i data-lucide="plus" class="h-3.5 w-3.5 inline mr-1"></i>New Scenario
-              </button>
-            </div>
-
-            <!-- New scenario form -->
-            <div x-show="showNewScenarioForm" x-cloak class="rounded-md border border-dashed border-border px-3 py-2 space-y-3 bg-muted/20">
-              <div>
-                <label class="text-xs font-medium text-muted-foreground mb-1 block">Scenario Name</label>
-                <input type="text" x-model="newScenarioName" placeholder="e.g. Cost Focus" class="w-full max-w-xs px-3 py-1.5 text-sm border border-border rounded-md bg-background text-foreground" aria-label="Scenario Name">
-              </div>
-              <div class="space-y-2">
-                <label class="text-xs font-medium text-muted-foreground block">
-                  Criteria Weights
-                  <span class="ml-2" :class="newScenarioWeightTotal === 100 ? 'text-success-emphasis' : 'text-destructive-emphasis'" x-text="'(Total: ' + newScenarioWeightTotal + '%)'"></span>
-                </label>
-                <template x-for="key in ['cost', 'capability_coverage', 'risk', 'strategic_fit', 'implementation']" :key="key">
-                  <div class="grid grid-cols-12 gap-3 items-center">
-                    <span class="col-span-3 text-xs text-foreground capitalize" x-text="key.replace(/_/g, ' ')"></span>
-                    <input aria-label="Scenario weight" type="range" min="0" max="100" step="5" x-model="newScenarioWeights[key]" class="col-span-7 accent-primary">
-                    <span class="col-span-2 text-xs font-mono text-right" x-text="newScenarioWeights[key] + '%'"></span>
-                  </div>
-                </template>
-              </div>
-              <div class="flex gap-2">
-                <button type="button" @click="createScenario()" :disabled="!newScenarioName.trim() || newScenarioWeightTotal !== 100"
-                  class="px-3 py-1.5 text-sm bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed">
-                  Create Scenario
-                </button>
-                <button type="button" @click="showNewScenarioForm = false" class="px-3 py-1.5 text-sm border border-border rounded-md hover:bg-muted">Cancel</button>
-              </div>
-            </div>
-
-            <!-- Loading -->
-            <div x-show="loadingScenarios" x-cloak class="text-center py-4">
-              <i data-lucide="loader-2" class="h-5 w-5 mx-auto animate-spin text-muted-foreground"></i>
-            </div>
-
-            <!-- Empty state -->
-            <div x-show="!loadingScenarios && scenarios.length === 0" x-cloak class="text-center py-6 text-muted-foreground">
-              <i data-lucide="git-compare" class="h-8 w-8 mx-auto mb-2 opacity-40"></i>
-              <p class="text-sm">No scenarios yet. Save the current weights or create a new scenario to compare different weighting strategies.</p>
-            </div>
-
-            <!-- Comparison table -->
-            <div x-show="!loadingScenarios && scenarios.length > 0" x-cloak class="overflow-x-auto">
-              <table class="dense-table w-full text-sm">
-                <thead>
-                  <tr class="border-b bg-muted/50">
-                    <th class="px-3 py-2 text-left text-xs font-medium text-muted-foreground uppercase sticky left-0 bg-muted/50 z-10">Vendor</th>
-                    <template x-for="s in scenarios" :key="s.id">
-                      <th class="px-3 py-2 text-center text-xs font-medium text-muted-foreground uppercase min-w-[120px]">
-                        <div class="flex items-center justify-center gap-1">
-                          <span x-text="s.scenario_name"></span>
-                          <span x-show="s.is_baseline" class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-primary/10 text-info-emphasis border border-primary/30">Base</span>
-                          <button type="button" @click="deleteScenario(s.id)" class="ml-1 text-muted-foreground/50 hover:text-destructive-emphasis transition-colors" title="Delete scenario">
-                            <i data-lucide="x" class="h-3 w-3"></i>
-                          </button>
-                        </div>
-                      </th>
-                    </template>
-                  </tr>
-                </thead>
-                <tbody>
-                  <template x-for="v in scenarioVendorNames()" :key="v.id">
-                    <tr class="border-b hover:bg-muted/30">
-                      <td class="px-3 py-2 font-medium text-foreground sticky left-0 bg-card z-10" x-text="v.name"></td>
-                      <template x-for="s in scenarios" :key="s.id">
-                        <td class="px-3 py-2 text-center">
-                          <div class="flex flex-col items-center">
-                            <span class="font-semibold tabular-nums"
-                              :class="scenarioRank(s, v.id) === 1 ? 'text-success-emphasis' : 'text-foreground'"
-                              x-text="scenarioScore(s, v.id) !== null ? scenarioScore(s, v.id).toFixed(1) : '—'"></span>
-                            <span class="text-xs text-muted-foreground"
-                              :class="scenarioRank(s, v.id) === 1 ? 'font-semibold text-success-emphasis' : ''"
-                              x-text="scenarioRank(s, v.id) ? '#' + scenarioRank(s, v.id) : ''"></span>
-                          </div>
-                        </td>
-                      </template>
-                    </tr>
-                  </template>
-                </tbody>
-                <tfoot>
-                  <tr class="border-t bg-muted/30">
-                    <td class="px-3 py-2 text-xs font-semibold text-muted-foreground sticky left-0 bg-muted/30 z-10">Weights</td>
-                    <template x-for="s in scenarios" :key="s.id">
-                      <td class="px-3 py-2 text-center text-xs text-muted-foreground leading-relaxed">
-                        <template x-for="key in ['cost', 'capability_coverage', 'risk', 'strategic_fit', 'implementation']" :key="key">
-                          <div>
-                            <span class="capitalize" x-text="key.replace(/_/g, ' ')"></span>:
-                            <span class="font-semibold" x-text="s.criteria_weights[key] ? Math.round(s.criteria_weights[key] * 100) + '%' : '—'"></span>
-                          </div>
-                        </template>
-                      </td>
-                    </template>
-                  </tr>
-                </tfoot>
-              </table>
-              <!-- Winner change alert -->
-              <template x-for="(s, idx) in scenarios" :key="'alert-' + s.id">
-                <div x-show="idx > 0 && scenarioWinnerChanged(s, scenarios[0])" x-cloak
-                  class="mt-2 flex items-center gap-2 p-2 rounded-md bg-warning/10 border border-warning/30 text-xs text-warning-emphasis">
-                  <i data-lucide="alert-triangle" class="h-3.5 w-3.5 flex-shrink-0"></i>
-                  <span>
-                    <span class="font-semibold" x-text="s.scenario_name"></span> produces a different winner than
-                    <span class="font-semibold" x-text="scenarios[0].scenario_name"></span>.
-                  </span>
                 </div>
               </template>
             </div>
+          {% endcall %}
+        {% endcall %}
+      </div>
+
+      <!-- Requirements Matrix Panel -->
+      <div x-show="comparisonVendors.length > 0" x-cloak>
+        {% call ui.card() %}
+          {% call button(variant='ghost', class='h-auto w-full justify-between rounded-b-none p-4 text-left font-normal', on_click='reqMatrixOpen = !reqMatrixOpen') %}
+            <span class="flex items-center gap-2">
+              <i data-lucide="list-checks" class="h-4 w-4 text-muted-foreground"></i>
+              <span class="font-semibold text-foreground">Requirements Matrix</span>
+              <span class="text-xs text-muted-foreground" x-text="'(' + requirements.length + ' requirements)'"></span>
+            </span>
+            <i data-lucide="chevron-down" class="h-4 w-4 text-muted-foreground transition-transform" :class="reqMatrixOpen ? 'rotate-180' : ''"></i>
+          {% endcall %}
+          <div x-show="reqMatrixOpen" x-cloak
+            x-transition:enter="transition ease-out duration-200"
+            x-transition:enter-start="opacity-0 -translate-y-1"
+            x-transition:enter-end="opacity-100 translate-y-0"
+            x-transition:leave="transition ease-in duration-150"
+            x-transition:leave-start="opacity-100 translate-y-0"
+            x-transition:leave-end="opacity-0 -translate-y-1"
+            class="border-t border-border">
+            <div class="p-4">
+              <!-- Add Requirement Form -->
+              <div class="flex flex-wrap items-end gap-3 mb-4">
+                <div class="flex-1 min-w-[12rem]">
+                  {% call form_group(id='new-req-name', label='Requirement Name') %}
+                    {{ input(id='new-req-name', placeholder='e.g. SSO Support', aria_label='Requirement Name', attrs_dict={'x-model': 'newReqName', '@keydown.enter': 'addRequirement()'}) }}
+                  {% endcall %}
+                </div>
+                <div class="w-36">
+                  {% call form_group(id='new-req-importance', label='Importance') %}
+                    {{ native_select(id='new-req-importance', aria_label='Importance', selected='medium', attrs_dict={'x-model': 'newReqImportance'}, options=[
+                      ('critical', 'Critical'), ('high', 'High'), ('medium', 'Medium'), ('low', 'Low')]) }}
+                  {% endcall %}
+                </div>
+                <div class="w-28">
+                  {% call form_group(id='new-req-must', label='Must Have') %}
+                    <div class="flex h-10 items-center">
+                      {{ checkbox(id='new-req-must', label='Required', attrs_dict={'x-model': 'newReqMustHave'}) }}
+                    </div>
+                  {% endcall %}
+                </div>
+                {{ button('Add', icon='plus', on_click='addRequirement()', attrs_dict={':disabled': '!newReqName.trim()'}) }}
+              </div>
+
+              <!-- Matrix Table -->
+              <div x-show="requirements.length > 0">
+                {% call tbl.table() %}
+                  {% call tbl.table_header() %}
+                    {% call tbl.table_row() %}
+                      {% call tbl.table_head(class='w-48 text-xs uppercase') %}Requirement{% endcall %}
+                      {% call tbl.table_head(class='w-20 text-xs uppercase') %}Importance{% endcall %}
+                      <template x-for="v in comparisonVendors" :key="v.id">
+                        {% call tbl.table_head(class='text-center text-xs uppercase min-w-[100px]', attrs_dict={'x-text': 'v.name'}) %}{% endcall %}
+                      </template>
+                      {% call tbl.table_head(class='w-16 text-center text-xs uppercase') %}Actions{% endcall %}
+                    {% endcall %}
+                  {% endcall %}
+                  {% call tbl.table_body() %}
+                    <template x-for="req in requirements" :key="req.id">
+                      {% call tbl.table_row() %}
+                        {% call tbl.table_cell(class='py-2') %}
+                          <div class="flex items-center gap-1.5">
+                            <span x-show="editingReqId !== req.id" class="text-foreground font-medium cursor-pointer hover:text-primary"
+                              @click="startEditReq(req)" x-text="req.capability_name"></span>
+                            <span x-show="editingReqId === req.id" x-cloak class="w-full">
+                              {{ input(class='h-8 border-primary', aria_label='Editing Req Name', attrs_dict={'x-model': 'editingReqName', '@keydown.enter': 'saveEditReq(req.id)', '@keydown.escape': 'cancelEditReq()', '@blur': 'saveEditReq(req.id)'}) }}
+                            </span>
+                            <span x-show="req.must_have" x-cloak>{% call badge('destructive') %}MUST{% endcall %}</span>
+                          </div>
+                        {% endcall %}
+                        {% call tbl.table_cell(class='py-2') %}
+                          {% for imp, tone in [('critical', 'destructive'), ('high', 'warning'), ('medium', 'info'), ('low', 'neutral')] %}
+                          <span x-show="req.importance === '{{ imp }}'" x-cloak>{% call badge(tone) %}<span x-text="req.importance"></span>{% endcall %}</span>
+                          {% endfor %}
+                        {% endcall %}
+                        <template x-for="v in comparisonVendors" :key="v.id">
+                          {% call tbl.table_cell(class='py-2 text-center') %}
+                            <div class="flex items-center justify-center gap-0.5">
+                              {% call button(variant='outline', size='icon-sm', class='data-[state=met]:bg-success/15 data-[state=met]:border-success/40 data-[state=met]:text-success-emphasis data-[state=partial]:bg-warning/15 data-[state=partial]:border-warning/40 data-[state=partial]:text-warning-emphasis data-[state=not_met]:bg-destructive/15 data-[state=not_met]:border-destructive/40 data-[state=not_met]:text-destructive-emphasis',
+                                  on_click='cycleFulfillment(req.id, v.id)',
+                                  attrs_dict={':data-state': "getFulfillment(req, v.id) || 'none'", ':title': 'getFulfillmentLabel(req, v.id)', ':aria-label': 'getFulfillmentLabel(req, v.id)'}) %}
+                                <template x-if="getFulfillment(req, v.id) === 'met'">
+                                  <i data-lucide="check" class="h-4 w-4"></i>
+                                </template>
+                                <template x-if="getFulfillment(req, v.id) === 'partial'">
+                                  <i data-lucide="minus" class="h-4 w-4"></i>
+                                </template>
+                                <template x-if="getFulfillment(req, v.id) === 'not_met'">
+                                  <i data-lucide="x" class="h-4 w-4"></i>
+                                </template>
+                                <template x-if="!getFulfillment(req, v.id)">
+                                  <i data-lucide="circle" class="h-3.5 w-3.5"></i>
+                                </template>
+                              {% endcall %}
+                            </div>
+                          {% endcall %}
+                        </template>
+                        {% call tbl.table_cell(class='py-2 text-center') %}
+                          {{ button(variant='ghost', size='icon-sm', icon='trash-2', aria_label='Delete requirement', on_click='deleteRequirement(req.id)', attrs_dict={'title': 'Delete requirement'}) }}
+                        {% endcall %}
+                      {% endcall %}
+                    </template>
+                  {% endcall %}
+                {% endcall %}
+              </div>
+
+              <!-- Empty State -->
+              <div x-show="requirements.length === 0" class="text-center py-8 text-muted-foreground">
+                <i data-lucide="list-checks" class="h-8 w-8 mx-auto mb-2 opacity-40"></i>
+                <p class="text-sm">No requirements defined yet. Add requirements above to build the feature matrix.</p>
+              </div>
+
+              <!-- Summary Row -->
+              <div x-show="requirements.length > 0 && comparisonVendors.length > 0" class="mt-3 pt-3 border-t border-border">
+                <div class="flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
+                  <span class="font-medium">Coverage:</span>
+                  <template x-for="v in comparisonVendors" :key="v.id">
+                    <span>
+                      <span class="font-medium text-foreground" x-text="v.name"></span>:
+                      <span x-text="getVendorCoverage(v.id)"></span>
+                    </span>
+                  </template>
+                </div>
+              </div>
+            </div>
           </div>
-        </div>
+        {% endcall %}
+      </div>
+
+      <!-- Scenario Comparison Panel -->
+      <div x-show="comparisonVendors.length > 0" x-cloak>
+        {% call ui.card() %}
+          {% call button(variant='ghost', class='h-auto w-full justify-between rounded-b-none p-4 text-left font-normal', on_click='scenarioOpen = !scenarioOpen; if (scenarioOpen && scenarios.length === 0) loadScenarios();') %}
+            <span class="flex items-center gap-2">
+              <i data-lucide="git-compare" class="h-4 w-4 text-muted-foreground"></i>
+              <span class="font-semibold text-foreground">Scenario Comparison</span>
+              <span class="text-xs text-muted-foreground" x-text="'(' + scenarios.length + ' scenarios)'"></span>
+            </span>
+            <i data-lucide="chevron-down" class="h-4 w-4 text-muted-foreground transition-transform" :class="scenarioOpen ? 'rotate-180' : ''"></i>
+          {% endcall %}
+          <div x-show="scenarioOpen" x-cloak
+            x-transition:enter="transition ease-out duration-200"
+            x-transition:enter-start="opacity-0 -translate-y-1"
+            x-transition:enter-end="opacity-100 translate-y-0"
+            x-transition:leave="transition ease-in duration-150"
+            x-transition:leave-start="opacity-100 translate-y-0"
+            x-transition:leave-end="opacity-0 -translate-y-1"
+            class="border-t border-border">
+            <div class="p-4 space-y-4">
+              <!-- Action buttons -->
+              <div class="flex flex-wrap items-end gap-3">
+                <div class="flex-1 min-w-[200px] max-w-md">
+                  {% call form_group(id='save-scenario-name', label='Save Current Weights as Scenario') %}
+                    <div class="flex gap-2">
+                      {{ input(id='save-scenario-name', placeholder='e.g. Baseline', aria_label='Save Current Weights as Scenario', attrs_dict={'x-model': 'saveScenarioName'}) }}
+                      {{ button('Save', icon='save', on_click='saveCurrentAsScenario()', attrs_dict={':disabled': '!saveScenarioName.trim()'}) }}
+                    </div>
+                  {% endcall %}
+                </div>
+                {{ button('New Scenario', variant='outline', icon='plus', on_click='showNewScenarioForm = !showNewScenarioForm') }}
+              </div>
+
+              <!-- New scenario form -->
+              <div x-show="showNewScenarioForm" x-cloak class="rounded-md border border-dashed border-border p-3 space-y-3 bg-muted/20">
+                {% call form_group(id='new-scenario-name', label='Scenario Name', class='max-w-xs') %}
+                  {{ input(id='new-scenario-name', placeholder='e.g. Cost Focus', aria_label='Scenario Name', attrs_dict={'x-model': 'newScenarioName'}) }}
+                {% endcall %}
+                <div class="space-y-2">
+                  <p class="text-xs font-medium text-muted-foreground">
+                    Criteria Weights
+                    <span class="ml-2" :class="newScenarioWeightTotal === 100 ? 'text-success-emphasis' : 'text-destructive-emphasis'" x-text="'(Total: ' + newScenarioWeightTotal + '%)'"></span>
+                  </p>
+                  <template x-for="key in ['cost', 'capability_coverage', 'risk', 'strategic_fit', 'implementation']" :key="key">
+                    <div class="grid grid-cols-12 gap-3 items-center">
+                      <span class="col-span-4 sm:col-span-3 text-xs text-foreground capitalize" x-text="key.replace(/_/g, ' ')"></span>
+                      <div class="col-span-6 sm:col-span-7">
+                        {{ input(type='range', aria_label='Scenario weight', attrs_dict={'min': '0', 'max': '100', 'step': '5', 'x-model': 'newScenarioWeights[key]'}) }}
+                      </div>
+                      <span class="col-span-2 text-xs font-mono text-right" x-text="newScenarioWeights[key] + '%'"></span>
+                    </div>
+                  </template>
+                </div>
+                <div class="flex gap-2">
+                  {{ button('Create Scenario', on_click='createScenario()', attrs_dict={':disabled': '!newScenarioName.trim() || newScenarioWeightTotal !== 100'}) }}
+                  {{ button('Cancel', variant='outline', on_click='showNewScenarioForm = false') }}
+                </div>
+              </div>
+
+              <!-- Loading -->
+              <div x-show="loadingScenarios" x-cloak class="text-center py-4">
+                <i data-lucide="loader-2" class="h-5 w-5 mx-auto animate-spin text-muted-foreground"></i>
+              </div>
+
+              <!-- Empty state -->
+              <div x-show="!loadingScenarios && scenarios.length === 0" x-cloak class="text-center py-6 text-muted-foreground">
+                <i data-lucide="git-compare" class="h-8 w-8 mx-auto mb-2 opacity-40"></i>
+                <p class="text-sm">No scenarios yet. Save the current weights or create a new scenario to compare different weighting strategies.</p>
+              </div>
+
+              <!-- Comparison table -->
+              <div x-show="!loadingScenarios && scenarios.length > 0" x-cloak>
+                {% call tbl.table() %}
+                  {% call tbl.table_header() %}
+                    {% call tbl.table_row() %}
+                      {% call tbl.table_head(class='sticky left-0 bg-card z-10 text-xs uppercase') %}Vendor{% endcall %}
+                      <template x-for="s in scenarios" :key="s.id">
+                        {% call tbl.table_head(class='text-center text-xs uppercase min-w-[120px]') %}
+                          <div class="flex items-center justify-center gap-1">
+                            <span x-text="s.scenario_name"></span>
+                            <span x-show="s.is_baseline" x-cloak>{% call badge('info') %}Base{% endcall %}</span>
+                            {{ button(variant='ghost', size='icon-xs', icon='x', aria_label='Delete scenario', on_click='deleteScenario(s.id)', attrs_dict={'title': 'Delete scenario'}) }}
+                          </div>
+                        {% endcall %}
+                      </template>
+                    {% endcall %}
+                  {% endcall %}
+                  {% call tbl.table_body() %}
+                    <template x-for="v in scenarioVendorNames()" :key="v.id">
+                      {% call tbl.table_row() %}
+                        {% call tbl.table_cell(class='py-2 font-medium text-foreground sticky left-0 bg-card z-10', attrs_dict={'x-text': 'v.name'}) %}{% endcall %}
+                        <template x-for="s in scenarios" :key="s.id">
+                          {% call tbl.table_cell(class='py-2 text-center') %}
+                            <div class="flex flex-col items-center">
+                              <span class="font-semibold tabular-nums"
+                                :class="scenarioRank(s, v.id) === 1 ? 'text-success-emphasis' : 'text-foreground'"
+                                x-text="scenarioScore(s, v.id) !== null ? scenarioScore(s, v.id).toFixed(1) : '—'"></span>
+                              <span class="text-xs text-muted-foreground"
+                                :class="scenarioRank(s, v.id) === 1 ? 'font-semibold text-success-emphasis' : ''"
+                                x-text="scenarioRank(s, v.id) ? '#' + scenarioRank(s, v.id) : ''"></span>
+                            </div>
+                          {% endcall %}
+                        </template>
+                      {% endcall %}
+                    </template>
+                  {% endcall %}
+                  <tfoot>
+                    {% call tbl.table_row(class='bg-muted/30') %}
+                      {% call tbl.table_cell(class='py-2 text-xs font-semibold text-muted-foreground sticky left-0 bg-card z-10') %}Weights{% endcall %}
+                      <template x-for="s in scenarios" :key="s.id">
+                        {% call tbl.table_cell(class='py-2 text-center text-xs text-muted-foreground leading-relaxed') %}
+                          <template x-for="key in ['cost', 'capability_coverage', 'risk', 'strategic_fit', 'implementation']" :key="key">
+                            <div>
+                              <span class="capitalize" x-text="key.replace(/_/g, ' ')"></span>:
+                              <span class="font-semibold" x-text="s.criteria_weights[key] ? Math.round(s.criteria_weights[key] * 100) + '%' : '—'"></span>
+                            </div>
+                          </template>
+                        {% endcall %}
+                      </template>
+                    {% endcall %}
+                  </tfoot>
+                {% endcall %}
+                <!-- Winner change alert -->
+                <template x-for="(s, idx) in scenarios" :key="'alert-' + s.id">
+                  <div x-show="idx > 0 && scenarioWinnerChanged(s, scenarios[0])" x-cloak
+                    class="mt-2 flex items-center gap-2 p-2 rounded-md bg-warning/10 border border-warning/30 text-xs text-warning-emphasis" role="status">
+                    <i data-lucide="alert-triangle" class="h-3.5 w-3.5 flex-shrink-0"></i>
+                    <span>
+                      <span class="font-semibold" x-text="s.scenario_name"></span> produces a different winner than
+                      <span class="font-semibold" x-text="scenarios[0].scenario_name"></span>.
+                    </span>
+                  </div>
+                </template>
+              </div>
+            </div>
+          </div>
+        {% endcall %}
       </div>
 
       <div class="flex justify-between items-center">
-        <button type="button" @click="attemptSwitchTab('scoring')" class="px-4 py-2 border border-border rounded-md text-sm hover:bg-muted">
-          <i data-lucide="arrow-left" class="h-4 w-4 inline mr-1"></i> Back to Scoring
-        </button>
-        <button type="button" @click="attemptSwitchTab('decision')" class="px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm font-medium hover:bg-primary/90"
-          :disabled="rankedVendors.length === 0">
-          Next: Decision <i data-lucide="arrow-right" class="h-4 w-4 inline ml-1"></i>
-        </button>
+        {{ button('Back to Scoring', variant='outline', icon='arrow-left', on_click="attemptSwitchTab('scoring')") }}
+        {{ button('Next: Decision', icon='arrow-right', icon_position='right', on_click="attemptSwitchTab('decision')", attrs_dict={':disabled': 'rankedVendors.length === 0'}) }}
       </div>
     </div>
   </div>
@@ -1195,83 +932,63 @@
       {{ skeleton_table(rows=5, columns=9) }}
     </div>
     <div x-show="!loadingDecision" x-cloak class="space-y-6">
-      <div class="rounded-lg border border-border bg-card">
-        <div class="p-4 border-b">
+      {% call ui.card() %}
+        {% call ui.card_header(class='p-4 border-b') %}
           <h3 class="text-lg font-semibold text-foreground">Vendor Rankings</h3>
-        </div>
-        <div class="overflow-x-auto">
-          <table class="dense-table w-full">
-            <thead>
-              <tr class="border-b bg-muted/50">
-                <th class="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Rank</th>
-                <th class="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Vendor</th>
-                <th class="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Total Score</th>
-                <th class="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Cost</th>
-                <th class="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Capability</th>
-                <th class="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Risk</th>
-                <th class="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Strategic Fit</th>
-                <th class="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Implementation</th>
-                <th class="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">TCO</th>
-              </tr>
-            </thead>
-            <tbody>
-              <template x-for="(v, idx) in rankedVendors" :key="v.id">
-                <tr class="border-b" :class="idx === 0 ? 'bg-success/5' : ''">
-                  <td class="px-4 py-3 text-sm font-bold" x-text="v.ranking || (idx + 1)"></td>
-                  <td class="px-4 py-3 text-sm font-medium text-foreground">
-                    <span x-text="v.name"></span>
-                    <span x-show="idx === 0" x-cloak class="ml-2 inline-flex items-center gap-1 px-1.5 py-0.5 bg-success/10 text-success-emphasis rounded text-xs">
-                      <i data-lucide="trophy" class="h-3 w-3"></i> Top Ranked
-                    </span>
-                  </td>
-                  <td class="px-4 py-3 text-sm font-bold" x-text="v.total_score ? v.total_score.toFixed(1) : 'N/A'"></td>
-                  <td class="px-4 py-3 text-sm" x-text="v.cost_score ? v.cost_score.toFixed(1) : 'N/A'"></td>
-                  <td class="px-4 py-3 text-sm" x-text="v.capability_score ? v.capability_score.toFixed(1) : 'N/A'"></td>
-                  <td class="px-4 py-3 text-sm" x-text="v.risk_score ? v.risk_score.toFixed(1) : 'N/A'"></td>
-                  <td class="px-4 py-3 text-sm" x-text="v.strategic_fit_score ? v.strategic_fit_score.toFixed(1) : 'N/A'"></td>
-                  <td class="px-4 py-3 text-sm" x-text="v.implementation_score ? v.implementation_score.toFixed(1) : 'N/A'"></td>
-                  <td class="px-4 py-3 text-sm" x-text="formatCell(v.tco_total, 'currency')"></td>
-                </tr>
-              </template>
-            </tbody>
-          </table>
-        </div>
-      </div>
+        {% endcall %}
+        {% call tbl.table() %}
+          {% call tbl.table_header() %}
+            {% call tbl.table_row() %}
+              {% for heading in ['Rank', 'Vendor', 'Total Score', 'Cost', 'Capability', 'Risk', 'Strategic Fit', 'Implementation', 'TCO'] %}
+              {% call tbl.table_head(class='text-xs uppercase') %}{{ heading }}{% endcall %}
+              {% endfor %}
+            {% endcall %}
+          {% endcall %}
+          {% call tbl.table_body() %}
+            <template x-for="(v, idx) in rankedVendors" :key="v.id">
+              {% call tbl.table_row(class='data-[top=true]:bg-success/5', attrs_dict={':data-top': 'idx === 0'}) %}
+                {% call tbl.table_cell(class='py-3 font-bold', attrs_dict={'x-text': 'v.ranking || (idx + 1)'}) %}{% endcall %}
+                {% call tbl.table_cell(class='py-3 font-medium text-foreground') %}
+                  <span x-text="v.name"></span>
+                  <span x-show="idx === 0" x-cloak class="ml-2">{% call badge('success', class='gap-1') %}<i data-lucide="trophy" class="h-3 w-3"></i> Top Ranked{% endcall %}</span>
+                {% endcall %}
+                {% call tbl.table_cell(class='py-3 font-bold', attrs_dict={'x-text': "v.total_score ? v.total_score.toFixed(1) : 'N/A'"}) %}{% endcall %}
+                {% for field in ['cost_score', 'capability_score', 'risk_score', 'strategic_fit_score', 'implementation_score'] %}
+                {% call tbl.table_cell(class='py-3', attrs_dict={'x-text': "v." ~ field ~ " ? v." ~ field ~ ".toFixed(1) : 'N/A'"}) %}{% endcall %}
+                {% endfor %}
+                {% call tbl.table_cell(class='py-3', attrs_dict={'x-text': "formatCell(v.tco_total, 'currency')"}) %}{% endcall %}
+              {% endcall %}
+            </template>
+          {% endcall %}
+        {% endcall %}
+      {% endcall %}
 
-      <div class="rounded-lg border border-border bg-card p-6" x-show="rankedVendors.length > 0" x-cloak>
-        <h3 class="text-lg font-semibold text-foreground mb-4">Record Decision</h3>
-        <div class="space-y-4 max-w-2xl">
-          <div>
-            <label class="block text-sm font-medium text-foreground/80 mb-1" id="decision-vendor-label">Selected Vendor</label>
-            <select x-model="decision.vendorId" aria-labelledby="decision-vendor-label" class="w-full px-3 py-2 border border-border rounded-md bg-background text-foreground">
-              <option value="">-- Select Recommended Vendor --</option>
-              <template x-for="v in rankedVendors" :key="v.id">
-                <option :value="v.id" x-text="v.name + ' (Score: ' + (v.total_score ? v.total_score.toFixed(1) : 'N/A') + ')'"></option>
-              </template>
-            </select>
-          </div>
-          <div>
-            <label class="block text-sm font-medium text-foreground/80 mb-1">Decision <span class="text-destructive-emphasis">*</span></label>
-            <select x-model="decision.status" aria-required="true" class="w-full px-3 py-2 border border-border rounded-md bg-background text-foreground" aria-label="Decision">
-              <option value="">-- Select Decision --</option>
-              <option value="approved">Approve -- proceed with selected vendor</option>
-              <option value="rejected">Reject -- none of the options are suitable</option>
-              <option value="deferred">Defer -- need more information</option>
-            </select>
-          </div>
-          <div>
-            <label class="block text-sm font-medium text-foreground/80 mb-1">Rationale <span class="text-destructive-emphasis">*</span></label>
-            <textarea x-model="decision.rationale" rows="4" aria-required="true"
-              class="w-full px-3 py-2 border border-border rounded-md bg-background text-foreground text-sm"
-              placeholder="Explain the reasoning behind this decision..." aria-label="Rationale"></textarea>
-          </div>
-          <div class="flex gap-3">
-            <button type="button" @click="confirmDecision()" :disabled="!decision.status || !decision.rationale.trim()"
-              class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
-              <i data-lucide="stamp" class="h-4 w-4"></i> Submit Decision
-            </button>
-          </div>
-        </div>
+      <div x-show="rankedVendors.length > 0" x-cloak>
+        {% call ui.card() %}
+          {% call ui.card_header() %}
+            <h3 class="text-lg font-semibold text-foreground">Record Decision</h3>
+          {% endcall %}
+          {% call ui.card_content(class='space-y-4 max-w-2xl') %}
+            {% call form_group(id='decision-vendor', label='Selected Vendor') %}
+              {% call native_select(id='decision-vendor', aria_label='Selected Vendor', attrs_dict={'x-model': 'decision.vendorId'}, options=[('', '-- Select Recommended Vendor --')]) %}
+                <template x-for="v in rankedVendors" :key="v.id">
+                  <option :value="v.id" x-text="v.name + ' (Score: ' + (v.total_score ? v.total_score.toFixed(1) : 'N/A') + ')'"></option>
+                </template>
+              {% endcall %}
+            {% endcall %}
+            {% call form_group(id='decision-status', label='Decision', required=true) %}
+              {{ native_select(id='decision-status', aria_label='Decision', attrs_dict={'x-model': 'decision.status', 'aria-required': 'true'}, options=[
+                ('', '-- Select Decision --'), ('approved', 'Approve -- proceed with selected vendor'),
+                ('rejected', 'Reject -- none of the options are suitable'), ('deferred', 'Defer -- need more information')]) }}
+            {% endcall %}
+            {% call form_group(id='decision-rationale', label='Rationale', required=true) %}
+              {{ textarea(id='decision-rationale', rows=4, placeholder='Explain the reasoning behind this decision...', aria_label='Rationale', attrs_dict={'x-model': 'decision.rationale', 'aria-required': 'true'}) }}
+            {% endcall %}
+            <div class="flex gap-3">
+              {{ button('Submit Decision', icon='stamp', class='gap-2', on_click='confirmDecision()', attrs_dict={':disabled': '!decision.status || !decision.rationale.trim()'}) }}
+            </div>
+          {% endcall %}
+        {% endcall %}
       </div>
     </div>
   </div>
@@ -1280,81 +997,61 @@
   <!-- Stakeholder Multi-Rater Panel (inside Results tab)            -->
   <!-- ============================================================ -->
   <div x-show="activeTab === 'results'" x-cloak class="mt-6">
-    <div class="rounded-lg border border-border bg-card">
-      <button @click="stakeholderOpen = !stakeholderOpen; if (stakeholderOpen && stakeholders.length === 0) loadStakeholders();" type="button"
-              class="flex w-full items-center justify-between p-4 hover:bg-accent/50 transition-colors">
-        <div class="flex items-center gap-2">
+    {% call ui.card() %}
+      {% call button(variant='ghost', class='h-auto w-full justify-between rounded-b-none p-4 text-left font-normal', on_click='stakeholderOpen = !stakeholderOpen; if (stakeholderOpen && stakeholders.length === 0) loadStakeholders();') %}
+        <span class="flex items-center gap-2">
           <i data-lucide="users" class="w-5 h-5 text-muted-foreground"></i>
-          <h4 class="font-semibold text-foreground">Stakeholder Input</h4>
-          <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-info/10 text-info border border-info/30"
-                x-text="stakeholders.length + ' invited'"></span>
-        </div>
-        <i data-lucide="chevron-down" class="w-4 h-4 text-muted-foreground transition-transform"
-           :class="stakeholderOpen ? 'rotate-180' : ''"></i>
-      </button>
+          <span class="font-semibold text-foreground">Stakeholder Input</span>
+          {% call badge('info') %}<span x-text="stakeholders.length + ' invited'"></span>{% endcall %}
+        </span>
+        <i data-lucide="chevron-down" class="w-4 h-4 text-muted-foreground transition-transform" :class="stakeholderOpen ? 'rotate-180' : ''"></i>
+      {% endcall %}
       <div x-show="stakeholderOpen" x-cloak class="border-t p-4 space-y-4">
         <!-- Invite form -->
         <div class="flex items-center gap-2">
-          <button @click="showInviteForm = !showInviteForm" type="button"
-                  class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
-            <i data-lucide="user-plus" class="w-3 h-3"></i> Invite Stakeholder
-          </button>
+          {{ button('Invite Stakeholder', icon='user-plus', on_click='showInviteForm = !showInviteForm') }}
         </div>
-        <div x-show="showInviteForm" x-cloak class="flex items-end gap-3 p-3 rounded-md bg-muted/50">
-          <div>
-            <label class="text-xs text-muted-foreground">User ID</label>
-            <input type="number" x-model="inviteUserId" placeholder="User ID"
-                   class="mt-1 w-24 rounded-md border border-input bg-transparent px-2 py-1 text-sm" aria-label="User ID">
-          </div>
-          <div>
-            <label class="text-xs text-muted-foreground">Role</label>
-            <select x-model="inviteRole" class="mt-1 rounded-md border border-input bg-transparent px-2 py-1 text-sm" aria-label="Role">
-              <option>IT</option><option>Finance</option><option>Business</option>
-              <option>Legal</option><option>Security</option><option>Executive</option>
-            </select>
-          </div>
-          <button @click="inviteStakeholder()" type="button"
-                  class="px-3 py-1.5 rounded-md text-xs font-medium bg-primary text-primary-foreground hover:bg-primary/90">
-            Send Invite
-          </button>
+        <div x-show="showInviteForm" x-cloak class="flex flex-wrap items-end gap-3 p-3 rounded-md bg-muted/50">
+          {% call form_group(id='invite-user-id', label='User ID', class='w-28') %}
+            {{ input(id='invite-user-id', type='number', placeholder='User ID', aria_label='User ID', attrs_dict={'x-model': 'inviteUserId'}) }}
+          {% endcall %}
+          {% call form_group(id='invite-role', label='Role', class='w-40') %}
+            {{ native_select(id='invite-role', aria_label='Role', attrs_dict={'x-model': 'inviteRole'}, options=[
+              ('IT', 'IT'), ('Finance', 'Finance'), ('Business', 'Business'), ('Legal', 'Legal'), ('Security', 'Security'), ('Executive', 'Executive')]) }}
+          {% endcall %}
+          {{ button('Send Invite', on_click='inviteStakeholder()') }}
         </div>
 
         <!-- Stakeholder list -->
         <template x-if="stakeholders.length > 0">
-          <div class="overflow-x-auto">
-            <table class="dense-table w-full text-sm">
-              <thead>
-                <tr class="border-b text-left text-muted-foreground">
-                  <th class="pb-2 font-medium">Stakeholder</th>
-                  <th class="pb-2 font-medium">Role</th>
-                  <th class="pb-2 font-medium">Status</th>
-                  <th class="pb-2 font-medium">Preferred Vendor</th>
-                  <th class="pb-2 font-medium"></th>
-                </tr>
-              </thead>
-              <tbody>
+          <div>
+            {% call tbl.table() %}
+              {% call tbl.table_header() %}
+                {% call tbl.table_row() %}
+                  {% call tbl.table_head() %}Stakeholder{% endcall %}
+                  {% call tbl.table_head() %}Role{% endcall %}
+                  {% call tbl.table_head() %}Status{% endcall %}
+                  {% call tbl.table_head() %}Preferred Vendor{% endcall %}
+                  {% call tbl.table_head() %}<span class="sr-only">Actions</span>{% endcall %}
+                {% endcall %}
+              {% endcall %}
+              {% call tbl.table_body() %}
                 <template x-for="s in stakeholders" :key="s.id">
-                  <tr class="border-b border-border/50">
-                    <td class="py-2" x-text="s.stakeholder_name || ('User #' + s.stakeholder_id)"></td>
-                    <td class="py-2">
-                      <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-info/10 text-info border border-info/30"
-                            x-text="s.stakeholder_role"></span>
-                    </td>
-                    <td class="py-2">
-                      <span x-show="s.is_complete" class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-success/10 text-success-emphasis border border-success/30">Submitted</span>
-                      <span x-show="!s.is_complete" class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-warning/10 text-warning-emphasis border border-warning/30">Pending</span>
-                    </td>
-                    <td class="py-2" x-text="s.preferred_vendor_id ? ('Option #' + s.preferred_vendor_id) : '—'"></td>
-                    <td class="py-2">
-                      <button aria-label="Remove stakeholder" @click="removeStakeholder(s.id)" type="button"
-                              class="text-muted-foreground hover:text-destructive-emphasis">
-                        <i data-lucide="trash-2" class="w-4 h-4"></i>
-                      </button>
-                    </td>
-                  </tr>
+                  {% call tbl.table_row() %}
+                    {% call tbl.table_cell(class='py-2', attrs_dict={'x-text': "s.stakeholder_name || ('User #' + s.stakeholder_id)"}) %}{% endcall %}
+                    {% call tbl.table_cell(class='py-2') %}{% call badge('info') %}<span x-text="s.stakeholder_role"></span>{% endcall %}{% endcall %}
+                    {% call tbl.table_cell(class='py-2') %}
+                      <span x-show="s.is_complete" x-cloak>{% call badge('success') %}Submitted{% endcall %}</span>
+                      <span x-show="!s.is_complete" x-cloak>{% call badge('warning') %}Pending{% endcall %}</span>
+                    {% endcall %}
+                    {% call tbl.table_cell(class='py-2', attrs_dict={'x-text': "s.preferred_vendor_id ? ('Option #' + s.preferred_vendor_id) : '—'"}) %}{% endcall %}
+                    {% call tbl.table_cell(class='py-2') %}
+                      {{ button(variant='ghost', size='icon-sm', icon='trash-2', aria_label='Remove stakeholder', on_click='removeStakeholder(s.id)') }}
+                    {% endcall %}
+                  {% endcall %}
                 </template>
-              </tbody>
-            </table>
+              {% endcall %}
+            {% endcall %}
           </div>
         </template>
 
@@ -1370,8 +1067,7 @@
               <div class="text-xs">
                 <span class="text-muted-foreground">Preference votes:</span>
                 <template x-for="(count, vid) in stakeholderConsensus.vendor_preferences" :key="vid">
-                  <span class="ml-2 inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-info-emphasis border border-primary/30"
-                        x-text="'Option #' + vid + ': ' + count + ' votes'"></span>
+                  {% call badge('info', class='ml-2') %}<span x-text="'Option #' + vid + ': ' + count + ' votes'"></span>{% endcall %}
                 </template>
               </div>
             </template>
@@ -1382,7 +1078,7 @@
           <p class="text-sm text-muted-foreground text-center py-4">No stakeholders invited yet. Use the button above to invite team members.</p>
         </template>
       </div>
-    </div>
+    {% endcall %}
   </div>
 
   <!-- ============================================================ -->
@@ -1390,44 +1086,41 @@
   <!-- ============================================================ -->
   <div x-show="activeTab === 'export'" x-cloak>
     <div class="space-y-6">
-      <div class="rounded-lg border border-border bg-card p-6">
-        <h3 class="text-lg font-semibold text-foreground mb-4">Export Analysis</h3>
-        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <div class="border rounded-lg p-4 hover:border-primary transition-colors">
-            <div class="flex items-center gap-2 mb-2">
-              <i data-lucide="file-spreadsheet" class="h-5 w-5 text-success"></i>
-              <h4 class="font-semibold text-foreground">CSV</h4>
+      {% call ui.card() %}
+        {% call ui.card_header() %}
+          <h3 class="text-lg font-semibold text-foreground">Export Analysis</h3>
+        {% endcall %}
+        {% call ui.card_content() %}
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div class="border rounded-lg p-4 hover:border-primary transition-colors">
+              <div class="flex items-center gap-2 mb-2">
+                <i data-lucide="file-spreadsheet" class="h-5 w-5 text-success"></i>
+                <h4 class="font-semibold text-foreground">CSV</h4>
+              </div>
+              <p class="text-sm text-muted-foreground mb-4">Comparison data for Excel analysis</p>
+              {{ button('Download CSV', icon='download', class='w-full', on_click='exportCSV()', attrs_dict={':disabled': '!analysis.id'}) }}
             </div>
-            <p class="text-sm text-muted-foreground mb-4">Comparison data for Excel analysis</p>
-            <button type="button" @click="exportCSV()" :disabled="!analysis.id"
-              class="w-full px-3 py-2 bg-success text-primary-foreground rounded-md text-sm hover:bg-success/90 disabled:opacity-50">
-              <i data-lucide="download" class="h-4 w-4 inline mr-1"></i> Download CSV
-            </button>
-          </div>
-          <div class="border rounded-lg p-4 opacity-60">
-            <div class="flex items-center gap-2 mb-2">
-              <i data-lucide="file-text" class="h-5 w-5 text-destructive"></i>
-              <h4 class="font-semibold text-foreground">PDF</h4>
-              <span class="px-1.5 py-0.5 bg-muted text-muted-foreground rounded text-xs">Coming Soon</span>
+            <div class="border rounded-lg p-4 opacity-60">
+              <div class="flex items-center gap-2 mb-2">
+                <i data-lucide="file-text" class="h-5 w-5 text-destructive"></i>
+                <h4 class="font-semibold text-foreground">PDF</h4>
+                {% call badge('neutral') %}Coming Soon{% endcall %}
+              </div>
+              <p class="text-sm text-muted-foreground mb-4">Comprehensive PDF report with charts</p>
+              {{ button('Not Available', variant='secondary', icon='download', class='w-full', disabled=true) }}
             </div>
-            <p class="text-sm text-muted-foreground mb-4">Comprehensive PDF report with charts</p>
-            <button type="button" disabled class="w-full px-3 py-2 bg-muted text-muted-foreground rounded-md text-sm cursor-not-allowed">
-              <i data-lucide="download" class="h-4 w-4 inline mr-1"></i> Not Available
-            </button>
-          </div>
-          <div class="border rounded-lg p-4 opacity-60">
-            <div class="flex items-center gap-2 mb-2">
-              <i data-lucide="presentation" class="h-5 w-5 text-warning"></i>
-              <h4 class="font-semibold text-foreground">PowerPoint</h4>
-              <span class="px-1.5 py-0.5 bg-muted text-muted-foreground rounded text-xs">Coming Soon</span>
+            <div class="border rounded-lg p-4 opacity-60">
+              <div class="flex items-center gap-2 mb-2">
+                <i data-lucide="presentation" class="h-5 w-5 text-warning"></i>
+                <h4 class="font-semibold text-foreground">PowerPoint</h4>
+                {% call badge('neutral') %}Coming Soon{% endcall %}
+              </div>
+              <p class="text-sm text-muted-foreground mb-4">Presentation-ready executive summary</p>
+              {{ button('Not Available', variant='secondary', icon='download', class='w-full', disabled=true) }}
             </div>
-            <p class="text-sm text-muted-foreground mb-4">Presentation-ready executive summary</p>
-            <button type="button" disabled class="w-full px-3 py-2 bg-muted text-muted-foreground rounded-md text-sm cursor-not-allowed">
-              <i data-lucide="download" class="h-4 w-4 inline mr-1"></i> Not Available
-            </button>
           </div>
-        </div>
-      </div>
+        {% endcall %}
+      {% endcall %}
     </div>
   </div>
 

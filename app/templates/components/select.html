@@ -40,3 +40,21 @@
         {% endif %}
     </div>
 {% endmacro %}
+
+
+{# Native <select> for a field bound to the page's own Alpine state (x-model) or posted with a form.
+   Options come from `options` ([(value, label)]) and/or the call block (e.g. an Alpine <template x-for>). #}
+{% macro native_select(id='', name='', options=[], selected=none, class='', aria_label=none, multiple=false, size=none, attrs_dict={}) %}
+    <select
+        {% if id %}id="{{ id }}"{% endif %}
+        {% if name %}name="{{ name }}"{% endif %}
+        {% if aria_label %}aria-label="{{ aria_label }}"{% endif %}
+        {% if multiple %}multiple{% endif %}
+        {% if size %}size="{{ size }}"{% endif %}
+        {{ attrs_dict|xmlattr }}
+        class="flex w-full rounded-md border border-input bg-background px-3 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 {% if multiple %}py-2{% else %}h-10{% endif %} {{ class }}"
+    >
+        {% for value, label in options %}<option value="{{ value }}"{% if selected is not none and selected == value %} selected{% endif %}>{{ label }}</option>{% endfor %}
+        {{ caller() if caller }}
+    </select>
+{% endmacro %}
