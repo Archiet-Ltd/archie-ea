@@ -110,12 +110,85 @@ def test_enterprise_architect_finds_connections_and_billing(page, live_server, w
     _journey(page, live_server, email)
 
 
-def test_colleague_who_may_not_open_them_is_not_shown_them(page, live_server, world):
-    email = world["architects"]["emails"]["business_architect"]
+def _assert_persona(email, persona, administers):
+    from app import create_app
+    from app.models.user import User
+
+    app = create_app("testing")
+    with app.app_context():
+        user = User.query.filter_by(email=email).one()
+        assert user.enterprise_role == persona, user.enterprise_role
+        assert not user.is_platform_admin
+        assert bool(user.is_org_admin) is administers
+
+
+@pytest.fixture(scope="module")
+def colleagues():
+    """An organisation like the demonstration one: the architects hold the
+    Viewer platform role and do not administer the organisation."""
+    return create_fresh_org(
+        "enterprise_architect", org_admin=False, platform_role="Viewer",
+        extra_roles=("business_architect", "security_architect"))
+
+
+def _reaches_connections_not_billing(page, base, email):
+    sign_in(page, base, email)
+    page.goto(base + "/dashboard/", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    nav = page.locator(SIDEBAR)
+    expect(nav).to_contain_text("Workspace")
+    expect(nav).not_to_contain_text("Billing")
+    _walk(page, base, "Connections", "/admin/connectors", "GitHub")
+    page.goto(base + "/admin/billing/", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    expect(page.locator("main").first).not_to_contain_text("Plan")
+
+
+def test_enterprise_architect_who_does_not_administer_finds_connections_only(page, live_server, colleagues):
+    email = colleagues["emails"]["enterprise_architect"]
+    _assert_persona(email, "enterprise_architect", administers=False)
+    _reaches_connections_not_billing(page, live_server, email)
+
+
+def test_business_architect_finds_connections_only(page, live_server, colleagues):
+    email = colleagues["emails"]["business_architect"]
+    _assert_persona(email, "business_architect", administers=False)
+    _reaches_connections_not_billing(page, live_server, email)
+
+
+def test_security_architect_is_shown_neither(page, live_server, colleagues):
+    email = colleagues["emails"]["security_architect"]
+    _assert_persona(email, "security_architect", administers=False)
     sign_in(page, live_server, email)
     page.goto(live_server + "/dashboard/", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
     nav = page.locator(SIDEBAR)
     expect(nav).not_to_contain_text("Billing")
     expect(nav).not_to_contain_text("Connections")
+    page.goto(live_server + "/admin/connectors", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    expect(page.locator("main").first).not_to_contain_text("GitHub")
+
+
+def test_owner_reads_the_plans_prices_and_a_plain_renewal_line(page, live_server, world):
+    """The owner opens Billing: every plan shows what it costs, the same figures
+    /pricing shows; the renewal tile says there is no renewal yet instead of a
+    dash; the sidebar still carries the Entelim wordmark."""
+    _assert_startup_cto(world["owner"]["email"])
+    sign_in(page, live_server, world["owner"]["email"])
     page.goto(live_server + "/admin/billing/", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
-    expect(page.locator("main").first).not_to_contain_text("Plan")
+    expect(page.locator("#admin-sidebar .sidebar-app-name")).to_have_text("Entelim")
+    expect(page.get_by_test_id("billing-renewal")).to_have_text("No renewal yet")
+    shown = {}
+    for key in ("free", "startup", "team", "enterprise"):
+        shown[key] = " ".join(page.get_by_test_id("plan-price-%s" % key).inner_text().split())
+        assert shown[key], key
+    assert shown["startup"] == "$490 a year $49 a month"
+    assert shown["team"] == "$290 per editor a year $29 per editor a month"
+    assert shown["enterprise"] == "From $24,000 a year"
+    page.goto(live_server + "/pricing", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    pricing = page.locator("main").inner_text()
+    for figure in ("$490", "$49", "$290", "$29", "$24,000"):
+        assert figure in pricing, figure
+    # Choosing a plan lands on its checkout step, which says plainly what to do.
+    page.goto(live_server + "/admin/billing/", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    page.get_by_test_id("plan-card-team").locator("xpath=ancestor::*[@data-slot='card'][1]") \
+        .get_by_role("link", name="Choose Team").click()
+    page.wait_for_url(lambda url: "plan=team" in url, timeout=PAGE_TIMEOUT)
+    expect(page.get_by_test_id("checkout-unavailable")).to_contain_text("Contact us")
