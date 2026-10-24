@@ -15,6 +15,18 @@ from tests.smoke.test_archetype_journeys import _login
 PAGE_TIMEOUT = 30000
 
 
+def _assert_persona(email, persona):
+    """The signed-in user is the persona named and holds no administrator role."""
+    from app import create_app
+    from app.models.user import User
+
+    with create_app("testing").app_context():
+        user = User.query.filter_by(email=email).one()
+        assert user.enterprise_role == persona, (
+            "Expected enterprise_role %s, got %s" % (persona, user.enterprise_role))
+        assert not user.is_admin(), "User must not be an administrator"
+
+
 @pytest.fixture()
 def linked_impact_data(app, seeded):
     """A root element with relationships to business and technology elements,
@@ -77,6 +89,7 @@ def test_impact_analysis_rebuild_shows_analysis_and_links_land_on_content(
     stat cards, by-layer breakdown, and tables. Every link lands on a
     page with content. The signed-in role is enterprise_architect."""
     email = seeded["emails"]["enterprise_architect"]
+    _assert_persona(email, "enterprise_architect")
     context = browser.new_context(ignore_https_errors=True, viewport={"width": 1440, "height": 900})
     try:
         page = context.new_page()

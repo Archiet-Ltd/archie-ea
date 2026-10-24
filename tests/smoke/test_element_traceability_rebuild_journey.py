@@ -23,6 +23,18 @@ def _login(page, base, email):
     page.wait_for_url(lambda url: "/account/login" not in url, timeout=PAGE_TIMEOUT)
 
 
+def _assert_persona(email, persona):
+    """The signed-in user is the persona named and holds no administrator role."""
+    from app import create_app
+    from app.models.user import User
+
+    with create_app("testing").app_context():
+        user = User.query.filter_by(email=email).one()
+        assert user.enterprise_role == persona, (
+            "Expected enterprise_role %s, got %s" % (persona, user.enterprise_role))
+        assert not user.is_admin(), "User must not be an administrator"
+
+
 @pytest.fixture()
 def linked_trace_data(app, seeded):
     """A chain of ArchiMate elements with relationships for traceability,
@@ -83,6 +95,7 @@ def test_element_traceability_shows_chain_and_links_land_on_content(
     """As the enterprise architect, see the traceability chain and follow
     every link to a page with content."""
     email = seeded["emails"]["enterprise_architect"]
+    _assert_persona(email, "enterprise_architect")
     context = browser.new_context(ignore_https_errors=True, viewport={"width": 1440, "height": 900})
     try:
         page = context.new_page()
@@ -147,6 +160,7 @@ def test_element_traceability_links_reach_their_own_chains(
     """As the enterprise architect, every linked element in the chain is a
     link that lands on that element's own traceability page with content."""
     email = seeded["emails"]["enterprise_architect"]
+    _assert_persona(email, "enterprise_architect")
     context = browser.new_context(ignore_https_errors=True, viewport={"width": 1440, "height": 900})
     try:
         page = context.new_page()

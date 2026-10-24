@@ -13,6 +13,19 @@
 {% block title %}Impact Analysis: {{ element.name }}{% endblock %}
 
 {% block content %}
+{% set rel_names = {
+    'RealizationRelationship': 'Realization',
+    'ServingRelationship': 'Serving',
+    'AssignmentRelationship': 'Assignment',
+    'CompositionRelationship': 'Composition',
+    'AggregationRelationship': 'Aggregation',
+    'AssociationRelationship': 'Association',
+    'AccessRelationship': 'Access',
+    'TriggeringRelationship': 'Triggering',
+    'FlowRelationship': 'Flow',
+    'SpecializationRelationship': 'Specialization',
+    'InfluenceRelationship': 'Influence',
+} %}
 <div class="flex-1 overflow-auto">
     {% macro _ps_actions() %}
         {{ button(text='Direct only', variant='outline', href=url_for('architect_ui.impact_analysis', element_id=element.id) + '?hops=1') }}
@@ -191,7 +204,7 @@
                                 {% endif %}
                             {% endcall %}
                             {% call table_cell() %}<span class="text-muted-foreground">{{ imp.type }}</span>{% endcall %}
-                            {% call table_cell() %}<span class="text-muted-foreground">{{ imp.via_relationship }}</span>{% endcall %}
+                            {% call table_cell() %}<span class="text-muted-foreground">{{ rel_names.get(imp.via_relationship, imp.via_relationship | replace('Relationship', '')) }}</span>{% endcall %}
                             {% call table_cell() %}
                                 {% if imp.direction == 'outgoing' %}
                                 <span class="inline-flex items-center gap-1 text-xs text-primary">
@@ -249,7 +262,7 @@
                                 {% endif %}
                             {% endcall %}
                             {% call table_cell() %}<span class="text-muted-foreground">{{ imp.type }}</span>{% endcall %}
-                            {% call table_cell() %}<span class="text-muted-foreground">{{ imp.via_relationship }}</span>{% endcall %}
+                            {% call table_cell() %}<span class="text-muted-foreground">{{ rel_names.get(imp.via_relationship, imp.via_relationship | replace('Relationship', '')) }}</span>{% endcall %}
                             {% call table_cell() %}
                                 {% if imp.direction == 'outgoing' %}
                                 <span class="inline-flex items-center gap-1 text-xs text-primary">
