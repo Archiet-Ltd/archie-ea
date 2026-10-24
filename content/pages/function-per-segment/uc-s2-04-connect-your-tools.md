@@ -1,7 +1,7 @@
 ---
 page_family: function-per-segment
 use_case_id: UC-S2-04
-segment_id: S2
+segment_id: S1
 state: on_main
 source: docs/artifacts/icp-use-case-register.yml (v3, 2026-09-23)
 capture_status: awaiting_capture
@@ -9,9 +9,9 @@ url_slug: /use-cases/import-from-jira-and-github
 icon: github
 ---
 
-# How do I stop typing every system into Entelim by hand?
+# Connect GitHub and ask what breaks, without typing every system in
 
-**For scale-up CTOs and VPs of Engineering who already track their systems somewhere else.**
+**For startup and scale-up CTOs who already track their systems somewhere else.**
 
 Connect GitHub. Entelim reads your repositories, proposes the services, dependencies and owners it finds, and you
 approve them in one step. Every fact links back to the repository and file it came from. If your list lives in

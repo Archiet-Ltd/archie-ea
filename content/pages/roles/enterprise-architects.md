@@ -4,7 +4,7 @@ role_group: architecture
 state: on_main
 capture_status: live
 cta: plans
-description: "Enterprise architect tools from Entelim: one model for Ask, roadmaps, portfolio, diagrams and the review board. Start free, see pricing today."
+description: "Enterprise architect tools from Entelim: one model for the AI chat, roadmaps, portfolio, diagrams and the review board. Start free, see pricing today."
 source: app/utils/role_access.py (ROLE_ENTERPRISE_ARCHITECT, SIDEBAR_ZONES, _MY_WORK_LINKS),
   content/pages/modules/{portfolio,roadmaps,diagrams,arb,architecture-model}.md,
   content/pages/function-per-segment/{uc-s2-01-what-breaks,uc-s3-04-value-streams-at-risk,
@@ -15,7 +15,7 @@ source: app/utils/role_access.py (ROLE_ENTERPRISE_ARCHITECT, SIDEBAR_ZONES, _MY_
 # Enterprise architect tools for one model, not three disconnected ones
 
 Enterprise architect tools exist to answer one question honestly: what does this change touch, and
-who is accountable for it? Entelim answers that from a single shared model — ask on the Ask screen,
+who is accountable for it? Entelim answers that from a single shared model — ask in the AI chat,
 trace the result on the twin map, and carry it through a roadmap's gap register to a review board
 decision, all against the same data. It is an enterprise architecture tool for EA teams and the
 technology leaders they report to, and a team can start on the free Community plan.
@@ -41,7 +41,7 @@ question directly, not a diagram redrawn and re-checked by hand each time.
 
 ## The screens you will use
 
-- **Ask**, first, and the twin map it opens into: ask a plain question about an element and trace
+- **The AI chat**, first, and the twin map: ask a plain question about an element and trace
   what it affects, including the model as it stood on an earlier date — see
   [Digital twin of your organisation](/modules/digital-twin).
 - **Roadmaps**, with the gap register between today's stages and the target state and the projects
@@ -64,7 +64,7 @@ on [CTOs and CIOs](/roles/cto-and-cio).
 1. Bring your existing model in: an ArchiMate Open Exchange or .archimate export lands in the
    [architecture model](/modules/architecture-model) browser with its elements and relationships
    intact.
-2. Ask a question on the Ask screen — what breaks if this application fails, which value streams sit
+2. Ask the AI chat — what breaks if this application fails, which value streams sit
    on an immature capability — and read the traced answer, with the twin map to see it.
 3. Check the [roadmap](/modules/roadmaps)'s gap register for the affected stage, and the
    [transformation programme](/modules/portfolio) it belongs to, with cost shown as genuinely missing
@@ -101,7 +101,7 @@ add technology to the model by itself.
 
 As soon as your model is imported. An ArchiMate Open Exchange or .archimate export brings elements,
 relationships and properties across intact, with an import history of what came in and when, and the
-Ask screen reads that same import straight away — there is no separate setup step before you can ask
+AI chat reads that same import straight away — there is no separate setup step before you can ask
 your first question against it.
 
 ### Can I import from Archi or LeanIX exports?
@@ -114,7 +114,7 @@ the export came from. Compare Entelim with Archi on [Entelim vs Archi](/vs/archi
 
 Anyone editing the model — adding elements, running a change through the review board, updating a
 roadmap or a programme — needs an editor seat on the Team plan, priced per editor. People who only
-ever ask questions on the Ask screen are free, on every plan. The Community plan covers one whole
+ever ask questions in the AI chat are free, on every plan. The Community plan covers one whole
 organisation of up to three people at no cost at all.
 
 ### Does it support ArchiMate 3.2?
