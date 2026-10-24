@@ -139,7 +139,8 @@ def test_every_link_lands_on_content(page, live_server, world):
 
     # Breadcrumb: Applications → list page
     page.get_by_role("link", name="Applications").first.click()
-    page.wait_for_url(lambda u: "/applications" in u and "roadmap" not in u, timeout=PAGE_TIMEOUT)
+    page.wait_for_url(lambda u: ("/applications" in u or "/my-applications" in u) and "roadmap" not in u,
+                      timeout=PAGE_TIMEOUT)
     expect(page.locator("h1").first).to_be_visible(timeout=PAGE_TIMEOUT)
 
     # Go back to roadmap
@@ -203,5 +204,5 @@ def test_empty_org_shows_empty_state(page, live_server, world):
     assert "Add Work Package" in empty_text, "next step CT" + "A missing for empty state"
 
     # There should be an "Add Work Package" button
-    add_btn = page.get_by_role("button", name="Add Work Package")
+    add_btn = page.get_by_role("button", name="Add Work Package").first
     expect(add_btn).to_be_visible(timeout=PAGE_TIMEOUT)

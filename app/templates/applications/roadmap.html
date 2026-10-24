@@ -14,7 +14,6 @@
 
 {% block content %}
 <div class="space-y-6" x-data="applicationRoadmapCrud()" x-init="init()">
-  <input type="hidden" id="roadmap-csrf-token" value="{{ csrf_token() }}">
 
   {{ page_header(
     title=application.name ~ ' Roadmap',
@@ -116,8 +115,8 @@
                 </template>
               </div>
               {# Today marker #}
-              <div x-show="timelineRange.start && timelineRange.end" class="absolute top-0 bottom-0 w-px bg-destructive/50 z-10" 
-                   :style="'left: ' + todayPosition + '%'"
+              <div x-show="timelineRange.start && timelineRange.end" class="absolute top-0 bottom-0 w-px bg-destructive/50 z-10"
+                   :style="{'--x': todayPosition + '%'}"
                    :aria-label="'Today: ' + todayLabel">
                 <span class="absolute -top-4 left-1/2 -translate-x-1/2 text-[10px] text-destructive-emphasis whitespace-nowrap" x-text="todayLabel"></span>
               </div>
@@ -125,9 +124,9 @@
               <div class="space-y-2 pt-4">
                 <template x-for="item in filteredItems" :key="item.id">
                   <div class="relative h-8">
-                    <button type="button"
-                      :style="'left: ' + itemTimelineLeft(item) + '%; width: ' + itemTimelineWidth(item) + '%'"
-                      :class="timelineBarClass(item)"
+                    <button type="button" data-slot="roadmap-timeline-bar"
+                      :style="{'--x': itemTimelineLeft(item) + '%', '--w': itemTimelineWidth(item) + '%'}"
+                      :class="timelineBarClass(item) + ' left-[var(--x)] w-[var(--w)]'"
                       :aria-label="item.name + ', ' + formatDate(item.start_date) + ' to ' + formatDate(item.target_date) + ', ' + formatLabel(item.status)"
                       class="absolute h-full rounded-md px-2 text-xs font-medium truncate border text-left transition-colors hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                       @click="openEditModal(item)"
@@ -305,10 +304,11 @@
 
 {% block scripts %}
 <script>
+  const roadmapCsrfToken = '{{ csrf_token() }}';
   function applicationRoadmapCrud() {
     const initialItems = {{ work_packages|tojson|safe }};
     const applicationId = {{ application.id }};
-    const csrfToken = document.getElementById('roadmap-csrf-token')?.value || '';
+    const csrfToken = roadmapCsrfToken;
     const endpointBase = `/api/applications/${applicationId}/work-packages`;
 
     const blankForm = () => ({
