@@ -5,6 +5,7 @@ journey) who has just signed up. The goal: load the sample company, ask what bre
 payments service fails, and read an answer that names its assistant, says every link in plain
 words and never prints a missing value.
 """
+import os
 import re
 import time
 
@@ -15,6 +16,13 @@ from .conftest import PAGE_TIMEOUT
 from .test_sign_up_first_screen_journey import QUESTION, SIZES, _assert_persona, _sign_up
 
 pytestmark = [pytest.mark.smoke, pytest.mark.journey]
+
+WALK = os.environ.get("ONB_WALK_DIR")
+
+
+def _shot(page, name, width):
+    if WALK:
+        page.screenshot(path=os.path.join(WALK, "%s-%d.png" % (name, width)), full_page=True)
 
 
 def _load_sample(page, base):
@@ -39,6 +47,7 @@ def test_the_first_answer_is_clean_and_in_plain_words(browser, live_server, name
         remove = page.get_by_role("button", name="Remove it", exact=True)
         assert remove.count() == 1
         assert remove.inner_text().strip() == "Remove it"
+        _shot(page, "c-sample-loaded", viewport["width"])
 
         page.goto(live_server + "/ai-chat", wait_until="networkidle", timeout=PAGE_TIMEOUT)
         chosen = page.locator("#persona-selector").evaluate("e => e.options[e.selectedIndex].text")
@@ -55,11 +64,13 @@ def test_the_first_answer_is_clean_and_in_plain_words(browser, live_server, name
         for technical in ("derivation table", "followed by", "started by A person"):
             assert technical not in text, text
         assert not re.search(r"\bNone\b", text), text
+        _shot(page, "c-answer-plain", viewport["width"])
         # the technical detail is one click away, behind "How this was worked out"
         assert answer.locator("[data-why-detail]:visible").count() == 0
         assert answer.locator("[data-why-toggle]").count() >= 1
         for toggle in answer.locator("[data-why-toggle]").all():
             toggle.click()
+        _shot(page, "c-answer-opened", viewport["width"])
         opened = answer.inner_text()
         assert "ArchiMate derivation table" in opened or "no stronger rule applies" in opened, opened
         assert not re.search(r"\bNone\b", opened), opened
