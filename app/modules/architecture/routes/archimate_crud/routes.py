@@ -1377,6 +1377,11 @@ def detail_element(layer, element_type, element_id):
     owner_assign_link = None
     if owner_assign_url is None and element_type == "Capability":
         owner_assign_link = url_for("capability_map.index", cap=element.id)
+    # Only a type that has an owner field shows an Owner row at all; one that
+    # has none must not claim a missing owner.
+    has_owner_field = (
+        owner_assign_url is not None or element_type == "Capability" or bool(owner_rows)
+    )
 
     # The external-identifiers help names only connectors this organisation
     # can use today, read from the one connector registry. When none are live
@@ -1401,6 +1406,7 @@ def detail_element(layer, element_type, element_id):
         display_fields=display_fields,
         technical_fields=technical_fields,
         owner_rows=owner_rows,
+        has_owner_field=has_owner_field,
         owner_assign_url=owner_assign_url,
         owner_assign_link=owner_assign_link,
         external_links=external_links,

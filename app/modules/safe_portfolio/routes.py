@@ -86,6 +86,23 @@ def _can_write() -> bool:
     return can(current_user, "edit", "motivation_element")
 
 
+def _owner_name(element: ArchiMateElement, org_id: int):
+    """Name of the person who recorded the element by hand, if they belong to this organization."""
+    ref = (element.source_ref or "").strip()
+    if element.source_kind != "manual" or not ref.isdigit():
+        return None
+    from app.models.user import User
+
+    owner = (
+        db.session.query(User)
+        .filter(User.id == int(ref), User.organization_id == org_id)
+        .first()
+    )
+    if owner is None:
+        return None
+    return f"{owner.first_name} {owner.last_name}".strip() or owner.email
+
+
 def _get_epics() -> List[Dict]:
     """Load all Epic work packages for the current organization."""
     org_id = current_org_id()
@@ -125,19 +142,11 @@ def _get_epics() -> List[Dict]:
         )
 
         # Get owner name if available
-        owner_name = None
-        created_by_id = getattr(element, "created_by_id", None)
-        if created_by_id:
-            from app.models.user import User
-            owner = db.session.query(User).filter_by(id=created_by_id, organization_id=org_id).first()
-            if owner:
-                owner_name = f"{owner.first_name} {owner.last_name}".strip() or owner.email
+        owner_name = _owner_name(element, org_id)
 
         # Format date
-        date_str = None
-        stamp = getattr(element, "updated_at", None) or getattr(element, "created_at", None)
-        if stamp:
-            date_str = stamp.strftime("%Y-%m-%d")
+        recorded = element.source_recorded_at or element.recorded_at
+        date_str = recorded.strftime("%Y-%m-%d") if recorded else None
 
         epics.append(
             {

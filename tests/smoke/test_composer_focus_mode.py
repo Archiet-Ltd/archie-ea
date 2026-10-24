@@ -222,6 +222,34 @@ def test_discard_empties_the_canvas_and_saves_nothing(browser, live_server, seed
 
 
 @pytest.mark.smoke
+def test_the_connections_list_names_every_neighbour_and_opens_it(browser, live_server, seeded, graph):
+    centre = graph["service"]
+    context, page = _open(browser, live_server, seeded, "?element=%s&depth=2&derived=1" % centre)
+    try:
+        _wait_loaded(page)
+        toggle = page.locator("#composer-focus-list-toggle")
+        answer = _answer(page, centre, 2, True)
+        assert str(len(answer["keys"])) in toggle.inner_text()
+        expect(page.locator("#composer-focus-list")).to_be_hidden()
+        toggle.click()
+        rows = page.locator("#composer-focus-list [data-focus-row]")
+        expect(rows).to_have_count(len(answer["keys"]))
+        assert toggle.inner_text().startswith("Hide")
+        first = rows.first
+        name = first.locator("td").nth(2).inner_text().strip()
+        assert name and name != "Unnamed element"
+        first.locator("td").nth(2).locator("button").click()
+        expect(page.locator(".detail-panel")).to_be_visible()
+        assert page.evaluate(
+            "(sel) => Alpine.$data(document.querySelector(sel)).selectedNode.label", APP
+        ) == name
+        toggle.click()
+        expect(page.locator("#composer-focus-list")).to_be_hidden()
+    finally:
+        context.close()
+
+
+@pytest.mark.smoke
 def test_leaving_the_unsaved_view_triggers_the_unsaved_changes_prompt(browser, live_server, seeded, graph):
     centre = graph["service"]
     context, page = _open(browser, live_server, seeded, "?element=%s&depth=1&derived=1" % centre)

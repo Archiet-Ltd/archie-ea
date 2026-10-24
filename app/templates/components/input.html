@@ -31,7 +31,11 @@
         {% if aria_describedby %}aria-describedby="{{ aria_describedby }}"{% elif error and id %}aria-describedby="{{ id }}-error"{% endif %}
         {% if aria_label %}aria-label="{{ aria_label }}"{% endif %}
         {{ attrs_dict|xmlattr }}
+        {% if type == 'range' %}
+        class="h-2 w-full cursor-pointer accent-primary disabled:cursor-not-allowed disabled:opacity-50 {{ class }}"
+        {% else %}
         class="flex {{ heights.get(size, 'h-10') }} w-full rounded-md border {% if error %}border-destructive{% else %}border-input{% endif %} bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 {{ class }}"
+        {% endif %}
     />
     {% if error and id %}
     <p id="{{ id }}-error" class="text-sm text-destructive-emphasis mt-1" role="alert">{{ error }}</p>
