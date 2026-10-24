@@ -322,7 +322,7 @@
                 {% endcall %}
               {% endcall %}
               {% call form_group(id='vs-stream', label='Value Stream', required=true, help_text='Ctrl/Cmd-click to select multiple') %}
-                {% call native_select(id='vs-stream', aria_label='Value Stream', multiple=true, size=5, attrs_dict={'x-model': 'vsSelectedStream', '@change': 'onValueStreamSelected()'}) %}
+                {% call native_select(id='vs-stream', aria_label='Value Stream', multiple=true, visible_rows=5, attrs_dict={'x-model': 'vsSelectedStream', '@change': 'onValueStreamSelected()'}) %}
                   <template x-for="vs in vsOptions" :key="vs.id">
                     <option :value="vs.id" x-text="vs.name"></option>
                   </template>

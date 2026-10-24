@@ -67,7 +67,7 @@
 ) %}
 {% set col_count = columns|length + (1 if selectable else 0) %}
 {% set _scroll_id = 'wbt-scroll-' ~ range(1000000)|random %}
-<div data-slot="card" class="rounded-xl border bg-card {{ class }}">
+<div data-slot="card" class="rounded-lg border bg-card {{ class }}">
 
     {# ── Toolbar ──────────────────────────────────────────────────────── #}
     <div class="flex flex-col gap-3 p-4 border-b sm:flex-row sm:items-center sm:justify-between">

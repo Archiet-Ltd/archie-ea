@@ -269,7 +269,7 @@ async function loadTargets() {
                     description: item.description || '',
                     type: item.type || 'Element',
                     layer: item.layer || 'business',
-                    layer_color: item.layer_color || '#CCCCCC',
+                    layer_color: item.layer_color || null,
                     table: item.table || '',
                     is_template: item.is_template || false,
                     category: item.layer  // Use layer as category for filtering

@@ -82,6 +82,7 @@ GOVERNANCE_ACTIONS = {
     "archimate": ("edit",),
     "arb_decision": ("vote", "decide"),
     "portfolio": ("manage",),
+    "owner": ("assign",),
 }
 _GOVERNANCE_DEFAULTS = {
     "solution": {
@@ -98,6 +99,14 @@ _GOVERNANCE_DEFAULTS = {
     },
     "portfolio": {
         "manage": frozenset({"portfolio_manager", "enterprise_architect", "business_architect", "platform_admin"}),
+    },
+    # Recording who owns an application or another element: the architect
+    # personas, who are the ones asked to keep ownership complete.
+    "owner": {
+        "assign": frozenset({
+            "solution_architect", "enterprise_architect", "business_architect",
+            "data_architect", "security_architect", "platform_admin",
+        }),
     },
 }
 

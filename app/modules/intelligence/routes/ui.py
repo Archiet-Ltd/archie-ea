@@ -1,7 +1,7 @@
-"""Ask, Twin map, Value streams at risk and Traceability: the pages of the
+"""Ask, Value streams at risk and Traceability: the pages of the
 intelligence module's user interface.
 
-Ask, Twin map and Value streams at risk only render a page shell. Their data
+Ask and Value streams at risk only render a page shell. Their data
 is fetched in the browser from endpoints that already exist: element search
 from the ArchiMate picker endpoint, the impact answer and the
 value-streams-at-risk answer from the intelligence API, so those pages carry
@@ -14,7 +14,7 @@ The provenance drawer is not a route. It opens over either page.
 
 from __future__ import annotations
 
-from flask import Blueprint, current_app, g, render_template, request
+from flask import Blueprint, current_app, g, redirect, render_template, request, url_for
 from flask_login import login_required
 
 intelligence_ui = Blueprint(
@@ -103,20 +103,19 @@ def ask():
 @intelligence_ui.route("/twin-map", methods=["GET"])
 @login_required
 def twin_map():
-    """Show what a chosen element connects to, banded by architecture layer.
+    """Old address of the twin map; the ArchiMate Composer now draws it.
 
-    ``element`` (optional) is the id of the element to centre the map on, so a
-    row on the Ask page can hand its element straight across. A value that is
-    not a whole number is ignored and the page opens on its picker.
+    The twin map drew what one element connects to, which is the Composer's
+    focus mode. Bookmarks and old links keep working: ``element`` (optional)
+    goes across to ``/archimate/composer?element=<id>`` and with none the
+    Composer opens on its own picker. A value that is not a whole number is
+    ignored. The Composer applies the organisation fence, so another
+    organisation's element answers 404 there.
     """
-    initial_element_id = request.args.get("element", type=int)
-    workspace_is_empty = _workspace_is_empty()
-    return render_template(
-        "intelligence/twin_map.html",
-        initial_element_id=initial_element_id,
-        workspace_counts_available=workspace_is_empty is not None,
-        workspace_is_empty=workspace_is_empty,
-    )
+    element_id = request.args.get("element", type=int)
+    if element_id is None:
+        return redirect(url_for("archimate.composer_page"), code=302)
+    return redirect(url_for("archimate.composer_page", element=element_id), code=302)
 
 
 # The maturity threshold the value-streams-at-risk answer is asked for. The

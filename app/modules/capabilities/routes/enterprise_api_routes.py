@@ -34,7 +34,7 @@ from app.models.adm_kanban import KanbanCard
 from app.models.application_portfolio import ApplicationComponent
 from app.models.audit_log import AuditLog
 from app.models.project_models import Project
-from app.models.solution_architect_models import SolutionRequirement
+from app.models.solution_architect_models import RequirementType, SolutionRequirement
 from app.models.system_architecture import SystemBoundary
 from app.models.vendor.vendor_organization import EnterpriseInitiative
 from app.utils.pagination import safe_int_arg
@@ -405,9 +405,22 @@ def get_projects():
 def create_requirement():
     """Manually create a new requirement."""
     data = request.get_json() or {}
-    name = (data.get('requirement_name') or '').strip()
+    name = (data.get('name') or '').strip()
     if not name:
-        return jsonify({"error": "requirement_name is required"}), 400
+        return jsonify({"error": "Give the requirement a name."}), 400
+    if len(name) > 200:
+        return jsonify({"error": "The requirement name must be 200 characters or fewer."}), 400
+    type_value = (data.get('requirement_type') or 'functional').strip().lower()
+    try:
+        req_kind = RequirementType(type_value)
+    except ValueError:
+        return jsonify({"error": "The requirement type must be functional, quality or constraint."}), 400
+    try:
+        priority = int(data.get('priority') if data.get('priority') not in (None, '') else 3)
+    except (TypeError, ValueError):
+        return jsonify({"error": "The priority must be a number from 1 (highest) to 5."}), 400
+    if not 1 <= priority <= 5:
+        return jsonify({"error": "The priority must be a number from 1 (highest) to 5."}), 400
 
     layer = data.get('layer') or None
     template_id = data.get('template_id') or None
@@ -439,11 +452,12 @@ def create_requirement():
     req = SolutionRequirement(
         solution_id=data.get('solution_id'),
         capability_id=data.get('capability_id'),
-        requirement_name=name,
-        description=data.get('description') or None,
-        requirement_type=data.get('requirement_type') or 'functional',
+        name=name,
+        description=(data.get('description') or '').strip(),
+        requirement_type=req_kind,
         moscow_priority=data.get('moscow_priority') or 'SHOULD',
-        priority=data.get('priority') or 'medium',
+        priority=priority,
+        status='Draft',
         acceptance_criteria=data.get('acceptance_criteria') or None,
         story_points=data.get('story_points') or None,
         epic_parent_id=data.get('epic_parent_id') or None,
@@ -468,14 +482,19 @@ def create_requirement():
     compliance_tags = data.get('compliance_tags', [])
     if compliance_tags and isinstance(compliance_tags, list):
         req.compliance_tags = compliance_tags
-    db.session.add(req)
-    sync_archimate_element(req)
-    db.session.commit()
+    try:
+        db.session.add(req)
+        sync_archimate_element(req)
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        logger.exception("Could not create requirement")
+        return jsonify({"error": "The requirement could not be saved. Check the fields and try again."}), 500
     return jsonify({"success": True, "requirement": {
         "id": req.id,
-        "requirement_name": req.requirement_name,
+        "name": req.name,
         "description": req.description,
-        "requirement_type": req.requirement_type,
+        "requirement_type": req.requirement_type.value if req.requirement_type else None,
         "moscow_priority": req.moscow_priority,
         "priority": req.priority,
         "acceptance_criteria": req.acceptance_criteria,
@@ -483,6 +502,26 @@ def create_requirement():
         "capability_id": req.capability_id,
         "created_at": req.created_at.isoformat() if hasattr(req, 'created_at') and req.created_at else None,
     }}), 201
+
+
+@enterprise_api_bp.route("/requirements/<int:req_id>", methods=["DELETE"])
+@login_required
+@require_roles("admin", "architect")
+def delete_requirement(req_id):
+    """Remove a requirement from the backlog (soft delete: the row is kept, marked deleted)."""
+    req = SolutionRequirement.query.filter(
+        SolutionRequirement.id == req_id, SolutionRequirement.deleted_at.is_(None)
+    ).first()
+    if req is None:
+        return jsonify({"success": False, "error": "Requirement not found"}), 404
+    if req.solution_id:
+        from app.models.solution_models import Solution
+        sol = Solution.query.get(req.solution_id)
+        if sol and sol.created_by_id != current_user.id and not is_active_org_admin():
+            return jsonify({"success": False, "error": "Forbidden: you do not own this solution"}), 403
+    req.soft_delete(current_user.id)
+    db.session.commit()
+    return jsonify({"success": True, "id": req_id})
 
 
 @enterprise_api_bp.route('/requirements/suggest-layer', methods=['GET'])

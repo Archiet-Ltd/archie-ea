@@ -41,7 +41,7 @@ def test_empty_dict_column_is_skipped_not_rendered_as_braces():
     row = _make(acm_properties={}, custom_properties={"source_model": "Risk"})
     fields = {f["label"]: f["value"] for f in _get_display_fields(row, _FakeElement)}
 
-    assert "Acm Properties" not in fields
+    assert "Acm properties" not in fields
     assert "ACM Properties" not in fields
 
 
@@ -49,8 +49,8 @@ def test_populated_dict_renders_as_readable_pairs_not_python_repr():
     row = _make(custom_properties={"source_model": "Risk"})
     fields = {f["label"]: f["value"] for f in _get_display_fields(row, _FakeElement)}
 
-    value = fields["Custom Properties"]
-    assert value == "source_model: Risk"
+    value = fields["Custom properties"]
+    assert value == "Source model: Risk"
     assert "{" not in value and "}" not in value
     assert "'" not in value
 
@@ -59,8 +59,8 @@ def test_known_acronym_is_capitalised_correctly():
     row = _make(acm_properties={"tier": "0"})
     fields = {f["label"]: f["value"] for f in _get_display_fields(row, _FakeElement)}
 
-    assert "ACM Properties" in fields
-    assert "Acm Properties" not in fields
+    assert "ACM properties" in fields
+    assert "Acm properties" not in fields
 
 
 def test_list_column_renders_as_comma_joined_text():
@@ -77,5 +77,5 @@ def test_none_and_empty_string_are_still_skipped():
 
     labels = [f["label"] for f in fields]
     assert "Acm Properties" not in labels
-    assert "Custom Properties" not in labels
+    assert "Custom properties" not in labels
     assert "Tags" not in labels

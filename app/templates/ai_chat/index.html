@@ -18,7 +18,6 @@
         padding: 1rem;
         background: var(--card);
         color: var(--card-foreground);
-        box-shadow: 0 1px 2px rgba(0,0,0,0.05);
         margin: 0.5rem 0;
     }
     .action-card-header {
@@ -44,18 +43,18 @@
         border: 1px solid;
     }
     .confidence-high {
-        background-color: hsl(var(--emerald-500) / 0.05);
-        color: hsl(var(--emerald-700, 142 71% 29%));
-        border-color: hsl(var(--emerald-500) / 0.2);
+        background-color: hsl(var(--success) / 0.05);
+        color: hsl(var(--success-emphasis));
+        border-color: hsl(var(--success) / 0.2);
     }
     .confidence-medium {
-        background-color: hsl(var(--amber-500) / 0.05);
-        color: hsl(var(--amber-700, 32 95% 33%));
-        border-color: hsl(var(--amber-500) / 0.2);
+        background-color: hsl(var(--warning) / 0.05);
+        color: hsl(var(--warning-emphasis));
+        border-color: hsl(var(--warning) / 0.2);
     }
     .confidence-low {
         background-color: hsl(var(--destructive) / 0.05);
-        color: hsl(var(--destructive));
+        color: hsl(var(--destructive-emphasis));
         border-color: hsl(var(--destructive) / 0.2);
     }
     .element-item {
@@ -137,7 +136,7 @@
 {% if not llm_configured %}
 <div class="flex flex-wrap items-center gap-x-2 gap-y-1 bg-warning/10 border-b border-warning/30 px-4 py-2 text-sm text-warning-emphasis"
      role="alert">
-        <i data-lucide="alert-triangle" class="h-4 w-4 shrink-0 text-amber-600" aria-hidden="true"></i><!-- token-migration-ok -->
+        <i data-lucide="alert-triangle" class="h-4 w-4 shrink-0 text-warning-emphasis" aria-hidden="true"></i>
         {# The banner named the fault and stopped there. It is the earliest and
            most visible surface for "the AI cannot answer", so it is also the
            right place to say what closes it — otherwise every archetype reads
@@ -675,9 +674,9 @@
                     <div class="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 mt-3 text-xs text-muted-foreground">
                         <span class="text-xs uppercase tracking-wider">Their governed work products:</span>
                         <a href="/solutions/briefings" class="text-primary hover:underline">EA Briefing</a>
-                        <span class="text-border">·</span>
+                        <span class="text-muted-foreground" aria-hidden="true">·</span>
                         <a href="/solutions/data-stewardship" class="text-primary hover:underline">Data Stewardship</a>
-                        <span class="text-border">·</span>
+                        <span class="text-muted-foreground" aria-hidden="true">·</span>
                         <a href="/solutions/architect-synthesis" class="text-primary hover:underline">Chief Architect Synthesis</a>
                     </div>
 
@@ -698,8 +697,8 @@
                         </button>
                         <!-- Technology -->
                         <button type="button" data-domain="technology" data-prompt="Review my tech stack and identify lifecycle risks"
-                            class="domain-card group flex flex-col p-4 bg-card border border-border rounded-xl text-left hover:border-emerald-500 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"><!-- design-tokens-ok: domain-card legend, 6 distinct hues > available semantic tokens -->
-                            <div class="w-9 h-9 bg-emerald-50 rounded-lg flex items-center justify-center text-emerald-600 mb-2.5 group-hover:bg-emerald-500 group-hover:text-primary-foreground transition-colors"><!-- token-migration-ok -->
+                            class="domain-card group flex flex-col p-4 bg-card border border-border rounded-xl text-left hover:border-layer-technology transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"><!-- design-tokens-ok: domain-card legend, 6 distinct hues > available semantic tokens -->
+                            <div class="w-9 h-9 bg-layer-technology/10 rounded-lg flex items-center justify-center text-layer-technology-emphasis mb-2.5 group-hover:bg-layer-technology-emphasis group-hover:text-background transition-colors"><!-- token-migration-ok -->
                                 <i data-lucide="cpu" class="h-5 w-5" aria-hidden="true"></i>
                             </div>
                             <h3 class="text-sm font-semibold text-foreground">Technology</h3>
@@ -707,8 +706,8 @@
                         </button>
                         <!-- Capabilities -->
                         <button type="button" data-domain="business_capability" data-prompt="Map my business capabilities and identify strategic gaps"
-                            class="domain-card group flex flex-col p-4 bg-card border border-border rounded-xl text-left hover:border-purple-500 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"><!-- design-tokens-ok: domain-card legend, 6 distinct hues > available semantic tokens -->
-                            <div class="w-9 h-9 bg-purple-50 rounded-lg flex items-center justify-center text-primary mb-2.5 group-hover:bg-primary group-hover:text-primary-foreground transition-colors"><!-- token-migration-ok -->
+                            class="domain-card group flex flex-col p-4 bg-card border border-border rounded-xl text-left hover:border-layer-motivation transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"><!-- design-tokens-ok: domain-card legend, 6 distinct hues > available semantic tokens -->
+                            <div class="w-9 h-9 bg-layer-motivation/10 rounded-lg flex items-center justify-center text-layer-motivation-emphasis mb-2.5 group-hover:bg-primary group-hover:text-primary-foreground transition-colors"><!-- token-migration-ok -->
                                 <i data-lucide="building-2" class="h-5 w-5" aria-hidden="true"></i>
                             </div>
                             <h3 class="text-sm font-semibold text-foreground">Capabilities</h3>
@@ -724,8 +723,8 @@
                          class="grid grid-cols-[repeat(auto-fill,minmax(240px,1fr))] gap-3">
                         <!-- Gap Analysis -->
                         <button type="button" data-domain="gap_analysis" data-prompt="Identify gaps in my current architecture roadmap"
-                            class="domain-card group flex flex-col p-4 bg-card border border-border rounded-xl text-left hover:border-orange-500 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"><!-- design-tokens-ok: domain-card legend, 6 distinct hues > available semantic tokens -->
-                            <div class="w-9 h-9 bg-orange-50 rounded-lg flex items-center justify-center text-orange-600 mb-2.5 group-hover:bg-orange-500 group-hover:text-primary-foreground transition-colors"><!-- token-migration-ok -->
+                            class="domain-card group flex flex-col p-4 bg-card border border-border rounded-xl text-left hover:border-layer-strategy transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"><!-- design-tokens-ok: domain-card legend, 6 distinct hues > available semantic tokens -->
+                            <div class="w-9 h-9 bg-layer-strategy/10 rounded-lg flex items-center justify-center text-layer-strategy-emphasis mb-2.5 group-hover:bg-layer-strategy-emphasis group-hover:text-background transition-colors"><!-- token-migration-ok -->
                                 <i data-lucide="git-branch" class="h-5 w-5" aria-hidden="true"></i>
                             </div>
                             <h3 class="text-sm font-semibold text-foreground">Gap Analysis</h3>
@@ -733,8 +732,8 @@
                         </button>
                         <!-- Vendors -->
                         <button type="button" data-domain="vendor_intelligence" data-prompt="Analyze my vendor contracts and identify supplier risks"
-                            class="domain-card group flex flex-col p-4 bg-card border border-border rounded-xl text-left hover:border-cyan-500 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"><!-- design-tokens-ok: domain-card legend, 6 distinct hues > available semantic tokens -->
-                            <div class="w-9 h-9 bg-cyan-50 rounded-lg flex items-center justify-center text-cyan-600 mb-2.5 group-hover:bg-cyan-500 group-hover:text-primary-foreground transition-colors"><!-- token-migration-ok -->
+                            class="domain-card group flex flex-col p-4 bg-card border border-border rounded-xl text-left hover:border-layer-implementation transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"><!-- design-tokens-ok: domain-card legend, 6 distinct hues > available semantic tokens -->
+                            <div class="w-9 h-9 bg-layer-implementation/10 rounded-lg flex items-center justify-center text-layer-implementation-emphasis mb-2.5 group-hover:bg-layer-implementation-emphasis group-hover:text-background transition-colors"><!-- token-migration-ok -->
                                 <i data-lucide="briefcase" class="h-5 w-5" aria-hidden="true"></i>
                             </div>
                             <h3 class="text-sm font-semibold text-foreground">Vendors</h3>
