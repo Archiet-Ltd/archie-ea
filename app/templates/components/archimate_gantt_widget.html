@@ -117,7 +117,7 @@ that can only ever fail.
                         <div class="flex-1 min-w-0">
                             <div class="flex items-center gap-2">
                                 <i data-lucide="package" class="w-4 h-4 text-primary"></i>
-                                <span class="font-medium text-foreground truncate">${escapeHtml(item.name || 'Untitled')}</span>
+                                <span class="text-foreground truncate">${escapeHtml(item.name || 'Untitled')}</span>
                                 <span class="px-2 py-0.5 text-xs rounded-full ${statusClass} text-primary-foreground">${escapeHtml((item.status || 'planned').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()))}</span>
                             </div>
                             <div class="flex items-center gap-4 mt-1 text-xs text-muted-foreground">
@@ -238,7 +238,7 @@ that can only ever fail.
     </div>
 
     <!-- Stats -->
-    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
         <div class="bg-card rounded-lg p-4">
             <p class="text-sm text-muted-foreground">Work Packages</p>
             <p class="text-2xl font-bold text-foreground" id="archimate-wp-count-{{ container_id }}">0</p>
