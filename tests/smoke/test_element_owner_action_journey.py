@@ -204,3 +204,151 @@ def test_external_identifiers_help_names_only_live_connectors(page, live_server,
     help_text = page.locator("[data-testid='external-identifiers']").inner_text()
     assert "GitHub" in help_text, "did not name GitHub once it is live"
     assert "Jira" not in help_text, "named Jira, which is not live"
+
+
+# ---------------------------------------------------------------------------
+# The enterprise architect (not an organisation administrator) takes the step
+# on an application page, on an application opened as a generic element, and
+# on a capability page; the owner then shows on the fact sheet and the list.
+# ---------------------------------------------------------------------------
+
+ARCHITECT = "enterprise_architect"
+
+
+def _seed_generic_application_and_capability(org_id):
+    """An application that a person reaches through its generic element row
+    (the element id and the application id differ), and a capability that has
+    been projected into the one capability store."""
+    from app import create_app, db
+    from app.models.application_portfolio import ApplicationComponent
+    from app.models.business_capabilities import BusinessCapability
+    from app.models.models import ArchiMateElement
+    from app.models.unified_capability import UnifiedCapability
+
+    app = create_app("testing")
+    suffix = uuid.uuid4().hex[:6]
+    with app.app_context():
+        top = db.session.execute(db.text(
+            "SELECT GREATEST(COALESCE((SELECT MAX(id) FROM archimate_elements), 0),"
+            " COALESCE((SELECT MAX(id) FROM application_components), 0))"
+        )).scalar()
+        element = ArchiMateElement(
+            id=top + 1000, name="Relay application %s" % suffix,
+            type="ApplicationComponent", layer="application",
+            organization_id=org_id,
+        )
+        db.session.add(element)
+        db.session.flush()
+        component = ApplicationComponent(
+            name=element.name, organization_id=org_id,
+            lifecycle_status="operational", archimate_element_id=element.id,
+        )
+        capability = BusinessCapability(
+            name="Relay capability %s" % suffix, organization_id=org_id,
+            level=1, category="Operations",
+        )
+        db.session.add_all([component, capability])
+        db.session.flush()
+        unified = UnifiedCapability(
+            name=capability.name, organization_id=org_id,
+            source_table="business_capability", source_id=str(capability.id),
+        )
+        db.session.add(unified)
+        db.session.commit()
+        ids = {
+            "element_id": element.id,
+            "application_id": component.id,
+            "application_name": component.name,
+            "capability_id": capability.id,
+            "capability_name": capability.name,
+        }
+        db.session.remove()
+    return ids
+
+
+@pytest.fixture
+def architect_orgs():
+    orgs = []
+    for _ in range(2):
+        org = fresh_org.create_fresh_org(ARCHITECT, org_admin=False, extra_roles=(OWNER,))
+        org["ids"] = _seed_generic_application_and_capability(org["org_id"])
+        orgs.append(org)
+    return orgs
+
+
+def _assign_with_picker(page, owner_name):
+    box = page.locator("[data-owner-picker] [data-owner-search]")
+    assert box.count() == 1, "the page offers no Assign owner step"
+    box.fill(owner_name.split()[-1])
+    page.locator(
+        "[data-owner-picker] [data-owner-results] button", has_text=owner_name
+    ).first.click()
+    # Saving reloads the page; wait for that reload before moving on.
+    with page.expect_navigation(wait_until="networkidle", timeout=PAGE_TIMEOUT):
+        with page.expect_response(
+            lambda r: r.request.method == "POST" and "/owners" in r.url
+        ) as saved:
+            page.locator("[data-owner-picker] [data-owner-save]").click()
+    assert saved.value.status == 201
+
+
+def test_architect_assigns_owner_on_application_and_element_pages(
+    page, live_server, architect_orgs
+):
+    org_a, org_b = architect_orgs
+    ids = org_a["ids"]
+    owner_name = _owner_name(org_a)
+    fresh_org.sign_in(page, live_server, org_a["emails"][ARCHITECT])
+
+    # Application page: the architect sees the step and takes it.
+    app_url = "%s/applications/%d" % (live_server, ids["application_id"])
+    page.goto(app_url, wait_until="networkidle", timeout=PAGE_TIMEOUT)
+    assert "No owner recorded" in page.inner_text("main")
+    _assign_with_picker(page, owner_name)
+    page.goto(app_url, wait_until="networkidle", timeout=PAGE_TIMEOUT)
+    assert owner_name in page.locator("[data-testid='application-owner']").inner_text()
+
+    # The same application opened as a generic element shows that owner.
+    element_url = "%s/architecture/application/ApplicationComponent/%d" % (
+        live_server, ids["element_id"])
+    page.goto(element_url, wait_until="networkidle", timeout=PAGE_TIMEOUT)
+    assert owner_name in page.locator("[data-testid='element-owner']").inner_text(), (
+        "the element page does not show the owner assigned on the application page"
+    )
+
+    # A capability page offers the step to the same architect and saves it.
+    cap_url = "%s/architecture/strategy/Capability/%d" % (live_server, ids["capability_id"])
+    page.goto(cap_url, wait_until="networkidle", timeout=PAGE_TIMEOUT)
+    assert "No owner recorded" in page.locator("[data-testid='element-owner']").inner_text()
+    _assign_with_picker(page, owner_name)
+    page.goto(cap_url, wait_until="networkidle", timeout=PAGE_TIMEOUT)
+    assert owner_name in page.locator("[data-testid='element-owner']").inner_text()
+
+    # Nothing leaks into the other organisation, and its own elements still
+    # show the empty state with the step.
+    page.goto(live_server + "/account/logout", wait_until="networkidle", timeout=PAGE_TIMEOUT)
+    fresh_org.sign_in(page, live_server, org_b["emails"][ARCHITECT])
+    page.goto("%s/architecture/application/ApplicationComponent/%d" % (
+        live_server, org_b["ids"]["element_id"]),
+        wait_until="networkidle", timeout=PAGE_TIMEOUT)
+    cell = page.locator("[data-testid='element-owner']")
+    assert owner_name not in cell.inner_text()
+    assert "No owner recorded" in cell.inner_text()
+    assert page.locator("[data-owner-picker] [data-owner-search]").count() == 1
+
+
+def test_application_element_page_step_assigns_from_generic_row(
+    page, live_server, architect_orgs
+):
+    """The step on the generic element page of an application saves, and the
+    application page then names the owner."""
+    org_a = architect_orgs[0]
+    ids = org_a["ids"]
+    owner_name = _owner_name(org_a)
+    fresh_org.sign_in(page, live_server, org_a["emails"][ARCHITECT])
+    page.goto("%s/architecture/application/ApplicationComponent/%d" % (
+        live_server, ids["element_id"]), wait_until="networkidle", timeout=PAGE_TIMEOUT)
+    _assign_with_picker(page, owner_name)
+    page.goto("%s/applications/%d" % (live_server, ids["application_id"]),
+              wait_until="networkidle", timeout=PAGE_TIMEOUT)
+    assert owner_name in page.locator("[data-testid='application-owner']").inner_text()

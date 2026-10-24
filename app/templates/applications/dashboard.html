@@ -454,7 +454,7 @@
           {% else %}
           <div class="py-3" data-testid="application-owner-empty">
             <p class="text-sm text-muted-foreground">No owner recorded.</p>
-            {% if can('edit', 'application') and owner_assign_url %}
+            {% if (can('assign', 'owner') or can('edit', 'application')) and owner_assign_url %}
             <div class="mt-3 space-y-2" data-owner-picker data-owners-url="{{ owner_assign_url }}">
               <p class="text-sm font-medium text-foreground">Assign owner</p>
               <div class="relative">

@@ -487,18 +487,64 @@ def _readable(value):
     return str(getattr(value, "name", None) or getattr(value, "title", None) or "")
 
 
+def _element_owner_target(element, element_type, organization_id):
+    """The owner record this element's owner lives on: ``(kind, id)`` or None.
+
+    Resolves the concrete element first: a page opened on the generic
+    ``archimate_elements`` row of an application is the application whose
+    ``archimate_element_id`` points at it, and an AI system is owned under its
+    own element id. None means this type has no owner field.
+    """
+    from app.modules.enterprise_genome.services.ai_system_profile import is_ai_system
+
+    if organization_id is None:
+        return None
+    if isinstance(element, ApplicationComponent):
+        return ("application", element.id)
+    if is_application_kind(element_type):
+        if is_ai_system(element):
+            return ("ai_system", element.id)
+        component = ApplicationComponent.query.filter_by(
+            archimate_element_id=element.id, organization_id=organization_id,
+        ).first()
+        return ("application", component.id) if component is not None else None
+    if element_type == "Capability":
+        # Capability owners are recorded on the unified capability this row
+        # projects into (by provenance), never on the source row's own id.
+        from app.models.unified_capability import UnifiedCapability
+
+        unified = UnifiedCapability.query.filter_by(
+            source_table="business_capability", source_id=str(element.id),
+            organization_id=organization_id,
+        ).first()
+        return ("capability", unified.id) if unified is not None else None
+    return None
+
+
 def _element_owner_rows(element, element_type, organization_id):
     """Owner rows for the detail page, through the one ownership record's existing readers."""
     from app.models.application_owner import ApplicationOwner
 
-    if organization_id is None:
+    target = _element_owner_target(element, element_type, organization_id)
+    if target is None:
         return []
-    if is_application_kind(element_type) and isinstance(element, ApplicationComponent):
-        return ApplicationOwner.get_display_rows_for_application(element.id, organization_id)
-    slug = {"Capability": "capability"}.get(element_type)
-    if slug in ApplicationOwner.ELEMENT_TYPES:
-        return ApplicationOwner.get_display_rows_for_element(slug, element.id, organization_id)
-    return []
+    kind, target_id = target
+    if kind == "application":
+        return ApplicationOwner.get_display_rows_for_application(target_id, organization_id)
+    return ApplicationOwner.get_display_rows_for_element(kind, target_id, organization_id)
+
+
+def _element_owner_url(element, element_type, organization_id):
+    """Where the owner picker saves an owner for this element, or None."""
+    target = _element_owner_target(element, element_type, organization_id)
+    if target is None:
+        return None
+    kind, target_id = target
+    if kind == "application":
+        return url_for("unified_applications.add_owner", app_id=target_id)
+    if kind == "capability":
+        return url_for("capability_map.api_set_capability_owner", capability_id=target_id)
+    return url_for("ai_systems_genome.ai_system_set_owner", element_id=target_id)
 
 
 def _get_display_fields(element, model_class):
@@ -1290,11 +1336,14 @@ def detail_element(layer, element_type, element_id):
     technical_fields = [f for f in all_fields if f["technical"]]
     external_links = CrosswalkService.get_links_for_element(ae_id or element.id)
     owner_rows = _element_owner_rows(element, element_type, getattr(element, "organization_id", None))
-    owner_assign_url = None
-    if isinstance(element, ApplicationComponent):
-        owner_assign_url = url_for("unified_applications.application_detail", id=element.id)
-    elif element_type == "Capability":
-        owner_assign_url = url_for("capability_map.index", cap=element.id)
+    owner_assign_url = _element_owner_url(
+        element, element_type, getattr(element, "organization_id", None)
+    )
+    # A capability not yet projected into the one capability store has no
+    # record to save an owner on here; it keeps the link to the capability map.
+    owner_assign_link = None
+    if owner_assign_url is None and element_type == "Capability":
+        owner_assign_link = url_for("capability_map.index", cap=element.id)
 
     # The external-identifiers help names only connectors this organisation
     # can use today, read from the one connector registry. When none are live
@@ -1320,6 +1369,7 @@ def detail_element(layer, element_type, element_id):
         technical_fields=technical_fields,
         owner_rows=owner_rows,
         owner_assign_url=owner_assign_url,
+        owner_assign_link=owner_assign_link,
         external_links=external_links,
         live_connectors=live_connectors,
         connectors_url=connectors_url,

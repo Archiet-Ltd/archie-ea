@@ -255,7 +255,21 @@
                         {{ owner_rows | map(attribute='user_name') | select | join(', ') or 'No owner recorded' }}
                         {% else %}
                         <span class="font-normal text-muted-foreground">No owner recorded</span>
-                        {% if owner_assign_url %}<a href="{{ owner_assign_url }}" class="ml-2 text-primary hover:underline">Assign owner</a>{% endif %}
+                        {% if owner_assign_url and (can('assign', 'owner') or can('edit', 'application')) %}
+                        <div class="mt-3 space-y-2 font-normal" data-owner-picker data-owners-url="{{ owner_assign_url }}">
+                            <p class="text-sm font-medium text-foreground">Assign owner</p>
+                            <div class="relative">
+                                <input type="text" data-owner-search autocomplete="off" aria-label="Search for an owner by name"
+                                       placeholder="Search by name"
+                                       class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+                                <div data-owner-results class="hidden absolute z-10 mt-1 w-full rounded-md border border-border bg-card max-h-48 overflow-y-auto"></div>
+                            </div>
+                            <button type="button" data-owner-save disabled
+                                    class="inline-flex h-9 items-center justify-center rounded-md border border-input bg-background px-3 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50">Save owner</button>
+                        </div>
+                        {% elif owner_assign_link and (can('assign', 'owner') or can('edit', 'application')) %}
+                        <a href="{{ owner_assign_link }}" class="ml-2 text-primary hover:underline">Assign owner</a>
+                        {% endif %}
                         {% endif %}
                     </dd>
                 </div>
@@ -387,6 +401,10 @@
     {% endif %}
 
 </div>
+
+{% if owner_assign_url %}
+<script src="{{ url_for('static', filename='js/applications/owner_picker.js') }}"></script>
+{% endif %}
 
 <script>
 /* Top-level (window) factory used as x-data="archimateDetail()". The CSP-safe
