@@ -8478,11 +8478,16 @@
     "badge",
     "breadcrumb",
     "button",
+    "card",
+    "dialog",
+    "dropdown-menu",
     "empty",
     "field",
     "input",
     "page-header",
-    "skeleton"
+    "select",
+    "skeleton",
+    "tabs"
    ],
    "controls": {
     "button": 53,
