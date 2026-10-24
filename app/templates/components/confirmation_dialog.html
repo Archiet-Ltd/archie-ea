@@ -30,8 +30,11 @@
     message='This action cannot be undone.',
     confirm_text='Confirm',
     cancel_text='Cancel',
-    variant='destructive'
-) %}
+    variant='destructive',
+    confirm_label=none,
+    cancel_label=none,
+    button_class=none,
+    stop_clicks=true) %}
 <div id="confirm-dialog-{{ id }}" x-data="{ callback: null }" hidden
      @open-confirm-{{ id }}.window="callback = $event.detail?.callback; Platform.modal.open('confirm-dialog-{{ id }}')"
      @keydown.escape.window="Platform.modal.close('confirm-dialog-{{ id }}')"
@@ -48,7 +51,7 @@
         aria-describedby="dialog-desc-{{ id }}">
         
         <div class="bg-card rounded-lg max-w-md w-full p-6 border border-border" 
-             @click.stop>
+             {% if stop_clicks %}@click.stop{% endif %}>
             
             <!-- Icon -->
             {% if variant == 'destructive' %}
