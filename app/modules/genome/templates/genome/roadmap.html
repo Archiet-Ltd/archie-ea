@@ -2,6 +2,7 @@
 {% from 'components/page_header.html' import page_header %}
 {% from 'components/button.html' import button %}
 {% from 'components/empty_state.html' import empty_state %}
+{% from 'components/input.html' import input %}
 {% block title %}Transformation Roadmap{% endblock %}
 
 {% block content %}
@@ -16,7 +17,7 @@
     ) }}
 
     <form method="post" action="{{ url_for('genome_roadmap.generate') }}">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        {{ input(name='csrf_token', type='hidden', value=csrf_token()) }}
         {{ button(text='Generate roadmap', icon='calendar-range', type='submit') }}
     </form>
 
