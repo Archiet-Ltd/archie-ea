@@ -1,0 +1,50 @@
+{# The owner step: who owns this, when they were assigned, and the controls to
+   change or clear them. One implementation for the application page and the
+   element page.
+   rows        owner display rows (user_name, ownership_type_label, assigned_label, remove_url)
+   assign_url  where the picker saves; none hides every control
+   can_edit    whether the signed-in person may assign or clear
+   assign_link where a capability not yet in the capability store is owned instead
+   legacy_text an owner recorded only as text, shown until a person is assigned
+   Pages keep their own data-testid on the wrapper they put this inside. #}
+{% from 'components/button.html' import button %}
+{% from 'components/input.html' import input %}
+{% from 'components/badge.html' import badge %}
+{% if rows %}
+<ul class="space-y-2" aria-label="Owners">
+  {% for row in rows %}
+  <li class="flex items-start justify-between gap-3" data-owner-row>
+    <div class="min-w-0">
+      <p class="break-words font-medium text-foreground">{{ row.user_name }}
+        {% call badge('neutral', class='ml-1') %}{{ row.ownership_type_label }}{% endcall %}
+      </p>
+      {% if row.assigned_label %}
+      <p class="text-xs font-normal text-muted-foreground" data-owner-assigned>Assigned {{ row.assigned_label }}</p>
+      {% endif %}
+    </div>
+    {% if can_edit and assign_url and row.remove_url %}
+    {{ button(text='Clear', variant='outline', size='sm', aria_label='Clear owner ' ~ row.user_name, attrs_dict={'data-owner-clear': row.remove_url}) }}
+    {% endif %}
+  </li>
+  {% endfor %}
+</ul>
+{% elif legacy_text %}
+<p class="font-medium text-foreground">{{ legacy_text }}</p>
+<p class="text-xs font-normal text-muted-foreground">Recorded as text. Assign a person to make it an owner record.</p>
+{% else %}
+<p class="font-normal text-muted-foreground">No owner recorded</p>
+{% endif %}
+{% if can_edit and not assign_url and assign_link %}
+<a href="{{ assign_link }}" class="text-primary hover:underline">Assign owner</a>
+{% endif %}
+{% if can_edit and assign_url %}
+<div class="mt-3 space-y-2 font-normal" data-owner-picker data-owners-url="{{ assign_url }}"{% if rows or legacy_text %} data-owner-replace{% endif %}>
+  <p class="text-sm font-medium text-foreground">{{ 'Change owner' if (rows or legacy_text) else 'Assign owner' }}</p>
+  <div class="relative">
+    {{ input(placeholder='Search by name', aria_label='Search for an owner by name', size='sm', attrs_dict={'data-owner-search': '', 'autocomplete': 'off'}) }}
+    <div data-owner-results class="absolute z-10 mt-1 hidden max-h-48 w-full overflow-y-auto rounded-md border border-border bg-card"></div>
+  </div>
+  <p class="sr-only" role="status" aria-live="polite" data-owner-status></p>
+  {{ button(text='Save owner', variant='outline', disabled=true, attrs_dict={'data-owner-save': ''}) }}
+</div>
+{% endif %}

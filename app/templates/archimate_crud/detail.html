@@ -246,26 +246,12 @@
 
             <dl class="grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2">
                 {% if has_owner_field %}
+                {% set rows = owner_rows %}{% set assign_url = owner_assign_url %}{% set legacy_text = legacy_owner_text %}{% set assign_link = owner_assign_link %}
+                {% set can_edit = can('assign', 'owner') or can('edit', 'application') %}
                 <div class="text-sm" data-testid="element-owner">
                     <dt class="text-muted-foreground">Owner</dt>
                     <dd class="mt-0.5 font-medium">
-                        {% if owner_rows %}
-                        {{ owner_rows | map(attribute='user_name') | select | join(', ') or 'No owner recorded' }}
-                        {% else %}
-                        <span class="font-normal text-muted-foreground">No owner recorded</span>
-                        {% if owner_assign_url and (can('assign', 'owner') or can('edit', 'application')) %}
-                        <div class="mt-3 space-y-2 font-normal" data-owner-picker data-owners-url="{{ owner_assign_url }}">
-                            <p class="text-sm font-medium text-foreground">Assign owner</p>
-                            <div class="relative">
-                                {{ input(placeholder='Search by name', aria_label='Search for an owner by name', class='h-9', attrs_dict={'data-owner-search': '', 'autocomplete': 'off'}) }}
-                                <div data-owner-results class="hidden absolute z-10 mt-1 w-full rounded-md border border-border bg-card max-h-48 overflow-y-auto"></div>
-                            </div>
-                            {{ button(text='Save owner', variant='outline', disabled=true, attrs_dict={'data-owner-save': ''}) }}
-                        </div>
-                        {% elif owner_assign_link and (can('assign', 'owner') or can('edit', 'application')) %}
-                        <a href="{{ owner_assign_link }}" class="ml-2 text-primary hover:underline">Assign owner</a>
-                        {% endif %}
-                        {% endif %}
+                        {% include 'partials/owner_step.html' with context %}
                     </dd>
                 </div>
                 {% endif %}
