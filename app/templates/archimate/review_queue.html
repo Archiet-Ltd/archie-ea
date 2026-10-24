@@ -26,8 +26,8 @@
     {% endmacro %}
     {{ page_shell(title='Relationship Review Queue', subtitle='Review AI-suggested ArchiMate relationships. Accept to add to the enterprise graph, reject to discard.', actions_caller=_ps_actions) }}
     <div class="flex items-center gap-3 mb-4 p-3 rounded-lg border border-input bg-card">
-        {{ button(text='Accept all > 80%', variant='primary', on_click='bulkAccept(0.8)', disabled='processing') }}
-        {{ button(text='Accept all > 60%', variant='outline', on_click='bulkAccept(0.6)', disabled='processing') }}
+        {{ button(text='Accept all > 80%', variant='primary', on_click='bulkAccept(0.8)', attrs_dict={':disabled': 'processing'}) }}
+        {{ button(text='Accept all > 60%', variant='outline', on_click='bulkAccept(0.6)', attrs_dict={':disabled': 'processing'}) }}
         <span class="text-xs text-muted-foreground ml-auto" x-text="loadError ? '— pending suggestions' : suggestions.length + ' pending suggestions'"></span>
         {% call native_select(aria_label='Sort By', attrs_dict={'x-model': 'sortBy', '@change': 'loadSuggestions()'}) %}
             <option value="confidence">Sort: Confidence</option>
