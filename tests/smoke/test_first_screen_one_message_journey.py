@@ -47,7 +47,7 @@ def test_public_home_fold_is_one_message(browser, live_server):
         proof = page.locator('[data-testid="home-hero-proof"]')
         assert proof.evaluate("e => e.complete && e.naturalWidth > 0")
         assert _top(page, '[data-testid="home-hero-proof"]') < FOLD["height"]
-        assert "Calibration Ledger" in proof.get_attribute("alt")
+        assert "What breaks if" in proof.get_attribute("alt")
         # nothing else: no licence line, and the next section starts below the fold
         assert "AGPL" not in hero.inner_text()
         assert _top(page, "section.home-section") >= FOLD["height"]
@@ -119,5 +119,56 @@ def test_populated_workspace_opens_on_question_and_cited_answer(browser, live_se
             page.locator('[data-testid="kpi-tile-applications"]').click()
             page.wait_for_url("**/applications/**", timeout=PAGE_TIMEOUT)
             assert len(page.locator("main").first.inner_text().strip()) > 50
+    finally:
+        context.close()
+
+
+@pytest.mark.parametrize("viewport", [FOLD, PHONE], ids=["1440", "390"])
+def test_empty_workspace_fold_holds_only_the_one_message(browser, live_server, seeded, viewport):
+    """Signed in as a new architect: the welcome line and the company-kind block wait below the fold."""
+    email, _ = _empty_organisation_user(live_server)
+    context, page = _page(browser, viewport)
+    try:
+        _login(page, live_server, email)
+        page.goto(live_server + "/dashboard/overview", wait_until="networkidle", timeout=PAGE_TIMEOUT)
+        expect(page.locator('[data-testid="first-message"]')).to_be_in_viewport()
+        for testid in ("welcome-banner", "guided-setup", "company-kind-selector"):
+            target = page.locator('[data-testid="%s"]' % testid)
+            if target.count():
+                assert _top(page, '[data-testid="%s"]' % testid) >= viewport["height"], testid
+        # the company-kind choice is still there, one scroll down, and works
+        page.locator('[data-testid="company-kind-selector"]').scroll_into_view_if_needed()
+        expect(page.locator('[data-testid="company-kind-selector"]')).to_be_visible()
+    finally:
+        context.close()
+
+
+def test_first_answer_names_the_owner_and_its_source_with_a_link(browser, live_server, seeded):
+    """Signed in as the architect who loaded the sample company: the capability the first answer
+    reaches names the owner the capability page shows, and its source control names the import
+    and opens the record."""
+    email, _ = _empty_organisation_user(live_server)
+    context, page = _page(browser, FOLD)
+    try:
+        _login(page, live_server, email)
+        page.goto(live_server + "/dashboard/overview", wait_until="networkidle", timeout=PAGE_TIMEOUT)
+        page.locator('[data-testid="first-action-sample"]').click()
+        cascade = page.locator('[data-testid="overview-cascade"]')
+        expect(cascade.locator("li[data-depth]").first).to_be_visible(timeout=PAGE_TIMEOUT * 2)
+        rows = cascade.locator("li[data-depth]")
+        capability = rows.filter(has_text="Sell to customers online")
+        expect(capability).to_contain_text("Startup CTO")
+        expect(capability).not_to_contain_text("No owner recorded")
+
+        # the source control says where the fact came from, with the date, and opens the record
+        first = cascade.locator("li[data-depth]:not([data-root])").first
+        first.get_by_role("button", name="Source of this connection").click()
+        tip = first.get_by_role("tooltip")
+        expect(tip).to_contain_text("Imported from sample-company.oef.xml")
+        expect(tip).to_contain_text("Recorded")
+        expect(tip).not_to_contain_text("Recorded in the model")
+        tip.locator('[data-testid="cascade-source-link"]').click()
+        page.wait_for_url("**/archimate/elements/*/impact", timeout=PAGE_TIMEOUT)
+        assert len(page.locator("main").first.inner_text().strip()) > 50
     finally:
         context.close()

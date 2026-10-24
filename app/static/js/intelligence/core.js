@@ -526,7 +526,15 @@
         var ownerName = owners.length ? owners.map(function(o) { return o.name; }).join(', ') : null;
         var computed = timeText(relation.computed_at);
         var stale = relation.stale === true;
+        // Where an explicit connection came from: the import, or the person who drew it,
+        // with the date, and a link to the record it rests on.
+        var provenance = !derived && relation.provenance ? relation.provenance : null;
+        var sourceText = provenance && provenance.text && provenance.text !== 'origin not recorded' ? provenance.text : null;
+        var recorded = provenance ? timeText(provenance.recorded_at) : null;
         return {
+            sourceName: sourceText,
+            sourceTimestamp: sourceText && recorded ? 'Recorded ' + recorded : null,
+            sourceHref: sourceText ? '/archimate/elements/' + row.element_id + '/impact' : null,
             key: derived
                 ? 'derived-' + (relation.derived_id != null ? relation.derived_id : row.element_id + '-' + relation.depth)
                 : 'explicit-' + row.element_id + '-' + relation.depth,

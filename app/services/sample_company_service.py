@@ -125,7 +125,10 @@ def add_working_data(org_id: int, user, log) -> Dict[str, int]:
     from app.models.business_capabilities import BusinessCapability
     from app.models.risk import Risk, RiskStatus
     from app.models.solution_models import Solution
+    from app.commands.project_capabilities import SOURCE_TABLE
+    from app.models.unified_capability import UnifiedCapability
     from app.services.application_cost_accessor import sync_cost_fact
+    from app.services.capability_ownership_service import set_capability_owner
 
     elements = {
         e.name: e
@@ -160,6 +163,22 @@ def add_working_data(org_id: int, user, log) -> Dict[str, int]:
         if element is None and row.archimate_element_id:
             mirrors.append(int(row.archimate_element_id))
         note("business_capability", row)
+        # The capability's owner goes in the one ownership record, so an answer
+        # that reaches this capability names the same person the capability page does.
+        projected = UnifiedCapability.query.filter_by(
+            organization_id=org_id, source_table=SOURCE_TABLE, source_id=str(row.id),
+        ).first()
+        if projected is not None:
+            db.session.refresh(row)
+            if projected.archimate_element_id is None and row.archimate_element_id:
+                # The mirror element is created after the first projection; carry its id across.
+                projected.archimate_element_id = row.archimate_element_id
+            record = set_capability_owner(
+                capability_id=projected.id, user_id=user.id, organization_id=org_id,
+                assigned_by=user.id, replace_primary=True,
+            )
+            db.session.flush()
+            note("application_owners", record)
 
     applications = []
     for (element_name, name, lifecycle, component_type, vendor, licence, infra, capability) in _APPLICATIONS:

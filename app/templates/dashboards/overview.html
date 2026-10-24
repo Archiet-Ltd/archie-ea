@@ -53,31 +53,11 @@
         breadcrumb=[('Home', none), ('Dashboard', none)]
     ) }}
     {# Workspace links removed from overview per council-07; all links remain reachable from the sidebar my_work zone. #}
-    {% if mode == 'guided' and not current_user.welcome_banner_dismissed_at %}
-    <div x-data="{ show: true, dismiss() {
-                this.show = false;
-                // Use Platform.fetch for automatic CSRF and error handling
-                // silent: true because we don't want a toast if the request fails (banner will reappear on next load)
-                (window.Platform?.fetch || window.apiFetch || fetch)('/dashboard/api/welcome-dismiss', {
-                    method: 'POST',
-                    body: {}, // empty object ensures JSON serialization
-                    silent: true,
-                }).catch(() => { /* swallow-ok: best-effort persist; the banner is already hidden for this visit and simply reappears next load if the POST failed, which is not worth an error toast */ });
-             } }"
-         x-show="show"
-         data-testid="welcome-banner"
-         class="flex h-10 items-center justify-between gap-3 rounded-md border border-border bg-card px-4 text-13">
-        <p class="text-sm text-foreground min-w-0">
-            <span class="font-medium">Welcome to {{ config.APP_NAME }}</span>
-            <span class="text-muted-foreground"> — <a href="/ai-chat" class="text-info hover:underline">ask the AI architect</a> anytime, no setup needed.</span>
-        </p>
-        {{ button(variant='ghost', size='icon', icon='x', on_click='dismiss()', aria_label='Dismiss welcome message', class='shrink-0') }}
-    </div>
-    {% endif %}
     {% if mode == 'guided' %}
     {# ══════════════════════════════════════════════════════════════════════
        GUIDED MODE — sparse org: a setup journey, not a failing report card.
        ══════════════════════════════════════════════════════════════════════ #}
+    <div class="min-h-screen" data-testid="first-fold">
     {% call card(class='') %}
     <div data-testid="first-message">
         {% call card_header() %}
@@ -106,8 +86,30 @@
         {% endcall %}
     </div>
     {% endcall %}
+    </div>
 
-    {# The checklist sits beneath the one message. #}
+    {# The welcome line and the checklist sit beneath the one message, below the fold. #}
+    {% if mode == 'guided' and not current_user.welcome_banner_dismissed_at %}
+    <div x-data="{ show: true, dismiss() {
+                this.show = false;
+                // Use Platform.fetch for automatic CSRF and error handling
+                // silent: true because we don't want a toast if the request fails (banner will reappear on next load)
+                (window.Platform?.fetch || window.apiFetch || fetch)('/dashboard/api/welcome-dismiss', {
+                    method: 'POST',
+                    body: {}, // empty object ensures JSON serialization
+                    silent: true,
+                }).catch(() => { /* swallow-ok: best-effort persist; the banner is already hidden for this visit and simply reappears next load if the POST failed, which is not worth an error toast */ });
+             } }"
+         x-show="show"
+         data-testid="welcome-banner"
+         class="flex h-10 items-center justify-between gap-3 rounded-md border border-border bg-card px-4 text-13">
+        <p class="text-sm text-foreground min-w-0">
+            <span class="font-medium">Welcome to {{ config.APP_NAME }}</span>
+            <span class="text-muted-foreground"> — <a href="/ai-chat" class="text-info hover:underline">ask the AI architect</a> anytime, no setup needed.</span>
+        </p>
+        {{ button(variant='ghost', size='icon', icon='x', on_click='dismiss()', aria_label='Dismiss welcome message', class='shrink-0') }}
+    </div>
+    {% endif %}
     {% call section_card(title="Set up your workspace") %}
     <div class="space-y-4" data-testid="guided-setup">
         <p class="text-sm text-muted-foreground max-w-[60ch]">
