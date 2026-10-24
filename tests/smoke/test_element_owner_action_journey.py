@@ -48,6 +48,15 @@ def _seed_elements(org_id):
         )
         db.session.add_all([capability, component])
         db.session.commit()
+        # This journey is about a capability not yet projected into the one
+        # capability store, which offers a link to the capability map; remove
+        # the projection the write-time sync may already have made.
+        db.session.execute(
+            db.text("DELETE FROM unified_capabilities WHERE source_table = "
+                    "'business_capability' AND source_id = :sid"),
+            {"sid": str(capability.id)},
+        )
+        db.session.commit()
         ids = {
             "capability_id": capability.id,
             "application_id": component.id,
@@ -115,6 +124,8 @@ def test_assign_owner_action_shows_on_application_and_element_pages(page, live_s
     # The application page states the same gap and offers the same step.
     page.goto(_application_url(live_server, ids_a), wait_until="networkidle",
               timeout=PAGE_TIMEOUT)
+    page.locator("[data-testid='application-owner-empty']").wait_for(
+        state="visible", timeout=PAGE_TIMEOUT)
     assert "No owner recorded" in page.inner_text("main")
     assign = page.locator("[data-owner-picker] [data-owner-search]")
     assert assign.count() == 1, "the application page has no owner picker"
@@ -249,11 +260,19 @@ def _seed_generic_application_and_capability(org_id):
         )
         db.session.add_all([component, capability])
         db.session.flush()
-        unified = UnifiedCapability(
-            name=capability.name, organization_id=org_id,
+        # The capability's write-time projection may already have created the
+        # unified row (it does once the provenance index exists); add it only
+        # when it has not.
+        unified = UnifiedCapability.query.filter_by(
             source_table="business_capability", source_id=str(capability.id),
-        )
-        db.session.add(unified)
+            organization_id=org_id,
+        ).first()
+        if unified is None:
+            unified = UnifiedCapability(
+                name=capability.name, organization_id=org_id,
+                source_table="business_capability", source_id=str(capability.id),
+            )
+            db.session.add(unified)
         db.session.commit()
         ids = {
             "element_id": element.id,
