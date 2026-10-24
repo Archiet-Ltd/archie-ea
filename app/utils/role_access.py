@@ -510,12 +510,15 @@ def get_all_roles_with_access(section: str) -> List[str]:
 # agent) is a new, genuinely needed platform_admin-only screen, not a
 # duplicate of anything already in the Admin zone. No fold is available for
 # the same reason as above; taking the budget 32 -> 33.
-SIDEBAR_LINK_BUDGET = 33
+# Workspace (24 Oct 2026): Connections and Billing, one lasting place for the two
+# setup pages an administrator needs from any screen; taking the budget 33 -> 35.
+SIDEBAR_LINK_BUDGET = 35
 
 _ZONE_TITLES = {
     "home": "Home",
     "my_work": "My work",
     "library": "Library",
+    "workspace": "Workspace",
     "governance": "Governance",
     "admin": "Admin",
 }
@@ -567,6 +570,14 @@ _ASK_LINK = _link("Ask a question", "unified_ai_chat.index", "message-square")
 _APPROVAL_INBOX_LINK = _link(
     "Approval Inbox", "unified_ai_chat.approval_inbox", "inbox", requires="general"
 )
+
+# Workspace: the organisation's own setup, in the same place for everyone who may use
+# it. Both pages are @admin_required, so both links carry requires="admin" and a
+# person the route would refuse never sees them.
+_WORKSPACE_LINKS = [
+    _link("Connections", "m365_connector.connectors_index", "plug", requires="admin"),
+    _link("Billing", "billing.billing_index", "credit-card", requires="admin"),
+]
 
 _HOME_LINKS = [
     _link("Dashboard Overview", "dashboard.overview", "layout-dashboard"),
@@ -1058,6 +1069,8 @@ def _build_zones(role: str) -> List[Dict]:
     zones = [
         _zone("home", home_links),
         _zone("my_work", [_ASK_LINK] + _MY_WORK_LINKS[role]),
+        # Above Library, so the group is on screen without scrolling the sidebar.
+        _zone("workspace", _WORKSPACE_LINKS),
         _zone("library", library_links),
     ]
     if role in _BOARD_ROLES:
