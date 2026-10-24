@@ -180,47 +180,37 @@ def capture_arb(browser, base, password, wide: bool) -> tuple[int, int]:
 
 
 def capture_home_impact(browser, base, password, wide: bool) -> tuple[int, int]:
-    """The 'what breaks if this fails' answer: the twin map centred on one system.
+    """The cited answer card: the sentence, what depends on the system and who owns each.
 
-    Taken at 740px viewport (desktop) so the crop is 644 CSS px wide -- the width
-    of the hero's figure column -- and shown there at 1:1.
+    The first screen of the public home shows this crop, so it is kept short: the
+    question sentence, the asked-about row and the first dependents (four on desktop, two on a
+    phone), which puts the whole image above the fold at 1440 by 900 and 375 by 812.
     """
-    vw, vh = (740, 1400) if wide else (390, 1800)
+    vw, vh = (1180, 1100) if wide else (440, 1400)
+    rows_shown = 4 if wide else 2
     ctx = browser.new_context(viewport={"width": vw, "height": vh}, device_scale_factor=DPR)
     page = ctx.new_page()
-    _login(page, base, DEMO_EMAIL, password)
-    page.goto(base + "/intelligence/twin-map", wait_until="networkidle")
-    page.wait_for_timeout(1500)
-    _dismiss_onboarding(page)
-    page.fill("#twin-picker-input", SUBJECT)
-    page.wait_for_selector("#twin-picker-listbox [role=option]", timeout=20000)
-    page.locator("#twin-picker-listbox [role=option]").first.click()
-    page.wait_for_timeout(2500)
-    button = page.get_by_role("button", name="Work them out now")
-    if button.count():
-        button.click()
-        page.wait_for_timeout(10000)
-    page.locator("body").click(position={"x": 2, "y": 2})
-    _tidy(page)
-    top = page.locator("#twin-picker-input").locator("xpath=ancestor::*[contains(@class,'rounded')][1]").bounding_box()
-    tech = page.get_by_text("Technology", exact=True).last.bounding_box()
-    main = _box(page, "main")
-    pad = 48 if wide else 16
-    bottom = tech["y"] - 6
-    if not wide:
-        # Phone: the map alone (the picker and controls would make the crop two screens tall).
-        goals = page.get_by_text("Goals", exact=True).last.bounding_box()
-        top = {"y": goals["y"] - 10}
-    clip = {
-        "x": main["x"] + pad,
-        "y": top["y"],
-        "width": main["width"] - 2 * pad,
-        "height": bottom - top["y"],
-    }
-    name = "impact-answer.webp" if wide else "impact-answer-mobile.webp"
-    size = _webp(_shoot(page, clip), IMG / "home" / name)
-    ctx.close()
-    return size
+    try:
+        _login(page, base, DEMO_EMAIL, password)
+        page.goto(base + "/dashboard/overview", wait_until="networkidle")
+        _dismiss_onboarding(page)
+        page.wait_for_selector('[data-testid="overview-cascade"] [data-depth]', state="visible", timeout=30000)
+        page.wait_for_timeout(1500)
+        _tidy(page)
+        page.evaluate("window.scrollTo(0, 0)")
+        card = _box(page, "#overview-answer-cascade")
+        rows = page.locator('[data-testid="overview-cascade"] [data-depth]')
+        if rows.count() < rows_shown + 1:
+            raise SystemExit("the answer card has too few rows to photograph: run seed-demo-company first")
+        last = rows.nth(rows_shown).bounding_box()
+        clip = {
+            "x": card["x"], "y": card["y"], "width": card["width"],
+            "height": last["y"] + last["height"] + 4 - card["y"],
+        }
+        name = "impact-answer.webp" if wide else "impact-answer-mobile.webp"
+        return _webp(_shoot(page, clip), IMG / "home" / name)
+    finally:
+        ctx.close()
 
 
 def capture_home_product(browser, base, password, wide: bool) -> tuple[int, int]:
