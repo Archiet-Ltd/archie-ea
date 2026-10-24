@@ -12,7 +12,8 @@
     class='',
     error=none,
     aria_describedby=none,
-    aria_label=none
+    aria_label=none,
+    attrs={}
 ) %}
     <input
         {% if id %}id="{{ id }}"{% endif %}
@@ -25,6 +26,7 @@
         {% if error %}aria-invalid="true"{% endif %}
         {% if aria_describedby %}aria-describedby="{{ aria_describedby }}"{% elif error and id %}aria-describedby="{{ id }}-error"{% endif %}
         {% if aria_label %}aria-label="{{ aria_label }}"{% endif %}
+        {{ attrs|xmlattr }}
         class="flex h-10 w-full rounded-md border {% if error %}border-destructive{% else %}border-input{% endif %} bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 {{ class }}"
     />
     {% if error and id %}
@@ -50,7 +52,8 @@
     class='',
     error=none,
     aria_describedby=none,
-    aria_label=none
+    aria_label=none,
+    attrs={}
 ) %}
     <textarea
         {% if id %}id="{{ id }}"{% endif %}
@@ -61,6 +64,7 @@
         {% if error %}aria-invalid="true"{% endif %}
         {% if aria_describedby %}aria-describedby="{{ aria_describedby }}"{% elif error and id %}aria-describedby="{{ id }}-error"{% endif %}
         {% if aria_label %}aria-label="{{ aria_label }}"{% endif %}
+        {{ attrs|xmlattr }}
         rows="{{ rows }}"
         class="flex min-h-[80px] w-full rounded-md border {% if error %}border-destructive{% else %}border-input{% endif %} bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 {{ class }}"
     >{{ caller() if caller }}</textarea>
