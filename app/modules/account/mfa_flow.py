@@ -48,11 +48,12 @@ def run_mfa_challenge(user, complete):
             secret = mfa_service.generate_secret()
             session["_mfa_enroll_secret"] = secret
         uri = mfa_service.provisioning_uri(user, secret)
+        error = None
         if request.method == "POST":
             try:
                 recovery_codes = mfa_service.enroll(user, secret, request.form.get("code", ""))
             except mfa_service.MFAError as exc:
-                flash(str(exc), "form-error")
+                error = str(exc)
             else:
                 session.pop("_mfa_enroll_secret", None)
                 return render_template(
@@ -64,8 +65,10 @@ def run_mfa_challenge(user, complete):
             secret=secret,
             provisioning_uri=uri,
             qr_data_uri=_qr_data_uri(uri),
+            error=error,
         )
 
+    error = None
     if request.method == "POST":
         code = request.form.get("code", "")
         if request.form.get("use_recovery"):
@@ -73,8 +76,8 @@ def run_mfa_challenge(user, complete):
                 return complete(user)
         elif mfa_service.verify_login_code(user, code):
             return complete(user)
-        flash("That code was not accepted. Try again.", "form-error")
+        error = "That code was not accepted. Try again."
 
     return render_template(
-        "account/mfa_challenge.html", use_recovery=bool(request.form.get("use_recovery") or request.args.get("recovery"))
+        "account/mfa_challenge.html", error=error, use_recovery=bool(request.form.get("use_recovery") or request.args.get("recovery"))
     )

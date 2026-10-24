@@ -86,7 +86,7 @@
           {{ input(
             id='mfa-code', name='code', type='text', inputmode='numeric', pattern='[0-9]*',
             autocomplete='one-time-code', maxlength=6, required=True, autofocus=True,
-            class='text-lg tracking-widest text-center', placeholder='000000'
+            class='text-lg tracking-widest text-center', placeholder='000000', error=error
           ) }}
         </div>
         {{ button(text='Verify and continue', size='lg', class='w-full', type='submit') }}

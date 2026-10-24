@@ -27,12 +27,12 @@
           {% if use_recovery %}
           {% call label(for='mfa-code', required=True) %}Recovery code{% endcall %}
           {{ input(id='mfa-code', name='code', type='text', autocomplete='off', maxlength=16,
-                   required=True, autofocus=True, class='font-mono tracking-widest text-center') }}
+                   required=True, autofocus=True, class='font-mono tracking-widest text-center', error=error) }}
           {% else %}
           {% call label(for='mfa-code', required=True) %}6-digit code{% endcall %}
           {{ input(id='mfa-code', name='code', type='text', inputmode='numeric', pattern='[0-9]*',
                    autocomplete='one-time-code', maxlength=6, required=True, autofocus=True,
-                   class='text-lg tracking-widest text-center') }}
+                   class='text-lg tracking-widest text-center', error=error) }}
           {% endif %}
         </div>
         {{ button(text='Verify', size='lg', class='w-full', type='submit') }}
