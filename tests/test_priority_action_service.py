@@ -322,3 +322,26 @@ def test_foreign_gap_record_answers_404(client, login_as, db_session, make_org, 
     db_session.expunge_all()  # .get() answers from the identity map on a hit, which a request never has
     response = client.get("/architecture/implementation/Gap/%d" % foreign_id)
     assert response.status_code == 404
+
+
+def test_each_gap_is_named_once_and_listed_once(db_session, make_org, tenant_ctx):
+    org, other = make_org("a"), make_org("b")
+    with tenant_ctx(other.id):
+        _gap(db_session, other, "Gap: Billing", "high")
+    with tenant_ctx(org.id):
+        _gap(db_session, org, "Gap: Gap: Asset Lifecycle Management", "medium")
+        _gap(db_session, org, "Gap: Asset Lifecycle Management", "critical")
+        _gap(db_session, org, "Asset Lifecycle Management", "low")
+        _gap(db_session, org, "Gap: Data Analytics", "high")
+        result = svc.prioritised_actions(org.id, today=TODAY)
+    actions = [r["action"] for r in result["rows"]]
+    assert actions == [
+        "Convert the Asset Lifecycle Management to a work package",
+        "Convert the Data Analytics to a work package",
+    ]
+    assert result["total"] == 2
+    assert not any("Gap:" in a for a in actions)
+    first = result["rows"][0]
+    assert first["severity"] == "Critical"
+    assert "3 open gap records share this name" in first["why"]
+    assert len({(r["action"]) for r in result["rows"]}) == len(result["rows"])
