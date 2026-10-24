@@ -66,7 +66,8 @@
     trigger_size='default',
     trigger_testid=none,
     trigger_aria_label=none,
-    trigger_title=none
+    trigger_title=none,
+    trigger_attrs_dict={}
 ) %}
 {% set unique_id = id or 'dropdown-' ~ range(1000, 9999) | random %}
 
@@ -98,7 +99,7 @@
         :aria-expanded="menuOpen"
         aria-haspopup="true"
         class="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 {{ 'h-8' if trigger_size == 'sm' else ('h-9' if trigger_size == 'md' else 'h-10') }} {{ ('w-8' if trigger_size == 'sm' else ('w-9' if trigger_size == 'md' else 'w-10')) if trigger_icon_only else ('px-3' if trigger_size in ('sm', 'md') else 'px-4 py-2') }} {{ trigger_variants.get(trigger_variant, trigger_variants['default']) }} {{ trigger_class }}"
-     aria-label="{{ trigger_aria_label or 'Open' }}"{% if trigger_testid %} data-testid="{{ trigger_testid }}"{% endif %}{% if trigger_title %} title="{{ trigger_title }}"{% endif %}>
+     aria-label="{{ trigger_aria_label or 'Open' }}"{% if trigger_testid %} data-testid="{{ trigger_testid }}"{% endif %}{% if trigger_title %} title="{{ trigger_title }}"{% endif %}{% for attr_name, attr_value in trigger_attrs_dict.items() %} {{ attr_name }}="{{ attr_value }}"{% endfor %}>
         {% if trigger_icon %}
         <i data-lucide="{{ trigger_icon }}" class="{% if not trigger_icon_only %}mr-2{% endif %} w-4 h-4" aria-hidden="true"></i>
         {% endif %}
