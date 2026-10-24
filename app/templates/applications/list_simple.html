@@ -5,6 +5,8 @@
 {% from 'components/skeleton.html' import skeleton_table %}
 {% from 'components/empty_state.html' import empty_state %}
 {% from 'macros/page_shell.html' import page_shell, stat_card %}
+{% from 'components/provenance.html' import explained_value %}
+{% from 'components/completeness_ring.html' import completeness_ring %}
 
 {% block title %}Applications{% endblock %}
 
@@ -200,10 +202,28 @@
   {# ─ MAIN TABLE CARD ─ #}
   <div data-slot="card" class="rounded-lg border border-border bg-card" role="region" aria-label="Applications table">
     <div class="flex items-center justify-between gap-3 border-b border-border px-3 py-2">
-      <div class="flex min-w-0 flex-1 items-center gap-2 rounded-md border border-warning/40 bg-warning/10 px-3 py-1.5 text-xs text-foreground" role="status" data-testid="data-quality-alert">
+      {# T-council-10: non-truncating data quality summary with filterable links #}
+      <div class="flex min-w-0 flex-1 items-center gap-2 rounded-md border border-warning/40 bg-warning/10 px-3 py-1.5 text-xs text-foreground flex-wrap" role="status" data-testid="data-quality-alert">
         <i data-lucide="alert-triangle" class="h-3.5 w-3.5 shrink-0 text-warning-emphasis" aria-hidden="true"></i>
         <span class="font-medium text-warning-emphasis">Data quality</span>
-        <span class="truncate">{{ stats.owner_assigned|dash }} of {{ stats.total|dash }} applications in the portfolio have a named owner (a business owner on record, or an application manager assigned) · {{ stats.vendor_assigned|dash }} of {{ stats.total|dash }} applications in the portfolio have a vendor recorded · {{ stats.decommissioned|dash }} of {{ stats.total|dash }} applications in the portfolio decommissioned</span>
+        <span class="flex flex-wrap items-center gap-x-1">
+          {%- set no_owner_count = stats.total - stats.owner_assigned -%}
+          {%- set no_capability_count = stats.total - stats.capability_mapped -%}
+          {%- set no_vendor_count = stats.total - stats.vendor_assigned -%}
+          {%- if no_owner_count > 0 -%}
+          <a href="{{ url_for('unified_applications.application_list', no_owner='true') }}" class="font-medium text-warning-emphasis hover:underline">{{ no_owner_count }} of {{ stats.total }} have no owner</a>
+          {%- else -%}
+          <span>All {{ stats.total }} have an owner</span>
+          {%- endif -%}
+          {%- if no_capability_count > 0 or no_vendor_count > 0 %}<span class="text-muted-foreground">·</span>{% endif -%}
+          {%- if no_capability_count > 0 -%}
+          <a href="{{ url_for('unified_applications.application_list', no_capability='true') }}" class="font-medium text-warning-emphasis hover:underline">{{ no_capability_count }} of {{ stats.total }} have no capability</a>
+          {%- endif -%}
+          {%- if no_vendor_count > 0 %}<span class="text-muted-foreground">·</span>{% endif -%}
+          {%- if no_vendor_count > 0 -%}
+          <a href="{{ url_for('unified_applications.application_list', no_vendor='true') }}" class="font-medium text-warning-emphasis hover:underline">{{ no_vendor_count }} of {{ stats.total }} have no vendor</a>
+          {%- endif -%}
+        </span>
         <a href="{{ url_for('enterprise_crud.data_freshness_cockpit') }}" class="ml-auto shrink-0 font-medium text-info hover:underline">View full data-freshness report</a>
       </div>
       <div class="flex items-center gap-2">
@@ -296,6 +316,30 @@
         </div>
       </div>
     </div>
+    {# T-council-10: active filter chips #}
+    {% if active_filters.no_owner or active_filters.no_capability or active_filters.no_vendor %}
+    <div class="flex items-center gap-2 px-4 py-2 border-b bg-muted/30" data-testid="active-filters">
+      <span class="text-xs font-medium text-muted-foreground">Active filters:</span>
+      {% if active_filters.no_owner %}
+      <a href="{{ url_for('unified_applications.application_list') }}" class="inline-flex items-center gap-1 rounded-md border border-border bg-background px-2 py-1 text-xs font-medium text-foreground hover:bg-muted/50">
+        No owner
+        <i data-lucide="x" class="h-3 w-3" aria-hidden="true"></i>
+      </a>
+      {% endif %}
+      {% if active_filters.no_capability %}
+      <a href="{{ url_for('unified_applications.application_list') }}" class="inline-flex items-center gap-1 rounded-md border border-border bg-background px-2 py-1 text-xs font-medium text-foreground hover:bg-muted/50">
+        No capability
+        <i data-lucide="x" class="h-3 w-3" aria-hidden="true"></i>
+      </a>
+      {% endif %}
+      {% if active_filters.no_vendor %}
+      <a href="{{ url_for('unified_applications.application_list') }}" class="inline-flex items-center gap-1 rounded-md border border-border bg-background px-2 py-1 text-xs font-medium text-foreground hover:bg-muted/50">
+        No vendor
+        <i data-lucide="x" class="h-3 w-3" aria-hidden="true"></i>
+      </a>
+      {% endif %}
+    </div>
+    {% endif %}
     <div x-show="!loading && selectedIds.size > 0" x-cloak
       x-transition:enter="transition ease-out duration-150" x-transition:enter-start="opacity-0 -translate-y-1" x-transition:enter-end="opacity-100 translate-y-0"
       class="flex items-center gap-3 px-4 py-2.5 bg-primary/5 border-b" role="toolbar" aria-label="Bulk actions" data-testid="bulk-toolbar">
@@ -377,14 +421,7 @@
                 @change="toggleSelectAll($event.target.checked)"
                 class="rounded border-input h-4 w-4 cursor-pointer" aria-label="Select all">
             </th>
-            {# ARCH-100: sortable headers. sortBy() toggles asc/desc and re-navigates
-               with the current filters + page preserved (see list.js _navigate()). #}
-            <th scope="col" class="h-10 px-2 align-middle text-left w-20">
-              <button type="button" @click="sortBy('id')" data-testid="th-sort-id"
-                class="inline-flex items-center gap-1 hover:text-foreground transition-colors" aria-label="Sort by ID">
-                ID<i data-lucide="chevron-up" class="h-3 w-3" x-show="sort === 'id' && dir === 'asc'" x-cloak aria-hidden="true"></i><i data-lucide="chevron-down" class="h-3 w-3" x-show="sort === 'id' && dir === 'desc'" x-cloak aria-hidden="true"></i>
-              </button>
-            </th>
+            {# T-council-10: ID column removed (still on fact sheet and exports) #}
             <th scope="col" class="h-10 px-2 align-middle text-left min-w-[180px]">
               <button type="button" @click="sortBy('name')" data-testid="th-sort-name"
                 class="inline-flex items-center gap-1 hover:text-foreground transition-colors" aria-label="Sort by Application name">
@@ -404,12 +441,8 @@
                 Lifecycle Status<i data-lucide="chevron-up" class="h-3 w-3" x-show="sort === 'lifecycle_status' && dir === 'asc'" x-cloak aria-hidden="true"></i><i data-lucide="chevron-down" class="h-3 w-3" x-show="sort === 'lifecycle_status' && dir === 'desc'" x-cloak aria-hidden="true"></i>
               </button>
             </th>
-            {# Hidden until data enrichment — Criticality, Business Owner, Vendor #}
-            {#
-            <th scope="col" class="h-10 px-2 align-middle text-left min-w-[130px]">Criticality</th>
-            <th scope="col" class="h-10 px-2 align-middle text-left min-w-[140px]">Business Owner</th>
-            <th scope="col" class="h-10 px-2 align-middle text-left min-w-[130px]">Vendor</th>
-            #}
+            <th scope="col" class="h-10 px-2 align-middle text-left min-w-[140px]">Owner</th>
+            <th scope="col" class="h-10 px-2 align-middle text-center w-20">Record</th>
             <th scope="col" class="h-10 px-2 align-middle text-left min-w-[150px]">Capability</th>
             <th scope="col" class="h-10 px-2 align-middle text-right min-w-[180px]">Actions</th>
           
@@ -417,10 +450,11 @@
 {% call dense_table(header=_dt_header_27049, testid='applications-table') %}
           {% for app in applications %}
           {%- set sk = (app.lifecycle_status or app.deployment_status or '').lower() -%}
-          {%- set si = STATUS_MAP.get(sk, {'label': app.lifecycle_status or app.deployment_status or 'Not set', 'cls': 'bg-muted text-muted-foreground'}) -%}
+          {%- set si = STATUS_MAP.get(sk, {'label': app.lifecycle_status or app.deployment_status, 'cls': 'bg-muted text-muted-foreground'}) -%}
           {%- set ck = (app.business_criticality or '').lower() -%}
           {%- set cc = CRIT_MAP.get(ck, 'bg-muted text-muted-foreground') -%}
           {%- set pc = app.capability_mappings[0] if app.capability_mappings else none -%}
+          {%- set app_owners = owners_by_app.get(app.id, []) -%}
           <tr class="group transition-colors hover:bg-muted/50" data-app-id="{{ app.id }}" data-testid="app-row-{{ app.id }}">
             <td class="px-2 align-middle">
               <input type="checkbox" class="row-select rounded border-input h-4 w-4 cursor-pointer"
@@ -428,14 +462,14 @@
                 @change="toggleRow({{ app.id }}, $event.target.checked)"
                 aria-label="Select {{ app.name | e }}" data-testid="row-select-{{ app.id }}">
             </td>
-            <td class="px-2 align-middle"><span class="text-xs font-mono text-muted-foreground">{{ app.id }}</span></td>
+            {# T-council-10: ID column removed #}
             <td class="px-2 align-middle">
               <p class="font-medium text-sm text-foreground truncate max-w-[220px]" title="{{ app.name | e }}{% if app.description %} — {{ app.description[:120] | e }}{% endif %}">{{ app.name }}</p>
             </td>
             <td class="px-2 align-middle">
               {% if app.component_type %}<span class="text-sm text-muted-foreground" data-testid="app-type-{{ app.id }}">{{ app.component_type[:1] | upper }}{{ app.component_type[1:] }}</span>
-              {% elif can('edit', 'application') %}<a href="{{ url_for('unified_applications.application_edit', id=app.id) }}" class="text-xs text-muted-foreground underline hover:text-info" data-testid="app-type-{{ app.id }}">Not set: open to classify</a>
-              {% else %}<span class="text-xs text-muted-foreground" data-testid="app-type-{{ app.id }}">Not set</span>{% endif %}
+              {% elif can('edit', 'application') %}<a href="{{ url_for('unified_applications.application_edit', id=app.id) }}" class="text-xs text-muted-foreground underline hover:text-info" data-testid="app-type-{{ app.id }}">{{ explained_value('Not set', 'Open to classify') }}</a>
+              {% else %}{{ explained_value('Not set') }}{% endif %}
             </td>
             <td class="px-2 align-middle text-center">
               {% if app.archimate_element_id %}
@@ -448,7 +482,29 @@
               {% endif %}
             </td>
             <td class="px-2 align-middle">
+              {% if si.label %}
               <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium {{ si.cls }}">{{ si.label }}</span>
+              {% else %}
+              {{ explained_value('Not set') }}
+              {% endif %}
+            </td>
+            <td class="px-2 align-middle">
+              {% if app_owners %}
+                {% for owner in app_owners %}
+                <span class="text-xs text-foreground block" data-testid="app-owner-{{ app.id }}">{{ owner.name }}</span>
+                {% endfor %}
+              {% elif can('edit', 'application') %}
+                <a href="{{ url_for('unified_applications.application_edit', id=app.id) }}#owner" class="text-xs text-muted-foreground hover:underline" data-testid="app-owner-{{ app.id }}">{{ explained_value('No owner', 'Assign owner') }}</a>
+              {% else %}
+                {{ explained_value('No owner') }}
+              {% endif %}
+            </td>
+            <td class="px-2 align-middle text-center">
+              {% if app.completeness_score is not none %}
+                {{ completeness_ring(app.completeness_score, size='small', label='Record ' ~ app.completeness_score ~ '% complete', href=url_for('unified_applications.application_fact_sheet', id=app.id) ~ '#missing') }}
+              {% else %}
+                <span class="text-xs text-muted-foreground">—</span>
+              {% endif %}
             </td>
             {# Hidden until data enrichment — Criticality, Business Owner, Vendor #}
             {#
@@ -468,9 +524,10 @@
             #}
             <td class="px-2 align-middle">
               {% if pc and pc.business_capability %}
-              <span class="text-xs text-muted-foreground truncate max-w-[150px] block" title="{{ pc.business_capability.name | e }}">{{ pc.business_capability.name }}</span>
-              {% elif can('edit', 'application') %}<button type="button" class="text-xs text-muted-foreground underline hover:text-info" data-testid="app-capability-{{ app.id }}" @click='openMappingForApp({{ app.id }}, {{ app.name | tojson }}, "capability")'>No capability mapped yet: map it</button>
-              {% else %}<span class="text-xs text-muted-foreground">No capability mapped yet</span>{% endif %}
+              <span class="text-xs text-foreground truncate max-w-[150px] block" title="{{ pc.business_capability.name | e }}" data-testid="app-capability-{{ app.id }}">{{ pc.business_capability.name }}</span>
+              {% else %}
+              <span class="text-xs text-muted-foreground" data-testid="app-capability-{{ app.id }}">Not mapped</span>
+              {% endif %}
             </td>
             <td class="px-2 align-middle text-right">
               <div class="flex justify-end gap-1 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
@@ -497,8 +554,8 @@
                   <!-- modal-a11y-ok: dropdown menu, not a dialog --><div x-show="mapOpen" x-transition x-cloak
                     class="absolute right-0 mt-1 w-52 bg-card border rounded-md z-30 py-1" role="menu">
                     <button type="button" @click="(() => { const el = $el.closest('[data-app-map-id]'); if (el) openMappingForApp(el.dataset.appMapId, el.dataset.appMapName, 'capability'); mapOpen=false; })()"
-                      class="w-full text-left px-4 py-2 text-sm hover:bg-accent flex items-center gap-2" role="menuitem" aria-label="Map to Capabilities">
-                      <i data-lucide="box" class="h-4 w-4 text-primary" aria-hidden="true"></i>Map to Capabilities
+                      class="w-full text-left px-4 py-2 text-sm hover:bg-accent flex items-center gap-2" role="menuitem" aria-label="Map a capability" data-testid="action-map-capability-{{ app.id }}">
+                      <i data-lucide="box" class="h-4 w-4 text-primary" aria-hidden="true"></i>Map a capability
                     </button>
                     <button type="button" @click="(() => { const el = $el.closest('[data-app-map-id]'); if (el) openMappingForApp(el.dataset.appMapId, el.dataset.appMapName, 'apqc'); mapOpen=false; })()"
                       class="w-full text-left px-4 py-2 text-sm hover:bg-accent flex items-center gap-2" role="menuitem" aria-label="Map to APQC">
