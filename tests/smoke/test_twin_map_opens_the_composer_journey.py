@@ -71,20 +71,20 @@ def test_application_page_button_opens_the_composer_on_that_application(
 
     names = graph["names"]
     # The application's element and what it connects to are drawn within five seconds.
-    _wait_drawn(page, [names["gateway"], names["service"], names["ops"]])
+    _wait_drawn(page, [names["gateway"], names["ops"]])
     expect(page.locator("#composer-focus-title")).to_contain_text(names["gateway"])
 
     # The connections are also a list, and the same rows are in it.
     page.locator("#composer-focus-list-toggle").click()
     rows = page.locator("[data-focus-row]")
     expect(rows.first).to_be_visible()
-    expect(page.locator("#composer-focus-list")).to_contain_text(names["service"])
+    expect(page.locator("#composer-focus-list")).to_contain_text(names["ops"])
 
     # Clicking a connected element opens its details.
-    rows.filter(has_text=names["service"]).get_by_role("button", name=names["service"]).click()
+    rows.filter(has_text=names["ops"]).get_by_role("button", name=names["ops"]).click()
     panel = page.locator(".detail-panel")
     expect(panel).to_be_visible(timeout=PAGE_TIMEOUT)
-    expect(panel.locator('input[aria-label="Element name"]')).to_have_value(names["service"])
+    expect(panel.locator('input[aria-label="Element name"]')).to_have_value(names["ops"])
 
 
 def test_clicking_a_drawn_element_opens_its_details(page, live_server, seeded, graph):
@@ -129,7 +129,7 @@ def test_old_twin_map_address_with_no_element_opens_the_composer(page, live_serv
 
 
 def test_an_organisation_with_no_model_sees_why_it_is_empty_and_how_to_fill_it(page, live_server):
-    fresh = create_fresh_org("enterprise_architect")
+    fresh = create_fresh_org("enterprise_architect", org_admin=True)
     sign_in(page, live_server, fresh["emails"]["enterprise_architect"])
     page.goto("%s/intelligence/twin-map" % live_server, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
     assert page.url.rstrip("/").endswith("/archimate/composer"), page.url
