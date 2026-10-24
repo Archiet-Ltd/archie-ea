@@ -60,11 +60,23 @@ def _person(seeded, persona, platform_role="Viewer"):
     return email
 
 
-def _seed_requirements(seeded):
+def _assert_persona(email, persona):
+    """The signed-in user is the persona named and holds no administrator role."""
+    from app import create_app
+    from app.models.user import User
+
+    with create_app("testing").app_context():
+        user = User.query.filter_by(email=email).one()
+        assert user.enterprise_role == persona
+        assert user.role.name == "Viewer"
+        assert not user.is_admin()
+
+
+def _seed_requirements(seeded, owner_email=None):
     """Two requirements in the standard organisation, one linked to a capability."""
     from app import create_app, db
     from app.models.business_capabilities import BusinessCapability
-    from app.models.solution_architect_models import SolutionRequirement
+    from app.models.solution_architect_models import Solution, SolutionRequirement
 
     tag = uuid.uuid4().hex[:6]
     org_id = seeded["ids"]["org"]
@@ -72,36 +84,47 @@ def _seed_requirements(seeded):
     with app.app_context():
         cap = BusinessCapability(name="Invoicing %s" % tag, organization_id=org_id)
         db.session.add(cap)
+        solution = Solution(name="Billing platform %s" % tag, organization_id=org_id,
+                            description="Replaces the invoice export job.",
+                            solution_owner=owner_email)
+        private = Solution(name="Treasury platform %s" % tag, organization_id=org_id,
+                           description="Not shared with the architect.")
+        db.session.add_all([solution, private])
         db.session.flush()
         linked = SolutionRequirement(
             name="Customers can export invoices %s" % tag,
             description="Finance can download every invoice as a file.",
-            status="Draft", priority=2, capability_id=cap.id, organization_id=org_id,
+            status="Draft", priority=2, capability_id=cap.id, solution_id=solution.id,
+            organization_id=org_id,
         )
         unlinked = SolutionRequirement(
             name="Payment reminders go out on day 7 %s" % tag,
             description="Overdue customers get one reminder.",
-            status="Refined", priority=3, organization_id=org_id,
+            status="Refined", priority=3, solution_id=private.id, organization_id=org_id,
         )
         db.session.add_all([linked, unlinked])
         db.session.commit()
         return {"tag": tag, "cap_id": cap.id, "cap_name": cap.name,
+                "solution_id": solution.id, "solution_name": solution.name,
+                "private_name": private.name,
                 "linked": linked.name, "unlinked": unlinked.name}
 
 
 def test_backlog_shows_linked_requirements_and_edits_persist(browser, live_server, seeded):
-    data = _seed_requirements(seeded)
+    email = _person(seeded, "enterprise_architect")
+    data = _seed_requirements(seeded, owner_email=email)
     tag = data["tag"]
     ctx = browser.new_context(viewport={"width": 1440, "height": 900})
     ctx.set_default_timeout(PAGE_TIMEOUT)
     page = ctx.new_page()
     try:
-        _login(page, live_server, _person(seeded, "enterprise_architect"))
+        _assert_persona(email, "enterprise_architect")
+        _login(page, live_server, email)
         _open_backlog(page, live_server)
 
         # The list is the shared table, with a column for every cell the rows carry.
         table = page.locator("[data-testid=requirements-table]")
-        assert table.locator("thead th").count() == 7
+        assert table.locator("thead th").count() == 8
         page.fill("input[aria-label='Search requirements']", tag)
         page.wait_for_function(
             "() => document.querySelectorAll('[data-testid=requirements-table] tbody tr').length === 2"
@@ -114,11 +137,27 @@ def test_backlog_shows_linked_requirements_and_edits_persist(browser, live_serve
         assert "Not linked" not in linked_row.inner_text()
         assert "Not linked" in table.locator("tbody tr", has_text=data["unlinked"]).inner_text()
 
-        # The capability link lands on a page that names the capability.
+        # The capability link lands on the capability's page, not a data payload.
         linked_row.get_by_role("link", name=data["cap_name"]).click()
-        page.wait_for_url("**/enterprise/capabilities/%s" % data["cap_id"])
-        assert data["cap_name"] in page.inner_text("body")
+        page.wait_for_url("**/enterprise/capabilities/%s/fact-sheet" % data["cap_id"])
+        assert page.locator("h1").first.inner_text().strip() == data["cap_name"]
+        assert not page.inner_text("body").lstrip().startswith("{")
         _open_backlog(page, live_server)
+        page.fill("input[aria-label='Search requirements']", tag)
+        table.locator("tbody tr", has_text=data["linked"]).wait_for()
+
+        # The row names its solution and the link opens that solution's page.
+        linked_row = table.locator("tbody tr", has_text=data["linked"])
+        linked_row.get_by_role("link", name=data["solution_name"]).click()
+        page.wait_for_url("**/solutions/%s*" % data["solution_id"])
+        assert data["solution_name"] in page.inner_text("body")
+        assert page.locator("h1").count() >= 1
+        _open_backlog(page, live_server)
+        page.fill("input[aria-label='Search requirements']", tag)
+        # A solution the architect cannot open is named, but is not offered as a dead link.
+        unlinked_row = table.locator("tbody tr", has_text=data["unlinked"])
+        assert data["private_name"] in unlinked_row.inner_text()
+        assert unlinked_row.get_by_role("link", name=data["private_name"]).count() == 0
 
         # Dialogs are the shared modal: open, cancel, escape, open again.
         create = page.locator("#create-req-modal")
