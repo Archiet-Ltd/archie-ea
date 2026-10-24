@@ -39,18 +39,8 @@
         subtitle="Architecture health, portfolio insights, and actions needed" if mode == 'data' else "Let's get your workspace ready.",
         breadcrumb=[('Home', none), ('Dashboard', none)]
     ) }}
-    {# Workspace links: a quiet row, not cards. Heading kept for assistive tech. #}
-    {% set my_work_zone = (get_sidebar_zones(current_user) | selectattr('zone', 'equalto', 'my_work') | first) %}
-    {% if my_work_zone and my_work_zone.links %}
-    <nav aria-labelledby="workspace-links-heading" class="-mt-4 flex flex-wrap items-center gap-x-1 gap-y-1 text-13">
-        <h2 id="workspace-links-heading" class="sr-only">Your Workspace</h2>
-        {% for link in (my_work_zone.links | selectattr('endpoint', 'in', flask.current_app.view_functions) | list) %}
-        {% if not loop.first %}<span class="text-muted-foreground/60" aria-hidden="true">&middot;</span>{% endif %}
-        <a href="{{ url_for(link.endpoint, **(link.query_params or {})) }}" class="inline-flex h-6 min-w-6 items-center justify-center rounded px-1 text-muted-foreground transition-colors hover:text-info">{{ link.label }}</a>
-        {% endfor %}
-    </nav>
-    {% endif %}
-    {% if not current_user.welcome_banner_dismissed_at %}
+    {# Workspace links removed from overview per council-07; all links remain reachable from the sidebar my_work zone. #}
+    {% if mode == 'guided' and not current_user.welcome_banner_dismissed_at %}
     <div x-data="{ show: true, dismiss() {
                 this.show = false;
                 // Use Platform.fetch for automatic CSRF and error handling
@@ -165,51 +155,142 @@
     {% endcall %}
     {% else %}
 
-    {# KPI band: four cards, 16px padding, label 11px uppercase, value 28px tabular,
-       optional 12px line beneath, no icons. The Solutions card carries the
-       pipeline sentence (one phase, no phase, or phases active). #}
-    {% set sp = solution_pipeline if solution_pipeline else [] %}
-    {% set sp_total = sp|map(attribute='count')|sum %}
-    {% set sp_phases = sp|selectattr('count', 'gt', 0)|list %}
-    {% if sp_total > 0 and sp_phases|length == 1 and sp_phases[0].phase is none %}
-    {% set sp_line = sp_total ~ ' without a recorded ADM phase' %}
-    {% elif sp_total > 0 and sp_phases|length == 1 %}
-    {% set _sp_parts = (sp_phases[0].label or '').split(': ', 1) %}{% set sp_letter = _sp_parts[0] if _sp_parts|length == 2 else '' %}{% set sp_name = _sp_parts[1] if _sp_parts|length == 2 else (sp_phases[0].label or '') %}
-    {% set sp_line = 'Nothing past ' ~ sp_name ~ ' yet — all ' ~ sp_total ~ ' solution' ~ ('s' if sp_total != 1 else '') ~ ' ' ~ ('are' if sp_total != 1 else 'is') ~ ' in phase ' ~ sp_letter %}
-    {% elif sp_total > 0 %}
-    {% set sp_line = sp_phases|length ~ ' of ' ~ sp|length ~ ' ADM phases active' %}
-    {% else %}
-    {% set sp_line = none %}
-    {% endif %}
+    {# KPI band: four tiles, each with number, source, as-of date, and link to the list.
+       Council-07: each tile is clickable and links to the list it counts. Real zeros
+       are explained with next steps; unmeasured values never show as "0.0%". #}
+    {% from 'components/explained_value.html' import explained_value %}
+    {% set _now = now().strftime("%d %b %Y") %}
     <section aria-label="Key figures" class="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        {% set kpis = [
-            ('Applications', metrics.applications|dash, 'health-kpi-applications', none),
-            ('Solutions', nav_stats.solutions|dash, 'health-kpi-solutions', sp_line),
-            ('ArchiMate elements', nav_stats.elements|dash, 'health-kpi-elements', none),
-            ('Health score', health_score_text|default('—'), 'health-score-value', none)
-        ] %}
-        {% for label, value, testid, line in kpis %}
-        <div class="rounded-lg border border-border bg-card p-4">
-            <p class="text-2xs font-semibold uppercase tracking-[0.06em] text-muted-foreground">{{ label }}</p>
-            <p class="mt-1 text-28 font-semibold leading-9 tabular-nums text-foreground" data-testid="{{ testid }}">{{ value }}</p>
-            {% if line %}<p class="mt-1 truncate text-xs text-muted-foreground tabular-nums" title="{{ line }}">{{ line }}</p>{% endif %}
+        {# Applications #}
+        <a href="{{ url_for('unified_applications.application_list') if 'unified_applications.application_list' in flask.current_app.view_functions else '/applications/' }}"
+           class="rounded-lg border border-border bg-card p-4 transition-colors hover:border-ring"
+           data-testid="kpi-tile-applications">
+            <p class="text-2xs font-semibold uppercase tracking-[0.06em] text-muted-foreground">Applications</p>
+            <p class="mt-1 text-28 font-semibold leading-9 tabular-nums text-foreground" data-testid="health-kpi-applications">{{ metrics.applications }}</p>
+            <p class="mt-1 text-xs text-muted-foreground">from Application portfolio, as of {{ _now }}</p>
+        </a>
+
+        {# Solution designs #}
+        {% set solutions_count = nav_stats.solutions %}
+        <a href="{{ url_for('solution_design.list_solutions') if 'solution_design.list_solutions' in flask.current_app.view_functions else '/solutions/' }}"
+           class="rounded-lg border border-border bg-card p-4 transition-colors hover:border-ring"
+           data-testid="kpi-tile-solutions">
+            <p class="text-2xs font-semibold uppercase tracking-[0.06em] text-muted-foreground">Solution designs</p>
+            {% if solutions_count == 0 %}
+            <p class="mt-1 text-28 font-semibold leading-9 tabular-nums text-foreground" data-testid="health-kpi-solutions">0</p>
+            <p class="mt-1 text-xs text-muted-foreground">No solution designs yet. Start one from a journey.</p>
+            {% else %}
+            <p class="mt-1 text-28 font-semibold leading-9 tabular-nums text-foreground" data-testid="health-kpi-solutions">{{ solutions_count }}</p>
+            <p class="mt-1 text-xs text-muted-foreground">from Solution pipeline, as of {{ _now }}</p>
+            {% endif %}
+        </a>
+
+        {# Elements in the model #}
+        <a href="{{ url_for('archimate_crud.dashboard') if 'archimate_crud.dashboard' in flask.current_app.view_functions else '/architecture/dashboard' }}"
+           class="rounded-lg border border-border bg-card p-4 transition-colors hover:border-ring"
+           data-testid="kpi-tile-elements">
+            <p class="text-2xs font-semibold uppercase tracking-[0.06em] text-muted-foreground">Elements in the model</p>
+            <p class="mt-1 text-28 font-semibold leading-9 tabular-nums text-foreground" data-testid="health-kpi-elements">{{ nav_stats.elements }}</p>
+            <p class="mt-1 text-xs text-muted-foreground">from ArchiMate repository, as of {{ _now }}</p>
+        </a>
+
+        {# Health score with disclosure #}
+        <div class="rounded-lg border border-border bg-card p-4" data-testid="kpi-tile-health-score"
+             x-data="{ open: false }">
+            <p class="text-2xs font-semibold uppercase tracking-[0.06em] text-muted-foreground">Health score</p>
+            {% if health_score is not none %}
+            <p class="mt-1 text-28 font-semibold leading-9 tabular-nums text-foreground" data-testid="health-score-value">{{ health_score_text }}</p>
+            <p class="mt-1 text-xs text-muted-foreground">weighted composite, as of {{ _now }}</p>
+            <button type="button" @click="open = !open"
+                    class="mt-2 text-xs font-medium text-primary hover:underline"
+                    data-testid="health-score-disclosure-button">
+                <span x-show="!open">How this is worked out</span>
+                <span x-show="open" x-cloak>Hide details</span>
+            </button>
+            <div x-show="open" x-cloak class="mt-3 space-y-2 border-t border-border pt-3" data-testid="health-score-disclosure">
+                <p class="text-xs font-medium text-foreground">Weighted from:</p>
+                <ul class="space-y-1.5 text-xs text-muted-foreground">
+                {% for key in ['phase_maturity', 'risk_health', 'capability_coverage', 'governance'] %}
+                    {% set part = health_components.get(key, {}) %}
+                    <li class="flex items-start gap-2">
+                        {% if part.value is not none %}
+                        <span class="shrink-0 text-foreground font-medium">{{ part.value }}%</span>
+                        <span>{{ part.label }}</span>
+                        {% else %}
+                        <span class="shrink-0 text-muted-foreground">—</span>
+                        <span>{{ part.label }}: {{ part.basis }}</span>
+                        {% endif %}
+                    </li>
+                {% endfor %}
+                </ul>
+                {% if health_unavailable %}
+                <p class="text-xs text-muted-foreground mt-2">
+                    Not measured: {{ health_unavailable|join(', ')|replace('_', ' ')|title }}.
+                </p>
+                {% endif %}
+            </div>
+            {% else %}
+            <p class="mt-1 text-28 font-semibold leading-9 tabular-nums text-foreground" data-testid="health-score-value">—</p>
+            {{ explained_value(basis="Health score could not be computed", action="Record data in at least two of the four components to see a score") }}
+            {% endif %}
         </div>
-        {% endfor %}
     </section>
 
-    {# Lenses: a 32px segmented control on the tokens. Overview, CTO and CFO are
-       the executive summaries; the six ArchiMate 3.2 layers each open their own
-       panel below. #}
-    <div aria-label="Dashboard lens" class="flex w-fit max-w-full flex-wrap items-center gap-0.5 rounded-md bg-muted p-0.5">
-        {% for role_key, role_label in [('overview', 'Overview'), ('cto', 'CTO'), ('cfo', 'CFO'), ('motivation', 'Motivation'), ('strategy', 'Strategy'), ('business', 'Business'), ('application', 'Application'), ('technology', 'Technology'), ('implementation', 'Implementation & Migration')] %}
-        <button type="button" @click="activeRole = '{{ role_key }}'"
-                data-testid="layer-tab-{{ role_key }}"
-                :aria-pressed="activeRole === '{{ role_key }}' ? 'true' : 'false'"
-                :class="activeRole === '{{ role_key }}' ? 'bg-background text-foreground' : 'text-muted-foreground hover:text-foreground'"
-                class="h-7 rounded px-2.5 text-xs font-medium transition-colors">
-            {{ role_label }}
-        </button>
-        {% endfor %}
+    {# Council-07: Priority actions list directly under the KPI band, max 5 rows with "See all" #}
+    {% if priority_actions and priority_actions.rows %}
+    {% include 'components/priority_actions.html' %}
+    {% endif %}
+
+    {# Council-07: Lenses split into two labelled groups: "View as" (executive summaries)
+       and "Layer" (ArchiMate 3.2 layers). At 390 the layer group becomes a select. #}
+    <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:gap-6" aria-label="Dashboard lenses">
+        {# View as group #}
+        <div class="flex flex-col gap-1.5">
+            <label class="text-xs font-medium text-muted-foreground">View as</label>
+            <div class="flex w-fit items-center gap-0.5 rounded-md bg-muted p-0.5">
+                {% for role_key, role_label in [('overview', 'Overview'), ('cto', 'CTO'), ('cfo', 'CFO')] %}
+                <button type="button" @click="activeRole = '{{ role_key }}'"
+                        data-testid="layer-tab-{{ role_key }}"
+                        :aria-pressed="activeRole === '{{ role_key }}' ? 'true' : 'false'"
+                        :class="activeRole === '{{ role_key }}' ? 'bg-background text-foreground' : 'text-muted-foreground hover:text-foreground'"
+                        class="h-7 rounded px-2.5 text-xs font-medium transition-colors">
+                    {{ role_label }}
+                </button>
+                {% endfor %}
+            </div>
+        </div>
+
+        {# Layer group #}
+        <div class="flex flex-col gap-1.5">
+            <label class="text-xs font-medium text-muted-foreground">Layer</label>
+            {# Desktop: segmented control #}
+            <div class="hidden sm:flex w-fit items-center gap-0.5 rounded-md bg-muted p-0.5">
+                {% for role_key, role_label in [('motivation', 'Motivation'), ('strategy', 'Strategy'), ('business', 'Business'), ('application', 'Application'), ('technology', 'Technology'), ('implementation', 'Implementation & Migration')] %}
+                <button type="button" @click="activeRole = '{{ role_key }}'"
+                        data-testid="layer-tab-{{ role_key }}"
+                        :aria-pressed="activeRole === '{{ role_key }}' ? 'true' : 'false'"
+                        :class="activeRole === '{{ role_key }}' ? 'bg-background text-foreground' : 'text-muted-foreground hover:text-foreground'"
+                        class="h-7 rounded px-2.5 text-xs font-medium transition-colors whitespace-nowrap">
+                    {{ role_label }}
+                </button>
+                {% endfor %}
+            </div>
+            {# Mobile: select #}
+            <select @change="activeRole = $event.target.value"
+                    :value="activeRole"
+                    class="sm:hidden h-9 rounded-md border border-border bg-background px-3 text-xs"
+                    data-testid="layer-select-mobile">
+                <option value="overview">Overview</option>
+                <option value="cto">CTO</option>
+                <option value="cfo">CFO</option>
+                <option value="motivation">Motivation</option>
+                <option value="strategy">Strategy</option>
+                <option value="business">Business</option>
+                <option value="application">Application</option>
+                <option value="technology">Technology</option>
+                <option value="implementation">Implementation & Migration</option>
+            </select>
+        </div>
     </div>
 
     {# ══════════════════════════════════════════════════════════════════════
@@ -232,26 +313,25 @@
         </a>
     </div>
 
-    {# What the health score was weighted from. A component that was not
-       measured reads as an em dash, never as a confident zero. #}
+    {# Council-07: Architecture health — each part shows value with source/date, or the
+       basis sentence and action to measure it. #}
     <section aria-labelledby="architecture-health-heading" class="rounded-lg border border-border bg-card" data-testid="architecture-health">
         <div class="flex items-center justify-between border-b border-border px-4 py-2">
             <h2 id="architecture-health-heading" class="text-base font-semibold text-foreground">Architecture health</h2>
             <span class="text-2xs font-semibold uppercase tracking-[0.06em] text-muted-foreground">What the score is weighted from</span>
         </div>
-        <div class="grid grid-cols-2 gap-px bg-border md:grid-cols-4">
-            {% for key, label in [
-                ('phase_maturity', 'Phase Maturity'),
-                ('risk_health', 'Risk Posture'),
-                ('capability_coverage', 'Capability Coverage'),
-                ('governance', 'Governance'),
-            ] %}
-            {% set val = (health_components or {}).get(key) %}
+        <div class="grid grid-cols-1 gap-px bg-border md:grid-cols-2">
+            {% for key in ['phase_maturity', 'risk_health', 'capability_coverage', 'governance'] %}
+            {% set part = health_components.get(key, {}) %}
             <div class="bg-card px-4 py-3">
-                <p class="text-xs text-muted-foreground">{{ label }}</p>
-                <p class="mt-1 text-lg font-semibold tabular-nums text-foreground">{{ (val ~ "%") if val is not none else "—" }}</p>
-                {% if key == 'phase_maturity' %}
-                <p class="mt-1 text-xs text-muted-foreground">Share of solutions with a recorded ADM phase that are in phase C or later</p>
+                <p class="text-xs text-muted-foreground">{{ part.label or key|replace('_', ' ')|title }}</p>
+                {% if part.value is not none %}
+                <p class="mt-1 text-lg font-semibold tabular-nums text-foreground">{{ part.value }}%</p>
+                <p class="mt-1 text-xs text-muted-foreground">{{ part.basis }}</p>
+                <p class="mt-0.5 text-xs text-muted-foreground">from {{ part.source }}, as of {{ part.as_of }}</p>
+                {% else %}
+                <p class="mt-1 text-lg font-semibold tabular-nums text-foreground">—</p>
+                <p class="mt-1 text-xs text-muted-foreground">{{ part.basis or 'Not measured yet' }}</p>
                 {% endif %}
             </div>
             {% endfor %}
