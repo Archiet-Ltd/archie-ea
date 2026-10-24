@@ -79,7 +79,7 @@
             {% for state in states %}
             {% set label = (labels.get(state) if labels else None) or state %}
             {% set group = (stage_group.get(state) if stage_group else None) %}
-            <div class="kanban-column {{ card_width }} shrink-0 lg:w-auto lg:flex-1 lg:min-w-[10rem]{% if lane %} rounded-lg border border-border bg-muted/40 p-2{% endif %}"
+            <div class="kanban-column {{ card_width }} shrink-0 lg:w-auto lg:flex-1 lg:min-w-[10rem]{% if lane %} rounded-lg border border-border bg-muted/40 p-1.5{% endif %}"
                  data-state="{{ state }}"
                  {% if group %}data-stage-group="{{ group }}"{% endif %}
                  {% if can_write %}@dragover.prevent="onDragOver($event, '{{ state }}')"
