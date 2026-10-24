@@ -27,6 +27,11 @@ def page(browser):
     pg.on("pageerror", lambda e: errors.append(str(e)))
     pg.goto(HARNESS.as_uri())
     pg.wait_for_function("typeof ComposerRenderer !== 'undefined'")
+    # Measure text only once the vendored Inter the harness pins is actually
+    # loaded; its @font-face uses font-display:swap, so without this a label can
+    # be measured against the fallback before Inter arrives, and the geometry in
+    # the golden snapshot would not be reproducible.
+    pg.evaluate("() => document.fonts.load('700 12px Inter').then(() => document.fonts.load('400 9px Inter')).then(() => document.fonts.ready)")
     yield pg
     assert errors == []
     pg.close()

@@ -90,7 +90,7 @@ def world(github_server, app):
         # server: a holder left by an earlier run gives it up.
         for old in User.query.filter_by(email=OWNER_EMAIL).all():
             old.email = "owner.one.%s@example.test" % uuid.uuid4().hex[:8]
-        db.session.flush()
+        db.session.commit()
         # The Community plan admits three people: the administrator, the Viewer and Payments Service's owner.
         db.session.add(User(first_name="Olive", last_name="One", email=OWNER_EMAIL, organization_id=one["org_id"], confirmed=True))
         viewer = User.query.filter_by(email=one["emails"]["non_technical_owner"]).one()

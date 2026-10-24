@@ -5,7 +5,20 @@
 <title>ComposerRenderer harness</title>
 <link rel="stylesheet" href="../../app/static/vendor/joint.min.css">
 <link rel="stylesheet" href="../../app/static/css/shadcn_tokens.css">
-<style>body{margin:0;background:#fff}#host{width:640px}</style>
+<style>
+  body{margin:0;background:#fff}
+  #host{width:640px}
+  /* Measure every label against the one font vendored with the product
+   * (app/static/vendor/inter-*.woff2, wired in shadcn_tokens.css), so the
+   * golden snapshot does not depend on which fonts the host machine happens
+   * to have installed. The renderer's own stack leads with 'Public Sans',
+   * which is present on some developer machines and absent on the CI runner:
+   * text measured against it there wrapped and sized differently, so the
+   * SVG geometry in the golden — label backgrounds, text lengths — diverged.
+   * A CSS font-family beats the inline SVG presentation attribute JointJS
+   * sets, so this pins the measured font without touching the renderer. */
+  #host text, #host tspan { font-family: 'Inter', sans-serif !important; }
+</style>
 </head>
 <body>
 <div id="host"></div>
