@@ -133,8 +133,8 @@ def test_canvas_matches_the_impact_answer(browser, live_server, seeded, graph):
         expect(page.locator("#composer-focus-derived-note")).to_be_visible()
         expect(page.locator("#composer-focus-save")).to_be_visible()
         expect(page.locator("#composer-focus-discard")).to_be_visible()
-        # The editor treats it as unsaved.
-        assert page.evaluate("(s) => Alpine.$data(document.querySelector(s)).viewpointDirty", APP) is True
+        # The view is not saved, but opening it to look is not an edit.
+        assert page.evaluate("(s) => Alpine.$data(document.querySelector(s)).viewpointDirty", APP) is False
         assert page.evaluate("(s) => Alpine.$data(document.querySelector(s)).currentSavedVpId", APP) is None
     finally:
         context.close()
@@ -250,15 +250,18 @@ def test_the_connections_list_names_every_neighbour_and_opens_it(browser, live_s
 
 
 @pytest.mark.smoke
-def test_leaving_the_unsaved_view_triggers_the_unsaved_changes_prompt(browser, live_server, seeded, graph):
+def test_leaving_the_unsaved_view_asks_only_after_something_is_changed(browser, live_server, seeded, graph):
     centre = graph["service"]
     context, page = _open(browser, live_server, seeded, "?element=%s&depth=1&derived=1" % centre)
     try:
         _wait_loaded(page)
-        prevented = page.evaluate(
-            "() => { const e = new Event('beforeunload', {cancelable: true}); window.dispatchEvent(e); return e.defaultPrevented; }"
-        )
-        assert prevented is True
+        leave = "() => { const e = new Event('beforeunload', {cancelable: true}); window.dispatchEvent(e); return e.defaultPrevented; }"
+        assert page.evaluate(leave) is False
+        page.wait_for_timeout(4500)
+        page.evaluate(
+            """(s) => { const a = Alpine.$data(document.querySelector(s));
+                a.graph.getElements()[0].translate(30, 30); }""", APP)
+        assert page.evaluate(leave) is True
     finally:
         context.close()
 

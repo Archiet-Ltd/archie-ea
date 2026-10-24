@@ -16,6 +16,8 @@ from __future__ import annotations
 from flask import Blueprint, current_app, g, redirect, render_template, request, url_for
 from flask_login import login_required
 
+from app.extensions import db
+
 intelligence_ui = Blueprint(
     "intelligence_ui",
     __name__,
@@ -84,6 +86,31 @@ def ask():
     return redirect(url_for("unified_ai_chat.index"), code=302)
 
 
+def _most_connected_element_id():
+    """The id of the element with the most relationships in the signed-in
+    organisation (lowest id on a tie), or None when nothing is connected.
+
+    Both queries run through the tenant fence, so another organisation's
+    elements and links are never counted.
+    """
+    from sqlalchemy import func, union_all  # noqa: PLC0415
+
+    from app.models import ArchiMateElement, ArchiMateRelationship  # noqa: PLC0415
+
+    ends = union_all(
+        db.select(ArchiMateRelationship.source_id.label("element_id")),
+        db.select(ArchiMateRelationship.target_id.label("element_id")),
+    ).subquery()
+    row = db.session.execute(
+        db.select(ArchiMateElement.id, func.count().label("links"))
+        .join(ends, ends.c.element_id == ArchiMateElement.id)
+        .group_by(ArchiMateElement.id)
+        .order_by(func.count().desc(), ArchiMateElement.id)
+        .limit(1)
+    ).first()
+    return row[0] if row else None
+
+
 @intelligence_ui.route("/twin-map", methods=["GET"])
 @login_required
 def twin_map():
@@ -91,15 +118,24 @@ def twin_map():
 
     The twin map drew what one element connects to, which is the Composer's
     focus mode. Bookmarks and old links keep working: ``element`` (optional)
-    goes across to ``/archimate/composer?element=<id>`` and with none the
-    Composer opens on its own picker. A value that is not a whole number is
-    ignored. The Composer applies the organisation fence, so another
-    organisation's element answers 404 there.
+    goes across to ``/archimate/composer?element=<id>``. With none, the
+    Composer opens on the organisation's most connected element, and says so
+    (``most_connected=1``); an organisation with nothing connected gets the
+    Composer's own start page. A value that is not a whole number is ignored.
+    The Composer applies the organisation fence, so another organisation's
+    element answers 404 there.
     """
     element_id = request.args.get("element", type=int)
+    if element_id is not None:
+        return redirect(url_for("archimate.composer_page", element=element_id), code=302)
+    try:
+        element_id = _most_connected_element_id()
+    except Exception:
+        current_app.logger.warning("[MODULE] intelligence: most connected element unavailable")
+        element_id = None
     if element_id is None:
         return redirect(url_for("archimate.composer_page"), code=302)
-    return redirect(url_for("archimate.composer_page", element=element_id), code=302)
+    return redirect(url_for("archimate.composer_page", element=element_id, most_connected=1), code=302)
 
 
 # The maturity threshold the value-streams-at-risk answer is asked for. The

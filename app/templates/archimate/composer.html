@@ -933,6 +933,7 @@
                 <div class="flex-1">
                     <h3 class="text-sm font-semibold text-foreground mb-1" id="composer-focus-title"
                         x-text="focusView ? ('Unsaved view: ' + focusView.name + ', ' + _focusHopsText(focusView.depth)) : ''"></h3>
+                    {% if focus and focus.most_connected %}<p class="text-xs text-muted-foreground mb-1" id="composer-focus-most-connected">Showing the most connected element in your model. Search for another element to look at it instead.</p>{% endif %}
                     <p class="text-xs text-muted-foreground mb-1" id="composer-focus-empty-note" x-show="focusView && focusView.empty">No connections at this depth</p>
                     <p class="text-xs text-muted-foreground mb-2" id="composer-focus-derived-note" x-show="focusView && focusView.hasDerived">Worked-out connections are shown dashed and are not stored with a saved diagram.</p>
                     <div class="mb-2" x-show="focusView && !focusView.empty">
