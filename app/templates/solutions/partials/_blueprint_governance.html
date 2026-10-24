@@ -228,6 +228,8 @@
             {% set gov_status = solution.governance_status if solution.governance_status is defined and solution.governance_status else 'draft' %}
             {% if gov_status == 'approved' %}
             <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-success/10 text-success-emphasis border border-success/30">Approved</span>
+            {% elif gov_status == 'proposed' %}
+            <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-info-emphasis border border-primary/30">Proposed to the ARB</span>
             {% elif gov_status == 'arb_review' or gov_status == 'in_review' %}
             <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-info-emphasis border border-primary/30">In ARB Review</span>
             {% elif gov_status == 'rejected' %}
