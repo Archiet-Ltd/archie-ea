@@ -117,6 +117,19 @@ def _applications_without_owner(organization_id: int, **_: Any) -> Dict[str, Any
         )
         citations.append(application_citation(app.id, app.name))
 
+    # Nothing unowned is only a finding when there are applications to own:
+    # with none recorded, "every application has an owner" would be vacuous.
+    any_application = bool(unowned) or (
+        ApplicationComponent.query.filter(ApplicationComponent.organization_id == organization_id).first()
+        is not None
+    )
+    if unowned:
+        reason = None
+    elif any_application:
+        reason = "every application in this organisation has a recorded owner"
+    else:
+        reason = "no applications are recorded in this organisation"
+
     return {
         "answer": "applications with no recorded owner, by business criticality",
         "groups": [
@@ -124,7 +137,8 @@ def _applications_without_owner(organization_id: int, **_: Any) -> Dict[str, Any
         ],
         "total": len(unowned),
         "citations": citations,
-        "reason": None if unowned else "every application in this organisation has a recorded owner",
+        "reason": reason,
+        "complete": bool(not unowned and any_application),
     }
 
 
