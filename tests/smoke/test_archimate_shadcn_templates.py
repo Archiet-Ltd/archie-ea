@@ -124,7 +124,7 @@ def test_diagrams_library_page_loads_as_enterprise_architect(browser, live_serve
     page = context.new_page()
     _login(page, live_server, email)
 
-    page.goto(live_server + "/archimate/library", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    page.goto(live_server + "/archimate/diagrams", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
 
     # The page has the expected title
     expect(page.get_by_role("heading", name=re.compile(r"Diagrams", re.I))).to_be_visible(timeout=PAGE_TIMEOUT)
