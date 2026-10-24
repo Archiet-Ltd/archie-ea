@@ -24,7 +24,7 @@
 <div class="flex flex-col gap-4" data-canvas="{{ id }}" x-data="{ view: 'canvas' }">
   <div class="flex flex-wrap items-end justify-between gap-3">
     <div class="flex flex-col gap-1">
-      <h2 class="text-lg font-semibold tracking-tight">{{ data.title }}</h2>
+      {% if data.title %}<h2 class="text-lg font-semibold tracking-tight">{{ data.title }}</h2>{% endif %}
       <p class="text-sm text-muted-foreground">{{ data.subtitle }}</p>
     </div>
     <div class="flex gap-1" role="group" aria-label="{{ name }} view">
@@ -90,7 +90,7 @@
 {% call ui.card(size='sm', class=b.area ~ ' ' ~ (b.class or '')) %}
   <div id="box-{{ b.key }}" class="contents"></div>
   {% call ui.card_header() %}
-    {% call ui.card_title(class='flex items-center gap-2') %}
+    {% call ui.card_title(class='flex items-center gap-2' ~ (' pr-6' if editable and not b.readonly else '')) %}
       {% if b.number %}{{ ui.badge(text=b.number, variant='outline', class='size-5 rounded-full px-0') }}{% elif b.icon %}{{ ui.lucide(b.icon, 'size-4 text-muted-foreground') }}{% endif %}
       <span>{{ b.title }}</span>
     {% endcall %}

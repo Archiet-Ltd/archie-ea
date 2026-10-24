@@ -193,6 +193,11 @@ def test_canvas_keeps_its_nine_boxes_at_phone_width(browser, live_server, seeded
         page.goto(f"{live_server}/business-model/{filled_id}", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
         region = page.get_by_role("region", name=re.compile("scroll horizontally"))
         assert region.evaluate("e => e.scrollWidth > e.clientWidth"), "the canvas must scroll sideways, not stack"
+        assert region.evaluate("e => e.scrollWidth") >= 900, "the nine boxes keep their natural width"
+        narrowest = page.locator("[data-canvas-notes]").evaluate_all(
+            "els => Math.min(...els.map(e => e.closest('[data-slot=card]').getBoundingClientRect().width))"
+        )
+        assert narrowest >= 120, f"a box is squeezed to {narrowest}px"
         tops = {
             box: page.locator(f'[data-canvas-notes="{box}"]').evaluate("e => e.closest('[data-slot=card]').getBoundingClientRect().top")
             for box in ("key-partners", "value-propositions", "customer-segments")
