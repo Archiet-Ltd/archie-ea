@@ -37,7 +37,7 @@ pytestmark = [pytest.mark.smoke, pytest.mark.journey]
 
 # The four sidebar panels. Contractual ids: the rebuild moves the code that
 # drives them out of the template, but these are what the markup promises.
-TABS = ("context", "query", "alerts", "history")
+TABS = ("context", "query", "alerts")
 
 # Console noise that is not the page's doing. Kept deliberately short — every
 # entry added here is a class of error this test stops seeing.
@@ -219,6 +219,7 @@ def test_persona_storage_denial_keeps_chat_initialized(page, live_server, seeded
     """)
 
     _open_chat(page, live_server, seeded)
+    page.get_by_role("button", name="Chat options").click()
 
     persona = page.locator("#persona-selector")
     assert persona.input_value() == "enterprise_architect", (
@@ -250,12 +251,14 @@ def test_persona_switch_system_message_is_not_clipped(page, live_server, seeded)
     moment earlier falls short of the true bottom. The result: the pill's
     lower ~60% renders clipped by the container's own overflow, with only a
     thin, barely-readable sliver of its top edge visible above the always-
-    below "Quick prompts" strip. Fixed in render.js's scrollToBottom() by
+    below the composer. Fixed in render.js's scrollToBottom() by
     re-applying the scroll on the next animation frame as well.
     """
     _open_chat(page, live_server, seeded)
 
+    page.get_by_role("button", name="Chat options").click()
     page.locator("#persona-selector").select_option("data_architect")
+    page.keyboard.press("Escape")
     page.wait_for_timeout(400)  # scrollToBottom's rAF follow-up
 
     pill = page.locator("#messages-container div", has_text="Persona switched to:").last
@@ -410,6 +413,8 @@ def test_exactly_one_sidebar_panel_is_visible_at_a_time(page, live_server, seede
     half a per-tab check misses.
     """
     _open_chat(page, live_server, seeded)
+    page.get_by_role("button", name="Chat options").click()
+    page.wait_for_timeout(500)
 
     assert _visible_panels(page) == ["context"], (
         "the sidebar does not open on Context alone, it shows %s" % _visible_panels(page))

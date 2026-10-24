@@ -136,7 +136,7 @@ def test_load_sample_is_a_real_click_and_lands_on_content(browser, live_server, 
         expect(page.get_by_text("Payments service", exact=False).first).to_be_visible()
         page.goto(live_server + "/dashboard/overview", wait_until="networkidle", timeout=PAGE_TIMEOUT)
         # removal is one confirmation that returns to the setup screen
-        page.get_by_role("button", name="Remove the sample company").first.click()
+        page.get_by_role("button", name="Remove it", exact=True).first.click()
         page.locator('[data-testid="sample-company-remove-confirm"]').click()
         expect(page.get_by_text("Sample company removed")).to_be_visible(timeout=PAGE_TIMEOUT)
         expect(page.locator('[data-testid="guided-setup"]')).to_be_visible(timeout=PAGE_TIMEOUT)

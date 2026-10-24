@@ -112,14 +112,16 @@ def test_a_failed_request_is_reported_as_an_error_not_as_no_results(page):
     assert state["results"] == [] and state["loading"] is False
 
 
-def test_a_module_result_with_no_zone_defaults_to_all_modules(page):
+def test_a_module_result_with_no_zone_carries_an_empty_label(page):
     _reset(page)
     page.evaluate("() => window.finder.search('impact')")
     page.wait_for_function("() => window.pending.length === 1")
     body = {"results": [{"type": "module", "id": "x", "name": "Impact Analysis", "url": "/strategic/impact-analysis"}]}
     page.evaluate("(b) => window.pending[0].resolve(b)", body)
     page.wait_for_function("() => window.log.states.length && !window.log.states[window.log.states.length - 1].loading")
-    assert _last(page)["results"][0]["zone"] == "All modules"
+    # Navigation v3: every page has a sidebar entry; a hit with none says nothing rather than
+    # pointing at a directory the sidebar no longer links.
+    assert _last(page)["results"][0]["zone"] == ""
 
 
 # ---- the real sidebar, real Alpine, real endpoint -----------------------------------------------------
@@ -164,26 +166,27 @@ def _serve_app_in_browser(pg, client, document, path):
 
 
 def test_typing_in_the_real_sidebar_shows_a_link_level_result_with_zone(app, client, browser):
-    # CTO's own zones don't carry Impact Analysis, so a hit can only have come from the search.
+    # A CTO's sidebar carries no Traceability entry, so a hit can only have come from the search.
     login(client, _persona(app, "cto"))
     page_path = "/dashboard/overview"
     document = client.get(page_path).get_data(as_text=True)
-    assert 'href="/strategic/impact-analysis"' not in document.split('data-testid="sidebar-search-results"')[0]
+    assert 'href="/architecture/traceability"' not in document
 
     pg = browser.new_page(viewport={"width": 1440, "height": 900})
     try:
         _serve_app_in_browser(pg, client, document, page_path)
         pg.goto("http://app.test" + page_path)
-        pg.fill('#sidebar-nav input[x-ref="searchInput"]', "impact")
-        hit = pg.locator('[data-testid="sidebar-search-results"] a[href="/strategic/impact-analysis"]')
+        pg.fill("#sidebar-search", "traceability")
+        hit = pg.locator('[data-testid="sidebar-search-results"] a[href="/architecture/traceability"]')
         hit.wait_for(state="visible", timeout=10000)
-        assert hit.inner_text().strip().split("\n")[0] == "Impact Analysis"
+        name, section = [part.strip() for part in hit.inner_text().strip().split("\n") if part.strip()]
+        assert (name, section) == ("Traceability", "Impact")
     finally:
         pg.close()
 
 
-def test_only_matching_links_show_not_the_whole_zone(app, client, browser):
-    """A hit on one link in a zone must not pull in that zone's other, unrelated links."""
+def test_only_matching_pages_show_not_the_whole_sidebar(app, client, browser):
+    """A hit on one page must not pull in unrelated pages."""
     login(client, _persona(app, "solution_architect"))
     page_path = "/dashboard/overview"
     document = client.get(page_path).get_data(as_text=True)
@@ -191,20 +194,17 @@ def test_only_matching_links_show_not_the_whole_zone(app, client, browser):
     try:
         _serve_app_in_browser(pg, client, document, page_path)
         pg.goto("http://app.test" + page_path)
-        pg.fill('#sidebar-nav input[x-ref="searchInput"]', "vendor")
-        pg.wait_for_selector('[data-testid="sidebar-search-results"] a:visible')
+        pg.fill("#sidebar-search", "vendor")
+        pg.wait_for_selector('[data-testid="sidebar-search-page"]')
         pg.wait_for_timeout(300)
-        rows = pg.locator('[data-testid="sidebar-search-results"] a:visible').all_inner_texts()
-        assert rows, "no results for 'vendor'"
-        for row in rows:
-            name = row.strip().split("\n")[0]
-            assert "vendor" in name.lower(), rows
-        assert not any("Capabilities" in row or "Applications" in row for row in rows), rows
+        rows = [r.strip().split("\n")[0] for r in pg.locator('[data-testid="sidebar-search-page"]').all_inner_texts()]
+        assert "Vendors" in rows, rows
+        assert not [r for r in rows if r in ("Capability map", "Compliance", "Changes", "Home")], rows
     finally:
         pg.close()
 
 
-def test_no_match_shows_the_two_ways_out_and_the_hint_stays_visible(app, client, browser):
+def test_no_match_offers_to_ask_the_ai_chat_and_the_hint_stays_visible(app, client, browser):
     login(client, _persona(app, "solution_architect"))
     page_path = "/dashboard/overview"
     document = client.get(page_path).get_data(as_text=True)
@@ -212,23 +212,20 @@ def test_no_match_shows_the_two_ways_out_and_the_hint_stays_visible(app, client,
     try:
         _serve_app_in_browser(pg, client, document, page_path)
         pg.goto("http://app.test" + page_path)
-        pg.fill('#sidebar-nav input[x-ref="searchInput"]', "zzzznomatch")
+        pg.fill("#sidebar-search", "zzzznomatch")
         pg.wait_for_selector('[data-testid="sidebar-search-results"]', state="visible")
-        # A fixed timeout here raced the debounced request (module_search.js's 250ms debounce
-        # plus the round trip): under load the assertion below could still catch the "Searching…"
-        # loading text instead of the settled no-match state. Wait for the loading paragraph
-        # itself to clear -- the actual condition this test needs, not a guessed duration.
         pg.locator('[data-testid="sidebar-search-results"] p', has_text="Searching").wait_for(state="hidden", timeout=5000)
         results = pg.locator('[data-testid="sidebar-search-results"]')
-        assert 'No pages match "zzzznomatch"' in results.inner_text()
-        assert results.get_by_role("button", name="Search everywhere (Ctrl+K)").is_visible()
-        assert results.get_by_role("link", name="Browse all modules").is_visible()
-        assert pg.get_by_text("Ctrl+K").first.is_visible()
+        assert "No page matches. Press Enter to ask the AI chat." in results.inner_text()
+        ask = results.locator('[data-testid="sidebar-search-ask"]')
+        assert ask.is_visible() and "zzzznomatch" in ask.inner_text()
+        assert "q=zzzznomatch" in ask.get_attribute("href")
+        assert pg.locator("kbd", has_text="K").first.is_visible()
     finally:
         pg.close()
 
 
-def test_clearing_the_box_restores_the_zones(app, client, browser):
+def test_clearing_the_box_restores_the_sidebar(app, client, browser):
     login(client, _persona(app, "solution_architect"))
     page_path = "/dashboard/overview"
     document = client.get(page_path).get_data(as_text=True)
@@ -237,10 +234,12 @@ def test_clearing_the_box_restores_the_zones(app, client, browser):
         _serve_app_in_browser(pg, client, document, page_path)
         pg.goto("http://app.test" + page_path)
         before = pg.locator("#sidebar-nav").inner_text()
-        pg.fill('#sidebar-nav input[x-ref="searchInput"]', "vendor")
-        pg.wait_for_selector('[data-testid="sidebar-search-results"] a')
-        pg.click('button[title="Clear search"]')
+        pg.fill("#sidebar-search", "vendor")
+        pg.wait_for_selector('[data-testid="sidebar-search-page"]')
+        pg.press("#sidebar-search", "Escape")
         pg.wait_for_timeout(200)
+        assert pg.input_value("#sidebar-search") == ""
+        assert not pg.locator('[data-testid="sidebar-search-results"]').is_visible()
         after = pg.locator("#sidebar-nav").inner_text()
         assert before == after
     finally:

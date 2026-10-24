@@ -6,6 +6,7 @@ from flask import jsonify, render_template, request, url_for
 from flask_login import current_user, login_required
 
 from app.middleware.tenant_context import current_org_id
+from app.modules.ai_chat.services.catalogue_answer import answer_catalogue_question
 from app.modules.ai_chat.services.estate_answer import answer_estate_question, explanations_for, recorded_text
 from app.modules.ai_chat.services.lens_answer import answer_lens_question
 from app.modules.intelligence.services import answer_envelope as envelope
@@ -66,6 +67,28 @@ def _lens_line(lens):
     return "Answer from your records about %s: %d %s%s recorded." % (name, count, noun, "" if count == 1 else "s")
 
 
+def _catalogue_response(message, thread_id, keep):
+    """The catalogue's cited answer to a plain startup question, or ``found: false``."""
+    organization_id = current_org_id()
+    answer = answer_catalogue_question(message[:MAX_QUESTION_CHARS], int(organization_id)) if organization_id else None
+    if answer is None:
+        return jsonify({"success": True, "found": False})
+    count = len(answer["records"])
+    line = "Answer from your records: %s. %s" % (
+        answer["title"],
+        "%d record%s cited." % (count, "" if count == 1 else "s") if count else "Your records cannot answer this yet.",
+    )
+    return jsonify(
+        {
+            "success": True,
+            "found": True,
+            "thread_id": _remember(thread_id, message, line, keep=keep),
+            "entry_id": answer["entry_id"],
+            "html": render_template("ai_chat/_catalogue_answer.html", answer=answer),
+        }
+    )
+
+
 @unified_ai_chat_bp.route("/estate-answer", methods=["POST"])
 @login_required
 def estate_answer():
@@ -109,7 +132,7 @@ def estate_answer():
     except envelope.AnswerNotAskable:
         record = None
     if record is None:
-        return jsonify({"success": True, "found": False})
+        return _catalogue_response(message, thread_id, keep)
     answer = envelope.present(record)
     # Closest connections first, a recorded one ahead of a worked-out one at the same
     # distance, then by name, as the dashboard's first answer lists them.

@@ -61,6 +61,7 @@ ARCHITECT_PERSONAS = (
     "arb_member",
     "portfolio_manager",
     "cto",
+    "cto_founder",
     "procurement",
     "application_manager",
     "application_architect",
@@ -139,9 +140,21 @@ ROLE_DEFAULT_PERSONAS: Dict[str, str] = {
 DEFAULT_CHAT_PERSONA = "enterprise_architect"
 
 
-def get_default_chat_persona(enterprise_role: Optional[str]) -> str:
-    """Return the selectable AI persona for a persisted enterprise role."""
-    return ROLE_DEFAULT_PERSONAS.get(enterprise_role or "", DEFAULT_CHAT_PERSONA)
+# A self-serve owner signs up with the "cto" lens; the assistant that answers
+# a startup's questions is the technical founder's, not the executive briefing
+# the assigned "cto" role gets.
+LENS_DEFAULT_PERSONAS: Dict[str, str] = {"cto": "cto_founder"}
+
+
+def get_default_chat_persona(
+    enterprise_role: Optional[str], persona_lens: Optional[str] = None
+) -> str:
+    """Return the selectable AI persona: the chosen lens first, then the role."""
+    if persona_lens in LENS_DEFAULT_PERSONAS:
+        return LENS_DEFAULT_PERSONAS[persona_lens]
+    return ROLE_DEFAULT_PERSONAS.get(
+        persona_lens or enterprise_role or "", DEFAULT_CHAT_PERSONA
+    )
 
 
 def _validate_role_default_personas() -> None:
@@ -412,6 +425,26 @@ HOW YOU ANSWER: verdict first, in five sentences or fewer unless explicitly
 asked for more detail. State the number, the trend if known, the risk, and
 ONE next action with a specific Entelim page. No architecture jargon unless
 asked.
+{_EVIDENCE_RULES}""",
+
+    "cto_founder": f"""You are Entelim's AI assistant for a CTO or technical founder running a young company's technology.
+
+MISSION: answer the four questions a technical founder asks of their estate,
+in this order of usefulness: what breaks, who owns it, what it costs, and
+what to fix first. You speak plainly, without architecture jargon, and you
+never assume a large organisation, a review board or a mature process.
+
+SCOPE OF DUTY:
+- What breaks: which applications depend on which, and what an outage of one
+  would reach, from the recorded links only.
+- Who owns it: applications with no recorded owner are findings, named.
+- What it costs: the recorded annual cost per application; an application
+  with no recorded cost is reported as "no cost recorded", never as zero.
+- What to fix first: rank by reach (how much depends on it) and by missing
+  ownership, and say why.
+
+HOW YOU ANSWER: lead with the answer in plain sentences, name the
+applications involved, then ONE next action with a specific Entelim page.
 {_EVIDENCE_RULES}""",
 
     "procurement": f"""You are Entelim's AI Procurement Steward — the commercial view of the estate.
@@ -1061,6 +1094,18 @@ def _cto_context() -> str:
     return "\n".join(lines)
 
 
+def _cto_founder_context() -> str:
+    lines = []
+
+    def portfolio_total():
+        from app.models.application_portfolio import ApplicationComponent
+        n = db.session.query(func.count(ApplicationComponent.id)).scalar() or 0
+        return f"- Applications recorded: {n}"
+
+    lines.append(_safe("portfolio_total", portfolio_total))
+    return "\n".join(lines)
+
+
 def _procurement_context() -> str:
     lines = []
 
@@ -1495,6 +1540,7 @@ _CONTEXT_BUILDERS: Dict[str, Callable[[], str]] = {
     "arb_member": _arb_member_context,
     "portfolio_manager": _portfolio_manager_context,
     "cto": _cto_context,
+    "cto_founder": _cto_founder_context,
     "procurement": _procurement_context,
     "application_manager": _application_manager_context,
     "application_architect": _application_architect_context,
