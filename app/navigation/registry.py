@@ -574,9 +574,14 @@ def search_index(user) -> list:
         catalogue = _catalogue()
     except Exception:  # noqa: BLE001 - outside a signed-in request there is no catalogue
         catalogue = []
+    from app.utils.search_text import normalise_search_text
+
+    # A catalogue page whose name is already a name (or old name) of a page above is the
+    # same idea under its old name, merged into that page (ADR-0015): offered once.
+    known = {normalise_search_text(term) for row in rows for term in row["terms"]}
     for page in catalogue:
         endpoint = page["endpoint"]
-        if not _registered(endpoint):
+        if not _registered(endpoint) or normalise_search_text(page["label"]) in known:
             continue
         try:
             url = url_for(endpoint, **(page.get("query_params") or {}))

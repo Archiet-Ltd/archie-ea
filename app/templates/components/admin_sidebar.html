@@ -109,7 +109,7 @@ Budget: scripts/check_sidebar_links.py renders this per role and counts its link
             {{ input(
                 id='sidebar-search',
                 name='sidebar-search',
-                type='search',
+                type='text',
                 placeholder='Search or ask…',
                 aria_label='Search pages or ask a question',
                 size='sm',
@@ -132,7 +132,7 @@ Budget: scripts/check_sidebar_links.py renders this per role and counts its link
                     '@keydown.escape': 'clear()'
                 }
             ) }}
-            <kbd class="pointer-events-none absolute right-2 top-1/2 inline-flex h-5 -translate-y-1/2 select-none items-center rounded border border-border bg-muted px-1.5 font-mono text-2xs font-medium text-muted-foreground" x-text="kbd" aria-hidden="true">Ctrl K</kbd>
+            <kbd class="pointer-events-none absolute right-2 top-1/2 hidden h-5 lg:inline-flex -translate-y-1/2 select-none items-center rounded border border-border bg-muted px-1.5 font-mono text-2xs font-medium text-muted-foreground" x-text="kbd" aria-hidden="true">Ctrl K</kbd>
         </div>
 
         <div id="sidebar-search-results" role="listbox" aria-label="Search results"
@@ -215,7 +215,7 @@ Budget: scripts/check_sidebar_links.py renders this per role and counts its link
         {# Stage awareness: until the organisation has connected a source. #}
         {% if nav.connected is sameas false and nav.connect_url %}
         <div class="sidebar-connect-card mt-auto px-2 pt-4" data-slot="sidebar-group" data-testid="connect-source-card">
-            {% call card.card(class='bg-background') %}
+            {% call card.card(class='border-border bg-background') %}
                 {% call card.card_header(class='space-y-1 p-4') %}
                     {% call card.card_title(class='text-sm') %}Connect GitHub or Jira to build your model{% endcall %}
                     {% call card.card_description(class='text-xs') %}Entelim reads your repositories or projects and drafts your systems for you to approve.{% endcall %}
