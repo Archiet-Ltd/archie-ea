@@ -1,25 +1,18 @@
 {% extends "layouts/admin_base.html" %}
-{% from 'components/page_header.html' import page_header %}
+{% from 'macros/page_shell.html' import page_shell %}
+{% from 'components/button.html' import button %}
+{% from 'components/input.html' import input, label %}
+{% from 'components/select.html' import native_select %}
+{% from 'components/checkbox.html' import checkbox %}
+{% import 'components/card.html' as card %}
+{% import 'components/table.html' as table %}
 
 {% block title %}Import a diagram{% endblock %}
 
-{% block extra_css %}
-<style>
-  [x-cloak]{display:none!important}
-  .verdict-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
-  .verdict-created { background: rgb(22 163 74); }
-  .verdict-linked  { background: rgb(100 116 139); }
-  .verdict-changed { background: rgb(217 119 6); }
-  .verdict-skipped { background: rgb(220 38 38); }
-</style>
-{% endblock %}
-
 {% block content %}
-<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8" x-data="diagramImport()" x-cloak>
-
-    {{ page_header(title='Import a diagram', breadcrumbs=[{'label': 'Home', 'href': '/'}, {'label': 'Import a diagram'}], description='Load a Lucidchart or Visio export into the ArchiMate repository') }}
-
-    <div class="rounded-lg border border-border bg-muted/30 p-4 mb-6 text-sm text-muted-foreground">
+<div x-data="diagramImport()" x-cloak>
+    {% macro _ps_meta() %}
+    <div class="rounded-lg border border-border bg-muted/30 p-4 text-sm text-muted-foreground">
         Export from Lucidchart with <strong class="text-foreground">File → Export → JSON</strong>,
         or upload a native <code>.lucid</code> archive or a Visio <code>.vsdx</code> drawing.
         Prefer <code>.vsdx</code> where you have it: Lucid's JSON export discards shape
@@ -27,32 +20,34 @@
         which data centre. Nothing is written until you press Import — the preview shows
         exactly what would be created, attached to what is already here, or changed.
     </div>
+    {% endmacro %}
+    {{ page_shell(
+        title='Import a diagram',
+        breadcrumb=[('Home', '/'), ('Import a diagram', None)],
+        meta_caller=_ps_meta
+    ) }}
 
     {# ── Step 1: the file and how to read it ─────────────────────────────── #}
-    <div class="rounded-lg border border-border bg-card p-6 mb-6">
+    {% call card.card() %}
+        {% call card.card_content() %}
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <div>
-                <label for="diagram-file" class="block text-sm font-medium text-foreground mb-1.5">
-                    Diagram export
-                </label>
+                {% call label(for='diagram-file') %}Diagram export{% endcall %}
                 <input id="diagram-file" type="file" accept=".json,.lucid,.vsdx"
                        @change="file = $event.target.files[0]; report = null; committed = false"
-                       class="block w-full text-sm text-muted-foreground rounded-md border border-input
-                              bg-background px-3 py-2 file:mr-3 file:rounded file:border-0
-                              file:bg-muted file:px-3 file:py-1 file:text-sm file:text-foreground">
+                       class="mt-1.5 flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-muted-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50">
             </div>
 
             <div>
-                <label for="fallback-type" class="block text-sm font-medium text-foreground mb-1.5">
-                    Shapes without an ArchiMate type
-                </label>
-                <select id="fallback-type" x-model="fallbackType"
-                        class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
+                {% call label(for='fallback-type') %}Shapes without an ArchiMate type{% endcall %}
+                <div class="mt-1.5">
+                {% call native_select(id='fallback-type', attrs_dict={'x-model': 'fallbackType'}) %}
                     <option value="">Skip them (safest)</option>
                     <template x-for="t in elementTypes" :key="t">
                         <option :value="t" x-text="'Import as ' + t"></option>
                     </template>
-                </select>
+                {% endcall %}
+                </div>
                 <p class="mt-1 text-xs text-muted-foreground">
                     Diagrams drawn with ordinary rectangles carry no type. Importing them keeps
                     their names, colours and nesting; the type is a guess you can correct in
@@ -61,15 +56,14 @@
             </div>
 
             <div>
-                <label for="dedupe" class="block text-sm font-medium text-foreground mb-1.5">
-                    Matching existing elements
-                </label>
-                <select id="dedupe" x-model="dedupe"
-                        class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
+                {% call label(for='dedupe') %}Matching existing elements{% endcall %}
+                <div class="mt-1.5">
+                {% call native_select(id='dedupe', attrs_dict={'x-model': 'dedupe'}) %}
                     <option value="name-type">By name and type</option>
                     <option value="name-type-container">By name, type and data centre</option>
                     <option value="none">Import everything as drawn</option>
-                </select>
+                {% endcall %}
+                </div>
                 <p class="mt-1 text-xs text-muted-foreground">
                     Name and type is right for a repository, but merges five boxes called
                     INTERNET into one. Add the data centre to keep them distinct.
@@ -78,20 +72,14 @@
 
             <div class="space-y-2">
                 <span class="block text-sm font-medium text-foreground mb-1.5">Application portfolio</span>
-                <label class="flex items-center gap-2 text-sm text-muted-foreground">
-                    <input type="checkbox" x-model="linkApplications" class="rounded border-input">
-                    Attach matching applications to their imported element
-                </label>
-                <label class="flex items-center gap-2 text-sm text-muted-foreground">
-                    <input type="checkbox" x-model="createApplications" class="rounded border-input">
-                    Create portfolio entries for applications not yet there
-                </label>
+                {{ checkbox(id='link-apps', attrs_dict={'x-model': 'linkApplications'}, label='Attach matching applications to their imported element') }}
+                {{ checkbox(id='create-apps', attrs_dict={'x-model': 'createApplications'}, label='Create portfolio entries for applications not yet there') }}
             </div>
         </div>
 
         <div class="mt-4 rounded-md border border-border bg-muted/20 px-3 py-2">
-            <label class="flex items-start gap-2 text-sm text-foreground">
-                <input type="checkbox" x-model="aiAssist" class="mt-0.5 rounded border-input">
+            <label class="flex items-start gap-2 text-sm text-foreground cursor-pointer">
+                <input type="checkbox" x-model="aiAssist" class="mt-0.5 h-4 w-4 shrink-0 rounded border-input accent-primary text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
                 <span>
                     <span class="font-medium">Ask AI to fill the gaps</span>
                     <span class="block text-xs text-muted-foreground mt-0.5">
@@ -106,43 +94,40 @@
         </div>
 
         <div class="mt-6 flex flex-wrap items-center gap-3">
-            <button type="button" @click="preview()" :disabled="!file || busy"
-                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
-                <span x-show="!busy || mode !== 'preview'">Preview</span>
-                <span x-show="busy && mode === 'preview'" x-cloak>Reading…</span>
-            </button>
-            <button type="button" @click="commit()" :disabled="!report || busy || committed"
-                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
-                <span x-show="!busy || mode !== 'commit'">Import</span>
-                <span x-show="busy && mode === 'commit'" x-cloak>Importing…</span>
-            </button>
+            {{ button(text='Preview', variant='outline', on_click='preview()', disabled='!file || busy', attrs_dict={'x-show': "!busy || mode !== 'preview'"}) }}
+            <span x-show="busy && mode === 'preview'" x-cloak>{{ button(text='Reading…', variant='outline', disabled=true) }}</span>
+            {{ button(text='Import', variant='primary', on_click='commit()', disabled='!report || busy || committed', attrs_dict={'x-show': "!busy || mode !== 'commit'"}) }}
+            <span x-show="busy && mode === 'commit'" x-cloak>{{ button(text='Importing…', variant='primary', disabled=true) }}</span>
             <span x-show="error" x-cloak class="text-sm text-destructive-emphasis" x-text="error"></span>
             <template x-if="committed && report && report.composer_url">
                 <a :href="report.composer_url"
-                   class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
-                    Open in composer →
+                   class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4">
+                    <i data-lucide="external-link" class="h-4 w-4"></i> Open in composer
                 </a>
             </template>
             <span x-show="committed" x-cloak class="text-sm text-foreground">
                 Imported. <a href="/archimate/import-review" class="underline">Review what was guessed →</a>
             </span>
         </div>
-    </div>
+        {% endcall %}
+    {% endcall %}
 
     {# ── Step 2: what it would do ────────────────────────────────────────── #}
     <template x-if="report">
-    <div>
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
-            <template x-for="card in summaryCards" :key="card.label">
-                <div class="rounded-lg border border-border bg-card p-4">
-                    <p class="text-2xl font-bold text-foreground" x-text="card.value"></p>
-                    <p class="text-xs text-muted-foreground mt-1" x-text="card.label"></p>
-                </div>
+    <div class="mt-6 space-y-6">
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <template x-for="crd in summaryCards" :key="crd.label">
+                {% call card.card() %}
+                    {% call card.card_content() %}
+                        <p class="text-2xl font-bold text-foreground" x-text="crd.value"></p>
+                        <p class="text-xs text-muted-foreground mt-1" x-text="crd.label"></p>
+                    {% endcall %}
+                {% endcall %}
             </template>
         </div>
 
         <template x-if="report.conformance">
-        <div class="rounded-lg border border-border bg-muted/30 p-4 mb-6 text-sm text-muted-foreground">
+        <div class="rounded-lg border border-border bg-muted/30 p-4 text-sm text-muted-foreground">
             <span class="text-foreground font-medium">ArchiMate 3.2 conformance:</span>
             <span x-text="report.conformance.ok"></span> permitted,
             <span x-text="report.conformance.violations.length"></span> not permitted between
@@ -154,16 +139,16 @@
         </template>
 
         <template x-for="w in report.warnings" :key="w">
-            <div class="rounded-lg border border-border bg-muted/40 p-3 mb-2 text-xs text-muted-foreground"
+            <div class="rounded-lg border border-border bg-muted/40 p-3 text-xs text-muted-foreground"
                  x-text="w"></div>
         </template>
 
         {# ── AI-assist suggestions (advisory; only ticked ones are imported) ── #}
         <template x-if="report.suggestions">
-        <div class="rounded-xl border border-primary/40 bg-primary/5 overflow-hidden mt-4 mb-2">
+        <div class="rounded-xl border border-primary/40 bg-primary/5 overflow-hidden">
             <div class="bg-primary/10 px-5 py-2 border-b border-primary/20 flex items-center gap-2">
                 <span class="text-xs font-semibold text-foreground">AI suggestions for the gaps</span>
-                <span class="text-2xs text-muted-foreground">tick to include on Import — nothing here is saved otherwise</span>
+                <span class="text-xs text-muted-foreground">tick to include on Import — nothing here is saved otherwise</span>
             </div>
 
             <template x-if="!report.suggestions.available">
@@ -181,22 +166,22 @@
                         Untyped shapes — propose a type
                         (<span x-text="report.suggestions.retype.length"></span>)
                     </p>
-                    <table class="dense-table w-full text-sm">
+                    {% call table.table() %}
                         <tbody>
                             <template x-for="(s, i) in report.suggestions.retype" :key="'rt'+i">
-                                <tr class="border-t border-border/60">
-                                    <td class="px-2 py-1.5 w-8">
-                                        <input aria-label="Accept retype suggestion" type="checkbox" x-model="s.accepted" class="rounded border-input">
+                                <tr class="border-b transition-colors hover:bg-muted/50">
+                                    <td class="p-2 w-8">
+                                        <input aria-label="Accept retype suggestion" type="checkbox" x-model="s.accepted" class="mt-0.5 h-4 w-4 shrink-0 rounded border-input accent-primary text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
                                     </td>
-                                    <td class="px-2 py-1.5 text-foreground" x-text="s.name"></td>
-                                    <td class="px-2 py-1.5 text-xs">
-                                        <span class="rounded bg-muted px-1.5 py-0.5 text-foreground" x-text="s.proposed_type"></span>
+                                    <td class="p-2 text-foreground text-sm" x-text="s.name"></td>
+                                    <td class="p-2">
+                                        <span class="rounded bg-muted px-1.5 py-0.5 text-xs text-foreground" x-text="s.proposed_type"></span>
                                     </td>
-                                    <td class="px-2 py-1.5 text-xs text-muted-foreground" x-text="s.rationale"></td>
+                                    <td class="p-2 text-xs text-muted-foreground" x-text="s.rationale"></td>
                                 </tr>
                             </template>
                         </tbody>
-                    </table>
+                    {% endcall %}
                 </div>
 
                 <div x-show="report.suggestions.relationships && report.suggestions.relationships.length" x-cloak>
@@ -204,26 +189,26 @@
                         Recovered relationships
                         (<span x-text="report.suggestions.relationships.length"></span>)
                     </p>
-                    <table class="dense-table w-full text-sm">
+                    {% call table.table() %}
                         <tbody>
                             <template x-for="(s, i) in report.suggestions.relationships" :key="'rl'+i">
-                                <tr class="border-t border-border/60">
-                                    <td class="px-2 py-1.5 w-8">
-                                        <input aria-label="Accept relationship suggestion" type="checkbox" x-model="s.accepted" class="rounded border-input">
+                                <tr class="border-b transition-colors hover:bg-muted/50">
+                                    <td class="p-2 w-8">
+                                        <input aria-label="Accept relationship suggestion" type="checkbox" x-model="s.accepted" class="mt-0.5 h-4 w-4 shrink-0 rounded border-input accent-primary text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
                                     </td>
-                                    <td class="px-2 py-1.5 text-foreground" x-text="s.source_name"></td>
-                                    <td class="px-2 py-1.5 text-xs text-muted-foreground">
-                                        <span class="rounded bg-muted px-1.5 py-0.5" x-text="s.rel_type"></span>
+                                    <td class="p-2 text-foreground text-sm" x-text="s.source_name"></td>
+                                    <td class="p-2">
+                                        <span class="rounded bg-muted px-1.5 py-0.5 text-xs text-muted-foreground" x-text="s.rel_type"></span>
                                     </td>
-                                    <td class="px-2 py-1.5 text-foreground" x-text="s.target_name"></td>
-                                    <td class="px-2 py-1.5 text-xs text-muted-foreground" x-text="s.rationale"></td>
+                                    <td class="p-2 text-foreground text-sm" x-text="s.target_name"></td>
+                                    <td class="p-2 text-xs text-muted-foreground" x-text="s.rationale"></td>
                                 </tr>
                             </template>
                         </tbody>
-                    </table>
+                    {% endcall %}
                 </div>
 
-                <p class="text-2xs text-muted-foreground pt-1">
+                <p class="text-xs text-muted-foreground pt-1">
                     AI proposals are validated server-side against the ArchiMate 3.2
                     vocabulary and the elements actually imported. Re-run Preview to change
                     the file; ticked items are written when you press Import.
@@ -233,38 +218,47 @@
         </div>
         </template>
 
-        <div class="rounded-lg border border-border bg-card overflow-hidden mt-4">
+        <div class="rounded-lg border border-border bg-card overflow-hidden">
             <div class="bg-muted/40 px-5 py-2 border-b border-border flex items-center gap-4">
                 <span class="text-xs font-medium text-muted-foreground">Elements</span>
                 <template x-for="v in ['created','changed','linked','skipped']" :key="v">
-                    <button type="button" @click="filter = (filter === v ? '' : v)"
-                            :class="filter === v ? 'ring-1 ring-primary' : ''"
-                            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-8 px-2.5 items-center">
-                        <span class="verdict-dot" :class="'verdict-' + v"></span>
-                        <span x-text="v"></span>
-                        <span class="opacity-60" x-text="countOf(v)"></span>
-                    </button>
+                    {{ button(
+                        text='',
+                        variant='ghost',
+                        size='xs',
+                        on_click="filter = (filter === v ? '' : v)",
+                        attrs_dict={
+                            ':class': "filter === v ? 'ring-1 ring-primary' : ''",
+                            'x-text': 'v',
+                        }
+                    ) }}
                 </template>
             </div>
             <div class="overflow-x-auto max-h-96 overflow-y-auto">
-                <table class="dense-table w-full text-sm">
+                {% call table.table() %}
                     <tbody>
                         <template x-for="(row, i) in shownElements" :key="i">
-                            <tr class="border-t border-border">
+                            <tr class="border-b transition-colors hover:bg-muted/50">
                                 <td class="px-4 py-1.5">
-                                    <span class="verdict-dot" :class="'verdict-' + row.verdict"></span>
+                                    <span class="inline-block w-2 h-2 rounded-full"
+                                          :class="{
+                                              'bg-success': row.verdict === 'created',
+                                              'bg-muted-foreground': row.verdict === 'linked',
+                                              'bg-warning': row.verdict === 'changed',
+                                              'bg-destructive': row.verdict === 'skipped'
+                                          }"></span>
                                 </td>
-                                <td class="px-2 py-1.5 text-foreground" x-text="row.name"></td>
+                                <td class="px-2 py-1.5 text-foreground text-sm" x-text="row.name"></td>
                                 <td class="px-2 py-1.5 text-xs text-muted-foreground" x-text="row.type"></td>
                                 <td class="px-2 py-1.5 text-xs text-muted-foreground" x-text="row.detail"></td>
-                                <td class="px-2 py-1.5 text-2xs">
+                                <td class="px-2 py-1.5">
                                     <span x-show="row.guessed" x-cloak
-                                          class="rounded bg-muted text-foreground px-1.5 py-0.5">type guessed</span>
+                                          class="rounded bg-muted text-foreground px-1.5 py-0.5 text-xs">type guessed</span>
                                 </td>
                             </tr>
                         </template>
                     </tbody>
-                </table>
+                {% endcall %}
             </div>
         </div>
     </div>
@@ -324,8 +318,6 @@ function diagramImport() {
             return fd;
         },
 
-        // Collect only the suggestions the user actually ticked, in the shape
-        // the commit endpoint re-validates and folds in.
         _acceptedSuggestions() {
             const s = this.report && this.report.suggestions;
             if (!s || !s.available) return null;
@@ -348,8 +340,6 @@ function diagramImport() {
                 if (extra) {
                     Object.keys(extra).forEach(k => body.append(k, extra[k]));
                 }
-                // Platform.fetch automatically injects CSRF token and throws on non-ok responses.
-                // We pass { silent: true } because we handle errors inline via this.error.
                 const data = await Platform.fetch(url, {
                     method: 'POST',
                     body: body,
