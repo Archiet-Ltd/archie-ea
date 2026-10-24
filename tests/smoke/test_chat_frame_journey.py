@@ -217,7 +217,7 @@ def test_at_390_the_unavailable_notice_is_one_line_and_the_first_screen_keeps_th
         expect(cards).to_have_count(4, timeout=PAGE_TIMEOUT)
         notice = page.get_by_test_id("model-unavailable-notice")
         if notice.count():
-            assert notice.bounding_box()["height"] <= 48, notice.bounding_box()
+            assert notice.bounding_box()["height"] <= 34, notice.bounding_box()  # one line of text
         composer_top = page.locator("#chat-form").evaluate("e => e.closest('.border-t').getBoundingClientRect().top")
         for i in range(4):
             bottom = cards.nth(i).bounding_box()

@@ -99,7 +99,7 @@
                         <template id="startup-first-steps">
                             <div class="flex flex-col items-center gap-3 sm:flex-row sm:justify-center" data-testid="startup-first-steps">
                                 {% if startup_first_steps.connect %}
-                                {{ button(text='Connect GitHub', href=url_for('m365_connector.github_connect'), icon='github', testid='chat-first-connect') }}
+                                {{ button(text='Connect GitHub', href=url_for('m365_connector.github_connect'), testid='chat-first-connect') }}
                                 {% endif %}
                                 {% if startup_first_steps.sample %}
                                 <form method="post" action="{{ url_for('architect_ui.load_sample_company') }}">
@@ -126,9 +126,9 @@
                not url_for: the admin blueprint is selected at boot and a missing endpoint would 500 this whole page. #}
             <div class="shrink-0 px-4 pb-2">
                 {% if current_user.is_admin() %}
-                {{ alert('warning', title='No AI model', text='Questions about your records still work.', link_href='/admin/api-settings', link_text='API Settings', testid='model-unavailable-notice') }} {# ui-contract-ok: the alert macro, not a native dialog #}
+                {{ alert('warning', text='No AI model. Records still answer.', link_href='/admin/api-settings', link_text='API Settings', testid='model-unavailable-notice') }} {# ui-contract-ok: the alert macro, not a native dialog #}
                 {% else %}
-                {{ alert('warning', title='No AI model', text='Ask an administrator to set one up. Records questions still work.', testid='model-unavailable-notice') }} {# ui-contract-ok: the alert macro, not a native dialog #}
+                {{ alert('warning', text='No AI model. Ask an administrator.', testid='model-unavailable-notice') }} {# ui-contract-ok: the alert macro, not a native dialog #}
                 {% endif %}
             </div>
             {% endif %}
