@@ -734,8 +734,8 @@ class BlueprintCompletenessService:
 
         # 35 pts: Goal → ValueStream realization (Goal realizes ValueStream, or VS realizes Goal)
         goal_vs_linked = any(
-            (r.relationship_type == "realization" and r.source_id in vs_ids and r.target_id in goal_ids)
-            or (r.relationship_type == "realization" and r.source_id in goal_ids and r.target_id in vs_ids)
+            ((r.type or "").lower() == "realization" and r.source_id in vs_ids and r.target_id in goal_ids)
+            or ((r.type or "").lower() == "realization" and r.source_id in goal_ids and r.target_id in vs_ids)
             for r in rels
         )
         if goal_vs_linked:
@@ -746,7 +746,7 @@ class BlueprintCompletenessService:
 
         # 35 pts: ValueStream → Capability (association or serving in either direction)
         vs_cap_linked = has_cap and any(
-            (r.relationship_type in ("association", "serving", "realization"))
+            ((r.type or "").lower() in ("association", "serving", "realization"))
             and (
                 (r.source_id in vs_ids and r.target_id in cap_ids)
                 or (r.source_id in cap_ids and r.target_id in vs_ids)
@@ -760,7 +760,7 @@ class BlueprintCompletenessService:
 
         # 30 pts: ValueStream → Outcome realization
         vs_outcome_linked = has_outcome and any(
-            r.relationship_type == "realization"
+            (r.type or "").lower() == "realization"
             and (
                 (r.source_id in vs_ids and r.target_id in outcome_ids)
                 or (r.source_id in outcome_ids and r.target_id in vs_ids)
