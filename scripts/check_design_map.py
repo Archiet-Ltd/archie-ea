@@ -475,6 +475,10 @@ def dump(design_map):
 
 # ------------------------------------------------------------------ tracker
 
+TIER_NAMES = {"A": "the original verbatim", "B": "composed in the nearest original's frame", "C1": "diagram canvas",
+              "C2": "matrix and map", "C3": "timeline", "C4": "board and canvas", "C5": "generated document"}
+
+
 def tracker_rows(design_map, result):
     """Pages per block and per status, plus pages outside their block."""
     outside = Counter(o["block"] for o in result["outside_block"])
@@ -528,10 +532,13 @@ def render_tracker(design_map, result):
             f'<p><a class="spec" href="{_esc(spec)}">Open the redesign spec</a></p></article>'
         )
     page_rows = "\n".join(
-        f'<tr data-block="{_esc(e["block"])}" data-persona="{_esc(e["persona"])}"><td>{_esc(rel)}</td>'
+        f'<tr data-block="{_esc(e["block"])}" data-persona="{_esc(e["persona"])}" data-tier="{_esc(e["tier"])}" '
+        f'data-confidence="{_esc(e["confidence"])}"><td>{_esc(rel)}</td>'
         f'<td>{_esc(design_map["blocks"][e["block"]]["title"])}</td>'
         f'<td>{_esc(design_map["personas"][e["persona"]])}</td>'
-        f'<td>{_esc(", ".join(e["components"]))}</td><td>{_esc(e["status"])}</td>'
+        f'<td>{_esc(", ".join(e["components"]))}</td><td>{_esc(e["tier"])}</td>'
+        f'<td>{_esc(e["page_type"])}{" (corrected)" if e["type_changed"] else ""}<br>'
+        f'<span class="muted">{_esc(e["reason"])}</span></td><td>{_esc(e["confidence"])}</td><td>{_esc(e["status"])}</td>'
         f'<td>{_esc(", ".join(outside[rel])) if rel in outside else "None: follows its block"}</td>'
         f'<td>{(chr(60) + "a href=" + chr(34) + _esc(e["spec"].replace("docs/design/", "")) + chr(34) + ">Spec</a>") if e.get("spec") else "Not written yet"}</td></tr>'
         for rel, e in design_map["pages"].items()
@@ -540,7 +547,18 @@ def render_tracker(design_map, result):
     persona_options = "".join(
         f'<option value="{_esc(key)}">{_esc(name)}</option>' for key, name in design_map["personas"].items()
         if any(e["persona"] == key for e in design_map["pages"].values()))
+    tier_counts = ", ".join(f"{t} {n}" for t, n in result["tiers"].items())
+    tier_options = "".join(f'<option value="{_esc(t)}">Tier {_esc(t)}: {_esc(TIER_NAMES[t])} ({n})</option>'
+                           for t, n in result["tiers"].items())
+    check_rows = "\n".join(
+        f'<tr data-check="{_esc(name)}"><th scope="row">{_esc(TIER_CHECKS[name])}</th>'
+        f'<td class="n">{found["count"]}</td>'
+        f'<td>{_esc(", ".join(f"{t} {n}" for t, n in found["by_tier"].items()) or "None")}</td></tr>'
+        for name, found in result["tier_checks"].items())
+    pending = "".join(f"<li><strong>{_esc(k)}</strong>: needs {_esc(v)}</li>"
+                      for k, v in result["tier_checks_pending"].items())
     return TRACKER_TEMPLATE.format(
+        tier_counts=_esc(tier_counts), tier_options=tier_options, check_rows=check_rows, pending=pending,
         total=total, block_rows=block_rows, cards="\n".join(cards), page_rows=page_rows, options=options, persona_options=persona_options,
         outside=result["outside_block_count"], outside_components=result["outside_components_count"], unmarked=result["unmarked_count"],
         specified=sum(r["specified"] for r in rows),
@@ -580,6 +598,7 @@ a {{ color:inherit; }}
 figure {{ margin:8px 0; }} img {{ width:100%; border:1px solid hsl(var(--border)); border-radius:6px; }}
 figcaption {{ font-size:12px; color:hsl(var(--muted-foreground)); }}
 .filters {{ display:flex; gap:8px; flex-wrap:wrap; margin-bottom:8px; }}
+.filters label {{ max-width:100%; }} .filters select {{ max-width:100%; }}
 select, input {{ font:inherit; padding:6px 8px; border:1px solid hsl(var(--border)); border-radius:6px; background:hsl(var(--background)); color:hsl(var(--foreground)); }}
 .summary {{ display:flex; gap:24px; flex-wrap:wrap; }} .summary div strong {{ display:block; font-size:22px; }}
 </style>
@@ -595,6 +614,7 @@ select, input {{ font:inherit; padding:6px 8px; border:1px solid hsl(var(--borde
 <div><strong id="unmarked-pages">{unmarked}</strong>do not yet name their block in the template</div>
 <div><strong id="outside-components">{outside_components}</strong>use a component their row does not list</div>
 </div>
+<p class="muted">Pages by tier: <span id="tier-counts">{tier_counts}</span></p>
 <div role="tablist" aria-label="Views">
 <button type="button" role="tab" id="tab-blocks" aria-controls="panel-blocks" aria-selected="true">Blocks</button>
 <button type="button" role="tab" id="tab-startup" aria-controls="panel-startup" aria-selected="false">Startup path</button>
@@ -606,6 +626,15 @@ select, input {{ font:inherit; padding:6px 8px; border:1px solid hsl(var(--borde
 <tbody>
 {block_rows}
 </tbody></table></div>
+<h2>Checks against each page's tier</h2>
+<p class="muted">What the gate can measure from the templates today. Each count may only fall.</p>
+<div class="scroll"><table id="tier-checks">
+<thead><tr><th scope="col">Check</th><th scope="col">Pages failing</th><th scope="col">Tiers</th></tr></thead>
+<tbody>
+{check_rows}
+</tbody></table></div>
+<p class="muted">Not measured yet, because each needs a rendered original or a browser:</p>
+<ul id="tier-pending">{pending}</ul>
 <p class="muted">Mapped: the page has a block. Specified: it has a redesign spec. Implemented: it has been rebuilt to the spec. Verified: someone walked it beside the reference. Each stage counts the pages that have reached it or gone further.</p>
 </section>
 <section role="tabpanel" id="panel-startup" aria-labelledby="tab-startup" hidden>
@@ -618,11 +647,13 @@ select, input {{ font:inherit; padding:6px 8px; border:1px solid hsl(var(--borde
 <div class="filters">
 <label>Block <select id="block-filter"><option value="">Every block</option>{options}</select></label>
 <label>Persona <select id="persona-filter"><option value="">Every persona</option>{persona_options}</select></label>
+<label>Tier <select id="tier-filter"><option value="">Every tier</option>{tier_options}</select></label>
+<label>Confidence <select id="confidence-filter"><option value="">Any confidence</option><option value="high">High</option><option value="low">Low</option></select></label>
 <label>Search <input id="page-search" type="search" placeholder="Template path"></label>
 <span class="muted" id="page-count" aria-live="polite"></span>
 </div>
 <div class="scroll"><table id="pages-table">
-<thead><tr><th scope="col">Template</th><th scope="col">Block</th><th scope="col">Persona</th><th scope="col">Components</th><th scope="col">Status</th><th scope="col">Macros outside its block</th><th scope="col">Spec</th></tr></thead>
+<thead><tr><th scope="col">Template</th><th scope="col">Block</th><th scope="col">Persona</th><th scope="col">Components</th><th scope="col">Tier</th><th scope="col">Page type and why</th><th scope="col">Confidence</th><th scope="col">Status</th><th scope="col">Macros outside its block</th><th scope="col">Spec</th></tr></thead>
 <tbody>
 {page_rows}
 </tbody></table></div>
@@ -641,22 +672,27 @@ select, input {{ font:inherit; padding:6px 8px; border:1px solid hsl(var(--borde
   tabs.forEach(function (t) {{ t.addEventListener('click', function () {{ select(t); }}); }});
   var filter = document.getElementById('block-filter');
   var persona = document.getElementById('persona-filter');
+  var tier = document.getElementById('tier-filter');
+  var confidence = document.getElementById('confidence-filter');
   var search = document.getElementById('page-search');
   var rows = Array.prototype.slice.call(document.querySelectorAll('#pages-table tbody tr'));
   function apply() {{
     var block = filter.value, who = persona.value, text = search.value.toLowerCase(), shown = 0;
+    var level = tier.value, sure = confidence.value;
     rows.forEach(function (r) {{
-      var on = (!block || r.getAttribute('data-block') === block) && (!who || r.getAttribute('data-persona') === who) && r.cells[0].textContent.toLowerCase().indexOf(text) !== -1;
+      var on = (!block || r.getAttribute('data-block') === block) && (!who || r.getAttribute('data-persona') === who) && (!level || r.getAttribute('data-tier') === level) && (!sure || r.getAttribute('data-confidence') === sure) && r.cells[0].textContent.toLowerCase().indexOf(text) !== -1;
       r.hidden = !on; if (on) shown += 1;
     }});
     document.getElementById('page-count').textContent = shown + ' of ' + rows.length + ' pages';
   }}
   filter.addEventListener('change', apply);
   persona.addEventListener('change', apply);
+  tier.addEventListener('change', apply);
+  confidence.addEventListener('change', apply);
   search.addEventListener('input', apply);
   Array.prototype.slice.call(document.querySelectorAll('.show-block')).forEach(function (b) {{
     b.addEventListener('click', function () {{
-      filter.value = b.getAttribute('data-block'); persona.value = ''; search.value = ''; apply(); select(document.getElementById('tab-pages'));
+      filter.value = b.getAttribute('data-block'); persona.value = ''; tier.value = ''; confidence.value = ''; search.value = ''; apply(); select(document.getElementById('tab-pages'));
     }});
   }});
   apply();
