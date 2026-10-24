@@ -102,7 +102,7 @@
                     });
                     if (!response.ok) throw new Error('Failed to save');
                 } catch (err) {
-                    console.error('Failed to save company kind:', err);
+                    window.Platform?.toast?.('Could not save the company kind. Try again.', 'error');
                 } finally {
                     this.saving = false;
                 }
