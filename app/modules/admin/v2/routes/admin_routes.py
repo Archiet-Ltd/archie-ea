@@ -2647,15 +2647,24 @@ def jira_test_connection():
 @csrf.exempt
 def jira_webhook():
     """Receive Jira webhook events and sync status back to KanbanCard."""
+    from app.middleware.tenant_context import current_org_id
     from app.models.models import ExternalSystem
+    from app.modules.integrations.jira.jira_webhook_security import (
+        card_for_issue_in_org,
+        webhook_secret_configured,
+    )
 
     # HMAC verification
     secret = os.environ.get("JIRA_WEBHOOK_SECRET", "")
-    if secret:
-        sig = request.headers.get("X-Hub-Signature", "")
-        expected = "sha256=" + hmac.new(secret.encode(), request.data, hashlib.sha256).hexdigest()
-        if not hmac.compare_digest(expected, sig):
-            return jsonify({"error": "Invalid signature"}), 403
+    if not webhook_secret_configured(secret):
+        # An unset secret means the integration is not configured, which must
+        # mean "refuse", never "trust every logged-in caller". Fail closed.
+        return jsonify({"error": "webhook not configured"}), 503
+
+    sig = request.headers.get("X-Hub-Signature", "")
+    expected = "sha256=" + hmac.new(secret.encode(), request.data, hashlib.sha256).hexdigest()
+    if not hmac.compare_digest(expected, sig):
+        return jsonify({"error": "Invalid signature"}), 403
 
     data = request.get_json(silent=True) or {}
     issue_key = data.get("issue", {}).get("key", "")
@@ -2675,11 +2684,13 @@ def jira_webhook():
     if new_status:
         try:
             from app.config.kanban_jira_field_mapping import COLUMN_TO_JIRA_STATUS
-            from app.models.adm_kanban_models import KanbanCard
             jira_to_column = {v: k for k, v in COLUMN_TO_JIRA_STATUS.items()}
             new_column = jira_to_column.get(new_status)
             if new_column:
-                card = KanbanCard.query.filter_by(jira_issue_key=issue_key).first()
+                # Scope to the caller's active organisation, so a logged-in user
+                # in one organisation cannot move another organisation's card
+                # even when they share an issue key.
+                card = card_for_issue_in_org(issue_key, current_org_id())
                 if card:
                     card.status = new_column
                     card.updated_at = datetime.utcnow()
