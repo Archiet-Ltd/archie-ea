@@ -6,6 +6,11 @@
 
 {% block title %}ArchiMate Relationship Review Queue{% endblock %}
 
+{% block head %}
+{# shadcn-reference: example:tasks @e55b60b #}
+<meta name="shadcn-nearest" content="dashboard-01">
+{% endblock %}
+
 {% block breadcrumb %}
 {% from 'components/breadcrumb_nav.html' import breadcrumb_nav %}
 {{ breadcrumb_nav(items=[

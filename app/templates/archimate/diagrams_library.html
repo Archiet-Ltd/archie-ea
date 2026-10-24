@@ -8,6 +8,11 @@
 
 {% block title %}Diagrams{% endblock %}
 
+{% block head %}
+{# shadcn-reference: example:tasks @e55b60b #}
+<meta name="shadcn-nearest" content="dashboard-01">
+{% endblock %}
+
 {% block content %}
 {{ page_shell(
     'Diagrams',

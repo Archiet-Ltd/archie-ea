@@ -9,6 +9,19 @@
 
 {% block title %}Import a diagram{% endblock %}
 
+{% block head %}
+{# shadcn-reference: gap:G-6 @e55b60b #}
+<meta name="shadcn-nearest" content="dashboard-01">
+{% endblock %}
+{% from 'components/button.html' import button %}
+{% from 'components/input.html' import input, label %}
+{% from 'components/select.html' import native_select %}
+{% from 'components/checkbox.html' import checkbox %}
+{% import 'components/card.html' as card %}
+{% import 'components/table.html' as table %}
+
+{% block title %}Import a diagram{% endblock %}
+
 {% block content %}
 <div x-data="diagramImport()" x-cloak>
     {% macro _ps_meta() %}
