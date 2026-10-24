@@ -262,8 +262,10 @@ def remove(org_id: int, user_id: int) -> Optional[Dict[str, Any]]:
         for row in rows(model, table):
             db.session.delete(row)
     for app in rows(ApplicationComponent, "application_components"):
+        app.total_cost_of_ownership = None
+        app.license_cost_annual = None
+        app.infrastructure_cost_monthly = None
         for column in ("total_cost_of_ownership", "license_cost_annual", "infrastructure_cost_monthly"):
-            setattr(app, column, None)
             sync_cost_fact(app, column)
     db.session.flush()
     for app in rows(ApplicationComponent, "application_components"):
