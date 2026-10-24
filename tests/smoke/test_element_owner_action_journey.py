@@ -303,7 +303,10 @@ def test_architect_assigns_owner_on_application_and_element_pages(
     # Application page: the architect sees the step and takes it.
     app_url = "%s/applications/%d" % (live_server, ids["application_id"])
     page.goto(app_url, wait_until="networkidle", timeout=PAGE_TIMEOUT)
-    assert "No owner recorded" in page.inner_text("main")
+    # The ownership card in the overview tab states the gap.
+    owner_empty = page.locator("[data-testid='application-owner-empty']")
+    owner_empty.wait_for(state="visible", timeout=PAGE_TIMEOUT)
+    assert "No owner recorded" in owner_empty.inner_text()
     _assign_with_picker(page, owner_name)
     page.goto(app_url, wait_until="networkidle", timeout=PAGE_TIMEOUT)
     assert owner_name in page.locator("[data-testid='application-owner']").inner_text()
