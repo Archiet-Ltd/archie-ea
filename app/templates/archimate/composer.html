@@ -1,4 +1,5 @@
 {% extends "layouts/composer_base.html" %}
+{% from 'components/empty_state.html' import empty_state %}
 {% block title %}Architecture Composer{% endblock %}
 
 {% block breadcrumb %}
@@ -823,7 +824,7 @@ z-index: 45;
                             </div>
                             <div class="flex-1">
                                 <label class="text-2xs font-medium text-muted-foreground uppercase tracking-wide">Audience</label>
-                                {% call native_select(aria_label="Audience", class="w-full mt-1 text-xs", attrs_dict={"x-model": "diagramAudience"}) %}
+                                {% call native_select(size="sm", aria_label="Audience", class="w-full mt-1 text-xs", attrs_dict={"x-model": "diagramAudience"}) %}
                                     <option>Technical</option>
                                     <option>Business</option>
                                     <option>Executive</option>
@@ -856,6 +857,12 @@ z-index: 45;
                 <div x-show="!viewpointLoading && elementCount === 0 && (!graph || graph.getElements().length === 0)" x-cloak
                      class="absolute inset-0 flex items-start justify-center p-8 pt-12 z-10 pointer-events-none overflow-y-auto">
                     <div class="flex flex-col items-center gap-6 max-w-2xl w-full pointer-events-auto">
+                        {% if workspace_is_empty is sameas true and not focus %}
+                        {# Nothing is modelled in this organisation: say so and offer the way in #}
+                        <div class="w-full rounded-lg border border-border bg-card" data-testid="composer-empty-workspace">
+                            {{ empty_state(icon='layers', title='Nothing is modelled yet', description='Connect GitHub and your systems, and the elements they connect to, appear here to open and explore.', cta_text='Connect GitHub', cta_href=url_for('m365_connector.github_connect') if 'm365_connector.github_connect' in flask.current_app.view_functions else none) }}
+                        </div>
+                        {% endif %}
                         {# Hero #}
                         <div class="flex flex-col items-center gap-3 text-center">
                             <div class="size-14 rounded-lg bg-card border border-border flex items-center justify-center text-primary">
@@ -1108,7 +1115,7 @@ z-index: 45;
                         {# Phase selector #}
                         <div class="px-3 pt-2 pb-1">
                             <label class="text-2xs font-semibold text-muted-foreground uppercase tracking-wide">Phase Gate</label>
-                            {% call native_select(aria_label="Phase Gate", class="mt-1 w-full text-xs", attrs_dict={"x-model": "validationPhase", "@change": "runValidation()"}) %}
+                            {% call native_select(size="sm", aria_label="Phase Gate", class="mt-1 w-full text-xs", attrs_dict={"x-model": "validationPhase", "@change": "runValidation()"}) %}
                                 <option value="">No phase filter</option>
                                 <option value="A">Phase A — Architecture Vision</option>
                                 <option value="B">Phase B — Business Architecture</option>
@@ -1480,6 +1487,39 @@ z-index: 45;
                         x-text="focusView ? ('Unsaved view: ' + focusView.name + ', ' + _focusHopsText(focusView.depth)) : ''"></h3>
                     <p class="text-xs text-muted-foreground mb-1" id="composer-focus-empty-note" x-show="focusView && focusView.empty">No connections at this depth</p>
                     <p class="text-xs text-muted-foreground mb-2" id="composer-focus-derived-note" x-show="focusView && focusView.hasDerived">Worked-out connections are shown dashed and are not stored with a saved diagram.</p>
+                    <div class="mb-2" x-show="focusView && !focusView.empty">
+                        <button type="button" id="composer-focus-list-toggle" @click="focusView.listOpen = !focusView.listOpen"
+                                :aria-expanded="focusView && focusView.listOpen ? 'true' : 'false'" aria-controls="composer-focus-list"
+                                class="text-xs font-medium text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                x-text="focusView && focusView.listOpen ? 'Hide the connections as a list' : ('Show the connections as a list (' + (focusView ? focusView.rows.length : 0) + ')')"></button>
+                        <div id="composer-focus-list" x-show="focusView && focusView.listOpen" x-cloak class="mt-2 max-h-64 overflow-auto rounded-md border border-border">
+                            <table class="dense-table w-full text-left text-xs">
+                                <caption class="sr-only">Connections of the chosen element</caption>
+                                <thead class="bg-muted/50 text-muted-foreground">
+                                    <tr>
+                                        <th scope="col" class="px-2 py-1 font-medium">From</th>
+                                        <th scope="col" class="px-2 py-1 font-medium">Relationship</th>
+                                        <th scope="col" class="px-2 py-1 font-medium">To</th>
+                                        <th scope="col" class="px-2 py-1 font-medium">Kind</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <template x-for="row in (focusView ? focusView.rows : [])" :key="row.key">
+                                        <tr class="border-t border-border" data-focus-row>
+                                            <td class="px-2 py-1 text-foreground" x-text="row.from || 'Unnamed element'"></td>
+                                            <td class="px-2 py-1 text-foreground" x-text="row.relation"></td>
+                                            <td class="px-2 py-1">
+                                                <button type="button" @click="openFocusConnection(row.elementId)"
+                                                        class="text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                                        x-text="row.name || 'Unnamed element'"></button>
+                                            </td>
+                                            <td class="px-2 py-1 text-foreground" x-text="row.kind"></td>
+                                        </tr>
+                                    </template>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
                     <div class="flex gap-2">
                         {% call button(variant='default', size='xs', class="text-xs", attrs_dict={"id": "composer-focus-save", "@click": "saveFocusView()", ":disabled": "focusView && focusView.saving"}) %}Save as diagram{% endcall %}
                         {% call button(variant='outline', size='xs', class="text-xs", attrs_dict={"id": "composer-focus-discard", "@click": "discardFocusView()", "style": "border-color: hsl(var(--border));"}) %}Discard{% endcall %}
@@ -1530,7 +1570,7 @@ z-index: 45;
                     <div>
                         <dt class="font-semibold text-muted-foreground uppercase tracking-wide text-2xs">Status</dt>
                         <dd class="mt-1">
-                            {% call native_select(aria_label="Element status", class="w-full text-xs", attrs_dict={"x-model": "selectedNode.status", "@change": "updateSelectedNodeStatus()"}) %}
+                            {% call native_select(size="sm", aria_label="Element status", class="w-full text-xs", attrs_dict={"x-model": "selectedNode.status", "@change": "updateSelectedNodeStatus()"}) %}
                                 <option value="">— not set —</option>
                                 <option value="planned">Planned</option>
                                 <option value="assigned">Assigned</option>
@@ -1544,7 +1584,7 @@ z-index: 45;
                     <div x-show="selectedNode && (selectedNode.elType === 'Grouping' || selectedNode.elType === 'Location')" x-cloak>
                         <dt class="font-semibold text-muted-foreground uppercase tracking-wide text-2xs">Deployment Zone</dt>
                         <dd class="mt-1">
-                            {% call native_select(aria_label="Zone Type", class="w-full text-xs", attrs_dict={"x-model": "selectedNode._zoneType", "@change": "updateZoneType()"}) %}
+                            {% call native_select(size="sm", aria_label="Zone Type", class="w-full text-xs", attrs_dict={"x-model": "selectedNode._zoneType", "@change": "updateZoneType()"}) %}
                                 <option value="default">Default</option>
                                 <option value="saas">SaaS</option>
                                 <option value="on_premises">On-Premises</option>
@@ -1564,7 +1604,7 @@ z-index: 45;
                     <div x-show="selectedNode && selectedNode.elType === 'DataObject'" x-cloak>
                         <dt class="font-semibold text-muted-foreground uppercase tracking-wide text-2xs">Data Classification</dt>
                         <dd class="mt-1">
-                            {% call native_select(aria_label="Data classification", class="w-full text-xs", attrs_dict={"x-model": "selectedNode._dataClassification", "@change": "updateDataClassification()"}) %}
+                            {% call native_select(size="sm", aria_label="Data classification", class="w-full text-xs", attrs_dict={"x-model": "selectedNode._dataClassification", "@change": "updateDataClassification()"}) %}
                                 <option value="">— not set —</option>
                                 <option value="public">Public</option>
                                 <option value="internal">Internal</option>
@@ -1864,7 +1904,7 @@ z-index: 45;
                             <div class="grid grid-cols-2 gap-1.5">
                                 <div>
                                     <label class="text-2xs text-muted-foreground">Transfer Strategy</label>
-                                    {% call native_select(aria_label="Transfer Strategy", class="w-full text-xs", attrs_dict={"x-model": "selectedEdge._connSpec.transfer_strategy", "@change": "updateConnectionSpec()"}) %}
+                                    {% call native_select(size="sm", aria_label="Transfer Strategy", class="w-full text-xs", attrs_dict={"x-model": "selectedEdge._connSpec.transfer_strategy", "@change": "updateConnectionSpec()"}) %}
                                         <option value="">—</option>
                                         <option value="PUSH">PUSH</option>
                                         <option value="PULL">PULL</option>
@@ -1874,7 +1914,7 @@ z-index: 45;
                                 </div>
                                 <div>
                                     <label class="text-2xs text-muted-foreground">Protocol</label>
-                                    {% call native_select(aria_label="Protocol", class="w-full text-xs", attrs_dict={"x-model": "selectedEdge._connSpec.protocol", "@change": "updateConnectionSpec()"}) %}
+                                    {% call native_select(size="sm", aria_label="Protocol", class="w-full text-xs", attrs_dict={"x-model": "selectedEdge._connSpec.protocol", "@change": "updateConnectionSpec()"}) %}
                                         <option value="">—</option>
                                         <option value="HTTPS">HTTPS</option>
                                         <option value="SFTP">SFTP</option>
@@ -1894,7 +1934,7 @@ z-index: 45;
                             <div class="grid grid-cols-2 gap-1.5">
                                 <div>
                                     <label class="text-2xs text-muted-foreground">IAM / Auth</label>
-                                    {% call native_select(aria_label="IAM / Auth", class="w-full text-xs", attrs_dict={"x-model": "selectedEdge._connSpec.iam_method", "@change": "updateConnectionSpec()"}) %}
+                                    {% call native_select(size="sm", aria_label="IAM / Auth", class="w-full text-xs", attrs_dict={"x-model": "selectedEdge._connSpec.iam_method", "@change": "updateConnectionSpec()"}) %}
                                         <option value="">—</option>
                                         <option value="oAuth2.0">oAuth2.0</option>
                                         <option value="SSH Key">SSH Key</option>
@@ -1908,7 +1948,7 @@ z-index: 45;
                                 </div>
                                 <div>
                                     <label class="text-2xs text-muted-foreground">File Format</label>
-                                    {% call native_select(aria_label="File Format", class="w-full text-xs", attrs_dict={"x-model": "selectedEdge._connSpec.file_format", "@change": "updateConnectionSpec()"}) %}
+                                    {% call native_select(size="sm", aria_label="File Format", class="w-full text-xs", attrs_dict={"x-model": "selectedEdge._connSpec.file_format", "@change": "updateConnectionSpec()"}) %}
                                         <option value="">—</option>
                                         <option value="JSON">JSON</option>
                                         <option value="XML">XML</option>

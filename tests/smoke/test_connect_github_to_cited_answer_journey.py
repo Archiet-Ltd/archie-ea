@@ -455,12 +455,12 @@ def test_7c_a_citation_link_opens_on_content(admin, world):
     # The citation's short commit is the start of the commit in the address.
     short = re.search(r"@ ([0-9a-f]{7})", rows.filter(has_text="Billing Api").first.inner_text()).group(1)
     assert "/blob/" + short in href
-    # Inside the product, the same row leads to the element on the twin map, which has content.
-    inside = rows.filter(has_text="Billing Api").first.get_by_role("link", name="View on twin map")
+    # Inside the product, the same row leads to the element in the Composer, which draws it.
+    inside = rows.filter(has_text="Billing Api").first.get_by_role("link", name="Open in the Composer")
     inside.click()
     admin.wait_for_load_state("domcontentloaded")
-    assert admin.locator("#main-content").inner_text().strip()
-    expect(admin.locator("#main-content").get_by_text("Billing Api").first).to_be_visible()
+    assert "/archimate/composer?element=" in admin.url
+    expect(admin.locator("#composer-focus-title")).to_contain_text("Billing Api", timeout=15000)
 
 
 def test_7d_the_saved_answer_cites_each_dependent_with_a_link(admin, world):
