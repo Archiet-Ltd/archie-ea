@@ -106,3 +106,44 @@ def test_the_logo_is_the_primary_blue_in_both_themes(browser, live_server, theme
         assert fill == primary
     finally:
         page.close()
+
+
+@pytest.mark.parametrize("theme", ["light", "dark"])
+def test_the_login_panel_glows_are_the_primary_blue(browser, live_server, theme):
+    page = browser.new_page(viewport={"width": 1440, "height": 900})
+    try:
+        page.goto(live_server + "/account/login", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        _theme(page, theme)
+        r, g, b = [int(v) for v in PRIMARY[theme][4:-1].split(",")]
+        want = "rgba(%d, %d, %d, 0.16)" % (r, g, b)
+        for ring in ("tl", "br"):
+            got = _style(page, ".login-brand__ring--" + ring, "backgroundColor")
+            assert got == want, "%s glow is %s, expected %s" % (ring, got, want)
+
+        _shot(page, "login", 1440, theme)
+    finally:
+        page.close()
+
+
+@pytest.mark.parametrize("theme", ["light", "dark"])
+def test_architect_skip_links_carry_the_primary_blue(browser, live_server, seeded, theme):
+    email = seeded["emails"]["enterprise_architect"]
+    assert _role_of(email) == "enterprise_architect"  # the persona, not an administrator
+
+    context = browser.new_context(viewport={"width": 1440, "height": 900})
+    context.add_init_script("localStorage.setItem('archie_onboarding_ts', Date.now().toString());")
+    page = context.new_page()
+    try:
+        _login(page, live_server, email)
+        page.goto(live_server + "/dashboard/overview", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        _theme(page, theme)
+        links = page.locator("a.skip-link")
+        assert links.count() > 0, "the signed-in shell offers no skip link"
+        for i in range(links.count()):
+            assert links.nth(i).inner_text().strip() != ""
+            assert links.nth(i).evaluate("el => getComputedStyle(el).backgroundColor") == PRIMARY[theme]
+        links.first.focus()
+        assert links.first.evaluate("el => getComputedStyle(el).top") != "-40px"
+        _shot(page, "skip-link", 1440, theme)
+    finally:
+        context.close()
