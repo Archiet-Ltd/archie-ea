@@ -84,7 +84,7 @@ def test_implementation_planning_dashboard_reachable(browser, live_server):
         export_trigger.click()
         export_modal = page.locator("#export-impl-data")
         expect(export_modal).to_be_visible()
-        expect(export_modal.get_by_text("Export Implementation Data")).to_be_visible()
+        expect(export_modal.get_by_role("heading", name="Export Implementation Data")).to_be_visible()
         with page.expect_download() as download_info:
             page.get_by_role("button", name="Export CSV").click()
         download = download_info.value
@@ -94,7 +94,7 @@ def test_implementation_planning_dashboard_reachable(browser, live_server):
         page.get_by_role("button", name="Create Work Package", exact=True).first.click()
         create_modal = page.locator("#create-work-package")
         expect(create_modal).to_be_visible()
-        expect(create_modal.get_by_text("Create Work Package")).to_be_visible()
+        expect(create_modal.get_by_role("heading", name="Create Work Package")).to_be_visible()
         page.fill("#cwp-name", "Cloud Migration Phase 1")
         create_modal.get_by_role("button", name="Create Work Package",
                                  exact=True).click()
