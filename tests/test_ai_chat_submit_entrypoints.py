@@ -51,7 +51,7 @@ def test_entity_analysis_ordinary_click_uses_shared_submit_path(launch):
     toggle = page.get_by_role('button', name='Toggle conversation panel', exact=True)
     if toggle.get_attribute('aria-expanded') == 'false':
         toggle.click()
-    page.get_by_role('button', name='Query', exact=True).click()
+    page.get_by_role('tab', name='Query', exact=True).click()
     page.get_by_label('Natural language query', exact=True).fill('List applications')
     page.get_by_role('button', name='Execute query', exact=True).click()
     page.locator('#nl-results-list').get_by_text('Fixture Payments', exact=True).click()

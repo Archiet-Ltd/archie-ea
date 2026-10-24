@@ -122,6 +122,9 @@ def launch(browser):
                 body = self.rfile.read(int(self.headers.get('Content-Length', 0)))
                 if self.path == '/account/session/keepalive':
                     return self.respond({'success': True})
+                if self.path == '/ai-chat/estate-answer':
+                    # The chat asks the records first; this organisation names nothing in them.
+                    return self.respond({'success': True, 'found': False})
                 if self.path == '/ai-chat/message/stream':
                     payloads.append(json.loads(body))
                     events = [{'type': 'token', 'text': 'Fixture response.'},

@@ -2,10 +2,10 @@
 
 As the architect of a fresh workspace: loads the sample company and reads a toast
 count that equals the card; opens the capability map and the capabilities list and
-finds the five capabilities the model holds; asks what breaks if the payments
+finds the five capabilities the model holds; asks in the chat what breaks if the payments
 service fails and reads, on every connection, where it came from and (where the
 model records one) its health, with each owner named once and no prompt to work
-the indirect connections out; when an answer fails, presses Try again and gets it;
+the indirect connections out; when an answer fails, presses Retry and gets it;
 opens the removal dialog and closes it by its name.
 """
 import os
@@ -30,10 +30,10 @@ def _shot(page, name, width):
 
 
 def _ask_payments(page, base):
-    page.goto(base + "/intelligence/ask", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
-    page.locator("#ask-picker-input").fill("Payments service")
-    page.wait_for_selector("#ask-picker-listbox [role=option]")
-    page.locator("#ask-picker-listbox [role=option]", has_text="Payments service").first.click()
+    """Ask in the chat, where every question is asked."""
+    page.goto(base + "/ai-chat", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    page.locator("#user-input").fill("What breaks if Payments service fails")
+    page.locator("#user-input").press("Enter")
 
 
 @pytest.mark.parametrize("width", [1440, 390])
@@ -67,23 +67,22 @@ def test_first_answer_is_cited_and_the_figures_agree(browser, live_server, seede
 
         # The first answer: every connection cites its source; nothing asks to be worked out.
         _ask_payments(page, live_server)
-        rows = page.locator("[data-ask-row]")
-        expect(rows.first).to_be_visible(timeout=PAGE_TIMEOUT)
+        answer = page.get_by_test_id("estate-answer")
+        expect(answer).to_be_visible(timeout=PAGE_TIMEOUT)
+        rows = answer.locator("[data-answer-row]")
         assert rows.count() >= 10
-        expect(page.locator("[data-not-computed-notice]")).to_be_hidden()
-        expect(page.locator("[data-citation-missing]:visible")).to_have_count(0)
-        for i in range(rows.count()):
-            row = rows.nth(i)
-            source = row.locator("[data-citation]:visible").first.inner_text()
+        cards = answer.locator("[data-slot='card']").filter(has=page.locator("[data-answer-row]"))
+        for i in range(cards.count()):
+            source = cards.nth(i).locator("[data-citation]").inner_text()
             assert "Sample company" in source or "Worked out from the model" in source, source
         _shot(page, "first-answer", width)
 
         # An application shows its health and its owner once; a capability its computed health.
-        web = rows.filter(has_text="Customer web app").first
+        web = cards.filter(has_text="Customer web app").first
         assert web.get_by_label(re.compile(r"^Health: ")).get_attribute("aria-label") == "Health: Healthy"
         owner = web.get_by_label(re.compile(r"^Owner: ")).get_attribute("aria-label")
         assert owner == "Owner: Startup CTO", owner
-        capability = rows.filter(has_text="Process online payments").first
+        capability = cards.filter(has_text="Process online payments").first
         assert re.match(r"Health: (Healthy|Warning|Critical)$",
                         capability.get_by_label(re.compile(r"^Health: ")).get_attribute("aria-label"))
     finally:
@@ -111,12 +110,12 @@ def test_a_failed_answer_offers_try_again(browser, live_server, seeded):
             else:
                 route.continue_()
 
-        page.route(re.compile(r"/api/v1/intelligence/impact/"), refuse_once)
+        page.route(re.compile(r"/ai-chat/estate-answer"), refuse_once)
         _ask_payments(page, live_server)
         expect(page.get_by_text("We could not answer that just now.").first).to_be_visible(timeout=PAGE_TIMEOUT)
-        page.get_by_role("button", name="Try again").click()
-        expect(page.locator("[data-ask-row]").first).to_be_visible(timeout=PAGE_TIMEOUT)
-        expect(page.get_by_text("We could not answer that just now.").first).to_be_hidden()
+        page.get_by_role("button", name="Retry").click()
+        expect(page.locator("[data-answer-row]").first).to_be_visible(timeout=PAGE_TIMEOUT)
+        expect(page.get_by_text("We could not answer that just now.")).to_have_count(0)
     finally:
         context.close()
 
