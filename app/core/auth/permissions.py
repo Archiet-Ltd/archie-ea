@@ -87,7 +87,13 @@ GOVERNANCE_ACTIONS = {
 _GOVERNANCE_DEFAULTS = {
     "solution": {
         "edit": frozenset({"solution_architect", "enterprise_architect", "business_architect", "platform_admin"}),
-        "view_all": frozenset({"enterprise_architect", "cto", "platform_admin"}),
+        # Reading every solution in the organisation (never editing): the
+        # architect personas and the reviewer, the CTO, and a viewer, who
+        # reads solutions but cannot change them.
+        "view_all": frozenset({
+            "enterprise_architect", "solution_architect", "business_architect",
+            "arb_member", "cto", "viewer", "platform_admin",
+        }),
         "access_any": frozenset({"platform_admin"}),
     },
     "archimate": {
@@ -181,6 +187,27 @@ def persona_key(user) -> str:
     return str(getattr(user, "enterprise_role", "") or "").strip().lower()
 
 
+def _governance_key(user, org_id) -> str:
+    """The persona an administrator assigned; a person with none answers as ``viewer``
+    when their organisation role is viewer, so a viewer's read ability is in the matrix."""
+    persona = persona_key(user)
+    if persona:
+        return persona
+    return "viewer" if role_key(user, org_id) == "viewer" else ""
+
+
+def can_change_model(user, organization_id: Optional[int] = None) -> bool:
+    """Whether ``user`` may create or edit model elements and import model files.
+
+    The persona that edits the model (``archimate`` / ``edit``) or the role that
+    edits elements one at a time (``motivation_element`` / ``edit``): the two
+    answers the screens used to ask separately by role name.
+    """
+    return can(user, "edit", "archimate", organization_id) or can(
+        user, "edit", "motivation_element", organization_id
+    )
+
+
 def default_allowed(role: str, action: str, object_type: str) -> bool:
     if object_type in GOVERNANCE_ACTIONS:
         return str(role).lower() in _GOVERNANCE_DEFAULTS[object_type].get(action, frozenset())
@@ -217,7 +244,7 @@ def can(user, action: str, object_type: str, organization_id: Optional[int] = No
         row = _grant(org_id, "user", user.id, object_type, action)
         if row is not None:
             return bool(row.allowed)
-    key = persona_key(user) if governance else role_key(user, org_id)
+    key = _governance_key(user, org_id) if governance else role_key(user, org_id)
     if org_id is not None:
         row = _grant(org_id, "role", key, object_type, action)
         if row is not None:
