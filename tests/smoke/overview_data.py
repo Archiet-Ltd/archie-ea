@@ -22,8 +22,11 @@ def _apply_history_trigger():
     assert result.exit_code == 0, result.output
 
 
-def seed_overview_org(label, apps, contracts, with_owner_user=True):
-    """Create one organisation. ``apps`` is a list of dicts; ``contracts`` of (vendor, annual cost, months ago)."""
+def seed_overview_org(label, apps, contracts, with_owner_user=True, spread=True, last_year=False):
+    """Create one organisation. ``apps`` is a list of dicts; ``contracts`` of (vendor, annual cost, months ago).
+
+    ``spread`` dates the records across the last 90 days, as the demonstration organisation is.
+    """
     from app import create_app, db
     from app.models import ArchiMateElement, ArchiMateRelationship
     from app.models.application_owner import ApplicationOwner
@@ -88,6 +91,19 @@ def seed_overview_org(label, apps, contracts, with_owner_user=True):
                 start_date=today - dt.timedelta(days=30 * months_ago),
             ))
         db.session.commit()
+        if spread:
+            from app.commands.seed_demo_company import spread_history
+
+            spread_history(org_id)
+            db.session.commit()
+            if last_year:
+                # one record was added last year, so the year card has two years to set side by side
+                from app.models.entity_history import EntityHistory
+
+                row = (EntityHistory.query.filter_by(organization_id=org_id, table_name="archimate_relationships")
+                       .order_by(EntityHistory.id).first())
+                row.valid_from = dt.datetime(dt.date.today().year - 1, 6, 1)
+                db.session.commit()
         info["app_ids"] = {r.name: r.id for r in made}
         info["relationships"] = ArchiMateRelationship.query.filter_by(organization_id=org_id).count()
         db.session.remove()
@@ -101,7 +117,7 @@ def purge_org(org_id):
     app = create_app("testing")
     with app.app_context():
         for table in ("archimate_relationships", "vendor_contracts", "application_owners", "archimate_elements",
-                      "application_components"):
+                      "application_components", "entity_history"):
             db.session.execute(text("DELETE FROM %s WHERE organization_id = :o" % table), {"o": org_id})
         db.session.commit()
         db.session.remove()
