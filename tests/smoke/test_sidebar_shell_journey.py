@@ -4,7 +4,8 @@ The person: an enterprise architect in an organisation that already holds applic
 a solution and a contract. Their goals, each asserted as the outcome they need:
 
 - every sidebar entry opens a page with that entry's content and is marked as the
-  current one, in the expanded sidebar and in the icon rail;
+  current one: the top entries directly, the Work and Model items by opening them
+  first and choosing a page inside, in the expanded sidebar and in the icon rail;
 - they can fold the sidebar to an icon rail with the trigger or Ctrl+B, the rail names
   each icon in a tooltip, and the choice is still there after a reload and on the next
   page;
@@ -29,14 +30,20 @@ from tests.smoke.fresh_org import sign_in
 
 pytestmark = [pytest.mark.smoke, pytest.mark.journey]
 
-# Entry key -> (name on the sidebar, address it opens, words its page carries or None).
+# Entry key -> (name on the sidebar, address it opens, words its page carries or None, the item
+# that holds it or None for an entry on the sidebar itself).
 ENTRIES = [
-    ("home", "Home", r"/dashboard", None),
-    ("ai_chat", "AI chat", r"/ai-chat", None),
-    ("systems", "Systems", r"/applications/?$", "Smoke"),
-    ("impact", "Impact", r"/enterprise/analysis/impact-analysis", None),
-    ("changes", "Changes", r"/enterprise/implementation/gap-analysis", None),
-    ("compliance", "Compliance", r"/risks/?$", None),
+    ("home", "Home", r"/dashboard", None, None),
+    ("ai_chat", "AI chat", r"/ai-chat", None, None),
+    ("applications", "Applications", r"/applications/?$", "Smoke", "systems"),
+    ("impact_analysis", "Impact analysis", r"/enterprise/analysis/impact-analysis", None, "impact"),
+    ("gaps", "Gaps", r"/enterprise/implementation/gap-analysis", None, "changes"),
+    ("solutions", "Solutions", r"/solutions", None, "changes"),
+    ("business_cases", "Business cases", r"/business-case/?$", "business case", "changes"),
+    ("roadmap", "Roadmap", r"/genome/roadmap", None, "changes"),
+    ("risks", "Risks", r"/risks/?$", None, "compliance"),
+    ("type_ValueStream", "Value stream", r"/value-streams", None, "layer_strategy"),
+    ("frameworks", "Frameworks", r"/frameworks/?$", "Industry process frameworks", None),
 ]
 
 
@@ -64,7 +71,17 @@ class Walk:
         return self.page.get_by_role("dialog", name="Navigation")
 
     def entry(self, key):
-        return self.page.locator('a[data-slot="sidebar-menu-button"][data-nav-key="%s"]' % key)
+        return self.page.locator('[data-slot="sidebar-menu-button"][data-nav-key="%s"]' % key)
+
+    def sub(self, key):
+        return self.page.locator('a[data-slot="sidebar-menu-sub-button"][data-nav-key="%s"]' % key)
+
+    def open_item(self, key):
+        """Open a Work or Model item if it is shut; its pages are then in the list."""
+        item = self.entry(key)
+        if item.get_attribute("aria-expanded") != "true":
+            item.click()
+        expect(item).to_have_attribute("aria-expanded", "true")
 
     def settle_width(self, width):
         """The fold animates; wait for the sidebar column to reach its width."""
@@ -154,7 +171,7 @@ def test_02_the_trigger_opens_and_closes_the_drawer_on_a_phone(walk, seeded):
     walk.trigger().click()
     drawer = walk.drawer()
     expect(drawer).to_be_visible()
-    expect(drawer.get_by_role("link", name="Systems")).to_be_visible()
+    expect(drawer.get_by_role("button", name="Systems")).to_be_visible()
     walk.shot("drawer-open")
     # Tab goes round inside the drawer and never reaches the page behind it.
     for _ in range(60):
@@ -195,15 +212,15 @@ def test_03_the_trigger_and_ctrl_b_fold_the_sidebar_to_an_icon_rail(walk, seeded
     # The choice survives a reload and the next page.
     page.reload(wait_until="domcontentloaded")
     assert walk.sidebar().get_attribute("data-state") == "collapsed"
-    walk.entry("systems").click()
-    page.wait_for_url(re.compile(r"/applications/?$"), timeout=PAGE_TIMEOUT)
+    walk.entry("ai_chat").click()
+    page.wait_for_url(re.compile(r"/ai-chat"), timeout=PAGE_TIMEOUT)
     assert walk.sidebar().get_attribute("data-state") == "collapsed"
-    expect(page.locator("main").first).to_contain_text("Smoke")
-    expect(walk.entry("systems")).to_have_attribute("aria-current", "page")
+    expect(page.locator("#user-input")).to_be_visible()
+    expect(walk.entry("ai_chat")).to_have_attribute("aria-current", "page")
     # Ctrl+B brings the labels back, and takes them away again.
     page.keyboard.press("Control+b")
     assert walk.sidebar().get_attribute("data-state") == "expanded"
-    expect(page.locator('a[data-nav-key="systems"]')).to_contain_text("Systems")
+    expect(page.locator('a[data-nav-key="ai_chat"]')).to_contain_text("AI chat")
     page.keyboard.press("Control+b")
     assert walk.sidebar().get_attribute("data-state") == "collapsed"
     page.keyboard.press("Control+b")
@@ -211,12 +228,16 @@ def test_03_the_trigger_and_ctrl_b_fold_the_sidebar_to_an_icon_rail(walk, seeded
     walk.shot("expanded-again")
 
 
-@pytest.mark.parametrize("key,name,address,words", ENTRIES, ids=[e[0] for e in ENTRIES])
-def test_04_every_entry_lands_on_a_page_with_content(walk, seeded, key, name, address, words):
+@pytest.mark.parametrize("key,name,address,words,parent", ENTRIES, ids=[e[0] for e in ENTRIES])
+def test_04_every_entry_lands_on_a_page_with_content(walk, seeded, key, name, address, words, parent):
     _arrive_as_architect(walk, seeded)
     page = walk.page
     _open_sidebar_on_phone(walk)
-    link = walk.entry(key)
+    if parent:
+        walk.open_item(parent)
+        link = walk.sub(key)
+    else:
+        link = walk.entry(key)
     expect(link).to_contain_text(name)
     link.click()
     page.wait_for_url(re.compile(address), timeout=PAGE_TIMEOUT)
@@ -224,21 +245,54 @@ def test_04_every_entry_lands_on_a_page_with_content(walk, seeded, key, name, ad
     expect(main).not_to_be_empty()
     assert len(main.inner_text().strip()) > 40, "%s opened an empty page" % name
     if words:
-        expect(main).to_contain_text(words)
+        expect(main).to_contain_text(re.compile(words, re.I))
     assert "403" not in page.title() and "Not Found" not in page.title()
     _open_sidebar_on_phone(walk)
-    expect(walk.entry(key)).to_have_attribute("aria-current", "page")
+    if parent:
+        # The page's own entry is marked and its item stays open.
+        walk.open_item(parent)
+        expect(walk.sub(key)).to_have_attribute("aria-current", "page")
+    else:
+        expect(walk.entry(key)).to_have_attribute("aria-current", "page")
     walk.shot("entry-%s" % key)
+
+
+def test_04b_changes_opens_onto_its_pages_in_the_briefed_order(walk, seeded):
+    _arrive_as_architect(walk, seeded)
+    _open_sidebar_on_phone(walk)
+    walk.open_item("changes")
+    names = walk.page.locator('a[data-slot="sidebar-menu-sub-button"]:visible').evaluate_all(
+        "(links) => links.filter((a) => a.closest('[data-nav-item=\"changes\"]')).map((a) => a.innerText.trim())"
+    )
+    assert names == ["Gaps", "Solutions", "Options analysis", "Business cases", "Work packages", "Roadmap",
+                     "Programmes", "Canvases"], names
+    walk.shot("changes-open")
+
+
+def test_04c_what_a_person_opens_stays_open_on_the_next_page(walk, seeded):
+    _arrive_as_architect(walk, seeded)
+    _open_sidebar_on_phone(walk)
+    walk.open_item("layer_business")
+    walk.page.reload(wait_until="domcontentloaded")
+    _open_sidebar_on_phone(walk)
+    expect(walk.entry("layer_business")).to_have_attribute("aria-expanded", "true")
+    expect(walk.sub("type_BusinessProcess")).to_be_visible()
+    walk.entry("layer_business").click()
+    walk.page.reload(wait_until="domcontentloaded")
+    _open_sidebar_on_phone(walk)
+    expect(walk.entry("layer_business")).to_have_attribute("aria-expanded", "false")
 
 
 def test_05_the_architect_has_connections_and_no_billing(walk, seeded):
     _arrive_as_architect(walk, seeded)
     page = walk.page
     _open_sidebar_on_phone(walk)
-    expect(page.locator('[data-testid="nav-architecture"]')).to_contain_text("Architecture")
-    integrations = walk.entry("integrations")
-    expect(integrations).to_contain_text("Integrations")
-    href = integrations.get_attribute("href")
+    expect(page.locator('[data-testid="nav-work"]')).to_contain_text("Work")
+    expect(page.locator('[data-testid="nav-model"]')).to_contain_text("Model")
+    assert page.locator('[data-testid="nav-architecture"]').count() == 0
+    connections = walk.entry("connections")
+    expect(connections).to_contain_text("Connections")
+    href = connections.get_attribute("href")
     page.locator("[data-testid=user-menu]").click()
     menu = page.get_by_test_id("user-menu-account")
     expect(menu).to_be_visible()
@@ -249,7 +303,7 @@ def test_05_the_architect_has_connections_and_no_billing(walk, seeded):
     if walk.phone:
         # The first Escape closed the menu only; the drawer is still open.
         expect(walk.drawer()).to_be_visible()
-    integrations.click()
+    connections.click()
     page.wait_for_url(lambda url: href in url or "/admin/connectors" in url or "/import" in url, timeout=PAGE_TIMEOUT)
     assert len(page.locator("main").first.inner_text().strip()) > 40
 
