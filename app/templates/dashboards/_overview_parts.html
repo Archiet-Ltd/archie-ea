@@ -33,7 +33,7 @@
   'config': {value_key: {'label': series_label, 'color': color}},
   'data': data,
   'props': {'accessibilityLayer': true, 'layout': 'vertical', 'margin': {'left': 16, 'right': 12}},
-  'series': [{'component': 'Bar', 'dataKey': value_key, 'fill': color, 'radius': 4}],
+  'series': [{'component': 'Bar', 'dataKey': value_key, 'fill': color, 'radius': 4, 'labelList': [{'dataKey': value_key, 'position': 'right', 'fill': color, 'offset': 6}]}],
   'axes': [
     {'component': 'XAxis', 'type': 'number', 'dataKey': value_key, 'hide': true},
     {'component': 'YAxis', 'dataKey': name_key, 'type': 'category', 'tickLine': false, 'axisLine': false, 'tickMargin': 8, 'width': name_width, 'interval': 0},
