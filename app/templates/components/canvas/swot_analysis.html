@@ -1,0 +1,20 @@
+{# Vendored from flask-basecoat, branch feat/canvases-capability-map, commit 2b02744, flask_basecoat/templates/basecoat/canvas/ swot-analysis.html. Adapted only to Entelim macro names. #}
+{# SWOT analysis, C2. The textbook matrix (Albert Humphrey, SRI, 1960s): columns Helpful | Harmful, rows Internal origin | External origin, so Strengths and Weaknesses sit over Opportunities and Threats. #}
+{% import 'components/canvas/_frame.html' as f with context %}
+{% set SPEC = {
+  'form': 'C2', 'name': 'SWOT analysis', 'grid': 'grid-cols-5',
+  'hint': 'Scroll sideways on a narrow screen to see both columns.',
+  'boxes': [
+    {'key': 'strengths', 'title': 'Strengths', 'icon': 'trending-up', 'question': 'What do we do well? What do customers value in us?', 'empty': 'No strengths yet. Add the assessments of what you do well.', 'area': 'col-span-2 col-start-2 row-start-2'},
+    {'key': 'weaknesses', 'title': 'Weaknesses', 'icon': 'triangle-alert', 'question': 'Where do we fall short? What do competitors do better?', 'empty': 'No weaknesses yet. Add the assessments of where you fall short.', 'area': 'col-span-2 col-start-4 row-start-2'},
+    {'key': 'opportunities', 'title': 'Opportunities', 'icon': 'target', 'question': 'Which trends and openings can we use?', 'empty': 'No opportunities yet. Add the openings you can use.', 'area': 'col-span-2 col-start-2 row-start-3'},
+    {'key': 'threats', 'title': 'Threats', 'icon': 'shield', 'question': 'What could harm us?', 'empty': 'No threats yet. Add what could harm you.', 'area': 'col-span-2 col-start-4 row-start-3'},
+  ]} %}
+{% macro swot_analysis(data, id='swot-analysis') -%}
+{% call f.grid_canvas(SPEC, data, id) %}
+    <div class="col-start-2 col-span-2 row-start-1 flex flex-col items-center gap-0.5 py-1"><span class="text-sm font-semibold">Helpful</span><span class="text-xs text-muted-foreground">to achieving the objective</span></div>
+    <div class="col-start-4 col-span-2 row-start-1 flex flex-col items-center gap-0.5 py-1"><span class="text-sm font-semibold">Harmful</span><span class="text-xs text-muted-foreground">to achieving the objective</span></div>
+    <div class="col-start-1 row-start-2 flex flex-col justify-center gap-0.5 px-2"><span class="text-sm font-semibold">Internal origin</span><span class="text-xs text-muted-foreground">attributes of the organisation</span></div>
+    <div class="col-start-1 row-start-3 flex flex-col justify-center gap-0.5 px-2"><span class="text-sm font-semibold">External origin</span><span class="text-xs text-muted-foreground">attributes of the environment</span></div>
+{% endcall %}
+{%- endmacro %}

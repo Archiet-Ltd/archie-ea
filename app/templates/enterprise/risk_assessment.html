@@ -1,3 +1,4 @@
+{# design-block: dashboard #}
 {% extends 'layouts/admin_base.html' %}
 {% from 'components/page_header.html' import page_header %}
 {% from 'components/metrics_card.html' import metrics_card %}
@@ -55,7 +56,7 @@
                         <tr class="border-b hover:bg-muted/50">
                             <td class="p-3">
                                 <div class="font-medium">
-                                    {% set _h = row_href('archimate_crud.detail_element', layer='implementation', element_type='Gap', element_id=gap.id)|trim %}{% if _h %}<a href="{{ _h }}" class="font-medium text-primary hover:underline">{{ gap.name|default('N/A') }}</a>{% else %}{{ gap.name|default('N/A') }}{% endif %}
+                                    {% set _h = row_href('archimate_crud.detail_element', layer='implementation', element_type='Gap', element_id=gap.id)|trim %}{% if _h %}<a href="{{ _h }}" class="font-medium text-primary hover:underline">{{ gap.name|default('Unnamed gap') }}</a>{% else %}{{ gap.name|default('Unnamed gap') }}{% endif %}
                                 </div>
                                 <div class="text-sm text-muted-foreground">{{ gap.description|default('', true)|truncate(50) }}</div>
                             </td>

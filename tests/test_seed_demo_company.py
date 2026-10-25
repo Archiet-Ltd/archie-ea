@@ -784,7 +784,7 @@ def test_arb_queue_has_real_reviews_with_cycle_times(app, db_session, make_org):
     from app.models.architecture_review_board import ARBReviewItem
 
     stats = _seed_once()
-    assert stats["arb_reviews_created"] == 9
+    assert stats["arb_reviews_created"] == 11
     items = ARBReviewItem.query.filter(ARBReviewItem.review_number.like("LQ-ARB-%")).all()
     decided = [i for i in items if i.decision_date and i.submitted_at]
     assert len(decided) >= 4
@@ -862,26 +862,31 @@ def test_ask_programme_card_has_owner_and_connections(app, db_session, make_org)
 
 
 def test_business_model_canvas_is_seeded_once_and_tenant_scoped(app, db_session, make_org):
-    from app.models.business_model import CANVAS_BLOCKS, BusinessModelCanvas
+    from app.config.archimate_viewpoints import CANVAS_TEMPLATES
+    from app.models.business_model import BusinessModelCanvas
+    from app.modules.business_model_canvas import model_service
 
     stats = _seed_once()
     assert stats["business_model_canvases_created"] == 1
     org_id = _get_lantern_org_id()
     canvases = BusinessModelCanvas.query.filter_by(organization_id=org_id).all()
-    assert len(canvases) == 1
-    canvas = canvases[0]
-    assert canvas.operating_model_type
-    for block in CANVAS_BLOCKS:
-        assert (getattr(canvas, block) or "").strip(), block
-    assert _seed_once()["business_model_canvases_created"] == 0
+    bmc = [c for c in canvases if c.canvas_type is None]
+    assert len(bmc) == 1
+    assert bmc[0].operating_model_type
+    # one filled canvas of every other framework, and none of them empty in any element box
+    framework = {c.canvas_type: c for c in canvases if c.canvas_type}
+    assert set(framework) == {k for k, t in CANVAS_TEMPLATES.items() if t["record"] == "business_model_canvas"} - {
+        "business_model_canvas"
+    }
+    for key, canvas in framework.items():
+        for box in model_service.element_boxes(canvas):
+            assert model_service.entries(canvas, box), (key, box)
+    again = _seed_once()
+    assert again["business_model_canvases_created"] == 0 and again["framework_canvases_created"] == 0
     other = make_org("other-tenant-canvas")
     other_id = other.id
     db_session.commit()
     assert BusinessModelCanvas.query.filter_by(organization_id=other_id).count() == 0
-
-
-# ── the demo agrees with itself ─────────────────────────────────────────────
-
 
 def test_demo_store_agreement_check_is_clean(app, db_session, make_org, tenant_ctx):
     """After seeding, the store-agreement check reports nothing for the demo
@@ -1029,3 +1034,37 @@ def test_demo_seed_twice_changes_nothing(app, db_session, make_org):
     assert len(work_package_service.addressed_gap_ids(org_id)) == links_before
     assert sum(len(g.plateaus) for g in Gap.query.filter_by(organization_id=org_id)) == plateau_links_before
     assert again["gaps_created"] == 0
+
+
+def test_demo_weekly_briefing_has_content_in_every_section(app, db_session, make_org, tenant_ctx):
+    """The demonstration organisation fills all four briefing sections."""
+    from sqlalchemy import text
+
+    from app.commands.apply_entity_history_trigger import FUNCTION_SQL, TABLES
+    from app.modules.solutions_strategic.v2.services import weekly_briefing
+
+    # Elements the seed adds are recorded as changes only once the history
+    # trigger is installed, as it is on every deployed database.
+    from app import db
+
+    with db.engine.connect() as conn:
+        conn.execute(text(FUNCTION_SQL))
+        for table in TABLES:
+            conn.execute(text(f'DROP TRIGGER IF EXISTS entity_history_trg ON "{table}"'))
+            conn.execute(text(
+                f'CREATE TRIGGER entity_history_trg BEFORE INSERT OR UPDATE OR DELETE '
+                f'ON "{table}" FOR EACH ROW EXECUTE FUNCTION entity_history_record_version()'
+            ))
+        conn.commit()
+
+    _seed_once()
+    org_id = _get_lantern_org_id()
+    with tenant_ctx(org_id):
+        briefing = weekly_briefing.build(org_id)
+
+    sections = {s["key"]: s for s in briefing["sections"]}
+    assert sections["changes"]["total"] >= 1
+    assert sections["decisions"]["total"] >= 2
+    assert sections["risks"]["total"] >= 2
+    assert sections["conformance"]["total"] >= 3
+    assert "3 reviews past the time limit" in briefing["headline"]

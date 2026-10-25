@@ -1,4 +1,4 @@
-"""Routes for the Business Model Canvas + Operating Model module.
+"""Routes for the canvases: the Business Model Canvas + Operating Model and the other framework canvases.
 
 Blueprint: business_model_bp, url_prefix="/business-model".
 Index endpoint (linked from the sidebar by the orchestrator post-merge):
@@ -16,6 +16,7 @@ from flask_login import login_required
 from app.decorators import require_roles
 
 from app import db
+from app.config.archimate_viewpoints import CANVAS_TEMPLATES
 from app.models.business_model import OPERATING_MODEL_TYPES
 from app.models.price_plan import BILLING_PERIODS
 from app.utils.api_response import error_response, not_found_response, success_response
@@ -42,6 +43,8 @@ def index():
         "business_model/index.html",
         canvases=canvases,
         operating_model_types=OPERATING_MODEL_TYPES,
+        canvas_types=model_service.canvas_types(),
+        type_names=dict(model_service.canvas_types()),
     )
 
 
@@ -53,12 +56,14 @@ def create():
     name = (request.form.get("name") or "").strip()
     description = (request.form.get("description") or "").strip() or None
     operating_model_type = request.form.get("operating_model_type") or None
+    canvas_type = request.form.get("canvas_type") or None
 
     try:
         canvas = service.create_canvas(
             name=name or "Untitled Canvas",
             description=description,
             operating_model_type=operating_model_type,
+            canvas_type=canvas_type,
         )
     except ValueError as exc:
         logger.warning("Invalid canvas create payload: %s", exc)
@@ -89,46 +94,53 @@ def _note_entry(canvas, box_key, el, editable):
 
 
 def _canvas_boxes(canvas):
-    """The notes of every box, read from the model: elements for seven boxes,
-    price plans for Revenue Streams and cost facts for Cost Structure."""
+    """The notes of every box, read from the model: elements for the element boxes, and, on the canvases
+    with a Revenue Streams box, price plans there and cost facts in Cost Structure."""
     editable = _can_edit()
+    zones = model_service.zones(canvas)
     boxes = {key.replace("_", "-"): [_note_entry(canvas, key, el, editable) for el in model_service.entries(canvas, key)]
-             for key in model_service.element_boxes()}
-    elements = {el.id: el for el in model_service.entries(canvas, model_service.PRICEABLE_BOX)}
-    plan_href = {eid: model_service.element_href(el) for eid, el in elements.items()}
-    boxes["revenue-streams"] = [
-        {
-            "id": plan.id, "box": "revenue_streams",
-            "text": f"{elements[plan.element_id].name}: {plan.name}, {plan.price:,.2f} {plan.currency} per {plan.billing_period}",
-            "href": plan_href[plan.element_id],
-            **({"remove_url": url_for("business_model.remove_price", canvas_id=canvas.id, plan_id=plan.id)} if editable else {}),
-        }
-        for plan in model_service.price_plans(canvas) if plan.element_id in elements
-    ]
-    lines = model_service.cost_lines(canvas)
-    boxes["cost-structure"] = [
-        {
-            "text": f"{line['name']}: {line['amount']:,.0f} {line['currency']} a year",
-            "href": url_for("unified_applications.application_detail", id=line["id"]),
-        }
-        for line in lines[:8]
-    ]
-    return boxes, len(lines)
+             for key in model_service.element_boxes(canvas)}
+    cost_line_count = 0
+    priceable = model_service.priceable_box(canvas)
+    if model_service.PRICE_BOX in zones and priceable:
+        elements = {el.id: el for el in model_service.entries(canvas, priceable)}
+        plan_href = {eid: model_service.element_href(el) for eid, el in elements.items()}
+        boxes["revenue-streams"] = [
+            {
+                "id": plan.id, "box": "revenue_streams",
+                "text": f"{elements[plan.element_id].name}: {plan.name}, {plan.price:,.2f} {plan.currency} per {plan.billing_period}",
+                "href": plan_href[plan.element_id],
+                **({"remove_url": url_for("business_model.remove_price", canvas_id=canvas.id, plan_id=plan.id)} if editable else {}),
+            }
+            for plan in model_service.price_plans(canvas) if plan.element_id in elements
+        ]
+    if model_service.COST_BOX in zones:
+        lines = model_service.cost_lines(canvas)
+        cost_line_count = len(lines)
+        boxes["cost-structure"] = [
+            {
+                "text": f"{line['name']}: {line['amount']:,.0f} {line['currency']} a year",
+                "href": url_for("unified_applications.application_detail", id=line["id"]),
+            }
+            for line in lines[:8]
+        ]
+    return boxes, cost_line_count
 
 
 @business_model_bp.route("/<int:canvas_id>")
 @login_required
 def detail(canvas_id):
-    """The 9-box Business Model Canvas, drawn from the organisation's model."""
+    """A framework canvas (the Business Model Canvas by default), drawn from the organisation's model."""
     canvas = service.get_canvas_or_none(canvas_id)
     if canvas is None:
         return render_template("business_model/not_found.html", canvas_id=canvas_id), 404
 
+    key = model_service.template_key(canvas)
     boxes, cost_line_count = _canvas_boxes(canvas)
-    zones = model_service.zones()
+    zones = model_service.zones(canvas)
     pickers = {
-        key: [{"id": el.id, "name": el.name, "type": el.type} for el in model_service.candidates(canvas, key)]
-        for key in model_service.element_boxes()
+        box: [{"id": el.id, "name": el.name, "type": el.type} for el in model_service.candidates(canvas, box)]
+        for box in model_service.element_boxes(canvas)
     }
     vision = None
     if canvas.vision_element_id:
@@ -140,6 +152,9 @@ def detail(canvas_id):
     return render_template(
         "business_model/detail.html",
         canvas=canvas,
+        canvas_key=key,
+        canvas_type_name=CANVAS_TEMPLATES[key]["name"],
+        is_bmc=key == model_service.TEMPLATE_KEY,
         boxes=boxes,
         zones=zones,
         pickers=pickers,
@@ -149,7 +164,8 @@ def detail(canvas_id):
         can_edit=_can_edit(),
         operating_model_types=OPERATING_MODEL_TYPES,
         billing_periods=BILLING_PERIODS,
-        priceable=boxes["value-propositions"],
+        priceable_box_key=model_service.priceable_box(canvas),
+        priceable=boxes.get(model_service.priceable_box(canvas).replace("_", "-"), []) if model_service.priceable_box(canvas) else [],
     )
 
 
@@ -158,7 +174,7 @@ def detail(canvas_id):
 def value_proposition(canvas_id):
     """The Value Proposition Canvas over the same segment and value elements."""
     canvas = service.get_canvas_or_none(canvas_id)
-    if canvas is None:
+    if canvas is None or model_service.template_key(canvas) != model_service.TEMPLATE_KEY:
         return render_template("business_model/not_found.html", canvas_id=canvas_id), 404
     from app.modules.business_model_canvas import vpc_service
 
@@ -263,12 +279,12 @@ def export_canvas(canvas_id):
         resolve_canvas_saved_diagram_id,
     )
 
-    saved_diagram_id = resolve_canvas_saved_diagram_id(canvas, "business_model_canvas")
+    key = model_service.template_key(canvas)
+    saved_diagram_id = resolve_canvas_saved_diagram_id(canvas, key)
     body, mimetype, ext = export_canvas_viewpoint(
-        "business_model_canvas", saved_diagram_id, fmt,
-        name=canvas.name or "Business Model Canvas",
+        key, saved_diagram_id, fmt, name=canvas.name or CANVAS_TEMPLATES[key]["name"],
     )
-    filename = f"business-model-canvas-{canvas_id}.{ext}"
+    filename = f"{key.replace('_', '-')}-{canvas_id}.{ext}"
     return Response(
         body, status=200, mimetype=mimetype,
         headers={"Content-Disposition": f"attachment; filename={filename}"},

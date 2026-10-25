@@ -1,7 +1,12 @@
+{# design-block: record-detail #}
 {% extends 'layouts/admin_base.html' %}
 {% from "components/page_header.html" import page_header %}
 {% from "components/metrics_card.html" import metrics_card %}
 {% from "components/empty_state.html" import empty_state %}
+{% from "components/badge.html" import badge %}
+{% from "components/button.html" import button %}
+{% from "components/form_field.html" import form_group %}
+{% from "components/select.html" import native_select %}
 
 {% block title %}{{ cap.name }} — Capability Fact Sheet{% endblock %}
 
@@ -81,7 +86,7 @@
       </p>
     </div>
 
-    {{ metrics_card(title='Strategic importance',
+    {{ metrics_card(title='Importance',
         value=(cap.strategic_importance if cap.strategic_importance is not none else '—'),
         icon='target',
         footer_text='ROI score: ' ~ (cap.roi_score if cap.roi_score is not none else '—')) }}
@@ -107,6 +112,32 @@
   </div>
   {% endif %}
 
+  {# ── Capability type ─────────────────────────────────────────────────── #}
+  <div class="mb-4">
+  {% call panel('Capability type', 'tags') %}
+    <div class="flex flex-wrap items-center gap-3">
+      <p class="text-sm text-muted-foreground">This capability is</p>
+      {% if capability_type %}
+        {% call badge('info' if capability_type == 'strategic' else 'neutral' if capability_type == 'operational' else 'secondary') %}<span data-testid="capability-type">{{ type_labels[capability_type] }}</span>{% endcall %}
+        <p class="text-sm text-muted-foreground">{{ type_help[capability_type] }}</p>
+      {% else %}
+        <p class="text-sm text-muted-foreground">not yet classified.</p>
+      {% endif %}
+    </div>
+    {% if can_edit_type and capability_type %}
+    <form method="post" action="{{ url_for('enterprise_crud.set_capability_type_route', capability_id=cap.id) }}" class="mt-4 flex flex-wrap items-end gap-3">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      {% call form_group(id='capability_type', label='Change the type', help_text='Strategic: differentiates the company, so invest and measure. Operational: runs it day to day, so keep it reliable. Supporting: every company needs it, so buy it.') %}
+        {{ native_select(id='capability_type', name='capability_type', aria_label='Capability type', class='w-56',
+            options=[('strategic', 'Strategic'), ('operational', 'Operational'), ('supporting', 'Supporting')],
+            selected=capability_type) }}
+      {% endcall %}
+      {{ button(text='Save type', type='submit', testid='save-capability-type') }}
+    </form>
+    {% endif %}
+  {% endcall %}
+  </div>
+
   {# ── Detail panels ───────────────────────────────────────────────────── #}
   <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
 
@@ -115,7 +146,7 @@
       {{ drow('Code', cap.code) }}
       {{ drow('Level', cap.level) }}
       {{ drow('Business domain', cap.business_domain) }}
-      {{ drow('Business owner', cap.business_owner) }}
+      {{ drow('Business owner', owners | map(attribute='user_name') | join(', ') if owners else cap.business_owner) }}
       {{ drow('IT owner', cap.it_owner) }}
       {{ drow('Maturity assessed', maturity.assessed) }}
     </dl>
