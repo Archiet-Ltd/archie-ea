@@ -2135,7 +2135,15 @@ def change_request_detail(cr_id):
     # The template refers to this as `cr` throughout; passing it as
     # `change_request` raised UndefinedError, so every row of the change-request
     # list at arb/change_requests.html:106 linked to a 500.
-    return render_template("arb/change_request_detail.html", cr=change_request)
+    valid_dispositions = ["accept", "reject", "defer", "escalate"]
+    return render_template(
+        "arb/change_request_detail.html",
+        cr=change_request,
+        valid_dispositions=valid_dispositions,
+        disposition_options=[('', 'Select disposition\u2026')] + [(d, d.replace('_', ' ').title()) for d in valid_dispositions],
+        impacts=[],
+        notices=[],
+    )
 
 
 @arb_bp.route("/change-requests/new", methods=["GET", "POST"])
@@ -2167,6 +2175,7 @@ def change_request_new():
         "arb/change_request_form.html",
         change_request=None,
         valid_trigger_types=VALID_TRIGGER_TYPES,
+        trigger_options=[('', 'Select trigger type\u2026')] + [(tt, tt.replace('_', ' ').title()) for tt in VALID_TRIGGER_TYPES],
     )
 
 
