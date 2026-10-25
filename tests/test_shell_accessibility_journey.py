@@ -41,7 +41,7 @@ PAGES = {
 RUN = """async () => { const r = await axe.run(document, {runOnly: {type: 'tag',
   values: ['wcag2a','wcag2aa','wcag21a','wcag21aa','wcag22aa']}, resultTypes: ['violations']});
   return r.violations.filter(v => ['serious','critical'].includes(v.impact)).map(v => ({id: v.id,
-    nodes: v.nodes.map(n => n.target.join(' ') + ' :: ' + (n.failureSummary || '').split('\\n').slice(0, 3).join(' | ').slice(0, 220))})); }"""
+    nodes: v.nodes.map(n => n.target.join(' ') + ' :: ' + (n.failureSummary || '').split('\\n').slice(0, 3).join(' | ').slice(0, 700))})); }"""
 SHELL = """() => Object.fromEntries(['org-switcher-trigger', 'user-menu-btn'].map(id => {
   const el = document.getElementById(id);
   return [id, el ? {label: el.getAttribute('aria-label'), text: el.innerText.replace(/\\s+/g, ' ').trim()} : null]; }))"""
