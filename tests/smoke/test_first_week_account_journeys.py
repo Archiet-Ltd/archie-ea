@@ -372,8 +372,9 @@ def test_a_new_person_buys_startup_at_checkout_and_then_cancels(browser, checkou
         expect(page.locator("main")).to_contain_text("%.2f USD per year" % startup.display_price_annual)
         page.get_by_role("button", name="Pay").click()
         page.wait_for_url(re.compile(r"/admin/billing/$"), timeout=PAGE_TIMEOUT)
-        expect(page.get_by_test_id("billing-page")).to_contain_text(
-            "Payment received. Your organisation is on the Startup plan.")
+        # The payment confirmation is a toast (not an inline alert).
+        expect(page.locator("#platform-toast-container")).to_contain_text(
+            "Payment received", timeout=PAGE_TIMEOUT)
         assert _plan_shown(page) == "Startup"
         assert "10" in page.get_by_test_id("billing-people-limit").inner_text()
         expect(page.get_by_test_id("billing-renewal")).not_to_be_empty()
@@ -394,9 +395,15 @@ def test_a_new_person_buys_startup_at_checkout_and_then_cancels(browser, checkou
         page.reload(wait_until="domcontentloaded")
         page.get_by_role("button", name="Cancel subscription").click()
         page.get_by_role("button", name="Cancel at the end of the period").click()
-        expect(page.get_by_test_id("billing-page")).to_contain_text("Your subscription is cancelled.")
+        # The cancel confirmation is a toast, not an inline alert.
+        expect(page.locator("#platform-toast-container")).to_contain_text(
+            "Your subscription is cancelled.", timeout=PAGE_TIMEOUT)
         assert _plan_shown(page) == "Startup", "the paid period is still running"
         expect(page.get_by_role("button", name="Keep my subscription")).to_be_visible()
+        # The cancel message shows once (toast), not twice (no inline alert with the same words).
+        inline_text = page.locator("#main-content [role=status], #main-content [role=alert]").all_inner_texts()
+        assert not any("Your subscription is cancelled." in t for t in inline_text), \
+            "the cancel message appeared as an inline alert as well as a toast"
         _shoot(page, "cancel-scheduled")
 
         # The paid period ends: the provider's signed event arrives and the plan is Community.
@@ -412,6 +419,13 @@ def test_a_new_person_buys_startup_at_checkout_and_then_cancels(browser, checkou
         assert _plan_shown(page) == "Community"
         expect(page.get_by_test_id("billing-people-limit")).to_contain_text("of 3")
         expect(page.get_by_role("button", name="Cancel subscription")).to_have_count(0)
+        # On the free plan: status reads "Free plan" with no red, renewal says "Nothing to renew".
+        expect(page.get_by_test_id("billing-page")).not_to_contain_text("Cancelled")
+        expect(page.get_by_test_id("billing-renewal")).to_have_text("Nothing to renew")
+        # Every plan price says "USD", not "$" alone.
+        for key in ("startup", "team", "enterprise"):
+            price_text = page.get_by_test_id("plan-price-%s" % key).inner_text()
+            assert "USD" in price_text, "plan %s price does not say USD: %s" % (key, price_text)
         _shoot(page, "cancel-community")
         with app.app_context():
             from app import db
