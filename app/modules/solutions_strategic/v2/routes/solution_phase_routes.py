@@ -2,7 +2,7 @@ from app.services.archimate_backbone import sync_archimate_element
 import csv
 import io
 import logging
-from flask import abort, jsonify, request, url_for
+from flask import abort, jsonify, redirect, request, url_for
 from flask_login import current_user, login_required
 from app import db
 from app.models.solution_models import Solution
@@ -159,8 +159,18 @@ def get_solution_risks(solution_id):
     (retired_into_risk_id IS NULL). A merged legacy row is excluded here --
     its replacement already exists on the canonical side, so it is never
     shown twice.
+
+    Slice S3 (D4): this one address answered JSON to every caller, script or
+    browser, so a person following this link from anywhere never saw a page
+    -- the heat-map page meant to serve it (risk.risk_heat_map_page, same URL
+    and method) was registered second and could never be reached. A browser
+    navigation now redirects to the one risk register, filtered to this
+    solution; a script asking for JSON (the only real caller, confirmed by
+    search) keeps the same response.
     """
     Solution.query.get_or_404(solution_id)
+    if request.accept_mimetypes.best != "application/json":
+        return redirect(url_for("risk.risk_register", solution=solution_id))
     from datetime import datetime as _datetime
 
     from app.services import risk_service
