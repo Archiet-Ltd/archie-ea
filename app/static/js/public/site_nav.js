@@ -158,6 +158,21 @@
     if (sheetIsOpen() && !header.contains(event.target)) { setSheet(false); }
   });
 
+  // Coming back to a page from history (or after a click on a menu link) never
+  // shows a menu open over the page.
+  window.addEventListener('pageshow', function () {
+    closeMenus(null);
+    if (sheetButton) { setSheet(false); }
+  });
+
+  header.addEventListener('click', function (event) {
+    var link = event.target.closest ? event.target.closest('a[href]') : null;
+    if (link && header.contains(link)) {
+      closeMenus(null);
+      if (sheetButton) { setSheet(false); }
+    }
+  });
+
   function onResize() {
     closeMenus(null);
     if (sheetButton) { setSheet(false); }
