@@ -39,7 +39,6 @@ A_VISITS = "Field visits for faulty sensors cost more than the sensor"
 A_ACCEPTED = "Regulators accept our certificates without re-testing"
 A_THREE = "Calibration relies on three senior technicians"
 A_RECERTIFY = "Only we recertify recovered assemblies at scale"
-A_PRICES = "Rising component prices squeeze margin"
 A_REGULATION = "New monitoring rules create demand for continuous readings"
 A_IMPORTS = "Imported sensors undercut us on price"
 A_BUYERS = "Large utilities buy in bulk and negotiate hard"
@@ -70,7 +69,7 @@ _ELEMENTS = {
     GOAL_VISION: _GOAL, GOAL_MARGIN: _GOAL, GOAL_TURNAROUND: _GOAL, GOAL_TRACE: _GOAL, GOAL_TRAIN: _GOAL,
     "Pass every audit without re-testing": _GOAL,
     A_WAIT: _ASSESSMENT, A_VISITS: _ASSESSMENT, A_ACCEPTED: _ASSESSMENT, A_THREE: _ASSESSMENT,
-    A_RECERTIFY: _ASSESSMENT, A_PRICES: _ASSESSMENT, A_REGULATION: _ASSESSMENT, A_IMPORTS: _ASSESSMENT,
+    A_RECERTIFY: _ASSESSMENT, A_REGULATION: _ASSESSMENT, A_IMPORTS: _ASSESSMENT,
     A_BUYERS: _ASSESSMENT, A_ENTRY: _ASSESSMENT, A_SLOW: _ASSESSMENT, A_SATELLITE: _ASSESSMENT, A_FUNDING: _ASSESSMENT,
     "Public funding for water-infrastructure renewal": _DRIVER, D_PRICES: _DRIVER,
     "Public demand for open water-quality data": _DRIVER,
@@ -136,7 +135,7 @@ CANVASES = [
         "strengths": [A_ACCEPTED, A_RECERTIFY],
         "weaknesses": [A_WAIT, A_THREE],
         "opportunities": [A_REGULATION, A_FUNDING],
-        "threats": [A_PRICES, A_IMPORTS],
+        "threats": [A_ENTRY, A_IMPORTS],
     }),
     ("pestle_analysis", "Lantern Quay Systems: PESTLE", {
         "political": ["Public funding for water-infrastructure renewal"],
@@ -148,7 +147,7 @@ CANVASES = [
     }),
     ("porters_five_forces", "Lantern Quay Systems: Porter's Five Forces", {
         "new_entrants": [A_ENTRY, "Overseas sensor maker entering the market"],
-        "suppliers": [A_PRICES, D_PRICES, "Component suppliers"],
+        "suppliers": [D_PRICES, "Component suppliers"],
         "rivalry": [D_RIVALS, A_IMPORTS],
         "buyers": [A_BUYERS, SEG_MUNICIPAL],
         "substitutes": ["Manual grab-sample testing", A_SATELLITE],
@@ -213,7 +212,6 @@ CANVASES = [
 # (source, target, relationship type): the links that make the shared elements a connected model.
 LINKS = [
     (A_REGULATION, D_LEGAL, "Association"),
-    (A_PRICES, D_PRICES, "Association"),
     (A_IMPORTS, D_RIVALS, "Association"),
     (O_TURNAROUND, GOAL_TURNAROUND, "Realization"),
     (O_RECERTIFIED, GOAL_VISION, "Realization"),
@@ -223,6 +221,17 @@ LINKS = [
     (SVC_CERTIFIED, VAL_TRUST, "Realization"),
     (A_WAIT, SEG_MUNICIPAL, "Association"),
     ("Days from receipt to certificate", O_TURNAROUND, "Association"),
+    # The Wardley Map's dependencies: what serves what, from the user's need downwards.
+    (SVC_REMOTE, VAL_TRUST, "Realization"),
+    ("Sensor Calibration", SVC_CERTIFIED, "Serving"),
+    ("Recertify recovered assembly", SVC_CERTIFIED, "Serving"),
+    ("Calibration Rig Pool", "Sensor Calibration", "Serving"),
+    ("Calibration Rig Pool", "Recertify recovered assembly", "Serving"),
+    ("Component stock and supplier panel", "Calibration Rig Pool", "Serving"),
+    ("Cloud hosting", SVC_REMOTE, "Serving"),
+    ("Cloud hosting", "Sensor Calibration", "Serving"),
+    (PKG_RIGS, "Calibration Rig Pool", "Association"),
+    (A_THREE, "Sensor Calibration", "Association"),
 ]
 
 

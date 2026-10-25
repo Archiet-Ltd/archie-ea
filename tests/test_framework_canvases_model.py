@@ -101,6 +101,10 @@ def test_each_type_takes_the_element_types_its_mapping_names(canvas_type):
 def test_each_types_boxes_are_the_boxes_its_layout_draws(canvas_type):
     layout = (LAYOUTS / f"{canvas_type}.html").read_text(encoding="utf8")
     drawn = set(re.findall(r"\{'key': '([a-z0-9-]+)'", layout))
+    if canvas_type == "wardley_mapping":  # drawn as a plot: the stages come from the plot, the anchors and extras from its notes
+        from app.modules.business_model_canvas import wardley_service
+
+        drawn = {k for k, _t in wardley_service.STAGES} | {"user", "user-need", "movement", "inertia"}
     stored = {z["box_key"].replace("_", "-") for z in CANVAS_TEMPLATES[canvas_type]["zones"]}
     assert drawn == stored
 
