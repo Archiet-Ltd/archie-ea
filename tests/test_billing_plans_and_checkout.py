@@ -490,6 +490,31 @@ def test_buy_starts_checkout_for_the_chosen_plan(app, db_session, client, login_
     assert Subscription.query.filter_by(organization_id=org.id).one().stripe_customer_id == "cus_buy"
 
 
+def test_the_page_with_the_buy_form_lets_the_browser_follow_it_to_the_hosted_checkout(
+        app, db_session, client, login_as, billing, monkeypatch):
+    """The buy form posts here and is answered with a redirect to the provider's own checkout
+    address; a browser refuses that second hop unless the page that held the form allows it."""
+    org, admin = _admin_org(db_session, "formaction")
+    monkeypatch.delenv("STRIPE_API_BASE", raising=False)
+    with app.app_context():
+        login_as(client, admin)
+        page = client.get("/admin/billing/?plan=startup&interval=year")
+    policy = page.headers["Content-Security-Policy"]
+    form_action = [d for d in policy.split("; ") if d.startswith("form-action")][0]
+    assert page.status_code == 200
+    assert form_action.split() == ["form-action", "'self'", "https://checkout.stripe.com"], form_action
+
+
+def test_every_other_page_keeps_forms_to_this_site(app, db_session, client, login_as, billing, monkeypatch):
+    org, admin = _admin_org(db_session, "formaction-other")
+    monkeypatch.delenv("STRIPE_API_BASE", raising=False)
+    with app.app_context():
+        login_as(client, admin)
+        page = client.get("/account/manage")
+    policy = page.headers["Content-Security-Policy"]
+    assert [d for d in policy.split("; ") if d.startswith("form-action")] == ["form-action 'self'"]
+
+
 def test_enterprise_is_contact_sales_not_checkout(app, db_session, client, login_as, billing, monkeypatch):
     org, admin = _admin_org(db_session, "ent")
 

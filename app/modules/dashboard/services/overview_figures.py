@@ -145,13 +145,19 @@ def _sourced_share(org_id):
 def _relationships(org_id, now):
     from app.models import ArchiMateElement as E
     from app.models import ArchiMateRelationship as R
+    from app.models.audit_log import AuditLog
 
     total = db.session.execute(db.select(func.count(R.id)).where(R.organization_id == org_id)).scalar_one()
     if not total:
         return {"total": 0}
     since = now - timedelta(days=30)
     added = db.session.execute(
-        db.select(func.count(R.id)).where(R.organization_id == org_id, R.created_at >= since)
+        db.select(func.count(AuditLog.id)).where(
+            AuditLog.organization_id == org_id,
+            AuditLog.table_name == "archimate_relationships",
+            AuditLog.action == "create",
+            AuditLog.created_at >= since,
+        )
     ).scalar_one()
     ends = Counter()
     for source_id, target_id in db.session.execute(
@@ -418,7 +424,16 @@ def _activity(changes, now, org_id):
         {"day": (week_start + timedelta(days=i)).strftime("%a"), "changes": per_weekday[week_start + timedelta(days=i)]}
         for i in range(7)
     ]
-    recent = sorted((c for c in changes if c.valid_from), key=lambda c: c.valid_from, reverse=True)[:5]
+    recent_all = sorted((c for c in changes if c.valid_from), key=lambda c: c.valid_from, reverse=True)
+    # Collapse changes to the same element on the same day into one row, keeping the latest.
+    seen = {}
+    recent = []
+    for c in recent_all:
+        key = (c.table_name, c.record_id, c.valid_from.date())
+        if key not in seen:
+            seen[key] = c
+            recent.append(c)
+    recent = recent[:5]
     applications = _application_names(recent)
     relationships = _relationship_phrases(org_id, recent)
     people = _person_names(org_id, recent)
