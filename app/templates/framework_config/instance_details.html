@@ -15,7 +15,7 @@
             <div class="px-4 lg:px-6">
                 {% call breadcrumb() %}
                     {% call breadcrumb_item(href=url_for('framework_config_ui.instances')) %}Framework Instances{% endcall %}
-                    {% call breadcrumb_separator() %}{% endcall %}
+                    {{ breadcrumb_separator() }}
                     {% call breadcrumb_item(active=true) %}{{ instance.instance_name }}{% endcall %}
                 {% endcall %}
 
