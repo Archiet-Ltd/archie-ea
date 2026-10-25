@@ -215,7 +215,12 @@ def test_a_startup_cto_signs_up_gives_github_and_asks_about_their_own_systems(br
         page.get_by_role("button", name="Connect GitHub").click()
         expect(page.get_by_test_id("signup-status-github")).to_contain_text(re.compile(r"GitHub is connected\. Reading starts in a moment|Reading GitHub now|Read 16 repositories"))
 
-        # Industry and one framework, nothing preselected.
+        shoot(page, "step2-sources")
+        page.get_by_test_id("signup-continue").click()
+
+        # Step 3: the company. Industry and one framework, nothing preselected.
+        page.wait_for_url("**/account/welcome?step=3")
+        expect(page.get_by_role("heading", name="About your company")).to_be_visible()
         expect(page.locator("[data-framework]:checked")).to_have_count(0)
         assert page.get_by_label("Your industry").input_value() == ""
         page.get_by_label("Your industry").select_option(label="Banking and payments")
@@ -223,8 +228,8 @@ def test_a_startup_cto_signs_up_gives_github_and_asks_about_their_own_systems(br
         shoot(page, "step2-filled")
         page.get_by_role("button", name="Continue").click()
 
-        # Step 3: Community, so the built-in AI comes first.
-        page.wait_for_url("**/account/welcome?step=3")
+        # Step 4: Community, so the built-in AI comes first.
+        page.wait_for_url("**/account/welcome?step=4")
         expect(page.get_by_role("heading", name="Your AI provider")).to_be_visible()
         expect(page.get_by_test_id("signup-built-in")).to_be_visible()
         expect(page.get_by_test_id("signup-own-key")).to_be_hidden()
@@ -276,11 +281,18 @@ def test_a_second_cto_skips_everything_and_lands_on_the_dashboard_as_before(brow
     try:
         email, started = sign_up(page, str(server), people)
         assert_is_a_startup_cto_not_an_administrator(app, email)
-        page.get_by_test_id("signup-skip-company").click()
+        page.get_by_test_id("signup-continue").click()
         page.wait_for_url("**/account/welcome?step=3")
+        page.get_by_test_id("signup-continue").click()
+        page.wait_for_url("**/account/welcome?step=4")
         page.get_by_role("button", name="Finish").click()
         page.wait_for_url("**/dashboard/**")
         expect(page.get_by_test_id("signup-sources")).to_have_count(0)
+        # The dashboard says plainly what was skipped and offers GitHub, and the offer lands on content.
+        skipped = page.get_by_test_id("signup-sources-skipped")
+        expect(skipped).to_contain_text("You skipped GitHub, Jira and the company website")
+        # The kind was answered in the company step, so the dashboard does not ask it again.
+        expect(page.get_by_test_id("company-kind-selector")).to_have_count(0)
         # Nothing was given, so the sample company is on offer, exactly as before.
         sample = page.get_by_test_id("first-action-sample")
         expect(sample).to_be_visible()
@@ -315,8 +327,10 @@ def test_a_paying_cto_is_asked_for_their_own_key_first_and_it_is_tested(browser,
             set_contract_plan(org, "team", 5)
             db.session.commit()
             db.session.remove()
-        page.get_by_test_id("signup-skip-company").click()
+        page.get_by_test_id("signup-continue").click()
         page.wait_for_url("**/account/welcome?step=3")
+        page.get_by_test_id("signup-continue").click()
+        page.wait_for_url("**/account/welcome?step=4")
         own = page.get_by_test_id("signup-own-key")
         expect(own).to_be_visible()
         expect(own).to_contain_text("Your questions go only to the provider you choose, and are never slowed by shared limits")
@@ -352,5 +366,86 @@ def test_a_paying_cto_is_asked_for_their_own_key_first_and_it_is_tested(browser,
             assert LLMService._get_all_api_keys("openai")[:1] == [GOOD_KEY]
         page.get_by_test_id("signup-finish").click()
         page.wait_for_url("**/dashboard/**")
+    finally:
+        context.close()
+
+
+def _footer_in_first_view(page, names):
+    """Every action in the step's footer is on screen without scrolling."""
+    height = page.viewport_size["height"]
+    for name in names:
+        box = page.get_by_test_id(name).bounding_box()
+        assert box is not None, name
+        assert 0 <= box["y"] and box["y"] + box["height"] <= height, "%s is below the first view: %s" % (name, box)
+
+
+def test_every_step_keeps_its_actions_in_view_and_every_later_step_has_previous(browser, server, people, app):
+    for width, height in ((1440, 900), (390, 844)):
+        context = browser.new_context(viewport={"width": width, "height": height})
+        context.add_init_script(SKIP_WELCOME)
+        context.set_default_timeout(PAGE_TIMEOUT)
+        page = context.new_page()
+        try:
+            email, _started = sign_up(page, str(server), people)
+            assert_is_a_startup_cto_not_an_administrator(app, email)
+            nav = page.get_by_role("navigation", name="Progress steps")
+            expect(nav).to_contain_text("Your sources")
+            expect(nav).to_contain_text("Your company")
+            # Step 2, sources.
+            expect(page.get_by_role("heading", name="Bring in your company")).to_be_visible()
+            _footer_in_first_view(page, ["signup-previous", "signup-continue"])
+            page.get_by_test_id("signup-continue").click()
+            # Step 3, the company.
+            page.wait_for_url("**/account/welcome?step=3")
+            expect(page.get_by_role("heading", name="About your company")).to_be_visible()
+            expect(page.get_by_label("What kind of company are you?")).to_have_value("startup")
+            _footer_in_first_view(page, ["signup-previous", "signup-continue"])
+            # Previous returns to the step before, with its content.
+            page.get_by_test_id("signup-previous").click()
+            page.wait_for_url("**/account/welcome")
+            expect(page.get_by_label("Website address")).to_be_visible()
+            page.get_by_test_id("signup-continue").click()
+            page.get_by_test_id("signup-continue").click()
+            # Step 4, the AI provider.
+            page.wait_for_url("**/account/welcome?step=4")
+            _footer_in_first_view(page, ["signup-previous", "signup-finish"])
+            page.get_by_test_id("signup-previous").click()
+            page.wait_for_url("**/account/welcome?step=3")
+            expect(page.get_by_role("heading", name="About your company")).to_be_visible()
+        finally:
+            context.close()
+
+
+def test_the_company_kind_chosen_at_sign_up_is_kept_and_not_asked_again(browser, server, people, app):
+    context, page = new_page(browser)
+    try:
+        email, _started = sign_up(page, str(server), people)
+        assert_is_a_startup_cto_not_an_administrator(app, email)
+        page.get_by_test_id("signup-continue").click()
+        page.wait_for_url("**/account/welcome?step=3")
+        page.get_by_label("What kind of company are you?").select_option(label="Enterprise")
+        page.get_by_label("ISO 27001").check()
+        page.get_by_test_id("signup-continue").click()
+        page.wait_for_url("**/account/welcome?step=4")
+        page.get_by_role("button", name="Finish").click()
+        page.wait_for_url("**/dashboard/**")
+        expect(page.get_by_test_id("company-kind-selector")).to_have_count(0)
+        with app.app_context():
+            from app.models.user import User
+            from app.models.organization import Organization
+            from app import db
+
+            org = db.session.get(Organization, User.query.filter_by(email=email).one().organization_id)
+            assert org.settings["company_context"]["kind"] == "enterprise"
+            db.session.remove()
+        page.goto(str(server) + "/account/manage", wait_until="domcontentloaded")
+        expect(page.get_by_label("What kind of company are you?")).to_have_value("enterprise")
+        expect(page.get_by_label("ISO 27001")).to_be_checked()
+        # The skipped panel's offer lands on the GitHub connection page, with content.
+        page.goto(str(server) + "/dashboard/", wait_until="domcontentloaded")
+        connect = page.get_by_test_id("first-action-connect")
+        expect(connect).to_be_visible()
+        connect.click()
+        expect(page.get_by_role("heading", name=re.compile("GitHub"))).to_be_visible()
     finally:
         context.close()
