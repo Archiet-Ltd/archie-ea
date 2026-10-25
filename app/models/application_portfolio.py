@@ -279,6 +279,21 @@ class ApplicationComponent(TenantMixin, db.Model, OptimisticLockMixin):
         index=True,
     )
 
+    # The vendor that supplies this application: the one link every vendor
+    # screen reads (app/services/vendor_register.py). ``vendor_name`` above is
+    # the text it was named by; setting the name writes this link.
+    vendor_organization_id = Column(
+        db.Integer,
+        ForeignKey(
+            "vendor_organizations.id",
+            ondelete="SET NULL",
+            use_alter=True,
+            name="fk_application_components_vendor_organization_id",
+        ),
+        nullable=True,
+        index=True,
+    )
+
     # Lifecycle management
     # ARCH-031: was default="operational", which meant an application created
     # with only a name silently claimed to be live in production and rendered

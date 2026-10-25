@@ -55,6 +55,7 @@
     label='',
     description='',
     accept='',
+    accept_label='',
     multiple=false,
     required=false,
     max_size='10MB',
@@ -167,7 +168,7 @@
                     <span class="text-primary">Click to upload</span> or drag and drop
                 </p>
                 <p class="text-xs text-muted-foreground">
-                    {% if accept %}{{ accept }} files, {% endif %}up to {{ max_size }}{% if multiple %}, max {{ max_files }} files{% endif %}
+                    {% if accept_label %}{{ accept_label }}{% elif accept %}{{ accept }} files, {% endif %}up to {{ max_size }}{% if multiple %}, max {{ max_files }} files{% endif %}
                 </p>
             </div>
         </div>

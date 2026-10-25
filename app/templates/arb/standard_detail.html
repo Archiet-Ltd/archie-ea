@@ -1,185 +1,182 @@
+<!-- shadcn-nearest: dashboard-01 -->
+{# shadcn-reference: preview@e55b60b #}
 {% extends "layouts/admin_base.html" %}
-{% from 'components/page_header.html' import page_header %}
-{% from 'components/badge.html' import badge %}
+{% from "components/page_header.html" import page_header %}
+{% from "components/badge.html" import badge %}
+{% from "components/card.html" import card, card_header, card_title, card_description, card_content %}
+{% from "components/breadcrumb.html" import breadcrumb, breadcrumb_item, breadcrumb_separator %}
+{% from "components/table.html" import table, table_header, table_body, table_row, table_head, table_cell %}
 
 {% block title %}Standard: {{ standard.name }}{% endblock %}
 
 {% block content %}
-<div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+<div class="@container/main flex flex-1 flex-col gap-2">
+    {{ page_header(
+        title=standard.name,
+        description='',
+        breadcrumbs=[
+            {'label': 'Dashboard', 'href': url_for('main.index')},
+            {'label': 'ARB', 'href': url_for('arb.dashboard')},
+            {'label': 'Standards', 'href': url_for('arb.standards')},
+            {'label': standard.name}
+        ],
+        actions=[]
+    ) }}
 
-    <!-- Back link -->
-    <div class="mb-6">
-        <a href="{{ url_for('arb.standards') }}"
-           class="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors">
-            <i data-lucide="arrow-left" class="w-4 h-4" aria-hidden="true"></i>
-            Back to Standards
-        </a>
-    </div>
+    <div class="flex flex-col gap-4 py-4 md:gap-6 md:py-6 px-4 lg:px-6">
+        <!-- Status and badges row -->
+        <div class="flex flex-wrap items-center gap-2 mb-2">
+            {% if standard.code %}
+                {% call badge('info') %}{{ standard.code }}{% endcall %}
+            {% endif %}
+            {% set status_variant = {
+                'active': 'success',
+                'deprecated': 'neutral',
+                'draft': 'info'
+            }.get(standard.status, 'neutral') %}
+            {% call badge(variant=status_variant) %}
+                {{ standard.status | default('active') | title }}
+            {% endcall %}
+            {% if standard.mandatory %}
+                {% call badge('destructive') %}Mandatory{% endcall %}
+            {% else %}
+                {% call badge('neutral') %}Optional{% endcall %}
+            {% endif %}
+        </div>
 
-    <!-- Page Header: name + code badge -->
-    <div class="flex flex-wrap items-start gap-3 mb-8">
-        <div class="flex-1 min-w-0">
-            <h1 class="text-3xl font-bold text-foreground leading-tight">{{ standard.name }}</h1>
-            <div class="flex flex-wrap items-center gap-2 mt-2">
-                {% if standard.code %}
-                {% call badge(variant='info') %}{{ standard.code }}{% endcall %}
-                {% endif %}
+        <!-- Description -->
+        <div data-slot="card" class="rounded-lg border border-border bg-card p-6">
+            <h2 class="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-2">Description</h2>
+            <p class="text-sm text-foreground leading-relaxed">
+                {{ standard.description or 'No description provided.' }}
+            </p>
+        </div>
 
-                <!-- Status badge -->
-                {% set status_variant = {
-                    'active': 'success',
-                    'deprecated': 'neutral',
-                    'draft': 'info'
-                }.get(standard.status, 'neutral') %}
-                {% call badge(variant=status_variant) %}
-                    {{ standard.status | default('active') | title }}
-                {% endcall %}
-
-                <!-- Mandatory / Optional badge -->
-                {% if standard.mandatory %}
-                {% call badge(variant='destructive') %}Mandatory{% endcall %}
-                {% else %}
-                {% call badge(variant='neutral') %}Optional{% endcall %}
-                {% endif %}
+        <!-- Details grid -->
+        <div data-slot="card" class="rounded-lg border border-border bg-card p-6">
+            <h2 class="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-4">Details</h2>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-4">
+                <div>
+                    <span class="text-xs text-muted-foreground block mb-0.5">Category</span>
+                    <span class="text-sm font-medium text-foreground">
+                        {{ standard.category | default('Uncategorized') | title }}
+                    </span>
+                </div>
+                <div>
+                    <span class="text-xs text-muted-foreground block mb-0.5">TOGAF Phase</span>
+                    <span class="text-sm font-medium text-foreground">
+                        {{ standard.togaf_phase or '—' }}
+                    </span>
+                </div>
+                <div>
+                    <span class="text-xs text-muted-foreground block mb-0.5">ArchiMate Layer</span>
+                    <span class="text-sm font-medium text-foreground">
+                        {{ standard.archimate_layer or '—' }}
+                    </span>
+                </div>
+                <div>
+                    <span class="text-xs text-muted-foreground block mb-0.5">Effective Date</span>
+                    <span class="text-sm font-medium text-foreground">
+                        {{ standard.effective_date or '—' }}
+                    </span>
+                </div>
+                <div>
+                    <span class="text-xs text-muted-foreground block mb-0.5">Next Review Date</span>
+                    <span class="text-sm font-medium text-foreground">
+                        {{ standard.review_date or '—' }}
+                    </span>
+                </div>
+                <div>
+                    <span class="text-xs text-muted-foreground block mb-0.5">Owner</span>
+                    <span class="text-sm font-medium text-foreground">
+                        {% if standard.owner %}
+                            {{ standard.owner.name | default(standard.owner.email) }}
+                        {% else %}
+                            Unassigned
+                        {% endif %}
+                    </span>
+                </div>
+                <div>
+                    <span class="text-xs text-muted-foreground block mb-0.5">Exceptions Allowed</span>
+                    <span class="text-sm font-medium text-foreground">
+                        {{ 'Yes' if standard.exceptions_allowed else 'No' }}
+                    </span>
+                </div>
             </div>
         </div>
-    </div>
 
-    <!-- Description -->
-    <div data-slot="card" class="rounded-lg border border-border bg-card p-6 mb-6">
-        <h2 class="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-2">Description</h2>
-        <p class="text-sm text-foreground leading-relaxed">
-            {{ standard.description or 'No description provided.' }}
-        </p>
-    </div>
-
-    <!-- Details grid -->
-    <div data-slot="card" class="rounded-lg border border-border bg-card p-6 mb-6">
-        <h2 class="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-4">Details</h2>
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-4">
-            <div>
-                <span class="text-xs text-muted-foreground block mb-0.5">Category</span>
-                <span class="text-sm font-medium text-foreground">
-                    {{ standard.category | default('Uncategorized') | title }}
+        <!-- Applies To -->
+        <div data-slot="card" class="rounded-lg border border-border bg-card p-6">
+            <h2 class="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">Applies To</h2>
+            {% if standard.applies_to_review_types %}
+            <div class="flex flex-wrap gap-2">
+                {% for review_type in standard.applies_to_review_types %}
+                <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-muted text-muted-foreground border">
+                    {{ review_type | replace('_', ' ') | title }}
                 </span>
+                {% endfor %}
             </div>
-            <div>
-                <span class="text-xs text-muted-foreground block mb-0.5">TOGAF Phase</span>
-                <span class="text-sm font-medium text-foreground">
-                    {{ standard.togaf_phase or '—' }}
-                </span>
-            </div>
-            <div>
-                <span class="text-xs text-muted-foreground block mb-0.5">ArchiMate Layer</span>
-                <span class="text-sm font-medium text-foreground">
-                    {{ standard.archimate_layer or '—' }}
-                </span>
-            </div>
-            <div>
-                <span class="text-xs text-muted-foreground block mb-0.5">Effective Date</span>
-                <span class="text-sm font-medium text-foreground">
-                    {{ standard.effective_date or '—' }}
-                </span>
-            </div>
-            <div>
-                <span class="text-xs text-muted-foreground block mb-0.5">Next Review Date</span>
-                <span class="text-sm font-medium text-foreground">
-                    {{ standard.review_date or '—' }}
-                </span>
-            </div>
-            <div>
-                <span class="text-xs text-muted-foreground block mb-0.5">Owner</span>
-                <span class="text-sm font-medium text-foreground">
-                    {% if standard.owner %}
-                        {{ standard.owner.name | default(standard.owner.email) }}
-                    {% else %}
-                        Unassigned
-                    {% endif %}
-                </span>
-            </div>
-            <div>
-                <span class="text-xs text-muted-foreground block mb-0.5">Exceptions Allowed</span>
-                <span class="text-sm font-medium text-foreground">
-                    {{ 'Yes' if standard.exceptions_allowed else 'No' }}
-                </span>
-            </div>
+            {% else %}
+            <p class="text-sm text-muted-foreground">No review types specified.</p>
+            {% endif %}
         </div>
-    </div>
 
-    <!-- Applies To -->
-    <div data-slot="card" class="rounded-lg border border-border bg-card p-6 mb-6">
-        <h2 class="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">Applies To</h2>
-        {% if standard.applies_to_review_types %}
-        <div class="flex flex-wrap gap-2">
-            {% for review_type in standard.applies_to_review_types %}
-            <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-muted text-muted-foreground border">
-                {{ review_type | replace('_', ' ') | title }}
-            </span>
-            {% endfor %}
+        <!-- Requirements -->
+        <div data-slot="card" class="rounded-lg border border-border bg-card p-6">
+            <h2 class="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">Requirements</h2>
+            {% if standard.requirements %}
+            <ol class="space-y-2 list-decimal list-inside">
+                {% for req in standard.requirements %}
+                <li class="text-sm text-foreground leading-relaxed">{{ req }}</li>
+                {% endfor %}
+            </ol>
+            {% else %}
+            <p class="text-sm text-muted-foreground">No requirements defined for this standard.</p>
+            {% endif %}
         </div>
-        {% else %}
-        <p class="text-sm text-muted-foreground">No review types specified.</p>
-        {% endif %}
-    </div>
 
-    <!-- Requirements -->
-    <div data-slot="card" class="rounded-lg border border-border bg-card p-6 mb-6">
-        <h2 class="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">Requirements</h2>
-        {% if standard.requirements %}
-        <ol class="space-y-2 list-decimal list-inside">
-            {% for req in standard.requirements %}
-            <li class="text-sm text-foreground leading-relaxed">{{ req }}</li>
-            {% endfor %}
-        </ol>
-        {% else %}
-        <p class="text-sm text-muted-foreground">No requirements defined for this standard.</p>
-        {% endif %}
-    </div>
-
-    <!-- Checklist Items -->
-    <div data-slot="card" class="rounded-lg border border-border bg-card p-6 mb-6">
-        <h2 class="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">Reviewer Checklist</h2>
-        {% if standard.checklist_items %}
-        <div class="overflow-x-auto">
-            <table class="dense-table w-full text-sm">
-                <thead>
-                    <tr class="border-b">
-                        <th class="text-left py-2 pr-4 text-xs font-medium text-muted-foreground uppercase tracking-wide">Item</th>
-                        <th class="text-center py-2 w-24 text-xs font-medium text-muted-foreground uppercase tracking-wide">Required</th>
+        <!-- Checklist Items -->
+        <div data-slot="card" class="rounded-lg border border-border bg-card p-6">
+            <h2 class="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">Reviewer Checklist</h2>
+            {% if standard.checklist_items %}
+            {% call table() %}
+                {% call table_header() %}
+                    <tr>
+                        {% call table_head(class='pl-0') %}Item{% endcall %}
+                        {% call table_head(class='text-center w-24') %}Required{% endcall %}
                     </tr>
-                </thead>
-                <tbody class="divide-y">{# actionable-rows-ok: checklist items are a JSON list held on this standard, not records of their
-                       own. Edit them with Edit Standard above; reviewers tick them on the
-                       review they belong to. #}
+                {% endcall %}
+                {% call table_body() %}
                     {% for item in standard.checklist_items %}
                     {% set is_required = item.required if item is mapping else false %}
                     {% set item_text = item.item if item is mapping else item %}
                     <tr class="hover:bg-muted/30 transition-colors">
-                        <td class="py-3 pr-4 text-foreground leading-relaxed">{{ item_text }}</td>
-                        <td class="py-3 text-center">
+                        {% call table_cell(class='pl-0') %}
+                            <span class="text-foreground leading-relaxed">{{ item_text }}</span>
+                        {% endcall %}
+                        {% call table_cell(class='text-center') %}
                             {% if is_required %}
                             <i data-lucide="check-circle-2" class="w-4 h-4 text-success inline-block" title="Required"></i>
                             {% else %}
                             <i data-lucide="circle" class="w-4 h-4 text-muted-foreground inline-block" title="Optional"></i>
                             {% endif %}
-                        </td>
+                        {% endcall %}
                     </tr>
                     {% endfor %}
-                </tbody>
-            </table>
+                {% endcall %}
+            {% endcall %}
+            {% else %}
+            <p class="text-sm text-muted-foreground">No checklist items defined for this standard.</p>
+            {% endif %}
         </div>
-        {% else %}
-        <p class="text-sm text-muted-foreground">No checklist items defined for this standard.</p>
+
+        {% if standard.exception_process %}
+        <!-- Exception Process -->
+        <div data-slot="card" class="rounded-lg border border-border bg-card p-6">
+            <h2 class="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">Exception Process</h2>
+            <p class="text-sm text-foreground leading-relaxed whitespace-pre-line">{{ standard.exception_process }}</p>
+        </div>
         {% endif %}
     </div>
-
-    {% if standard.exception_process %}
-    <!-- Exception Process -->
-    <div data-slot="card" class="rounded-lg border border-border bg-card p-6 mb-6">
-        <h2 class="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">Exception Process</h2>
-        <p class="text-sm text-foreground leading-relaxed whitespace-pre-line">{{ standard.exception_process }}</p>
-    </div>
-    {% endif %}
-
 </div>
 {% endblock %}
