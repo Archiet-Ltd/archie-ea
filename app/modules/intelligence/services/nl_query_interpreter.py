@@ -127,28 +127,33 @@ _SERVICE_PATTERNS = [
 # named" so the answer falls through to single points of failure without a
 # "nothing recorded matches" reason line.
 _SUPERLATIVE_PHRASES = [
-    re.compile(r"^most connected\b", re.I),
-    re.compile(r"^most depended[- ]?on\b", re.I),
-    re.compile(r"^most critical\b", re.I),
-    re.compile(r"^biggest\b", re.I),
-    re.compile(r"^our main\b", re.I),
-    re.compile(r"^the core\b", re.I),
-    # Also catch "main" and "core" when they appear as the first word of the
-    # captured phrase (e.g. "main application", "core database") since the
-    # regex patterns strip leading "the/our" before capturing.
-    re.compile(r"^main\b", re.I),
-    re.compile(r"^core\b", re.I),
+    re.compile(
+        r"^(?:(?:our|the) )?"
+        r"(?:most connected|most depended[- ]?on|most critical|biggest|main|core)"
+        r"(?: (?:application|app|system|service|platform|database|single point of failure))?$",
+        re.I,
+    ),
 ]
 
 
 def _is_superlative_phrase(service: str) -> bool:
-    """True if the captured phrase is a superlative/descriptive term that
-    names no specific system (e.g. "most connected", "our main", "the core").
+    """True only when the whole phrase is a superlative or descriptive word,
+    optionally followed by a generic noun ("most connected application",
+    "main system"). A real name such as "core banking" or "main website" is
+    not superlative.
     """
-    s = service.strip().lower()
-    for pattern in _SUPERLATIVE_PHRASES:
-        if pattern.match(s):
-            return True
+    s = " ".join(service.strip().lower().split())
+    return any(pattern.match(s) for pattern in _SUPERLATIVE_PHRASES)
+
+
+def asks_for_superlative(question: str) -> bool:
+    """True when the question's service phrase is a superlative ("our most
+    connected application"): it asks for the single points of failure."""
+    text = (question or "").strip()
+    for pattern in _SERVICE_PATTERNS:
+        found = pattern.search(text)
+        if found:
+            return _is_superlative_phrase(found.group(1).strip().rstrip("?.! "))
     return False
 
 
