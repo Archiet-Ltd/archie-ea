@@ -62,7 +62,7 @@
 
     {# Status and actions for this instance (P01 page header actions, P23 status badge). #}
     <div class="flex flex-wrap items-center gap-3">
-        {% call badge(variant=status_variants.get(instance.status, 'neutral')) %}{{ instance.status|replace('_', ' ')|title }}{% endcall %}
+        <span data-testid="instance-status-badge">{% call badge(variant=status_variants.get(instance.status, 'neutral')) %}{{ instance.status|replace('_', ' ')|title }}{% endcall %}</span>
         <span class="text-sm text-muted-foreground">
             Workflow:
             <a href="{{ url_for('integration.workflow_detail', workflow_code=instance.definition.workflow_code) }}"
