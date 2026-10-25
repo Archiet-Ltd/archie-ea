@@ -172,6 +172,19 @@ def _assert_wip_limits_show_on_headers(page):
         assert "/" not in header.replace("epics", ""), f"{state} should show no WIP limit: {header!r}"
 
 
+def _autoscroll_to(page, target, handle):
+    """Carry a held card to a lane that is scrolled out of view the way a person
+    does: hold the pointer at the board's edge until the board scrolls the lane in."""
+    region = page.locator("[data-kanban-scroll]").first.bounding_box()
+    for _ in range(40):
+        box = target.bounding_box()
+        if box["x"] >= region["x"] and box["x"] + box["width"] <= region["x"] + region["width"]:
+            return
+        edge = region["x"] + 6 if box["x"] < region["x"] else region["x"] + region["width"] - 6
+        page.mouse.move(edge, handle["y"] + handle["height"] / 2, steps=6)
+        page.wait_for_timeout(250)
+
+
 def _drag_card(page, card, to_state):
     """Drag a card onto a column with real mouse events: press on the card's
     drag handle, move across the board in steps, release over the target lane.
@@ -181,7 +194,7 @@ def _drag_card(page, card, to_state):
     handle = card.locator("[data-drag-handle]").bounding_box()
     page.mouse.move(handle["x"] + handle["width"] / 2, handle["y"] + handle["height"] / 2)
     page.mouse.down()
-    target.scroll_into_view_if_needed()
+    _autoscroll_to(page, target, handle)
     box = target.bounding_box()
     page.mouse.move(box["x"] + box["width"] / 2, box["y"] + 60, steps=12)
     page.mouse.move(box["x"] + box["width"] / 2, box["y"] + 70, steps=4)
