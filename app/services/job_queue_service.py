@@ -29,7 +29,7 @@ class JobQueueService:
 
     # Reading a whole website takes minutes; it has its own worker so the import a person is waiting
     # for (GitHub, Jira) never queues behind it.
-    SLOW_TASKS = ("website_profile_crawl",)
+    SLOW_TASKS = ("website_profile_crawl", "company_signals_refresh")
 
     def create_job(
         self,
@@ -242,6 +242,10 @@ class JobQueueService:
             from app.modules.organization.website_crawl import run_website_crawl_job
 
             return run_website_crawl_job(payload)
+        elif task == "company_signals_refresh":
+            from app.modules.organization.public_signals import run_signals_job
+
+            return run_signals_job(payload)
         elif task in ("onboarding_github_import", "onboarding_jira_import"):
             return self._execute_onboarding_import(task, payload)
         else:

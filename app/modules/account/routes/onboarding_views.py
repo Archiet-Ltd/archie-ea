@@ -139,7 +139,25 @@ def add_routes(bp, access) -> None:
             result = confirm.confirm(org, current_user, data.get("facts") or [])
         except ValueError as exc:
             return _problem(str(exc))
+        from app.modules.organization.public_signals import queue_signals_refresh
+
+        queue_signals_refresh(org.id)  # the public sources, read for the company just confirmed
         return jsonify({"ok": True, **result})
+
+    @bp.route("/signals/refresh", methods=["POST"])
+    @login_required
+    def signals_refresh():
+        """Read the public sources again now, for the organisation that agreed to it. It reads public pages
+        only and is held to once a day, so anyone shown the button on their account page may press it."""
+        from flask import flash
+
+        from app.modules.organization.public_signals import queue_signals_refresh
+
+        if queue_signals_refresh(g.current_org_id) is None:
+            flash("Your company has not agreed to its public footprint being read, so there is nothing to refresh.", "error")
+        else:
+            flash("Reading the public sources now. New signals appear here in a few minutes.", "success")
+        return redirect(url_for("account.manage"))
 
     @bp.route("/welcome/ai/test", methods=["POST"])
     @login_required
