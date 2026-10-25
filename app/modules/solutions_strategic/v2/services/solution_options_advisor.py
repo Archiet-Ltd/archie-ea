@@ -144,7 +144,9 @@ class SolutionOptionsAdvisor:
         if status not in valid:
             return {"success": False, "error": f"Invalid status. Allowed: {sorted(valid)}"}
         adr = ArchitectureDecision.query.filter_by(id=adr_id).first()
-        if adr is None:
+        # Only a decision the options advisor recorded against a solution is
+        # changed here; any other decision goes through its own register.
+        if adr is None or adr.solution_id is None:
             return {"success": False, "error": "Decision not found."}
         adr.status = status
         if status == "accepted":
