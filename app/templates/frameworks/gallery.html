@@ -1,7 +1,6 @@
-{# design-block: gallery #}
+{# design-block: dashboard #}
 {% extends "layouts/admin_base.html" %}
-{% from 'components/page_header.html' import page_header %}
-{% from 'components/empty_state.html' import empty_state %}
+{% from 'macros/page_shell.html' import page_shell, empty_state as shell_empty %}
 {% import 'components/card.html' as card %}
 {% from 'components/badge.html' import badge %}
 
@@ -30,14 +29,11 @@
 {% endmacro %}
 
 {% block content %}
-<div class="space-y-8">
-    {{ page_header(
+<div class="p-6 space-y-6">
+    {{ page_shell(
         title='Frameworks',
-        description='The frameworks your organisation has chosen come first, then every industry and compliance framework the platform supports.',
-        breadcrumbs=[
-            {'label': 'Dashboard', 'href': url_for('main.index')},
-            {'label': 'Frameworks'}
-        ]
+        subtitle='The frameworks your organisation has chosen come first, then every industry and compliance framework the platform supports.',
+        breadcrumb=[('Home', url_for('dashboard.overview')), ('Model', None), ('Frameworks', None)]
     ) }}
 
     {% if load_error %}
@@ -51,7 +47,7 @@
             {% for item in adopted %}{{ compliance_card(item) }}{% endfor %}
         </ul>
         {% else %}
-        {{ empty_state(icon='library', title='Your organisation has not adopted a framework yet', description='Open a compliance framework below to see its controls and adopt it.') }}
+        {{ shell_empty(icon='library', headline='Your organisation has not adopted a framework yet', body='Open a compliance framework below to see its controls and adopt it.') }}
         {% endif %}
     </section>
 
@@ -79,7 +75,7 @@
             {% endfor %}
         </ul>
         {% else %}
-        {{ empty_state(icon='workflow', title='No industry frameworks are installed', description='The frameworks load with the platform. Ask a platform administrator to check the installation.') }}
+        {{ shell_empty(icon='workflow', headline='No industry frameworks are installed', body='The frameworks load with the platform. Ask a platform administrator to check the installation.') }}
         {% endif %}
     </section>
 
