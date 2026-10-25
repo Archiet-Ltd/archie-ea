@@ -213,6 +213,14 @@ MODULE_CAPTURES: list[tuple[str, str, str, str, str]] = [
 # slug back to the matching *_CAPTURES list above -- the two are meant to
 # be mutually exclusive, never both.
 MODULE_CAPTURE_PENDING: dict[str, str] = {
+    "build-your-model-from-your-tools": (
+        "the connection step happens at sign-up in a new organisation, so there is "
+        "no seeded screen to photograph yet; capture it from a fresh sign-up"
+    ),
+    "answer-sources": (
+        "shown inside the AI chat answer, which the home page already photographs; "
+        "a module-specific capture is owed"
+    ),
     "integrations": (
         "connector health dashboard throws \"An internal error occurred\" on any "
         "data: app/routes/connector_routes.py api_list_connectors() calls .value "

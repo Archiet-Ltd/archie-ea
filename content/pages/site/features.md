@@ -306,7 +306,5 @@ it's priced](/pricing) or [try it](/account/register).
 
 These are not available yet. Open one to join its waiting list and we will tell you the day it ships.
 
-- [Build your model from your tools](/modules/build-your-model-from-your-tools): start your model from the tools you already use.
 - [Scenarios](/modules/scenario-modelling): compare what-if plans side by side before you commit.
-- [Every answer shows its sources](/modules/answer-sources): see the records behind each figure in an answer.
 - [Software and tool discovery](/modules/software-and-tool-discovery): discover the software and tools you actually pay for and use.

@@ -52,9 +52,9 @@ to read it from the tools that already hold it.
 - **Applications**, the portfolio the import fills, with a count of how many applications have a named owner
   and how many have a vendor recorded, and a fact sheet for each application showing the owner recorded
   against it.
-- **Ask**, the plain-language question screen. Pick *What breaks if ___ fails*, name a system, and it lists
-  what is recorded as connected to it. Where nothing is recorded it says so plainly instead of guessing, and
-  *Work them out now* extends the answer to indirect connections. The same answer opens on the twin map — see
+- **The AI chat**, where you ask in plain words what breaks if a system fails. It lists what is recorded as
+  connected to it and cites the record behind each line. Where nothing is recorded it says so plainly instead of
+  guessing. The same answer opens on the twin map — see
   [Digital twin of your organisation](/modules/digital-twin).
 - **The health scorecard**, which reads the elements, open risks and review pipeline recorded so far and
   marks anything not yet measured as not measured.
@@ -67,11 +67,11 @@ to read it from the tools that already hold it.
 3. Approve the applications and owners it proposes. Prefer a spreadsheet? On Applications, choose Import,
    upload it and match each column to a field (application name, owner, description).
 4. Check the portfolio's owner count: every application with a named owner is counted.
-5. Open Ask, pick *What breaks if*, and name the system you worry about most.
+5. Open the AI chat and ask what breaks if the system you worry about most fails.
 
 ## What you hand over
 
-A portfolio of every application GitHub, Jira or your spreadsheet named, each with its owner. A first answer, from Ask,
+A portfolio of every application GitHub, Jira or your spreadsheet named, each with its owner. A first answer, from the AI chat,
 to what a given system connects to. A starting point for the rest: relationships, capabilities and review
 decisions can be added to the same model as the company grows.
 
@@ -84,7 +84,7 @@ sign in with an authenticator app.
 
 ## Limits
 
-An answer on Ask comes from what is recorded: a system with no recorded connections shows none, and the
+An answer in the AI chat comes from what is recorded: a system with no recorded connections shows none, and the
 fuller picture builds as relationships are added to the model. Import brings in the fields your columns are
 matched to; anything not matched is left out, so the record is as complete as the sheet is. The review
 board, roadmap and scorecards are there when the company needs them, but a first sitting does not require
@@ -94,7 +94,7 @@ any of them.
 
 ### Do I need to know ArchiMate or TOGAF?
 
-No. Import and Ask work from a plain spreadsheet and a plain question. The ArchiMate 3.2 model underneath
+No. Import and the AI chat work from a plain spreadsheet and a plain question. The ArchiMate 3.2 model underneath
 is there for the architects you hire later; you do not have to learn it to get the first answer.
 
 ### Do I have to connect GitHub or Jira?
