@@ -579,6 +579,7 @@ to reconfirm the count before trusting it:**
 | `deployed-deps` | installed packages below the pinned floors | must be 0 (boot-health job only) |
 | `js-build` | committed `js/bundles/*.js` stale vs a rebuild | must pass |
 | `console-reporting` | `console.*` calls in shipped JS/templates | ratchet @ 0 |
+| `content-placeholders` | "Nothing here yet", "No data" or "N/A" placeholder text in templates and JS | ratchet @ 153, only falls |
 | `js-syntax` | shipped JS that fails to parse in a real engine | must pass |
 | `css-build` | committed `tailwind-output.css` stale vs a rebuild | must pass (needs Tailwind CLI) |
 | `sri` | `integrity=` hash not matching the file it guards | must be 0 |
