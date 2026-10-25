@@ -10,6 +10,8 @@ module.exports = {
     // `focus:ring-2 focus:ring-ring` and `-translate-y-1/2` were unbuilt.
     './app/modules/**/templates/**/*.html',
     './app/static/js/**/*.js',
+    // The class lists of the vendored component macros (the Overview dashboard).
+    './app/basecoat_kit/data/recipes.json',
   ],
   theme: {
     container: {
@@ -34,7 +36,7 @@ module.exports = {
         'span-10': 'span 10 / span 10',
         'span-18': 'span 18 / span 18',
       },
-      minWidth: { '240': '60rem' },
+      minWidth: { '200': '50rem', '240': '60rem', '260': '65rem', '270': '67.5rem' },
       // Pilot type scale (design register: typography). Plain sizes: the line
       // height stays inherited, as it was with the arbitrary text-[Npx] values.
       // The 11px tier is .text-2xs in shadcn_tokens.css (16px line height).
@@ -61,6 +63,8 @@ module.exports = {
         primary: {
           DEFAULT: "hsl(var(--primary) / <alpha-value>)",
           foreground: "hsl(var(--primary-foreground) / <alpha-value>)",
+          surface: "hsl(var(--primary-surface) / <alpha-value>)",
+          "surface-foreground": "hsl(var(--primary-surface-foreground) / <alpha-value>)",
         },
         secondary: {
           DEFAULT: "hsl(var(--secondary) / <alpha-value>)",

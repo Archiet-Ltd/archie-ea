@@ -22,7 +22,7 @@ EXPECTED_H2 = [
     "Licensed under AGPL-3.0.",
     "How Entelim compares.",
     "Questions.",
-    "Import your model. Get a cited answer in minutes.",
+    "Connect your tools. Get a cited answer.",
 ]
 
 

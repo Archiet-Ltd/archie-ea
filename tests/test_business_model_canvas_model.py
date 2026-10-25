@@ -48,7 +48,8 @@ def test_adding_an_entry_creates_an_element_on_the_canvas_view(db_session, make_
         el = ms.add_entry(canvas, "customer_segments", name="Online retailers")
         assert el.type == "BusinessActor"
         assert el.organization_id == org.id
-        assert ms._profile(el) == "customer_segment"
+        row = SavedDiagramElement.query.filter_by(diagram_id=canvas.saved_diagram_id, element_id=el.id).one()
+        assert row.canvas_box == "customer_segments"
         assert [e.id for e in ms.entries(canvas, "customer_segments")] == [el.id]
         assert ms.entries(canvas, "channels") == []
         assert SavedDiagramElement.query.filter_by(diagram_id=canvas.saved_diagram_id, element_id=el.id).count() == 1

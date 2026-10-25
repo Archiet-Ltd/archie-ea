@@ -1,3 +1,4 @@
+{# design-block: dashboard #}
 {% extends 'layouts/admin_base.html' %}
 {% from 'components/page_header.html' import page_header %}
 {% from 'components/metrics_card.html' import metrics_card %}
@@ -78,7 +79,7 @@
                         <tbody class="divide-y divide-border">
                             {% for risk in capability_risks|default([]) %}
                             <tr class="hover:bg-muted/50">
-                                <td class="p-3 text-sm">{{ risk.capability_name|default('N/A') }}</td>
+                                <td class="p-3 text-sm">{{ risk.capability_name|default('No capability linked') }}</td>
                                 <td class="p-3">
                                     <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium
                                         {% if risk.risk_level == 'CRITICAL' %}bg-destructive/10 text-destructive-emphasis border border-destructive/30
