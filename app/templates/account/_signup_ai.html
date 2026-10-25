@@ -43,12 +43,12 @@
                 {{ own_key_card() }}
             {% endif %}
         {% endcall %}
-        {% call card_footer(class='justify-between') %}
+        {% call card_footer(class='sticky bottom-0 justify-between border-t border-border bg-card') %}
+            {{ button(text='Previous', variant='ghost', icon='arrow-left', href=url_for('account.welcome', step=3), testid='signup-previous') }}
             <form method="post" action="{{ url_for('account.welcome_finish') }}" class="contents">
                 {{ input(type='hidden', name='csrf_token', value=csrf_token()) }}
                 {{ button(text='Use the built-in AI for now' if paying else 'Finish', type='submit', variant='outline' if paying else 'default', testid='signup-finish', attrs_dict={'data-finish': ''}) }}
             </form>
-            {{ button(text='Back', variant='ghost', href=url_for('account.welcome'), testid='signup-back') }}
         {% endcall %}
     {% endcall %}
 </div>

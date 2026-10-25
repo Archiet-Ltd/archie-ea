@@ -57,19 +57,19 @@
       <div class="home-frame">
         <div class="home-frame__bar" aria-hidden="true">
           <span class="home-frame__dot"></span><span class="home-frame__dot"></span><span class="home-frame__dot"></span>
-          <span class="home-frame__url">Ask</span>
+          <span class="home-frame__url">AI chat</span>
         </div>
-        {# A real answer from the demonstration company, captured by scripts/capture_proof_assets.py. #}
+        {# A real answer from the sample company in the AI chat, captured by scripts/capture_proof_assets.py --home-chat. #}
         <picture>
-          <source media="(max-width: 739px)" srcset="{{ url_for('static', filename='img/home/impact-answer-mobile.webp') }}"
-                  width="342" height="242">
-          <img src="{{ url_for('static', filename='img/home/impact-answer.webp') }}"
-               alt="An answer in Entelim for a demonstration company: What breaks if Alert Manager fails or is under-resourced? Alert Manager is asked about, and the answer lists what depends on it, with the owner of each shown or marked as not recorded."
-               width="842" height="311" decoding="async" fetchpriority="high" class="home-frame__img" data-testid="home-hero-proof">
+          <source media="(max-width: 739px)" srcset="{{ url_for('static', filename='img/home/chat-answer-mobile.webp') }}"
+                  width="374" height="529">
+          <img src="{{ url_for('static', filename='img/home/chat-answer.webp') }}"
+               alt="The AI chat answering what breaks if the Payments service fails: it lists the connections, and under each one the owner and the source the link was read from."
+               width="908" height="670" decoding="async" fetchpriority="high" class="home-frame__img" data-testid="home-hero-proof">
         </picture>
       </div>
       <figcaption class="public-card-body mt-3 text-center">
-        A real answer from the demonstration company: what depends on one system, and who owns each part.
+        A real answer in the AI chat: what depends on one system, with the owner and the source behind each connection.
       </figcaption>
     </figure>
   </div>
@@ -210,7 +210,7 @@
         <p class="public-card-body">What does it mean, what happens next, and what should we do?</p>
         <ul class="public-card-body mt-6 space-y-2">
           <li><a href="/features#enterprise-intelligence" class="public-link text-foreground">Enterprise Intelligence</a></li>
-          <li><a href="/features#simulation-and-scenario-planning" class="public-link text-foreground">Simulation and Scenario Planning</a></li>
+          <li><a href="/modules/scenario-modelling" class="public-link text-foreground">Scenarios (coming soon)</a></li>
           <li><a href="/features#agentic-automation" class="public-link text-foreground">Agentic Automation</a></li>
         </ul>
       </div>
