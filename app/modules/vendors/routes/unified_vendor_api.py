@@ -204,7 +204,7 @@ def vendor_choices():
     if org_id is None:
         return api_error("No organisation is selected.", "NO_ORGANISATION", 400)
     query = VendorOrganization.query.filter(
-        db.or_(VendorOrganization.organization_id.is_(None), VendorOrganization.id.in_(
+        db.or_(VendorOrganization.named_by_organization_id.is_(None), VendorOrganization.id.in_(
             vendor_register.vendor_ids(org_id) or [0])))
     if term:
         query = query.filter(VendorOrganization.name.ilike(f"%{term}%"))
@@ -234,7 +234,7 @@ def map_system_to_vendor():
     if str(data.get("vendor_id") or "").isdigit():
         vendor = db.session.get(VendorOrganization, int(data["vendor_id"]))
         if vendor is None or vendor.id not in set(vendor_register.vendor_ids(org_id)) | {
-                v.id for v in VendorOrganization.query.filter(VendorOrganization.organization_id.is_(None))}:
+                v.id for v in VendorOrganization.query.filter(VendorOrganization.named_by_organization_id.is_(None))}:
             return api_error("Vendor not found.", "NOT_FOUND", 404)
     else:
         name = vendor_register.clean_name(data.get("vendor_name"))

@@ -66,7 +66,7 @@ def resolve_vendor(name, org_id: Optional[int] = None) -> Optional[VendorOrganiz
         return None
     vendor = find_vendor(name)
     if vendor is None:
-        vendor = VendorOrganization(name=name[:200], organization_id=_org(org_id))
+        vendor = VendorOrganization(name=name[:200], named_by_organization_id=_org(org_id))
         db.session.add(vendor)
         db.session.flush()
     return vendor
@@ -124,7 +124,7 @@ def vendor_ids(org_id: Optional[int] = None) -> List[int]:
             VendorContract.organization_id == org_id, VendorContract.vendor_id.isnot(None)).distinct()
     ).scalars())
     ids |= set(db.session.execute(
-        db.select(VendorOrganization.id).where(VendorOrganization.organization_id == org_id)
+        db.select(VendorOrganization.id).where(VendorOrganization.named_by_organization_id == org_id)
     ).scalars())
     ids.discard(None)
     return sorted(ids)
@@ -281,7 +281,7 @@ def _write_vendor_link(session, flush_context, instances):
             # A nested flush is not allowed here, so the vendor is written directly.
             vendor_id = session.connection().execute(
                 VendorOrganization.__table__.insert()
-                .values(name=name[:200], organization_id=obj.organization_id or _org(None))
+                .values(name=name[:200], named_by_organization_id=obj.organization_id or _org(None))
                 .returning(VendorOrganization.__table__.c.id)
             ).scalar_one()
         else:

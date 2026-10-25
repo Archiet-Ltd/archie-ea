@@ -29,6 +29,10 @@
                     // Which tab is showing: the vendors, or the systems still to be mapped.
                     tab: 'vendors',
 
+                    showTab: function (name) {
+                        this.tab = name;
+                    },
+
                     // ── Edit form state ───────────────────────────────
                     editForm: {
                         name:           '',
@@ -56,6 +60,7 @@
 
                     // ── Init ──────────────────────────────────────────
                     init: function () {
+                        if (new URLSearchParams(window.location.search).get('tab') === 'mapping') this.tab = 'mapping';
                         this._tableInit();
                     },
 

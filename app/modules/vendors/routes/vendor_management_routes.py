@@ -107,7 +107,7 @@ def create_vendor():
         headquarters_location=data.get("country"),  # model column is headquarters_location
         description=data.get("description"),
         website=data.get("website"),
-        organization_id=current_org_id(),
+        named_by_organization_id=current_org_id(),
         created_at=datetime.utcnow(),
         updated_at=datetime.utcnow(),
     )
@@ -413,7 +413,7 @@ def api_create_vendor():
         headquarters_location=data.get("country"),  # model column is headquarters_location
         description=data.get("description"),
         website=data.get("website"),
-        organization_id=current_org_id(),
+        named_by_organization_id=current_org_id(),
         created_at=datetime.utcnow(),
         updated_at=datetime.utcnow(),
     )

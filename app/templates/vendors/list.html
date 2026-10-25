@@ -1,9 +1,7 @@
+{# design-block: data-table #}
 {% extends 'layouts/admin_base.html' %}
 {% from 'components/form_field.html' import form_group, form_footer %}
-{% from "components/card.html" import card, card_header, card_title, card_description, card_content, card_footer %}
 {% from "components/page_header.html" import page_header %}
-{% from "components/data_card.html" import data_card %}
-{% from "components/status_badge.html" import status_badge %}
 {% from "components/workbench_table.html" import workbench_table with context %}
 {% from "components/modal.html" import modal %}
 
@@ -21,7 +19,7 @@
 {% endblock %}
 
 {% block content %}
-<div class="space-y-6" x-data="vendorListTable()" x-init="tab = new URLSearchParams(location.search).get('tab') === 'mapping' ? 'mapping' : 'vendors'" x-cloak>
+<div class="space-y-6" x-data="vendorListTable()" x-cloak>
 
   {% set vp = vendor_page() %}
   {{ page_header(
@@ -54,7 +52,7 @@
     <p class="mt-1 text-sm text-muted-foreground">
       {% if vp.unmapped_count %}
         {{ vp.unmapped_count }} of your systems have no vendor recorded.
-        <a href="?tab=mapping" @click.prevent="tab = 'mapping'" class="text-primary hover:underline">Set the vendor</a>
+        <a href="?tab=mapping" @click.prevent="showTab('mapping')" class="text-primary hover:underline">Set the vendor</a>.
       {% elif vp.total_systems %}
         Every system has a vendor recorded.
       {% else %}
@@ -73,10 +71,10 @@
 
   <div role="tablist" aria-label="Vendor views" class="inline-flex h-10 items-center rounded-md bg-muted p-1 text-muted-foreground">
     <button type="button" role="tab" id="tab-vendors" aria-controls="panel-vendors" :aria-selected="tab === 'vendors'"
-            @click="tab = 'vendors'" :class="tab === 'vendors' ? 'bg-background text-foreground' : ''"
+            @click="showTab('vendors')" :class="tab === 'vendors' ? 'bg-background text-foreground' : ''"
             class="inline-flex items-center rounded-sm px-3 py-1.5 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">Vendors</button>
     <button type="button" role="tab" id="tab-mapping" aria-controls="panel-mapping" :aria-selected="tab === 'mapping'"
-            @click="tab = 'mapping'" :class="tab === 'mapping' ? 'bg-background text-foreground' : ''"
+            @click="showTab('mapping')" :class="tab === 'mapping' ? 'bg-background text-foreground' : ''"
             class="inline-flex items-center rounded-sm px-3 py-1.5 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
       Mapping{% if vp and vp.unmapped_count %} <span class="ml-2 rounded-full bg-primary/10 px-2 text-xs text-primary">{{ vp.unmapped_count }}</span>{% endif %}
     </button>
@@ -94,13 +92,13 @@
           <a href="{{ url_for('unified_applications.application_detail', id=system.id) }}" class="font-medium text-primary hover:underline break-words">{{ system.name }}</a>
           <p class="text-xs text-muted-foreground">{{ system.lifecycle_status|replace('_', ' ')|title if system.lifecycle_status else 'Lifecycle not recorded' }}</p>
         </div>
-        <div class="relative w-full sm:w-80">
+        <div class="relative w-full sm:w-72">
           <div class="flex gap-2">
             <input type="text" x-model="query" @input="search()" @focus="search()" @keydown.enter.prevent="saveTyped()"
                    @keydown.escape="open = false" autocomplete="off" role="combobox" aria-autocomplete="list" :aria-expanded="open"
                    aria-label="Vendor for {{ system.name }}" placeholder="Search or type a vendor"
                    class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-            <button type="button" @click="saveTyped()" :disabled="saving" aria-label="Save vendor for {{ system.name }}"
+            <button type="button" @click="saveTyped()" :disabled="saving" aria-label="Save the vendor choice for {{ system.name }}"
                     class="inline-flex h-9 items-center justify-center rounded-md bg-primary px-4 text-sm font-semibold text-primary-foreground hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50">Save</button>
           </div>
           <ul x-show="open && choices.length" x-cloak role="listbox"
@@ -200,7 +198,7 @@
           <p class="text-xs text-muted-foreground" x-show="row.system_count === 0">None of your systems name it yet</p>
         </td>
         <td class="px-4 py-3 align-middle text-sm tabular-nums">
-          <span x-show="row.annual_cost !== null && row.annual_cost !== undefined" x-text="window.currencyManager ? window.currencyManager.format(row.annual_cost) : row.annual_cost"></span>
+          <span x-show="row.annual_cost !== null && row.annual_cost !== undefined" x-text="(row.annual_cost === null || row.annual_cost === undefined) ? '' : (window.currencyManager ? window.currencyManager.format(row.annual_cost) : row.annual_cost)"></span>
           <span x-show="(row.annual_cost === null || row.annual_cost === undefined)" class="text-xs text-muted-foreground"
                 x-text="row.cost_visible === false ? 'Not shown for your role' : 'No cost recorded'"></span>
         </td>

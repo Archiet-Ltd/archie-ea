@@ -368,7 +368,7 @@ class VendorOrganization(db.Model):
     # the platform (see the class docstring), so two organisations that name
     # "Okta" share one row; what each sees of it is decided by its own
     # applications and contracts (app/services/vendor_register.py).
-    organization_id = db.Column(
+    named_by_organization_id = db.Column(
         db.Integer,
         db.ForeignKey("organizations.id", ondelete="SET NULL"),
         nullable=True,

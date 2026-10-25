@@ -62,7 +62,7 @@ def test_register_counts_equal_what_systems_and_contracts_name(db_session, make_
         a = _app(db_session, org, "A", vendor=f"Salesforce{tag}", cost=1200)
         b = _app(db_session, org, "B", vendor=f"Salesforce{tag}", cost=300)
         _app(db_session, org, "C", vendor=f"Oracle{tag}")
-        only_contract = VendorOrganization(name=f"Datadog{tag}", organization_id=org.id)
+        only_contract = VendorOrganization(name=f"Datadog{tag}", named_by_organization_id=org.id)
         db_session.add(only_contract)
         db_session.flush()
         _contract(db_session, org, only_contract, date.today() + timedelta(days=30))

@@ -45,7 +45,7 @@ def two_orgs(db_session, make_org):
     sf2 = _app(db_session, mine, f"Service Cloud {tag}", f"Salesforce {tag}", 3000)
     _app(db_session, mine, f"Identity {tag}", f"Okta {tag}")
     loose = _app(db_session, mine, f"Loose {tag}")
-    datadog = VendorOrganization(name=f"Datadog {tag}", organization_id=mine.id)
+    datadog = VendorOrganization(name=f"Datadog {tag}", named_by_organization_id=mine.id)
     db_session.add(datadog)
     db_session.flush()
     db_session.add(VendorContract(
