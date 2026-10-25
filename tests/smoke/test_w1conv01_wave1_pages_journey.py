@@ -246,7 +246,7 @@ def test_status_health_and_modules_pages_have_their_content(admin_page, live_ser
     assert len(_body(page)) > 200
     _visit(page, live_server, "/dashboard/health")
     _no_template_failure(page)
-    expect(page.get_by_role("button", name="Generate AI executive briefing")).to_be_visible()
+    expect(page.get_by_role("button", name="Generate briefing")).to_be_visible()
     response, _state = _visit(page, live_server, "/pricing")
     assert response.status == 200, "pricing opens when signed in"
     _visit(page, live_server, "/modules/")

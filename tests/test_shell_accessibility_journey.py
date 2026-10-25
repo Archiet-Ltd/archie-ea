@@ -33,10 +33,20 @@ PAGES = {
     "/admin/formula-register/": ["label-content-name-mismatch", "label"],
     "/archimate/composer": ["label-content-name-mismatch", "aria-required-children", "list"],
     "/backlog/prioritisation": ["label-content-name-mismatch", "aria-valid-attr-value"],
-    "/dashboard/vendor-analysis/new": ["label-content-name-mismatch", "aria-valid-attr-value"],
+    "/dashboard/vendor-analysis/new": ["label-content-name-mismatch", "aria-valid-attr-value", "aria-required-children"],
     "/dashboard/rationalization": ["label-content-name-mismatch", "aria-allowed-attr"],
     "/applications/vendors": ["label-content-name-mismatch", "link-in-text-block"],
     "/applications/rationalization": ["label-content-name-mismatch", "color-contrast"],
+    "/dashboard/health": ["label-content-name-mismatch", "link-in-text-block"],
+    "/solutions/briefings": ["label-content-name-mismatch", "link-in-text-block"],
+    "/vendors/technical": ["label-content-name-mismatch", "link-in-text-block"],
+    "/enterprise/data_architecture_dashboard": ["label-content-name-mismatch", "color-contrast"],
+    "/architecture/elements": ["label-content-name-mismatch", "color-contrast"],
+    "/capability-map/hierarchy": ["label-content-name-mismatch", "color-contrast"],
+    "/epics/hierarchy": ["label-content-name-mismatch", "color-contrast"],
+    "/solutions/portfolio": ["label-content-name-mismatch", "color-contrast"],
+    "/stakeholders/map": ["label-content-name-mismatch", "color-contrast"],
+    "/enterprise/policy-monitoring": ["label-content-name-mismatch", "color-contrast"],
 }
 RUN = """async () => { const r = await axe.run(document, {runOnly: {type: 'tag',
   values: ['wcag2a','wcag2aa','wcag21a','wcag21aa','wcag22aa']}, resultTypes: ['violations']});
@@ -55,6 +65,16 @@ def _axe_source():
     pytest.fail("axe-core is not installed: run `npm install` (axe-core is a devDependency) or set AXE_CORE_JS")
 
 
+def _seed_applications(db_session, org):
+    """A portfolio with systems that have no vendor recorded, so the pages that point at the
+    vendor mapping step show the link a person would meet."""
+    from app.models.application_portfolio import ApplicationComponent
+
+    for index in range(4):
+        db_session.add(ApplicationComponent(name="Ledger %d %s" % (index, uuid.uuid4().hex[:6]), organization_id=org.id))
+    db_session.flush()
+
+
 def _signed_in_pages(client, db_session, make_org):
     from flask import g
 
@@ -66,6 +86,7 @@ def _signed_in_pages(client, db_session, make_org):
 
     OrganizationSignal.__table__.create(db.session.connection(), checkfirst=True)
     org = make_org("axe")
+    _seed_applications(db_session, org)
     user = User(email="axe-%s@example.com" % uuid.uuid4().hex[:8], first_name="Axel", last_name="Reader",
                 organization_id=org.id, confirmed=True, enterprise_role="platform_admin", is_org_admin=True)
     db_session.add(user)
@@ -181,4 +202,3 @@ def test_no_page_loses_a_screen_reader_user_to_this_rule(swept, rule):
             if violation["id"] == rule:
                 failures.append("%s %s %s: %s" % (path, size, scheme, violation["nodes"][:2]))
     assert failures == [], "\n".join(failures)
-

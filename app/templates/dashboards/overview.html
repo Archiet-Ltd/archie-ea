@@ -41,7 +41,7 @@
   {% endcall %}
 {%- endset -%}
 {%- if href -%}
-<a href="{{ href }}" class="block rounded-xl outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50" data-testid="{{ testid }}" aria-label="{{ label }}: {{ sentence }}">{{ inner }}</a>
+<a href="{{ href }}" class="block rounded-xl outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50" data-testid="{{ testid }}">{{ inner }}</a>
 {%- else -%}
 <div data-testid="{{ testid }}">{{ inner }}</div>
 {%- endif -%}
@@ -275,7 +275,7 @@
         {% if sourced.layers %}
         {% call ui.item_group(class='gap-1') %}
           {% for row in sourced.layers %}
-          {% call ui.item(size='sm', class='px-0', attrs={'data-testid': 'sourced-layer'}) %}
+          {% call ui.item(size='sm', class='px-0', attrs={'data-testid': 'sourced-layer', 'role': 'listitem'}) %}
             {% call ui.item_content() %}{% if row.href %}<a href="{{ row.href }}" class="text-sm font-medium hover:underline">{{ row.layer | capitalize }} layer</a>{% else %}{{ ui.item_title(text=row.layer | capitalize ~ ' layer') }}{% endif %}{{ ui.item_description(text=row.count ~ ' elements') }}{% endcall %}
             {% call ui.item_actions() %}{{ ui.badge(text=row.percent ~ '%', variant='secondary') }}{% endcall %}
           {% endcall %}

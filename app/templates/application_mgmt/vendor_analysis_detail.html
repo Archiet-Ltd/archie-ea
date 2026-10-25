@@ -181,7 +181,7 @@
                   <i data-lucide="search" class="absolute left-2.5 top-3 h-3.5 w-3.5 text-muted-foreground"></i>
                   {{ input(placeholder='Filter ' ~ lvl.n ~ '...', class='pl-8', aria_label='Search ' ~ lvl.n ~ ' capabilities', attrs_dict={'x-model': lvl.search}) }}
                 </div>
-                <div class="border border-border rounded-md bg-background max-h-48 overflow-y-auto" role="listbox" aria-label="{{ lvl.n }} capabilities"{% if lvl.n == 'L1' %} x-ref="l1Panel"{% endif %}>
+                <div class="border border-border rounded-md bg-background max-h-48 overflow-y-auto" role="group" aria-label="{{ lvl.n }} capabilities"{% if lvl.n == 'L1' %} x-ref="l1Panel"{% endif %}>
                   <template x-if="{{ lvl.loading }}">
                     <div class="p-4 text-center text-muted-foreground text-sm"><i data-lucide="loader-2" class="h-4 w-4 inline animate-spin mr-1"></i> Loading...</div>
                   </template>
