@@ -5,9 +5,8 @@ outcome they need, not as an element on a page:
 
 - they are told what to do first (connect GitHub or Jira) and the button takes them to
   the page where they do it;
-- they can ask a question in one action from the sidebar (the AI chat entry) and in one
-  action from the search box (type the question, press Enter), and the question is
-  waiting in the chat;
+- the search box only searches (a question typed there gets no ask control and does not leave
+  the page), and the AI chat, where questions are asked, is one click from the sidebar;
 - every job opens onto its pages: Changes reaches the Roadmap and Solutions in one click each,
   Model then Strategy reaches Value stream, Model then Frameworks opens the gallery, and
   Connections opens the connectors page; each click lands on a page with content and marks that
@@ -151,19 +150,27 @@ def test_03_the_ai_chat_is_one_click_from_the_sidebar(walk):
     expect(page.locator("#user-input")).to_be_visible()
 
 
-def test_04_a_question_typed_in_the_search_box_opens_the_chat_with_it(walk):
+def test_04_the_search_box_only_searches_and_the_chat_is_one_click_away(walk):
     page = walk.page
     page.goto(walk.base + "/dashboard/overview", wait_until="domcontentloaded")
     _dismiss_first_run_dialog(page)
     walk.sidebar()
     box = page.locator("#sidebar-search")
+    expect(box).to_have_attribute("placeholder", "Search pages and records")
     box.click()
     box.fill(QUESTION)
-    expect(page.get_by_test_id("sidebar-search-ask")).to_contain_text(QUESTION)
-    walk.shot("search-ask")
+    results = page.get_by_test_id("sidebar-search-results")
+    expect(results).to_contain_text("Nothing matches. Try another word.")
+    expect(page.get_by_test_id("sidebar-search-ask")).to_have_count(0)
+    walk.shot("search-no-match")
+    before = page.url
     box.press("Enter")
-    page.wait_for_url(re.compile(r".*/ai-chat.*q=.*"))
-    expect(page.locator("#user-input")).to_have_value(QUESTION)
+    page.wait_for_timeout(500)
+    assert page.url == before, "a question in the search box must not leave the page"
+    box.fill("")
+    walk.sidebar().locator('a[data-nav-key="ai_chat"]').click()
+    page.wait_for_url(re.compile(r".*/ai-chat.*"))
+    expect(page.locator("#user-input")).to_be_visible()
 
 
 def test_05_ctrl_k_reaches_the_search_box_from_any_page(walk):

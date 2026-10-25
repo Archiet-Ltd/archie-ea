@@ -204,7 +204,7 @@ def test_only_matching_pages_show_not_the_whole_sidebar(app, client, browser):
         pg.close()
 
 
-def test_no_match_offers_to_ask_the_ai_chat_and_the_hint_stays_visible(app, client, browser):
+def test_no_match_says_so_without_an_ask_control_and_the_hint_stays_visible(app, client, browser):
     login(client, _persona(app, "solution_architect"))
     page_path = "/dashboard/overview"
     document = client.get(page_path).get_data(as_text=True)
@@ -216,10 +216,9 @@ def test_no_match_offers_to_ask_the_ai_chat_and_the_hint_stays_visible(app, clie
         pg.wait_for_selector('[data-testid="sidebar-search-results"]', state="visible")
         pg.locator('[data-testid="sidebar-search-results"] p', has_text="Searching").wait_for(state="hidden", timeout=5000)
         results = pg.locator('[data-testid="sidebar-search-results"]')
-        assert "No page matches. Press Enter to ask the AI chat." in results.inner_text()
-        ask = results.locator('[data-testid="sidebar-search-ask"]')
-        assert ask.is_visible() and "zzzznomatch" in ask.inner_text()
-        assert "q=zzzznomatch" in ask.get_attribute("href")
+        assert "Nothing matches. Try another word." in results.inner_text()
+        assert results.locator('[data-testid="sidebar-search-ask"]').count() == 0
+        assert results.locator('a[href*="q=zzzznomatch"]').count() == 0
         assert pg.locator("kbd", has_text="K").first.is_visible()
     finally:
         pg.close()

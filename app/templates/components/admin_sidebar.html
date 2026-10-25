@@ -13,7 +13,7 @@ registry change.
 The library's sidebar-07 shell (components/ui_sidebar.html), collapsible='icon', two levels at most.
 The layouts wrap it in sidebar_wrapper and put the page in sidebar_inset (layouts/admin_base.html):
     organisation switcher (top)
-    one search box: "Search or ask..." (Ctrl/Cmd+K)
+    one search box: pages and records (Ctrl/Cmd+K)
     top: Home, AI chat, Approvals (with the number waiting for the person)
     Work group: Systems, Impact, Changes, Spend, Compliance - each opens onto its pages
     Model group (every role): one item per ArchiMate layer opening onto its element types,
@@ -82,12 +82,12 @@ Budget: scripts/check_sidebar_links.py renders this per role and counts its link
     </a>
     {% endif %}
 
-    {# The one search box: pages by any name, records, and asking. Not part of the icon rail. #}
+    {# The one search box: pages by any name and records. Not part of the icon rail. #}
     {% if current_user.is_authenticated %}
     <script src="{{ url_for('static', filename='js/sidebar/module_search.js') }}"></script>
     <script src="{{ url_for('static', filename='js/sidebar/search.js') }}"></script>
     <div class="sidebar-search-wrap relative group-data-[collapsible=icon]:hidden"
-         x-data="sidebarSearch('{{ url_for('unified_ai_chat.index') }}')"
+         x-data="sidebarSearch()"
          @click.away="highlighted = -1">
         <div class="relative">
             <i data-lucide="search" class="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true"></i>
@@ -95,8 +95,8 @@ Budget: scripts/check_sidebar_links.py renders this per role and counts its link
                 id='sidebar-search',
                 name='sidebar-search',
                 type='text',
-                placeholder='Search or ask…',
-                aria_label='Search pages or ask a question',
+                placeholder='Search pages and records',
+                aria_label='Search pages and records',
                 size='sm',
                 class='pl-8 pr-16',
                 attrs_dict={
@@ -126,7 +126,7 @@ Budget: scripts/check_sidebar_links.py renders this per role and counts its link
              data-testid="sidebar-search-results">
             <p x-show="loading" class="px-2 py-1.5 text-xs text-muted-foreground">Searching…</p>
             <template x-if="error">
-                <p role="alert" class="px-2 py-1.5 text-xs text-destructive-emphasis">Search is unavailable. Try again, or ask the AI chat below.</p>
+                <p role="alert" class="px-2 py-1.5 text-xs text-destructive-emphasis">Search is unavailable. Try again in a moment.</p>
             </template>
             <template x-if="!loading && pages.length">
                 <div>
@@ -157,18 +157,8 @@ Budget: scripts/check_sidebar_links.py renders this per role and counts its link
                 </div>
             </template>
             <template x-if="!loading && !error && !pages.length && !records.length">
-                <p class="px-2 py-1.5 text-xs text-muted-foreground">No page matches. Press Enter to ask the AI chat.</p>
+                <p class="px-2 py-1.5 text-xs text-muted-foreground">Nothing matches. Try another word.</p>
             </template>
-            <div class="my-1 h-px bg-border" role="separator"></div>
-            <a href="{{ url_for('unified_ai_chat.index') }}" :href="askUrl()" role="option"
-               :aria-selected="highlighted === askIndex() ? 'true' : 'false'"
-               :class="highlighted === askIndex() ? 'bg-accent text-accent-foreground' : 'text-foreground'"
-               class="flex items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent"
-               data-testid="sidebar-search-ask">
-                {# collapsed-nav-ok: the search box and its results are hidden in the icon rail #}
-                <i data-lucide="message-square" class="h-4 w-4 flex-shrink-0 text-muted-foreground" aria-hidden="true"></i>
-                <span class="min-w-0 flex-1 truncate">Ask the AI chat: <span class="font-medium" x-text="query"></span></span>
-            </a>
         </div>
     </div>
     {% endif %}

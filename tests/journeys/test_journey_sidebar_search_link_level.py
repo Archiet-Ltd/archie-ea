@@ -1,4 +1,4 @@
-"""Journey: the sidebar's search box ("Search or ask...") returns individual pages, each labelled with
+"""Journey: the sidebar's search box returns individual pages, each labelled with
 the sidebar entry it sits under,
 matches either spelling of a variant word, and never lists a page the persona cannot open.
 

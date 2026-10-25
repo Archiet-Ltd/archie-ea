@@ -7,7 +7,7 @@ inside the sidebar (the header already carries the same toggle, with the same Ct
 the search box living inside the scrolling <nav> both ate into that height for no reason.
 
 Navigation 3.1: the search box sits above the scrolling list, outside it, and a search with no page match
-offers to ask the AI chat instead.
+says so, with no ask control.
 """
 from pathlib import Path
 from urllib.parse import parse_qsl, urlparse
@@ -150,9 +150,9 @@ def test_a_no_match_search_still_says_so_after_the_layout_change(app, client, br
     try:
         pg.fill('#sidebar-search', "zzzznomatch")
         results = pg.locator('[data-testid="sidebar-search-results"]')
-        # Navigation v3: nothing matches, so the way out is asking the AI chat.
-        expect(results).to_contain_text("No page matches. Press Enter to ask the AI chat.")
-        expect(results.locator('[data-testid="sidebar-search-ask"]')).to_contain_text("zzzznomatch")
+        # Navigation 3.1: nothing matches, so the box says so; it never asks anything itself.
+        expect(results).to_contain_text("Nothing matches. Try another word.")
+        expect(results.locator('[data-testid="sidebar-search-ask"]')).to_have_count(0)
 
         pg.press('#sidebar-search', "Escape")
         pg.wait_for_timeout(150)
