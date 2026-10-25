@@ -659,12 +659,22 @@ def test_the_public_signals_are_about_the_company_the_person_confirmed_and_sit_u
         {"source": {"name": "Robotics Weekly"}, "title": "Acme Robotics Group opens a pick-and-pack line", "description": "Warehouse robots.",
          "url": about, "publishedAt": "2026-10-20T09:30:00Z"},
         {"source": {"name": "Daily Wire"}, "title": "Warehouse automation trends for 2026", "description": "An industry overview.",
-         "url": products, "publishedAt": "2026-10-19T09:30:00Z"}]}
+         "url": "https://dailywire.example/automation-2026", "publishedAt": "2026-10-19T09:30:00Z"}]}
     acme["https://api.search.brave.com/"] = {"web": {"results": [
         {"title": "Acme Robotics Group - company profile", "url": products, "description": "Makers of PickBot."}]}}
     acme["https://hn.algolia.com/"] = {"hits": [
-        {"title": "Show HN: robots that pick and pack", "story_text": "Built by the team at %s" % site.url, "objectID": "11", "created_at": "2026-10-12T00:00:00Z"},
-        {"title": "Entrepreneurial passion and the 2008 start-up", "objectID": "12", "created_at": "2008-03-01T00:00:00Z"}]}
+        {"title": "Show HN: robots that pick and pack", "url": products, "objectID": "11", "created_at": "2026-10-12T00:00:00Z"},
+        {"title": "Entrepreneurial passion and the 2008 start-up", "objectID": "12", "created_at": "2008-03-01T00:00:00Z"},
+        # other companies' launches that only carry the company's booking link are not about it
+        {"title": "Show HN: Praxos", "story_text": "Book a call at %s/demo" % site.url, "url": "https://praxos.example/", "objectID": "15", "created_at": "2026-10-21T00:00:00Z"},
+        {"title": "Launch HN: Vendo", "story_text": "Questions? %s/ask" % site.url, "url": "https://vendo.example/", "objectID": "16", "created_at": "2026-10-21T01:00:00Z"},
+        # the same story from the same source on the same day, found at two addresses, is one signal
+        {"title": "Acme Robotics Group is going closed source", "objectID": "13", "created_at": "2026-10-18T08:00:00Z"},
+        {"title": "Acme Robotics Group is going closed source", "objectID": "14", "created_at": "2026-10-18T09:30:00Z"}]}
+    # some sources fail with a status code, and one has no key: the page says neither
+    from app.modules.organization.public_signals import sources as _sources
+
+    acme["https://efts.sec.gov/"] = _sources.SourceFailed("answered 403")
     acme["https://api.openalex.org/"] = {"results": [
         {"id": "https://openalex.org/W9", "display_name": "Neuroprotective Effect of Lithium Chloride in Rat Model of Cardiac Arrest",
          "publication_date": "2020-01-01", "abstract_inverted_index": {"Rats": [0], "recover": [1]}}]}
@@ -761,7 +771,13 @@ def test_the_public_signals_are_about_the_company_the_person_confirmed_and_sit_u
         rows = table.locator("tbody tr")
         shown = [r.locator("a, span.font-medium").first.inner_text() for r in rows.all()]
         assert sorted(t for t in shown if not t.startswith("Public sentiment")) == sorted([
-            "Acme Robotics Group opens a pick-and-pack line", "Acme Robotics Group - company profile", "Show HN: robots that pick and pack"]), shown
+            "Acme Robotics Group opens a pick-and-pack line", "Acme Robotics Group - company profile", "Show HN: robots that pick and pack",
+            "Acme Robotics Group is going closed source"]), shown
+        for off in ("Praxos", "Vendo"):
+            assert off not in table.inner_text(), off
+        left_out = card.get_by_test_id("company-signals-left-out")
+        expect(left_out).to_have_text("Some public sources could not be read today; we try again tomorrow.")
+        assert not re.search(r"_KEY|\b(403|429|503)\b|answered", page.locator("body").inner_text()), "the page shows a variable name or a status code"
         host = site.url.split("//")[1].split(":")[0]
         for row in rows.all():
             cite = row.get_by_test_id("signal-cite")
@@ -773,8 +789,9 @@ def test_the_public_signals_are_about_the_company_the_person_confirmed_and_sit_u
 
         with app.app_context():
             kept = [r for r in OrganizationSignal.query.filter_by(organization_id=org_id).all() if r.kind != "sentiment"]
-            assert kept and all(sources_module.is_about(r.title, r.summary, "Acme Robotics Group", host) for r in kept), [r.title for r in kept]
+            assert kept and all(sources_module.is_about(r.title, "Acme Robotics Group", host, sources_module.own_link(r.url, r.details)) for r in kept), [r.title for r in kept]
             assert {r.subject for r in OrganizationSignal.query.filter_by(organization_id=org_id).all()} == {"Acme Robotics Group"}
+            assert OrganizationSignal.query.filter_by(organization_id=org_id, title="Acme Robotics Group is going closed source").count() == 1
             db.session.remove()
         for gone in ("Entrepreneurial", "Lithium", "Warehouse automation trends", "Casey"):
             assert gone not in card.inner_text(), gone

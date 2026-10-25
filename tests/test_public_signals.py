@@ -269,7 +269,8 @@ def test_missing_keys_skip_those_sources_and_the_card_says_so(db_session, make_o
     assert report["sources"]["news_api"]["skipped"] == "needs NEWSAPI_KEY to be set"
     assert report["sources"]["alpha_vantage"]["skipped"] == "needs ALPHAVANTAGE_API_KEY to be set"
     state = service.refresh_state(_fresh(org))
-    assert state["skipped"]["NewsAPI"] == "needs NEWSAPI_KEY to be set" and state["refreshed_at"] is not None
+    assert state["some_unread"] is True and state["refreshed_at"] is not None
+    assert "NEWSAPI" not in str(state) and "ALPHAVANTAGE" not in str(state) and "_KEY" not in str(_fresh(org).settings)
 
 
 def test_a_failing_source_is_named_and_the_rest_still_arrive(db_session, make_org, keys):
@@ -279,7 +280,9 @@ def test_a_failing_source_is_named_and_the_rest_still_arrive(db_session, make_or
     report = service.refresh_organization(org.id, http=FakeHttp(answers), llm=_model)
     assert report["sources"]["sec_edgar"]["failed"] == "SEC EDGAR answered 503"
     assert report["sources"]["uspto"]["signals"] == 1
-    assert "SEC EDGAR answered 503" in service.refresh_state(_fresh(org))["failed"]
+    state = service.refresh_state(_fresh(org))
+    assert state["some_unread"] is True
+    assert "503" not in str(state) and "503" not in str(_fresh(org).settings)  # the code stays in the server log
 
 
 def test_signals_feed_pestle_swot_and_competitor_views(db_session, make_org, keys):
@@ -358,7 +361,8 @@ def _posthog_answers():
     answers = _answers()
     answers["https://hn.algolia.com/"] = {"hits": [
         {"title": "PostHog opens its roadmap", "objectID": "1", "created_at": "2026-10-10T00:00:00Z"},
-        {"title": "Show HN: a product analytics stack", "story_text": "Self-hosted, built on posthog.com", "objectID": "2", "created_at": "2026-10-11T00:00:00Z"},
+        {"title": "Show HN: a product analytics stack", "url": "https://app.posthog.com/stack", "objectID": "2", "created_at": "2026-10-11T00:00:00Z"},
+        {"title": "Show HN: Booking made simple", "story_text": "Book a call at posthog.com/demo", "url": "https://example.org/booking", "objectID": "5", "created_at": "2026-10-13T00:00:00Z"},
         {"title": "Entrepreneurial passion and venture outcomes", "objectID": "3", "created_at": "2008-03-01T00:00:00Z"},
         {"title": "Post hog roast recipes", "objectID": "4", "created_at": "2026-10-12T00:00:00Z"},
     ]}
@@ -397,7 +401,7 @@ def test_only_hits_naming_the_company_or_its_address_are_kept_and_the_address_is
     http = FakeHttp(_posthog_answers())
     service.refresh_organization(org.id, http=http, llm=_no_model)
     titles = {r["title"] for r in service.signals_for_profile(org.id) if r["kind"] != "sentiment"}
-    assert titles == {"PostHog opens its roadmap", "Show HN: a product analytics stack"}  # by name, and by address in the summary
+    assert titles == {"PostHog opens its roadmap", "Show HN: a product analytics stack"}  # by name, and by the story's own link; a link inside another post is not enough
     searched = {(kw.get("params") or {}).get("query") for url, kw in http.calls if url.startswith("https://hn.algolia.com/")}
     assert searched == {"PostHog", "posthog.com"}
     assert not any(STAND_IN in (r.subject or "") for r in _rows(org.id))
@@ -408,19 +412,58 @@ def test_a_paper_that_does_not_name_the_company_is_dropped_and_one_that_does_is_
     org = _confirmed(db_session, make_org, "PostHog, Inc.", "https://posthog.com")
     answers = _posthog_answers()
     answers["https://api.openalex.org/"]["results"].append(
-        {"id": "https://openalex.org/W10", "display_name": "Product analytics adoption", "publication_date": "2025-05-01",
+        {"id": "https://openalex.org/W10", "display_name": "PostHog and product analytics adoption", "publication_date": "2025-05-01",
          "abstract_inverted_index": {"PostHog": [0], "usage": [1]}})
     report = service.refresh_organization(org.id, http=FakeHttp(answers), llm=_no_model)
     papers = [r["title"] for r in service.signals_for_profile(org.id) if r["kind"] == "research"]
-    assert papers == ["Product analytics adoption"] and report["sources"]["open_alex"]["signals"] == 1
+    assert papers == ["PostHog and product analytics adoption"] and report["sources"]["open_alex"]["signals"] == 1
 
 
 def test_the_company_is_found_as_whole_words_only():
-    assert src.is_about("PostHog opens its roadmap", "", "PostHog")
-    assert src.is_about("A note", "docs at blog.posthog.com/launch", "PostHog", "posthog.com")
-    assert not src.is_about("Posthoggery", "", "PostHog")
-    assert not src.is_about("Look at myposthog.com", "", "PostHog", "posthog.com")
-    assert not src.is_about("Rat model of cardiac arrest", "Lithium chloride", "PostHog", "posthog.com")
+    assert src.is_about("PostHog opens its roadmap", "PostHog")
+    assert src.is_about("Docs at blog.posthog.com/launch", "PostHog", "posthog.com")
+    assert src.is_about("A note", "PostHog", "posthog.com", "https://blog.posthog.com/launch")  # the story's own link is on its domain
+    assert not src.is_about("Posthoggery", "PostHog")
+    assert not src.is_about("Look at myposthog.com", "PostHog", "posthog.com")
+    assert not src.is_about("A note", "PostHog", "posthog.com", "https://notposthog.com/launch")
+    assert not src.is_about("Rat model of cardiac arrest", "PostHog", "posthog.com")
+
+
+def _calcom_answers():
+    answers = _posthog_answers()
+    launches = [("Show HN: Praxos", "1"), ("Launch HN: Vendo", "2"), ("Show HN: Posting Machine", "3"), ("Show HN: Extract", "4")]
+    answers["https://hn.algolia.com/"] = {"hits": [
+        *[{"title": t, "story_text": "Book a call: https://cal.com/someone/30min", "url": "https://%s.example/" % i, "objectID": i,
+           "created_at": "2026-10-2%sT00:00:00Z" % i} for t, i in launches],
+        {"title": "Cal.com is going closed source", "objectID": "10", "created_at": "2026-10-15T08:00:00Z"},
+        {"title": "Cal.com is going closed source", "objectID": "11", "created_at": "2026-10-15T09:00:00Z"},
+        {"title": "A scheduling write-up", "url": "https://cal.com/blog/scheduling", "objectID": "12", "created_at": "2026-10-14T00:00:00Z"},
+    ]}
+    return answers
+
+
+def test_a_link_to_the_company_inside_someone_elses_post_does_not_make_it_about_the_company(db_session, make_org, keys):
+    org = _confirmed(db_session, make_org, "Cal.com", "https://cal.com")
+    other = _confirmed(db_session, make_org, "Contoso Haulage", "https://contoso.example")
+    service.refresh_organization(org.id, http=FakeHttp(_calcom_answers()), llm=_no_model)
+    first_ten = [r["title"] for r in service.signals_for_profile(org.id) if r["kind"] != "sentiment"][:10]
+    assert sorted(first_ten) == ["A scheduling write-up", "Cal.com is going closed source"]  # no other company's launch, and the same story once
+    assert service.signals_for_profile(other.id) == []
+
+
+def test_the_same_source_title_and_date_is_stored_and_shown_once_even_when_kept_before(db_session, make_org, tenant_ctx, keys):
+    org = _confirmed(db_session, make_org, "Cal.com", "https://cal.com")
+    day = datetime(2026, 10, 15, 8)
+    for url in ("https://news.ycombinator.com/item?id=10", "https://news.ycombinator.com/item?id=11"):  # kept twice by an earlier reading
+        _stored(org.id, subject="Cal.com", source="hackernews", source_label="Hacker News", kind="mention",
+                title="Cal.com is going closed source", summary="", url=url, published_at=day)
+    _stored(org.id, subject="Cal.com", source="hackernews", source_label="Hacker News", kind="mention",
+            title="Show HN: Praxos", summary="Book at cal.com/x", url="https://news.ycombinator.com/item?id=1", published_at=day)
+    shown = [r["title"] for r in service.signals_for_profile(org.id)]
+    assert shown.count("Cal.com is going closed source") == 1  # shown once before anything is cleaned
+    service.refresh_organization(org.id, http=FakeHttp(_calcom_answers()), llm=_no_model, force=True)
+    stored = [r.title for r in _rows(org.id) if r.kind != "sentiment"]
+    assert sorted(stored) == ["A scheduling write-up", "Cal.com is going closed source"], stored
 
 
 def test_signals_already_kept_under_the_stand_in_or_off_topic_are_removed_for_their_own_organisation_only(db_session, make_org, tenant_ctx, keys):
