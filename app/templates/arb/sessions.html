@@ -156,7 +156,7 @@
     {{ form_field(id='cas-description', label='Description', name='description', input_type='textarea', rows=2, placeholder='Agenda and objectives for this session') }}
     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {{ form_field(id='cas-date', label='Schedule Date & Time', name='scheduled_date', type='datetime-local', required=true) }}
-        {{ form_field(id='cas-duration', label='Duration (minutes)', name='duration_minutes', type='number', value='120', min=30, max=480) }}
+        {{ form_field(id='cas-duration', label='Duration (minutes)', name='duration_minutes', type='number', value='120', attrs_dict={'min': 30, 'max': 480}) }}
     </div>
     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {% call form_group(id='cas-chair', label='Chair', required=true) %}
