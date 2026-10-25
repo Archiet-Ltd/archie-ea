@@ -10,9 +10,18 @@
    the page renders without a Tailwind rebuild.
    Suppress public analytics (GA4/Clarity) because this page carries customer
    architecture content and must never load third-party tracking.
+
+   No `separator` macro exists in app/templates/components yet (checked 24 Oct
+   2026) -- the border-t/border-b rules below use the same border-border token
+   a separator component would use, not a raw colour, so this departs from the
+   brief's component list by omission rather than by a hand-rolled substitute.
 #}
 {% set suppress_public_analytics = true %}
 {% extends 'layouts/public_base.html' %}
+{% import 'components/card.html' as card %}
+{% from 'components/badge.html' import badge %}
+{% from 'components/button.html' import button %}
+{% from 'components/table.html' import table, table_header, table_body, table_row, table_head, table_cell %}
 
 {% block title %}{{ artefact_title }}{% endblock %}
 
@@ -32,11 +41,13 @@
 {%- endmacro %}
 
 {% macro stat(label, value, hint='') -%}
-<div class="rounded-lg border border-border bg-card px-4 py-3">
+{% call card.card() %}
+{% call card.card_content(class='px-4 py-3') %}
   <p class="text-xs font-medium text-muted-foreground uppercase tracking-wide">{{ label }}</p>
   <p class="mt-1 text-2xl font-bold text-foreground">{{ value }}</p>
   {% if hint %}<p class="mt-0.5 text-xs text-muted-foreground">{{ hint }}</p>{% endif %}
-</div>
+{% endcall %}
+{% endcall %}
 {%- endmacro %}
 
 {% block extra_css %}
@@ -68,14 +79,8 @@
         </p>
       </div>
       <div class="flex items-center gap-2 share-noprint">
-        <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-xs font-medium bg-muted text-muted-foreground border border-border">
-          <i data-lucide="eye" class="h-3.5 w-3.5"></i> Read-only
-        </span>
-        <button type="button"
-                data-action="print-artefact"
-                class="inline-flex items-center justify-center gap-2 rounded-md text-sm font-medium border border-input bg-background hover:bg-accent hover:text-accent-foreground h-9 px-4 py-2">
-          <i data-lucide="printer" class="h-4 w-4"></i> Print
-        </button>
+        {% call badge(variant='neutral') %}<i data-lucide="eye" class="h-3.5 w-3.5 mr-1"></i> Read-only{% endcall %}
+        {{ button(text='Print', icon='printer', variant='outline', attrs_dict={'data-action': 'print-artefact'}) }}
       </div>
     </div>
     <p class="mt-4 text-sm text-muted-foreground">
@@ -86,13 +91,15 @@
   </header>
 
   {% if data is none %}
-    <div class="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-6 text-center">
+    {% call card.card(class='border-destructive/30 bg-destructive/10') %}
+    {% call card.card_content(class='px-4 py-6 text-center') %}
       <p class="text-sm font-medium text-destructive-emphasis">This artefact could not be loaded.</p>
       <p class="mt-1 text-sm text-muted-foreground">
         Nothing is shown rather than a partial or estimated view. Please ask the person
         who shared this link to regenerate it.
       </p>
-    </div>
+    {% endcall %}
+    {% endcall %}
 
   {# ── Capability maturity heatmap ─────────────────────────────────────────── #}
   {% elif artefact_type == 'maturity_heatmap' %}
@@ -103,7 +110,8 @@
       {{ stat('Average target', data.avg_target|round(1)|dash if data.avg_target is not none else '—') }}
     </section>
 
-    <section class="rounded-lg border border-border bg-card p-4">
+    {% call card.card() %}
+    {% call card.card_content(class='p-4') %}
       <p class="text-xs font-medium text-muted-foreground uppercase tracking-wide">Maturity scale</p>
       <div class="mt-3 flex flex-wrap items-center gap-4">
         {% for level, label in data.scale %}
@@ -117,14 +125,16 @@
           Not assessed
         </span>
       </div>
-    </section>
+    {% endcall %}
+    {% endcall %}
 
     {# A leadership artefact is a summary, not a dump. With nothing assessed this
        page rendered 219 rows of em dashes over 12,000px — technically accurate,
        and nobody would read it. When there is no assessment to show, state that
        and stop; the per-category counts above still say what exists. #}
     {% if data.assessed_count == 0 %}
-    <section class="rounded-lg border border-dashed border-border bg-card p-6 text-center">
+    {% call card.card(class='border-dashed') %}
+    {% call card.card_content(class='p-6 text-center') %}
       <p class="text-base font-medium text-foreground">No capability has been assessed yet</p>
       <p class="mx-auto mt-2 max-w-xl text-sm text-muted-foreground">
         {{ data.total_count }} capabilities are recorded across
@@ -132,48 +142,49 @@
         None carries a recorded assessment date, so no maturity level is shown —
         an unassessed capability is deliberately not reported as Level 1.
       </p>
-    </section>
+    {% endcall %}
+    {% endcall %}
     {% else %}
     {% for group in data.groups %}
-    <section class="rounded-lg border border-border bg-card overflow-hidden">
-      <div class="border-b border-border px-4 py-3">
-        <h2 class="text-lg font-semibold text-foreground">{{ group.name }}</h2>
-        <p class="text-sm text-muted-foreground">{{ group.capabilities|length }} capabilities</p>
-      </div>
+    {% call card.card(class='overflow-hidden') %}
+      {% call card.card_header(class='border-b border-border') %}
+        {% call card.card_title(class='text-lg') %}{{ group.name }}{% endcall %}
+        {% call card.card_description() %}{{ group.capabilities|length }} capabilities{% endcall %}
+      {% endcall %}
       <div class="overflow-x-auto">
-        <table class="w-full text-sm">
+        {% call table() %}
           <caption class="sr-only">{{ group.name }} capability maturity</caption>
-          <thead>
-            <tr class="border-b border-border text-left">
-              <th scope="col" class="px-4 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">Capability</th>
-              <th scope="col" class="px-4 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">Current</th>
-              <th scope="col" class="px-4 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">Target</th>
-              <th scope="col" class="px-4 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">Gap</th>
-              <th scope="col" class="px-4 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">Assessed</th>
-            </tr>
-          </thead>
-          <tbody>{# actionable-rows-ok: a published, public snapshot of a maturity assessment, shared with people who
+          {% call table_header() %}
+            {% call table_row(class='hover:bg-transparent') %}
+              {% call table_head() %}Capability{% endcall %}
+              {% call table_head() %}Current{% endcall %}
+              {% call table_head() %}Target{% endcall %}
+              {% call table_head() %}Gap{% endcall %}
+              {% call table_head() %}Assessed{% endcall %}
+            {% endcall %}
+          {% endcall %}
+          {% call table_body() %}{# actionable-rows-ok: a published, public snapshot of a maturity assessment, shared with people who
                have no account. Deliberately inert; the assessment is edited in Entelim by
                its owner. #}
             {% for cap in group.capabilities %}
-            <tr class="border-b border-border last:border-0">
-              <td class="px-4 py-2 text-foreground">{{ cap.name }}</td>
-              <td class="px-4 py-2">{{ level_cell(cap.current, cap.assessed) }}</td>
-              <td class="px-4 py-2">{{ level_cell(cap.target, cap.assessed) }}</td>
-              <td class="px-4 py-2 text-foreground">{{ cap.gap|dash }}</td>
-              <td class="px-4 py-2 text-muted-foreground">
-                {{ cap.assessed_on|format_datetime('medium') if cap.assessed_on else '—' }}
-              </td>
-            </tr>
+            {% call table_row() %}
+              {% call table_cell() %}{{ cap.name }}{% endcall %}
+              {% call table_cell() %}{{ level_cell(cap.current, cap.assessed) }}{% endcall %}
+              {% call table_cell() %}{{ level_cell(cap.target, cap.assessed) }}{% endcall %}
+              {% call table_cell(class='text-foreground') %}{{ cap.gap|dash }}{% endcall %}
+              {% call table_cell(class='text-muted-foreground') %}{{ cap.assessed_on|format_datetime('medium') if cap.assessed_on else '—' }}{% endcall %}
+            {% endcall %}
             {% endfor %}
-          </tbody>
-        </table>
+          {% endcall %}
+        {% endcall %}
       </div>
-    </section>
+    {% endcall %}
     {% else %}
-      <p class="rounded-lg border border-border bg-card px-4 py-8 text-center text-sm text-muted-foreground">
-        No capabilities have been recorded yet.
-      </p>
+      {% call card.card() %}
+      {% call card.card_content(class='px-4 py-8 text-center') %}
+        <p class="text-sm text-muted-foreground">No capabilities have been recorded yet.</p>
+      {% endcall %}
+      {% endcall %}
     {% endfor %}
     {% endif %}
 
@@ -185,19 +196,18 @@
     </section>
 
     {% for group in data.groups %}
-    <section class="rounded-lg border border-border bg-card">
-      <div class="border-b border-border px-4 py-3">
-        <h2 class="text-lg font-semibold text-foreground">{{ group.name }}</h2>
-        <p class="text-sm text-muted-foreground">{{ group.capabilities|length }} capabilities</p>
-      </div>
+    {% call card.card() %}
+      {% call card.card_header(class='border-b border-border') %}
+        {% call card.card_title(class='text-lg') %}{{ group.name }}{% endcall %}
+        {% call card.card_description() %}{{ group.capabilities|length }} capabilities{% endcall %}
+      {% endcall %}
       <div class="grid gap-3 p-4 sm:grid-cols-2 lg:grid-cols-3">
         {% for cap in group.capabilities %}
-        <article class="rounded-lg border border-border bg-background p-3">
+        {% call card.card(class='bg-background') %}
+        {% call card.card_content(class='p-3') %}
           <div class="flex items-start justify-between gap-2">
             <h3 class="text-sm font-semibold text-foreground">{{ cap.name }}</h3>
-            <span class="shrink-0 inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-muted text-muted-foreground border border-border">
-              L{{ cap.level|dash }}
-            </span>
+            {% call badge(variant='neutral', class='shrink-0') %}L{{ cap.level|dash }}{% endcall %}
           </div>
           {% if cap.description %}
           <p class="mt-1 text-sm text-muted-foreground">{{ cap.description|truncate(140) }}</p>
@@ -205,14 +215,17 @@
           <p class="mt-2 text-xs text-muted-foreground">
             {{ cap.category or '—' }}{% if cap.strategic_importance %} · {{ cap.strategic_importance|capitalize }} importance{% endif %}
           </p>
-        </article>
+        {% endcall %}
+        {% endcall %}
         {% endfor %}
       </div>
-    </section>
+    {% endcall %}
     {% else %}
-      <p class="rounded-lg border border-border bg-card px-4 py-8 text-center text-sm text-muted-foreground">
-        No capabilities have been recorded yet.
-      </p>
+      {% call card.card() %}
+      {% call card.card_content(class='px-4 py-8 text-center') %}
+        <p class="text-sm text-muted-foreground">No capabilities have been recorded yet.</p>
+      {% endcall %}
+      {% endcall %}
     {% endfor %}
 
   {# ── Capability roadmap ──────────────────────────────────────────────────── #}
@@ -223,13 +236,13 @@
     </section>
 
     {% for horizon in data.horizons %}
-    <section class="rounded-lg border border-border bg-card">
-      <div class="border-b border-border px-4 py-3">
-        <h2 class="text-lg font-semibold text-foreground">
+    {% call card.card() %}
+      {% call card.card_header(class='border-b border-border') %}
+        {% call card.card_title(class='text-lg') %}
           {% if horizon.year %}{{ horizon.year }}{% else %}Unscheduled{% endif %}
-        </h2>
-        <p class="text-sm text-muted-foreground">{{ horizon.items|length }} items</p>
-      </div>
+        {% endcall %}
+        {% call card.card_description() %}{{ horizon.items|length }} items{% endcall %}
+      {% endcall %}
       <ul class="divide-y divide-border">
         {% for item in horizon.items %}
         <li class="px-4 py-3">
@@ -241,9 +254,7 @@
               </p>
             </div>
             {% if item.status %}
-            <span class="shrink-0 inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-muted text-muted-foreground border border-border">
-              {{ item.status|replace('_', ' ')|capitalize }}
-            </span>
+            {% call badge(variant='neutral', class='shrink-0') %}{{ item.status|replace('_', ' ')|capitalize }}{% endcall %}
             {% endif %}
           </div>
           <dl class="mt-2 grid grid-cols-2 gap-2 text-xs sm:grid-cols-4">
@@ -269,11 +280,13 @@
         </li>
         {% endfor %}
       </ul>
-    </section>
+    {% endcall %}
     {% else %}
-      <p class="rounded-lg border border-border bg-card px-4 py-8 text-center text-sm text-muted-foreground">
-        No roadmap items have been recorded yet.
-      </p>
+      {% call card.card() %}
+      {% call card.card_content(class='px-4 py-8 text-center') %}
+        <p class="text-sm text-muted-foreground">No roadmap items have been recorded yet.</p>
+      {% endcall %}
+      {% endcall %}
     {% endfor %}
   {% endif %}
 
