@@ -100,6 +100,10 @@ def create_app(config=None):
     from app.middleware.audit_middleware import install_audit_logging
     install_audit_logging(app)
 
+    # 1d-3. Activity record: page use and security events in the one audit store
+    from app._bootstrap.activity import install_activity_record
+    install_activity_record(app)
+
     # 1e. Server-side error aggregation: dedupes WARNING+ log records into
     # error_events (see app/_bootstrap/error_tracking.py) so silent
     # degradation shows up at /admin/errors instead of only in stdout.
