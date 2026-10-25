@@ -763,7 +763,7 @@ def _profile_next_step(organization_id: int, has_site: bool, pending: int):
         if pending:
             return "Confirm what we read from your website, and the chat can answer from it.", url_for("account.welcome", step=3), "Confirm what we read"
         if has_site:
-            return ("Your confirmed facts say nothing about this. Read your website again, or confirm more of what it states.",
+            return ("Read your website again, or confirm more of what it states.",
                     url_for("account.welcome"), "Read the website again")
         return ("Give your company website, and what it states comes here to confirm.", url_for("account.welcome"), "Give your website")
     except RuntimeError:  # outside a request there is no page to point to
