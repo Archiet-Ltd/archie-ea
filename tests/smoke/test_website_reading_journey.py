@@ -156,6 +156,14 @@ def test_a_founder_watches_the_reading_confirms_what_it_found_and_asks_the_chat_
         expect(card).to_contain_text("corrected by Casey Founder")
         expect(card).to_contain_text("confirmed by Casey Founder")
         expect(card).not_to_contain_text("Acme Robotics Ltd")
+        # Every record's name is readable in full: it wraps inside the card instead of running off the screen.
+        edge = page.evaluate("() => window.innerWidth")
+        for i in range(records.count()):
+            link = records.nth(i).get_by_test_id("catalogue-open")
+            box = link.bounding_box()
+            assert box and box["x"] + box["width"] <= edge, (link.inner_text(), box, edge)
+            fits = link.evaluate("el => el.scrollWidth <= el.clientWidth + 1")
+            assert fits, link.inner_text()
         shoot(page, "chat-overview", width)
 
         # Every fact links to the company's own page it was read from, and each page has content.
