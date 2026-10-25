@@ -24,7 +24,7 @@
 {% call button(variant='outline', size='sm' if text else 'icon-sm', icon=icon, aria_label=label, testid=testid, class='rounded-none first:rounded-l-md last:rounded-r-md', attrs_dict={'@click': click, ':aria-pressed': value_expr, ':class': value_expr ~ " ? 'bg-accent text-foreground' : ''"}) %}{% if text %}<span class="hidden 2xl:inline">{{ text }}</span>{% endif %}{% endcall %}
 {% endmacro %}
 
-{% macro diagram_toolbar(import_items=[], export_items=[], more_items=[], menus=true) %}
+{% macro diagram_toolbar(import_items=[], export_items=[], more_items=[], menus=true, history=true) %}
 <nav aria-label="Composer toolbar" class="shrink-0 border-b border-border bg-card px-3 py-2" data-testid="diagram-toolbar">
   <div class="flex items-center gap-2" role="toolbar" aria-label="Diagram tools">
     {# On a phone the tools scroll sideways in one row and the menus stay put, so a menu is never clipped. #}
@@ -50,10 +50,10 @@
       {{ icon_button('Fit the diagram to the view', 'fitCanvas()', 'maximize', testid='zoom-fit') }}
     </div>
 
-    <div class="inline-flex items-center gap-1" role="group" aria-label="History">
+    {% if history %}<div class="inline-flex items-center gap-1" role="group" aria-label="History">
       {{ icon_button('Undo', 'undo()', 'undo-2', disabled_expr='!canUndoNow || mode === \'view\'', testid='history-undo') }}
       {{ icon_button('Redo', 'redo()', 'redo-2', disabled_expr='!canRedoNow || mode === \'view\'', testid='history-redo') }}
-    </div>
+    </div>{% endif %}
 
     <div class="inline-flex items-center gap-1" role="group" aria-label="Selection">
       {% call button(variant='outline', size='sm', icon='pencil', aria_label='Properties', testid='action-properties', attrs_dict={'@click': 'shellOpenProperties()', ':disabled': '!hasProperties'}) %}<span class="hidden md:inline">Properties</span>{% endcall %}
