@@ -1,828 +1,203 @@
 {% extends "layouts/admin_base.html" %}
 {% from 'macros/page_shell.html' import page_shell %}
+{% from 'components/button.html' import button %}
+{% from 'components/card.html' import card, card_header, card_title, card_description, card_content %}
+{% from 'components/switch.html' import switch %}
+{% from 'components/select.html' import native_select %}
+{% from 'components/input.html' import input %}
+{% from 'components/tabs.html' import tabs, tabs_list, tabs_trigger, tabs_content %}
+{% from 'components/alert.html' import alert as quiet_alert %}
+{% from 'components/confirmation_dialog.html' import confirmation_dialog %}
 
 {% block title %}System Settings{% endblock %}
 
-{% block head %}
-<style>
-/* Settings specific styles */
-.settings-section {
-    background: hsl(var(--background));
-    border-radius: 8px;
-    border: 1px solid hsl(var(--border));
-    margin-bottom: 2rem;
-}
+{% macro setting_row(id, label, help_text) %}
+<div class="flex flex-col gap-3 border-b border-border py-4 last:border-b-0 sm:flex-row sm:items-center sm:justify-between">
+    <div class="min-w-0 sm:mr-6">
+        <label for="{{ id }}" class="block text-sm font-medium text-foreground">{{ label }}</label>
+        <p class="mt-1 text-sm text-muted-foreground">{{ help_text }}</p>
+    </div>
+    <div class="shrink-0">{{ caller() }}</div>
+</div>
+{% endmacro %}
 
-.settings-header {
-    padding: 1.5rem;
-    border-bottom: 1px solid hsl(var(--border));
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
+{% macro toggle_row(id, label, help_text) %}
+{% call setting_row(id, label, help_text) %}
+{{ switch(id=id, bind_checked="values['" ~ id ~ "']", on_click="change('" ~ id ~ "', !values['" ~ id ~ "'])", aria_label=label) }}
+{% endcall %}
+{% endmacro %}
 
-.settings-content {
-    padding: 1.5rem;
-}
-
-.setting-item {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 1rem 0;
-    border-bottom: 1px solid hsl(var(--muted));
-}
-
-.setting-item:last-child {
-    border-bottom: none;
-}
-
-.setting-label {
-    flex: 1;
-    margin-right: 1rem;
-}
-
-.setting-description {
-    font-size: 0.875rem;
-    color: hsl(var(--muted-foreground));
-    margin-top: 0.25rem;
-}
-
-.setting-control {
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-}
-
-.toggle-switch {
-    position: relative;
-    display: inline-block;
-    width: 44px;
-    height: 24px;
-}
-
-.toggle-switch input {
-    opacity: 0;
-    width: 0;
-    height: 0;
-}
-
-.slider {
-    position: absolute;
-    cursor: pointer;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background-color: #ccc;
-    transition: 0.4s;
-    border-radius: 24px;
-}
-
-.slider:before {
-    position: absolute;
-    content: "";
-    height: 18px;
-    width: 18px;
-    left: 3px;
-    bottom: 3px;
-    background-color: white;
-    transition: 0.4s;
-    border-radius: 50%;
-}
-
-input:checked + .slider {
-    background-color: hsl(var(--primary));
-}
-
-input:checked + .slider:before {
-    transform: translateX(20px);
-}
-
-.security-indicator {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.5rem 1rem;
-    border-radius: 6px;
-    font-size: 0.875rem;
-    font-weight: 500;
-}
-
-.security-strong { background: hsl(var(--success) / 0.15); color: hsl(var(--success)); }
-.security-medium { background: hsl(var(--warning) / 0.15); color: hsl(var(--warning)); }
-.security-weak { background: hsl(var(--destructive) / 0.1); color: hsl(var(--destructive)); }
-
-.notification-item {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 1rem 0;
-    border-bottom: 1px solid hsl(var(--muted));
-}
-
-.notification-item:last-child {
-    border-bottom: none;
-}
-
-.form-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-    gap: 1rem;
-}
-
-.btn-export {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.5rem 1rem;
-    border: 1px solid hsl(var(--border));
-    border-radius: 6px;
-    background: hsl(var(--background));
-    color: hsl(var(--foreground));
-    text-decoration: none;
-    transition: all 0.2s ease;
-}
-
-.btn-export:hover {
-    border-color: hsl(var(--primary));
-    color: hsl(var(--primary));
-}
-
-.danger-zone {
-    background: hsl(var(--destructive) / 0.05);
-    border: 1px solid hsl(var(--destructive) / 0.2);
-    border-radius: 8px;
-    padding: 1.5rem;
-    margin-top: 2rem;
-}
-
-.danger-zone h3 {
-    color: hsl(var(--destructive));
-    margin-bottom: 1rem;
-}
-
-.danger-zone .bg-destructive {
-    background: hsl(var(--destructive));
-    border-color: hsl(var(--destructive));
-}
-
-.danger-zone .bg-destructive:hover {
-    background: hsl(var(--destructive));
-    border-color: hsl(var(--destructive));
-}
-</style>
-{% endblock %}
+{% macro select_row(id, label, help_text, options) %}
+{% call setting_row(id, label, help_text) %}
+{{ native_select(id=id, aria_label=label, class='w-full sm:w-64', options=options, attrs_dict={'x-model': "values['" ~ id ~ "']", '@change': "change('" ~ id ~ "', values['" ~ id ~ "'])"}) }}
+{% endcall %}
+{% endmacro %}
 
 {% block content %}
-<div class="p-6 space-y-6 mx-auto">
-    <!-- Settings info banner -->
-    <div id="settings-saved-banner" class="mb-6 rounded-md border border-success/50 bg-success/10 px-4 py-2 flex items-center gap-3 hidden">
-        <svg class="h-5 w-5 text-success flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
-        </svg>
-        <p class="text-sm font-medium text-success-emphasis">Settings saved successfully.</p>
-    </div>
-
-    <!-- Header -->
+<div class="p-6 space-y-6 mx-auto" x-data="settingsPage()" x-init="load()">
     {% macro _ps_actions() %}
-<div class="flex gap-3">
-            <button type="button" id="btn-export-settings" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center whitespace-nowrap" data-testid="btn-export-settings" aria-label="Export settings to file">
-                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-                </svg>
-                Export Settings
-            </button>
-            <button type="button" id="btn-import-settings" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center whitespace-nowrap" data-testid="btn-import-settings" aria-label="Import settings from file">
-                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
-                </svg>
-                Import Settings
-            </button>
-            <button type="button" id="btn-save-all" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center whitespace-nowrap" data-testid="btn-save-all" aria-label="Save all settings">
-                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"/>
-                </svg>
-                Save All Changes
-            </button>
-        </div>
+    <div class="flex gap-3">
+        {{ button(text='Save all changes', variant='primary', icon='save', testid='btn-save-all', aria_label='Save all settings', on_click='save()', attrs_dict={':disabled': 'saving'}) }}
+    </div>
     {% endmacro %}
-    {{ page_shell(title='System Settings', breadcrumb=[('Home', '/'), ('System Settings', none)], subtitle='Configure application settings, security, and user preferences', actions_caller=_ps_actions) }}
+    {{ page_shell(title='System Settings', breadcrumb=[('Home', '/'), ('System Settings', none)], subtitle='Platform-wide configuration. Changes apply to every organisation.', actions_caller=_ps_actions) }}
 
-    <!-- Settings Tabs -->
-    <div class="mb-6">
-        <nav class="flex space-x-1 bg-muted p-1 rounded-lg" data-testid="settings-tabs">
-            <button type="button" class="tab-btn active px-4 py-2 text-sm font-medium rounded-md" data-tab="general" data-testid="tab-general" aria-label="View general settings">General</button>
-            <button type="button" class="tab-btn px-4 py-2 text-sm font-medium rounded-md" data-tab="security" data-testid="tab-security" aria-label="View security settings">Security</button>
-            <button type="button" class="tab-btn px-4 py-2 text-sm font-medium rounded-md" data-tab="notifications" data-testid="tab-notifications" aria-label="View notification settings">Notifications</button>
-            <button type="button" class="tab-btn px-4 py-2 text-sm font-medium rounded-md" data-tab="integrations" data-testid="tab-integrations" aria-label="View integration settings">Integrations</button>
-            <button type="button" class="tab-btn px-4 py-2 text-sm font-medium rounded-md" data-tab="backup" data-testid="tab-backup" aria-label="View backup and restore options">Backup & Restore</button>
-        </nav>
+    <div x-show="loadFailed" x-cloak>
+        {{ quiet_alert(kind='warning', title='Saved settings could not be loaded', text='The values shown are the defaults, not what is saved. Reload the page before changing anything.') }}
     </div>
 
-    <!-- General Settings -->
-    <div id="tab-general" class="tab-content" data-testid="tab-content-general">
-        <div class="settings-section">
-            <div class="settings-header">
-                <h2 class="text-xl font-semibold text-foreground">General Settings</h2>
-            </div>
-            <div class="settings-content">
-                <div class="setting-item">
-                    <div class="setting-label">
-                        <label for="app-name" class="block text-sm font-medium text-foreground">Application Name</label>
-                        <p class="setting-description">The name displayed in the application header</p>
-                    </div>
-                    <div class="setting-control">
-                        <input type="text" id="app-name" required value="Enterprise Architecture Platform" class="w-72 px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary" data-testid="app-name">
-                    </div>
-                </div>
-
-                <div class="setting-item">
-                    <div class="setting-label">
-                        <label for="default-language" class="block text-sm font-medium text-foreground">Default Language</label>
-                        <p class="setting-description">The default language for new users</p>
-                    </div>
-                    <div class="setting-control">
-                        <select id="default-language" class="px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary" data-testid="default-language">
-                            <option value="en">English</option>
-                            <option value="es">Spanish</option>
-                            <option value="fr">French</option>
-                            <option value="de">German</option>
-                        </select>
-                    </div>
-                </div>
-
-                <div class="setting-item">
-                    <div class="setting-label">
-                        <label for="timezone" class="block text-sm font-medium text-foreground">Timezone</label>
-                        <p class="setting-description">The default timezone for date/time display</p>
-                    </div>
-                    <div class="setting-control">
-                        <select id="timezone" class="px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary" data-testid="timezone">
-                            <option value="UTC">UTC</option>
-                            <option value="America/New_York">Eastern Time</option>
-                            <option value="America/Chicago">Central Time</option>
-                            <option value="America/Denver">Mountain Time</option>
-                            <option value="America/Los_Angeles">Pacific Time</option>
-                        </select>
-                    </div>
-                </div>
-
-                <div class="setting-item">
-                    <div class="setting-label">
-                        <label for="items-per-page" class="block text-sm font-medium text-foreground">Items Per Page</label>
-                        <p class="setting-description">Number of items to display per page in lists</p>
-                    </div>
-                    <div class="setting-control">
-                        <select id="items-per-page" class="px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary" data-testid="items-per-page">
-                            <option value="10">10</option>
-                            <option value="25" selected>25</option>
-                            <option value="50">50</option>
-                            <option value="100">100</option>
-                        </select>
-                    </div>
-                </div>
-
-                <div class="setting-item">
-                    <div class="setting-label">
-                        <label for="analytics" class="block text-sm font-medium text-foreground">Enable Analytics</label>
-                        <p class="setting-description">Collect anonymous usage analytics to improve the application</p>
-                    </div>
-                    <div class="setting-control">
-                        <label class="toggle-switch">
-                            <input type="checkbox" id="analytics" checked data-testid="analytics">
-                            <span class="slider"></span>
-                        </label>
-                    </div>
-                </div>
-            </div>
-        </div>
+    {% call tabs(default_value='general') %}
+    <div class="overflow-x-auto" data-testid="settings-tabs">
+        {% call tabs_list() %}
+            {% call tabs_trigger(value='general') %}General{% endcall %}
+            {% call tabs_trigger(value='security') %}Security{% endcall %}
+            {% call tabs_trigger(value='notifications') %}Notifications{% endcall %}
+            {% call tabs_trigger(value='integrations') %}Integrations{% endcall %}
+            {% call tabs_trigger(value='backup') %}Backup and restore{% endcall %}
+        {% endcall %}
     </div>
 
-    <!-- Security Settings -->
-    <div id="tab-security" class="tab-content hidden" data-testid="tab-content-security">
-        <div class="settings-section">
-            <div class="settings-header">
-                <h2 class="text-xl font-semibold text-foreground">Security Settings</h2>
-                <span class="security-indicator security-strong" data-testid="security-indicator">
-                    <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                        <path fill-rule="evenodd" d="M2.166 4.999A11.954 11.954 0 0010 1.944 11.954 11.954 0 0017.834 5c.11.65.166 1.32.166 2.001 0 5.225-3.34 9.67-8 11.317C5.34 16.67 2 12.225 2 7c0-.682.057-1.35.166-2.001zm11.541 3.708a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
-                    </svg>
-                    Strong Security
-                </span>
+    {% call tabs_content(value='general') %}
+    {% call card() %}
+        {% call card_header() %}{% call card_title() %}General{% endcall %}{% endcall %}
+        {% call card_content() %}
+            {% call setting_row('app-name', 'Application name', 'The name shown in the application header') %}
+                {{ input(id='app-name', required=true, class='w-full sm:w-72', aria_label='Application name', attrs_dict={'x-model': "values['app-name']", '@input': "change('app-name', values['app-name'])"}) }}
+            {% endcall %}
+            {{ select_row('default-language', 'Default language', 'The language new users start with', [('en', 'English'), ('es', 'Spanish'), ('fr', 'French'), ('de', 'German')]) }}
+            {{ select_row('timezone', 'Time zone', 'The time zone used to show dates and times', [('UTC', 'UTC'), ('America/New_York', 'Eastern Time'), ('America/Chicago', 'Central Time'), ('America/Denver', 'Mountain Time'), ('America/Los_Angeles', 'Pacific Time')]) }}
+            {{ select_row('items-per-page', 'Items per page', 'How many rows a list shows before it pages', [('10', '10'), ('25', '25'), ('50', '50'), ('100', '100')]) }}
+            {{ toggle_row('analytics', 'Usage analytics', 'Collect anonymous usage figures to improve the application') }}
+        {% endcall %}
+    {% endcall %}
+    {% endcall %}
+
+    {% call tabs_content(value='security') %}
+    {% call card() %}
+        {% call card_header() %}{% call card_title() %}Security{% endcall %}{% endcall %}
+        {% call card_content() %}
+            {{ select_row('password-policy', 'Password policy', 'The minimum a password must meet', [('basic', 'Basic (8+ characters)'), ('standard', 'Standard (8+ characters, mixed case)'), ('strong', 'Strong (12+ characters, mixed case, numbers, symbols)')]) }}
+            {{ select_row('session-timeout', 'Session timeout', 'Sign out people who have been inactive for this long', [('15', '15 minutes'), ('30', '30 minutes'), ('60', '1 hour'), ('240', '4 hours'), ('0', 'Never')]) }}
+            {{ toggle_row('two-factor', 'Two-factor sign-in', 'Ask for a second code when signing in') }}
+            {{ toggle_row('ip-whitelist', 'Allowed addresses only', 'Accept sign-ins only from approved IP addresses') }}
+            {{ toggle_row('audit-logging', 'Record page use', 'Record which pages each person opens and whether the request succeeded, was refused or failed. This switch controls only that record. Sign-ins, failed sign-ins, two-factor and recovery-code use, password resets, exports, refused permissions and attempts to reach another organisation are always recorded.') }}
+            {{ toggle_row('data-encryption', 'Encrypt sensitive data', 'Encrypt sensitive data at rest and in transit') }}
+        {% endcall %}
+    {% endcall %}
+    {% endcall %}
+
+    {% call tabs_content(value='notifications') %}
+    {% call card() %}
+        {% call card_header() %}{% call card_title() %}Notifications{% endcall %}{% endcall %}
+        {% call card_content() %}
+            {{ toggle_row('email-notifications', 'Email notifications', 'Receive notifications by email') }}
+            {{ toggle_row('system-alerts', 'System alerts', 'Critical system alerts and errors') }}
+            {{ toggle_row('user-activity', 'People activity', 'Notifications about what people do and change') }}
+            {{ toggle_row('integration-updates', 'Integration updates', 'News from connected systems') }}
+            {{ toggle_row('scheduled-reports', 'Scheduled reports', 'Reports delivered on a schedule') }}
+            {{ toggle_row('marketing-communications', 'Product news', 'Product updates and announcements') }}
+        {% endcall %}
+    {% endcall %}
+    {% endcall %}
+
+    {% call tabs_content(value='integrations') %}
+    {% call card() %}
+        {% call card_header() %}{% call card_title() %}Integrations{% endcall %}{% endcall %}
+        {% call card_content() %}
+            {{ select_row('sync-interval', 'Automatic sync', 'How often connected systems are synchronised', [('5', 'Every 5 minutes'), ('15', 'Every 15 minutes'), ('30', 'Every 30 minutes'), ('60', 'Every hour'), ('manual', 'Only when asked')]) }}
+            {{ select_row('retry-attempts', 'Retries after an error', 'How many times a failed call to a connected system is retried', [('0', 'No retries'), ('1', '1 retry'), ('3', '3 retries'), ('5', '5 retries')]) }}
+            {{ toggle_row('rate-limiting', 'Limit call rate', 'Limit how fast calls are made to connected systems') }}
+            {{ toggle_row('webhook-security', 'Signed callbacks only', 'Accept a callback only when it carries a valid signature') }}
+        {% endcall %}
+    {% endcall %}
+    {% endcall %}
+
+    {% call tabs_content(value='backup') %}
+    {% call card() %}
+        {% call card_header() %}{% call card_title() %}Backup and restore{% endcall %}{% endcall %}
+        {% call card_content() %}
+            <div data-testid="backup-capability-unavailable">
+                <p class="text-sm font-medium text-foreground">Backup and restore are not available from this page.</p>
+                <p class="mt-1 text-sm text-muted-foreground">Database backups are taken by the hosting platform on a schedule and restored by an operator; the application's own database role is read-only for that purpose by design. No archive is created or restored here.</p>
             </div>
-            <div class="settings-content">
-                <div class="setting-item">
-                    <div class="setting-label">
-                        <label for="password-policy" class="block text-sm font-medium text-foreground">Password Policy</label>
-                        <p class="setting-description">Minimum password requirements for all users</p>
-                    </div>
-                    <div class="setting-control">
-                        <select id="password-policy" class="px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary" data-testid="password-policy">
-                            <option value="basic">Basic (8+ characters)</option>
-                            <option value="standard" selected>Standard (8+ chars, mixed case)</option>
-                            <option value="strong">Strong (12+ chars, mixed case, numbers, symbols)</option>
-                        </select>
-                    </div>
-                </div>
-
-                <div class="setting-item">
-                    <div class="setting-label">
-                        <label for="session-timeout" class="block text-sm font-medium text-foreground">Session Timeout</label>
-                        <p class="setting-description">Automatically log out inactive users after this time</p>
-                    </div>
-                    <div class="setting-control">
-                        <select id="session-timeout" class="px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary" data-testid="session-timeout">
-                            <option value="15">15 minutes</option>
-                            <option value="30">30 minutes</option>
-                            <option value="60" selected>1 hour</option>
-                            <option value="240">4 hours</option>
-                            <option value="0">Never</option>
-                        </select>
-                    </div>
-                </div>
-
-                <div class="setting-item">
-                    <div class="setting-label">
-                        <label for="two-factor" class="block text-sm font-medium text-foreground">Two-Factor Authentication</label>
-                        <p class="setting-description">Require 2FA for all user accounts</p>
-                    </div>
-                    <div class="setting-control">
-                        <label class="toggle-switch">
-                            <input type="checkbox" id="two-factor" checked data-testid="two-factor">
-                            <span class="slider"></span>
-                        </label>
-                    </div>
-                </div>
-
-                <div class="setting-item">
-                    <div class="setting-label">
-                        <label for="ip-whitelist" class="block text-sm font-medium text-foreground">IP Whitelist</label>
-                        <p class="setting-description">Restrict access to specific IP addresses</p>
-                    </div>
-                    <div class="setting-control">
-                        <label class="toggle-switch">
-                            <input type="checkbox" id="ip-whitelist" data-testid="ip-whitelist">
-                            <span class="slider"></span>
-                        </label>
-                    </div>
-                </div>
-
-                <div class="setting-item">
-                    <div class="setting-label">
-                        <label for="audit-logging" class="block text-sm font-medium text-foreground">Audit Logging</label>
-                        <p class="setting-description">Log all user actions for security auditing</p>
-                    </div>
-                    <div class="setting-control">
-                        <label class="toggle-switch">
-                            <input type="checkbox" id="audit-logging" checked data-testid="audit-logging">
-                            <span class="slider"></span>
-                        </label>
-                    </div>
-                </div>
-
-                <div class="setting-item">
-                    <div class="setting-label">
-                        <label for="data-encryption" class="block text-sm font-medium text-foreground">Data Encryption</label>
-                        <p class="setting-description">Encrypt sensitive data at rest and in transit</p>
-                    </div>
-                    <div class="setting-control">
-                        <label class="toggle-switch">
-                            <input type="checkbox" id="data-encryption" checked data-testid="data-encryption">
-                            <span class="slider"></span>
-                        </label>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Notifications Settings -->
-    <div id="tab-notifications" class="tab-content hidden" data-testid="tab-content-notifications">
-        <div class="settings-section">
-            <div class="settings-header">
-                <h2 class="text-xl font-semibold text-foreground">Notification Settings</h2>
-            </div>
-            <div class="settings-content">
-                <div class="notification-item">
-                    <div>
-                        <label for="email-notifications" class="block text-sm font-medium text-foreground">Email Notifications</label>
-                        <p class="setting-description">Receive notifications via email</p>
-                    </div>
-                    <label class="toggle-switch">
-                        <input type="checkbox" id="email-notifications" checked data-testid="email-notifications">
-                        <span class="slider"></span>
-                    </label>
-                </div>
-
-                <div class="notification-item">
-                    <div>
-                        <label for="system-alerts" class="block text-sm font-medium text-foreground">System Alerts</label>
-                        <p class="setting-description">Critical system alerts and errors</p>
-                    </div>
-                    <label class="toggle-switch">
-                        <input type="checkbox" id="system-alerts" checked data-testid="system-alerts">
-                        <span class="slider"></span>
-                    </label>
-                </div>
-
-                <div class="notification-item">
-                    <div>
-                        <label for="user-activity" class="block text-sm font-medium text-foreground">User Activity</label>
-                        <p class="setting-description">Notifications about user actions and changes</p>
-                    </div>
-                    <label class="toggle-switch">
-                        <input type="checkbox" id="user-activity" data-testid="user-activity">
-                        <span class="slider"></span>
-                    </label>
-                </div>
-
-                <div class="notification-item">
-                    <div>
-                        <label for="integration-updates" class="block text-sm font-medium text-foreground">Integration Updates</label>
-                        <p class="setting-description">Updates from third-party integrations</p>
-                    </div>
-                    <label class="toggle-switch">
-                        <input type="checkbox" id="integration-updates" checked data-testid="integration-updates">
-                        <span class="slider"></span>
-                    </label>
-                </div>
-
-                <div class="notification-item">
-                    <div>
-                        <label for="scheduled-reports" class="block text-sm font-medium text-foreground">Scheduled Reports</label>
-                        <p class="setting-description">Automated report deliveries</p>
-                    </div>
-                    <label class="toggle-switch">
-                        <input type="checkbox" id="scheduled-reports" checked data-testid="scheduled-reports">
-                        <span class="slider"></span>
-                    </label>
-                </div>
-
-                <div class="notification-item">
-                    <div>
-                        <label for="marketing-communications" class="block text-sm font-medium text-foreground">Marketing Communications</label>
-                        <p class="setting-description">Product updates and marketing materials</p>
-                    </div>
-                    <label class="toggle-switch">
-                        <input type="checkbox" id="marketing-communications" data-testid="marketing-communications">
-                        <span class="slider"></span>
-                    </label>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Integrations Settings -->
-    <div id="tab-integrations" class="tab-content hidden" data-testid="tab-content-integrations">
-        <div class="settings-section">
-            <div class="settings-header">
-                <h2 class="text-xl font-semibold text-foreground">Integration Settings</h2>
-            </div>
-            <div class="settings-content">
-                <div class="setting-item">
-                    <div class="setting-label">
-                        <label for="sync-interval" class="block text-sm font-medium text-foreground">Auto-sync Interval</label>
-                        <p class="setting-description">How often to automatically sync with integrations</p>
-                    </div>
-                    <div class="setting-control">
-                        <select id="sync-interval" class="px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary" data-testid="sync-interval">
-                            <option value="5">Every 5 minutes</option>
-                            <option value="15" selected>Every 15 minutes</option>
-                            <option value="30">Every 30 minutes</option>
-                            <option value="60">Every hour</option>
-                            <option value="manual">Manual only</option>
-                        </select>
-                    </div>
-                </div>
-
-                <div class="setting-item">
-                    <div class="setting-label">
-                        <label for="retry-attempts" class="block text-sm font-medium text-foreground">Error Retry Attempts</label>
-                        <p class="setting-description">Number of times to retry failed integration calls</p>
-                    </div>
-                    <div class="setting-control">
-                        <select id="retry-attempts" class="px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary" data-testid="retry-attempts">
-                            <option value="0">No retries</option>
-                            <option value="1">1 retry</option>
-                            <option value="3" selected>3 retries</option>
-                            <option value="5">5 retries</option>
-                        </select>
-                    </div>
-                </div>
-
-                <div class="setting-item">
-                    <div class="setting-label">
-                        <label for="rate-limiting" class="block text-sm font-medium text-foreground">Rate Limiting</label>
-                        <p class="setting-description">Enable rate limiting for API calls to integrations</p>
-                    </div>
-                    <div class="setting-control">
-                        <label class="toggle-switch">
-                            <input type="checkbox" id="rate-limiting" checked data-testid="rate-limiting">
-                            <span class="slider"></span>
-                        </label>
-                    </div>
-                </div>
-
-                <div class="setting-item">
-                    <div class="setting-label">
-                        <label for="webhook-security" class="block text-sm font-medium text-foreground">Webhook Security</label>
-                        <p class="setting-description">Require webhook signatures for secure callbacks</p>
-                    </div>
-                    <div class="setting-control">
-                        <label class="toggle-switch">
-                            <input type="checkbox" id="webhook-security" checked data-testid="webhook-security">
-                            <span class="slider"></span>
-                        </label>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Backup & Restore -->
-    <div id="tab-backup" class="tab-content hidden" data-testid="tab-content-backup">
-        <div class="settings-section">
-            <div class="settings-header">
-                <h2 class="text-xl font-semibold text-foreground">Backup & Restore</h2>
-            </div>
-            <div class="settings-content">
-                <div class="rounded-lg border border-border bg-muted/30 p-4" data-testid="backup-capability-unavailable">
-                    <p class="text-sm font-medium text-foreground">Backup and restore are not available from this page.</p>
-                    <p class="mt-1 text-sm text-muted-foreground">Database backups are taken by the hosting platform on a schedule and restored by an operator; the application's own database role is read-only for that purpose by design. No archive is created or restored here.</p>
-                </div>
-            </div>
-        </div>
-    </div>
+        {% endcall %}
+    {% endcall %}
+    {% endcall %}
+    {% endcall %}
 
     <!-- Danger Zone -->
-    <div class="danger-zone">
-        <h3 class="text-lg font-semibold">Danger Zone</h3>
-        <p class="text-sm text-muted-foreground mb-4">These actions are irreversible and may cause data loss. Proceed with caution.</p>
+    {% call card() %}
+        {% call card_header() %}{% call card_title() %}Reset{% endcall %}{% call card_description() %}Puts every setting on this page back to its default. Nothing is saved until you press Save all changes. Your data is not affected.{% endcall %}{% endcall %}
+        {% call card_content() %}
+            {{ button(text='Reset to defaults', variant='destructive', icon='rotate-ccw', testid='btn-reset-defaults', aria_label='Reset all settings to defaults', on_click="$dispatch('open-confirm-reset-settings', { callback: () => resetToDefaults() })") }}
+        {% endcall %}
+    {% endcall %}
 
-        <div class="flex gap-3">
-            <button type="button" id="btn-reset-defaults" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-destructive text-destructive-foreground text-sm font-semibold transition-colors hover:bg-destructive/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center whitespace-nowrap" data-testid="btn-reset-defaults" aria-label="Reset all settings to defaults">
-                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
-                </svg>
-                Reset to Defaults
-            </button>
-            <button type="button" id="btn-clear-all-data" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-destructive text-destructive-foreground text-sm font-semibold transition-colors hover:bg-destructive/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center whitespace-nowrap" data-testid="btn-clear-all-data" aria-label="Clear all user data">
-                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
-                </svg>
-                Clear All Data
-            </button>
-        </div>
-    </div>
+    {{ confirmation_dialog(id='reset-settings', title='Reset to defaults?', message='Every setting on this page goes back to its default. Nothing is saved until you press Save all changes.', confirm_text='Reset settings', variant='destructive') }}
 </div>
-
-<!-- Reset Confirmation Modal -->
-<div id="reset-modal" class="fixed inset-0 bg-muted-foreground bg-opacity-50 overflow-y-auto h-full w-full hidden z-50" data-testid="reset-modal" role="dialog">
-    <div class="relative top-20 mx-auto p-5 border w-96 rounded-md bg-background">
-        <div class="mt-3 text-center">
-            <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-warning/10">
-                <svg class="h-6 w-6 text-warning" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"/>
-                </svg>
-            </div>
-            <h3 class="text-lg font-medium text-foreground mt-4">Reset to Defaults</h3>
-            <p class="text-sm text-muted-foreground mt-2">This will reset all settings to their default values. Your data will not be affected, but custom configurations will be lost.</p>
-            <div class="flex justify-center gap-3 mt-6">
-                <button type="button" id="btn-cancel-reset" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center whitespace-nowrap" data-testid="btn-cancel-reset" aria-label="Cancel reset operation">Cancel</button>
-                <button type="button" id="btn-confirm-reset" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-destructive text-destructive-foreground text-sm font-semibold transition-colors hover:bg-destructive/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center whitespace-nowrap" data-testid="btn-confirm-reset" aria-label="Confirm and reset all settings">Reset Settings</button>
-            </div>
-        </div>
-    </div>
-</div>
-
 {% endblock %}
 
 {% block scripts %}
 <script>
-// Settings Management JavaScript
-document.addEventListener('DOMContentLoaded', function() {
-    let settings = {};
-    let hasUnsavedChanges = false;
-
-    // DOM Elements
-    const tabButtons = document.querySelectorAll('.tab-btn');
-    const tabContents = document.querySelectorAll('.tab-content');
-    const resetModal = document.getElementById('reset-modal');
-
-    // Initialize
-    loadSettings();
-
-    // Tab switching
-    tabButtons.forEach(button => {
-        button.addEventListener('click', function() {
-            const tabName = this.dataset.tab;
-
-            // Update tab buttons
-            tabButtons.forEach(btn => btn.classList.remove('active'));
-            this.classList.add('active');
-
-            // Update tab content
-            tabContents.forEach(content => content.classList.add('hidden'));
-            document.getElementById(`tab-${tabName}`).classList.remove('hidden');
-        });
-    });
-
-    // Setting change tracking
-    document.querySelectorAll('input, select').forEach(element => {
-        element.addEventListener('change', function() {
-            hasUnsavedChanges = true;
-            updateSetting(this.id, this.type === 'checkbox' ? this.checked : this.value);
-        });
-    });
-
-    // Button event listeners
-    document.getElementById('btn-save-all').addEventListener('click', saveAllSettings);
-    document.getElementById('btn-export-settings').addEventListener('click', exportSettings);
-    document.getElementById('btn-import-settings').addEventListener('click', importSettings);
-    document.getElementById('btn-reset-defaults').addEventListener('click', () => resetModal.classList.remove('hidden'));
-    document.getElementById('btn-cancel-reset').addEventListener('click', () => resetModal.classList.add('hidden'));
-    document.getElementById('btn-confirm-reset').addEventListener('click', resetToDefaults);
-    document.getElementById('btn-clear-all-data').addEventListener('click', clearAllData);
-
-    // Modal events
-    document.addEventListener('keydown', function(e) {
-        if (e.key === 'Escape') {
-            resetModal.classList.add('hidden');
-        }
-    });
-
-    async function loadSettings() {
-        try {
-            const data = await Platform.fetch('/api/system-settings');
-            const saved = data.settings || {};
-
-            // Default values merged with any saved values
-            const defaults = {
-                appName: 'Enterprise Architecture Platform',
-                defaultLanguage: 'en',
-                timezone: 'UTC',
-                itemsPerPage: '25',
-                darkMode: false,
-                analytics: true,
-                passwordPolicy: 'standard',
-                sessionTimeout: '60',
-                twoFactor: true,
-                ipWhitelist: false,
-                auditLogging: true,
-                dataEncryption: true,
-                emailNotifications: true,
-                systemAlerts: true,
-                userActivity: false,
-                integrationUpdates: true,
-                scheduledReports: true,
-                marketingCommunications: false,
-                syncInterval: '15',
-                retryAttempts: '3',
-                rateLimiting: true,
-                webhookSecurity: true
-            };
-            settings = Object.assign({}, defaults, saved);
-
-            // Apply settings to form elements
-            Object.keys(settings).forEach(key => {
-                const element = document.getElementById(key);
-                if (element) {
-                    if (element.type === 'checkbox') {
-                        element.checked = settings[key];
-                    } else {
-                        element.value = settings[key];
-                    }
+document.addEventListener('alpine:init', function () {
+    Alpine.data('settingsPage', function () {
+        return {
+            defaults: {
+                'app-name': 'Enterprise Architecture Platform', 'default-language': 'en', 'timezone': 'UTC',
+                'items-per-page': '25', 'analytics': true, 'password-policy': 'standard', 'session-timeout': '60',
+                'two-factor': true, 'ip-whitelist': false, 'audit-logging': true, 'data-encryption': true,
+                'email-notifications': true, 'system-alerts': true, 'user-activity': false,
+                'integration-updates': true, 'scheduled-reports': true, 'marketing-communications': false,
+                'sync-interval': '15', 'retry-attempts': '3', 'rate-limiting': true, 'webhook-security': true
+            },
+            values: {},
+            changed: {},
+            dirty: false,
+            saving: false,
+            loadFailed: false,
+            init() {
+                this.values = Object.assign({}, this.defaults);
+                window.addEventListener('beforeunload', (e) => {
+                    if (this.dirty) { e.preventDefault(); e.returnValue = ''; }
+                });
+            },
+            async load() {
+                try {
+                    const response = await fetch('/api/system-settings', { headers: { 'Accept': 'application/json' } });
+                    if (!response.ok) throw new Error('settings request failed');
+                    const data = await response.json();
+                    this.values = Object.assign({}, this.defaults, data.settings || {});
+                } catch (error) {
+                    this.loadFailed = true;
                 }
-            });
-
-        } catch (error) {
-            // Platform.fetch already shows a toast for non‑silent errors.
-            // The endpoint now answers a failure with 500 rather than an empty
-            // "ok" payload, so this must throw: silently substituting {} would
-            // present the defaults below as if they were the saved settings.
-            // We keep the catch to prevent the error from propagating further,
-            // but we do NOT invent data; the form will stay with defaults.
-            if (window.Platform && Platform.toast) {
-                Platform.toast.error('Could not load saved settings; showing defaults instead.');
+            },
+            change(key, value) {
+                this.values[key] = value;
+                this.changed[key] = value;
+                this.dirty = true;
+            },
+            resetToDefaults() {
+                this.values = Object.assign({}, this.defaults);
+                this.changed = Object.assign({}, this.defaults);
+                this.dirty = true;
+                Platform.toast.info('Defaults restored. Press Save all changes to keep them.');
+            },
+            async save() {
+                if (this.saving) return;
+                this.saving = true;
+                try {
+                    await Platform.fetch.post('/api/system-settings/save', { settings: Object.assign({}, this.values) });
+                    this.dirty = false;
+                    this.changed = {};
+                    Platform.toast.success('Settings saved.');
+                } catch (error) {
+                    Platform.toast.error('Settings were not saved.');
+                } finally {
+                    this.saving = false;
+                }
             }
-        }
-    }
-
-    function updateSetting(key, value) {
-        settings[key] = value;
-        hasUnsavedChanges = true;
-    }
-
-    async function saveAllSettings() {
-        try {
-            document.getElementById('btn-save-all').disabled = true;
-            document.getElementById('btn-save-all').textContent = 'Saving...';
-
-            await Platform.fetch.post('/api/system-settings/save', { settings: settings });
-
-            hasUnsavedChanges = false;
-            const banner = document.getElementById('settings-saved-banner');
-            if (banner) { banner.classList.remove('hidden'); setTimeout(() => banner.classList.add('hidden'), 3000); }
-            showSuccess('Settings saved successfully');
-        } catch (error) {
-            showError('Failed to save settings');
-        } finally {
-            document.getElementById('btn-save-all').disabled = false;
-            document.getElementById('btn-save-all').textContent = 'Save All Changes';
-        }
-    }
-
-    async function exportSettings() {
-        try {
-            const exportData = {
-                settings: settings,
-                exportedAt: new Date().toISOString(),
-                version: '1.0'
-            };
-
-            const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = 'settings_export.json';
-            a.click();
-            window.URL.revokeObjectURL(url);
-
-            showSuccess('Settings exported successfully');
-        } catch (error) {
-            showError('Failed to export settings');
-        }
-    }
-
-    async function importSettings() {
-        showError('Settings import is not available in this build.');
-    }
-
-    async function resetToDefaults() {
-        try {
-            // Reset all form elements to defaults
-            document.getElementById('app-name').value = 'Enterprise Architecture Platform';
-            document.getElementById('default-language').value = 'en';
-            document.getElementById('timezone').value = 'UTC';
-            document.getElementById('items-per-page').value = '25';
-            document.getElementById('analytics').checked = true;
-            document.getElementById('password-policy').value = 'standard';
-            document.getElementById('session-timeout').value = '60';
-            document.getElementById('two-factor').checked = true;
-            document.getElementById('ip-whitelist').checked = false;
-            document.getElementById('audit-logging').checked = true;
-            document.getElementById('data-encryption').checked = true;
-            document.getElementById('email-notifications').checked = true;
-            document.getElementById('system-alerts').checked = true;
-            document.getElementById('user-activity').checked = false;
-            document.getElementById('integration-updates').checked = true;
-            document.getElementById('scheduled-reports').checked = true;
-            document.getElementById('marketing-communications').checked = false;
-            document.getElementById('sync-interval').value = '15';
-            document.getElementById('retry-attempts').value = '3';
-            document.getElementById('rate-limiting').checked = true;
-            document.getElementById('webhook-security').checked = true;
-
-            // NOT loadSettings(): that re-reads the SAVED settings and writes them
-            // back over the defaults just applied, so the reset visibly undid itself
-            // while still reporting success. The form now holds the defaults and is
-            // unsaved until the user presses Save.
-            hasUnsavedChanges = true;
-
-            resetModal.classList.add('hidden');
-            showSuccess('Settings reset to defaults — press Save to apply them.');
-        } catch (error) {
-            showError('Failed to reset settings');
-        }
-    }
-
-    // Previously prompted for a destructive confirmation, slept 3s, then reported
-    // "All data cleared successfully" without deleting anything.
-    async function clearAllData() {
-        showError('Bulk data deletion is not available in this build. No data was changed.');
-    }
-
-    // Warn about unsaved changes
-    window.addEventListener('beforeunload', function(e) {
-        if (hasUnsavedChanges) {
-            e.preventDefault();
-            e.returnValue = 'You have unsaved changes. Are you sure you want to leave?';
-        }
+        };
     });
-
-    // Utility functions — route through Platform.toast (DESIGN.md: never alert()/console)
-    function showSuccess(message) {
-        Platform.toast.success(message);
-    }
-
-    function showError(message) {
-        Platform.toast.error(message);
-    }
-
-    function showInfo(message) {
-        Platform.toast.info(message);
-    }
 });
 </script>
 {% endblock %}
