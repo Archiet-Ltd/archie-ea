@@ -238,7 +238,6 @@ def test_status_health_and_modules_pages_have_their_content(admin_page, live_ser
     box = page.locator("#modules-directory-search")
     expect(box).to_be_visible()
     box.fill("zzzzzz-no-module")
-    clear = page.get_by_role("button", name="Clear")
     box.fill("")
 
 
@@ -270,7 +269,6 @@ def test_public_pricing_comparison_hub_and_demo_company(browser, live_server):
     assert month.is_checked() and not year.is_checked(), "the billing interval toggle still switches"
     _visit(page, live_server, "/vs")
     _no_template_failure(page)
-    links = page.locator("main a[href*='/vs/'], main a[href^='http']").all()
     hrefs = []
     for link in page.locator("main li a").all():
         href = link.get_attribute("href")
