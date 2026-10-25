@@ -12,6 +12,7 @@ to the organisation's settings; a person confirming a proposal is a later step.
 from __future__ import annotations
 
 import logging
+import re
 import time
 import uuid
 from datetime import datetime
@@ -424,6 +425,68 @@ def _store(org_id: int, facts: List[Dict[str, Any]], crawl_id: str) -> int:
     return len(facts)
 
 
+_HOME_NAME_BREAK = re.compile(r"[|•·–—\-\u2013\u2014\u00b7\u2022]\s*(?:Home|Welcome|Official|Website|Site|\w+\.\w+).*$")
+
+
+def _home_page_company_name(first_page: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """The company name from the home page: ``og:site_name``, organisation name in JSON-LD,
+    or the page title, with the suffix after a separator (|, -, —, etc.) dropped.
+
+    Returns ``{"value", "confidence", "basis"}`` when a name was read, ``None`` when the
+    home page gave no name at all (not even a title), or a dict with ``"confidence": None``
+    when there is a candidate but the page declares no confidence."""
+    static = first_page.get("static") or {}
+    # site_name from meta or organisation name from JSON-LD
+    name = static.get("company_name")
+    if name:
+        value = _HOME_NAME_BREAK.sub("", str(name["value"]).strip()).strip()
+        if value:
+            return {"value": value, "confidence": name["confidence"], "basis": "page"}
+    # title as fallback
+    title = static.get("title") or ""
+    if title.strip():
+        value = _HOME_NAME_BREAK.sub("", title.strip()).strip()
+        if value and static.get("text_length", 0) > 200:
+            return {"value": value, "confidence": None, "basis": "page"}
+    # model analysis of the home page as last resort
+    analysis = first_page.get("analysis") or {}
+    company = analysis.get("company") if isinstance(analysis.get("company"), dict) else {}
+    model_name = _text(company.get("name"))
+    if model_name:
+        value = _HOME_NAME_BREAK.sub("", model_name).strip()
+        if value:
+            confidences = analysis.get("field_confidence") if isinstance(analysis.get("field_confidence"), dict) else {}
+            return {"value": value, "confidence": _number(confidences.get("company_name")), "basis": "model"}
+    return None
+
+
+def _replace_company_name(facts: _Facts, name: str, url: str, at: str, confidence: Optional[float],
+                          basis: str) -> None:
+    """Replace any company_name fact with one from the home page. Confidence that is None
+    means the page gave no confidence, so it falls to the default floor."""
+    # Remove every existing company_name row
+    keys = [k for k in facts.rows if k[0] == "company_name"]
+    for k in keys:
+        del facts.rows[k]
+    facts.scalar.pop("company_name", None)
+    # Only add when we have a genuine name
+    if name:
+        facts.add("company_name", name, url, at, confidence, basis)
+
+
+def _cap_company_name_confidence(facts: _Facts, home_url: str) -> None:
+    """When the home page gave no name at all, lower the confidence of whatever name was
+    found on another page, so it is never reported at 100%."""
+    for key, row in list(facts.rows.items()):
+        if key[0] != "company_name":
+            continue
+        if row.get("source_url") == home_url:
+            continue
+        if row["confidence"] > DEFAULT_CONFIDENCE:
+            row["confidence"] = DEFAULT_CONFIDENCE
+            row["confidence_basis"] = "default"
+
+
 def pending_website_proposals(org_id: int) -> List[Dict[str, Any]]:
     """The profile facts read from the organisation's website that wait for a person, in profile order."""
     import json
@@ -479,6 +542,18 @@ def crawl_organization_website(
         _from_static(facts, page["url"], page["fetched_at"], page["static"])
         _from_analysis(facts, page["url"], page["fetched_at"], page["analysis"])
     first = read["pages"][0]
+
+    # The company name must come from the home page, not a sub-page whose title or
+    # heading may differ (e.g. "Cal.com Docs" read from the docs page). Take the home
+    # page's site_name or title, and drop the suffix after a separator so "Acme | Home"
+    # becomes "Acme". When the home page gives no name at all the confidence is lowered
+    # to the default floor rather than reported at 100%.
+    _home_name = _home_page_company_name(first)
+    if _home_name:
+        _replace_company_name(facts, _home_name["value"], first["url"], first["fetched_at"],
+                              _home_name["confidence"], _home_name["basis"])
+    else:
+        _cap_company_name_confidence(facts, first["url"])
     inferred: Dict[str, Any] = {}
     try:
         inferred = parse_json(model(prompts.render("website_inference", _merged_for_inference(read["pages"], facts))))
