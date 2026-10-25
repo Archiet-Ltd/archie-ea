@@ -43,6 +43,8 @@ product:
            blurb: "Ask questions about your model in plain words and read the answer in chat."}
         - {label: Twin map, icon: network, href: /modules/digital-twin, capability: CAP-13.02,
            blurb: "Pick a system and see the applications and services that depend on it."}
+        - {label: Every answer shows its sources, icon: search, href: /modules/answer-sources, capability: CAP-13.04,
+           blurb: "Open the records behind each answer to check it before you rely on it."}
         - {label: Connect your AI assistant, icon: plug, href: /connectors/ai-assistants, capability: CAP-15.07,
            blurb: "Connect an AI assistant you already use to your organisation's model."}
     - id: map-your-business
@@ -58,6 +60,8 @@ product:
     - id: know-what-you-run
       label: Know what you run
       items:
+        - {label: Build your model from your tools, icon: git-branch, href: /modules/build-your-model-from-your-tools, capability: CAP-17.08,
+           blurb: "Connect GitHub or Jira at sign-up and start your model from them."}
         - {label: Application inventory, icon: list-checks, href: /modules/applications, capability: CAP-02.01,
            blurb: "Keep a list of your applications and record the details of each."}
         - {label: Architecture model, icon: boxes, href: /modules/architecture-model, capability: CAP-03.01,
@@ -102,12 +106,10 @@ product:
     label: Coming soon
     all_link: {label: Everything coming soon, href: "/features#coming-soon", blurb: On the features page}
     items:
-      - {label: Build your model from your tools, icon: git-branch, href: /modules/build-your-model-from-your-tools, capability: CAP-17.08,
-         blurb: "Coming soon: start your model from the tools you already use."}
       - {label: Scenarios, icon: git-compare, href: /modules/scenario-modelling, capability: CAP-14.01,
          blurb: "Coming soon: compare what-if plans side by side before you commit."}
-      - {label: Every answer shows its sources, icon: search, href: /modules/answer-sources, capability: CAP-13.04,
-         blurb: "Coming soon: see the records behind each figure in an answer."}
+      - {label: Software and tool discovery, icon: search, href: /modules/software-and-tool-discovery,
+         blurb: "Coming soon: discover the software and tools you actually pay for and use."}
 
 solutions:
   label: Solutions
@@ -138,18 +140,17 @@ solutions:
       - {label: Software and tool discovery, icon: search, href: /modules/software-and-tool-discovery,
          blurb: "Coming soon: discover the software and tools you actually pay for and use."}
 
-# Role families, in menu order. A role with a page links to it; a role without
-# one links to its place on the /roles hub, which lists all of them.
+# Role families, in menu order. The menu and the hub list only the roles that
+# have a page, each a link; a family with no role page is left out of the menu.
 roles:
   label: Roles
-  all_link: {label: All 47 roles, href: /roles}
-  shown_per_family: 6
+  all_link: {label: All roles, href: /roles}
   families:
     - id: executives
       label: Executives
       roles:
         - {label: Chief Executive Officer}
-        - {label: Chief Information Officer, href: /roles/cto-and-cio}
+        - {label: Chief Information Officer, href: /roles/cto-and-cio, card_title: CTOs and CIOs, card_blurb: "Read a scorecard, rationalise applications and defend the budget."}
         - {label: Chief Technology Officer, href: /roles/cto-and-cio}
         - {label: Chief Financial Officer}
         - {label: Chief Information Security Officer}
@@ -160,18 +161,18 @@ roles:
     - id: startups-and-scale-ups
       label: Startups and scale-ups
       roles:
-        - {label: Startup Founder}
+        - {label: Startup Founder, href: /roles/startup-founder, card_title: Startup founders, card_blurb: "Know what you run and who owns it, starting from GitHub or Jira."}
         - {label: Business Owner}
-        - {label: Scale-up CTO, href: /roles/scale-up-cto-and-vp-engineering}
+        - {label: Scale-up CTO, href: /roles/scale-up-cto-and-vp-engineering, card_title: Scale-up CTOs, card_blurb: "Record who owns what across a growing company and see what a failure reaches."}
     - id: architecture
       label: Architecture
       roles:
-        - {label: Chief Architect, href: /roles/chief-architects}
-        - {label: Enterprise Architect, href: /roles/enterprise-architects}
-        - {label: Solution Architect, href: /roles/solution-architects}
-        - {label: Business Architect, href: /roles/business-architects}
-        - {label: Security Architect, href: /roles/security-architects}
-        - {label: Data Architect, href: /roles/data-architects}
+        - {label: Chief Architect, href: /roles/chief-architects, card_title: Chief architects, card_blurb: "See architecture health, review board throughput and traceability."}
+        - {label: Enterprise Architect, href: /roles/enterprise-architects, card_title: Enterprise architects, card_blurb: "Keep one model for roadmaps, portfolio, diagrams and the review board."}
+        - {label: Solution Architect, href: /roles/solution-architects, card_title: Solution architects, card_blurb: "Design a solution and take it through the review board with its impact."}
+        - {label: Business Architect, href: /roles/business-architects, card_title: Business architects, card_blurb: "Tie capabilities and value streams to the work that changes them."}
+        - {label: Security Architect, href: /roles/security-architects, card_title: Security architects, card_blurb: "See what a risk reaches, not only where it was logged."}
+        - {label: Data Architect, href: /roles/data-architects, card_title: Data architects, card_blurb: "Trace data flows to real elements in the model."}
         - {label: Technology Architect}
         - {label: AI Architect}
         - {label: Application Architect}
@@ -180,7 +181,7 @@ roles:
     - id: portfolio-programmes-and-product
       label: Portfolio, programmes and product
       roles:
-        - {label: Portfolio Manager, href: /roles/it-portfolio-managers}
+        - {label: Portfolio Manager, href: /roles/it-portfolio-managers, card_title: IT portfolio managers, card_blurb: "Score applications, find duplicates and track cost."}
         - {label: Programme Manager}
         - {label: Project Manager}
         - {label: PMO Lead}
