@@ -106,7 +106,7 @@ that can only ever fail.
             const progress = item.progress || item.percent_complete || 0;
 
             let html = `
-                <div class="archimate-row border-b border-border hover:bg-muted/50" data-id="${item.id}" data-level="${item.level}">
+                <div class="archimate-row border-b border-border hover:bg-muted/50" data-wp-id="${item.id}" data-level="${item.level}">
                     <div class="flex items-center p-3" style="padding-left: ${16 + indent}px">  <!-- inline-style-ok -->
                         ${item.hasChildren ?
                             `<button type="button" data-action="toggleArchimateRow${containerId}" data-id="${item.id}" class="mr-2 p-1 hover:bg-accent rounded" aria-label="Toggle work package details">

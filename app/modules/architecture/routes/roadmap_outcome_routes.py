@@ -10,7 +10,9 @@ import logging
 from flask import Blueprint, jsonify, render_template, request
 
 from app.services import product_roadmap_service
-from flask_login import login_required
+from flask_login import current_user, login_required
+
+from app.core.auth.permissions import may_change_model_element
 
 logger = logging.getLogger(__name__)
 
@@ -37,6 +39,8 @@ def get_product_roadmap():
 @login_required
 def assign_horizon(epic_id: int):
     """PATCH /api/product-roadmap/epics/<id>/horizon — body: {"horizon": "now|next|later"}"""
+    if not may_change_model_element(current_user, "edit"):
+        return jsonify({"error": "Your role can view the roadmap but not change it."}), 403
     data = request.get_json(force=True) or {}
     horizon = (data.get("horizon") or "").strip()
     try:
@@ -55,4 +59,7 @@ def assign_horizon(epic_id: int):
 @login_required
 def product_roadmap_page():
     """GET /product-roadmap — render the product roadmap template."""
-    return render_template("roadmap/product_roadmap.html")
+    return render_template(
+        "roadmap/product_roadmap.html",
+        can_write=may_change_model_element(current_user, "edit"),
+    )
