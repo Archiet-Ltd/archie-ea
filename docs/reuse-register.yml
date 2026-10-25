@@ -462,6 +462,20 @@ entries:
         scope: [app/static/js, app/templates]
         suffixes: [.js, .html]
 
+  - id: diagram-editor-shell
+    concept: The editor chrome around an ArchiMate diagram (toolbar, element palette, finder, relationship legend, minimap, status line, header, properties sheet)
+    status: active
+    canonical:
+      path: app/templates/components/diagram/toolbar.html
+      symbols: [diagram_toolbar]
+    reuse: >
+      A diagram page draws its chrome with the macros under app/templates/components/diagram/ (diagram_toolbar,
+      diagram_palette, diagram_finder, diagram_legend, diagram_status_line, diagram_minimap, diagram_header,
+      diagram_properties_sheet) and drives the one engine through composerApp. The state those macros read lives in
+      app/static/js/archimate/composer_shell.js; the notation icons are one sprite at
+      app/static/img/archimate-notation.svg and the layer colours are the --notation-* tokens. Do not build a second
+      toolbar or palette on a page, and do not write a layer colour in a template or script.
+
   - id: public-button
     concept: The public site button (primary and outline, 40px, 2px solid focus outline)
     status: active
