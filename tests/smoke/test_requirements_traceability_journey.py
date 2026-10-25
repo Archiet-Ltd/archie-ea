@@ -18,7 +18,6 @@ pytestmark = [pytest.mark.smoke, pytest.mark.journey]
 
 def test_requirements_traceability_shows_matrix(browser, live_server):
     org = create_fresh_org("enterprise_architect")
-    suffix = org["suffix"]
     context = browser.new_context(ignore_https_errors=True, viewport={"width": 1440, "height": 1000})
     context.add_init_script("localStorage.setItem('archie_onboarding_ts', Date.now().toString());")
     page = context.new_page()
