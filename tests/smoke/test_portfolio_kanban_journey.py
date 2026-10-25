@@ -172,6 +172,19 @@ def _assert_wip_limits_show_on_headers(page):
         assert "/" not in header.replace("epics", ""), f"{state} should show no WIP limit: {header!r}"
 
 
+def _autoscroll_to(page, target, handle):
+    """Carry a held card to a lane that is scrolled out of view the way a person
+    does: hold the pointer at the board's edge until the board scrolls the lane in."""
+    region = page.locator("[data-kanban-scroll]").first.bounding_box()
+    for _ in range(40):
+        box = target.bounding_box()
+        if box["x"] >= region["x"] and box["x"] + box["width"] <= region["x"] + region["width"]:
+            return
+        edge = region["x"] + 6 if box["x"] < region["x"] else region["x"] + region["width"] - 6
+        page.mouse.move(edge, handle["y"] + handle["height"] / 2, steps=6)
+        page.wait_for_timeout(250)
+
+
 def _drag_card(page, card, to_state):
     """Drag a card onto a column with real mouse events: press on the card's
     drag handle, move across the board in steps, release over the target lane.
@@ -181,7 +194,7 @@ def _drag_card(page, card, to_state):
     handle = card.locator("[data-drag-handle]").bounding_box()
     page.mouse.move(handle["x"] + handle["width"] / 2, handle["y"] + handle["height"] / 2)
     page.mouse.down()
-    target.scroll_into_view_if_needed()
+    _autoscroll_to(page, target, handle)
     box = target.bounding_box()
     page.mouse.move(box["x"] + box["width"] / 2, box["y"] + 60, steps=12)
     page.mouse.move(box["x"] + box["width"] / 2, box["y"] + 70, steps=4)
@@ -439,11 +452,14 @@ def test_portfolio_board_viewer_is_read_only(browser, live_server, seeded, db_se
         page.wait_for_load_state("networkidle")
         # The epics are visible (read access), but no move control is shown.
         expect(page.get_by_role("heading", name="Platform Modernization Epic").first).to_be_visible(timeout=PAGE_TIMEOUT)
-        # The "Move to" select is gated on canWrite (x-show), so for a viewer no
-        # select is visible — a hidden node may remain in the DOM, so the test
+        # The "Move to" menu is gated on canWrite (x-show), so for a viewer none
+        # is visible — a hidden node may remain in the DOM, so the test
         # asserts visibility, not DOM presence.
         assert page.locator(".kanban-card [data-testid='card-actions']").count() == 0, "viewer is shown a card actions menu"
         assert page.locator("[data-drag-handle]").count() == 0, "viewer is shown a drag handle"
+        menus = page.locator(".kanban-card [data-kanban-move] button")
+        for i in range(menus.count()):
+            assert not menus.nth(i).is_visible(), "viewer is shown a Move to menu"
         # The board's read-only-ness is also reported by the API it renders from.
         import json
         page.goto(live_server + "/api/safe/portfolio", timeout=PAGE_TIMEOUT)

@@ -215,7 +215,7 @@ def test_context_empty_and_failure_states_remain_distinct(context_page, mode, do
         page.locator('#domain-selector').select_option('technology')
     panel = page.locator('#domain-context')
     if mode == 'empty':
-        expect(panel).to_contain_text('No specific context available')
+        expect(panel).to_contain_text('so the answer uses your whole portfolio')
         assert not context_page.state.errors
     else:
         expect(panel).to_contain_text("Couldn't load context")
@@ -228,7 +228,7 @@ def test_context_empty_and_failure_states_remain_distinct(context_page, mode, do
 @pytest.mark.parametrize('null_reason', [False, True])
 def test_explicit_cancellation_rejects_and_keeps_loading_and_csrf_contracts(context_page, null_reason):
     page = context_page.start('empty')
-    expect(page.locator('#domain-context')).to_contain_text('No specific context available')
+    expect(page.locator('#domain-context')).to_contain_text('so the answer uses your whole portfolio')
     page.evaluate("""() => {
       // The layout fixture has no loading store; use a real Alpine store to observe the API balance.
       Alpine.store('loading', {pending: 0, start() {this.pending++;}, stop() {this.pending--;}});

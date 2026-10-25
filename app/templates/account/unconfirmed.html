@@ -1,4 +1,7 @@
+{# design-block: onboarding #}
 {% extends 'layouts/public_base.html' %}
+{% from 'components/button.html' import button %}
+{% from 'components/input.html' import input %}
 {% block title %}Confirm Your Email{% endblock %}
 {% from 'components/button.html' import button %}
 {% from 'components/input.html' import input %}
@@ -32,8 +35,7 @@
                         icon='mail-x',
                         title='E-mail is not available on this server',
                         description="No confirmation link can be sent to " + current_user.email + ". Ask your organisation's administrator for help."
-                    ) }}
-                    {% endif %}
+                    ) }}                    {% endif %}
 
                     <p class="text-sm text-muted-foreground mt-6">
                         Wrong account? <a href="{{ url_for('account.logout') }}" class="text-primary hover:underline">Sign out</a>

@@ -145,9 +145,8 @@ _MORE_TOOLS = [
     ("Batch Import", "batch_import_view.dashboard", "upload"),
     ("Consolidation List", "consolidation_list.dashboard", "combine"),
     ("Duplicate Detection", "unified_duplicate.simple_dashboard", "copy"),
-    ("EA Briefings", "solution_design.ea_briefings", "newspaper"),
+    ("Weekly Briefing", "solution_design.ea_briefings", "newspaper"),
     ("Data Stewardship", "solution_design.data_stewardship", "database"),
-    ("Chief Architect Synthesis", "solution_design.architect_synthesis", "layout-dashboard"),
     # Hidden from this list on 30 Aug 2026 after every entry was requested with
     # a logged-in client and its status recorded:
     #   main.capability_framework.dashboard - 302 to /framework-management/,
@@ -207,6 +206,7 @@ _MORE_TOOLS = [
     ("Usage Analytics", "usage_analytics.analytics_root", "bar-chart-3"),
     ("Vendor Analysis", "main.vendor_archimate_analysis", "building"),
     ("Integrations", "main.integrations", "cloud"),
+    ("Roadmap", "genome_roadmap.index", "map"),
     ("Architecture Roadmap", "main.archimate_roadmap", "map"),
     ("Enterprise Dashboard", "enterprise.enterprise_dashboard", "layout-dashboard"),
     # Every signed-in user can already open this from the sidebar footer
@@ -227,7 +227,9 @@ _NOT_RENDERED = {
     "main.capability_framework.dashboard": "302 -> Framework Management",
     "dashboard.index": "302 -> Dashboard Overview",
     "unified_duplicate.enterprise_dashboard": "302 -> Duplicate Detection",
-    "architect_ui.roadmap_builder": "302 -> Roadmaps",
+    "architect_ui.roadmap_builder": "302 -> Roadmap",
+    # The older ArchiMate roadmap address, a 302 to the one roadmap.
+    "main.archimate_roadmap": "302 -> Roadmap",
 }
 
 _ZONE_ORDER = ["home", "my_work", "library", "workspace", "governance", "admin"]

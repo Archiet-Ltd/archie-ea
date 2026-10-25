@@ -3,8 +3,7 @@
 A founder opens the public home and sees one headline, one sentence, two buttons and a real
 answer, and nothing else in the first 900 pixels. A new architect signs in to an empty workspace
 and sees one message with its action and a question box, no figures or tabs. A second architect
-signs in to a workspace that holds data and sees the question box with the first cited answer
-before any figure; asking a question lands on the chat with that question waiting.
+signs in to a workspace that holds data and sees the question box and then the figures, with no answer on the page; asking a question lands on the chat with that question waiting.
 """
 import pytest
 from playwright.sync_api import expect
@@ -92,9 +91,14 @@ def test_empty_workspace_first_screen_is_one_message(browser, live_server, seede
         # nothing else: no figures, tabs or quick links until there is data
         for testid in ("kpi-tile-applications", "layer-tab-overview", "layer-tab-motivation", "architecture-health"):
             expect(page.locator('[data-testid="%s"]' % testid)).to_have_count(0)
-        # this architect is not an administrator, so the page says who connects instead of a dead link
-        expect(page.locator('[data-testid="first-action-connect"]')).to_have_count(0)
-        expect(message).to_contain_text("organisation administrator")
+        # this architect is not an administrator but brings sources in, so the button is
+        # there and opens the GitHub page with its form rather than a refusal
+        expect(page.locator('[data-testid="first-action-connect"]')).to_have_count(1)
+        expect(message).not_to_contain_text("organisation administrator")
+        page.locator('[data-testid="first-action-connect"]').click()
+        page.wait_for_url("**/admin/connectors/github", timeout=PAGE_TIMEOUT)
+        expect(page.get_by_role("button", name="Connect and read my repositories")).to_be_visible()
+        page.goto(live_server + "/dashboard/overview", wait_until="networkidle", timeout=PAGE_TIMEOUT)
 
         # the question lands on the chat with the question waiting
         question.fill("what breaks if payments fails?")
@@ -112,7 +116,7 @@ def test_empty_workspace_first_screen_is_one_message(browser, live_server, seede
 
 
 @pytest.mark.parametrize("viewport", [FOLD, PHONE], ids=["1440", "390"])
-def test_populated_workspace_opens_on_question_and_cited_answer(browser, live_server, seeded, viewport):
+def test_populated_workspace_opens_on_question_and_shows_no_answer(browser, live_server, seeded, viewport):
     email = seeded["emails"]["enterprise_architect"]
     _assert_persona(email)
     context, page = _page(browser, viewport)
@@ -122,11 +126,8 @@ def test_populated_workspace_opens_on_question_and_cited_answer(browser, live_se
         message = page.locator('[data-testid="first-message"]')
         expect(message).to_contain_text("Ask your company a question")
         expect(page.locator('[data-testid="first-question-input"]')).to_be_in_viewport()
-        # the first cited answer is part of the message, with rows that cite a source
-        cascade = page.locator('[data-testid="overview-cascade"]')
-        expect(cascade).to_be_visible()
-        expect(cascade.locator('[data-testid="overview-answer-cascade"], #overview-answer-cascade').first).to_be_visible(timeout=PAGE_TIMEOUT)
-        assert len(cascade.inner_text().strip()) > 40
+        # the dashboard never renders an answer: the question is answered in the chat
+        expect(page.locator('[data-testid="overview-cascade"]')).to_have_count(0)
         # the figures and the nine tabs come after the message
         message_bottom = message.evaluate("e => e.getBoundingClientRect().bottom")
         assert _top(page, '[data-testid="kpi-tile-applications"]') >= message_bottom
@@ -161,10 +162,9 @@ def test_empty_workspace_fold_holds_only_the_one_message(browser, live_server, s
         context.close()
 
 
-def test_first_answer_names_the_owner_and_its_source_with_a_link(browser, live_server, seeded):
-    """Signed in as the architect who loaded the sample company: the capability the first answer
-    reaches names the owner the capability page shows, and its source control names the import
-    and opens the record."""
+def test_first_answer_in_the_chat_names_the_owner_and_its_source(browser, live_server, seeded):
+    """Signed in as the architect who loaded the sample company: the question typed on the dashboard
+    is answered in the chat, and the capability card names the owner and cites the import."""
     email, _ = _empty_organisation_user(live_server)
     _assert_persona(email)
     context, page = _page(browser, FOLD)
@@ -172,22 +172,16 @@ def test_first_answer_names_the_owner_and_its_source_with_a_link(browser, live_s
         _login(page, live_server, email)
         page.goto(live_server + "/dashboard/overview", wait_until="networkidle", timeout=PAGE_TIMEOUT)
         page.locator('[data-testid="first-action-sample"]').click()
-        cascade = page.locator('[data-testid="overview-cascade"]')
-        expect(cascade.locator("li[data-depth]").first).to_be_visible(timeout=PAGE_TIMEOUT * 2)
-        rows = cascade.locator("li[data-depth]")
-        capability = rows.filter(has_text="Sell to customers online")
-        expect(capability).to_contain_text("Startup CTO")
-        expect(capability).not_to_contain_text("No owner recorded")
-
-        # the source control says where the fact came from, with the date, and opens the record
-        first = cascade.locator("li[data-depth]:not([data-root])").first
-        first.get_by_role("button", name="Source of this connection").click()
-        tip = first.get_by_role("tooltip")
-        expect(tip).to_contain_text("Imported from Sample company")
-        expect(tip).to_contain_text("Recorded")
-        expect(tip).not_to_contain_text("Recorded in the model")
-        tip.locator('[data-testid="cascade-source-link"]').click()
-        page.wait_for_url("**/archimate/elements/*/impact", timeout=PAGE_TIMEOUT)
-        assert len(page.locator("main").first.inner_text().strip()) > 50
+        expect(page.locator('[data-testid="sample-company-indicator"]')).to_be_visible(timeout=PAGE_TIMEOUT * 2)
+        page.locator('[data-testid="first-question-input"]').fill("What breaks if Payments service fails")
+        page.locator('[data-testid="first-question-submit"]').click()
+        page.wait_for_url("**/ai-chat**", timeout=PAGE_TIMEOUT)
+        page.locator("#user-input").press("Enter")
+        answer = page.get_by_test_id("estate-answer")
+        expect(answer).to_be_visible(timeout=PAGE_TIMEOUT * 2)
+        capability = answer.locator("[data-slot='card']").filter(has=page.locator("[data-answer-row]")).filter(has_text="Sell to customers online")
+        expect(capability.first).to_contain_text("Startup CTO")
+        expect(capability.first).not_to_contain_text("No owner recorded")
+        assert "Sample company" in capability.first.locator("[data-citation]").inner_text()
     finally:
         context.close()

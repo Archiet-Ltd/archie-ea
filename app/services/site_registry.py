@@ -97,7 +97,6 @@ def _resolve_actions(raw: dict[str, Any]) -> list[dict[str, Any]]:
 
 def _roles(raw: dict[str, Any]) -> dict[str, Any]:
     section = raw["roles"]
-    shown_per_family = int(section.get("shown_per_family", 6))
     families = []
     for family in section["families"]:
         family_href = f"/roles#{family['id']}"
@@ -110,71 +109,90 @@ def _roles(raw: dict[str, Any]) -> dict[str, Any]:
                 "label": role["label"],
                 "href": role["href"] if has_page else f"/roles#{role_id}",
                 "has_page": has_page,
+                "card_title": role.get("card_title", role["label"]),
+                "card_blurb": role.get("card_blurb", ""),
             })
+        with_page: list[dict[str, Any]] = []
+        for role in roles:
+            if role["has_page"] and all(role["href"] != other["href"] for other in with_page):
+                with_page.append(role)
         families.append({
             "id": family["id"],
             "label": family["label"],
             "href": family_href,
             "roles": roles,
-            "shown": roles[:shown_per_family],
-            "more": len(roles) - shown_per_family if len(roles) > shown_per_family else 0,
+            "shown": with_page,
+            "has_page": bool(with_page),
         })
     return {
         "label": section["label"],
         "all_link": section["all_link"],
         "families": families,
+        "menu_families": [f for f in families if f["has_page"]],
+        "cards": _role_cards(families),
         "count": sum(len(f["roles"]) for f in families),
     }
 
 
+def _role_cards(families: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """The role pages as cards for the /roles hub: one card per page, grouped by
+    family, the startup family first. A page shared by two roles is one card (see the family's shown list)."""
+    ordered = sorted(families, key=lambda f: f["id"] != "startups-and-scale-ups")
+    groups = []
+    for family in ordered:
+        cards = []
+        for role in family["shown"]:
+            cards.append({"title": role["card_title"], "blurb": role["card_blurb"], "href": role["href"]})
+        if cards:
+            groups.append({"id": family["id"], "label": family["label"], "cards": cards})
+    return groups
+
+
 def _footer(reg: dict[str, Any]) -> dict[str, Any]:
-    """Two rows. Row one is the Product menu, group for group, then Coming soon.
-    Row two mirrors Solutions, Roles, Compare, Resources, Pricing and Legal."""
+    """One set of columns: Product, Solutions, Roles, Compare, Resources, Company
+    and Legal, each a plain list of live links. Everything not available yet sits
+    in one labelled group, Coming soon, and nothing live is in it."""
 
     def link(entry: dict[str, Any], **extra: Any) -> dict[str, Any]:
         return {"label": entry["label"], "href": entry["href"], **extra}
 
-    product = reg["product"]
-    row_one = [
-        {"id": g["id"], "label": g["label"], "items": [link(i) for i in g["items"]]}
-        for g in product["groups"]
-    ]
-    soon = product["coming_soon"]
-    row_one.append({
-        "id": "coming-soon",
-        "label": soon["label"],
-        "items": [link(i, coming_soon=True) for i in soon["items"]] + [link(soon["all_link"])],
-    })
+    product = [link(i) for g in reg["product"]["groups"] for i in g["items"]]
+    product.append(link(reg["product"]["all_link"]))
 
-    solutions = reg["solutions"]
-    roles = reg["roles"]
-    compare = reg["compare"]
-    row_two = [
-        {"id": "product-overview", "label": "Product", "items": [link(product["all_link"])]},
-        {"id": "solutions", "label": solutions["label"],
-         "items": [link(i) for i in solutions["items"]]
-         + [link(i, coming_soon=True) for i in solutions["coming_soon"]["items"]
-            if i["label"] not in {s["label"] for s in soon["items"]}]},
-        {"id": "roles", "label": roles["label"],
-         "items": [link(f) for f in roles["families"]] + [link(roles["all_link"])]},
-        {"id": "compare", "label": "Compare",
-         "items": [link(i) for i in compare["items"]] + [link(compare["all_link"])]},
-    ]
-    for group in reg["resources"]["groups"]:
-        row_two.append({"id": group["id"], "label": group["label"], "items": [link(i) for i in group["items"]]})
-    row_two.append({"id": "pricing", "label": reg["pricing"]["label"],
-                    "items": [link(i) for i in reg["pricing"]["items"]]})
+    solutions = [link(i) for i in reg["solutions"]["items"]]
+    roles = [link(f) for f in reg["roles"]["menu_families"]] + [link(reg["roles"]["all_link"])]
+    compare = [link(i) for i in reg["compare"]["items"]] + [link(reg["compare"]["all_link"])]
+
+    resources_ids = ("learn", "services")
+    resources = [link(i) for g in reg["resources"]["groups"] if g["id"] in resources_ids for i in g["items"]]
+    company = [link(i) for g in reg["resources"]["groups"] if g["id"] not in resources_ids for i in g["items"]]
+    company += [link(reg["pricing"]["items"][0])]
 
     from app.services.legal_pages import legal_links
 
-    legal_items = [{"label": item["label"], "href": item["href"], "legal_slug": item["slug"]}
-                   for item in legal_links()]
-    legal_items += [link(i) for i in reg["legal"].get("extra_items", [])]
-    row_two.append({"id": "legal", "label": reg["legal"]["label"], "items": legal_items})
-    return {"rows": [
-        {"id": "product", "label": "Product", "columns": row_one},
-        {"id": "everything-else", "label": "Everything else", "columns": row_two},
-    ]}
+    legal = [{"label": item["label"], "href": item["href"], "legal_slug": item["slug"]}
+             for item in legal_links()]
+    legal += [link(i) for i in reg["legal"].get("extra_items", [])]
+
+    soon_items: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for entry in reg["product"]["coming_soon"]["items"] + reg["solutions"]["coming_soon"]["items"]:
+        if entry["label"] not in seen:
+            seen.add(entry["label"])
+            soon_items.append(link(entry, coming_soon=True))
+    soon_items.append(link(reg["product"]["coming_soon"]["all_link"]))
+
+    columns = [
+        {"id": "product", "label": "Product", "items": product},
+        {"id": "solutions", "label": reg["solutions"]["label"], "items": solutions},
+        {"id": "roles", "label": reg["roles"]["label"], "items": roles},
+        {"id": "compare", "label": "Compare", "items": compare},
+        {"id": "resources", "label": "Resources", "items": resources},
+        {"id": "company", "label": "Company", "items": company},
+        {"id": "legal", "label": reg["legal"]["label"], "items": legal},
+        {"id": "coming-soon", "label": "Coming soon", "items": soon_items},
+    ]
+    return {"rows": [{"id": "site-map", "label": "Site map", "columns": [c for c in columns if c["items"]]}]}
 
 
 def site_registry() -> dict[str, Any]:
@@ -253,7 +271,7 @@ def registry_links(reg: dict[str, Any] | None = None) -> list[dict[str, Any]]:
     add(reg["product"]["coming_soon"]["all_link"], "navbar")
     for item in reg["solutions"]["items"] + reg["solutions"]["coming_soon"]["items"]:
         add(item, "navbar")
-    for family in reg["roles"]["families"]:
+    for family in reg["roles"]["menu_families"]:
         add(family, "navbar")
         for role in family["shown"]:
             add(role, "navbar")

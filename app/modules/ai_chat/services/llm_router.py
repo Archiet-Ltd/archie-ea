@@ -18,8 +18,9 @@ Provider Priority (configurable):
 1. anthropic (Claude - highest quality)
 2. openai (GPT - 4 - fast, reliable)
 3. gemini (Google - cost-effective)
-4. deepseek (open-source alternative)
-5. azure (enterprise option)
+4. openrouter (free models)
+5. nvidia (free models, fallback)
+5a. azure (enterprise option)
 6. huggingface (free, local models - last resort)
 
 Caching Strategy:
@@ -54,6 +55,7 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship  # dead-code-ok
 
 from app import db
+from app.modules.ai_chat.services.model_defaults import default_model_for as _default_model_for
 from app.services.llm_cache import get_cache as get_llm_cache
 from app.modules.ai_chat.services.llm_service_impl import LLMService as _LLMServiceImpl
 
@@ -74,7 +76,7 @@ class LLMProvider(str, Enum):
     ANTHROPIC = "anthropic"
     OPENAI = "openai"
     GEMINI = "gemini"
-    DEEPSEEK = "deepseek"
+    NVIDIA = "nvidia"
     AZURE = "azure"
     HUGGINGFACE = "huggingface"
     OPENROUTER = "openrouter"
@@ -154,8 +156,8 @@ class RouterConfig:
                 LLMProvider.OPENAI,
                 LLMProvider.ANTHROPIC,
                 LLMProvider.GEMINI,
-                LLMProvider.DEEPSEEK,
                 LLMProvider.OPENROUTER,
+                LLMProvider.NVIDIA,
                 LLMProvider.AZURE,
                 LLMProvider.HUGGINGFACE,
             ]
@@ -372,8 +374,8 @@ class LLMRouter:
             LLMProvider.ANTHROPIC: "claude-haiku-4-5-20251001",
             LLMProvider.OPENAI: "gpt-4o-mini",
             LLMProvider.GEMINI: "gemini-2.0-flash",
-            LLMProvider.DEEPSEEK: "deepseek-chat",
-            LLMProvider.OPENROUTER: "deepseek/deepseek-chat",
+            LLMProvider.NVIDIA: _default_model_for("nvidia"),
+            LLMProvider.OPENROUTER: "google/gemma-4-31b-it:free",
             LLMProvider.AZURE: "gpt-4o",
             LLMProvider.HUGGINGFACE: "meta-llama/Llama-3.1-8B-Instruct",
         }
@@ -475,8 +477,8 @@ class LLMRouter:
             LLMProvider.ANTHROPIC: 0.015,  # $15 per 1M tokens
             LLMProvider.OPENAI: 0.03,  # $30 per 1M tokens
             LLMProvider.GEMINI: 0.001,  # $1 per 1M tokens
-            LLMProvider.DEEPSEEK: 0.001,  # Approximate
-            LLMProvider.OPENROUTER: 0.005,  # Varies by model, average estimate
+            LLMProvider.NVIDIA: 0.0,  # Free models
+            LLMProvider.OPENROUTER: 0.0,  # Free models
             LLMProvider.AZURE: 0.03,  # Similar to OpenAI
             LLMProvider.HUGGINGFACE: 0.0,  # Free
         }

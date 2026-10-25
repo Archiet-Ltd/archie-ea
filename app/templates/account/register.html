@@ -1,15 +1,25 @@
+{# design-block: onboarding #}
 {% extends 'layouts/public_base.html' %}
 {% block title %}Create Account{% endblock %}
 {% import 'macros/form_macros.html' as f %}
 {% import 'macros/check_password.html' as check with context %}
-{% from 'components/card.html' import card, card_header, card_title, card_description, card_content with context %}
-
+{% from 'components/stepper.html' import stepper %}
+{% from 'components/card.html' import card, card_header, card_title, card_description, card_content, card_footer %}
+{% from 'components/button.html' import button %}
+{% from 'components/input.html' import input, label %}
+{% from 'components/select.html' import native_select %}
+{% from 'components/checkbox.html' import checkbox %}
+{% from 'components/alert.html' import alert %}
+{% set step = step | default(1) %}
+{% set sign_up_steps = [{'num': 1, 'label': 'Your account'}, {'num': 2, 'label': 'Your sources'}, {'num': 3, 'label': 'Your company'}, {'num': 4, 'label': 'Your AI provider'}] %}
 {% block content %}
 {# layouts/public_base.html already renders the sole <main id="main-content">
    landmark. Wrapping the page in a second one gave the document two main
    landmarks and two elements with the same id, so the "Skip to main content"
    link and screen-reader landmark navigation both resolved ambiguously. #}
-<div>
+<div class="mx-auto w-full max-w-2xl px-4 py-6 space-y-6" x-data="{ step: {{ step }}, done: {{ range(1, step) | list | tojson }}, locked: [] }">
+    {{ stepper(sign_up_steps, current_step_expr='step', completed_expr='done', locked_steps_expr='locked') }}
+    {% if step == 1 %}
     <div class="flex justify-center">
         <div class="w-full max-w-md">
             {% call card() %}
@@ -59,5 +69,12 @@
         </div>
     </div>
     {{ check.password_check('password', 0) }}
+    {% elif step == 2 %}
+    {% include 'account/_signup_sources.html' %}
+    {% elif step == 3 %}
+    {% include 'account/_signup_company.html' %}
+    {% else %}
+    {% include 'account/_signup_ai.html' %}
+    {% endif %}
 </div>
 {% endblock %}

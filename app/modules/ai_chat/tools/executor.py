@@ -397,6 +397,32 @@ class ToolExecutor:
             ),
         }
 
+    def _application_owner_fields(self, apps) -> dict:
+        """{application id: {"owners": [...], "has_owner": bool}} from the ownership records.
+
+        The same records and the same "is it owned" rule the Applications pages
+        read; owner text on the application row is used only when no record
+        names anyone.
+        """
+        from app.models.application_owner import ApplicationOwner
+        from app.services.element_ownership_service import application_is_owned
+
+        org_id = self._get_organization_id()
+        recorded = ApplicationOwner.get_display_rows_for_applications([a.id for a in apps], org_id)
+        fields = {}
+        for a in apps:
+            owners = [
+                {"name": row["user_name"], "ownership_type": row["ownership_type"]}
+                for row in recorded.get(a.id, [])
+                if row.get("user_name") and row["user_name"] != "\u2014"
+            ]
+            if not owners:
+                text = (a.legacy_business_owner or a.legacy_application_owner or "").strip()
+                if text:
+                    owners = [{"name": text, "ownership_type": None}]
+            fields[a.id] = {"owners": owners, "has_owner": application_is_owned(a)}
+        return fields
+
     def _get_organization_id(self) -> int:
         """Return the organization_id for the current user (cached after first call)."""
         if self._org_id is not None:
@@ -1043,6 +1069,14 @@ class ToolExecutor:
         if status_filter:
             q = q.filter(ApplicationComponent.lifecycle_status == status_filter)
 
+        # Ownership filter: the same "is it owned" rule the Applications pages use.
+        ownership = args.get("ownership")
+        if ownership in ("owned", "unowned"):
+            from app.services.element_ownership_service import application_is_owned_expression
+
+            owned = application_is_owned_expression(ApplicationComponent)
+            q = q.filter(owned if ownership == "owned" else ~owned)
+
         # Capability filter: join through ApplicationCapabilityMapping
         cap_name = args.get("capability_name")
         if cap_name:
@@ -1062,6 +1096,7 @@ class ToolExecutor:
         # told what it is not seeing.
         total = q.count()
         apps = q.limit(limit).all()
+        owner_fields = self._application_owner_fields(apps)
         rows = [
             {
                 "id": a.id,
@@ -1072,7 +1107,7 @@ class ToolExecutor:
                 # technical-deployment concept and is labelled as such.
                 "lifecycle_status": a.lifecycle_status,
                 "deployment_status": a.deployment_status,
-                "owner_team": getattr(a, "owner_team", None),
+                **owner_fields[a.id],
             }
             for a in apps
         ]
@@ -1944,6 +1979,7 @@ class ToolExecutor:
 
         app_map = {a.id: a for a in apps}
         rows = []
+        owner_fields = self._application_owner_fields(apps)
         for m in mappings:
             a = app_map.get(m.application_component_id)
             if not a:
@@ -1953,7 +1989,7 @@ class ToolExecutor:
                 "name": a.name,
                 "deployment_status": a.deployment_status,
                 "coverage_level": getattr(m, "coverage_level", None),
-                "owner_team": getattr(a, "owner_team", None),
+                **owner_fields[a.id],
             })
 
         coverage = self._coverage(

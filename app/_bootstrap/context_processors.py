@@ -702,6 +702,9 @@ def init_context_processors(app):
     app.jinja_env.globals["may_open_procurement"] = _template_may_open_procurement
     app.jinja_env.globals["home_url"] = _template_home_url
 
+    from app.modules.business_model_canvas.box_meta import canvas_box_meta
+    app.jinja_env.globals["canvas_box_meta"] = canvas_box_meta
+
     # NS-006: Register role-based access functions for persona navigation
     from app.utils.role_access import get_sidebar_zones, role_access_context_processor
     role_funcs = role_access_context_processor()
@@ -712,6 +715,38 @@ def init_context_processors(app):
     # template (components/admin_sidebar.html) renders from this only — see
     # app/utils/role_access.py for the single source of truth.
     app.jinja_env.globals["get_sidebar_zones"] = get_sidebar_zones
+
+    # Navigation v3: the sidebar, its search and the breadcrumb trail read the one
+    # registry (app/navigation/registry.py). Callables, so only the pages that draw the
+    # shell pay for them.
+    def _template_navigation(user=None):
+        from flask import g, has_request_context, request
+        from flask_login import current_user as signed_in
+
+        from app.navigation import registry
+
+        # The template passes the user it renders for (the page's current_user).
+        current_user = user if user is not None else signed_in
+
+        endpoint = request.endpoint if has_request_context() else None
+        nav = registry.sidebar_for(current_user, endpoint)
+        org_id = getattr(g, "current_org_id", None) if has_request_context() else None
+        if org_id is None:
+            org_id = getattr(current_user, "organization_id", None)
+        nav["connected"] = registry.has_connected_source(org_id)
+        nav["connect_url"] = registry.connect_url(current_user)
+        return nav
+
+    def _template_nav_trail():
+        from flask import has_request_context, request
+        from flask_login import current_user
+
+        from app.navigation import registry
+
+        return registry.trail(current_user, request.endpoint if has_request_context() else None)
+
+    app.jinja_env.globals["sidebar_navigation"] = _template_navigation
+    app.jinja_env.globals["nav_trail"] = _template_nav_trail
 
     # E2E-7: the header's role badge (components/admin_header.html) read
     # current_user.role.name -- the legacy Flask-Base Role/Permission table,

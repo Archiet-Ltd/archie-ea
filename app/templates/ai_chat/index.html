@@ -21,361 +21,136 @@
 {% endblock %}
 
 {% block content %}
-{# The chat follows the gallery's chat block: a header row, the message list (which opens on
-   what to ask first), and the composer at the bottom. Every control is a component macro.
-   The ids below are the ones the chat scripts read; they stay. #}
+{# The chat follows the gallery's AI chat screen: a history panel (New chat, search, past chats),
+   a welcome with a greeting and four suggestion cards, and the composer at the foot. Everything
+   else sits behind one "Chat options" sheet. The ids below are the ones the chat scripts read. #}
 {% set provider_label = (llm_provider | replace('_', ' ') | title) if llm_provider else 'the platform default' %}
+{% from 'components/drawer.html' import drawer with context %}
 <div x-data="{
         railOpen: (localStorage.getItem('archie_chat_rail') ?? (window.innerWidth >= 1280 ? 'open' : 'closed')) === 'open',
+        mobileOpen: false,
         activeTab: 'context',
-        showAdvanced: false
+        tipUpload: false
     }"
      x-init="$watch('railOpen', (v) => localStorage.setItem('archie_chat_rail', v ? 'open' : 'closed'))"
      @chat-tab.window="activeTab = $event.detail"
-     class="flex h-[calc(100dvh-10rem)] min-h-[28rem] flex-col bg-background -mx-4 -my-6">
+     id="chat-frame" class="flex h-[calc(100dvh-10rem)] min-h-[28rem] flex-col bg-background -mx-4 -my-6">
 {% if chat_bootstrap_error %}
 <div class="shrink-0 px-4 py-2">{{ alert('warning', text=chat_bootstrap_error) }}</div> {# ui-contract-ok: the alert macro, not a native dialog #}
 {% endif %}
-{% if not llm_configured %}
-{# The earliest and most visible place to say the model cannot answer, and what closes it.
-   The admin path is a literal, not url_for: the admin blueprint is selected at boot and a
-   missing endpoint would 500 this whole page. #}
-<div class="shrink-0 px-4 py-2">
-    {% if current_user.is_admin() %}
-    {% call alert('warning', title='AI model unavailable', link_href='/admin/api-settings', link_text='Open Admin → API Settings') %}No model is configured, so the assistant cannot write answers. Questions about your records are still answered from them.{% endcall %} {# ui-contract-ok: the alert macro, not a native dialog #}
-    {% else %}
-    {% call alert('warning', title='AI model unavailable') %}No model is configured, so the assistant cannot write answers. Ask an administrator to configure one. Questions about your records are still answered from them.{% endcall %} {# ui-contract-ok: the alert macro, not a native dialog #}
-    {% endif %}
-</div>
-{% endif %}
-    <header class="shrink-0 border-b border-border bg-background px-4 py-3 lg:px-6">
-        {# JS (updateDomainUI / updatePersonaUI) writes the active assistant and scope into these,
-           and a screen-reader user still hears which one is active. #}
-        <div id="domain-icon" class="sr-only" aria-hidden="true"><i data-lucide="bot" class="h-5 w-5" aria-hidden="true"></i></div>
-        <h1 id="domain-title" class="sr-only"></h1>
-        <p id="domain-description" class="sr-only"></p>
-
-        <div data-testid="chat-header-row" class="flex flex-wrap items-center justify-between gap-2">
-            <div class="flex min-w-0 flex-1 flex-wrap items-center gap-2">
-                {{ button(variant='outline', size='icon', icon='panel-left', aria_label='Toggle context panel', class='lg:hidden shrink-0', attrs_dict={'id': 'sidebar-toggle', '@click': 'toggleSidebar()'}) }}
-
-                {# Persona selects the charter; scope selects which context loader runs. They are
-                   orthogonal, so scope stays visible, labelled "Looking at". #}
-                {% set persona_category_labels = {
-                    'architects': 'AI Architects (governed, live data)',
-                    'governance': 'Governance',
-                    'stewards': 'Portfolio & commercial stewardship',
-                    'analysts': 'Specialist roles',
-                    'executives': 'Executive roles'
-                } %}
-                {% call native_select(id='persona-selector', aria_label='Assistant', size='sm', class='w-40 max-w-full font-medium sm:w-56') %}
-                    {% for category, persona_keys in persona_config.categories.items() %}
-                    <optgroup label="{{ persona_category_labels.get(category, category | replace('_', ' ') | title) }}">
-                        {% for persona_key in persona_keys %}
-                        {% set persona = persona_config.personas.get(persona_key) %}
-                        {% if persona %}
-                        <option value="{{ persona_key }}"{% if persona_key == default_chat_persona %} selected{% endif %}>{{ persona.name }}</option>
-                        {% endif %}
-                        {% endfor %}
-                    </optgroup>
-                    {% endfor %}
-                {% endcall %}
-                {{ native_select(id='domain-selector', aria_label='Looking at', size='sm', class='w-36 max-w-full sm:w-44', options=[
-                    ('general', 'Whole portfolio'),
-                    ('architecture', 'Architecture'),
-                    ('data_architecture', 'Data architecture'),
-                    ('technology', 'Technology'),
-                    ('business_capability', 'Capabilities'),
-                    ('gap_analysis', 'Gaps'),
-                    ('vendor_intelligence', 'Vendors'),
-                    ('compliance', 'Architecture principles'),
-                    ('smart_search', 'Everything (search)')
-                ]) }}
-            </div>
-
-            <div class="flex shrink-0 items-center gap-2">
-                {{ button(variant='outline', size='icon', icon='panel-right', aria_label='Toggle conversation panel', class='hidden lg:inline-flex', attrs_dict={'@click': 'railOpen = !railOpen', ':aria-expanded': 'railOpen.toString()', 'title': 'Toggle conversation panel'}) }}
-
-                {# Settings: the model picker. It stays hidden until the model list has more than one real
-                   choice (loadAvailableModels in app.js reveals it), so production with no keys reads as
-                   automatic selection rather than a broken picker. #}
-                <div class="relative">
-                    {{ button(text='Settings', variant='outline', icon='sliders-horizontal', aria_label='Toggle advanced settings', attrs_dict={'@click': 'showAdvanced = !showAdvanced', ':aria-expanded': 'showAdvanced.toString()', 'aria-haspopup': 'true', 'title': 'Role, model settings'}) }}
-                    <div x-show="showAdvanced" x-cloak @click.outside="showAdvanced = false" @keydown.escape.window="showAdvanced = false"
-                         class="absolute right-0 z-50 mt-2 w-64">
-                        {% call card(class='p-3') %}
-                            <div id="model-selector-wrap" class="hidden space-y-1.5">
-                                <label for="model-selector" class="block text-xs font-medium text-muted-foreground">AI model</label>
-                                {{ native_select(id='model-selector', aria_label='AI model', size='sm', class='w-full font-medium', options=[('', 'Auto-Select Model')]) }}
-                            </div>
-                            <p id="model-selector-empty-note" class="hidden text-xs text-muted-foreground">No AI models are configured — responses use the platform default.</p>
-                        {% endcall %}
-                    </div>
-                </div>
-
-                <div data-testid="chat-overflow-menu" class="flex items-center gap-2">
-                {# Approvals for review: the pending count is read from the one shared approvals store. #}
-                <div x-data="approvalManager()" x-cloak data-testid="chat-overflow-menu-approvals">
-                    {% call button(variant='outline', aria_label='Approvals for review', class='relative', attrs_dict={'data-modal-open': 'ai-chat-approvals-modal', 'title': 'Approvals for review'}) %}
-                        <i data-lucide="shield-check" class="h-4 w-4 sm:mr-2" aria-hidden="true"></i><span class="hidden sm:inline">Approvals</span>
-                        <span x-show="pendingCount > 0" x-cloak x-text="pendingCount" class="ml-2 rounded-md border border-primary/30 bg-primary/10 px-1.5 text-xs font-medium text-info-emphasis"></span>
-                    {% endcall %}
-                </div>
-
-                    {{ dropdown_menu(
-                        id='chat-overflow',
-                        trigger_icon='more-horizontal',
-                        trigger_icon_only=true,
-                        trigger_size='md',
-                        trigger_aria_label='More actions',
-                        trigger_title='More actions',
-                        menu_width='w-48',
-                        items=[
-                            {'text': 'Docs', 'icon': 'file-up', 'onclick': 'toggleDocumentUploadPanel()', 'aria_label': 'Docs', 'title': 'Upload documents — auto-create ArchiMate elements'},
-                            {'text': 'Match', 'icon': 'git-compare', 'href': url_for('unified_ai_chat.entity_matching_view'), 'title': 'Entity Matching'},
-                            {'text': 'Export', 'icon': 'download', 'onclick': 'exportConversation()', 'aria_label': 'Export', 'title': 'Export conversation as Markdown'}
-                        ]
-                    ) }}
-                </div>
-            </div>
-        </div>
-    </header>
 
     <div class="relative flex min-h-0 flex-1 overflow-hidden">
-        {# The context rail: context, query, alerts and past chats. #}
+        {# The history panel: New chat, search and past chats. A column beside the app sidebar on a
+           wide screen, a slide-over on a phone. #}
         <div id="context-sidebar" data-testid="chat-rail"
              :class="railOpen ? 'w-72 lg:w-80' : 'w-72 lg:w-0 lg:overflow-hidden lg:border-r-0'"
-             :aria-hidden="(!railOpen).toString()"
-             :inert="!railOpen"
-             class="absolute inset-y-0 left-0 z-40 flex max-h-full -translate-x-full transform flex-col overflow-hidden border-r border-border bg-background transition-all duration-200 ease-in-out lg:relative lg:translate-x-0">
-            {{ button(variant='ghost', size='icon-sm', icon='x', aria_label='Close sidebar', class='absolute right-2 top-2 z-50 lg:hidden', attrs_dict={'@click': 'toggleSidebar()'}) }}
-            <div class="shrink-0 border-b border-border p-2 pr-12 lg:pr-2">
-                {% call tabs_list(class='w-full') %}
-                    {% call tabs_trigger(value='context', class='flex-1 px-2', click="switchSidebarTab('context')") %}Context{% endcall %}
-                    {% call tabs_trigger(value='query', class='flex-1 px-2', click="switchSidebarTab('query')") %}Query{% endcall %}
-                    {% call tabs_trigger(value='alerts', class='relative flex-1 px-2', click="switchSidebarTab('alerts')") %}Alerts<span id="alert-badge" class="absolute right-0.5 top-0.5 hidden h-4 w-4 items-center justify-center rounded-full bg-destructive text-2xs font-bold text-destructive-foreground">0</span>{% endcall %}
-                    {% call tabs_trigger(value='history', class='flex-1 px-2', click="switchSidebarTab('history'); loadSessionList()") %}Chats{% endcall %}
-                {% endcall %}
+             :aria-hidden="(!railOpen && !mobileOpen).toString()"
+             :inert="!railOpen && !mobileOpen"
+             class="absolute inset-y-0 left-0 z-40 flex max-h-full -translate-x-full transform flex-col overflow-hidden border-r border-border bg-muted transition-all duration-200 ease-in-out lg:relative lg:translate-x-0">
+            {{ button(variant='ghost', size='icon-sm', icon='x', aria_label='Close chat history', class='absolute right-2 top-2 z-50 lg:hidden', attrs_dict={'@click': 'mobileOpen = false; toggleSidebar()'}) }}
+            <div class="shrink-0 border-b border-border p-4 pr-12 lg:pr-2">
+                {{ button(text='New chat', variant='default', icon='plus', class='w-full', aria_label='Start a new chat', attrs_dict={'@click': 'startNewConversation()'}) }}
             </div>
-
-            {% call tabs_content(value='context', class='mt-0 flex min-h-0 flex-1 flex-col overflow-hidden') %}
-                <div class="shrink-0 border-b border-border p-4">
-                    <h2 class="text-sm font-semibold">Context panel</h2>
-                    <div id="context-description" class="mt-0.5 text-xs text-muted-foreground">Select elements to focus AI analysis on specific data points.</div>
+            <div class="shrink-0 space-y-2 px-4 py-3">
+                <h2 class="text-sm font-medium uppercase tracking-wide text-muted-foreground">Recent chats</h2>
+                {{ input(id='chat-history-search', type='search', placeholder='Search chats…', aria_label='Search chats', size='sm') }}
+            </div>
+            <div class="min-h-0 flex-1 overflow-y-auto px-4 pb-4" tabindex="0">
+                <div id="session-list" class="space-y-2">
+                    <p class="py-8 text-center text-xs text-muted-foreground">Loading your conversations…</p>
                 </div>
-                <div class="min-h-0 flex-1 overflow-y-auto p-4" tabindex="0">
-                    <div id="domain-context">
-                        {{ empty_state(icon='inbox', title='No specific context', description='Context is set to the whole portfolio. Pick an item here or start a conversation to narrow it.', padding='py-10') }}
-                    </div>
-                </div>
-            {% endcall %}
-
-            {% call tabs_content(value='query', class='mt-0 flex min-h-0 flex-1 flex-col overflow-hidden') %}
-                <div class="flex h-full min-h-0 flex-col">
-                    <div class="shrink-0 border-b border-border p-4">
-                        <h2 class="flex items-center gap-2 text-sm font-semibold"><i data-lucide="database" class="h-4 w-4" aria-hidden="true"></i>Natural language query</h2>
-                        <p class="text-xs text-muted-foreground">Ask questions about your data</p>
-                    </div>
-                    <div class="min-h-0 flex-1 space-y-4 overflow-y-auto p-4" tabindex="0">
-                        <div class="space-y-1.5">
-                            <label for="nl-query-input" class="block text-xs font-medium text-muted-foreground">Natural language query</label>
-                            <div class="flex gap-2">
-                                {{ input(id='nl-query-input', placeholder='e.g., Show apps without owner...', size='sm') }}
-                                {{ button(variant='default', size='icon', icon='play', aria_label='Execute query', class='shrink-0', attrs_dict={'@click': 'executeNLQuery()'}) }}
-                            </div>
-                        </div>
-                        <div class="space-y-2">
-                            <p class="text-xs font-medium text-muted-foreground">Quick queries:</p>
-                            <div class="flex flex-wrap gap-1">
-                                {{ button(text='Apps without owner', variant='outline', size='xs', aria_label='Quick query: Apps without owner', attrs_dict={'data-quick-query': 'Show all applications without an assigned owner'}) }}
-                                {{ button(text='Low maturity caps', variant='outline', size='xs', aria_label='Quick query: Low maturity caps', attrs_dict={'data-quick-query': 'List capabilities with maturity below 3'}) }}
-                                {{ button(text='Expiring vendors', variant='outline', size='xs', aria_label='Quick query: Expiring vendors', attrs_dict={'data-quick-query': 'Show vendors with contracts expiring in the next 90 days'}) }}
-                                {{ button(text='High-risk apps', variant='outline', size='xs', aria_label='Quick query: High-risk apps', attrs_dict={'data-quick-query': 'List applications with risk score above 70'}) }}
-                                {{ button(text='Create capability', variant='outline', size='xs', aria_label='Quick query: Create capability', attrs_dict={'data-quick-query': 'Create a new business capability'}) }}
-                                {{ button(text='Map APQC framework', variant='outline', size='xs', aria_label='Quick query: Map APQC framework', attrs_dict={'data-quick-query': '/map-apqc'}) }}
-                            </div>
-                        </div>
-                        <div class="space-y-1.5 border-t border-border pt-3">
-                            {{ button(text='Create solution from brief', variant='outline', icon='plus-circle', class='w-full', aria_label='Create a new solution from a brief', attrs_dict={'id': 'ai-chat-create-solution-btn'}) }}
-                            <p class="text-center text-xs text-muted-foreground">Or type in chat: <em>Create a solution for …</em> or <em>I need a new solution about …</em></p>
-                        </div>
-                        <div id="nl-query-results" class="hidden space-y-3">
-                            <div class="flex items-center justify-between">
-                                <h3 class="text-sm font-semibold">Results</h3>
-                                <span id="nl-result-count" class="text-xs text-muted-foreground">0 found</span>
-                            </div>
-                            <div id="nl-query-explanation" class="rounded-md bg-muted/50 p-2 text-xs text-foreground"></div>
-                            <div id="nl-results-list" class="max-h-60 space-y-2 overflow-y-auto"></div>
-                        </div>
-                    </div>
-                </div>
-            {% endcall %}
-
-            {% call tabs_content(value='alerts', class='mt-0 flex min-h-0 flex-1 flex-col overflow-hidden') %}
-                <div class="flex h-full min-h-0 flex-col">
-                    <div class="flex shrink-0 items-center justify-between border-b border-border p-4">
-                        <h2 class="flex items-center gap-2 text-sm font-semibold"><i data-lucide="alert-triangle" class="h-4 w-4 text-warning" aria-hidden="true"></i>Alerts &amp; insights</h2>
-                        {{ button(text='Refresh', variant='ghost', size='xs', icon='refresh-cw', aria_label='Refresh', attrs_dict={'@click': 'refreshRecommendations()'}) }}
-                    </div>
-                    <div class="shrink-0 space-y-2 border-b border-border p-4">
-                        <div class="flex items-center justify-between">
-                            <span class="text-xs font-medium">Portfolio health</span>
-                            <span id="health-score" class="text-lg font-bold text-success">--</span>
-                        </div>
-                        <div class="h-2 w-full rounded-full bg-muted"><div id="health-bar" class="h-2 w-0 rounded-full bg-success transition-all duration-300"></div></div>
-                    </div>
-                    <div class="min-h-0 flex-1 space-y-3 overflow-y-auto p-4" tabindex="0">
-                        <div id="alerts-list" class="space-y-2"></div>
-                        <div id="recommendations-list" class="border-t border-border pt-3">
-                            <h3 class="mb-2 flex items-center gap-1 text-xs font-semibold"><i data-lucide="lightbulb" class="h-3 w-3 text-warning" aria-hidden="true"></i>Recommendations</h3>
-                            <div id="recs-content" class="space-y-2"></div>
-                        </div>
-                    </div>
-                </div>
-            {% endcall %}
-
-            {% call tabs_content(value='history', class='mt-0 flex min-h-0 flex-1 flex-col overflow-hidden') %}
-                <div class="flex h-full min-h-0 flex-col">
-                    <div class="flex shrink-0 items-center justify-between border-b border-border p-4">
-                        <h2 class="flex items-center gap-2 text-sm font-semibold"><i data-lucide="messages-square" class="h-4 w-4 text-muted-foreground" aria-hidden="true"></i>Conversations</h2>
-                        {{ button(text='Refresh', variant='ghost', size='xs', icon='refresh-cw', aria_label='Refresh conversations', attrs_dict={'@click': 'loadSessionList()'}) }}
-                    </div>
-                    <div class="shrink-0 border-b border-border p-3">
-                        {{ button(text='New chat', variant='outline', icon='plus', class='w-full', aria_label='Start a new chat', attrs_dict={'@click': 'startNewConversation()'}) }}
-                    </div>
-                    <div class="min-h-0 flex-1 space-y-2 overflow-y-auto p-4" tabindex="0">
-                        <div id="session-list" class="space-y-2">
-                            <p class="py-8 text-center text-xs text-muted-foreground">Loading your conversations…</p>
-                        </div>
-                    </div>
-                </div>
-            {% endcall %}
-
-            <div class="shrink-0 border-t border-border p-3">
-                {{ button(text='Export context log', variant='outline', size='sm', icon='upload', class='w-full', aria_label='Export context log', attrs_dict={'@click': 'exportContextLog()'}) }}
             </div>
         </div>
 
-        {# Behind the rail on a narrow screen. toggleSidebar() toggles the hidden class. #}
-        <div id="sidebar-backdrop" @click="toggleSidebar()" class="hidden modal-root fixed inset-0 z-30 overflow-y-auto bg-overlay/50 lg:hidden" aria-hidden="true"></div>
+        {# Behind the panel on a narrow screen. toggleSidebar() toggles the hidden class. #}
+        <div id="sidebar-backdrop" @click="mobileOpen = false; toggleSidebar()" class="hidden modal-root fixed inset-0 z-30 overflow-y-auto bg-overlay/50 lg:hidden" aria-hidden="true"></div>
 
         <div class="flex min-w-0 flex-1 flex-col">
+            {# JS (updateDomainUI / updatePersonaUI) writes the active assistant and scope into these,
+               and a screen-reader user still hears which one is active. #}
+            <div id="domain-icon" class="sr-only" aria-hidden="true"><i data-lucide="bot" class="h-5 w-5" aria-hidden="true"></i></div>
+            <p id="domain-title" class="sr-only"></p>
+            <p id="domain-description" class="sr-only"></p>
+
+            <header data-testid="chat-header-row" class="flex shrink-0 items-center justify-between gap-2 px-4 py-3">
+                <div class="flex items-center gap-2">
+                    {{ button(variant='ghost', size='icon', icon='panel-left', aria_label='Show chat history', class='lg:hidden', attrs_dict={'id': 'sidebar-toggle', '@click': 'mobileOpen = !mobileOpen; toggleSidebar()'}) }}
+                    {{ button(variant='ghost', size='icon', icon='panel-left', aria_label='Show or hide chat history', class='hidden lg:inline-flex', attrs_dict={'@click': 'railOpen = !railOpen', ':aria-expanded': 'railOpen.toString()'}) }}
+                </div>
+                {# The options trigger carries the count of approvals waiting, so it is seen without opening anything. #}
+                <div x-data="approvalManager()" x-cloak data-testid="chat-overflow-menu">
+                    {% call button(variant='outline', aria_label='Chat options', class='relative', attrs_dict={'@click': "openDrawer('chat-options')", 'aria-haspopup': 'dialog', 'data-testid': 'chat-options-trigger'}) %}
+                        <i data-lucide="sliders-horizontal" class="h-4 w-4 sm:mr-2" aria-hidden="true"></i><span class="hidden sm:inline">Chat options</span>
+                        <span x-show="pendingCount > 0" x-cloak class="ml-2">{% call badge('info') %}<span x-text="pendingCount"></span>{% endcall %}</span>
+                    {% endcall %}
+                </div>
+            </header>
+
             <div id="messages-container" class="min-h-0 flex-1 space-y-4 overflow-y-auto p-4" aria-live="polite" aria-relevant="additions">
-                {# What to ask first. It goes once the first message is sent. #}
-                <div id="domain-welcome-grid" class="mx-auto w-full max-w-3xl space-y-6 py-8" x-data="{ showMoreSuggestions: false }">
-                    <div class="space-y-2">
-                        <h2 class="text-3xl font-bold tracking-tight text-foreground">How can I help you today?</h2>
-                        <p class="text-muted-foreground">Ask about your company in plain words. A question that names one of your applications or services is answered from your own records, with where each fact came from.</p>
-                    </div>
+                {# The welcome. It goes once the first message is sent. #}
+                <div id="domain-welcome-grid" class="mx-auto flex w-full max-w-3xl flex-col items-center py-4 text-center">
+                    <h1 class="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">How can I help you today?</h1>
+                    <p class="mt-3 hidden max-w-xl text-muted-foreground sm:block">Ask about your company in plain words. A question that names one of your applications or services is answered from your own records, with where each fact came from.</p>
 
-                    <div class="space-y-2" data-testid="first-questions">
-                        <p class="text-sm font-medium text-foreground">Ask this first</p>
-                        {{ button(text='What breaks if our payments service fails?', variant='outline', icon='arrow-up-right', icon_position='right', class='h-auto w-full justify-between whitespace-normal p-3 text-left', attrs_dict={'@click': "setSuggestion('What breaks if Payments service fails')", 'data-testid': 'first-question-suggestion'}) }}
-                    </div>
-
-                    <div id="domain-welcome-suggestions" class="space-y-6">
-                        {# What is happening in this organisation now, from the recommendations the page already reads. panels.js fills it, including the failed state. #}
-                        <div id="portfolio-briefing" aria-live="polite" aria-busy="true">
-                            {% call card(class='p-4') %}
-                                <div class="flex items-center gap-2 text-xs text-muted-foreground">
-                                    <i data-lucide="loader-2" class="h-3.5 w-3.5 animate-spin" aria-hidden="true"></i>Reading your portfolio…
-                                </div>
-                            {% endcall %}
+                    <div id="domain-welcome-suggestions" class="mt-8 w-full text-left">
+                        {# Four questions from what this organisation's records flag now. panels.js fills it, including the failed and empty states. #}
+                        {% if startup_first_steps and startup_first_steps.show %}
+                        {# The empty-workspace next step for a startup. panels.js shows it when no application is recorded. #}
+                        <template id="startup-first-steps">
+                            <div class="flex flex-col items-center gap-3 sm:flex-row sm:justify-center" data-testid="startup-first-steps">
+                                {% if startup_first_steps.connect %}
+                                {{ button(text='Connect GitHub', href=url_for('m365_connector.github_connect'), testid='chat-first-connect') }}
+                                {% endif %}
+                                {% if startup_first_steps.sample %}
+                                <form method="post" action="{{ url_for('architect_ui.load_sample_company') }}">
+                                    {{ input(type='hidden', name='csrf_token', value=csrf_token()) }}
+                                    {{ button(text='See a sample company', type='submit', variant='outline' if startup_first_steps.connect else 'default', testid='chat-first-sample') }}
+                                </form>
+                                {% endif %}
+                            </div>
+                        </template>
+                        {% endif %}
+                        <div id="portfolio-briefing" aria-live="polite" aria-busy="true" data-testid="first-questions">
+                            <p class="flex items-center justify-center gap-2 text-xs text-muted-foreground">
+                                <i data-lucide="loader-2" class="h-3.5 w-3.5 animate-spin" aria-hidden="true"></i>Reading your portfolio…
+                            </p>
                         </div>
-
-                        <div class="space-y-2">
-                            <p class="text-sm font-medium text-foreground">Or start with a specialist</p>
-                            <div class="grid grid-cols-1 gap-3 lg:grid-cols-2">
-                                {% for key, title, hint, icon, prompt in [
-                                    ('enterprise_architect', 'AI Enterprise Architect', 'Portfolio, capabilities, programme drift.', 'building-2', "Give me a portfolio health verdict — rationalization picture, capability coverage, and any transformation programme that's drifting."),
-                                    ('solutions_architect', 'AI Solution Architect', 'Design within governance, options & ADRs.', 'puzzle', 'Help me design a solution — give me 2–3 options with cost/risk trade-offs and what the ARB will ask for.'),
-                                    ('technology_architect', 'AI Technical Architect', 'Conformance, patterns, infrastructure.', 'server-cog', 'Review my integration patterns and technology layer for conformance — flag any blocked patterns or single points of failure.'),
-                                    ('data_architect', 'AI Data Architect', 'Canonical model, classification, lineage.', 'database', 'Review my data layer — canonical entities, data-classification coverage, and lineage gaps. Where are the PII risks?'),
-                                    ('business_architect', 'AI Business Architect', 'Capabilities, value streams, operating model.', 'briefcase', 'Map my strategy to capabilities — which capabilities are most critical, where are the maturity gaps, and how do value streams depend on them?')
-                                ] %}
-                                {% call button(variant='outline', class='architect-card h-auto justify-between whitespace-normal p-3 text-left', attrs_dict={'data-persona': key, 'data-prompt': prompt}) %}
-                                    <span class="flex min-w-0 items-start gap-3">
-                                        <i data-lucide="{{ icon }}" class="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true"></i>
-                                        <span class="min-w-0"><span class="block text-sm font-medium text-foreground">{{ title }}</span><span class="block text-xs font-normal text-muted-foreground">{{ hint }}</span></span>
-                                    </span>
-                                {% endcall %}
-                                {% endfor %}
-                            </div>
-                        </div>
-
-                        <div class="space-y-2">
-                            <p class="text-sm font-medium text-foreground">Or explore by area</p>
-                            <div class="grid grid-cols-1 gap-3 lg:grid-cols-2">
-                                {% for key, title, hint, icon, prompt in [
-                                    ('architecture', 'Architecture', 'ArchiMate analysis & visual modeling.', 'layers', 'Analyze my application architecture and suggest ArchiMate improvements'),
-                                    ('technology', 'Technology', 'Tech stack inventory & lifecycle.', 'cpu', 'Review my tech stack and identify lifecycle risks'),
-                                    ('business_capability', 'Capabilities', 'Business mapping & strategic gaps.', 'building-2', 'Map my business capabilities and identify strategic gaps')
-                                ] %}
-                                {% call button(variant='outline', class='domain-card h-auto justify-between whitespace-normal p-3 text-left', attrs_dict={'data-domain': key, 'data-prompt': prompt}) %}
-                                    <span class="flex min-w-0 items-start gap-3">
-                                        <i data-lucide="{{ icon }}" class="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true"></i>
-                                        <span class="min-w-0"><span class="block text-sm font-medium text-foreground">{{ title }}</span><span class="block text-xs font-normal text-muted-foreground">{{ hint }}</span></span>
-                                    </span>
-                                {% endcall %}
-                                {% endfor %}
-                            </div>
-                            <div x-show="showMoreSuggestions" x-cloak class="grid grid-cols-1 gap-3 lg:grid-cols-2">
-                                {% for key, title, hint, icon, prompt in [
-                                    ('gap_analysis', 'Gap Analysis', 'Roadmap deficiency detection.', 'git-branch', 'Identify gaps in my current architecture roadmap'),
-                                    ('vendor_intelligence', 'Vendors', 'Contract analysis & supplier risk.', 'briefcase', 'Analyze my vendor contracts and identify supplier risks'),
-                                    ('smart_search', 'Smart Search', 'AI-powered enterprise search.', 'sparkles', 'Search across my entire enterprise portfolio')
-                                ] %}
-                                {% call button(variant='outline', class='domain-card h-auto justify-between whitespace-normal p-3 text-left', attrs_dict={'data-domain': key, 'data-prompt': prompt}) %}
-                                    <span class="flex min-w-0 items-start gap-3">
-                                        <i data-lucide="{{ icon }}" class="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true"></i>
-                                        <span class="min-w-0"><span class="block text-sm font-medium text-foreground">{{ title }}</span><span class="block text-xs font-normal text-muted-foreground">{{ hint }}</span></span>
-                                    </span>
-                                {% endcall %}
-                                {% endfor %}
-                            </div>
-                            <div x-show="!showMoreSuggestions">
-                                {{ button(text='More suggestions', variant='link', size='sm', attrs_dict={'@click': 'showMoreSuggestions = true'}) }}
-                            </div>
-                        </div>
-
-                        <p class="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-                            <span>Their governed work products:</span>
-                            <a href="/solutions/briefings" class="text-primary hover:underline">EA Briefing</a>
-                            <a href="/solutions/data-stewardship" class="text-primary hover:underline">Data Stewardship</a>
-                            <a href="/solutions/architect-synthesis" class="text-primary hover:underline">Chief Architect Synthesis</a>
-                        </p>
                     </div>
                 </div>
-            </div>
-
-            <div id="suggestion-chips-label" class="shrink-0 border-t border-border px-4 pb-1 pt-2 text-xs uppercase tracking-wider text-muted-foreground">Quick prompts</div>
-            <div id="suggestion-chips" class="flex shrink-0 flex-wrap gap-2 px-4 pb-2">
-                {{ button(text='Review tech stack gaps', variant='outline', size='xs', icon='alert-triangle', class='chip-btn rounded-full', attrs_dict={'@click': "setSuggestion('Review tech stack gaps and identify end-of-life risks')"}) }}
-                {{ button(text='Analyze cloud migration costs', variant='outline', size='xs', icon='cloud', class='chip-btn rounded-full', attrs_dict={'@click': "setSuggestion('Analyze cloud migration costs and timeline for my core applications')"}) }}
-                {{ button(text='Identify duplicate vendor services', variant='outline', size='xs', icon='copy', class='chip-btn rounded-full', attrs_dict={'@click': "setSuggestion('Identify duplicate vendor services and consolidation opportunities')"}) }}
-                {{ button(text='Generate ArchiMate diagram', variant='outline', size='xs', icon='box', class='chip-btn rounded-full', attrs_dict={'@click': "setSuggestion('Generate ArchiMate diagram for my application portfolio')"}) }}
             </div>
 
             {# The composer. Enter sends, Shift+Enter starts a new line, Escape clears. The diagram-attach control stays out
                on purpose: the assistant has no vision handling, so an attached picture would be ignored while the answer read as if it had been used. #}
+{% if not llm_configured %}
+            {# One line above the composer, so the greeting and the questions keep the first screen. The admin path is a literal,
+               not url_for: the admin blueprint is selected at boot and a missing endpoint would 500 this whole page. #}
+            <div class="shrink-0 px-4 pb-2">
+                {% if current_user.is_admin() %}
+                {{ alert('warning', text='No AI model. Records still answer.', link_href='/admin/api-settings', link_text='API Settings', testid='model-unavailable-notice') }} {# ui-contract-ok: the alert macro, not a native dialog #}
+                {% else %}
+                {{ alert('warning', text='No AI model. Ask an administrator.', testid='model-unavailable-notice') }} {# ui-contract-ok: the alert macro, not a native dialog #}
+                {% endif %}
+            </div>
+            {% endif %}
             <div class="shrink-0 border-t border-border bg-background px-4 pb-4 pt-3">
                 <form id="chat-form" class="mx-auto w-full max-w-3xl space-y-2">
                     {{ input(type='hidden', id='selected-element-id', class='hidden', aria_label='Selected element') }}
                     <div class="overflow-hidden rounded-xl border border-border bg-background">
                         {{ textarea(id='user-input', rows=2, placeholder='Ask about architecture, capabilities, gaps or vendors…', aria_label='Ask a question about your company', class='min-h-12 resize-none border-0 bg-transparent p-4 text-base focus-visible:ring-0 focus-visible:ring-offset-0') }}
                         <div class="flex items-center justify-between gap-2 border-t border-border bg-muted/40 p-3">
-                            <div class="flex items-center gap-2">
-                                {{ button(text='Upload', variant='outline', size='sm', icon='upload-cloud', aria_label='Upload document', attrs_dict={'@click': 'toggleDocumentUploadPanel()', 'title': 'Upload a document for AI analysis and auto-create ArchiMate elements'}) }}
+                            <div class="relative" @mouseenter="tipUpload = true" @mouseleave="tipUpload = false" @focusin="tipUpload = true" @focusout="tipUpload = false">
+                                {{ button(variant='ghost', size='icon', icon='paperclip', aria_label='Upload a document', attrs_dict={'@click': 'toggleDocumentUploadPanel()', 'aria-describedby': 'upload-tip', 'data-testid': 'chat-upload'}) }}
+                                <span id="upload-tip" role="tooltip" x-show="tipUpload" x-cloak class="absolute bottom-full left-0 mb-2 whitespace-nowrap rounded-md border border-border bg-background px-2 py-1 text-xs text-foreground">Upload a document</span>
                             </div>
                             <div class="flex items-center gap-2">
-                                {{ button(variant='destructive', size='icon', icon='square', aria_label='Stop generation', class='hidden', attrs_dict={'id': 'stop-btn', 'title': 'Stop generation'}) }}
-                                {{ button(type='submit', variant='default', size='icon', icon='arrow-up', aria_label='Send message', class='rounded-full', attrs_dict={'id': 'send-btn', 'title': 'Send message'}) }}
+                                {{ button(variant='destructive', size='icon', icon='square', aria_label='Stop generation', class='hidden', attrs_dict={'id': 'stop-btn'}) }}
+                                {{ button(type='submit', variant='default', size='icon', icon='arrow-up', aria_label='Send message', class='rounded-full', attrs_dict={'id': 'send-btn'}) }}
                             </div>
                         </div>
                     </div>
                     <p class="text-xs text-muted-foreground" data-testid="chat-scope">
                         {% if active_organization_name %}Answering from the records of <span class="font-medium text-foreground">{{ active_organization_name }}</span>.{% else %}Answering from your organisation's records.{% endif %}
-                        Model: <span class="font-medium text-foreground">{{ provider_label if llm_configured else 'none configured' }}</span>.
+                        Model: <span id="chat-model-name" class="font-medium text-foreground">{{ provider_label if llm_configured else 'none configured' }}</span>.
                         Entelim can make mistakes — check important decisions against the cited records.
                     </p>
                 </form>
@@ -420,6 +195,151 @@
             </div>
         </div>
     </div>
+
+{# Chat options: the assistant and scope, the model, approvals, export, and the context and query panels. #}
+{% call drawer(id='chat-options', title='Chat options', description='Who answers, what they look at, and the tools around the chat.', size='sm') %}
+    {% set persona_category_labels = {
+        'architects': 'AI Architects (governed, live data)',
+        'governance': 'Governance',
+        'stewards': 'Portfolio & commercial stewardship',
+        'analysts': 'Specialist roles',
+        'executives': 'Executive roles'
+    } %}
+    <div class="space-y-6" data-testid="chat-options-body">
+        <div class="space-y-3" data-testid="chat-scope-controls">
+            <div class="space-y-1.5">
+                <label for="persona-selector" class="block text-sm font-medium text-foreground">Assistant</label>
+                <p class="text-xs text-muted-foreground">The role that answers, and the way it reasons.</p>
+                {% call native_select(id='persona-selector', aria_label='Assistant', class='w-full font-medium') %}
+                    {% for category, persona_keys in persona_config.categories.items() %}
+                    <optgroup label="{{ persona_category_labels.get(category, category | replace('_', ' ') | title) }}">
+                        {% for persona_key in persona_keys %}
+                        {% set persona = persona_config.personas.get(persona_key) %}
+                        {% if persona %}
+                        <option value="{{ persona_key }}"{% if persona_key == default_chat_persona %} selected{% endif %}>{{ persona.name }}</option>
+                        {% endif %}
+                        {% endfor %}
+                    </optgroup>
+                    {% endfor %}
+                {% endcall %}
+            </div>
+            <div class="space-y-1.5">
+                <label for="domain-selector" class="block text-sm font-medium text-foreground">Looking at</label>
+                <p class="text-xs text-muted-foreground">The part of your records the answer draws on.</p>
+                {{ native_select(id='domain-selector', aria_label='Looking at', class='w-full', options=[
+                    ('general', 'Whole portfolio'),
+                    ('architecture', 'Architecture'),
+                    ('data_architecture', 'Data architecture'),
+                    ('technology', 'Technology'),
+                    ('business_capability', 'Capabilities'),
+                    ('gap_analysis', 'Gaps'),
+                    ('vendor_intelligence', 'Vendors'),
+                    ('compliance', 'Architecture principles'),
+                    ('smart_search', 'Everything (search)')
+                ]) }}
+            </div>
+            {# The model picker stays hidden until the list has more than one real choice (loadAvailableModels in app.js reveals it). #}
+            <div id="model-selector-wrap" class="hidden space-y-1.5">
+                <label for="model-selector" class="block text-sm font-medium text-foreground">AI model</label>
+                {{ native_select(id='model-selector', aria_label='AI model', class='w-full font-medium', options=[('', 'Auto-Select Model')]) }}
+            </div>
+            <p id="model-selector-empty-note" class="hidden text-xs text-muted-foreground">No AI models are configured — responses use the platform default.</p>
+        </div>
+
+        <div class="space-y-2 border-t border-border pt-4">
+            {# Approvals for review: the pending count is read from the one shared approvals store. #}
+            <div x-data="approvalManager()" x-cloak>
+                {% call button(variant='outline', aria_label='Approvals for review', class='w-full justify-between', attrs_dict={'data-modal-open': 'ai-chat-approvals-modal', '@click': "closeDrawer('chat-options')", 'data-testid': 'chat-options-approvals'}) %}
+                    <span class="flex items-center"><i data-lucide="shield-check" class="mr-2 h-4 w-4" aria-hidden="true"></i>Approvals for review</span>
+                    <span x-show="pendingCount > 0" x-cloak>{% call badge('info') %}<span x-text="pendingCount"></span>{% endcall %}</span>
+                {% endcall %}
+            </div>
+            {{ button(text='Export conversation', variant='outline', icon='download', class='w-full justify-start', attrs_dict={'@click': 'exportConversation()'}) }}
+            {{ button(text='Export context log', variant='outline', icon='upload', class='w-full justify-start', attrs_dict={'@click': 'exportContextLog()'}) }}
+            {{ button(text='Match entities', variant='outline', icon='git-compare', class='w-full justify-start', href=url_for('unified_ai_chat.entity_matching_view')) }}
+        </div>
+
+        <div class="space-y-3 border-t border-border pt-4">
+            {% call tabs_list(class='w-full') %}
+                {% call tabs_trigger(value='context', class='flex-1 px-2', click="switchSidebarTab('context')") %}Context{% endcall %}
+                {% call tabs_trigger(value='query', class='flex-1 px-2', click="switchSidebarTab('query')") %}Query{% endcall %}
+                {% call tabs_trigger(value='alerts', class='relative flex-1 px-2', click="switchSidebarTab('alerts')") %}Alerts<span id="alert-badge" class="absolute right-0.5 top-0.5 hidden h-4 w-4 items-center justify-center rounded-full bg-destructive text-2xs font-bold text-destructive-foreground">0</span>{% endcall %}
+            {% endcall %}
+
+            {% call tabs_content(value='context', class='mt-0 space-y-3') %}
+                <div>
+                    <h3 class="text-sm font-semibold">Context panel</h3>
+                    <div id="context-description" class="mt-0.5 text-xs text-muted-foreground">Select elements to focus AI analysis on specific data points.</div>
+                </div>
+                <div id="domain-context">
+                    {{ empty_state(icon='inbox', title='No specific context', description='Context is set to the whole portfolio. Pick an item here or start a conversation to narrow it.', padding='py-10') }}
+                </div>
+            {% endcall %}
+
+            {% call tabs_content(value='query', class='mt-0 space-y-4') %}
+                <div>
+                    <h3 class="flex items-center gap-2 text-sm font-semibold"><i data-lucide="database" class="h-4 w-4" aria-hidden="true"></i>Natural language query</h3>
+                    <p class="text-xs text-muted-foreground">Ask questions about your data</p>
+                </div>
+                <div class="space-y-1.5">
+                    <label for="nl-query-input" class="block text-xs font-medium text-muted-foreground">Natural language query</label>
+                    <div class="flex gap-2">
+                        {{ input(id='nl-query-input', placeholder='e.g., Show apps without owner...', size='sm') }}
+                        {{ button(variant='default', size='icon', icon='play', aria_label='Execute query', class='shrink-0', attrs_dict={'@click': 'executeNLQuery()'}) }}
+                    </div>
+                </div>
+                <div class="space-y-2">
+                    <p class="text-xs font-medium text-muted-foreground">Quick queries:</p>
+                    <div class="flex flex-wrap gap-1">
+                        {{ button(text='Apps without owner', variant='outline', size='xs', aria_label='Quick query: Apps without owner', attrs_dict={'data-quick-query': 'Show all applications without an assigned owner'}) }}
+                        {{ button(text='Low maturity caps', variant='outline', size='xs', aria_label='Quick query: Low maturity caps', attrs_dict={'data-quick-query': 'List capabilities with maturity below 3'}) }}
+                        {{ button(text='Expiring vendors', variant='outline', size='xs', aria_label='Quick query: Expiring vendors', attrs_dict={'data-quick-query': 'Show vendors with contracts expiring in the next 90 days'}) }}
+                        {{ button(text='High-risk apps', variant='outline', size='xs', aria_label='Quick query: High-risk apps', attrs_dict={'data-quick-query': 'List applications with risk score above 70'}) }}
+                        {{ button(text='Create capability', variant='outline', size='xs', aria_label='Quick query: Create capability', attrs_dict={'data-quick-query': 'Create a new business capability'}) }}
+                        {{ button(text='Map APQC framework', variant='outline', size='xs', aria_label='Quick query: Map APQC framework', attrs_dict={'data-quick-query': '/map-apqc'}) }}
+                    </div>
+                </div>
+                <div class="space-y-1.5 border-t border-border pt-3">
+                    {{ button(text='Create solution from brief', variant='outline', icon='plus-circle', class='w-full', aria_label='Create a new solution from a brief', attrs_dict={'id': 'ai-chat-create-solution-btn'}) }}
+                    <p class="text-center text-xs text-muted-foreground">Or type in chat: <em>Create a solution for …</em> or <em>I need a new solution about …</em></p>
+                </div>
+                <div id="nl-query-results" class="hidden space-y-3">
+                    <div class="flex items-center justify-between">
+                        <h3 class="text-sm font-semibold">Results</h3>
+                        <span id="nl-result-count" class="text-xs text-muted-foreground">0 found</span>
+                    </div>
+                    <div id="nl-query-explanation" class="rounded-md bg-muted/50 p-2 text-xs text-foreground"></div>
+                    <div id="nl-results-list" class="max-h-60 space-y-2 overflow-y-auto"></div>
+                </div>
+            {% endcall %}
+
+            {% call tabs_content(value='alerts', class='mt-0 space-y-3') %}
+                <div class="flex items-center justify-between">
+                    <h3 class="flex items-center gap-2 text-sm font-semibold"><i data-lucide="alert-triangle" class="h-4 w-4 text-warning" aria-hidden="true"></i>Alerts &amp; insights</h3>
+                    {{ button(text='Refresh', variant='ghost', size='xs', icon='refresh-cw', aria_label='Refresh', attrs_dict={'@click': 'refreshRecommendations()'}) }}
+                </div>
+                <div class="space-y-2 border-b border-border pb-3">
+                    <div class="flex items-center justify-between">
+                        <span class="text-xs font-medium">Portfolio health</span>
+                        <span id="health-score" class="text-lg font-bold text-success">--</span>
+                    </div>
+                    <div class="h-2 w-full rounded-full bg-muted"><div id="health-bar" class="h-2 w-0 rounded-full bg-success transition-all duration-300"></div></div>
+                </div>
+                <div id="alerts-list" class="space-y-2"></div>
+                <div id="recommendations-list" class="border-t border-border pt-3">
+                    <h3 class="mb-2 flex items-center gap-1 text-xs font-semibold"><i data-lucide="lightbulb" class="h-3 w-3 text-warning" aria-hidden="true"></i>Recommendations</h3>
+                    <div id="recs-content" class="space-y-2"></div>
+                </div>
+            {% endcall %}
+        </div>
+
+        <p class="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-border pt-4 text-xs text-muted-foreground">
+            <span>Governed work products:</span>
+            <a href="/solutions/briefings" class="text-primary hover:underline">Weekly briefing</a>
+            <a href="/solutions/data-stewardship" class="text-primary hover:underline">Data Stewardship</a>
+        </p>
+    </div>
+{% endcall %}
 </div>
 
 {# Create solution from a brief. Opened by app.js with Platform.modal. #}
@@ -508,6 +428,7 @@
     window.defaultChatPersona = {{ default_chat_persona | tojson }};
     window.chatPersonaPreferenceKey = {{ chat_persona_preference_key | tojson }};
     window.csrfToken = '{{ csrf_token() }}';
+    window.chatIsAdmin = {{ 'true' if current_user.is_admin() else 'false' }};
 </script>
 
 {# Chat modules. Classic scripts, so they execute in source order and before Alpine, which is

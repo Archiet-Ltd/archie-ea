@@ -250,7 +250,7 @@ def test_sign_up_waits_for_the_emailed_confirmation_then_goes_to_the_invite_step
     path = _link(outbox[0], "/account/confirm-account/")
     confirmed = client.get(path)
     assert confirmed.status_code == 302
-    assert confirmed.headers["Location"].endswith("/admin/team")
+    assert confirmed.headers["Location"].endswith("/account/welcome")
     assert _fresh(user).confirmed is True
 
     reused = _anonymous(app).get(path)
@@ -284,6 +284,19 @@ def test_resending_confirmation_withdraws_the_earlier_link(app, db_session, mail
     assert _anonymous(app).get(first).status_code == 410
 
 
+def test_sign_up_with_mail_configured_shows_no_server_wording(app, db_session, mail_on, outbox):
+    email = "founder-{}@example.com".format(uuid.uuid4().hex[:8])
+    client = _anonymous(app)
+    resp = _register(client, email)
+    assert resp.status_code == 302
+    assert len(outbox) == 1
+    with client.session_transaction() as sess:
+        flashes = [m for _c, m in sess.get("_flashes", [])]
+    page = client.get(resp.headers["Location"]).get_data(as_text=True)
+    assert not [m for m in flashes if "server" in m.lower()]
+    assert "not available on this server" not in page
+
+
 def test_sign_up_without_a_mail_server_is_usable_and_says_no_message_was_sent(
     app, db_session, mail_off, outbox
 ):
@@ -298,7 +311,8 @@ def test_sign_up_without_a_mail_server_is_usable_and_says_no_message_was_sent(
     assert outbox == []
     with client.session_transaction() as sess:
         flashes = [m for _c, m in sess.get("_flashes", [])]
-    assert any("E-mail is not available on this server" in m for m in flashes)
+    assert flashes and not any("server" in m.lower() for m in flashes)
+    assert any("ready to use" in m for m in flashes)
 
 
 # -- invitations ----------------------------------------------------------

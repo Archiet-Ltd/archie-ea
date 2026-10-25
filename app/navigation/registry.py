@@ -1,0 +1,656 @@
+"""Navigation v3: one registry the sidebar, the search index and the breadcrumbs read.
+
+Every entry a person sees in the signed-in shell is declared here once, with the job it
+serves, who may see it, and the old and new names a person might type for it. Nothing in
+a template decides what the sidebar shows; ``sidebar_for(user)`` does, from this data.
+
+The structure (sentence case, the shadcn sidebar pattern, two levels at most):
+
+- the organisation switcher, then one search box ("Search or ask...");
+- MAIN: the same seven entries in the same order for every role
+  (Home, AI chat, Systems, Impact, Changes, Spend, Compliance);
+- ARCHITECTURE: one extra group for enterprise and solution architects and review board
+  members (Model, Composer, Review board, Value streams). Frameworks have no
+  entry of their own (ADR-0017): each is a view picker on its job page, and the old
+  framework pages stay searchable and keep their addresses;
+- SECONDARY at the bottom: Integrations, Reports, Help;
+- the user menu in the footer: Account, Billing, Team, Settings, Platform admin, Sign out.
+
+Role depth never renames or reorders anything: procurement, finance and portfolio roles
+get the procurement pages as sub-items under Spend, and the architecture roles get the
+extra group. A startup CTO (any self-serve owner) sees exactly the ten main and
+secondary entries.
+
+The long tail (every page the old sidebar and the All-modules directory listed) is the
+catalogue: each page is filed under the entry whose job it serves, so the search index
+labels it with that entry and the breadcrumb trail reads "<entry> / <page>".
+
+A link whose route has a guard declares it in ``requires`` (the vocabulary of
+``app.utils.role_access.link_requires_satisfied``), so nobody is shown a link the route
+would refuse; ``fallback`` names the page offered instead when the guard fails.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from typing import Iterable
+
+from app.models.user import (
+    ROLE_ARB_MEMBER,
+    ROLE_ENTERPRISE_ARCHITECT,
+    ROLE_FINANCE,
+    ROLE_PORTFOLIO_MANAGER,
+    ROLE_PROCUREMENT,
+    ROLE_SOLUTION_ARCHITECT,
+)
+
+# Jobs, in the words of the consolidation map.
+JOBS = {
+    "home": "Start here",
+    "0": "Build the model from what you run",
+    "1": "What we have and who owns it",
+    "2": "What breaks if this fails",
+    "3": "What it costs",
+    "4": "What we are changing",
+    "5": "Can we prove we comply",
+    "6": "Ask and get a cited answer",
+    "account": "Account and administration",
+    "platform": "Platform administration",
+}
+
+ARCHITECTURE_ROLES = frozenset({ROLE_ENTERPRISE_ARCHITECT, ROLE_SOLUTION_ARCHITECT, ROLE_ARB_MEMBER})
+PROCUREMENT_ROLES = frozenset({ROLE_PROCUREMENT, ROLE_FINANCE, ROLE_PORTFOLIO_MANAGER})
+
+
+@dataclass(frozen=True)
+class NavLink:
+    """One destination. ``roles`` None means every role; ``requires`` names the route's guard."""
+
+    key: str
+    label: str
+    endpoint: str
+    icon: str | None = None
+    job: str = "home"
+    roles: frozenset | None = None
+    requires: str | None = None
+    aliases: tuple = ()
+    url_values: tuple = ()
+    fallback: "NavLink | None" = None
+    children: tuple = ()
+    # Endpoints whose pages belong to this entry: the entry is marked current there and
+    # heads the breadcrumb trail. An owner ending in "." or "_" is a prefix.
+    owns: tuple = ()
+    # Where the canonical page for this job is not built yet, what stands in for it.
+    note: str | None = None
+
+    @property
+    def values(self) -> dict:
+        return dict(self.url_values)
+
+
+def _l(key, label, endpoint, icon=None, **kw) -> NavLink:
+    for name in ("aliases", "children", "owns"):
+        if name in kw:
+            kw[name] = tuple(kw[name])
+    if "url_values" in kw:
+        kw["url_values"] = tuple(sorted(kw["url_values"].items()))
+    return NavLink(key=key, label=label, endpoint=endpoint, icon=icon, **kw)
+
+
+# ── Main: the same seven entries, in this order, for every role ──────────────────────────
+_SPEND_CHILDREN = (
+    _l("procurement", "Procurement", "procurement.index", job="3", roles=PROCUREMENT_ROLES,
+       requires="procurement", aliases=("Procurement overview", "Vendor spend")),
+    _l("contracts", "Contracts", "procurement.contracts_list", job="3", roles=PROCUREMENT_ROLES,
+       requires="procurement", aliases=("Vendor contracts",)),
+    _l("licences", "Licences", "procurement.licenses_list", job="3", roles=PROCUREMENT_ROLES,
+       requires="procurement_or_finance", aliases=("Licenses", "Software licences")),
+    _l("renewals", "Renewals", "procurement.renewals_dashboard", job="3", roles=PROCUREMENT_ROLES,
+       requires="procurement", aliases=("Contract renewals",)),
+    _l("spend_analytics", "Spend analytics", "procurement.spend_analytics", job="3",
+       roles=PROCUREMENT_ROLES, requires="procurement_or_finance", aliases=("Spend",)),
+)
+
+MAIN: tuple = (
+    _l("home", "Home", "dashboard.overview", "home", job="home",
+       aliases=("Overview", "Dashboard", "Dashboard overview", "Start", "Getting started"),
+       owns=("dashboard.overview", "dashboard.index", "dashboards.")),
+    _l("ai_chat", "AI chat", "unified_ai_chat.index", "message-square", job="6",
+       aliases=("Ask", "Ask a question", "Assistant", "Chat", "Saved answers", "Question"),
+       owns=("unified_ai_chat.", "intelligence_ui.ask", "intelligence_ui.answers")),
+    _l("systems", "Systems", "unified_applications.application_list", "boxes", job="1",
+       aliases=("Applications", "Application portfolio", "Services", "Owners", "Ownership", "Costs",
+                "Capabilities", "Capability map", "Vendors", "Model", "Library", "Inventory"),
+       owns=("unified_applications.", "capability_map.", "application_mgmt.", "my_applications.",
+             "capabilities.", "organization.", "teams.", "stakeholder_map.", "tech_radar.",
+             "data_architecture.", "data_governance.", "interface_register.", "unified_duplicate.",
+             "maturity_management.", "dashboard.health_scorecard")),
+    _l("impact", "Impact", "enterprise.impact_analysis", "zap", job="2",
+       aliases=("Impact analysis", "What breaks", "Dependencies", "Blast radius", "Traceability",
+                "Value streams at risk"),
+       owns=("strategic.impact_analysis", "architect_ui.traceability_matrix", "intelligence_ui.traceability",
+             "intelligence_ui.value_streams_at_risk", "intelligence_ui.twin_map")),
+    _l("changes", "Changes", "enterprise.gap_analysis", "route", job="4",
+       aliases=("Gaps", "Gap", "Gap analysis", "Work packages", "Roadmap", "Roadmaps", "Plateaus", "Programmes",
+                "Transformation", "Change"),
+       owns=("enterprise.work_packages", "enterprise.plateaus", "genome_roadmap.", "main.capability_roadmap",
+             "solution_design.programmes_list", "implementation_planning.", "adm_kanban_view.",
+             "architecture_journey.", "portfolio.", "solution_design.list_solutions"),
+       note="Lands on the gap register, the first step of gaps, work packages and the one roadmap "
+            "(/genome/roadmap/), each linked from the next."),
+    _l("spend", "Spend", "unified_applications.rationalization_dashboard", "wallet", job="3",
+       aliases=("Cost", "Costs", "Rationalisation", "Rationalization", "Portfolio KPIs", "Consolidation",
+                "Investment", "Savings"),
+       children=_SPEND_CHILDREN,
+       owns=("procurement.", "consolidation_list.", "formula_register.",
+             "dashboard_pages.rationalization_scorecard", "enterprise.investment_matrix")),
+_l("compliance", "Compliance", "risk.risk_register", "shield-check", job="5",
+       aliases=("Risks", "Risk register", "Controls", "Decisions", "Evidence", "Audit", "Policies",
+                 "Governance", "Standards"),
+       owns=("risk.", "arch_decisions.", "policy_monitoring.", "gdpr_bp.", "admin.audit_log_viewer",
+              "application_mgmt.compliance_frameworks_dashboard", "intelligence_ui.history_as_of_page",
+              "intelligence_ui.history_changes_page"),
+       children=(
+           _l("data_subject_requests", "Data Subject Requests", "gdpr_bp.dsr_index", job="5",
+              requires="data_subject_requests", aliases=("DSR", "GDPR requests")),
+       ),
+       note="Lands on the risk register, the canonical page for this job today; the compliance "
+             "dashboard is held back until its views carry data."),
+)
+
+# ── Architecture: one extra group for the architecture roles ────────────────────────────
+ARCHITECTURE: tuple = (
+    # One "Model" entry (ADR-0018): the model by ArchiMate layer; each element type has its
+    # list and record pages under its job, found by name from the search box.
+    _l("archimate_model", "Model", "archimate_crud.dashboard", "network", job="1",
+       roles=ARCHITECTURE_ROLES,
+       aliases=("ArchiMate model", "Architecture", "Architecture model", "Elements", "Catalogue", "Catalogues",
+                "Repository", "Layers"),
+       # Frameworks are views over this one model (ADR-0017): their pages sit here, with
+       # no sidebar entry of their own, and keep their addresses.
+       owns=("archimate_crud.", "archimate_layers.", "maturity_management.frameworks_overview",
+             "business_model.", "business_case.")),
+    # Opens on the layered viewpoint, not a blank canvas.
+    _l("composer", "Composer", "archimate.composer_page", "pen-tool", job="1", roles=ARCHITECTURE_ROLES,
+       url_values={"viewpoint": "layered"},
+       aliases=("ArchiMate composer", "Diagrams", "Diagram", "Views", "Viewpoints"),
+       owns=("archimate.",)),
+    _l("review_board", "Review board", "arb.dashboard", "gavel", job="5", roles=ARCHITECTURE_ROLES,
+       aliases=("ARB", "Architecture review board", "ARB dashboard", "Reviews", "Sessions"),
+       owns=("arb.",)),
+    _l("value_streams", "Value streams", "value_stream.index", "waypoints", job="1", roles=ARCHITECTURE_ROLES,
+       aliases=("Value stream", "Stages"), owns=("value_stream.",)),
+)
+
+# ── Secondary, at the bottom of the sidebar ─────────────────────────────────────────────
+# Connecting a source is an administrator's job (the connector pages are admin-only); a
+# person who may not connect one is offered the import pages, the other way in.
+_INTEGRATIONS_FALLBACK = _l("integrations", "Integrations", "batch_import_view.dashboard", "plug", job="0",
+                            aliases=("Imports", "Import", "Batch import"))
+
+SECONDARY: tuple = (
+    _l("integrations", "Integrations", "m365_connector.connectors_index", "plug", job="0", requires="admin",
+       fallback=_INTEGRATIONS_FALLBACK,
+       aliases=("Connectors", "Connections", "Connect a source", "Connect GitHub", "Connect Jira", "Sources",
+                "GitHub", "Jira", "Import", "Imports"),
+       owns=("m365_connector.", "batch_import_view.", "admin.salesforce_integration",
+             "admin.power_platform_integration", "admin.slack_integration", "admin.teams_meetings_integration",
+             "admin.jira_settings", "admin.abacus_")),
+    _l("reports", "Reports", "solution_design.ea_briefings", "file-text", job="6",
+       aliases=("Briefings", "EA briefings", "Exports", "Export", "Architect briefing", "Report"),
+       owns=("solution_design.architect_synthesis", "solution_design.ea_briefing_detail", "admin.report_builder", "cto_scorecard.")),
+    _l("help", "Help", "main.public_site_page", "life-buoy", job="account", url_values={"slug": "docs"},
+       aliases=("Documentation", "Docs", "Support", "Guide", "How do I"),
+       note="Opens the documentation page; there is no in-product help centre yet."),
+)
+
+# ── The user menu in the sidebar footer (Sign out is always last) ───────────────────────
+USER_MENU: tuple = (
+    _l("account", "Account", "account.manage", "user", job="account",
+       aliases=("Profile", "Account settings", "Password", "Change password", "Email")),
+    _l("billing", "Billing", "billing.billing_index", "credit-card", job="account", requires="admin",
+       aliases=("Plan", "Subscription", "Invoices", "Payment", "Cancel", "Upgrade")),
+    _l("team", "Team", "team.team", "users", job="account", requires="org_or_platform_admin",
+       aliases=("Invite your team", "Invite", "Members", "People", "Teammates")),
+    _l("settings", "Settings", "admin.index", "settings", job="account", requires="admin",
+       aliases=("Administration", "Workspace settings", "Command center", "Organisation settings", "Users",
+                "API settings")),
+    _l("platform_admin", "Platform admin", "platform_area.index", "shield", job="platform",
+       requires="platform_admin", aliases=("Platform administration", "Admin area")),
+)
+
+# ── The admin area the Platform admin entry opens (platform_admin flag only) ────────────
+PLATFORM_ADMIN_TOOLS: tuple = (
+    _l("organisations", "Organisations", "admin.organizations_list", "building-2", job="platform",
+       requires="platform_admin", aliases=("Organizations", "Tenants")),
+    _l("ai_prompts", "AI prompts", "admin.solution_prompts_page", "sparkles", job="platform",
+       requires="platform_admin", aliases=("Prompts", "Solution prompts")),
+    _l("errors", "Errors", "error_events.errors_dashboard", "alert-triangle", job="platform",
+       requires="platform_admin", aliases=("Error log", "Exceptions")),
+    _l("feature_flags", "Feature flags", "admin.feature_flags", "toggle-right", job="platform",
+       requires="platform_admin", aliases=("Flags", "Features")),
+    _l("platform_health", "Platform health", "service_status.status_page", "activity", job="platform",
+       requires="platform_admin", aliases=("Service status", "Status", "Health")),
+    # Its route admits every role with the administration section (can_access_section).
+    _l("agent_registry", "Agent registry", "agent_registry.index", "bot", job="platform",
+       requires="section:administration", aliases=("Agents", "Registered agents")),
+    _l("framework_management", "Framework management", "main.framework_management.dashboard", "library",
+       job="platform", requires="platform_admin", aliases=("Framework library",)),
+    _l("framework_configuration", "Framework configuration", "framework_config_ui.framework_config_dashboard",
+       "sliders-horizontal", job="platform", requires="platform_admin", aliases=("Framework config",)),
+)
+
+# ── Pages reached from a job page, under the names the consolidation map gives them ────
+# Not sidebar entries: each is one click inside its entry's page, and searchable by its
+# current name and the names it went by. They are listed ahead of the catalogue, so the
+# search index offers "Capability map", not the old "Capabilities".
+PAGES: tuple = (
+    _l("capability_map", "Capability map", "capability_map.index", job="1",
+       aliases=("Capabilities", "Capability heat map", "Capability health", "Business capabilities")),
+    _l("vendors", "Vendors", "unified_applications.vendors", job="1", aliases=("Suppliers", "Vendor list")),
+    _l("health_scorecard", "Health scorecard", "dashboard.health_scorecard", job="1",
+       aliases=("CTO scorecard", "Architecture health", "Model health", "Scorecard")),
+    _l("tech_radar", "Technology radar", "tech_radar.index", job="1", aliases=("Tech radar", "Radar")),
+    _l("org_chart", "Organisation units", "organization.index", job="1",
+       aliases=("Org chart", "RACI", "Org chart and RACI", "Organization")),
+    _l("data_architecture", "Data architecture", "data_architecture.data_architecture_dashboard", job="1",
+       aliases=("Data model", "Data lineage")),
+    _l("duplicates", "Duplicates", "unified_duplicate.simple_dashboard", job="1",
+       aliases=("Duplicate detection", "Dedupe")),
+    _l("history_changes", "Model changes", "intelligence_ui.history_changes_page", job="5",
+       aliases=("Changes between dates", "What changed", "Change history", "Audit trail",
+                "Who changed what", "History")),
+    _l("history_as_of", "Model as of", "intelligence_ui.history_as_of_page", job="5",
+       aliases=("Model as of a date", "Point in time", "As of")),
+    _l("traceability", "Traceability", "architect_ui.traceability_matrix", job="2",
+       aliases=("Traceability matrix", "Trace", "Requirements traceability")),
+    _l("value_streams_at_risk", "Value streams at risk", "intelligence_ui.value_streams_at_risk", job="2",
+       aliases=("At risk",)),
+    _l("roadmap", "Roadmap", "genome_roadmap.index", job="4",
+       aliases=("Roadmaps", "Transformation roadmap", "Capability roadmap", "Technology roadmap", "Timeline")),
+    _l("work_packages", "Work packages", "enterprise.work_packages", job="4",
+       aliases=("Work package", "WorkPackage", "Projects")),
+    _l("plateaus", "Plateaus", "enterprise.plateaus", job="4",
+       aliases=("Plateau", "Target states", "Transition states")),
+    _l("programmes", "Programmes", "solution_design.programmes_list", job="4",
+       aliases=("Transformation programmes", "Programs", "Initiatives")),
+    _l("consolidation", "Consolidation", "consolidation_list.dashboard", job="3",
+       aliases=("Consolidation list", "Retire", "Retirement")),
+    _l("investment_matrix", "Investment matrix", "enterprise.investment_matrix", job="3",
+       aliases=("Investment priorities", "Investment analysis")),
+    _l("decisions", "Decisions", "arch_decisions.list_decisions", job="5",
+       aliases=("Architecture decisions", "ADRs", "Decision log", "Board decisions")),
+    _l("policy_monitoring", "Policy monitoring", "policy_monitoring.policy_dashboard", job="5",
+       requires="general", aliases=("Policies", "Policy")),
+    _l("audit_log", "Audit log", "admin.audit_log_viewer", job="5", requires="admin",
+       aliases=("Audit trail", "Activity log")),
+    _l("data_subject_requests", "Data subject requests", "gdpr_bp.dsr_index", job="5",
+       requires="data_subject_requests", aliases=("DSR", "GDPR requests")),
+    _l("approvals", "Approvals", "unified_ai_chat.approval_inbox", job="6", requires="general",
+       aliases=("Approval inbox", "Pending changes", "Proposals")),
+    _l("architect_briefing", "Architect briefing", "solution_design.ea_briefings", job="6",
+       aliases=("Chief architect synthesis", "Weekly briefing")),
+    _l("frameworks", "Frameworks", "maturity_management.frameworks_overview", job="1",
+       aliases=("Maturity frameworks", "Capability frameworks", "TOGAF")),
+    _l("canvases", "Canvases", "business_model.index", job="1",
+       aliases=("Canvas", "Business model canvas", "Lean canvas", "Business models")),
+    _l("all_pages", "All modules", "modules_directory.index", job="account",
+       aliases=("Every page", "Modules", "Directory", "Site map")),
+)
+
+# Endpoint prefix -> entry key, for catalogue pages no entry's ``owns`` covers.
+_CATALOGUE_HOME = (
+    ("modules_directory.", "help"),
+    ("architecture.investment_priorities", "spend"),
+    ("architect_ui.market_intelligence", "spend"),
+    ("main.vendor_archimate_analysis", "spend"),
+    ("architect_ui.motivation_view", "systems"),
+    ("metamodel_properties.", "systems"),
+    ("application_management", "systems"),
+    ("dynamic_dashboards.", "systems"),
+    ("main.hybrid_mapping_dashboard", "systems"),
+    ("industry_apqc.", "systems"),
+    ("architect_ui.roadmap_builder", "changes"),
+    ("architect_ui.architecture_assistant", "changes"),
+    ("main.agentic_gaps_ui", "changes"),
+    ("main.ea_workflows_dashboard", "changes"),
+    ("roadmap_outcome.", "changes"),
+    ("main.archimate_roadmap", "changes"),
+    ("integration.", "integrations"),
+    ("main.integrations", "integrations"),
+    ("main.settings", "platform_admin"),
+    ("main.capability_framework", "platform_admin"),
+    ("usage_analytics.", "settings"),
+    ("solution_design.", "changes"),
+    ("enterprise.", "changes"),
+    ("strategic.", "impact"),
+    ("intelligence_ui.", "impact"),
+    ("main.framework_management", "platform_admin"),
+    ("admin.", "settings"),
+)
+
+ALL_ENTRIES: tuple = MAIN + ARCHITECTURE + SECONDARY + USER_MENU
+
+
+# ── Predicates ───────────────────────────────────────────────────────────────────────────
+def _role(user) -> str:
+    from app.utils.role_access import get_effective_role
+
+    return get_effective_role(user)
+
+
+def _registered(endpoint: str) -> bool:
+    try:
+        from flask import current_app
+
+        return endpoint in current_app.view_functions
+    except RuntimeError:  # no application context: data-only callers
+        return True
+
+
+def _allowed(user, link: NavLink, role: str) -> bool:
+    from app.utils.role_access import is_hidden_not_ready, link_requires_satisfied
+
+    if link.roles is not None and role not in link.roles:
+        return False
+    if not _registered(link.endpoint) or is_hidden_not_ready(link.endpoint):
+        return False
+    return link_requires_satisfied(user, link.requires)
+
+
+def resolve(user, link: NavLink, role: str | None = None) -> NavLink | None:
+    """The link this user is offered for ``link``: itself, its fallback, or nothing."""
+    role = role or _role(user)
+    if _allowed(user, link, role):
+        return link
+    if link.fallback is not None and _allowed(user, link.fallback, role):
+        return link.fallback
+    return None
+
+
+def href(link: NavLink) -> str | None:
+    from flask import url_for
+
+    try:
+        return url_for(link.endpoint, **link.values)
+    except Exception:  # noqa: BLE001 - one bad entry costs one link, never the page
+        return None
+
+
+def _by_key(key: str) -> NavLink | None:
+    for link in ALL_ENTRIES:
+        if link.key == key:
+            return link
+    return None
+
+
+def entry_for_endpoint(endpoint: str | None) -> NavLink | None:
+    """The sidebar entry a page belongs to: the entry marked current and the head of its trail."""
+    if not endpoint:
+        return None
+    # The entry's own page (or the page offered in its place) first ...
+    for link in ALL_ENTRIES:
+        if endpoint == link.endpoint or (link.fallback is not None and endpoint == link.fallback.endpoint):
+            return link
+    # ... then an exact owner, a sub-item, or a platform admin tool ...
+    for link in ALL_ENTRIES:
+        if endpoint in link.owns or any(endpoint == c.endpoint for c in link.children):
+            return link
+    if any(endpoint == tool.endpoint for tool in PLATFORM_ADMIN_TOOLS):
+        return _by_key("platform_admin")
+    # ... then the longest matching prefix owner.
+    best, best_len = None, 0
+    for link in ALL_ENTRIES:
+        for owned in link.owns:
+            if owned.endswith((".", "_")) and endpoint.startswith(owned) and len(owned) > best_len:
+                best, best_len = link, len(owned)
+    if best is not None:
+        return best
+    for prefix, key in _CATALOGUE_HOME:
+        if endpoint.startswith(prefix):
+            return _by_key(key)
+    return None
+
+
+# ── What the sidebar renders ─────────────────────────────────────────────────────────────
+@dataclass
+class SidebarItem:
+    key: str
+    label: str
+    href: str
+    icon: str | None
+    job: str
+    active: bool = False
+    current: bool = False
+    children: list = field(default_factory=list)
+
+
+def _item(user, link: NavLink, role: str, endpoint: str | None, current_entry: NavLink | None):
+    chosen = resolve(user, link, role)
+    if chosen is None:
+        return None
+    url = href(chosen)
+    if url is None:
+        return None
+    children = []
+    for child in link.children:
+        child_link = resolve(user, child, role)
+        child_url = href(child_link) if child_link else None
+        if child_url:
+            here = endpoint == child.endpoint
+            children.append(SidebarItem(child.key, child.label, child_url, None, child.job, active=here, current=here))
+    in_entry = current_entry is not None and current_entry.key == link.key
+    active = in_entry and not any(c.active for c in children)
+    return SidebarItem(link.key, link.label, url, link.icon, link.job, active=active,
+                       current=endpoint == chosen.endpoint, children=children)
+
+
+def sidebar_for(user, endpoint: str | None = None) -> dict:
+    """{"main", "architecture", "secondary", "user_menu"} -> [SidebarItem] for this user."""
+    role = _role(user)
+    current_entry = entry_for_endpoint(endpoint)
+
+    def build(links: Iterable[NavLink]):
+        return [i for i in (_item(user, link, role, endpoint, current_entry) for link in links) if i]
+
+    return {
+        "main": build(MAIN),
+        "architecture": build(ARCHITECTURE),
+        "secondary": build(SECONDARY),
+        "user_menu": build(USER_MENU),
+    }
+
+
+def platform_admin_tools(user) -> list:
+    role = _role(user)
+    return [i for i in (_item(user, t, role, None, None) for t in PLATFORM_ADMIN_TOOLS) if i]
+
+
+def connect_url(user) -> str | None:
+    """Where the connect card's one button goes: the connectors page, for a person who may
+    connect a source. Nobody else is shown the card (it would promise what they cannot do)."""
+    link = resolve(user, SECONDARY[0])
+    return href(link) if link is SECONDARY[0] else None
+
+
+# ── The search index ─────────────────────────────────────────────────────────────────────
+_KEEP_CASE = {"AI", "ARB", "API", "ADM", "CTO", "EA", "KPIs", "RACI", "APQC", "ArchiMate", "GitHub", "Jira",
+              "TOGAF", "SAFe", "Salesforce", "Power", "Platform", "Microsoft", "ServiceNow", "Slack", "Teams"}
+
+
+def sentence_case(label: str) -> str:
+    """'Traceability Matrix' -> 'Traceability matrix'; acronyms and product names keep their case."""
+    out = []
+    for i, word in enumerate(label.split(" ")):
+        if i == 0 or word in _KEEP_CASE or not word[:1].isupper() or not word[1:].islower():
+            out.append(word)
+        else:
+            out.append(word[:1].lower() + word[1:])
+    return " ".join(out)
+
+
+def _catalogue() -> list:
+    """Every page the All-modules directory lists for the signed-in person."""
+    from app.modules.modules_directory.routes import visible_module_links
+
+    return visible_module_links()
+
+
+# ── ArchiMate element types (ADR-0018) ──────────────────────────────────────────────────
+# Every element type has one list page, under its job; none has a sidebar entry. Types whose
+# list has a canonical page of its own answer from that page.
+_ELEMENT_TYPE_HOME = {"implementation": "changes", "application": "systems", "technology": "systems",
+                      "physical": "systems", "strategy": "systems", "business": "systems", "motivation": "systems"}
+_COMPLIANCE_TYPES = {"Requirement", "Constraint", "Principle", "Assessment"}
+_CANONICAL_TYPE_PAGES = {"Gap": "enterprise.gap_analysis", "WorkPackage": "enterprise.work_packages",
+                         "Plateau": "enterprise.plateaus"}
+
+
+def _type_label(element_type: str) -> str:
+    import re as _re
+
+    words = _re.sub(r"(?<=[a-z])(?=[A-Z])", " ", element_type).split()
+    return " ".join([words[0]] + [w.lower() for w in words[1:]]) if words else element_type
+
+
+def element_type_pages() -> list:
+    """(label, layer, element type, endpoint, url values, entry key) for every ArchiMate type with a list page."""
+    try:
+        from app.models import archimate_element_types as types
+        from app.modules.architecture.routes.archimate_crud.routes import MODEL_REGISTRY
+    except Exception:  # noqa: BLE001 - the element pages are optional for search
+        return []
+    rows = []
+    for layer in ("strategy", "business", "application", "technology", "physical", "motivation", "implementation"):
+        for element_type in getattr(types, layer.upper() + "_ELEMENT_TYPES", []):
+            if element_type not in MODEL_REGISTRY:
+                continue
+            home = "compliance" if element_type in _COMPLIANCE_TYPES else _ELEMENT_TYPE_HOME[layer]
+            if element_type in _CANONICAL_TYPE_PAGES:
+                rows.append((_type_label(element_type), layer, element_type, _CANONICAL_TYPE_PAGES[element_type], {}, home))
+            else:
+                rows.append((_type_label(element_type), layer, element_type, "archimate_crud.list_elements",
+                             {"layer": layer, "element_type": element_type}, home))
+    return rows
+
+
+def search_index(user) -> list:
+    """Every page this user may open, once, with the names a person may type for it.
+
+    Each row: label, url, endpoint, section (the sidebar entry it sits under, or the job of
+    an entry) and terms (label plus aliases). Sidebar entries first, then their sub-items
+    and the platform tools, then the named pages (PAGES), then the catalogue of every
+    other page.
+    """
+    from flask import url_for
+
+    role = _role(user)
+    rows: list = []
+    seen: set = set()
+
+    def add(label, endpoint, url, section, terms):
+        if not url or url in seen:
+            return
+        seen.add(url)
+        rows.append({"label": label, "endpoint": endpoint, "url": url, "section": section,
+                     "terms": [label, *terms]})
+
+    for links in (MAIN, ARCHITECTURE, SECONDARY, USER_MENU, PLATFORM_ADMIN_TOOLS, PAGES):
+        for link in links:
+            chosen = resolve(user, link, role)
+            if chosen is None:
+                continue
+            terms = list(link.aliases) + (list(chosen.aliases) if chosen is not link else [])
+            owner = entry_for_endpoint(chosen.endpoint)
+            section = owner.label if owner is not None and owner.key != link.key else JOBS.get(link.job, "")
+            add(link.label, chosen.endpoint, href(chosen), section, terms)
+            for child in link.children:
+                child_link = resolve(user, child, role)
+                if child_link is not None:
+                    add(child.label, child.endpoint, href(child_link), link.label, child.aliases)
+
+    for label, layer, element_type, endpoint, values, home in element_type_pages():
+        if not _registered(endpoint):
+            continue
+        try:
+            url = url_for(endpoint, **values)
+        except Exception:  # noqa: BLE001
+            continue
+        entry = _by_key(home)
+        plural = label + ("es" if label.endswith(("s", "x", "ch")) else "s")
+        add(plural, endpoint, url, entry.label if entry else "", [label, element_type, f"{layer} {label}"])
+
+    try:
+        catalogue = _catalogue()
+    except Exception:  # noqa: BLE001 - outside a signed-in request there is no catalogue
+        catalogue = []
+    from app.utils.search_text import normalise_search_text
+
+    # A catalogue page whose name is already a name (or old name) of a page above is the
+    # same idea under its old name, merged into that page (ADR-0015): offered once.
+    known = {normalise_search_text(term) for row in rows for term in row["terms"]}
+    for page in catalogue:
+        endpoint = page["endpoint"]
+        if not _registered(endpoint) or normalise_search_text(page["label"]) in known:
+            continue
+        try:
+            url = url_for(endpoint, **(page.get("query_params") or {}))
+        except Exception:  # noqa: BLE001
+            continue
+        owner = entry_for_endpoint(endpoint)
+        label = sentence_case(page["label"])
+        add(label, endpoint, url, owner.label if owner is not None else "", [page["label"]])
+    return rows
+
+
+def search_pages(user, query: str, limit: int = 12) -> list:
+    """Pages whose name or an alias contains the query, spelling-blind, best match first."""
+    from app.utils.search_text import normalise_search_text
+
+    q = normalise_search_text(query or "")
+    if not q:
+        return []
+    scored = []
+    for order, row in enumerate(search_index(user)):
+        best = None
+        for rank, term in enumerate(row["terms"]):
+            t = normalise_search_text(term)
+            if q not in t:
+                continue
+            score = (0 if t == q else 1 if t.startswith(q) else 2, 0 if rank == 0 else 1)
+            if best is None or score < best:
+                best = score
+        if best is not None:
+            scored.append((best, order, row))
+    scored.sort(key=lambda s: (s[0], s[1]))
+    return [row for _, _, row in scored[:limit]]
+
+
+# ── Breadcrumbs ──────────────────────────────────────────────────────────────────────────
+def trail(user, endpoint: str | None) -> list:
+    """[{"label", "href"}] for the sidebar entry a page sits under ("Systems" above "Capability map").
+
+    Empty for Home and for a page that is itself a sidebar entry's landing page.
+    """
+    entry = entry_for_endpoint(endpoint)
+    if entry is None or entry.key == "home":
+        return []
+    chosen = resolve(user, entry)
+    if chosen is not None and chosen.endpoint == endpoint:
+        return []
+    return [{"label": entry.label, "href": href(chosen) if chosen is not None else None}]
+
+
+# ── Stage awareness ──────────────────────────────────────────────────────────────────────
+def has_connected_source(org_id) -> bool | None:
+    """True once the organisation has connected a source; None when that cannot be told."""
+    if not org_id:
+        return None
+    try:
+        from app.extensions import db
+        from app.models.connector_config import ConnectorConfig
+
+        query = ConnectorConfig.query.filter(ConnectorConfig.organization_id == org_id)
+        return bool(db.session.query(query.exists()).scalar())
+    except Exception:  # noqa: BLE001 - a sidebar card must not 500 a page
+        return None
