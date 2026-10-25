@@ -47,9 +47,15 @@ def app(tmp_path):
 
 
 @pytest.fixture
-def debug_app(app):
-    app.debug = True
-    return app
+def testing_app(tmp_path):
+    static_dir = tmp_path / "static" / "css"
+    static_dir.mkdir(parents=True)
+    (static_dir / "tailwind-output.css").write_text("body{color:red}")
+
+    application = Flask(__name__, static_folder=str(tmp_path / "static"))
+    application.config["ASSET_MANIFEST_RELOAD"] = True
+    init_assets(application)
+    return application
 
 
 def _asset_url(application, filename):
@@ -81,74 +87,74 @@ def _force_reload(app):
     _maybe_reload_manifest(app)
 
 
-# ── debug mode: manifest reloads when mtime changes ────────────────────────
+# ── testing config: manifest reloads when mtime changes ────────────────────
 
 
-def test_debug_manifest_reloads_when_new_manifest_is_written(debug_app):
+def test_testing_manifest_reloads_when_new_manifest_is_written(testing_app):
     """Writing a new manifest changes the asset URL on the next request."""
     # Start with no manifest — asset_url falls back to mtime version.
-    before = _asset_url(debug_app, "css/tailwind-output.css")
+    before = _asset_url(testing_app, "css/tailwind-output.css")
     assert "?v=" in before
 
     # Write a manifest that maps to a hashed filename.
     _write_manifest(
-        debug_app,
+        testing_app,
         {"css/tailwind-output.css": "css/tailwind-output.b257857d.css"},
     )
 
     # Simulate the before_request handler firing.
-    _force_reload(debug_app)
+    _force_reload(testing_app)
 
-    after = _asset_url(debug_app, "css/tailwind-output.css")
+    after = _asset_url(testing_app, "css/tailwind-output.css")
     assert after == "/static/css/tailwind-output.b257857d.css"
     assert after != before
 
 
-def test_debug_manifest_reloads_when_manifest_changes(debug_app):
+def test_testing_manifest_reloads_when_manifest_changes(testing_app):
     """Changing an existing manifest updates the asset URL."""
     # Seed with an initial manifest.
     _write_manifest(
-        debug_app,
+        testing_app,
         {"css/tailwind-output.css": "css/tailwind-output.aaaaaaaa.css"},
     )
     # Force a load so the cache has the initial entry.
-    _load_manifest(debug_app)
-    before = _asset_url(debug_app, "css/tailwind-output.css")
+    _load_manifest(testing_app)
+    before = _asset_url(testing_app, "css/tailwind-output.css")
     assert before == "/static/css/tailwind-output.aaaaaaaa.css"
 
     # Write a new manifest with a different hash.
     _write_manifest(
-        debug_app,
+        testing_app,
         {"css/tailwind-output.css": "css/tailwind-output.bbbbbbbb.css"},
     )
 
     # Simulate the before_request handler firing.
-    _force_reload(debug_app)
+    _force_reload(testing_app)
 
-    after = _asset_url(debug_app, "css/tailwind-output.css")
+    after = _asset_url(testing_app, "css/tailwind-output.css")
     assert after == "/static/css/tailwind-output.bbbbbbbb.css"
     assert after != before
 
 
-def test_debug_manifest_reloads_when_manifest_is_deleted(debug_app):
+def test_testing_manifest_reloads_when_manifest_is_deleted(testing_app):
     """Deleting the manifest falls back to the mtime version."""
     # Seed with a manifest.
     _write_manifest(
-        debug_app,
+        testing_app,
         {"css/tailwind-output.css": "css/tailwind-output.aaaaaaaa.css"},
     )
-    _load_manifest(debug_app)
-    before = _asset_url(debug_app, "css/tailwind-output.css")
+    _load_manifest(testing_app)
+    before = _asset_url(testing_app, "css/tailwind-output.css")
     assert "aaaaaaaa" in before
 
     # Delete the manifest and bump its former mtime so the reload triggers.
-    manifest_path = os.path.join(debug_app.static_folder, "manifest.json")
+    manifest_path = os.path.join(testing_app.static_folder, "manifest.json")
     os.remove(manifest_path)
 
     # Simulate the before_request handler firing.
-    _force_reload(debug_app)
+    _force_reload(testing_app)
 
-    after = _asset_url(debug_app, "css/tailwind-output.css")
+    after = _asset_url(testing_app, "css/tailwind-output.css")
     # Should fall back to the mtime-based ?v= URL.
     assert "?v=" in after
     assert after != before
@@ -159,7 +165,7 @@ def test_debug_manifest_reloads_when_manifest_is_deleted(debug_app):
 
 def test_production_manifest_does_not_reload_when_new_manifest_is_written(app):
     """In production a new manifest is ignored — the startup copy stays."""
-    app.debug = False
+    app.config["ASSET_MANIFEST_RELOAD"] = False
     before = _asset_url(app, "css/tailwind-output.css")
     # Production uses the build-id version, not per-file mtime.
     assert "?v=" in before
@@ -177,7 +183,7 @@ def test_production_manifest_does_not_reload_when_new_manifest_is_written(app):
 
 def test_production_manifest_does_not_reload_when_manifest_changes(app):
     """In production a changed manifest is ignored."""
-    app.debug = False
+    app.config["ASSET_MANIFEST_RELOAD"] = False
     # Seed with an initial manifest loaded at startup.
     _write_manifest(
         app,
@@ -202,14 +208,14 @@ def test_production_manifest_does_not_reload_when_manifest_changes(app):
 # ── rate limit: mtime checked at most once per second ──────────────────────
 
 
-def test_manifest_reload_is_rate_limited(debug_app, monkeypatch):
+def test_manifest_reload_is_rate_limited(testing_app, monkeypatch):
     """Two rapid requests do not re-stat the manifest file."""
     # Seed with a manifest.
     _write_manifest(
-        debug_app,
+        testing_app,
         {"css/tailwind-output.css": "css/tailwind-output.aaaaaaaa.css"},
     )
-    _load_manifest(debug_app)
+    _load_manifest(testing_app)
 
     call_count = 0
     _real_getmtime = os.path.getmtime
@@ -222,22 +228,22 @@ def test_manifest_reload_is_rate_limited(debug_app, monkeypatch):
     monkeypatch.setattr(os.path, "getmtime", _counting_getmtime)
 
     # First call goes through.
-    _maybe_reload_manifest(debug_app)
+    _maybe_reload_manifest(testing_app)
     first_count = call_count
 
     # Second call within the same second is rate-limited.
-    _maybe_reload_manifest(debug_app)
+    _maybe_reload_manifest(testing_app)
     # call_count should not have increased (the rate-limit guard returns early).
     assert call_count == first_count
 
 
-def test_manifest_reload_fires_after_rate_limit_window(debug_app, monkeypatch):
+def test_manifest_reload_fires_after_rate_limit_window(testing_app, monkeypatch):
     """After the 1-second window the mtime is checked again."""
     _write_manifest(
-        debug_app,
+        testing_app,
         {"css/tailwind-output.css": "css/tailwind-output.aaaaaaaa.css"},
     )
-    _load_manifest(debug_app)
+    _load_manifest(testing_app)
 
     # Force the last-check timestamp into the past.
     import app._bootstrap.assets as assets_mod
@@ -254,6 +260,6 @@ def test_manifest_reload_fires_after_rate_limit_window(debug_app, monkeypatch):
 
     monkeypatch.setattr(os.path, "getmtime", _counting_getmtime)
 
-    _maybe_reload_manifest(debug_app)
+    _maybe_reload_manifest(testing_app)
     # The rate-limit window has passed, so getmtime should have been called.
     assert call_count >= 1
