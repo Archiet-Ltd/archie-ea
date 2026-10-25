@@ -1,0 +1,441 @@
+{# design-block: record-detail #}
+{# The solution record: one record page with a header that states the conclusion,
+   a properties column, and seven tabs. The Overview, Design and Review tabs are
+   built here; Requirements, Options and decision, Risks and Delivery say what they
+   will hold and open the page that holds it today.
+   Context: app/modules/solutions_strategic/v2/services/solution_record_service.py #}
+{% extends "layouts/admin_base.html" %}
+{% from 'macros/page_shell.html' import page_shell %}
+{% from 'components/badge.html' import badge %}
+{% from 'components/button.html' import button %}
+{% from 'components/card.html' import card, card_header, card_title, card_description, card_content %}
+{% from 'components/alert.html' import alert %}
+{% from 'components/dense_table.html' import dense_table %}
+{% from 'components/avatar.html' import avatar %}
+{% from 'solutions/partials/_design_score.html' import design_score_panel, design_score_ring %}
+
+{% block title %}{{ solution.name }} - Solution{% endblock %}
+
+{% set sid = solution.id %}
+{% set base = '/solutions/' ~ sid %}
+{% set stage_variant = {'Approved': 'success', 'Approved with conditions': 'success', 'In review': 'info', 'Rejected': 'danger', 'Proposed': 'info'}.get(stage, 'neutral') %}
+{% set change_variant = {'Added': 'success', 'Changed': 'info', 'Retired': 'warning'} %}
+
+{% macro initials(name) -%}
+{%- set parts = (name or '').split() -%}
+{{ ((parts[0][0] ~ (parts[-1][0] if parts|length > 1 else ''))|upper) if parts else '?' }}
+{%- endmacro %}
+
+{% macro empty_tab(testid, sentence, href, label) %}
+<div class="rounded-lg border border-dashed border-border p-6 text-center" data-testid="{{ testid }}">
+  <p class="text-sm text-foreground">{{ sentence }}</p>
+  <div class="mt-3">{{ button(text=label, variant='outline', size='sm', href=href) }}</div>
+</div>
+{% endmacro %}
+
+{% macro _meta() %}
+  <span data-testid="record-kind">{% call badge(variant='outline') %}Solution{% endcall %}</span>
+  <span data-testid="record-stage">{% call badge(variant=stage_variant) %}{{ stage }}{% endcall %}</span>
+  {% if owner %}
+  <span class="text-sm text-muted-foreground" data-testid="record-owner">Owner <span class="font-medium text-foreground">{{ owner }}</span></span>
+  {% else %}
+  <a href="{{ base }}/edit" class="text-sm text-primary hover:underline" data-testid="record-owner">No owner yet. Name one</a>
+  {% endif %}
+  {% if programme %}
+  <span class="text-sm text-muted-foreground" data-testid="record-programme">Programme
+    {% if programme.href %}<a href="{{ programme.href }}" class="font-medium text-foreground hover:underline">{{ programme.name }}</a>{% else %}<span class="font-medium text-foreground">{{ programme.name }}</span>{% endif %}</span>
+  {% endif %}
+  {% if gap %}
+  <span class="text-sm text-muted-foreground" data-testid="record-gap">Closes
+    {% if gap.href %}<a href="{{ gap.href }}" class="font-medium text-foreground hover:underline">{{ gap.name }}</a>{% else %}<span class="font-medium text-foreground">{{ gap.name }}</span>{% endif %}</span>
+  {% endif %}
+  <a href="{{ base }}?tab=overview#design-score" class="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground" data-testid="record-score" aria-label="Design score {{ score.label }}">
+    {{ design_score_ring(score, size='small') }}
+    <span class="tabular-nums">{{ score.label }}</span>
+  </a>
+{% endmacro %}
+
+{% macro _actions() %}
+  {% if actions.can_edit %}
+    {{ button(text='Edit', variant='outline', size='sm', icon='pencil', href=base ~ '/edit', testid='record-edit') }}
+  {% endif %}
+  {{ button(text='Compare options', variant='outline', size='sm', icon='git-compare', href=base ~ '/options-advisor', testid='record-compare') }}
+  {% if actions.can_submit %}
+    {{ button(text='Submit for review', variant='primary', size='sm', icon='send', testid='record-submit', attrs_dict={'data-submit-url': base ~ '/submit-for-arb', 'data-after-url': base ~ '?tab=review'}) }}
+  {% endif %}
+  {% if actions.can_decide %}
+    {{ button(text='Decide', variant='primary', size='sm', icon='gavel', href=actions.decide_href, testid='record-decide') }}
+  {% endif %}
+  {{ button(text='Download document', variant='outline', size='sm', icon='download', href=base ~ '/export/sad', testid='record-download') }}
+  {{ button(text='Ask about this solution', variant='outline', size='sm', icon='message-square', href='/ai-chat?q=' ~ ('What does the solution "' ~ solution.name ~ '" change, what does it cost and what should happen next?')|urlencode, testid='record-ask') }}
+{% endmacro %}
+
+{% block content %}
+<div class="p-6 mx-auto" data-testid="solution-record" data-solution-id="{{ sid }}" data-tab="{{ tab }}">
+
+  {{ page_shell(solution.name, breadcrumb=[('Solutions', '/solutions/'), (solution.name, None)], tabs=tabs, stack_actions=True, meta_caller=_meta, actions_caller=_actions) }}
+
+  <div class="grid grid-cols-1 gap-6 xl:grid-cols-3">
+
+    {# ── main column: the active tab ───────────────────────────────── #}
+    <div class="min-w-0 space-y-6 xl:col-span-2" data-testid="tab-{{ tab }}">
+
+      {% if tab == 'overview' %}
+        {# The conclusion first: the problem and the next step #}
+        {% call card() %}
+          {% call card_header() %}
+            {% call card_title(class='text-lg') %}The problem{% endcall %}
+          {% endcall %}
+          {% call card_content() %}
+            {% if problem %}
+            <p class="text-sm leading-6 text-foreground" data-testid="record-problem">{{ problem }}</p>
+            {% else %}
+            <p class="text-sm text-muted-foreground" data-testid="record-problem">No problem statement yet. Say in a sentence what this solution fixes.</p>
+            <div class="mt-3">{{ button(text='Add the problem statement', variant='outline', size='sm', href=base ~ '/edit') }}</div>
+            {% endif %}
+          {% endcall %}
+        {% endcall %}
+
+        {% call alert(kind='info' if next_step.action != 'Fix this' else 'warning', title='Next step: ' ~ next_step.label ~ '.', text=next_step.detail, link_href=next_step.href, link_text=next_step.action, testid='record-next-step') %}{% endcall %}
+
+        <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
+          {% call card() %}
+            {% call card_content(class='p-6') %}
+              {{ design_score_panel(score) }}
+            {% endcall %}
+          {% endcall %}
+
+          <div class="space-y-6">
+            {% call card() %}
+              {% call card_header() %}
+                {% call card_title(class='text-lg') %}What it changes{% endcall %}
+                {% call card_description() %}
+                  {% if changes.elements %}{{ changes.elements }} design element{{ 's' if changes.elements != 1 }} across the model.{% else %}Nothing linked to the model yet.{% endif %}
+                {% endcall %}
+              {% endcall %}
+              {% call card_content() %}
+                <dl class="grid grid-cols-3 gap-3 text-sm" data-testid="record-changes">
+                  <div><dt class="text-xs text-muted-foreground">Applications added</dt><dd class="text-xl font-semibold tabular-nums" data-testid="changes-added">{{ changes.added }}</dd></div>
+                  <div><dt class="text-xs text-muted-foreground">Changed</dt><dd class="text-xl font-semibold tabular-nums" data-testid="changes-changed">{{ changes.changed }}</dd></div>
+                  <div><dt class="text-xs text-muted-foreground">Retired</dt><dd class="text-xl font-semibold tabular-nums" data-testid="changes-retired">{{ changes.retired }}</dd></div>
+                  <div><dt class="text-xs text-muted-foreground">Capabilities served</dt><dd class="text-xl font-semibold tabular-nums" data-testid="changes-capabilities">{{ changes.capabilities }}</dd></div>
+                  <div><dt class="text-xs text-muted-foreground">Vendors involved</dt><dd class="text-xl font-semibold tabular-nums" data-testid="changes-vendors">{{ changes.vendors }}</dd></div>
+                </dl>
+                <div class="mt-4 flex flex-wrap gap-2">
+                  {{ button(text='See the design', variant='outline', size='sm', href=base ~ '?tab=design', testid='changes-design-link') }}
+                  {% if changes.impact_href %}{{ button(text='What depends on it', variant='ghost', size='sm', href=changes.impact_href, icon='zap') }}{% endif %}
+                </div>
+              {% endcall %}
+            {% endcall %}
+
+            {% call card() %}
+              {% call card_header() %}
+                {% call card_title(class='text-lg') %}What it costs{% endcall %}
+              {% endcall %}
+              {% call card_content() %}
+                {% if cost.recorded %}
+                <dl class="grid grid-cols-2 gap-3 text-sm" data-testid="record-cost">
+                  <div><dt class="text-xs text-muted-foreground">One-off</dt><dd class="text-xl font-semibold tabular-nums whitespace-nowrap" data-testid="cost-one-off">{{ cost.one_off_text }}</dd></div>
+                  <div><dt class="text-xs text-muted-foreground">Running, a year</dt><dd class="text-xl font-semibold tabular-nums whitespace-nowrap" data-testid="cost-running">{{ cost.running_text }}</dd></div>
+                  {% if cost.actual is not none %}<div><dt class="text-xs text-muted-foreground">Spent to date</dt><dd class="text-xl font-semibold tabular-nums whitespace-nowrap">{{ cost.actual_text }}</dd></div>{% endif %}
+                </dl>
+                {% elif cost.estimated is not none %}
+                <dl class="grid grid-cols-2 gap-3 text-sm" data-testid="record-cost">
+                  <div><dt class="text-xs text-muted-foreground">Estimate</dt><dd class="text-xl font-semibold tabular-nums whitespace-nowrap" data-testid="cost-estimate">{{ cost.estimated_text }}</dd></div>
+                  {% if cost.actual is not none %}<div><dt class="text-xs text-muted-foreground">Spent to date</dt><dd class="text-xl font-semibold tabular-nums whitespace-nowrap">{{ cost.actual_text }}</dd></div>{% endif %}
+                </dl>
+                <p class="mt-2 text-xs text-muted-foreground">One figure so far. Split it into one-off and running cost to pass the cost check.</p>
+                {% else %}
+                <p class="text-sm text-muted-foreground" data-testid="record-cost">No cost recorded yet. Record the one-off and running cost so the board can weigh it.</p>
+                {% endif %}
+                <div class="mt-3">{{ button(text='Record the cost', variant='outline', size='sm', href=base ~ '?edit=1', testid='cost-record-link') }}</div>
+              {% endcall %}
+            {% endcall %}
+          </div>
+        </div>
+
+      {% elif tab == 'design' %}
+        {% if groups %}
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <p class="text-sm text-muted-foreground" data-testid="design-summary">{{ changes.elements }} element{{ 's' if changes.elements != 1 }} in {{ groups|length }} layer{{ 's' if groups|length != 1 }}. Each one opens its own record.</p>
+            <div class="flex gap-2">
+              {{ button(text='Open in Composer', variant='outline', size='sm', icon='pen-tool', href=url_for('archimate.composer_page'), testid='design-composer') }}
+              {{ button(text='Link elements', variant='outline', size='sm', icon='link', href=base ~ '?edit=1', testid='design-link-elements') }}
+            </div>
+          </div>
+          {% for g in groups %}
+          {% call card(class='overflow-hidden') %}
+            {% call card_header(class='pb-3') %}
+              {% call card_title(class='text-base') %}{{ g.label }}{% endcall %}
+              {% call card_description() %}
+                {%- set bits = [] -%}
+                {%- if g.added %}{% set _ = bits.append(g.added ~ ' added') %}{% endif -%}
+                {%- if g.changed %}{% set _ = bits.append(g.changed ~ ' changed') %}{% endif -%}
+                {%- if g.retired %}{% set _ = bits.append(g.retired ~ ' retired') %}{% endif -%}
+                {{ bits|join(', ') }}
+              {% endcall %}
+              {% if g.note %}<p class="mt-2 text-sm leading-6 text-foreground" data-testid="design-note-{{ g.layer }}">{{ g.note }}</p>{% endif %}
+            {% endcall %}
+            {% call card_content(class='p-0') %}
+              {% call dense_table(columns=[('Element', '!pl-6'), ('Type', ''), ('Change', ''), ('Note', 'hidden md:table-cell')], rows=g.elements|length, caption=g.label ~ ' elements', testid='design-table-' ~ g.layer, flush=true) %}
+                {% for e in g.elements %}
+                <tr class="group h-12 transition-colors hover:bg-muted/50">
+                  <td class="px-2 !pl-6 align-middle font-medium text-foreground">
+                    {% if e.href %}<a href="{{ e.href }}" class="hover:underline" data-testid="design-element-link">{{ e.name }}</a>{% else %}{{ e.name }}{% endif %}
+                  </td>
+                  <td class="px-2 align-middle text-muted-foreground">{{ e.type }}</td>
+                  <td class="px-2 align-middle">{% call badge(variant=change_variant.get(e.change, 'neutral')) %}{{ e.change }}{% endcall %}</td>
+                  <td class="hidden px-2 align-middle text-muted-foreground md:table-cell">{{ e.notes }}</td>
+                </tr>
+                {% endfor %}
+              {% endcall %}
+            {% endcall %}
+          {% endcall %}
+          {% endfor %}
+        {% else %}
+          {{ empty_tab('design-empty', 'No design elements yet. Link the applications, data and technology this solution adds, changes or retires.', base ~ '?edit=1', 'Link elements') }}
+        {% endif %}
+
+      {% elif tab == 'review' %}
+        {% if not packet.success %}
+          {% call alert(kind='warning', text=packet.error or 'The review packet could not be assembled.', testid='review-unavailable') %}{% endcall %}
+        {% else %}
+        {% call card(class=('border-success/30' if packet.tone == 'good' else ('border-warning/30' if packet.tone == 'warn' else ''))) %}
+          {% call card_content(class='p-6') %}
+            <div class="flex items-start gap-4">
+              {{ design_score_ring(score, size='large') }}
+              <div class="min-w-0">
+                <p class="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Board verdict</p>
+                <h2 class="text-lg font-semibold text-foreground" data-testid="review-verdict">{{ packet.verdict }}</h2>
+                <p class="mt-1 text-sm text-muted-foreground">Design score {{ score.label }}.
+                  {% if score.passed == score.total %}Every check passes.{% else %}{{ score.total - score.passed }} check{{ 's' if score.total - score.passed != 1 }} still open.{% endif %}</p>
+                <div class="mt-3 flex flex-wrap gap-2">
+                  {% if actions.can_decide %}{{ button(text='Decide', variant='primary', size='sm', icon='gavel', href=actions.decide_href, testid='review-decide') }}{% endif %}
+                  {% if actions.can_submit %}{{ button(text='Submit for review', variant='primary', size='sm', icon='send', testid='review-submit', attrs_dict={'data-submit-url': base ~ '/submit-for-arb', 'data-after-url': base ~ '?tab=review'}) }}{% endif %}
+                  {% if actions.review_open and not actions.can_decide %}<span class="text-sm text-muted-foreground">Awaiting the board's decision.</span>{% endif %}
+                </div>
+              </div>
+            </div>
+          {% endcall %}
+        {% endcall %}
+
+        <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
+          {% call card() %}
+            {% call card_header() %}
+              {% call card_title(class='text-base') %}Conformance findings{% endcall %}
+              {% call card_description() %}
+                {% if not packet.conformance.controls_available %}The required controls are not available.
+                {% elif packet.conformance.findings %}{{ packet.conformance.flagged }} flagged.
+                {% else %}Nothing flagged.{% endif %}
+              {% endcall %}
+            {% endcall %}
+            {% call card_content() %}
+              {% if packet.conformance.findings %}
+              <ul class="space-y-2" data-testid="review-findings">
+                {% for f in packet.conformance.findings %}
+                <li class="flex items-start gap-2 text-sm">
+                  {% call badge(variant=('danger' if f.severity == 'critical' else ('warning' if f.severity == 'high' else 'neutral'))) %}{{ f.severity }}{% endcall %}
+                  <span class="text-foreground">{{ f.title }}</span>
+                </li>
+                {% endfor %}
+              </ul>
+              {% else %}
+              <p class="text-sm text-muted-foreground" data-testid="review-findings">{{ packet.conformance.summary or 'No findings. The design meets the technical policy as recorded.' }}</p>
+              {% endif %}
+            {% endcall %}
+          {% endcall %}
+
+          {% call card() %}
+            {% call card_header() %}
+              {% call card_title(class='text-base') %}Decision{% endcall %}
+            {% endcall %}
+            {% call card_content() %}
+              {% if packet.decision %}
+              <p class="text-sm font-medium text-foreground" data-testid="review-decision">{{ packet.decision.title }}</p>
+              <div class="mt-1">{% call badge(variant=('success' if packet.decision.status == 'accepted' else ('danger' if packet.decision.status == 'rejected' else 'warning'))) %}{{ packet.decision.status }}{% endcall %}</div>
+              <p class="mt-2 text-sm text-muted-foreground">{{ packet.decision.decision|truncate(240) }}</p>
+              {% else %}
+              <p class="text-sm text-muted-foreground" data-testid="review-decision">No decision recorded. Compare the options and record which one the design takes.</p>
+              <div class="mt-3">{{ button(text='Compare options', variant='outline', size='sm', href=base ~ '/options-advisor') }}</div>
+              {% endif %}
+            {% endcall %}
+          {% endcall %}
+        </div>
+
+        {% call card() %}
+          {% call card_header() %}
+            {% call card_title(class='text-base') %}Board history{% endcall %}
+            {% call card_description() %}Submissions, decisions and conditions, newest first.{% endcall %}
+          {% endcall %}
+          {% call card_content() %}
+            {% if history %}
+            <ol class="space-y-4" data-testid="review-history">
+              {% for h in history %}
+              <li class="flex gap-3">
+                {{ avatar(fallback=initials(h.decided_by_name or h.submitter_name), alt=h.decided_by_name or h.submitter_name or '', size='sm') }}
+                <div class="min-w-0 flex-1">
+                  <div class="flex flex-wrap items-center gap-2">
+                    <span class="text-sm font-medium text-foreground">{{ h.review_number }}</span>
+                    {% call badge(variant=('success' if h.decision in ('approved', 'approved_with_conditions') else ('danger' if h.decision == 'rejected' else 'neutral'))) %}{{ h.decision_label }}{% endcall %}
+                  </div>
+                  <p class="text-xs text-muted-foreground">
+                    {% if h.submitter_name %}Submitted by {{ h.submitter_name }}{% if h.submitted_at %} on {{ h.submitted_at }}{% endif %}.{% endif %}
+                    {% if h.decided_by_name %} Decided by {{ h.decided_by_name }}{% if h.decision_date %} on {{ h.decision_date }}{% endif %}.{% endif %}
+                  </p>
+                  {% if h.decision_rationale %}<p class="mt-1 text-sm text-foreground">{{ h.decision_rationale }}</p>{% endif %}
+                  {% if h.conditions %}
+                  <ul class="mt-1 list-disc pl-5 text-sm text-foreground">{% for c in h.conditions %}<li>{{ c }}</li>{% endfor %}</ul>
+                  {% endif %}
+                </div>
+              </li>
+              {% endfor %}
+            </ol>
+            {% else %}
+            <p class="text-sm text-muted-foreground" data-testid="review-history">Not submitted to the board yet.{% if actions.can_submit %} Submit it when the design score is where you want it.{% endif %}</p>
+            {% endif %}
+          {% endcall %}
+        {% endcall %}
+        {% endif %}
+
+      {% elif tab == 'requirements' %}
+        {{ empty_tab('requirements-next', 'Requirements and constraints will sit here beside the design element that realises each one. Today they are on the traceability page.', base ~ '/traceability', 'Open traceability') }}
+      {% elif tab == 'options' %}
+        {{ empty_tab('options-next', 'The options compared, their scores and the recorded decision will sit here. Today they are on the options page.', base ~ '/options-advisor', 'Compare options') }}
+      {% elif tab == 'risks' %}
+        {{ empty_tab('risks-next', 'The risks this solution carries, each with an owner, and their heat map will sit here. Today they are on the risks page.', base ~ '/risks', 'Open risks') }}
+      {% elif tab == 'delivery' %}
+        {{ empty_tab('delivery-next', 'Work packages, plateaus, dates and what this solution depends on will sit here. Today they are on the roadmap.', base ~ '/migration-roadmap', 'Open the roadmap') }}
+      {% endif %}
+    </div>
+
+    {# ── side column: properties, history, comments ───────────────── #}
+    <aside class="space-y-6 min-w-0">
+      {% call card() %}
+        {% call card_header(class='pb-3') %}
+          {% call card_title(class='text-base') %}Properties{% endcall %}
+        {% endcall %}
+        {% call card_content() %}
+          <dl class="space-y-2 text-sm" data-testid="record-properties">
+            {% for p in properties %}
+            <div class="flex items-start justify-between gap-3">
+              <dt class="shrink-0 text-muted-foreground">{{ p.label }}</dt>
+              <dd class="min-w-0 text-right text-foreground" data-testid="property-{{ p.key }}">
+                {%- if p.value and p.key == 'target_date' %}{{ p.value|format_datetime('d MMM yyyy') }}
+                {%- elif p.value %}{{ p.value }}
+                {%- else %}<a href="{{ base }}/edit" class="text-muted-foreground hover:text-foreground hover:underline">Not set</a>{% endif -%}
+              </dd>
+            </div>
+            {% endfor %}
+          </dl>
+        {% endcall %}
+      {% endcall %}
+
+      {% call card() %}
+        {% call card_header(class='pb-3') %}
+          {% call card_title(class='text-base') %}History{% endcall %}
+        {% endcall %}
+        {% call card_content() %}
+          <ul class="space-y-2 text-sm" data-testid="record-history">
+            {% if latest_review %}
+            <li class="flex items-start gap-2">
+              <i data-lucide="gavel" class="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true"></i>
+              <span>Review {{ latest_review.review_number }}: {{ ((latest_review.decision or latest_review.status or 'pending')|replace('_', ' ')|capitalize) }}.
+                <a href="{{ base }}?tab=review" class="text-primary hover:underline">Board history</a></span>
+            </li>
+            {% endif %}
+            {% if solution.updated_at %}
+            <li class="flex items-start gap-2">
+              <i data-lucide="pencil" class="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true"></i>
+              <span>Updated {{ solution.updated_at|format_datetime('d MMM yyyy') }}</span>
+            </li>
+            {% endif %}
+            {% if solution.created_at %}
+            <li class="flex items-start gap-2">
+              <i data-lucide="plus-circle" class="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true"></i>
+              <span>Created {{ solution.created_at|format_datetime('d MMM yyyy') }}{% if solution.created_by %} by {{ solution.created_by.full_name if solution.created_by.full_name is defined else solution.created_by.email }}{% endif %}</span>
+            </li>
+            {% endif %}
+          </ul>
+        {% endcall %}
+      {% endcall %}
+
+      {% call card() %}
+        {% call card_header(class='pb-3') %}
+          {% call card_title(class='text-base') %}Comments{% endcall %}
+        {% endcall %}
+        {% call card_content() %}
+          <form class="space-y-2" data-testid="comment-form" data-post-url="{{ base }}/comments">
+            <label for="record-comment" class="sr-only">Add a comment</label>
+            <textarea id="record-comment" name="content" rows="3" required maxlength="4000" placeholder="Add a comment" class="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"></textarea>
+            {{ button(text='Post', variant='outline', size='sm', type='submit', testid='comment-post') }}
+          </form>
+          {% if comments %}
+          <ul class="mt-4 space-y-3 text-sm" data-testid="record-comments">
+            {% for c in comments %}
+            <li class="flex gap-2">
+              {{ avatar(fallback=initials(c.author), alt=c.author or '', size='sm') }}
+              <div class="min-w-0">
+                <p class="text-xs text-muted-foreground"><span class="font-medium text-foreground">{{ c.author }}</span>{% if c.created_at %} · {{ c.created_at|format_datetime('d MMM yyyy, HH:mm') }}{% endif %}</p>
+                <p class="whitespace-pre-line text-foreground">{{ c.content }}</p>
+              </div>
+            </li>
+            {% endfor %}
+          </ul>
+          {% else %}
+          <p class="mt-3 text-sm text-muted-foreground" data-testid="record-comments">No comments yet.</p>
+          {% endif %}
+        {% endcall %}
+      {% endcall %}
+    </aside>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script nonce="{{ csp_nonce }}">
+(function () {
+  function csrf() {
+    var m = document.querySelector('meta[name="csrf-token"]');
+    return m ? m.content : '';
+  }
+  function post(url, body) {
+    return fetch(url, {
+      method: 'POST', credentials: 'same-origin',
+      headers: {'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRFToken': csrf()},
+      body: JSON.stringify(body || {})
+    }).then(function (r) { return r.json().then(function (j) { return {ok: r.ok, body: j}; }); });
+  }
+  function say(kind, text) {
+    if (window.Platform && Platform.toast && Platform.toast[kind]) { Platform.toast[kind](text); } else { window.console && console.log(text); }
+  }
+  document.querySelectorAll('[data-submit-url]').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      if (btn.disabled) { return; }
+      btn.disabled = true;
+      post(btn.getAttribute('data-submit-url'), {}).then(function (res) {
+        if (res.ok && res.body && res.body.success !== false) {
+          window.location.assign(btn.getAttribute('data-after-url'));
+        } else {
+          btn.disabled = false;
+          var why = (res.body && (res.body.error || res.body.message)) || 'The solution could not be submitted.';
+          if (res.body && res.body.missing_evidence && res.body.missing_evidence.length) { why += ' Missing: ' + res.body.missing_evidence.join(', ') + '.'; }
+          say('error', why);
+        }
+      }).catch(function () { btn.disabled = false; say('error', 'The solution could not be submitted.'); });
+    });
+  });
+  var form = document.querySelector('[data-testid="comment-form"]');
+  if (form) {
+    form.addEventListener('submit', function (ev) {
+      ev.preventDefault();
+      var box = form.querySelector('textarea');
+      var text = (box.value || '').trim();
+      if (!text) { return; }
+      post(form.getAttribute('data-post-url'), {section: 'record', content: text}).then(function (res) {
+        if (res.ok) { window.location.reload(); } else { say('error', (res.body && res.body.error) || 'The comment could not be posted.'); }
+      }).catch(function () { say('error', 'The comment could not be posted.'); });
+    });
+  }
+})();
+</script>
+{% endblock %}

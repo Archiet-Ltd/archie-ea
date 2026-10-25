@@ -3070,33 +3070,16 @@ def view_solution(solution_id: int):
     if not _check_solution_access(solution):
         abort(403)
 
-    # Blueprint page ships ON by default (wired, reachable). Explicit config/env
-    # value can opt OUT; ?edit=1 forces the legacy detail/editor view.
-    _bp_setting = current_app.config.get("USE_BLUEPRINT_PAGE")
-    if _bp_setting is None:
-        _bp_setting = os.environ.get("USE_BLUEPRINT_PAGE", "true")
-    use_blueprint = (
-        str(_bp_setting).strip().lower() in ("true", "1", "yes", "on")
-        and request.args.get("edit") != "1"
-    )
+    # The solution record: one record page with seven tabs (the solutions
+    # rethink, slice 5). ?edit=1 still opens the legacy editor.
+    if request.args.get("edit") != "1":
+        from app.modules.solutions_strategic.v2.services import solution_record_service
 
-    if use_blueprint:
-        try:
-            ctx = _build_blueprint_context(solution)
-
-            # Fire proactive analysis in background — does not block page render
-            import threading as _t
-            _t.Thread(
-                target=_run_proactive_analysis,
-                args=(current_app._get_current_object(), solution.id, solution.organization_id),
-                daemon=True,
-            ).start()
-
-            ctx["show_created_banner"] = request.args.get("created") == "1"
-            return render_template("solutions/blueprint.html", **ctx)
-        except Exception as e:
-            logger.error("Blueprint page failed for solution %s: %s. Falling back to legacy.", solution.id, e, exc_info=True)
-            # Fall through to legacy detail page
+        ctx = solution_record_service.build(
+            solution, tab=request.args.get("tab"), user=current_user,
+        )
+        ctx["show_created_banner"] = request.args.get("created") == "1"
+        return render_template("solutions/record.html", **ctx)
 
     # AIC-312: Check for active workbench workspace linked to this solution
     active_workspace_id = None
