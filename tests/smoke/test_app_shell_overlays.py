@@ -218,12 +218,12 @@ def test_help_button_z_index_below_overlays(browser, live_server, seeded):
 
 
 def test_help_button_reserves_space_on_main(browser, live_server, seeded):
-    """When guided_mode_steps are defined the main-content element must carry
-    pb-20 so the help button never covers a control."""
+    """When a page defines guided_mode_steps (the review board's page does) the
+    main-content element must carry pb-20 so the help button never covers a control."""
     page = browser.new_page(viewport={"width": 1280, "height": 800})
     try:
         _login(page, live_server, seeded["emails"]["platform_admin"])
-        page.goto(live_server + "/dashboard/overview",
+        page.goto(live_server + "/arb/",
                   wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
         page.wait_for_timeout(1000)
 
@@ -247,66 +247,42 @@ def test_help_button_reserves_space_on_main(browser, live_server, seeded):
         page.close()
 
 
-# ── Search and onboarding modals not at the same z-index ────────────────────
+# ── Search results and the first screen: nothing stands over what a person needs ─
 
 
-def test_search_and_onboarding_modals_different_z_index(browser, live_server, seeded):
-    """The search modal (z-[100]) and onboarding modal (z-[200]) must not
-    stack at the same level, so one never obscures the other's interaction
-    surface when both could be open."""
+def test_sidebar_search_results_stand_above_the_page_and_can_be_clicked(browser, live_server, seeded):
+    """The search box lives in the sidebar. Its results open over the page content and the
+    first result is what a click at its centre lands on (nothing sits on top of it)."""
     page = browser.new_page(viewport={"width": 1280, "height": 800})
     try:
         _login(page, live_server, seeded["emails"]["platform_admin"])
         page.goto(live_server + "/dashboard/overview",
                   wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
         page.wait_for_timeout(1000)
+        assert page.locator("#search-modal").count() == 0, "a second search modal is on the page"
 
-        # Open the search modal so it is visible
-        page.evaluate("""() => {
-            const modal = document.getElementById('search-modal');
-            if (modal) modal.style.display = 'flex';
-        }""")
-        page.wait_for_timeout(300)
-
-        z_indices = page.evaluate("""() => {
-            const searchModal = document.getElementById('search-modal');
-            // The onboarding modal overlay div (the outer fixed container)
-            const onboardingOverlay = document.querySelector(
-                '[x-show="showOnboarding"]'
-            );
+        page.fill('[data-testid="sidebar-search"]', "applications")
+        page.wait_for_selector('[data-testid="sidebar-search-page"]', timeout=PAGE_TIMEOUT)
+        hit = page.evaluate("""() => {
+            const first = document.querySelector('[data-testid="sidebar-search-page"]');
+            const box = first.getBoundingClientRect();
+            const atCentre = document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2);
             return {
-                searchZ: searchModal
-                    ? parseInt(getComputedStyle(searchModal).zIndex, 10) : null,
-                onboardingZ: onboardingOverlay
-                    ? parseInt(getComputedStyle(onboardingOverlay).zIndex, 10) : null,
+                text: first.textContent.trim(),
+                landsOnResult: !!atCentre && first.contains(atCentre),
+                panelZ: parseInt(getComputedStyle(document.getElementById('sidebar-search-results')).zIndex, 10),
             };
         }""")
-
-        assert z_indices["searchZ"] is not None, "search modal not found"
-        # The search modal must be at z-index 100
-        assert z_indices["searchZ"] == 100, (
-            "search modal z-index (%d) must be 100" % z_indices["searchZ"]
-        )
-        # If the onboarding overlay is present (it may not be for a user who
-        # already completed onboarding), it must be at a different z-index
-        if z_indices["onboardingZ"] is not None:
-            assert z_indices["onboardingZ"] != z_indices["searchZ"], (
-                "onboarding modal z-index (%d) must differ from search modal "
-                "z-index (%d) so they never stack at the same level"
-                % (z_indices["onboardingZ"], z_indices["searchZ"])
-            )
-            assert z_indices["onboardingZ"] > z_indices["searchZ"], (
-                "onboarding modal z-index (%d) must be above search modal "
-                "z-index (%d) so onboarding is never hidden behind search"
-                % (z_indices["onboardingZ"], z_indices["searchZ"])
-            )
+        assert "Applications" in hit["text"], hit
+        assert hit["landsOnResult"], "something covers the first search result: %s" % hit
+        assert hit["panelZ"] >= 30, hit
     finally:
         page.close()
 
 
-def test_onboarding_modal_z_index_is_200(browser, live_server):
-    """The onboarding modal overlay must render at z-index 200, above the
-    search modal (100) and every other overlay in the app shell."""
+def test_first_screen_of_a_new_user_has_no_overlay_over_the_page(browser, live_server):
+    """A person with no role in an empty workspace meets the page itself: no modal, wizard or
+    other full-screen layer stands over it, and the middle of the page is the page."""
     from app import create_app, db
     from app.models.organization import Organization
     from app.models.user import User
@@ -340,26 +316,32 @@ def test_onboarding_modal_z_index_is_200(browser, live_server):
                   wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
         page.wait_for_timeout(1500)
 
-        z_index = page.evaluate("""() => {
-            const overlay = document.querySelector('[x-show="showOnboarding"]');
-            if (!overlay) return null;
-            return parseInt(getComputedStyle(overlay).zIndex, 10);
+        state = page.evaluate("""() => {
+            const covering = [...document.querySelectorAll('body *')].filter((el) => {
+                const cs = getComputedStyle(el);
+                if (cs.position !== 'fixed' || cs.display === 'none' || cs.visibility === 'hidden') return false;
+                const r = el.getBoundingClientRect();
+                return r.width >= window.innerWidth * 0.9 && r.height >= window.innerHeight * 0.9
+                    && parseFloat(cs.opacity) > 0;
+            }).map((el) => el.id || el.className.toString().slice(0, 60));
+            const main = document.getElementById('main-content').getBoundingClientRect();
+            const atMiddle = document.elementFromPoint(main.left + main.width / 2, window.innerHeight / 2);
+            return {
+                covering,
+                middleIsPage: !!atMiddle && document.getElementById('main-content').contains(atMiddle),
+                role: document.body.textContent.includes("What's your role?"),
+            };
         }""")
-
-        assert z_index is not None, (
-            "onboarding modal overlay not found for a user with no role in "
-            "an empty workspace"
-        )
-        assert z_index == 200, (
-            "onboarding modal z-index (%d) must be 200, above the search "
-            "modal (100)" % z_index
-        )
+        assert state["covering"] == [], "a full-screen layer stands over the first screen: %s" % state["covering"]
+        assert state["middleIsPage"], "the middle of the first screen is not the page"
+        assert not state["role"], "the role wizard is back over the first screen"
     finally:
         page.close()
         with app.app_context():
             db.session.remove()
             db.session.execute(
-                db.text("DELETE FROM soc2_audit_log WHERE user_id=:uid"), {"uid": user_id})
+                db.text("DELETE FROM soc2_audit_log WHERE user_id=:uid OR organization_id=:oid"),
+                {"uid": user_id, "oid": org_id})
             db.session.execute(
                 db.text("DELETE FROM users WHERE id=:uid"), {"uid": user_id})
             db.session.execute(
