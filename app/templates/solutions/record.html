@@ -51,7 +51,7 @@
   {% endif %}
   <a href="{{ base }}?tab=overview#design-score" class="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground" data-testid="record-score" aria-label="Design score {{ score.label }}">
     {{ design_score_ring(score, size='small') }}
-    <span class="tabular-nums">{{ score.label }}</span>
+    <span class="tabular-nums">of {{ score.total }}</span>
   </a>
 {% endmacro %}
 
@@ -73,7 +73,20 @@
 {% block content %}
 <div class="p-6 mx-auto" data-testid="solution-record" data-solution-id="{{ sid }}" data-tab="{{ tab }}">
 
-  {{ page_shell(solution.name, breadcrumb=[('Solutions', '/solutions/'), (solution.name, None)], tabs=tabs, stack_actions=True, meta_caller=_meta, actions_caller=_actions) }}
+  {{ page_shell(solution.name, breadcrumb=[('Solutions', '/solutions/'), (solution.name, None)], stack_actions=True, meta_caller=_meta, actions_caller=_actions) }}
+
+  {# Seven tabs. On a phone the strip scrolls sideways instead of wrapping or overflowing the page. #}
+  <nav aria-label="Solution record sections" class="-mx-6 -mt-2 mb-6 overflow-x-auto px-6 sm:mx-0 sm:px-0" data-testid="record-tabs">
+    <ul class="flex min-w-max items-center gap-1 border-b border-border text-sm">
+      {% for label, href, active in tabs %}
+      <li>
+        <a href="{{ href }}"
+           class="inline-flex items-center whitespace-nowrap px-3 py-2 border-b-2 -mb-px transition-colors {% if active %}border-primary text-foreground font-medium{% else %}border-transparent text-muted-foreground hover:text-foreground{% endif %}"
+           {% if active %}aria-current="page"{% endif %}>{{ label }}</a>
+      </li>
+      {% endfor %}
+    </ul>
+  </nav>
 
   <div class="grid grid-cols-1 gap-6 xl:grid-cols-3">
 
@@ -96,7 +109,7 @@
           {% endcall %}
         {% endcall %}
 
-        {% call alert(kind='info' if next_step.action != 'Fix this' else 'warning', title='Next step: ' ~ next_step.label ~ '.', text=next_step.detail, link_href=next_step.href, link_text=next_step.action, testid='record-next-step') %}{% endcall %}
+        {% call alert(kind='info' if next_step.action != 'Fix this' else 'warning', title='Next step: ' ~ next_step.label ~ '.', text=next_step.detail, link_href=next_step.href, link_text=next_step.action, testid='record-next-step', class='flex-wrap') %}{% endcall %}
 
         <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
           {% call card() %}
@@ -352,7 +365,7 @@
             {% if solution.created_at %}
             <li class="flex items-start gap-2">
               <i data-lucide="plus-circle" class="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true"></i>
-              <span>Created {{ solution.created_at|format_datetime('d MMM yyyy') }}{% if solution.created_by %} by {{ solution.created_by.full_name if solution.created_by.full_name is defined else solution.created_by.email }}{% endif %}</span>
+              <span>Created {{ solution.created_at|format_datetime('d MMM yyyy') }}{% if solution.created_by %} by {{ solution.created_by.full_name() if solution.created_by.full_name is callable else (solution.created_by.full_name or solution.created_by.email) }}{% endif %}</span>
             </li>
             {% endif %}
           </ul>

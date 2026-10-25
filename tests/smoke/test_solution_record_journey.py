@@ -51,6 +51,8 @@ def demo(live_server, seeded):
             from app.services.solution_design_score_service import compute
 
             author = User.query.filter_by(email=AUTHOR_EMAIL).one()
+            author.password = PASSWORD  # the seed leaves an existing demo user's password alone
+            author.confirmed = True
             org_id = author.organization_id
             role = Role.query.filter_by(name="Architect").one()
             for email, first, enterprise_role in ((ARCHITECT_EMAIL, "Sol", "solution_architect"),
