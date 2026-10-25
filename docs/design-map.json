@@ -17717,6 +17717,9 @@
       "extends": [
         "layouts/admin_base.html"
       ],
+      "extra_macros": [
+        "components/card.html"
+      ],
       "frame": "dashboard-01",
       "inhouse_components": [
         "empty_state:Replace",
@@ -17724,9 +17727,10 @@
         "page-header:Replace"
       ],
       "macros": [
+        "components/card.html",
         "components/empty_state.html",
-        "components/metrics_card.html",
-        "components/page_header.html"
+        "components/page_header.html",
+        "components/table.html"
       ],
       "original": "example:tasks",
       "page_type": "data-table",
