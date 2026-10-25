@@ -246,7 +246,7 @@ def test_no_page_links_to_the_private_repository(app):
 
 def test_navbar_has_a_roles_menu_and_footer_links_the_roles_hub(app):
     """The Roles menu and the footer both read the site registry; /connectors joins
-    them only once a connector page is published (every one is held today)."""
+    them once a connector page is published (the AI assistant page is live)."""
     import re
 
     with app.test_client() as client:
@@ -258,4 +258,4 @@ def test_navbar_has_a_roles_menu_and_footer_links_the_roles_hub(app):
     footer = re.search(r"<footer\b.*?</footer>", html, re.DOTALL).group(0)
     footer_hrefs = re.findall(r'href="([^"]+)"', footer)
     assert "/roles" in footer_hrefs
-    assert "/connectors" not in header_hrefs + footer_hrefs
+    assert "/connectors" in header_hrefs + footer_hrefs

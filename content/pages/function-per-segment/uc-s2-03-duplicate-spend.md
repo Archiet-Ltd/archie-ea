@@ -28,7 +28,7 @@ Find what you're paying for twice. Run duplicate detection across your whole app
 
 Each group appears as a row with Group Name, Type, Apps, Similarity, Status and estimated savings. You can search and filter by type, status and risk level. **View** opens the group, **Add to List** puts it on the consolidation list and **Dismiss** marks it as ignored, after you confirm. Several groups can be added or dismissed together.
 
-The saving for a group is the average annual cost recorded across its applications, times the number of applications beyond the first. The cost comes from the application record: total cost of ownership, or licence plus maintenance cost. If no cost is recorded on any application in the group, the estimate is 0.
+The saving for a group is the average annual cost recorded across its applications, times the number of applications beyond the first. The cost comes from the application record: total cost of ownership, or licence plus maintenance cost. A group shows a saving once an application in it has a cost recorded.
 
 The **Consolidation List** carries the plan. Its cards show **Portfolio Annual Cost**, **Projected Savings** (with a verified figure beside it when one exists), **Migration Investment**, **In Progress**, **Requires Attention** and **High Risk**. Each entry has an Action (Pending Review, Decommission, Retire, Merge or Add to Roadmap), a TIME score, Annual Saving, Migration Cost, Status and Wave. **Score All (TIME)** and **Recalculate Savings** update the whole list.
 
@@ -36,7 +36,7 @@ The **Rationalization** dashboard strings the steps together as Detect, Score, P
 
 **Spend** (Spend Analytics) shows Total Contract Value, Annual Recurring Cost, Spend by Contract Type and Top Vendors by Annual Spend. A contract without a value is left out of the total, and the page says how many were left out.
 
-On **Ask**, the question "What is the rationalization status of ___?" takes you to rationalization planning for one application, with an **Open rationalization planning** button.
+Ask the AI chat for the rationalization status of one application and it answers with an **Open rationalization planning** button that takes you to that application's planning page.
 
 ## Who asks it
 
@@ -44,7 +44,7 @@ A CTO or VP of Engineering heading into a budget round, a renewal cycle or an ac
 
 ## How to get your answer
 
-1. Make sure your applications are in **Applications**, with costs where you know them.
+1. Make sure your applications are in **Applications**, with costs where you know them. Connect GitHub or import a file to bring the applications in.
 2. Open **Duplicate Detection** and click **Run Detection**. Start with Hybrid and the default threshold. Lower the threshold if you want more candidates.
 3. Open each group with **View**. Click **Add to List** for real duplicates and **Dismiss** for false matches.
 4. Open the **Consolidation List**. Set each entry's action and wave, then click **Score All (TIME)** and **Recalculate Savings**.
@@ -58,7 +58,7 @@ Export the card statement and the contract register, sort by vendor, and look fo
 ## Limits
 
 - Detection works on the application records you hold. A duplicate recorded under a different name and description may not be found, and every group needs a person's review.
-- Savings are estimates. They need costs on the application records, and a group with none shows 0.
+- Savings are estimates. They need costs on the application records.
 - Spend reads the vendor contracts recorded in Entelim, not your card or ledger data. It does not match contracts to applications.
 - Spend Recommendations (AI) are suggestions. Read them as prompts for a conversation.
 
@@ -66,7 +66,7 @@ Export the card statement and the contract register, sort by vendor, and look fo
 
 ### Do I need cost data before I start?
 
-No. Detection runs without it. Estimated savings need cost on the application records, so groups show 0 until you add it.
+No. Detection runs without it. Estimated savings need cost on the application records, so add it where you know it.
 
 ### What does Dismiss do?
 

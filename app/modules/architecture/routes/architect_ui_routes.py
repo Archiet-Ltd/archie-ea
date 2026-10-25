@@ -602,6 +602,8 @@ def _load_sample_company_locked(wants_json):
             sample_company_service.add_working_data(g.current_org_id, current_user, point)
             db.session.commit()
             sample_company_service.work_out_connections(g.current_org_id)
+            sample_company_service.date_the_load(g.current_org_id, point.started_at)
+            db.session.commit()
         except Exception:
             db.session.rollback()
             current_app.logger.exception("sample company working data not added")
