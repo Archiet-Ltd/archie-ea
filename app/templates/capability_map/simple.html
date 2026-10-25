@@ -35,7 +35,7 @@
         {{ metrics_card(title='Total Capabilities', value=(stats.total|dash), icon='layers') }}
         {{ metrics_card(title='Level 1 Capabilities', value=(stats.l1_count|dash), icon='folder-tree') }}
         {{ metrics_card(title='Max Depth', value=(stats.max_depth|dash), icon='git-branch') }}
-        {{ metrics_card(title='Domains', value=(stats.domain_count|dash), icon='globe') }}
+        {{ metrics_card(title='Domains', value=(stats.domain_count|dash if stats.domain_count else '—'), description=('' if stats.domain_count else 'No domain assigned yet'), icon='globe') }}
     </div>
 
     {% if capability_groups and stats.total %}
