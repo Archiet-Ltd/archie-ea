@@ -1,6 +1,6 @@
 """Take implementation planning dashboard screenshots at 1440 and 390, light and dark.
 
-Saves to /home/ubuntu/verify/seats/mg3ip056c/walk/ and extends the journey
+Saves to /home/ubuntu/verify/seats/mg3ip056e/walk/ and extends the journey
 test to capture screenshots as the portfolio manager persona.
 """
 
@@ -15,7 +15,7 @@ from .fresh_org import create_fresh_org, sign_in
 pytestmark = [pytest.mark.smoke, pytest.mark.journey]
 
 ROLE = "portfolio_manager"
-SCREENSHOT_DIR = "/home/ubuntu/verify/seats/mg3ip056c/walk"
+SCREENSHOT_DIR = "/home/ubuntu/verify/seats/mg3ip056e/walk"
 
 
 def _seed_work_package(app, org_id, user_id, name):
