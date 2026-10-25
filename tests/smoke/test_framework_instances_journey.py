@@ -77,7 +77,6 @@ def test_framework_instances_list_and_detail(browser, live_server, seeded):
         )
         db.session.add(inst)
         db.session.commit()
-        instance_id = inst.id
 
     # ---- Instances list page (data-table, tier B) ----
     page.goto(live_server + "/framework-config/instances", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
@@ -100,7 +99,7 @@ def test_framework_instances_list_and_detail(browser, live_server, seeded):
     expect(page.locator("h1").filter(has_text=name)).to_be_visible(timeout=PAGE_TIMEOUT)
 
     # Breadcrumb should exist with link back to instances
-    breadcrumb_link = page.locator("nav[aria-label=breadcrumb] a").filter(has_text="Framework Instances")
+    breadcrumb_link = page.locator("nav[aria-label=Breadcrumb] a").filter(has_text="Framework Instances")
     expect(breadcrumb_link).to_be_visible(timeout=PAGE_TIMEOUT)
 
     # Stat cards should show key metrics - card_description renders as p tag
