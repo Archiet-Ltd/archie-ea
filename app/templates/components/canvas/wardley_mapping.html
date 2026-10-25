@@ -40,21 +40,21 @@
   {%- for a in w.arrows %}
   <a href="{{ a.href }}" data-wardley-movement aria-label="Movement: {{ a.name }}, moves {{ a.component }}" class="focus-visible:outline-none">
     <line x1="{{ a.x1 }}" y1="{{ a.y }}" x2="{{ a.x2 }}" y2="{{ a.y }}" stroke="currentColor" stroke-width="2" class="text-primary" marker-end="url(#{{ id }}-head)"/>
-    <text x="{{ (a.x1 + a.x2) / 2 }}" y="{{ a.y - 8 }}" text-anchor="middle" class="text-xs" fill="currentColor">{{ a.name }}</text>
+    <text x="{{ a.x1 }}" y="{{ a.y - 14 }}" class="text-xs fill-foreground stroke-background [paint-order:stroke]" stroke-width="4" stroke-linejoin="round">{{ a.name }}</text>
   </a>
   {%- endfor %}
   {%- for b in w.bars %}
   <a href="{{ b.href }}" data-wardley-inertia aria-label="Inertia: {{ b.name }}, resists change to {{ b.component }}" class="focus-visible:outline-none">
     <line x1="{{ b.x }}" y1="{{ b.y1 }}" x2="{{ b.x }}" y2="{{ b.y2 }}" stroke="currentColor" stroke-width="5" class="text-destructive"/>
-    <text x="{{ b.x + 8 }}" y="{{ b.y2 + 12 }}" class="text-xs" fill="currentColor">{{ b.name }}</text>
+    <text x="{{ b.x + 8 }}" y="{{ b.y1 - 6 }}" class="text-xs fill-foreground stroke-background [paint-order:stroke]" stroke-width="4" stroke-linejoin="round">{{ b.name }}</text>
   </a>
   {%- endfor %}
   {%- for n in w.users + w.needs + w.components %}
   <a href="{{ n.href }}" data-wardley-dot="{{ n.kind }}" aria-label="{{ n.name }}" class="focus-visible:outline-none">
     <circle cx="{{ n.x }}" cy="{{ n.y }}" r="9" fill="currentColor" class="{{ 'text-primary' if n.kind == 'component' else 'text-foreground' }}" stroke="currentColor" stroke-width="2"/>
-    {%- if n.kind != 'component' %}<text x="{{ n.x }}" y="{{ n.y - 16 }}" text-anchor="middle" class="text-xs text-muted-foreground" fill="currentColor">{{ 'User' if n.kind == 'user' else 'User need' }}</text>{% endif %}
+    {%- if n.kind != 'component' %}<text x="{{ n.x }}" y="{{ n.y - 16 }}" text-anchor="middle" class="text-xs fill-muted-foreground stroke-background [paint-order:stroke]" stroke-width="4" stroke-linejoin="round">{{ 'User' if n.kind == 'user' else 'User need' }}</text>{% endif %}
     {%- for line in n.label %}
-    <text x="{{ n.x }}" y="{{ n.y + 26 + loop.index0 * 14 }}" text-anchor="middle" class="text-xs" fill="currentColor">{{ line }}</text>
+    <text x="{{ n.x }}" y="{{ n.y + 26 + loop.index0 * 14 }}" text-anchor="middle" class="text-xs fill-foreground stroke-background [paint-order:stroke]" stroke-width="4" stroke-linejoin="round">{{ line }}</text>
     {%- endfor %}
   </a>
   {%- endfor %}
