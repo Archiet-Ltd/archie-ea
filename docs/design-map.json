@@ -37602,6 +37602,7 @@
     "public-footer",
     "public-navbar",
     "navigation-menu",
+    "radio-group",
     "table",
     "accordion",
     "separator"
@@ -37620,6 +37621,10 @@
    ],
    "extends": [
     "layouts/public_base.html"
+   ],
+   "extra_macros": [
+    "components/radio_group.html",
+    "components/table.html"
    ],
    "frame": "navigation-menu",
    "grid": null,
