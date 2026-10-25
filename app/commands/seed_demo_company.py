@@ -1495,6 +1495,100 @@ _BACKLOG_REQUIREMENTS = [
 ]
 
 
+# Three data domains with the entities, attributes and relationships a data
+# architect would draw for a fabrication and fulfilment business. Each entity is
+# a DataEntity (and so its ArchiMate data object); nothing here is a second store.
+_DATA_MODEL = {
+    "Customer": {
+        "entities": {
+            "Customer": ["customer_id:uuid:pk", "legal_name:varchar", "segment:varchar?", "created_on:date"],
+            "Contact": ["contact_id:uuid:pk", "customer_id:uuid:fk", "full_name:varchar", "email:varchar?"],
+            "Delivery Address": ["address_id:uuid:pk", "customer_id:uuid:fk", "street:varchar", "postcode:varchar", "country:varchar"],
+            "Consent": ["consent_id:uuid:pk", "contact_id:uuid:fk", "purpose:varchar", "given_on:timestamp", "withdrawn_on:timestamp?"],
+        },
+        "relationships": [
+            ("Customer", "Contact", "one-to-many", "has"),
+            ("Customer", "Delivery Address", "one-to-many", "ships to"),
+            ("Contact", "Consent", "one-to-many", "gives"),
+        ],
+    },
+    "Orders and Fulfilment": {
+        "entities": {
+            "Sales Order": ["order_id:uuid:pk", "customer_id:uuid:fk", "placed_on:timestamp", "status:varchar"],
+            "Order Line": ["line_id:uuid:pk", "order_id:uuid:fk", "product_id:uuid:fk", "quantity:integer", "unit_price:decimal"],
+            "Product": ["product_id:uuid:pk", "sku:varchar", "name:varchar", "weight_kg:decimal?"],
+            "Shipment": ["shipment_id:uuid:pk", "order_id:uuid:fk", "carrier:varchar", "shipped_on:date?"],
+            "Return": ["return_id:uuid:pk", "line_id:uuid:fk", "reason:text", "received_on:date?"],
+        },
+        "relationships": [
+            ("Sales Order", "Order Line", "one-to-many", "contains"),
+            ("Product", "Order Line", "one-to-many", "is sold on"),
+            ("Sales Order", "Shipment", "one-to-many", "is sent in"),
+            ("Order Line", "Return", "one-to-many", "may be returned as"),
+        ],
+    },
+    "Finance": {
+        "entities": {
+            "Invoice": ["invoice_id:uuid:pk", "order_id:uuid:fk", "issued_on:date", "total:decimal"],
+            "Payment": ["payment_id:uuid:pk", "invoice_id:uuid:fk", "paid_on:date", "amount:decimal"],
+            "Cost Centre": ["cost_centre_id:varchar:pk", "name:varchar", "owner:varchar?"],
+            "Ledger Entry": ["entry_id:bigint:pk", "cost_centre_id:varchar:fk", "invoice_id:uuid:fk?", "posted_on:date", "amount:decimal"],
+        },
+        "relationships": [
+            ("Invoice", "Payment", "one-to-many", "is settled by"),
+            ("Cost Centre", "Ledger Entry", "one-to-many", "is charged by"),
+            ("Invoice", "Ledger Entry", "one-to-many", "is posted as"),
+        ],
+    },
+}
+
+
+def _seed_data_model(org_id) -> dict:
+    """Fill the demonstration organisation's data domains so each opens with a
+    drawn entity relationship diagram. Idempotent: a domain or entity that
+    exists by name is left as it is."""
+    from app.models.process_data import DataDomain, DataEntity, DataEntityRelationship
+    from app.modules.architecture.services import data_erd_service as erd
+
+    stats = {"data_domains_created": 0, "data_entities_created": 0, "data_relationships_created": 0}
+    for domain_name, spec in _DATA_MODEL.items():
+        domain = DataDomain.query.filter_by(organization_id=org_id, name=domain_name).first()
+        if domain is None:
+            domain = DataDomain(name=domain_name, organization_id=org_id,
+                                description=f"The {domain_name.lower()} data of Lantern Quay Systems")
+            db.session.add(domain)
+            db.session.flush()
+            stats["data_domains_created"] += 1
+        by_name = {}
+        for entity_name, columns in spec["entities"].items():
+            entity = DataEntity.query.filter_by(
+                organization_id=org_id, domain_id=domain.id, name=entity_name).first()
+            if entity is None:
+                attributes = []
+                for column in columns:
+                    parts = column.split(":")
+                    nullable = parts[-1].endswith("?")
+                    parts[-1] = parts[-1].rstrip("?")
+                    flags = parts[2:]
+                    attributes.append({
+                        "name": parts[0], "data_type": parts[1],
+                        "is_primary_key": "pk" in flags, "is_foreign_key": "fk" in flags,
+                        "is_nullable": nullable,
+                    })
+                entity = erd.create_entity(domain, entity_name, attributes)
+                stats["data_entities_created"] += 1
+            by_name[entity_name] = entity
+        for source, target, preset, label in spec["relationships"]:
+            exists = DataEntityRelationship.query.filter_by(
+                organization_id=org_id, source_entity_id=by_name[source].id,
+                target_entity_id=by_name[target].id).first()
+            if exists is None:
+                erd.relate(by_name[source], by_name[target], preset=preset, label=label)
+                stats["data_relationships_created"] += 1
+    db.session.flush()
+    return stats
+
+
 def _seed_boards(org_id, demo_user_id) -> dict:
     """SAFe kinds, ADM-board solutions, a value stream and a requirements
     backlog for the demonstration organisation.
@@ -2978,6 +3072,7 @@ def seed_demo_company() -> dict:
         demo_user = User.query.filter_by(
             email=_DEMO_USER_EMAIL, organization_id=org_id).first()
         stats.update(_seed_boards(org_id, demo_user.id if demo_user else None))
+        stats.update(_seed_data_model(org_id))
 
         db.session.commit()
 

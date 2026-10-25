@@ -75,8 +75,12 @@ def _apply_attributes(entity, rows):
             db.session.add(attr)
         else:
             keep.add(attr.id)
-        for key in ("name", "data_type", "is_primary_key", "is_foreign_key", "is_nullable", "position"):
-            setattr(attr, key, row[key])
+        attr.name = row["name"]
+        attr.data_type = row["data_type"]
+        attr.is_primary_key = row["is_primary_key"]
+        attr.is_foreign_key = row["is_foreign_key"]
+        attr.is_nullable = row["is_nullable"]
+        attr.position = row["position"]
     for attr_id, attr in existing.items():
         if attr_id not in keep:
             db.session.delete(attr)

@@ -830,12 +830,16 @@ def data_entity_diagram():
         domain=domain,
         diagram=diagram,
         data_types=erd.DATA_TYPES,
-        presets=[
-            {"value": "one-to-one", "label": "One to one"},
-            {"value": "one-to-many", "label": "One to many"},
-            {"value": "many-to-one", "label": "Many to one"},
-            {"value": "many-to-many", "label": "Many to many"},
+        domain_options=[(d.id, d.name) for d in domains],
+        type_options=[(t, t) for t in erd.DATA_TYPES],
+        preset_options=[
+            ("one-to-one", "One to one"),
+            ("one-to-many", "One to many"),
+            ("many-to-one", "Many to one"),
+            ("many-to-many", "Many to many"),
+            ("custom", "Custom"),
         ],
+        cardinality_options=[(v, erd.CARDINALITY_LABELS[v]) for v in erd.CARDINALITY_LABELS],
     )
 
 
