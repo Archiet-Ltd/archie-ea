@@ -3060,6 +3060,19 @@ def _run_proactive_analysis(app, solution_id: int, organization_id):
             logger.debug("Proactive analysis failed for sol %s: %s", solution_id, _e)
 
 
+@solution_design_bp.route("/<int:solution_id>/migration-roadmap", methods=["GET"])
+@login_required
+def solution_migration_roadmap_redirect(solution_id: int):
+    """Old address: the solution's own migration roadmap page, never built as a
+    separate page. Slice S3 (D14): redirects to the one roadmap, filtered to
+    this solution, which already reads ?solution= (genome.routes.roadmap_routes.index).
+    """
+    from app.modules.genome.services.roadmap_links import redirect_to_roadmap
+
+    Solution.query.get_or_404(solution_id)
+    return redirect_to_roadmap(solution=solution_id)
+
+
 @solution_design_bp.route("/<int:solution_id>", methods=["GET"])
 @login_required
 def view_solution(solution_id: int):
