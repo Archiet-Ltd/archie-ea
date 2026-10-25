@@ -113,9 +113,25 @@ def list_workflows():
                 workflows_by_category[cat] = []
             workflows_by_category[cat].append(definition)
 
+        # Every category a filter can choose, so the toolbar keeps its options
+        # even while one category is selected.
+        from app.models.workflow_models import EAWorkflowDefinition
+
+        categories = [
+            row[0]
+            for row in db.session.query(EAWorkflowDefinition.workflow_category)
+            .filter(
+                EAWorkflowDefinition.is_active.is_(True),
+                EAWorkflowDefinition.workflow_category.isnot(None),
+            )
+            .distinct()
+            .order_by(EAWorkflowDefinition.workflow_category)
+        ]
+
         return render_template(
             "integration/workflow_list.html",
             workflows_by_category=workflows_by_category,
+            categories=categories,
             selected_category=category,
         )
     except Exception as e:
@@ -125,6 +141,7 @@ def list_workflows():
         return render_template(
             "integration/workflow_list.html",
             workflows_by_category={},
+            categories=[],
             selected_category=None,
             load_error="The workflow catalog could not be read.",
         )
