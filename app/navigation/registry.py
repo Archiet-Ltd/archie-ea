@@ -140,6 +140,8 @@ WORK: tuple = (
               aliases=("Solution designs", "Solution design", "Designs")),
            _l("options_analysis", "Options analysis", "application_mgmt.vendor_analysis_list", job="4",
               aliases=("Vendor options", "Vendor selection", "Vendor analysis", "Compare options")),
+           _l("business_cases", "Business cases", "business_case.index", job="4",
+              aliases=("Business case", "Case for change", "Investment case", "Cost and benefit")),
            _l("work_packages", "Work packages", "enterprise.work_packages", job="4",
               aliases=("Work package", "WorkPackage", "Projects")),
            _l("roadmap", "Roadmap", "genome_roadmap.index", job="4",
@@ -148,8 +150,7 @@ WORK: tuple = (
            _l("programmes", "Programmes", "solution_design.programmes_list", job="4",
               aliases=("Transformation programmes", "Programs", "Initiatives")),
            _l("canvases", "Canvases", "business_model.index", job="4",
-              aliases=("Canvas", "Business model canvas", "Lean canvas", "Business models", "Business cases",
-                       "Business case")),
+              aliases=("Canvas", "Business model canvas", "Lean canvas", "Business models")),
        ),
        owns=("enterprise.plateaus", "genome_roadmap.", "main.capability_roadmap", "implementation_planning.",
              "adm_kanban_view.", "architecture_journey.", "portfolio.", "solution_design.", "business_model.",
@@ -576,7 +577,9 @@ def remembered_cookie_name(user) -> str:
 
 def remembered_items(cookies, user) -> dict:
     """{item key: True/False} from the person's cookie ("systems:1,layer_business:0")."""
-    raw = cookies.get(remembered_cookie_name(user)) or ""
+    from urllib.parse import unquote
+
+    raw = unquote(cookies.get(remembered_cookie_name(user)) or "")  # the page script stores it URL-encoded
     out = {}
     for part in raw.split(","):
         key, _, state = part.partition(":")

@@ -203,7 +203,7 @@ def test_every_layer_holds_its_element_types_and_every_job_its_pages(app, db_ses
         systems.remove("Interfaces")  # the page's own guard: the data integration section
     assert _subs(links, "systems") == systems
     assert _subs(links, "impact") == ["Impact analysis", "Traceability"]
-    assert _subs(links, "changes") == ["Gaps", "Solutions", "Options analysis", "Work packages", "Roadmap",
+    assert _subs(links, "changes") == ["Gaps", "Solutions", "Options analysis", "Business cases", "Work packages", "Roadmap",
                                        "Programmes", "Canvases"]
     assert _subs(links, "compliance") == ["Controls", "Risks", "Decisions", "Review board", "Evidence"]
     assert _subs(links, "layer_strategy") == ["Capability", "Value stream", "Resource", "Course of action"]

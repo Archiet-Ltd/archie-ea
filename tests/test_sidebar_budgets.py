@@ -43,7 +43,7 @@ SECONDARY = ["Connections", "Reports", "Help"]
 WORK_CHILDREN = {
     "Systems": ["Applications", "Portfolio", "Data register", "Interfaces", "Technology radar"],
     "Impact": ["Impact analysis", "Traceability"],
-    "Changes": ["Gaps", "Solutions", "Options analysis", "Work packages", "Roadmap", "Programmes", "Canvases"],
+    "Changes": ["Gaps", "Solutions", "Options analysis", "Business cases", "Work packages", "Roadmap", "Programmes", "Canvases"],
     "Spend": ["Costs", "Vendors", "Contracts and licences", "Renewals", "Investments"],
     "Compliance": ["Controls", "Risks", "Decisions", "Review board", "Evidence"],
 }
@@ -273,6 +273,9 @@ def test_the_remembered_choices_are_read_from_a_cookie_named_for_the_person():
     assert registry.remembered_items({"sidebar_items_42": "systems:1,layer_business:0,bad key:1,x:2"}, person) == {
         "systems": True, "layer_business": False}
     assert registry.remembered_items({"sidebar_items_7": "systems:1"}, person) == {}
+    # The page script stores the value URL-encoded; the choice is still read back.
+    assert registry.remembered_items({"sidebar_items_42": "layer_business%3A1%2Csystems%3A0"}, person) == {
+        "layer_business": True, "systems": False}
 
 
 @pytest.mark.parametrize("person", [
