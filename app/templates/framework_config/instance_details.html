@@ -3,7 +3,6 @@
 {% from 'components/page_header.html' import page_header %}
 {% from 'components/card.html' import card, card_header, card_title, card_description, card_content %}
 {% from 'components/badge.html' import badge %}
-{% from 'components/breadcrumb.html' import breadcrumb, breadcrumb_item, breadcrumb_separator %}
 {% from 'components/progress.html' import progress %}
 
 {% block title %}{{ instance.instance_name }} — Instance Details{% endblock %}
@@ -13,15 +12,14 @@
     <div class="flex flex-1 flex-col gap-2">
         <div class="flex flex-col gap-4 py-4 md:gap-6 md:py-6">
             <div class="px-4 lg:px-6">
-                {% call breadcrumb() %}
-                    {% call breadcrumb_item(href=url_for('framework_config_ui.instances')) %}Framework Instances{% endcall %}
-                    {{ breadcrumb_separator() }}
-                    {% call breadcrumb_item(active=true) %}{{ instance.instance_name }}{% endcall %}
-                {% endcall %}
-
                 {{ page_header(
                     title=instance.instance_name,
-                    description=instance.instance_description or 'Framework configuration instance'
+                    description=instance.instance_description or 'Framework configuration instance',
+                    breadcrumbs=[
+                        {'label': 'Home', 'href': '/'},
+                        {'label': 'Framework Instances', 'href': url_for('framework_config_ui.instances')},
+                        {'label': instance.instance_name}
+                    ]
                 ) }}
             </div>
 
