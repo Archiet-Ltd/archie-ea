@@ -727,9 +727,14 @@ def overview():
         if org_for_sources is not None else []
     )
     given_sources = bool(signup_sources)
+    skipped_sources = org_for_sources is not None and onboarding_service.skipped_sources(org_for_sources)
 
     guided_steps = []
     first_actions = {"connect": False, "sample": False, "import_href": None}
+    if skipped_sources:
+        from app.utils.role_access import may_connect_github as _may_connect
+
+        first_actions["connect"] = _may_connect(current_user, g.current_org_id)
     if dashboard_mode == "guided":
         from app.template_helpers import safe_url_for_with_fallback
         from app.utils.role_access import (
@@ -867,6 +872,8 @@ def overview():
     return render_template(
         "dashboards/overview.html",
         signup_sources=signup_sources,
+        skipped_sources=skipped_sources,
+        company_kind_answered=bool(company_kind),
         metrics=metrics,
         nav_stats=nav_stats,
         layer_breakdown=layer_breakdown,
