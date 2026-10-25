@@ -23,7 +23,7 @@ from app.utils.api_response import error_response, not_found_response, success_r
 
 from werkzeug.exceptions import HTTPException
 
-from . import model_service, service
+from . import model_service, service, wardley_service
 
 logger = logging.getLogger(__name__)
 
@@ -164,6 +164,7 @@ def detail(canvas_id):
         can_edit=_can_edit(),
         operating_model_types=OPERATING_MODEL_TYPES,
         billing_periods=BILLING_PERIODS,
+        wardley=wardley_service.plot(canvas, boxes) if key == "wardley_mapping" else None,
         priceable_box_key=model_service.priceable_box(canvas),
         priceable=boxes.get(model_service.priceable_box(canvas).replace("_", "-"), []) if model_service.priceable_box(canvas) else [],
     )

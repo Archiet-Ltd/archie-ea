@@ -20,7 +20,7 @@
 
 {#- The marked region plus everything around it. The caller draws the canvas inside the region.
     columns/rows describe the list route; rows are [box key, box title, (cells...), note, note link or '']. -#}
-{% macro frame(id, form, name, data, rows, hint, credit='', width='min-w-240', columns=['Box', 'Note']) -%}
+{% macro frame(id, form, name, data, rows, hint, credit='', width='min-w-240', columns=['Box', 'Note'], row_notes=none) -%}
 {%- set drawing = caller() -%}
 <div class="flex flex-col gap-4" data-canvas="{{ id }}" x-data="{ view: 'canvas' }">
   <div class="flex flex-wrap items-end justify-between gap-3">
@@ -45,6 +45,7 @@
     {% call ui.table_container() %}{% call ui.table(attrs={'aria-label': name ~ ', list view'}) %}
       {% call ui.table_header() %}{% call ui.table_row() %}
         {% for c in columns %}{{ ui.table_head(text=c, attrs={'scope': 'col'}) }}{% endfor %}
+        {% if row_notes is not none %}{{ ui.table_head(text='Change', attrs={'scope': 'col'}) }}{% endif %}
       {% endcall %}{% endcall %}
       {% call ui.table_body(attrs={'data-canvas-rows': ''}) %}
         {% for r in rows %}
@@ -52,6 +53,7 @@
           {% call ui.table_head(class='font-medium', attrs={'scope': 'row'}) %}{{ r[1] }}{% endcall %}
           {% for cell in r[2:-2] %}{{ ui.table_cell(text=cell) }}{% endfor %}
           {% call ui.table_cell() %}{% if r[-1] %}<a href="{{ r[-1] }}" class="text-primary hover:underline">{{ r[-2] }}</a>{% else %}{{ r[-2] }}{% endif %}{% endcall %}
+          {% if row_notes is not none %}{% call ui.table_cell() %}{{ note_actions(row_notes[loop.index0]) }}{% endcall %}{% endif %}
         {% endcall %}
         {% endfor %}
       {% endcall %}
@@ -69,6 +71,22 @@
   4: 'bg-chart-4/10 border-chart-4/30', 5: 'bg-chart-5/10 border-chart-5/30'} %}
 {#- What an empty box or sub-area says in the list view and the canvas view: its own text, or "No <title> yet." with its question. -#}
 {% macro empty_text(b) -%}{{ b.empty or ('No ' ~ b.title|lower ~ ' yet. ' ~ (b.question or 'Add the first entry from the canvas view.')) }}{%- endmacro %}
+
+{#- The rename and remove controls of one note; nothing when the note is read-only. -#}
+{% macro note_actions(n, class='') -%}
+  {% if n is mapping and (n.rename_url or n.remove_url) %}
+  <span class="{{ class }} flex shrink-0 items-center gap-0.5 py-1.5 pr-1.5">
+    {% if n.rename_url %}{{ ui.edit_popover('Edit this entry', 'Edit ' ~ n.text, n.rename_url, n.box, n.text, n.box ~ '-' ~ n.id) }}{% endif %}
+    {% if n.remove_url %}
+    <form method="post" action="{{ n.remove_url }}" class="inline-flex">
+      {{ ui.hidden('csrf_token', csrf_token()) }}
+      {{ ui.hidden('box', n.box) }}
+      {% call ui.tooltip('Remove from this canvas (stays in your model)', true) %}{% call ui.button(variant='ghost', size='icon-xs', type='submit', class='text-muted-foreground', attrs={'aria-label': 'Remove from this canvas (stays in your model)', 'data-note-remove': ''}) %}{{ ui.lucide('x', 'size-3') }}{% endcall %}{% endcall %}
+    </form>
+    {% endif %}
+  </span>
+  {% endif %}
+{%- endmacro %}
 
 {#- One note card: the note as the trigger of a hover card that previews the model element (help-and-overlays-v1 3). A note is a string,
     or a dict {'text', 'href', 'remove_url', 'box'}: with an href the text links to the element it names; with a remove_url a small
@@ -92,18 +110,7 @@
       </div>
     {% endcall %}
   {% endcall %}
-  {% if n is mapping and (n.rename_url or n.remove_url) %}
-  <span class="ml-auto flex shrink-0 items-center gap-0.5 py-1.5 pr-1.5">
-    {% if n.rename_url %}{{ ui.edit_popover('Edit this entry', 'Edit ' ~ text, n.rename_url, n.box, text, n.box ~ '-' ~ n.id) }}{% endif %}
-    {% if n.remove_url %}
-    <form method="post" action="{{ n.remove_url }}" class="inline-flex">
-      {{ ui.hidden('csrf_token', csrf_token()) }}
-      {{ ui.hidden('box', n.box) }}
-      {% call ui.tooltip('Remove from this canvas (stays in your model)', true) %}{% call ui.button(variant='ghost', size='icon-xs', type='submit', class='text-muted-foreground', attrs={'aria-label': 'Remove from this canvas (stays in your model)', 'data-note-remove': ''}) %}{{ ui.lucide('x', 'size-3') }}{% endcall %}{% endcall %}
-    </form>
-    {% endif %}
-  </span>
-  {% endif %}
+  {{ note_actions(n, 'ml-auto') }}
 </li>
 {%- endmacro %}
 
@@ -148,7 +155,6 @@
       </span>
     </div>
     {% call ui.card_title(class='flex items-center gap-2 text-foreground') %}
-      {% if b.number %}{{ ui.badge(text=b.number, variant='outline', class='size-5 rounded-full px-0') }}{% endif %}
       {% if b.icon %}{{ ui.lucide(b.icon, 'size-4 shrink-0 text-foreground') }}{% endif %}
       <span>{{ b.title }}</span>
     {% endcall %}

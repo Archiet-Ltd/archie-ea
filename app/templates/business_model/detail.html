@@ -6,6 +6,7 @@
 {% from 'components/input.html' import input, label %}
 {% from 'components/select.html' import native_select %}
 {% from 'components/empty_state.html' import empty_state %}
+{% from 'components/dropdown_menu.html' import dropdown_menu %}
 {% import 'components/canvas/index.html' as canvas_lib with context %}
 
 {% block title %}{{ canvas.name or canvas_type_name }}{% endblock %}
@@ -18,7 +19,6 @@
 {% set actions = [{'text': 'Business Model Canvas', 'icon': 'layout-grid', 'href': url_for('business_model.detail', canvas_id=canvas.id), 'variant': 'outline'}] %}
 {% else %}
 {% set actions = [{'text': 'Value Proposition Canvas', 'icon': 'layout-grid', 'href': url_for('business_model.value_proposition', canvas_id=canvas.id), 'variant': 'outline'}] if is_bmc else [] %}
-{% if can_edit %}{% set actions = actions + [{'text': 'Delete Canvas', 'icon': 'trash-2', 'onclick': "Platform.modal.open('bmc-delete-modal')", 'variant': 'outline'}] %}{% endif %}
 {% endif %}
 
 <div class="flex-1 overflow-auto">
@@ -76,7 +76,14 @@
       <p class="flex h-9 min-w-0 items-center gap-1 text-sm text-muted-foreground" data-testid="bmc-vision">Vision: <a class="text-primary hover:underline" href="{{ vision_href }}">{{ vision.name }}</a></p>
       {% endif %}
       <div class="ml-auto flex flex-wrap items-end gap-4">
-      {% if canvas_key in ('business_model_canvas', 'lean_canvas') %}
+      {% if can_edit and canvas_key == 'wardley_mapping' %}
+      {% set add_items = [] %}
+      {% for key, zone in zones.items() if zone.membership != 'attribute' %}{% set _ = add_items.append({'text': zone.label, 'onclick': "Platform.modal.open('add-" ~ (key | replace('_', '-')) ~ "')"}) %}{% endfor %}
+      <div class="flex flex-col gap-1.5" data-testid="wardley-add-menu">
+        {{ dropdown_menu(id='wardley-add', trigger_text='Add to the map', trigger_aria_label='Add to the map', trigger_icon='plus', trigger_variant='default', trigger_size='md', position='right', menu_width='w-56', items=add_items) }}
+      </div>
+      {% endif %}
+      {% if canvas_key == 'business_model_canvas' %}
       {% if can_edit %}
       <form method="post" action="{{ url_for('business_model.update_canvas', canvas_id=canvas.id) }}" class="flex items-end gap-2" data-testid="bmc-operating-model-panel">
         {{ input(type='hidden', name='csrf_token', value=csrf_token()) }}
@@ -103,10 +110,14 @@
         </div>
         {{ button(text='Download', variant='outline', type='submit', testid='bmc-export-file') }}
       </form>
+      {% if can_edit %}
+      {{ dropdown_menu(id='canvas-more', trigger_text='More', trigger_aria_label='More', trigger_icon='more-horizontal', trigger_variant='default', trigger_size='md', position='right', menu_width='w-48', trigger_testid='bmc-more', items=[{'text': 'Delete canvas', 'icon': 'trash-2', 'onclick': "Platform.modal.open('bmc-delete-modal')", 'variant': 'destructive'}]) }}
+      {% endif %}
       </div>
     </div>
 
     {{ canvas_lib[canvas_key]({
+         'plot': wardley,
          'title': '',
          'subtitle': 'Every entry is an element of your model. Select one to open it.',
          'boxes': boxes,

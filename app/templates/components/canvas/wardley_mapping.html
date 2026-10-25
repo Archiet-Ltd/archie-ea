@@ -1,24 +1,64 @@
-{# Vendored from flask-basecoat, branch feat/canvases-capability-map, commit 2b02744, flask_basecoat/templates/basecoat/canvas/ wardley-mapping.html, reduced to its axes and component areas. #}
-{# Wardley Map, C1. After Simon Wardley: the vertical axis is visibility to the user, the user need at the top down to infrastructure; the horizontal axis is evolution in four stages, Genesis, Custom-Built, Product (+rental) and Commodity (+utility). Entelim holds no x and y position for an element, so each component sits in the column of its evolution stage, and the user and the need sit above, as in the published figure. #}
+{# Vendored from flask-basecoat, branch feat/canvases-capability-map, commit 2b02744, flask_basecoat/templates/basecoat/canvas/ wardley-mapping.html, drawn here as a plot (see below). #}
+{# Wardley Map, C1. After Simon Wardley: the vertical axis is visibility to the user, the user need at the top down to infrastructure; the horizontal axis is evolution in four stages, Genesis, Custom-Built, Product (+rental) and Commodity (+utility). Entelim holds no x and y position for an element: a component sits in the column of its evolution stage, and its row is the number of dependency steps from the user need. #}
 {% import 'components/canvas/_frame.html' as f with context %}
 {% import 'components/canvas/_ui.html' as ui with context %}
-{% set SPEC = {
-  'form': 'C1', 'name': 'Wardley map', 'grid': 'grid-cols-4 grid-rows-[auto_auto_auto_auto_auto]', 'width': 'min-w-260',
-  'hint': 'Scroll sideways on a narrow screen to see all four evolution stages. Visibility falls from the user at the top to infrastructure below.',
-  'credit': 'Wardley Map after Simon Wardley, Wardley Maps.',
-  'boxes': [
-    {'key': 'user', 'title': 'User', 'icon': 'user', 'question': 'Who is the map for?', 'empty': 'No user yet. Add the actor or role the map starts from.', 'area': 'col-span-2 col-start-1 row-start-1'},
-    {'key': 'user-need', 'title': 'User need', 'icon': 'target', 'question': 'What do they need?', 'empty': 'No need yet. Add the goal or value they need.', 'area': 'col-span-2 col-start-3 row-start-1'},
-    {'key': 'genesis', 'title': 'Genesis', 'icon': 'sparkles', 'question': 'Novel, uncertain, still being discovered.', 'empty': 'No components yet. Add what is new and unproven.', 'area': 'col-start-1 row-start-3'},
-    {'key': 'custom-built', 'title': 'Custom-built', 'icon': 'hammer', 'question': 'Built specially, few alternatives.', 'empty': 'No components yet. Add what you build for yourself.', 'area': 'col-start-2 row-start-3'},
-    {'key': 'product', 'title': 'Product (+rental)', 'icon': 'package', 'question': 'Bought as a product, compared on features.', 'empty': 'No components yet. Add what you buy or rent as a product.', 'area': 'col-start-3 row-start-3'},
-    {'key': 'commodity', 'title': 'Commodity (+utility)', 'icon': 'plug', 'question': 'Standard, bought by the unit.', 'empty': 'No components yet. Add what you buy as a standard utility.', 'area': 'col-start-4 row-start-3'},
-    {'key': 'movement', 'title': 'Movement', 'icon': 'move-right', 'question': 'What is about to move along the evolution axis?', 'empty': 'No movement yet. Add the work packages that move a component.', 'area': 'col-span-2 col-start-1 row-start-5'},
-    {'key': 'inertia', 'title': 'Inertia', 'icon': 'anchor', 'question': 'What resists the move?', 'empty': 'No inertia yet. Add the assessments and constraints that resist change.', 'area': 'col-span-2 col-start-3 row-start-5'},
-  ]} %}
+{% set STAGE_HINTS = {'genesis': 'Novel, uncertain, still being discovered.', 'custom-built': 'Built specially, few alternatives.', 'product': 'Bought as a product, compared on features.', 'commodity': 'Standard, bought by the unit.'} %}
 {% macro wardley_mapping(data, id='wardley-mapping') -%}
-{% call f.grid_canvas(SPEC, data, id) %}
-      <div class="col-span-4 row-start-2 flex items-center justify-between gap-2 px-2 text-xs text-muted-foreground"><span class="font-medium text-foreground">Value chain: visible to the user, then less visible, then infrastructure</span><span class="flex items-center gap-1">Evolution {{ ui.lucide('arrow-right', 'size-4') }}</span></div>
-      <div class="col-span-4 row-start-4 flex items-center justify-between px-2 text-xs text-muted-foreground"><span>Uncharted</span><span>Industrialised</span></div>
+{%- set w = data.plot -%}
+{%- if not w -%}
+<div class="rounded-lg border bg-muted/30 p-4" data-canvas="{{ id }}" data-canvas-empty="wardley">
+  {% if data.editable %}{{ ui.empty('No map yet', 'Add the user, the need they have and the components that meet it, and the map draws itself.', cta_text='Add the user', cta_onclick="Platform.modal.open('add-user')") }}
+  {% else %}{{ ui.empty('No map yet', 'The user, the need they have and the components that meet it appear here once someone adds them.') }}{% endif %}
+</div>
+{%- else -%}
+{%- set rows = [] -%}
+{%- for r in w.table %}{% set _ = rows.append([r.box, r.stage, r.visibility, r.deps, r.name, r.href]) %}{% endfor -%}
+{%- set notes = [] -%}
+{%- for r in w.table %}{% set _ = notes.append(r.note) %}{% endfor -%}
+{% call f.frame(id, 'C1', 'Wardley map', data, rows,
+  'Scroll sideways on a narrow screen to see all four evolution stages. Each dot opens its element. Rows run from visible to the user at the top to invisible below.',
+  credit='Wardley Map after Simon Wardley, Wardley Maps.', width='min-w-260',
+  columns=['Part of the map', 'Visibility', 'Depends on', 'Name'], row_notes=notes) %}
+<svg viewBox="0 0 {{ w.width }} {{ w.height }}" class="block h-auto w-full text-foreground" role="group" aria-label="Wardley map plot" data-wardley-plot xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <marker id="{{ id }}-head" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="currentColor"/></marker>
+  </defs>
+  <rect x="{{ w.left }}" y="{{ w.top - 24 }}" width="{{ w.width - w.left - 16 }}" height="{{ w.plot_bottom - w.top + 24 }}" fill="none" stroke="currentColor" class="text-border"/>
+  {%- for st in w.stages %}
+  {%- if not loop.first %}<line x1="{{ st.x }}" y1="{{ w.top - 24 }}" x2="{{ st.x }}" y2="{{ w.plot_bottom }}" stroke="currentColor" stroke-dasharray="4 4" class="text-border"/>{% endif %}
+  <text x="{{ st.mid }}" y="{{ w.plot_bottom + 22 }}" text-anchor="middle" class="text-xs font-medium" fill="currentColor" data-wardley-stage="{{ st.key }}">{{ st.title }}</text>
+  {%- endfor %}
+  <text x="{{ w.left }}" y="{{ w.plot_bottom + 44 }}" class="text-xs text-muted-foreground" fill="currentColor">Genesis</text>
+  <text x="{{ w.width - 16 }}" y="{{ w.plot_bottom + 44 }}" text-anchor="end" class="text-xs text-muted-foreground" fill="currentColor">Commodity</text>
+  <line x1="{{ w.left + 52 }}" y1="{{ w.plot_bottom + 40 }}" x2="{{ w.width - 100 }}" y2="{{ w.plot_bottom + 40 }}" stroke="currentColor" class="text-muted-foreground" marker-end="url(#{{ id }}-head)"/>
+  <text x="{{ w.left // 2 }}" y="{{ w.top - 8 }}" text-anchor="middle" class="text-xs font-medium" fill="currentColor">Visible</text>
+  <line x1="{{ w.left // 2 }}" y1="{{ w.top }}" x2="{{ w.left // 2 }}" y2="{{ w.plot_bottom - 8 }}" stroke="currentColor" class="text-muted-foreground" marker-end="url(#{{ id }}-head)"/>
+  <text x="{{ w.left // 2 }}" y="{{ w.plot_bottom + 8 }}" text-anchor="middle" class="text-xs font-medium" fill="currentColor">Invisible</text>
+  {%- for e in w.edges %}
+  <line x1="{{ e.x1 }}" y1="{{ e.y1 }}" x2="{{ e.x2 }}" y2="{{ e.y2 }}" stroke="currentColor" class="text-muted-foreground" data-wardley-line><title>{{ e.from }} depends on {{ e.to }}</title></line>
+  {%- endfor %}
+  {%- for a in w.arrows %}
+  <a href="{{ a.href }}" data-wardley-movement aria-label="Movement: {{ a.name }}, moves {{ a.component }}" class="focus-visible:outline-none">
+    <line x1="{{ a.x1 }}" y1="{{ a.y }}" x2="{{ a.x2 }}" y2="{{ a.y }}" stroke="currentColor" stroke-width="2" class="text-primary" marker-end="url(#{{ id }}-head)"/>
+    <text x="{{ (a.x1 + a.x2) / 2 }}" y="{{ a.y - 8 }}" text-anchor="middle" class="text-xs" fill="currentColor">{{ a.name }}</text>
+  </a>
+  {%- endfor %}
+  {%- for b in w.bars %}
+  <a href="{{ b.href }}" data-wardley-inertia aria-label="Inertia: {{ b.name }}, resists change to {{ b.component }}" class="focus-visible:outline-none">
+    <line x1="{{ b.x }}" y1="{{ b.y1 }}" x2="{{ b.x }}" y2="{{ b.y2 }}" stroke="currentColor" stroke-width="5" class="text-destructive"/>
+    <text x="{{ b.x + 8 }}" y="{{ b.y2 + 12 }}" class="text-xs" fill="currentColor">{{ b.name }}</text>
+  </a>
+  {%- endfor %}
+  {%- for n in w.users + w.needs + w.components %}
+  <a href="{{ n.href }}" data-wardley-dot="{{ n.kind }}" aria-label="{{ n.name }}" class="focus-visible:outline-none">
+    <circle cx="{{ n.x }}" cy="{{ n.y }}" r="9" fill="currentColor" class="{{ 'text-primary' if n.kind == 'component' else 'text-foreground' }}" stroke="currentColor" stroke-width="2"/>
+    {%- if n.kind != 'component' %}<text x="{{ n.x }}" y="{{ n.y - 16 }}" text-anchor="middle" class="text-xs text-muted-foreground" fill="currentColor">{{ 'User' if n.kind == 'user' else 'User need' }}</text>{% endif %}
+    {%- for line in n.label %}
+    <text x="{{ n.x }}" y="{{ n.y + 26 + loop.index0 * 14 }}" text-anchor="middle" class="text-xs" fill="currentColor">{{ line }}</text>
+    {%- endfor %}
+  </a>
+  {%- endfor %}
+</svg>
 {% endcall %}
+{%- endif -%}
 {%- endmacro %}

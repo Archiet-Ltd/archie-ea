@@ -21,7 +21,7 @@ TYPES = {
     "empathy_map": ("C4", "Customers wait weeks for recalibration", "swot_analysis"),
     "swot_analysis": ("C2", "Customers wait weeks for recalibration", "lean_canvas"),
     "pestle_analysis": ("C2", "Component prices rising with supply shortages", "porters_five_forces"),
-    "porters_five_forces": ("C2", "Municipal water utilities", "wardley_mapping"),
+    "porters_five_forces": ("C2", "Municipal water utilities", "lean_canvas"),
     "ansoff_matrix": ("C2", "Field Tester Rollout", "mckinsey_7s"),
     "mckinsey_7s": ("C2", "Win on certified accuracy, not price", "balanced_scorecard"),
     "blue_ocean": ("C2", "Recovered assemblies recertified instead of scrapped", "product_vision_board"),
@@ -141,7 +141,7 @@ def _hrefs(page, boxes):
 
 @pytest.mark.smoke
 @pytest.mark.journey
-@pytest.mark.parametrize("canvas_type", list(TYPES))
+@pytest.mark.parametrize("canvas_type", [t for t in TYPES if t != "wardley_mapping"])  # the Wardley Map is a plot: test_wardley_map_journey.py
 def test_architect_opens_a_framework_canvas_filled_from_the_model(browser, live_server, seeded, canvas_type):
     form, shared, other_type = TYPES[canvas_type]
     email = seeded["emails"]["business_architect"]
@@ -284,6 +284,11 @@ def test_architect_creates_each_framework_from_the_canvases_page_and_sees_why_it
                 page.get_by_test_id("bmc-create-submit").click()
             expect(page.get_by_role("heading", name=name).first).to_be_visible()
             assert page.locator(f'[data-canvas="{canvas_type.replace("_", "-")}"]').count() == 1
+            if canvas_type == "wardley_mapping":  # a plot has no boxes; its empty state offers the first step
+                empty = page.locator('[data-canvas-empty="wardley"]')
+                expect(empty).to_contain_text("No map yet")
+                assert empty.get_by_role("button", name=re.compile(r"^Add ")).count() == 1
+                continue
             for box in _boxes(canvas_type):
                 empty = page.locator(f'[data-canvas-empty="{box}"]')
                 expect(empty).to_contain_text("No ")
