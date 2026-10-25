@@ -1,0 +1,37 @@
+{# The element table: the one way a record lists ArchiMate elements.
+
+   Dense rows; the first column is the element's name, a link to its own record page; the
+   caller renders the other cells; the table pages itself by 25 with the library's pagination
+   controls; the count and "Open in Composer" sit in the summary line above it (the caller's).
+   Used by the solution record's Design and Requirements tabs. Any other record that lists
+   elements uses this macro rather than its own table.
+
+   {% from 'solutions/partials/_element_table.html' import element_table %}
+   {% call(row) element_table(rows=items, columns=[('Type', ''), ('Change', '')], caption='Application elements', testid='design-table-application') %}
+     <td class="px-2 align-middle text-muted-foreground">{{ row.type }}</td>
+     ...
+   {% endcall %}
+
+   rows: dicts with name, href (None when the element has no page), and optionally description. #}
+{% from 'components/dense_table.html' import dense_table %}
+{% from 'components/pagination_controls.html' import pagination_controls %}
+
+{% macro element_table(rows, columns, caption, testid, first='Element', row_testid='element-row', link_testid='element-link', page_size=25, flush=true) %}
+{%- set total = rows|length -%}
+{%- set pages = (((total - 1) // page_size) + 1) if total else 1 -%}
+{%- set cells = caller -%}
+<div x-data="{ currentPage: 1, pageSize: {{ page_size }}, totalItems: {{ total }}, totalPages: {{ pages }} }" data-testid="{{ testid }}-pager" data-total="{{ total }}" data-page-size="{{ page_size }}">
+  {% call dense_table(columns=[(first, '!pl-6')] + columns, rows=total, caption=caption, testid=testid, flush=flush) %}
+    {% for row in rows %}
+    <tr class="group h-12 transition-colors hover:bg-muted/50" data-testid="{{ row_testid }}"{% if total > page_size %} x-show="Math.ceil({{ loop.index }} / pageSize) === currentPage"{% endif %}>
+      <td class="px-2 !pl-6 align-middle">
+        {% if row.href %}<a href="{{ row.href }}" class="font-medium text-foreground hover:underline" data-testid="{{ link_testid }}">{{ row.name }}</a>{% else %}<span class="font-medium text-foreground">{{ row.name }}</span>{% endif %}
+        {% if row.description %}<span class="block max-w-md truncate text-xs text-muted-foreground">{{ row.description }}</span>{% endif %}
+      </td>
+      {{ cells(row) }}
+    </tr>
+    {% endfor %}
+  {% endcall %}
+  {% if total > page_size %}{{ pagination_controls(class='border-t border-border') }}{% endif %}
+</div>
+{% endmacro %}

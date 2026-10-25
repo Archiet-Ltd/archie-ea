@@ -1,8 +1,7 @@
 {# design-block: record-detail #}
 {# The solution record: one record page with a header that states the conclusion,
-   a properties column, and seven tabs. The Overview, Design and Review tabs are
-   built here; Requirements, Options and decision, Risks and Delivery say what they
-   will hold and open the page that holds it today.
+   a properties column, typed notes, and seven tabs: Overview, Design,
+   Requirements, Options and decision, Risks, Review and Delivery.
    Context: app/modules/solutions_strategic/v2/services/solution_record_service.py #}
 {% extends "layouts/admin_base.html" %}
 {% from 'macros/page_shell.html' import page_shell %}
@@ -13,6 +12,10 @@
 {% from 'components/dense_table.html' import dense_table %}
 {% from 'components/avatar.html' import avatar %}
 {% from 'solutions/partials/_design_score.html' import design_score_panel, design_score_ring %}
+{% from 'components/input.html' import input, textarea %}
+{% from 'components/select.html' import native_select %}
+{% from 'components/progress.html' import progress %}
+{% from 'solutions/partials/_element_table.html' import element_table %}
 
 {% block title %}{{ solution.name }} - Solution{% endblock %}
 
@@ -20,6 +23,7 @@
 {% set base = '/solutions/' ~ sid %}
 {% set stage_variant = {'Approved': 'success', 'Approved with conditions': 'success', 'In review': 'info', 'Rejected': 'danger', 'Proposed': 'info'}.get(stage, 'neutral') %}
 {% set change_variant = {'Added': 'success', 'Changed': 'info', 'Retired': 'warning'} %}
+{% set band_cell = {'low': 'bg-success/10 border-success/30', 'medium': 'bg-warning/10 border-warning/30', 'high': 'bg-warning/30 border-warning/50', 'critical': 'bg-destructive/20 border-destructive/50'} %}
 
 {% macro initials(name) -%}
 {%- set parts = (name or '').split() -%}
@@ -190,17 +194,10 @@
               {% if g.note %}<p class="mt-2 text-sm leading-6 text-foreground" data-testid="design-note-{{ g.layer }}">{{ g.note }}</p>{% endif %}
             {% endcall %}
             {% call card_content(class='p-0') %}
-              {% call dense_table(columns=[('Element', '!pl-6'), ('Type', ''), ('Change', ''), ('Note', 'hidden md:table-cell')], rows=g.elements|length, caption=g.label ~ ' elements', testid='design-table-' ~ g.layer, flush=true) %}
-                {% for e in g.elements %}
-                <tr class="group h-12 transition-colors hover:bg-muted/50">
-                  <td class="px-2 !pl-6 align-middle font-medium text-foreground">
-                    {% if e.href %}<a href="{{ e.href }}" class="hover:underline" data-testid="design-element-link">{{ e.name }}</a>{% else %}{{ e.name }}{% endif %}
-                  </td>
-                  <td class="px-2 align-middle text-muted-foreground">{{ e.type }}</td>
-                  <td class="px-2 align-middle">{% call badge(variant=change_variant.get(e.change, 'neutral')) %}{{ e.change }}{% endcall %}</td>
-                  <td class="hidden px-2 align-middle text-muted-foreground md:table-cell">{{ e.notes }}</td>
-                </tr>
-                {% endfor %}
+              {% call(e) element_table(rows=g.elements, columns=[('Type', ''), ('Change', ''), ('Note', 'hidden md:table-cell')], caption=g.label ~ ' elements', testid='design-table-' ~ g.layer, row_testid='design-row', link_testid='design-element-link') %}
+                <td class="px-2 align-middle text-muted-foreground">{{ e.type }}</td>
+                <td class="px-2 align-middle">{% call badge(variant=change_variant.get(e.change, 'neutral')) %}{{ e.change }}{% endcall %}</td>
+                <td class="hidden px-2 align-middle text-muted-foreground md:table-cell">{{ e.notes }}</td>
               {% endcall %}
             {% endcall %}
           {% endcall %}
@@ -311,13 +308,264 @@
         {% endif %}
 
       {% elif tab == 'requirements' %}
-        {{ empty_tab('requirements-next', 'Requirements and constraints will sit here beside the design element that realises each one. Today they are on the traceability page.', base ~ '/traceability', 'Open traceability') }}
+        {% set reqs = requirements %}
+        {% if reqs.rows or reqs.constraints or reqs.motivation %}
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <p class="text-sm text-muted-foreground" data-testid="requirements-summary">{{ reqs.rows|length }} requirement{{ 's' if reqs.rows|length != 1 }}{% if reqs.from_model %}, {{ reqs.from_model }} from the model{% endif %}{% if reqs.constraints %}, {{ reqs.constraints|length }} constraint{{ 's' if reqs.constraints|length != 1 }}{% endif %}.{% if reqs.rows %} {{ reqs.realised }} of {{ reqs.rows|length }} realised by a design element.{% endif %}{% if reqs.motivation %} {{ reqs.motivation|length }} driver{{ 's' if reqs.motivation|length != 1 }}, goal{{ 's' if reqs.motivation|length != 1 }} and stakeholder{{ 's' if reqs.motivation|length != 1 }} behind {{ 'them' if reqs.rows else 'it' }}.{% endif %}</p>
+            <div class="flex flex-wrap gap-2">
+              {{ button(text='Open in Composer', variant='outline', size='sm', icon='pen-tool', href=url_for('archimate.composer_page'), testid='requirements-composer') }}
+              {{ button(text='Traceability matrix', variant='outline', size='sm', icon='git-branch', href=reqs.traceability_href, testid='requirements-traceability') }}
+              {{ button(text='Add a requirement', variant='outline', size='sm', icon='plus', href=reqs.add_href, testid='requirements-add') }}
+            </div>
+          </div>
+          {% if reqs.unrealised %}
+            {{ alert(kind='warning', title=reqs.unrealised ~ ' requirement' ~ ('s' if reqs.unrealised != 1 else '') ~ ' not yet realised by a design element', text='Link each one to the application, data or technology element that delivers it, so the matrix and the design agree.', link_href=base ~ '?tab=design', link_text='Open Design', testid='requirements-unrealised') }}
+          {% endif %}
+          {% if reqs.rows %}
+          {% call card(class='overflow-hidden') %}
+            {% call card_header(class='pb-3') %}
+              {% call card_title(class='text-base') %}Requirements{% endcall %}
+              {% call card_description() %}What the solution must do, and the design element that realises each one. A requirement from the model opens its own record.{% endcall %}
+            {% endcall %}
+            {% call card_content(class='p-0') %}
+              {% call(r) element_table(rows=reqs.rows, columns=[('Kind', ''), ('Priority', ''), ('Realised by', ''), ('Status', 'hidden md:table-cell')], caption='Requirements', testid='requirements-table', first='Requirement', row_testid='requirement-row', link_testid='requirement-link') %}
+                <td class="px-2 align-middle text-muted-foreground">{{ r.kind }}</td>
+                <td class="px-2 align-middle">
+                  {% if r.priority %}{% call badge(variant='outline') %}{{ r.priority }}{% endcall %}
+                  {% elif r.mandatory %}{% call badge(variant='outline') %}Mandatory{% endcall %}
+                  {% else %}<span class="text-muted-foreground">Not set</span>{% endif %}
+                </td>
+                <td class="px-2 align-middle">
+                  {% if r.realised_by %}<a href="{{ r.realised_by.href or (base ~ '?tab=design') }}" class="text-foreground hover:underline" data-testid="requirement-element-link">{{ r.realised_by.name }}</a>
+                  {% else %}<a href="{{ base }}?tab=design" class="text-muted-foreground hover:text-foreground hover:underline" data-testid="requirement-unrealised">Not linked yet</a>{% endif %}
+                </td>
+                <td class="hidden px-2 align-middle text-muted-foreground md:table-cell">{{ r.status }}</td>
+              {% endcall %}
+            {% endcall %}
+          {% endcall %}
+          {% else %}
+            {{ empty_tab('requirements-empty', 'No requirements yet. Add the first one, or link one the model already holds.', reqs.add_href, 'Add a requirement') }}
+          {% endif %}
+          {% if reqs.constraints %}
+          {% call card(class='overflow-hidden') %}
+            {% call card_header(class='pb-3') %}
+              {% call card_title(class='text-base') %}Constraints{% endcall %}
+              {% call card_description() %}The limits the design must stay within.{% endcall %}
+            {% endcall %}
+            {% call card_content(class='p-0') %}
+              {% call(c) element_table(rows=reqs.constraints, columns=[('Kind', ''), ('Limit', ''), ('Weight', 'hidden md:table-cell')], caption='Constraints', testid='constraints-table', first='Constraint', row_testid='constraint-row') %}
+                <td class="px-2 align-middle text-muted-foreground">{{ c.kind }}</td>
+                <td class="px-2 align-middle text-foreground">{{ c.value or 'Not quantified' }}</td>
+                <td class="hidden px-2 align-middle md:table-cell">{% call badge(variant='warning' if c.hard else 'outline') %}{{ 'Hard' if c.hard else 'Soft' }}{% endcall %}</td>
+              {% endcall %}
+            {% endcall %}
+          {% endcall %}
+          {% endif %}
+          {% if reqs.motivation %}
+          {% call card(class='overflow-hidden') %}
+            {% call card_header(class='pb-3') %}
+              {% call card_title(class='text-base') %}Drivers, goals and stakeholders{% endcall %}
+              {% call card_description() %}The Motivation elements behind the requirements. Each opens its own record.{% endcall %}
+            {% endcall %}
+            {% call card_content(class='p-0') %}
+              {% call(e) element_table(rows=reqs.motivation, columns=[('Type', ''), ('Change', ''), ('Note', 'hidden md:table-cell')], caption='Motivation elements', testid='motivation-table', row_testid='motivation-row', link_testid='motivation-link') %}
+                <td class="px-2 align-middle text-muted-foreground">{{ e.type }}</td>
+                <td class="px-2 align-middle">{% call badge(variant=change_variant.get(e.change, 'neutral')) %}{{ e.change }}{% endcall %}</td>
+                <td class="hidden px-2 align-middle text-muted-foreground md:table-cell">{{ e.notes }}</td>
+              {% endcall %}
+            {% endcall %}
+          {% endcall %}
+          {% endif %}
+        {% else %}
+          {{ empty_tab('requirements-empty', 'No requirements yet. Add the first one, or link one the model already holds.', reqs.add_href, 'Add a requirement') }}
+        {% endif %}
+
       {% elif tab == 'options' %}
-        {{ empty_tab('options-next', 'The options compared, their scores and the recorded decision will sit here. Today they are on the options page.', base ~ '/options-advisor', 'Compare options') }}
+        {% set opt = options %}
+        {% if opt.options or opt.decision %}
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <p class="text-sm text-muted-foreground" data-testid="options-summary">{% if opt.options %}{{ opt.options|length }} option{{ 's' if opt.options|length != 1 }} compared{% if opt.leader %}; {{ opt.leader.name }} leads{% endif %}.{% else %}The decision is recorded without a comparison of options.{% endif %}</p>
+            {{ button(text='Compare options', variant='outline', size='sm', icon='scale', href=opt.compare_href, testid='options-compare') }}
+          </div>
+          {% if opt.leader %}
+            {{ alert(kind='success', title=opt.leader.name ~ ' is recommended', text=(opt.leader.summary or (opt.decision.rationale if opt.decision else '')), testid='options-recommendation') }}
+          {% endif %}
+          {% if opt.options %}
+          {% call card(class='overflow-hidden') %}
+            {% call card_header(class='pb-3') %}
+              {% call card_title(class='text-base') %}Options compared{% endcall %}
+              {% call card_description() %}Each option against cost, time and risk{% if opt.source == 'options' %}, fit and coverage{% endif %}.{% endcall %}
+            {% endcall %}
+            {% call card_content(class='p-0') %}
+              {% if opt.source == 'options' %}
+                {% set opt_columns = [('Option', '!pl-6'), ('Fit', ''), ('Coverage', ''), ('Risk', ''), ('Summary', 'hidden md:table-cell')] %}
+              {% else %}
+                {% set opt_columns = [('Option', '!pl-6'), ('Approach', ''), ('Cost', ''), ('Time', ''), ('Risk', ''), ('Summary', 'hidden lg:table-cell')] %}
+              {% endif %}
+              {% call dense_table(columns=opt_columns, rows=opt.options|length, caption='Options compared', testid='options-table', flush=true) %}
+                {% for o in opt.options %}
+                <tr class="group h-12 transition-colors hover:bg-muted/50" data-testid="option-row">
+                  <td class="px-2 !pl-6 align-middle">
+                    <span class="font-medium text-foreground">{{ o.name }}</span>
+                    {% if o.recommended %} {% call badge(variant='success') %}Leader{% endcall %}{% endif %}
+                  </td>
+                  {% if opt.source == 'options' %}
+                  <td class="px-2 align-middle tabular-nums text-foreground">{{ o.fit or 'Not scored' }}</td>
+                  <td class="px-2 align-middle tabular-nums text-foreground">{{ o.coverage or 'Not scored' }}</td>
+                  <td class="px-2 align-middle tabular-nums text-foreground">{{ o.risk or 'Not scored' }}</td>
+                  {% else %}
+                  <td class="px-2 align-middle text-muted-foreground">{{ o.approach or 'Not stated' }}</td>
+                  <td class="px-2 align-middle text-foreground">{{ o.cost or 'Not stated' }}</td>
+                  <td class="px-2 align-middle text-foreground">{% if o.months %}{{ o.months }} month{{ 's' if o.months != 1 }}{% else %}Not stated{% endif %}</td>
+                  <td class="px-2 align-middle">{% if o.risk %}{% call badge(variant={'Low': 'success', 'Medium': 'warning', 'High': 'danger'}.get(o.risk, 'outline')) %}{{ o.risk }}{% endcall %}{% else %}<span class="text-muted-foreground">Not stated</span>{% endif %}</td>
+                  {% endif %}
+                  <td class="hidden px-2 align-middle text-muted-foreground {{ 'md:table-cell' if opt.source == 'options' else 'lg:table-cell' }}"><span class="block max-w-md truncate">{{ o.summary }}</span></td>
+                </tr>
+                {% endfor %}
+              {% endcall %}
+            {% endcall %}
+          {% endcall %}
+          {% endif %}
+          {% if opt.decision %}
+          {% set d = opt.decision %}
+          {% call card() %}
+            {% call card_header(class='pb-3') %}
+              <div class="flex flex-wrap items-center gap-2">
+                {% call card_title(class='text-base') %}Decision: {{ d.title }}{% endcall %}
+                {% call badge(variant={'accepted': 'success', 'approved': 'success', 'rejected': 'danger', 'superseded': 'neutral', 'deprecated': 'neutral'}.get(d.status_key, 'info')) %}{{ d.status }}{% endcall %}
+              </div>
+              {% call card_description() %}{% if d.decided_by %}{{ d.decided_by }}{% if d.decided_at %}, {{ d.decided_at|format_datetime('d MMM yyyy') }}{% endif %}{% elif d.decided_at %}Recorded {{ d.decided_at|format_datetime('d MMM yyyy') }}{% else %}Decision record{% endif %}{% endcall %}
+            {% endcall %}
+            {% call card_content() %}
+              <dl class="space-y-3 text-sm" data-testid="options-decision">
+                {% if d.decision %}<div><dt class="font-medium text-foreground">Decided</dt><dd class="mt-1 whitespace-pre-line text-foreground">{{ d.decision }}</dd></div>{% endif %}
+                {% if d.rationale %}<div><dt class="font-medium text-foreground">Why</dt><dd class="mt-1 whitespace-pre-line text-muted-foreground">{{ d.rationale }}</dd></div>{% endif %}
+                {% if d.consequences %}<div><dt class="font-medium text-foreground">What follows</dt><dd class="mt-1 whitespace-pre-line text-muted-foreground">{{ d.consequences }}</dd></div>{% endif %}
+                {% if d.effort or d.value %}<div class="flex flex-wrap gap-4"><dt class="sr-only">Effort and value</dt>{% if d.effort %}<dd><span class="text-muted-foreground">Effort</span> <span class="font-medium text-foreground">{{ d.effort }}</span></dd>{% endif %}{% if d.value %}<dd><span class="text-muted-foreground">Business value</span> <span class="font-medium text-foreground">{{ d.value }}</span></dd>{% endif %}</div>{% endif %}
+              </dl>
+            {% endcall %}
+          {% endcall %}
+          {% else %}
+            {{ alert(kind='info', title='No decision recorded yet', text='Choose the leading option and record the decision, so the board can decide on it.', link_href=opt.compare_href, link_text='Compare options', testid='options-no-decision') }}
+          {% endif %}
+        {% else %}
+          {{ empty_tab('options-empty', 'No options compared yet. Compare build, buy and extend for this solution and record the decision.', opt.compare_href, 'Compare options') }}
+        {% endif %}
+
       {% elif tab == 'risks' %}
-        {{ empty_tab('risks-next', 'The risks this solution carries, each with an owner, and their heat map will sit here. Today they are on the risks page.', base ~ '/risks', 'Open risks') }}
+        {% set rk = risks %}
+        {% if rk.rows %}
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <div class="flex flex-wrap items-center gap-2">
+              <p class="text-sm text-muted-foreground" data-testid="risks-summary">{{ rk.rows|length }} risk{{ 's' if rk.rows|length != 1 }}, {{ rk.open }} open{% if rk.without_owner %}, {{ rk.without_owner }} without an owner{% endif %}.</p>
+              {% for b in rk.bands %}{% call badge(variant={'low': 'success', 'medium': 'warning', 'high': 'warning', 'critical': 'danger'}[b.key]) %}{{ b.label }} {{ b.count }}{% endcall %}{% endfor %}
+            </div>
+            <div class="flex gap-2">
+              {{ button(text='Risk register', variant='outline', size='sm', icon='shield-alert', href=rk.register_href, testid='risks-register') }}
+              {{ button(text='Add a risk', variant='outline', size='sm', icon='plus', href=rk.add_href, testid='risks-add') }}
+            </div>
+          </div>
+          {% if rk.without_owner %}
+            {{ alert(kind='warning', title=rk.without_owner ~ ' risk' ~ ('s' if rk.without_owner != 1 else '') ~ ' without an owner', text='Every risk needs a person who carries it. Name one on the register.', link_href=rk.register_href, link_text='Open the register', testid='risks-no-owner') }}
+          {% endif %}
+          <div class="grid gap-6 lg:grid-cols-3">
+            {% call card(class='lg:col-span-1') %}
+              {% call card_header(class='pb-3') %}
+                {% call card_title(class='text-base') %}Probability and impact{% endcall %}
+                {% call card_description() %}Probability across, impact upward. Each cell counts the risks in it.{% endcall %}
+              {% endcall %}
+              {% call card_content() %}
+                <div class="flex gap-2">
+                  <div class="grid shrink-0 content-start gap-1 text-right text-xs leading-tight text-muted-foreground" aria-hidden="true">
+                    {% for n in [5, 4, 3, 2, 1] %}<span class="flex h-9 items-center justify-end">{{ n }}</span>{% endfor %}
+                  </div>
+                  <div class="min-w-0 flex-1">
+                    <div class="grid grid-cols-5 gap-1" role="grid" aria-label="Risk heat map, probability across and impact upward" data-testid="risks-grid">
+                      {% for row in rk.grid %}
+                      <div role="row" class="contents">
+                      {% for cell in row %}
+                        <div role="gridcell" class="flex h-9 items-center justify-center rounded border text-sm font-medium tabular-nums {{ band_cell[cell.band] }}" data-testid="risk-cell" data-count="{{ cell.count }}" aria-label="Probability {{ cell.likelihood }}, impact {{ cell.impact }}: {{ cell.count }} risk{{ 's' if cell.count != 1 }}"{% if cell.titles %} title="{{ cell.titles|join('; ') }}"{% endif %}>{% if cell.count %}{{ cell.count }}{% endif %}</div>
+                      {% endfor %}
+                      </div>
+                      {% endfor %}
+                    </div>
+                    <div class="mt-1 grid grid-cols-5 gap-1 text-center text-xs text-muted-foreground" aria-hidden="true">
+                      {% for n in [1, 2, 3, 4, 5] %}<span>{{ n }}</span>{% endfor %}
+                    </div>
+                  </div>
+                </div>
+                <p class="mt-2 text-xs text-muted-foreground">Impact rises upward, probability to the right.</p>
+              {% endcall %}
+            {% endcall %}
+            {% call card(class='overflow-hidden lg:col-span-2') %}
+              {% call card_header(class='pb-3') %}
+                {% call card_title(class='text-base') %}Risks on the register{% endcall %}
+                {% call card_description() %}Linked to this solution or to an element it changes. Each opens on the register.{% endcall %}
+              {% endcall %}
+              {% call card_content(class='p-0') %}
+                {% call dense_table(columns=[('Risk', '!pl-6'), ('Owner', ''), ('Score', ''), ('Status', 'hidden md:table-cell')], rows=rk.rows|length, caption='Risks', testid='risks-table', flush=true) %}
+                  {% for r in rk.rows %}
+                  <tr class="group h-12 transition-colors hover:bg-muted/50" data-testid="risk-row">
+                    <td class="px-2 !pl-6 align-middle">
+                      <a href="{{ r.href }}" class="font-medium text-foreground hover:underline" data-testid="risk-link">{{ r.title }}</a>
+                      {% if r.via %}<span class="block text-xs text-muted-foreground">through {{ r.via }}</span>{% endif %}
+                      {% if r.mitigation %}<span class="block max-w-md truncate text-xs text-muted-foreground">{{ r.mitigation }}</span>{% endif %}
+                    </td>
+                    <td class="px-2 align-middle">{% if r.owner %}<span class="text-foreground" data-testid="risk-owner">{{ r.owner }}</span>{% else %}<a href="{{ rk.register_href }}" class="text-muted-foreground hover:text-foreground hover:underline" data-testid="risk-owner">No owner yet</a>{% endif %}</td>
+                    <td class="px-2 align-middle">{% call badge(variant={'low': 'success', 'medium': 'warning', 'high': 'warning', 'critical': 'danger'}[r.band]) %}{{ r.band_label }} {{ r.score }}{% endcall %}</td>
+                    <td class="hidden px-2 align-middle text-muted-foreground md:table-cell">{{ r.status }}</td>
+                  </tr>
+                  {% endfor %}
+                {% endcall %}
+              {% endcall %}
+            {% endcall %}
+          </div>
+        {% else %}
+          {{ empty_tab('risks-empty', 'No risks recorded yet. Add the first risk this solution carries, with the person who owns it.', rk.add_href, 'Add a risk') }}
+        {% endif %}
+
       {% elif tab == 'delivery' %}
-        {{ empty_tab('delivery-next', 'Work packages, plateaus, dates and what this solution depends on will sit here. Today they are on the roadmap.', base ~ '/migration-roadmap', 'Open the roadmap') }}
+        {% set dl = delivery %}
+        {% if dl.packages %}
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <p class="text-sm text-muted-foreground" data-testid="delivery-summary">{{ dl.packages|length }} work package{{ 's' if dl.packages|length != 1 }}: {{ dl.done }} done, {{ dl.started }} under way, {{ dl.packages|length - dl.done - dl.started }} not started.{% if dl.plateaus %} Plateau{{ 's' if dl.plateaus|length != 1 }}: {{ dl.plateaus|map(attribute='name')|join(', ') }}.{% endif %}{% if dl.target_date %} Target {{ dl.target_date|format_datetime('d MMM yyyy') }}.{% endif %}{% if dl.programme %} Programme {{ dl.programme.name }}.{% endif %}</p>
+            {{ button(text='Open the roadmap', variant='outline', size='sm', icon='map', href=dl.roadmap_href, testid='delivery-roadmap') }}
+          </div>
+          {% if dl.roadmap and dl.roadmap.headline %}
+            {{ alert(kind='info', title=dl.roadmap.headline, text=(dl.roadmap.plateaus ~ ' plateau' ~ ('s' if dl.roadmap.plateaus != 1 else '')) ~ (' over ' ~ dl.roadmap.horizon ~ ' months' if dl.roadmap.horizon else '') ~ '.', link_href=dl.roadmap_href, link_text='Open the roadmap', testid='delivery-roadmap-summary') }}
+          {% endif %}
+          {% call card(class='overflow-hidden') %}
+            {% call card_header(class='pb-3') %}
+              {% call card_title(class='text-base') %}Work packages{% endcall %}
+              {% call card_description() %}The delivery work of this solution, in order, with what each depends on and what needs it.{% endcall %}
+            {% endcall %}
+            {% call card_content(class='p-0') %}
+              {% call dense_table(columns=[('Work package', '!pl-6'), ('Status', ''), ('Progress', ''), ('Dates', 'hidden lg:table-cell'), ('Owner', 'hidden md:table-cell'), ('Depends on', 'hidden md:table-cell'), ('Needed by', 'hidden md:table-cell')], rows=dl.packages|length, caption='Work packages', testid='delivery-table', flush=true) %}
+                {% for p in dl.packages %}
+                <tr class="group h-12 transition-colors hover:bg-muted/50" data-testid="work-package-row">
+                  <td class="px-2 !pl-6 align-middle">
+                    {% if p.href %}<a href="{{ p.href }}" class="font-medium text-foreground hover:underline" data-testid="work-package-link">{{ p.name }}</a>{% else %}<span class="font-medium text-foreground">{{ p.name }}</span>{% endif %}
+                    {% if p.plateau %}<span class="block text-xs text-muted-foreground">Plateau {{ p.plateau }}</span>{% endif %}
+                  </td>
+                  <td class="px-2 align-middle">{% call badge(variant={'Completed': 'success', 'Done': 'success', 'In progress': 'info', 'Blocked': 'danger', 'On hold': 'warning'}.get(p.status, 'outline')) %}{{ p.status }}{% endcall %}</td>
+                  <td class="px-2 align-middle">
+                    <div class="flex items-center gap-2" data-testid="work-package-progress" data-percent="{{ p.percent }}">
+                      {{ progress(value=p.percent, class='h-2 w-20') }}
+                      <span class="text-xs tabular-nums text-muted-foreground">{{ p.percent }}%</span>
+                    </div>
+                  </td>
+                  <td class="hidden px-2 align-middle text-muted-foreground lg:table-cell">{% if p.start or p.target %}{{ p.start|format_datetime('d MMM yyyy') if p.start else 'Start not set' }} to {{ p.target|format_datetime('d MMM yyyy') if p.target else 'end not set' }}{% else %}Not scheduled{% endif %}</td>
+                  <td class="hidden px-2 align-middle md:table-cell">{% if p.owner %}<span class="text-foreground">{{ p.owner }}</span>{% else %}<span class="text-muted-foreground">No owner yet</span>{% endif %}</td>
+                  <td class="hidden px-2 align-middle text-muted-foreground md:table-cell" data-testid="work-package-depends">{{ p.depends_on|join(', ') if p.depends_on else 'Nothing' }}</td>
+                  <td class="hidden px-2 align-middle text-muted-foreground md:table-cell" data-testid="work-package-needed">{{ p.needed_by|join(', ') if p.needed_by else 'Nothing' }}</td>
+                </tr>
+                {% endfor %}
+              {% endcall %}
+            {% endcall %}
+          {% endcall %}
+        {% else %}
+          {{ empty_tab('delivery-empty', 'No delivery work yet. Generate the roadmap or add the first work package; the board\'s approval puts the work on the roadmap.', dl.add_href, 'Open the roadmap') }}
+        {% endif %}
       {% endif %}
     </div>
 
@@ -374,12 +622,49 @@
 
       {% call card() %}
         {% call card_header(class='pb-3') %}
+          {% call card_title(class='text-base') %}<span id="record-notes">Notes</span>{% endcall %}
+          {% call card_description() %}Meetings, emails and decisions about this solution.{% endcall %}
+        {% endcall %}
+        {% call card_content() %}
+          <form class="space-y-2" data-testid="note-form" data-post-url="{{ base }}/notes">
+            <div class="flex gap-2">
+              <label for="note-kind" class="sr-only">Kind of note</label>
+              {{ native_select(id='note-kind', name='kind', size='sm', class='w-36 shrink-0', options=note_kinds, selected='meeting') }}
+              <label for="note-subject" class="sr-only">Subject</label>
+              {{ input(id='note-subject', name='subject', placeholder='Subject', required=true, class='h-9 min-w-0 flex-1') }}
+            </div>
+            <label for="note-summary" class="sr-only">What was said or decided</label>
+            {{ textarea(id='note-summary', name='summary', placeholder='What was said or decided', rows=2) }}
+            {{ button(text='Add note', variant='outline', size='sm', type='submit', testid='note-add') }}
+          </form>
+          {% if notes %}
+          <ul class="mt-4 space-y-3 text-sm" data-testid="record-notes-list">
+            {% for n in notes %}
+            <li class="flex gap-2" data-testid="note-item">
+              <i data-lucide="{{ {'meeting': 'users', 'email': 'mail', 'decision': 'gavel', 'escalation': 'alert-triangle', 'status_update': 'activity'}.get(n.kind, 'sticky-note') }}" class="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true"></i>
+              <div class="min-w-0">
+                <p class="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">{% call badge(variant='outline') %}{{ n.kind_label }}{% endcall %}{% if n.at %}<span>{{ n.at|format_datetime('d MMM yyyy') }}</span>{% endif %}{% if n.by %}<span>{{ n.by }}</span>{% endif %}</p>
+                <p class="font-medium text-foreground">{{ n.subject }}</p>
+                {% if n.summary %}<p class="whitespace-pre-line text-foreground">{{ n.summary }}</p>{% endif %}
+                {% if n.outcome %}<p class="text-muted-foreground">Outcome: {{ n.outcome }}</p>{% endif %}
+              </div>
+            </li>
+            {% endfor %}
+          </ul>
+          {% else %}
+          <p class="mt-3 text-sm text-muted-foreground" data-testid="record-notes-list">No notes yet. Record the first meeting, email or decision.</p>
+          {% endif %}
+        {% endcall %}
+      {% endcall %}
+
+      {% call card() %}
+        {% call card_header(class='pb-3') %}
           {% call card_title(class='text-base') %}Comments{% endcall %}
         {% endcall %}
         {% call card_content() %}
           <form class="space-y-2" data-testid="comment-form" data-post-url="{{ base }}/comments">
             <label for="record-comment" class="sr-only">Add a comment</label>
-            <textarea id="record-comment" name="content" rows="3" required maxlength="4000" placeholder="Add a comment" class="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"></textarea>
+            {{ textarea(id='record-comment', name='content', placeholder='Add a comment', rows=3, required=true) }}
             {{ button(text='Post', variant='outline', size='sm', type='submit', testid='comment-post') }}
           </form>
           {% if comments %}
@@ -447,6 +732,22 @@
       post(form.getAttribute('data-post-url'), {section: 'record', content: text}).then(function (res) {
         if (res.ok) { window.location.reload(); } else { say('error', (res.body && res.body.error) || 'The comment could not be posted.'); }
       }).catch(function () { say('error', 'The comment could not be posted.'); });
+    });
+  }
+  var noteForm = document.querySelector('[data-testid="note-form"]');
+  if (noteForm) {
+    noteForm.addEventListener('submit', function (ev) {
+      ev.preventDefault();
+      var subject = (noteForm.querySelector('[name="subject"]').value || '').trim();
+      if (!subject) { return; }
+      var body = {
+        kind: noteForm.querySelector('[name="kind"]').value,
+        subject: subject,
+        summary: (noteForm.querySelector('[name="summary"]').value || '').trim()
+      };
+      post(noteForm.getAttribute('data-post-url'), body).then(function (res) {
+        if (res.ok) { window.location.reload(); } else { say('error', (res.body && res.body.error) || 'The note could not be added.'); }
+      }).catch(function () { say('error', 'The note could not be added.'); });
     });
   }
 })();

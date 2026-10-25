@@ -1,6 +1,7 @@
 """The solution record: everything the solution page shows, assembled once.
 
-The header, the Overview, Design and Review tabs, the properties column and
+The header, the seven tabs (Overview, Design, Requirements, Options and
+decision, Risks, Review, Delivery), the properties column, the typed notes and
 the actions a person may take are read here from the solution's own record.
 Nothing is worked out twice: the design score comes from
 ``solution_design_score_service`` (the one figure every surface shows) and
@@ -44,6 +45,12 @@ _TAB_ALIASES = {
     "options-and-decision": "options",
     "work-packages": "delivery",
     "roadmap": "delivery",
+    "migration-roadmap": "delivery",
+    "traceability": "requirements",
+    "options-advisor": "options",
+    "heatmap": "risks",
+    "communications": "overview",
+    "notes": "overview",
 }
 
 # Which tab fixes each of the ten checks ("edit" opens the edit form).
@@ -154,12 +161,12 @@ def design_groups(solution) -> list[dict]:
             if el is None:
                 continue  # another organisation's element never shows
             layer = (el.layer or "").lower()
-            item = {"name": el.name or "Unnamed", "type": el.type or "", "layer": layer,
+            item = {"id": el.id, "name": el.name or "Unnamed", "type": el.type or "", "layer": layer,
                     "href": element_href(layer, el.type or "", el.id),
                     "change": _change_kind(r, el), "notes": (r.notes or "").strip()}
         else:
             layer = (r.layer_type or "").lower()
-            item = {"name": r.element_name or "Unnamed", "type": _TABLE_TYPES.get(table, ""),
+            item = {"id": None, "name": r.element_name or "Unnamed", "type": _TABLE_TYPES.get(table, ""),
                     "layer": layer, "href": None, "change": _change_kind(r, None),
                     "notes": (r.notes or "").strip()}
         by_layer.setdefault(layer, []).append(item)
@@ -443,6 +450,525 @@ def actions_for(solution, user, latest_review) -> dict:
     }
 
 
+# ── requirements, options, risks, delivery and notes (slice 5b) ────────────
+
+_REQ_KINDS = {
+    "functional": "Functional", "quality": "Quality", "non_functional": "Quality",
+    "constraint": "Constraint", "data": "Data", "integration": "Integration",
+    "compliance": "Compliance", "operational": "Operational",
+}
+_MOSCOW = {"MUST": "Must", "SHOULD": "Should", "COULD": "Could", "WONT": "Won't"}
+_LEVELS = {"very_low": 1, "low": 2, "medium": 3, "high": 4, "very_high": 5, "critical": 5}
+_BAND_LABELS = {"low": "Low", "medium": "Medium", "high": "High", "critical": "Critical"}
+NOTE_KINDS = (
+    ("meeting", "Meeting"),
+    ("email", "Email"),
+    ("decision", "Decision"),
+    ("escalation", "Escalation"),
+    ("status_update", "Status update"),
+)
+_NOTE_LABELS = dict(NOTE_KINDS)
+
+
+def _name_of(user) -> str:
+    """A person's name for the page, or their email, or nothing."""
+    if user is None:
+        return ""
+    full = getattr(user, "full_name", None)
+    try:
+        full = full() if callable(full) else full
+    except Exception:
+        full = None
+    return (full or getattr(user, "email", "") or "").strip()
+
+
+def _band(score: int) -> str:
+    from app.services import risk_service
+    return risk_service.risk_band(score)
+
+
+_REQUIREMENT_TYPES = ("Requirement", "Constraint", "Principle")
+
+
+def requirements_for(solution, groups) -> dict:
+    """Requirements and constraints from the model (the solution's Motivation elements of type
+    Requirement, Constraint and Principle), each beside the element that realises it, followed
+    by the record's own requirement rows; the solution's other Motivation elements (drivers,
+    goals, outcomes, stakeholders) come with them."""
+    from app.models.archimate_core import ArchiMateElement
+    from app.models.models import ArchiMateRelationship
+    from app.models.solution_architect_models import SolutionConstraint, SolutionRequirement
+
+    rows, constraints = [], []
+    by_id = {e["id"]: e for g in groups for e in g["elements"] if e.get("id")}
+    motivation = [e for g in groups if g["layer"] == "motivation" for e in g["elements"]]
+    model_reqs = [e for e in motivation if e["type"] in _REQUIREMENT_TYPES]
+    others = [e for e in motivation if e["type"] not in _REQUIREMENT_TYPES]
+
+    # 1. the model's requirements, each with the element whose realization relationship points at it
+    realised: dict = {}
+    if model_reqs:
+        try:
+            rels = (ArchiMateRelationship.query
+                    .filter(ArchiMateRelationship.target_id.in_([e["id"] for e in model_reqs]))
+                    .filter(db.func.lower(ArchiMateRelationship.type) == "realization")
+                    .order_by(ArchiMateRelationship.id).all())
+            missing = {r.source_id for r in rels} - set(by_id)
+            extra = {e.id: e for e in ArchiMateElement.query.filter(ArchiMateElement.id.in_(missing))} if missing else {}
+            for r in rels:
+                if r.target_id in realised:
+                    continue
+                if r.source_id in by_id:
+                    s = by_id[r.source_id]
+                    realised[r.target_id] = {"name": s["name"], "href": s["href"]}
+                elif r.source_id in extra:
+                    s = extra[r.source_id]
+                    realised[r.target_id] = {"name": s.name or "Unnamed",
+                                             "href": element_href((s.layer or "").lower(), s.type or "", s.id)}
+        except Exception as exc:
+            logger.warning("solution record reader (realizations): %s", exc)
+            db.session.rollback()
+    for e in sorted(model_reqs, key=lambda d: (d["type"] != "Requirement", d["name"].lower())):
+        rows.append({
+            "id": "element-%d" % e["id"], "name": e["name"], "href": e["href"], "description": e["notes"],
+            "kind": e["type"], "priority": "", "mandatory": e["type"] == "Constraint",
+            "status": e["change"], "realised_by": realised.get(e["id"]), "jira": None, "source": "model",
+        })
+
+    # 2. the record's own requirement rows (the older store), each beside its realising element
+    try:
+        query = SolutionRequirement.query.filter_by(solution_id=solution.id)
+        if hasattr(SolutionRequirement, "deleted_at"):
+            query = query.filter(SolutionRequirement.deleted_at.is_(None))
+        reqs = query.order_by(SolutionRequirement.priority.asc().nulls_last(),
+                              SolutionRequirement.id.asc()).all()
+    except Exception as exc:
+        logger.warning("solution record reader (requirement rows): %s", exc)
+        db.session.rollback()
+        reqs = []
+    ids = {r.archimate_element_id for r in reqs if r.archimate_element_id} - set(by_id)
+    elements = {}
+    if ids:
+        try:
+            elements = {e.id: e for e in ArchiMateElement.query.filter(ArchiMateElement.id.in_(ids))}
+        except Exception as exc:
+            logger.warning("solution record reader (requirement elements): %s", exc)
+            db.session.rollback()
+    for r in reqs:
+        linked = None
+        if r.archimate_element_id in by_id:
+            s = by_id[r.archimate_element_id]
+            linked = {"name": s["name"], "href": s["href"]}
+        elif r.archimate_element_id in elements:
+            el = elements[r.archimate_element_id]
+            linked = {"name": el.name or "Unnamed", "href": element_href((el.layer or "").lower(), el.type or "", el.id)}
+        kind = r.requirement_type.value if getattr(r, "requirement_type", None) else (r.req_type or "")
+        kind = (kind or "").lower()
+        priority = _MOSCOW.get((r.moscow_priority or "").upper().replace("'", ""), "")
+        if not priority and r.priority:
+            priority = "Priority %d" % r.priority
+        rows.append({
+            "id": r.id, "name": r.name, "href": None, "description": (r.description or "").strip(),
+            "kind": _REQ_KINDS.get(kind, kind.replace("_", " ").capitalize() or "Requirement"),
+            "priority": priority, "mandatory": bool(r.is_mandatory),
+            "status": (r.status or "open").replace("_", " ").capitalize(),
+            "realised_by": linked, "jira": r.jira_issue_key, "source": "record",
+        })
+
+    # 3. the record's own constraint rows
+    pids = {r.problem_id for r in reqs if r.problem_id}
+    if pids:
+        try:
+            for c in (SolutionConstraint.query.filter(SolutionConstraint.problem_id.in_(pids))
+                      .order_by(SolutionConstraint.severity.desc().nulls_last(), SolutionConstraint.id).all()):
+                value = " ".join(x for x in ((c.value or "").strip(), (c.unit or "").strip()) if x)
+                kind = c.constraint_type.value if getattr(c, "constraint_type", None) else ""
+                constraints.append({
+                    "id": c.id, "name": c.name, "description": (c.description or "").strip(),
+                    "kind": kind.replace("_", " ").capitalize(), "value": value,
+                    "hard": (c.severity or 0) >= 5,
+                })
+        except Exception as exc:
+            logger.warning("solution record reader (constraint rows): %s", exc)
+            db.session.rollback()
+
+    realised_count = sum(1 for r in rows if r["realised_by"])
+    return {
+        "rows": rows,
+        "constraints": constraints,
+        "motivation": others,
+        "from_model": sum(1 for r in rows if r["source"] == "model"),
+        "realised": realised_count,
+        "unrealised": len(rows) - realised_count,
+        "traceability_href": "/solutions/%d/traceability" % solution.id,
+        "add_href": "/solutions/%d?edit=1" % solution.id,
+    }
+
+
+def _score_text(value) -> str:
+    if value is None:
+        return ""
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return str(value)
+    return ("%d" % number) if number == int(number) else ("%.1f" % number)
+
+
+def options_for(solution) -> dict:
+    """The one options analysis about this solution and the decision record it ends in."""
+    options, decision, source, adr = [], None, None, None
+    try:
+        from app.modules.solutions_strategic.v2.services.solution_options_advisor import SolutionOptionsAdvisor
+        adr = SolutionOptionsAdvisor.latest(solution.id)
+    except Exception as exc:
+        logger.warning("solution record reader %d: %s", 4, exc)
+        db.session.rollback()
+    if adr is not None:
+        source = "decision"
+        data = SolutionOptionsAdvisor.to_dict(adr)
+        for o in data.get("options") or []:
+            if not isinstance(o, dict):
+                continue
+            options.append({
+                "name": o.get("name") or "Option",
+                "approach": (o.get("approach") or "").replace("_", " ").capitalize(),
+                "summary": o.get("summary") or "",
+                "cost": (o.get("cost_band") or "").capitalize(),
+                "months": o.get("timeline_months"),
+                "risk": (o.get("risk") or "").capitalize(),
+                "fit": "", "coverage": "",
+                "recommended": bool(o.get("recommended")),
+                "pros": [p for p in (o.get("pros") or []) if p],
+                "cons": [c for c in (o.get("cons") or []) if c],
+            })
+        decided_by = (getattr(adr, "decided_by", None) or getattr(adr, "approved_by", None)
+                      or getattr(adr, "created_by", None))
+        status = (adr.status or "proposed").lower()
+        decision = {
+            "id": adr.id,
+            "title": adr.title,
+            "status": status.replace("_", " ").capitalize(),
+            "status_key": status,
+            "context": (adr.context or "").strip(),
+            "decision": (adr.decision or "").strip(),
+            "rationale": (adr.rationale or "").strip(),
+            "consequences": (adr.consequences or "").strip(),
+            "effort": data.get("estimated_effort") or "",
+            "value": data.get("business_value") or "",
+            "decided_by": _name_of(decided_by),
+            "decided_at": adr.decided_at or adr.approved_at or adr.created_at,
+        }
+    else:
+        try:
+            rows = sorted(list(solution.options or []), key=lambda o: ((o.rank is None), o.rank or 0, o.id))
+        except Exception as exc:
+            logger.warning("solution record reader %d: %s", 5, exc)
+            db.session.rollback()
+            rows = []
+        if rows:
+            source = "options"
+        for o in rows:
+            options.append({
+                "name": o.name, "approach": "", "summary": (o.description or "").strip(),
+                "cost": "", "months": None, "risk": _score_text(o.risk_score),
+                "fit": _score_text(o.strategic_fit), "coverage": _score_text(o.coverage),
+                "recommended": bool(o.is_selected),
+                "pros": [p for p in (o.pros or []) if p], "cons": [c for c in (o.cons or []) if c],
+            })
+    leader = next((o for o in options if o["recommended"]), None)
+    return {
+        "options": options,
+        "decision": decision,
+        "leader": leader,
+        "source": source,
+        "compare_href": "/solutions/%d/options-advisor" % solution.id,
+    }
+
+
+def risks_for(solution, groups) -> dict:
+    """The register's risks for this solution (linked to it or to an element it changes),
+    with owners, and the cells of a probability-by-impact grid."""
+    from app.models.risk import Risk
+    from app.services import risk_service
+
+    register_href = "/risks/?solution_id=%d" % solution.id
+    rows, seen = [], set()
+
+    def _add(risk, via=None):
+        if risk.id in seen:
+            return
+        seen.add(risk.id)
+        likelihood = max(1, min(5, int(risk.likelihood or 1)))
+        impact = max(1, min(5, int(risk.impact or 1)))
+        score = likelihood * impact
+        status = risk.status.value if hasattr(risk.status, "value") else (risk.status or "open")
+        status = str(status).lower()
+        rows.append({
+            "id": risk.id, "title": risk.title, "owner": (risk.owner or "").strip(),
+            "likelihood": likelihood, "impact": impact, "score": score,
+            "band": _band(score), "band_label": _BAND_LABELS[_band(score)],
+            "status": status.replace("_", " ").capitalize(), "status_key": status,
+            "mitigation": (risk.mitigation_plan or "").strip(), "via": via, "href": register_href,
+        })
+
+    try:
+        canonical, legacy = risk_service.solution_risk_sources(solution.id)
+    except Exception as exc:
+        logger.warning("solution record reader %d: %s", 6, exc)
+        db.session.rollback()
+        canonical, legacy = [], []
+    for risk in canonical:
+        _add(risk)
+    try:
+        for risk in Risk.query.filter_by(solution_id=solution.id).order_by(Risk.id).all():
+            _add(risk)
+    except Exception as exc:
+        logger.warning("solution record reader %d: %s", 7, exc)
+        db.session.rollback()
+    element_names = {e["id"]: e["name"] for g in groups for e in g["elements"] if e.get("id")}
+    if element_names:
+        try:
+            for risk in (Risk.query.filter(Risk.archimate_element_id.in_(list(element_names)))
+                         .order_by(Risk.id).all()):
+                _add(risk, via=element_names.get(risk.archimate_element_id))
+        except Exception as exc:
+            logger.warning("solution record reader %d: %s", 8, exc)
+            db.session.rollback()
+    for risk in legacy:  # older solution_risks rows the merge has not retired yet
+        likelihood = _LEVELS.get((risk.probability or "medium").lower(), 3)
+        impact = _LEVELS.get((risk.impact or "medium").lower(), 3)
+        score = likelihood * impact
+        status = (risk.status or "open").lower()
+        rows.append({
+            "id": "legacy-%d" % risk.id,
+            "title": risk.risk_name or (risk.risk_description or "Risk")[:120],
+            "owner": (risk.owner or "").strip(), "likelihood": likelihood, "impact": impact,
+            "score": score, "band": _band(score), "band_label": _BAND_LABELS[_band(score)],
+            "status": status.replace("_", " ").capitalize(), "status_key": status,
+            "mitigation": (risk.mitigation or "").strip(), "via": None, "href": register_href,
+        })
+    rows.sort(key=lambda d: (-d["score"], d["title"].lower()))
+
+    cells: dict[tuple, list] = {}
+    for d in rows:
+        cells.setdefault((d["likelihood"], d["impact"]), []).append(d["title"])
+    grid = [[{"likelihood": lk, "impact": im, "count": len(cells.get((lk, im), [])),
+              "band": _band(lk * im), "titles": cells.get((lk, im), [])}
+             for lk in range(1, 6)] for im in range(5, 0, -1)]
+    bands = [{"key": key, "label": label, "count": sum(1 for d in rows if d["band"] == key)}
+             for key, label, _floor in risk_service.RISK_BANDS]
+    open_states = ("open", "in_progress", "mitigating", "identified", "assessed")
+    return {
+        "rows": rows,
+        "grid": grid,
+        "bands": [b for b in bands if b["count"]],
+        "open": sum(1 for d in rows if d["status_key"] in open_states),
+        "without_owner": sum(1 for d in rows if not d["owner"]),
+        "register_href": register_href,
+        "add_href": register_href,
+    }
+
+
+def _dependency_id(dep):
+    if isinstance(dep, bool):
+        return None
+    if isinstance(dep, int):
+        return dep
+    if isinstance(dep, str) and dep.isdigit():
+        return int(dep)
+    if isinstance(dep, dict):
+        for key in ("id", "depends_on_id", "work_package_id", "predecessor_id"):
+            if dep.get(key) is not None:
+                try:
+                    return int(dep[key])
+                except (TypeError, ValueError):
+                    return None
+    return None
+
+
+def _package_row(row_id, name, status, percent, start, target, owner, plateau, depends_on, needed_by, href, store):
+    status = (status or "planned").replace("_", " ").capitalize()
+    percent = int(percent or 0)
+    if status.lower() in ("completed", "complete", "done"):
+        percent = 100
+    return {
+        "id": row_id, "name": name, "status": status, "percent": max(0, min(100, percent)),
+        "start": start, "target": target, "owner": owner, "plateau": plateau,
+        "depends_on": depends_on, "needed_by": needed_by, "href": href, "store": store,
+    }
+
+
+def delivery_for(solution, groups) -> dict:
+    """The solution's delivery work: its work packages with progress, dates, owner, plateau,
+    what each depends on and what needs it; its plateaus; the programme; the roadmap.
+
+    The one store is ``unified_work_packages`` (a legacy ``work_packages`` row is copied
+    there the moment it is written). Both are read and a name appears once, so nothing a
+    person recorded in either store is hidden.
+    """
+    from app.models.implementation_migration import Plateau, WorkPackage
+    from app.models.unified_work_package import UnifiedWorkPackage
+    from app.models.user import User
+
+    unified, legacy = [], []
+    try:
+        unified = (UnifiedWorkPackage.query.filter(db.or_(
+            db.and_(UnifiedWorkPackage.context == "solution", UnifiedWorkPackage.context_id == solution.id),
+            db.and_(UnifiedWorkPackage.source_type == "solution", UnifiedWorkPackage.source_id == solution.id)))
+            .order_by(UnifiedWorkPackage.start_date.asc().nulls_last(), UnifiedWorkPackage.id).all())
+    except Exception as exc:
+        logger.warning("solution record reader (unified work packages): %s", exc)
+        db.session.rollback()
+    try:
+        legacy = WorkPackage.query.filter_by(context="solution", context_id=solution.id).all()
+        legacy.sort(key=lambda w: ((w.sequence_order is None), w.sequence_order or 0, w.id))
+    except Exception as exc:
+        logger.warning("solution record reader (work packages): %s", exc)
+        db.session.rollback()
+
+    owner_ids = {getattr(r, "owner_id", None) for r in unified + legacy} - {None}
+    plateau_ids = {getattr(r, "plateau_id", None) for r in unified + legacy} - {None}
+    owners, plateau_names = {}, {}
+    if owner_ids:
+        try:
+            owners = {u.id: _name_of(u) for u in User.query.filter(User.id.in_(owner_ids))}
+        except Exception as exc:
+            logger.warning("solution record reader (owners): %s", exc)
+            db.session.rollback()
+    if plateau_ids:
+        try:
+            plateau_names = {p.id: p.name for p in Plateau.query.filter(Plateau.id.in_(plateau_ids))}
+        except Exception as exc:
+            logger.warning("solution record reader (plateaus): %s", exc)
+            db.session.rollback()
+
+    def _names(rows, attr, dep_attr):
+        by_id = {r.id: r for r in rows}
+        needed: dict = {}
+        for r in rows:
+            for dep in (getattr(r, dep_attr, None) or []):
+                dep_id = _dependency_id(dep)
+                if dep_id is not None:
+                    needed.setdefault(dep_id, []).append(r.name)
+
+        def depends(r):
+            out = []
+            for dep in (getattr(r, dep_attr, None) or []):
+                dep_id = _dependency_id(dep)
+                name = by_id[dep_id].name if dep_id in by_id else (dep.get("name") if isinstance(dep, dict) else None)
+                if name:
+                    out.append(name)
+            return out
+        return depends, needed
+
+    packages, seen = [], set()
+    depends, needed = _names(unified, "id", "work_dependencies")
+    for u in unified:
+        href = None
+        try:
+            href = url_for("implementation_planning.work_package_detail", work_package_id=u.id)
+        except (BuildError, RuntimeError):
+            pass
+        if getattr(u, "archimate_element_id", None):
+            href = element_href("implementation", "WorkPackage", u.archimate_element_id) or href
+        packages.append(_package_row(
+            u.id, u.name, u.status, u.progress_percentage, u.start_date, u.end_date,
+            owners.get(u.owner_id) or (u.assigned_to or "").strip(), plateau_names.get(u.plateau_id, ""),
+            depends(u), needed.get(u.id, []), href, "unified"))
+        seen.add((u.name or "").strip().lower())
+    depends, needed = _names(legacy, "id", "dependencies")
+    for w in legacy:
+        key = (w.name or "").strip().lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        packages.append(_package_row(
+            "legacy-%d" % w.id, w.name, w.status, w.percent_complete, w.start_date, w.target_date,
+            owners.get(w.owner_id, ""), plateau_names.get(w.plateau_id, "") or getattr(getattr(w, "plateau", None), "name", ""),
+            depends(w), needed.get(w.id, []), None, "model"))
+    try:
+        from app.models.roadmap_models import RoadmapWorkPackage
+        roadmap_rows = (RoadmapWorkPackage.query.filter_by(source_type="solution", source_id=solution.id)
+                        .order_by(RoadmapWorkPackage.start_date.asc().nulls_last(), RoadmapWorkPackage.id).all())
+        for r in roadmap_rows:
+            key = (r.name or "").strip().lower()
+            if key in seen:
+                continue
+            seen.add(key)
+            packages.append(_package_row(
+                "roadmap-%d" % r.id, r.name, r.status, r.progress_percentage, r.start_date, r.end_date,
+                (r.assigned_to or "").strip(), "", [], [], None, "roadmap"))
+    except Exception as exc:
+        logger.warning("solution record reader (roadmap work packages): %s", exc)
+        db.session.rollback()
+
+    plateaus = []
+    try:
+        from app.models.solution_lifecycle_models import SolutionPlateau
+        plateaus = [{"name": p.name, "target": p.target_date}
+                    for p in SolutionPlateau.query.filter_by(solution_id=solution.id)
+                    .order_by(SolutionPlateau.order, SolutionPlateau.id).all()]
+    except Exception as exc:
+        logger.warning("solution record reader (solution plateaus): %s", exc)
+        db.session.rollback()
+    known = {p["name"] for p in plateaus}
+    for p in packages:
+        if p["plateau"] and p["plateau"] not in known:
+            plateaus.append({"name": p["plateau"], "target": None})
+            known.add(p["plateau"])
+    roadmap = None
+    try:
+        from app.modules.solutions_strategic.v2.services.migration_roadmap_advisor import MigrationRoadmapAdvisor
+        latest = MigrationRoadmapAdvisor.latest(solution.id)
+        if latest is not None:
+            roadmap = {
+                "headline": (latest.headline or "").strip(), "summary": (latest.summary or "").strip(),
+                "plateaus": latest.plateau_count or len(latest.plateaus or []),
+                "horizon": latest.horizon_months, "generated_at": latest.generated_at,
+            }
+    except Exception as exc:
+        logger.warning("solution record reader (migration roadmap): %s", exc)
+        db.session.rollback()
+    return {
+        "packages": packages,
+        "plateaus": plateaus,
+        "roadmap": roadmap,
+        "done": sum(1 for p in packages if p["percent"] >= 100),
+        "started": sum(1 for p in packages if 0 < p["percent"] < 100),
+        "programme": programme_of(solution),
+        "target_date": solution.planned_end_date,
+        "roadmap_href": "/solutions/%d/migration-roadmap" % solution.id,
+        "add_href": "/solutions/%d/migration-roadmap" % solution.id,
+    }
+
+
+def notes_for(solution_id: int) -> list[dict]:
+    """Typed notes (meeting, email, decision, escalation, status update), newest first."""
+    try:
+        from app.models.stakeholder_communication import StakeholderCommunication
+        from app.models.user import User
+        rows = (StakeholderCommunication.query.filter_by(solution_id=solution_id)
+                .order_by(StakeholderCommunication.logged_at.desc(), StakeholderCommunication.id.desc())
+                .limit(50).all())
+        ids = {r.logged_by for r in rows if r.logged_by}
+        users = {u.id: u for u in User.query.filter(User.id.in_(ids))} if ids else {}
+        out = []
+        for r in rows:
+            kind = r.comm_type.value if hasattr(r.comm_type, "value") else str(r.comm_type or "")
+            out.append({
+                "id": r.id, "kind": kind,
+                "kind_label": _NOTE_LABELS.get(kind, kind.replace("_", " ").capitalize()),
+                "subject": r.subject, "summary": (r.summary or "").strip(),
+                "outcome": (r.outcome or "").strip(), "at": r.logged_at, "by": _name_of(users.get(r.logged_by)),
+            })
+        return out
+    except Exception as exc:
+        logger.warning("solution record reader %d: %s", 13, exc)
+        db.session.rollback()
+        return []
+
+
 # ── the record ──────────────────────────────────────────────────────────────
 
 def build(solution, tab: str = "overview", user=None) -> dict:
@@ -476,8 +1002,18 @@ def build(solution, tab: str = "overview", user=None) -> dict:
         "actions": actions_for(solution, user, latest_review),
         "latest_review": latest_review,
         "record_url": record_url(solution.id),
+        "notes": notes_for(solution.id),
+        "note_kinds": NOTE_KINDS,
     }
     if tab == "review":
         ctx["packet"] = review_packet(solution)
         ctx["history"] = board_history(solution)
+    elif tab == "requirements":
+        ctx["requirements"] = requirements_for(solution, groups)
+    elif tab == "options":
+        ctx["options"] = options_for(solution)
+    elif tab == "risks":
+        ctx["risks"] = risks_for(solution, groups)
+    elif tab == "delivery":
+        ctx["delivery"] = delivery_for(solution, groups)
     return ctx

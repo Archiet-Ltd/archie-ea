@@ -38549,8 +38549,11 @@
     "breadcrumb",
     "button",
     "card",
-    "table",
+    "input",
     "page-shell",
+    "progress",
+    "select",
+    "table",
     "tabs"
    ],
    "confidence": "high",

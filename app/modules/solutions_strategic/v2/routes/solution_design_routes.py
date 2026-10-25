@@ -4475,6 +4475,41 @@ def list_solution_comments(solution_id: int):
         return jsonify({"error": str(e)}), 500
 
 
+@solution_design_bp.route("/<int:solution_id>/notes", methods=["POST"])
+@login_required
+def create_solution_note(solution_id: int):
+    """A typed note on the solution record: meeting, email, decision, escalation or
+    status update (the solutions rethink, slice 5b; the old communication log)."""
+    solution = Solution.query.get_or_404(solution_id)
+    if not _check_solution_access(solution):
+        abort(403)
+    from app.modules.solutions_strategic.v2.services.solution_record_service import NOTE_KINDS
+    from app.services import communication_log_service
+
+    data = request.get_json(silent=True) or {}
+    kind = (data.get("kind") or data.get("comm_type") or "").strip().lower()
+    subject = (data.get("subject") or "").strip()
+    if kind not in dict(NOTE_KINDS):
+        return jsonify({"error": "kind must be one of " + ", ".join(k for k, _ in NOTE_KINDS)}), 400
+    if not subject:
+        return jsonify({"error": "subject is required"}), 400
+    try:
+        entry = communication_log_service.log_communication(
+            solution_id=solution.id,
+            stakeholder_id=None,
+            comm_type=kind,
+            subject=subject[:255],
+            summary=(data.get("summary") or "").strip() or None,
+            outcome=(data.get("outcome") or "").strip() or None,
+            action_items=[],
+            logged_by=current_user.id,
+        )
+    except ValueError as exc:
+        db.session.rollback()
+        return jsonify({"error": str(exc)}), 400
+    return jsonify({"success": True, "note": entry.to_dict()}), 201
+
+
 @solution_design_bp.route("/<int:solution_id>/comments", methods=["POST"])
 @login_required
 def create_solution_comment(solution_id: int):
