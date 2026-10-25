@@ -108,6 +108,12 @@
 ] %}
 
 <div class="shrink-0 flex flex-wrap items-center justify-between gap-x-3 border-b border-border bg-background">
+{# On a phone Import and Export leave the toolbar for this menu, so the tools keep the room. #}
+{% set _ = more_items.append({'text': 'Import', 'class': 'md:hidden font-semibold text-foreground'}) %}
+{% for it in import_items %}{% set _ = more_items.append({'text': it.text, 'icon': it.icon, 'onclick': it.onclick, 'class': 'md:hidden'}) %}{% endfor %}
+{% set _ = more_items.append({'text': 'Export', 'class': 'md:hidden font-semibold text-foreground'}) %}
+{% for it in export_items if it.onclick %}{% set _ = more_items.append({'text': it.text, 'icon': it.icon, 'onclick': it.onclick, 'class': 'md:hidden'}) %}{% endfor %}
+
 {{ diagram_header(purposes=purposes) }}
 
 <div class="flex flex-wrap items-center gap-2 px-3 py-1" data-testid="composer-view-actions">

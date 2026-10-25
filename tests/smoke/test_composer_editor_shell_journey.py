@@ -228,8 +228,13 @@ def test_architect_finds_adds_connects_edits_undoes_exports_and_deletes(browser,
         spot = _free_spot(page)
         assert spot, "no free place on the canvas to drop an element"
         page.get_by_test_id("palette-item-BusinessProcess").drag_to(page.locator("#composer-canvas"), target_position=spot)
-        page.get_by_label("New Element Name").fill(process_name)
-        page.get_by_role("button", name=re.compile("^Create$")).click()
+        field = page.get_by_label("New Element Name")
+        expect(field).to_be_visible(timeout=PAGE_TIMEOUT)
+        field.click()
+        field.press_sequentially(process_name, delay=15)
+        create = page.get_by_role("button", name=re.compile("^Create$"))
+        expect(create).to_be_enabled(timeout=PAGE_TIMEOUT)
+        create.click()
         page.wait_for_function(
             "([sel, n]) => Alpine.$data(document.querySelector(sel)).graph.getElements().some(c => c.get('elName') === n)",
             arg=[APP, process_name], timeout=PAGE_TIMEOUT)
@@ -352,15 +357,22 @@ def test_shell_fits_a_phone_without_hiding_the_job(browser, live_server, seeded,
         expect(page.get_by_test_id("composer-rail")).to_be_visible()
         # No horizontal scroll on the page.
         assert page.evaluate("document.documentElement.scrollWidth <= window.innerWidth + 1")
-        # The tools scroll sideways in one row, so every one of them can be brought into view and used;
-        # the Import, Export and More menus stay in view, so a menu is never clipped.
-        for tid in ("tool-connect", "zoom-fit", "action-delete", "menu-import", "menu-export", "menu-more"):
+        # The tools scroll sideways in one row, so every one of them can be brought into view and used.
+        for tid in ("tool-connect", "zoom-fit", "action-delete", "menu-more"):
             page.get_by_test_id(tid).scroll_into_view_if_needed()
             box = page.get_by_test_id(tid).bounding_box()
             assert box and box["x"] >= 0 and box["x"] + box["width"] <= 391, (tid, box)
-        page.get_by_test_id("menu-export").click()
-        menu = page.get_by_role("menuitem", name="SVG image").bounding_box()
-        assert menu and menu["x"] >= 0 and menu["x"] + menu["width"] <= 391, menu
+        # Import and Export move into the More menu, which stays in view so it is never clipped, and the
+        # export still hands over a file.
+        expect(page.get_by_test_id("menu-export")).to_be_hidden()
+        page.get_by_test_id("menu-more").click()
+        item = page.get_by_role("menuitem", name="SVG image")
+        item.scroll_into_view_if_needed()
+        box = item.bounding_box()
+        assert box and box["x"] >= 0 and box["x"] + box["width"] <= 391, box
+        with page.expect_download(timeout=PAGE_TIMEOUT) as download:
+            item.click()
+        assert download.value.suggested_filename.lower().endswith(".svg")
         assert not errors, errors
     finally:
         context.close()

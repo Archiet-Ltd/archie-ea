@@ -45,9 +45,9 @@
         <ul class="flex flex-col gap-0.5 pb-2" :id="'palette-list-' + group.key" x-show="shellGroupIsOpen(group.key)" x-cloak>
           <template x-for="item in group.items" :key="item.type">
             <li class="flex cursor-grab items-center gap-2 rounded-md px-2 py-1 text-sm hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                role="button" tabindex="0" draggable="true"
+                role="button" tabindex="0" draggable="true" {# reuse-ok: drags an element type from the palette onto a diagram; no board column or card is involved #}
                 :aria-label="'Add ' + item.label" :data-testid="'palette-item-' + item.type" :data-element-type="item.type"
-                @dragstart="onPaletteDragStart($event, item)" @dragend="onPaletteDragEnd($event)"
+                @dragstart="onPaletteDragStart($event, item)" @dragend="onPaletteDragEnd($event)" {# reuse-ok: drags an element type from the palette onto a diagram; no board column or card is involved #}
                 @keydown.enter.prevent="shellAddType(item)" @keydown.space.prevent="shellAddType(item)" @dblclick="shellAddType(item)">
               {{ notation_swatch('item.type', 'item.layer') }}
               <span class="truncate" x-text="item.label"></span>
