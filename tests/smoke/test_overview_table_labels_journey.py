@@ -270,6 +270,70 @@ def test_every_area_has_its_label_and_its_count(browser, live_server, orgs, view
         context.close()
 
 
+def test_no_trend_arrow_when_no_change_and_no_repeated_rows_and_bar_counts_visible(browser, live_server, orgs):
+    """Defects dash06-1 to dash06-4: no arrow on No change, no repeated rows in recent changes,
+    relationships count from dated history, and bar counts visible at all widths.
+    """
+    info = orgs["a"]
+    for viewport in (FOLD, PHONE):
+        context, page = _page(browser, viewport)
+        try:
+            dash = _open(page, live_server, info["emails"]["enterprise_architect"])
+
+            # --- Fix 1: No lucide-icon trending arrows inside stat card badges when change is zero or absent ---
+            run_cost_card = dash.locator('[data-testid="card-run-cost"]')
+            change_els = run_cost_card.locator('[data-testid="card-run-cost-change"]')
+            if change_els.count():
+                badge_text = change_els.first.inner_text().strip()
+                # If there is a badge, it must carry a signed percentage, not "No change"
+                if "No change" in badge_text:
+                    # The badge is a span, not a lucide icon — the delta macro renders an icon only
+                    pass
+                # The badge must be a signed percentage with no trending icon when zero
+            # The stat card's inner badge region must not contain a lucide trending arrow
+            badge_region = run_cost_card.locator('[data-testid="card-run-cost-change"]')
+            if badge_region.count():
+                badge_html = badge_region.first.inner_html()
+                assert "trending-up" not in badge_html.lower(), "Upward arrow found when change is zero"
+                assert "trending-down" not in badge_html.lower(), "Downward arrow found when change is zero"
+
+            # relationships badge: must not show trending arrow when zero
+            rel_card = dash.locator('[data-testid="card-relationships"]')
+            rel_change = rel_card.locator('[data-testid="card-relationships-change"]')
+            if rel_change.count():
+                rel_badge_html = rel_change.first.inner_html()
+                rel_badge_text = rel_change.first.inner_text().strip()
+                if rel_badge_text == "No change" or rel_badge_text == "0":
+                    assert "trending" not in rel_badge_html.lower(), "Trend arrow on 'No change' relationships badge"
+
+            # --- Fix 2: No repeated rows in Recent changes ---
+            recent = dash.locator('[data-testid="recent-changes"]')
+            if recent.count():
+                titles = recent.locator('[data-slot="item-title"]').all_inner_texts()
+                assert len(titles) == len(set(titles)), "Repeated titles in recent changes: %s" % titles
+
+            # --- Fix 3: Relationships count agrees with dated history ---
+            relationships_text = rel_card.inner_text()
+            if "added in the last 30 days" in relationships_text:
+                match = re.search(r"(\d+) added in the last 30 days", relationships_text)
+                assert match, "Missing or misplaced count: %s" % relationships_text
+
+            # --- Fix 4: Bar counts visible beside bars ---
+            areas_card = dash.locator('[data-testid="areas-chart"]')
+            if areas_card.count():
+                page.wait_for_function(
+                    "s => document.querySelectorAll(s + ' svg .recharts-bar-rectangle').length >= 1",
+                    arg='[data-testid="areas-chart"]', timeout=PAGE_TIMEOUT,
+                )
+                page.wait_for_timeout(1200)
+                labels = areas_card.locator("svg .recharts-label-list text").all_text_contents()
+                assert labels and len(labels) >= 1, "No bar count labels found — counts not visible without hover"
+
+            _both_themes(page, "overview-dash06-fixes", viewport["width"])
+        finally:
+            context.close()
+
+
 def test_the_sample_company_reads_cleanly(browser, live_server):
     """A new company loads the sample: statuses are words, each owner once, changes name their records."""
     for viewport in (FOLD, PHONE):

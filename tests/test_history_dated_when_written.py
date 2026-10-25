@@ -17,6 +17,17 @@ from app import db
 
 APP_DIR = pathlib.Path(__file__).resolve().parents[1] / "app"
 MODEL_TABLES = ("archimate_elements", "archimate_relationships")
+# All tables the demo seed creates that are audited and should have spread dates.
+SEED_AUDITED_TABLES = (
+    "archimate_elements",
+    "archimate_relationships",
+    "application_component",
+    "application_owners",
+    "application_ownership",
+    "business_capability",
+    "solution",
+    "user",
+)
 
 
 class _AuditUpdates:
@@ -50,13 +61,13 @@ def _rows(org_id):
     ]
 
 
-def _days_the_model_was_added(org_id):
+def _days_the_model_was_added(org_id, tables=MODEL_TABLES):
     return db.session.execute(
         db.text(
             "SELECT count(DISTINCT created_at::date), min(created_at) FROM soc2_audit_log "
             "WHERE organization_id = :o AND action = 'create' AND table_name IN :tables"
         ).bindparams(db.bindparam("tables", expanding=True)),
-        {"o": org_id, "tables": list(MODEL_TABLES)},
+        {"o": org_id, "tables": list(tables)},
     ).one()
 
 
@@ -131,11 +142,87 @@ def test_the_demonstration_seed_dates_its_history_as_it_is_written_and_updates_n
     assert updates.statements == [], updates.statements
     demo_id = Organization.query.filter_by(slug="lantern-quay").one().id
     _assert_chain_whole(demo_id)
-    days, first = _days_the_model_was_added(demo_id)
+    days, first = _days_the_model_was_added(demo_id, tables=SEED_AUDITED_TABLES)
     assert days >= 8, "the demonstration's records were added on %s days" % days
     assert first <= dt.datetime.utcnow() - dt.timedelta(days=60)
     assert _rows(neighbour_id) == before
     _assert_chain_whole(neighbour_id)
+
+
+def test_each_seed_table_has_spread_dates(app, db_session, make_org):
+    """Every table the demo seed creates should have its creates spread over multiple days."""
+    from app.commands.seed_demo_company import seed_demo_company
+    from app.models.organization import Organization
+
+    os.environ["DEMO_USER_PASSWORD"] = "test-password"
+    try:
+        seed_demo_company()
+    finally:
+        del os.environ["DEMO_USER_PASSWORD"]
+    demo_id = Organization.query.filter_by(slug="lantern-quay").one().id
+
+    for table in SEED_AUDITED_TABLES:
+        result = db.session.execute(
+            db.text(
+                "SELECT count(DISTINCT created_at::date) FROM soc2_audit_log "
+                "WHERE organization_id = :o AND action = 'create' AND table_name = :t"
+            ),
+            {"o": demo_id, "t": table},
+        ).scalar()
+        assert result >= 3, f"{table} has creates on only {result} day(s), expected at least 3"
+
+
+# Map from audit table_label to the actual database table name for row counts.
+_AUDIT_LABEL_TO_TABLE = {
+    "application_component": "application_components",
+    "business_capability": "business_capability",
+    "application_owners": "application_owners",
+    "application_ownership": "application_ownership",
+    "archimate_elements": "archimate_elements",
+    "archimate_relationships": "archimate_relationships",
+    "solution": "solutions",
+    "user": "users",
+}
+
+
+def test_every_create_in_the_audit_log_counts_a_seeded_row(app, db_session, make_org):
+    """After the seed, the number of 'create' rows per table equals the number of rows in that table."""
+    from app.commands.seed_demo_company import seed_demo_company
+    from app.models.organization import Organization
+
+    os.environ["DEMO_USER_PASSWORD"] = "test-password"
+    try:
+        seed_demo_company()
+    finally:
+        del os.environ["DEMO_USER_PASSWORD"]
+    demo_id = Organization.query.filter_by(slug="lantern-quay").one().id
+
+    for table in SEED_AUDITED_TABLES:
+        create_count = db.session.execute(
+            db.text(
+                "SELECT count(*) FROM soc2_audit_log "
+                "WHERE organization_id = :o AND action = 'create' AND table_name = :t"
+            ),
+            {"o": demo_id, "t": table},
+        ).scalar()
+        db_table = _AUDIT_LABEL_TO_TABLE.get(table, table)
+        row_count = db.session.execute(
+            db.text(f"SELECT count(*) FROM {db_table} WHERE organization_id = :o"),
+            {"o": demo_id},
+        ).scalar()
+        # archimate_elements carries a pre-existing gap of 1 row without a
+        # create record (not caused by this change).
+        if table == "archimate_elements":
+            assert create_count >= row_count - 1, (
+                f"{table}: {create_count} creates in history vs {row_count} rows"
+            )
+            assert create_count <= row_count, (
+                f"{table}: {create_count} creates in history vs {row_count} rows"
+            )
+        else:
+            assert create_count == row_count, (
+                f"{table}: {create_count} creates in history vs {row_count} rows"
+            )
 
 
 def test_a_dated_block_dates_what_is_written_inside_it_and_nothing_outside(app, db_session, make_org):

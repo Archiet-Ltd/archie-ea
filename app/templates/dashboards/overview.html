@@ -80,8 +80,13 @@
     {% if cost.total is not none %}
             {% set cost_sentence = (cost.basis | capitalize ~ '. ' ~ cost.top.name ~ ' is ' ~ cost.top.percent ~ '% of it.') if cost.top else (cost.basis | capitalize ~ '.') %}
       {% if cost.difference %}{% set cost_sentence = cost_sentence ~ ' ' ~ cost.difference %}{% endif %}
-      {% set cost_badge = (('%+d%%' % cost.change) if cost.change else 'No change') if cost.change is not none else none %}
-      {{ stat_card('card-run-cost', 'circle-dollar-sign', 'Annual run cost', cost.total_short, cost_badge, (cost.change <= 0) if cost.change else none, cost_sentence, links.spend, exact=cost.total_exact) }}
+      {% if cost.change is not none and cost.change != 0 %}
+      {% set cost_badge = '%+d%%' % cost.change %}
+      {% elif cost.change is not none and cost.change == 0 %}
+      {% set cost_badge = none %}{% set cost_sentence = cost_sentence ~ ' No change from last month.' %}
+      {% else %}{% set cost_badge = none %}
+      {% endif %}
+      {{ stat_card('card-run-cost', 'circle-dollar-sign', 'Annual run cost', cost.total_short, cost_badge, (cost.change < 0) if cost.change is not none and cost.change != 0 else none, cost_sentence, links.spend, exact=cost.total_exact) }}
     {% else %}
       {{ stat_card('card-run-cost', 'circle-dollar-sign', 'Annual run cost', none, none, none, 'Appears here once a contract states its annual cost.' if not cost.contracts else (cost.contracts ~ (' active contract states' if cost.contracts == 1 else ' active contracts state') ~ ' no annual cost yet.'), links.spend) }}
     {% endif %}
@@ -89,7 +94,7 @@
     {# Relationships #}
     {% if rel.total %}
       {% set rel_sentence = (rel.top.name ~ ' is the most connected, with ' ~ rel.top.count ~ ' relationships.') if rel.top else 'Between the elements of the model.' %}
-      {% set rel_badge = ('+' ~ rel.added_30d) if rel.added_30d else 'No change' %}
+      {% set rel_badge = ('+' ~ rel.added_30d) if rel.added_30d else none %}
       {{ stat_card('card-relationships', 'share-2', 'Relationships', rel.total, rel_badge, none if not rel.added_30d else true, rel_sentence ~ (' ' ~ rel.added_30d ~ ' added in the last 30 days.' if rel.added_30d else ' None were added in the last 30 days.'), links.model) }}
     {% else %}
       {{ stat_card('card-relationships', 'share-2', 'Relationships', none, none, none, 'Appear here once a source is connected and the model links its systems.', links.model) }}
@@ -100,7 +105,7 @@
       {% set n = apps.unowned | length %}
       {% if n %}
         {% set owner_sentence = apps.unowned[0][1] ~ (' has no owner.' if n == 1 else ' and ' ~ (n - 1) ~ (' other have' if n == 2 else ' others have') ~ ' no owner.') %}
-        {% set owner_badge = ('+' ~ apps.unowned_added_30d) if apps.unowned_added_30d else 'No change' %}
+        {% set owner_badge = ('+' ~ apps.unowned_added_30d) if apps.unowned_added_30d else none %}
         {{ stat_card('card-no-owner', 'user-round-x', 'Applications with no owner', n, owner_badge, false if apps.unowned_added_30d else none, owner_sentence ~ (' ' ~ apps.unowned_added_30d ~ ' arrived in the last 30 days.' if apps.unowned_added_30d else ''), links.no_owner) }}
       {% else %}
         {{ stat_card('card-no-owner', 'user-check', 'Every application has an owner', none, none, none, 'All ' ~ apps.total ~ ' applications name someone accountable.', links.applications) }}
