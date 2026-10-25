@@ -1,0 +1,20 @@
+{# Sign-up step 3: what kind of company this is, its industry and the frameworks it works with. All optional. #}
+<div data-signup-steps
+     data-url-choices="{{ url_for('account.welcome_choices') }}"
+     class="space-y-6" data-testid="signup-company">
+    {% call card() %}
+        {% call card_header() %}
+            {% call card_title(class='text-xl') %}About your company{% endcall %}
+            {% call card_description() %}Optional. Your industry picks the starter capability model. You can change all of this later in Settings.{% endcall %}
+        {% endcall %}
+        {% call card_content(class='space-y-6') %}
+            {% include 'account/_company_choices.html' %}
+            <p class="text-sm text-destructive-emphasis" role="status" aria-live="polite" data-say="choices"></p>
+        {% endcall %}
+        {% call card_footer(class='sticky bottom-0 justify-between border-t border-border bg-card') %}
+            {{ button(text='Previous', variant='ghost', icon='arrow-left', href=url_for('account.welcome'), testid='signup-previous') }}
+            {{ button(text='Continue', icon='arrow-right', icon_position='right', testid='signup-continue', attrs_dict={'data-action': 'continue', 'data-next': url_for('account.welcome', step=4)}) }}
+        {% endcall %}
+    {% endcall %}
+</div>
+<script src="{{ url_for('static', filename='js/account/signup_steps.js') }}"></script>

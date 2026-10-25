@@ -98,9 +98,9 @@ PROCUREMENT_PERSONA = "taylor.procurement@lantern-quay.example.com"
 def _role_capture(slug: str, role: str) -> tuple[str, str, str, str, str]:
     article = "an" if role[0] in "AEIOUaeiou" or role.startswith("IT ") else "a"
     return (
-        slug, "/intelligence/ask", DEMO_PERSONA,
-        f"The Ask panel as {article} {role} sees it: the impact question put to Calibration Ledger, with the first row of the answer showing what depends on it.",
-        f"Screenshot of the Ask panel signed in as {article} {role}, with the impact question asked of Calibration Ledger and the first result row displayed.",
+        slug, "/ai-chat/", DEMO_PERSONA,
+        f"The AI chat as {article} {role} sees it: the impact question put to Calibration Ledger, with the first row of the answer showing what depends on it.",
+        f"Screenshot of the AI chat signed in as {article} {role}, with the impact question asked of Calibration Ledger and the first result row displayed.",
     )
 
 

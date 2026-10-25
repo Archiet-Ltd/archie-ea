@@ -1,0 +1,336 @@
+"""What sign-up asks after the account exists: the company's sources, the industry and the
+frameworks it works with, and the AI provider.
+
+Everything is optional and nothing here blocks the person from reaching the dashboard.
+The choices live on the organisation (``Organization.settings["company_context"]``, beside
+the company kind); the website and the consent to read it live under
+``settings["onboarding"]``. Imports run as background jobs and are reported from the job
+queue, so this page and the dashboard read one record of how far each source has got.
+"""
+
+from __future__ import annotations
+
+from datetime import datetime
+from typing import Any, Dict, List, Optional
+from urllib.parse import urlparse
+
+from sqlalchemy.orm.attributes import flag_modified
+
+from app import db
+
+GITHUB_TASK = "onboarding_github_import"
+JIRA_TASK = "onboarding_jira_import"
+
+# (key, label, starter capability model). The model is the one starter set the industry picks
+# later; this round only records the choice.
+INDUSTRIES = (
+    ("banking", "Banking and payments", "BIAN"),
+    ("insurance", "Insurance", "APQC"),
+    ("software", "Software and technology", "APQC"),
+    ("retail", "Retail and consumer goods", "APQC"),
+    ("manufacturing", "Manufacturing", "APQC"),
+    ("healthcare", "Healthcare and life sciences", "APQC"),
+    ("public", "Public sector", "APQC"),
+    ("energy", "Energy and utilities", "APQC"),
+    ("telecom", "Telecommunications", "APQC"),
+    ("other", "Something else", "APQC"),
+)
+
+FRAMEWORKS = (
+    ("iso27001", "ISO 27001", "Information security management"),
+    ("soc2", "SOC 2", "Trust services criteria for service providers"),
+    ("nistcsf", "NIST CSF", "Cybersecurity risk management"),
+    ("gdpr", "GDPR", "Personal data protection in the EU"),
+    ("safe", "SAFe", "Scaled agile delivery"),
+    ("togaf", "TOGAF", "Enterprise architecture method"),
+    ("archimate", "ArchiMate", "Enterprise architecture modelling language"),
+    ("itil4", "ITIL 4", "IT service management"),
+    ("cobit2019", "COBIT 2019", "IT governance"),
+)
+
+KINDS = (("startup", "Startup"), ("scaleup", "Scale-up"), ("enterprise", "Enterprise"))
+
+_KIND_KEYS = {key for key, _label in KINDS}
+_INDUSTRY_KEYS = {key for key, _label, _model in INDUSTRIES}
+_FRAMEWORK_KEYS = {key for key, _label, _note in FRAMEWORKS}
+
+
+def _context(org) -> Dict[str, Any]:
+    return dict((org.settings or {}).get("company_context") or {})
+
+
+def _onboarding(org) -> Dict[str, Any]:
+    return dict((org.settings or {}).get("onboarding") or {})
+
+
+def _write(org, section: str, values: Dict[str, Any]) -> None:
+    settings = dict(org.settings or {})
+    settings[section] = values
+    org.settings = settings
+    flag_modified(org, "settings")
+
+
+def choices(org) -> Dict[str, Any]:
+    """The industry and frameworks the organisation recorded, or nothing."""
+    context = _context(org)
+    return {
+        "kind": context.get("kind"),
+        "industry": context.get("industry"),
+        "frameworks": list(context.get("frameworks") or []),
+    }
+
+
+def settings_card(org) -> Dict[str, Any]:
+    """What Settings shows so the two choices can be changed after sign-up."""
+    return {"kinds": KINDS, "industries": INDUSTRIES, "frameworks": FRAMEWORKS, "chosen": choices(org)}
+
+
+def save_choices(
+    org, industry: Optional[str], frameworks: List[str], kind: Optional[str] = None
+) -> Dict[str, Any]:
+    """Record the company kind, the industry and the frameworks; an unknown value is refused, an empty
+    industry or framework list clears. An empty kind leaves the stored answer as it was."""
+    kind = (kind or "").strip() or None
+    if kind is not None and kind not in _KIND_KEYS:
+        raise ValueError("Choose a company kind from the list.")
+    industry = (industry or "").strip() or None
+    if industry is not None and industry not in _INDUSTRY_KEYS:
+        raise ValueError("Choose an industry from the list.")
+    wanted = [key for key in dict.fromkeys(frameworks or [])]
+    if any(key not in _FRAMEWORK_KEYS for key in wanted):
+        raise ValueError("Choose frameworks from the list.")
+    context = _context(org)
+    if kind is not None:
+        context["kind"] = kind
+    context["industry"] = industry
+    context["frameworks"] = wanted
+    _write(org, "company_context", context)
+    db.session.commit()
+    return choices(org)
+
+
+def normalise_website(raw: Optional[str]) -> Optional[str]:
+    """The company site as an https address, or None when nothing usable was typed."""
+    text = (raw or "").strip()
+    if not text:
+        return None
+    if "://" not in text:
+        text = "https://" + text
+    parts = urlparse(text)
+    host = parts.hostname or ""
+    if parts.scheme not in ("http", "https") or "." not in host or any(c.isspace() for c in text):
+        raise ValueError("Enter your company website, for example acme.com.")
+    return "%s://%s%s" % (parts.scheme, parts.netloc, parts.path.rstrip("/"))
+
+
+def save_website(org, raw: Optional[str], consent: bool, user_id: Optional[int]) -> Optional[str]:
+    """Record the site and the person's consent to read it. The reading itself comes later."""
+    url = normalise_website(raw)
+    if url is None:
+        return None
+    if not consent:
+        raise ValueError("Tick the box to let us read this site.")
+    state = _onboarding(org)
+    state["website"] = {"url": url, "consent_by": user_id, "consent_at": datetime.utcnow().isoformat()}
+    _write(org, "onboarding", state)
+    db.session.commit()
+    return url
+
+
+def mark_finished(org) -> None:
+    state = _onboarding(org)
+    state.setdefault("finished_at", datetime.utcnow().isoformat())
+    _write(org, "onboarding", state)
+    db.session.commit()
+
+
+def skipped_sources(org) -> bool:
+    """True once sign-up is finished and no source was given, so the dashboard can say so."""
+    return is_finished(org) and not any_source_given(org)
+
+
+def is_finished(org) -> bool:
+    return bool(_onboarding(org).get("finished_at"))
+
+
+def on_paying_plan(org) -> bool:
+    """True when the organisation is on a plan other than Community."""
+    from app.services.billing_plans import current_subscription, effective_plan
+
+    return effective_plan(current_subscription(org)).key != "free"
+
+
+# --------------------------------------------------------------------------------------------- #
+# Imports                                                                                        #
+# --------------------------------------------------------------------------------------------- #
+
+
+def run_github_import(org_id: int, connector_id: str, approver_id: int) -> Dict[str, Any]:
+    """Read the repositories, then add what was found to the model.
+
+    The person gave the token themselves, so what the read proposes is approved in the same job:
+    the first answer is about their own systems without a review step in between. Every row keeps
+    the repository and file it came from. Anything that cannot land yet stays pending, as on the
+    connectors page."""
+    from app.connectors import github as gh
+    from app.jobs.tenant_safe_job import tenant_scope
+
+    result = gh.run_first_sync(org_id, connector_id)
+    if not result.get("success"):
+        return result
+    with tenant_scope(org_id):
+        outcome = gh.approve_all_proposals(org_id, approver_id)
+        db.session.commit()
+    result["added"] = outcome["approved"]
+    result["not_added"] = len(outcome["failed"])
+    return result
+
+
+def run_jira_import(org_id: int, connector_id: str) -> Dict[str, Any]:
+    from app.jobs.tenant_safe_job import tenant_scope
+    from app.services.connector_framework import run_connector_sync
+
+    with tenant_scope(org_id):
+        result = run_connector_sync(org_id=org_id, connector_id=connector_id, delegated=True)
+        db.session.commit()
+    return {
+        "success": bool(result.get("success")),
+        "issues": result.get("records_processed", 0),
+        "error": (result.get("error") or result.get("error_message") or None) if not result.get("success") else None,
+    }
+
+
+def connect_jira(org_id: int, instance_url: str, email: str, token: str, approver_id: int) -> str:
+    """Save the Jira connection and queue its import. Returns the connector id."""
+    from app.modules.codegen.services.credential_vault import OrgCredentialVault
+    from app.services.connector_framework import (
+        CONNECTOR_ACTION_CREATE,
+        CONNECTOR_ACTION_UPDATE,
+        ConnectorURLRefused,
+        _load_org_connector,
+        apply_connector_change,
+        validate_connector_url,
+    )
+    from app.services.job_queue_service import get_job_queue_service
+
+    instance_url = (instance_url or "").strip().rstrip("/")
+    email = (email or "").strip()
+    token = (token or "").strip()
+    if not instance_url or not email or not token:
+        raise ValueError("Jira needs the site address, your email and an API token.")
+    try:
+        instance_url = validate_connector_url(instance_url)
+    except ConnectorURLRefused as exc:
+        raise ValueError(str(exc)) from exc
+    existing = _load_org_connector(org_id, connector_type="jira")
+    payload = {
+        "connector_type": "jira",
+        "connector_id": existing.id if existing else None,
+        "name": "Jira",
+        "config": {"instance_url": instance_url, "email": email, "enabled": True},
+        "status": "active",
+        "credential_provided": True,
+    }
+    cfg = apply_connector_change(
+        org_id=org_id,
+        action=CONNECTOR_ACTION_UPDATE if existing else CONNECTOR_ACTION_CREATE,
+        payload=payload,
+        delegated=True,
+    )
+    OrgCredentialVault().store(org_id=org_id, connector_type="jira", credential_type="api_token", value=token)
+    db.session.commit()
+    get_job_queue_service().create_job(
+        "Jira: read issues", JIRA_TASK, {"connector_id": cfg.id}, organization_id=org_id
+    )
+    return cfg.id
+
+
+def _source_state(org_id: int, task: str, label: str, done_text) -> Dict[str, Any]:
+    from app.models.job import JobStatus
+    from app.services.job_queue_service import get_job_queue_service
+
+    jobs = get_job_queue_service().list_jobs(org_id, limit=1, task=task)
+    if not jobs:
+        return {"state": "not_given", "text": "Not connected."}
+    job = jobs[0]
+    result = job.result or {}
+    if job.status == JobStatus.COMPLETED.value and result.get("success") is not False:
+        return {"state": "done", "text": done_text(result)}
+    if job.status in (JobStatus.FAILED.value, JobStatus.CANCELLED.value) or result.get("success") is False:
+        reason = result.get("error") or job.error or "The read did not finish."
+        return {"state": "failed", "text": "%s could not be read: %s" % (label, reason)}
+    if job.status == JobStatus.IN_PROGRESS.value:
+        return {"state": "reading", "text": "Reading %s now. This takes a few minutes; carry on." % label}
+    return {"state": "waiting", "text": "%s is connected. Reading starts in a moment; carry on." % label}
+
+
+def sources(org) -> List[Dict[str, Any]]:
+    """How far each source the person gave has got, one line each, for sign-up and the dashboard."""
+    rows = []
+    github = _source_state(
+        org.id, GITHUB_TASK, "GitHub",
+        lambda r: "Read %s repositories; %s items added to your model." % (r.get("repositories", 0), r.get("added", 0)),
+    )
+    rows.append({"key": "github", "label": "GitHub", **github})
+    jira = _source_state(org.id, JIRA_TASK, "Jira", lambda r: "Read %s issues." % r.get("issues", 0))
+    rows.append({"key": "jira", "label": "Jira", **jira})
+    site = _onboarding(org).get("website")
+    rows.append({
+        "key": "website",
+        "label": "Company website",
+        "state": "waiting" if site else "not_given",
+        "text": "%s will be read soon. Nothing from it is in your model yet." % site["url"] if site else "Not given.",
+    })
+    return rows
+
+
+def any_source_given(org) -> bool:
+    return any(row["state"] != "not_given" for row in sources(org))
+
+
+# --------------------------------------------------------------------------------------------- #
+# The AI provider                                                                                #
+# --------------------------------------------------------------------------------------------- #
+
+PROVIDERS = (("openai", "OpenAI"), ("anthropic", "Anthropic"))
+_KEY_PREFIX = {"openai": ("sk-",), "anthropic": ("sk-ant-",)}
+
+
+def check_key(provider: str, key: str) -> Dict[str, Any]:
+    """Test the key with one small call to the provider the person named."""
+    from app.services.llm_service import test_api_key
+
+    key = (key or "").strip()
+    if provider not in dict(PROVIDERS):
+        return {"success": False, "message": "Choose a provider from the list."}
+    prefixes = _KEY_PREFIX[provider]
+    if not key or not key.startswith(prefixes):
+        return {"success": False, "message": "That does not look like a %s key." % dict(PROVIDERS)[provider]}
+    return test_api_key(provider, key)
+
+
+def save_key(provider: str, key: str, user_id: int) -> None:
+    """Store a tested key for this organisation only, encrypted, and never read back to the page."""
+    from app.models.models import APISettings
+
+    row = APISettings.query.filter_by(provider=provider, key_label="").first()
+    if row is None:
+        row = APISettings(provider=provider, key_label="", api_key=key, enabled=True, updated_by_id=user_id)
+        db.session.add(row)
+    else:
+        row.api_key = key
+        row.enabled = True
+        row.updated_by_id = user_id
+    row.test_status = "success"
+    row.last_tested_at = datetime.utcnow()
+    db.session.commit()
+
+
+def own_key_provider() -> Optional[str]:
+    """The provider this organisation has a working key for, or None when it uses the built-in AI."""
+    from app.models.models import APISettings
+
+    row = APISettings.query.filter(
+        APISettings.provider.in_([p for p, _ in PROVIDERS]), APISettings.enabled.is_(True)
+    ).first()
+    return dict(PROVIDERS).get(row.provider) if row else None

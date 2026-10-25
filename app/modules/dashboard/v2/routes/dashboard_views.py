@@ -481,6 +481,49 @@ def overview():
         logger.warning("ENH-002: lifecycle distribution unavailable: %s", exc)
         db.session.rollback()
 
+    # Records added per day over the last 90 days: applications and model elements,
+    # counted from their created_at (applications) and recorded_at (elements) dates. None when the query fails, so the chart
+    # says it could not be drawn instead of drawing a flat line.
+    activity_series = None
+    activity_undated = 0
+    try:
+        from app.models.archimate_core import ArchiMateElement
+
+        activity_undated = (
+            db.session.query(db.func.count(ArchiMateElement.id))
+            .filter(ArchiMateElement.recorded_at.is_(None))
+            .scalar()
+        ) or 0
+
+        today = _dt.datetime.utcnow().date()
+        first_day = today - _dt.timedelta(days=89)
+        per_day = {}
+        for key, column, model in (
+            ("applications", ApplicationComponent.created_at, ApplicationComponent),
+            ("elements", ArchiMateElement.recorded_at, ArchiMateElement),
+        ):
+            day = db.func.date(column)
+            for when, count in (
+                db.session.query(day, db.func.count(model.id))
+                .filter(column >= first_day)
+                .group_by(day)
+                .all()
+            ):
+                per_day.setdefault(str(when), {})[key] = count
+        activity_series = []
+        for offset in range(90):
+            d = first_day + _dt.timedelta(days=offset)
+            row = per_day.get(d.isoformat(), {})
+            activity_series.append({
+                "date": d.isoformat(),
+                "label": d.strftime("%b ") + str(d.day),
+                "applications": row.get("applications", 0),
+                "elements": row.get("elements", 0),
+            })
+    except Exception as exc:
+        logger.warning("activity series unavailable: %s", exc)
+        db.session.rollback()
+
     # ENH-002: Solution pipeline by ADM phase
     solution_pipeline = []
     try:
@@ -674,11 +717,31 @@ def overview():
         else "data"
     )
 
+    from app.models.organization import Organization
+    from app.modules.account.services import onboarding_service
+
+    # How far each source given at sign-up has got; empty when none was given.
+    org_for_sources = db.session.get(Organization, g.current_org_id) if g.current_org_id else None
+    signup_sources = (
+        [row for row in onboarding_service.sources(org_for_sources) if row["state"] != "not_given"]
+        if org_for_sources is not None else []
+    )
+    given_sources = bool(signup_sources)
+    skipped_sources = org_for_sources is not None and onboarding_service.skipped_sources(org_for_sources)
+
     guided_steps = []
     first_actions = {"connect": False, "sample": False, "import_href": None}
+    if skipped_sources:
+        from app.utils.role_access import may_connect_github as _may_connect
+
+        first_actions["connect"] = _may_connect(current_user, g.current_org_id)
     if dashboard_mode == "guided":
         from app.template_helpers import safe_url_for_with_fallback
-        from app.utils.role_access import can_edit_capabilities
+        from app.utils.role_access import (
+            can_edit_capabilities,
+            may_connect_github,
+            may_load_sample_company,
+        )
 
         # A blueprint that failed to register leaves its step pointing here
         # rather than raising BuildError and taking the dashboard down.
@@ -731,31 +794,13 @@ def overview():
 
         # The sample company is offered once, inside the first card (first_actions), not again as a checklist step
         if not sample_loaded and applications_count == 0:
-            try:
-                _can_load_sample = bool(current_user.enterprise_role in (
-                    "enterprise_architect", "solution_architect", "platform_admin"
-                )) or bool(current_user.is_admin())
-            except Exception:
-                _can_load_sample = False
+            _can_load_sample = may_load_sample_company(current_user)
 
-            first_actions["sample"] = _can_load_sample
+            # Not offered to someone who already gave a source: their own data is on its way.
+            first_actions["sample"] = _can_load_sample and not given_sources
         # Same test the connector pages apply, so the link is only shown to
         # someone it opens for.
-        try:
-            from app.middleware.tenant_decorators import is_platform_admin
-            from app.services.rbac_service import rbac_service
-            from app.utils.role_access import may_use_connections
-
-            first_actions["connect"] = bool(
-                'm365_connector.github_connect' in current_app.view_functions
-                and (
-                    is_platform_admin(current_user)
-                    or rbac_service.is_org_admin(current_user, g.current_org_id)
-                    or may_use_connections(current_user)
-                )
-            )
-        except Exception:
-            first_actions["connect"] = False
+        first_actions["connect"] = may_connect_github(current_user, g.current_org_id)
         first_actions["import_href"] = safe_url_for_with_fallback(
             "unified_applications.application_list", FALLBACK_HREF, **{"import": 1}
         )
@@ -826,6 +871,9 @@ def overview():
 
     return render_template(
         "dashboards/overview.html",
+        signup_sources=signup_sources,
+        skipped_sources=skipped_sources,
+        company_kind_answered=bool(company_kind),
         metrics=metrics,
         nav_stats=nav_stats,
         layer_breakdown=layer_breakdown,
@@ -833,6 +881,8 @@ def overview():
         persona_metrics=persona_metrics,
         capability_health=capability_health,
         lifecycle_distribution=lifecycle_distribution,
+        activity_series=activity_series,
+        activity_undated=activity_undated,
         solution_pipeline=solution_pipeline,
         health_score=health_score,
         health_score_text=format_health_score(health_score),

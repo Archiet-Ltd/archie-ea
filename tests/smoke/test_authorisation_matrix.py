@@ -203,6 +203,14 @@ POLICY = {
         "solution_architect", "enterprise_architect", "business_architect",
         "security_architect", "data_architect",
     },
+    "/data-governance/no-steward": {
+        "solution_architect", "enterprise_architect", "business_architect",
+        "security_architect", "data_architect",
+    },
+    "/data-governance/retention-breaches": {
+        "solution_architect", "enterprise_architect", "business_architect",
+        "security_architect", "data_architect",
+    },
     # CTO scorecard (supported estate, open exceptions, end-of-support
     # exposure): gated on the "governance" section via can_access_section --
     # the same section-based predicate shape as the Interface Register rows
