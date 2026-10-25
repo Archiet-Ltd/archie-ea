@@ -100,7 +100,34 @@ def _norm(text: str) -> str:
 
 
 def names_company(text: str, company: str) -> bool:
-    return bool(_norm(company)) and _norm(company) in _norm(text)
+    """True when the company's name stands in the text as whole words ("Go" is not found in "Google")."""
+    return bool(_norm(company)) and (" %s " % _norm(company)) in (" %s " % _norm(text))
+
+
+_LEGAL_ENDINGS = {"inc", "incorporated", "ltd", "limited", "llc", "llp", "plc", "corp", "corporation", "gmbh", "ag", "bv", "sa", "co"}
+
+
+def name_variants(company: str) -> List[str]:
+    """The name as confirmed, and without a trailing legal ending ("PostHog, Inc." is also "PostHog")."""
+    words = _norm(company).split()
+    variants = [" ".join(words)] if words else []
+    while len(words) > 1 and words[-1] in _LEGAL_ENDINGS:
+        words = words[:-1]
+        variants.append(" ".join(words))
+    return variants
+
+
+def names_domain(text: str, domain: Optional[str]) -> bool:
+    """True when the company's web address (posthog.com, also www. or a subdomain of it) is written in the text."""
+    host = (domain or "").strip().lower()
+    host = host[4:] if host.startswith("www.") else host
+    return bool(host) and re.search(r"(?<![a-z0-9-])%s(?![a-z0-9-])" % re.escape(host), (text or "").lower()) is not None
+
+
+def is_about(title: str, summary: str, company: str, domain: Optional[str] = None) -> bool:
+    """A hit is kept only when its title or summary names the company or its web address."""
+    text = "%s %s" % (title or "", summary or "")
+    return any(names_company(text, v) for v in name_variants(company)) or names_domain(text, domain)
 
 
 def _strip_html(text: str) -> str:
@@ -365,6 +392,7 @@ class Source:
     key_env: Optional[str] = None  # the environment name of the key it needs, if any
     needs_feeds: bool = False  # reads only feeds the organisation listed
     social: bool = False  # feeds the sentiment reading
+    searched: bool = False  # a free-text search: what it returns is kept only where it names the company or its address
 
     @property
     def kind(self) -> str:
@@ -372,15 +400,15 @@ class Source:
 
 
 REGISTRY: List[Source] = [
-    Source("news_api", "NewsAPI", "news", news_api, key_env="NEWSAPI_KEY", social=True),
-    Source("brave_search", "Brave Search", "news", brave_search, key_env="BRAVE_SEARCH_API_KEY", social=True),
+    Source("news_api", "NewsAPI", "news", news_api, key_env="NEWSAPI_KEY", social=True, searched=True),
+    Source("brave_search", "Brave Search", "news", brave_search, key_env="BRAVE_SEARCH_API_KEY", social=True, searched=True),
     Source("sec_edgar", "SEC EDGAR", "regulatory", sec_edgar),
     Source("uspto", "USPTO patents", "patent", uspto),
-    Source("open_alex", "OpenAlex", "academic", open_alex),
-    Source("reddit", "Reddit", "social", reddit, social=True),
-    Source("hackernews", "Hacker News", "social", hackernews, social=True),
-    Source("bluesky", "Bluesky", "social", bluesky, social=True),
-    Source("mastodon", "Mastodon", "social", mastodon, social=True),
+    Source("open_alex", "OpenAlex", "academic", open_alex, searched=True),
+    Source("reddit", "Reddit", "social", reddit, social=True, searched=True),
+    Source("hackernews", "Hacker News", "social", hackernews, social=True, searched=True),
+    Source("bluesky", "Bluesky", "social", bluesky, social=True, searched=True),
+    Source("mastodon", "Mastodon", "social", mastodon, social=True, searched=True),
     Source("rss", "RSS feeds", "news", rss, needs_feeds=True, social=True),
     Source("yahoo_finance", "Yahoo Finance", "market", yahoo_finance),
     Source("alpha_vantage", "Alpha Vantage", "market", alpha_vantage, key_env="ALPHAVANTAGE_API_KEY"),

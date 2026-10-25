@@ -155,7 +155,9 @@ class AccountService:
         _slug = _base_slug
         while Organization.query.filter_by(slug=_slug).first():
             _slug = "{}-{}".format(_base_slug, _uuid.uuid4().hex[:6])
-        org = Organization(name="{}'s Workspace".format(_label), slug=_slug)
+        from app.modules.organization.public_signals import PLACEHOLDER_ENDING
+
+        org = Organization(name="{}{}".format(_label, PLACEHOLDER_ENDING), slug=_slug)
         db.session.add(org)
         db.session.flush()
 

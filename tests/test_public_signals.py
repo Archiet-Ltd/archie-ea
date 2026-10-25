@@ -203,7 +203,7 @@ def _model(prompt):
 
 def _org(db_session, make_org, consent=True, name=COMPANY):
     org = make_org("signals")
-    org.name = "%s %s" % (name, uuid.uuid4().hex[:6]) if name != COMPANY else name
+    org.name = name
     settings = {"onboarding": {"website": {"url": "https://northwind.example"}}}
     if consent:
         settings["onboarding"]["website"]["consent_at"] = "2026-10-01T00:00:00"
@@ -320,3 +320,119 @@ def test_refresh_all_visits_only_organisations_that_agreed(app, db_session, make
     results = service.refresh_all(app, http=FakeHttp(_answers()), llm=_model)
     by_org = {r["organization_id"]: r for r in results}
     assert "stored" in by_org[yes.id] and "not agreed" in by_org[no.id]["refused"]
+
+
+# ----------------------------------------------------------------------------- only the confirmed company is searched, and only hits about it are kept
+
+STAND_IN = "Casey Startup's Workspace"
+
+
+def _confirmed(db_session, make_org, name, site, stand_in=STAND_IN):
+    """An organisation that agreed to be read and confirmed its company name, still called by the stand-in."""
+    org = make_org("confirmed")
+    org.name = stand_in
+    org.settings = {
+        "onboarding": {"website": {"url": site, "consent_at": "2026-10-01T00:00:00"}},
+        "company_profile": {"company_name": {"value": name}},
+    }
+    db_session.commit()
+    return SimpleNamespace(id=org.id)
+
+
+def _stored(org_id, **fields):
+    from app.models.organization_signal import OrganizationSignal
+
+    row = OrganizationSignal(organization_id=org_id, checksum=uuid.uuid4().hex, fetched_at=datetime.utcnow(), **fields)
+    db.session.add(row)
+    db.session.commit()
+    return row.id
+
+
+def _rows(org_id):
+    from app.models.organization_signal import OrganizationSignal
+
+    return OrganizationSignal.query.filter_by(organization_id=org_id).all()
+
+
+def _posthog_answers():
+    answers = _answers()
+    answers["https://hn.algolia.com/"] = {"hits": [
+        {"title": "PostHog opens its roadmap", "objectID": "1", "created_at": "2026-10-10T00:00:00Z"},
+        {"title": "Show HN: a product analytics stack", "story_text": "Self-hosted, built on posthog.com", "objectID": "2", "created_at": "2026-10-11T00:00:00Z"},
+        {"title": "Entrepreneurial passion and venture outcomes", "objectID": "3", "created_at": "2008-03-01T00:00:00Z"},
+        {"title": "Post hog roast recipes", "objectID": "4", "created_at": "2026-10-12T00:00:00Z"},
+    ]}
+    answers["https://api.openalex.org/"] = {"results": [
+        {"id": "https://openalex.org/W9", "display_name": "Neuroprotective Effect of Lithium Chloride in Rat Model of Cardiac Arrest",
+         "publication_date": "2020-01-01", "abstract_inverted_index": {"Rats": [0], "recover": [1]}},
+    ]}
+    for prefix, empty in (("https://www.reddit.com/", {"data": {"children": []}}), ("https://public.api.bsky.app/", {"posts": []}),
+                          ("https://mastodon.social/", {"statuses": []}), ("https://efts.sec.gov/", {"hits": {"hits": []}}),
+                          ("https://developer.uspto.gov/", {"results": []}), ("https://query1.finance.yahoo.com/", {"quotes": []})):
+        answers[prefix] = empty
+    return answers
+
+
+def _no_model(prompt):
+    return json.dumps(load("sentiment"))
+
+
+def test_a_stand_in_name_is_never_searched_and_nothing_is_kept_under_it(db_session, make_org, keys):
+    org = make_org("standin")
+    org.name = STAND_IN
+    org.settings = {"onboarding": {"website": {"url": "https://posthog.com", "consent_at": "2026-10-01T00:00:00"}}}
+    db_session.commit()
+    mine = SimpleNamespace(id=org.id)
+    _stored(mine.id, subject=STAND_IN, source="hackernews", kind="mention", title="Show HN from 2008", summary="")
+    http = FakeHttp(_answers())
+    with pytest.raises(service.SignalsRefused, match="not been confirmed"):
+        service.refresh_organization(mine.id, http=http, llm=_no_model)
+    assert http.calls == []
+    assert _rows(mine.id) == [] and service.signals_for_profile(mine.id) == []
+    assert service.queue_signals_refresh(mine.id) is None  # nothing is queued for it either
+
+
+def test_only_hits_naming_the_company_or_its_address_are_kept_and_the_address_is_searched_too(db_session, make_org, keys):
+    org = _confirmed(db_session, make_org, "PostHog", "https://www.posthog.com/about")
+    http = FakeHttp(_posthog_answers())
+    service.refresh_organization(org.id, http=http, llm=_no_model)
+    titles = {r["title"] for r in service.signals_for_profile(org.id) if r["kind"] != "sentiment"}
+    assert titles == {"PostHog opens its roadmap", "Show HN: a product analytics stack"}  # by name, and by address in the summary
+    searched = {(kw.get("params") or {}).get("query") for url, kw in http.calls if url.startswith("https://hn.algolia.com/")}
+    assert searched == {"PostHog", "posthog.com"}
+    assert not any(STAND_IN in (r.subject or "") for r in _rows(org.id))
+    assert all(r.subject == "PostHog" for r in _rows(org.id))
+
+
+def test_a_paper_that_does_not_name_the_company_is_dropped_and_one_that_does_is_kept(db_session, make_org, keys):
+    org = _confirmed(db_session, make_org, "PostHog, Inc.", "https://posthog.com")
+    answers = _posthog_answers()
+    answers["https://api.openalex.org/"]["results"].append(
+        {"id": "https://openalex.org/W10", "display_name": "Product analytics adoption", "publication_date": "2025-05-01",
+         "abstract_inverted_index": {"PostHog": [0], "usage": [1]}})
+    report = service.refresh_organization(org.id, http=FakeHttp(answers), llm=_no_model)
+    papers = [r["title"] for r in service.signals_for_profile(org.id) if r["kind"] == "research"]
+    assert papers == ["Product analytics adoption"] and report["sources"]["open_alex"]["signals"] == 1
+
+
+def test_the_company_is_found_as_whole_words_only():
+    assert src.is_about("PostHog opens its roadmap", "", "PostHog")
+    assert src.is_about("A note", "docs at blog.posthog.com/launch", "PostHog", "posthog.com")
+    assert not src.is_about("Posthoggery", "", "PostHog")
+    assert not src.is_about("Look at myposthog.com", "", "PostHog", "posthog.com")
+    assert not src.is_about("Rat model of cardiac arrest", "Lithium chloride", "PostHog", "posthog.com")
+
+
+def test_signals_already_kept_under_the_stand_in_or_off_topic_are_removed_for_their_own_organisation_only(db_session, make_org, tenant_ctx, keys):
+    mine = _confirmed(db_session, make_org, "PostHog", "https://posthog.com")
+    theirs = _confirmed(db_session, make_org, "Contoso Haulage", "https://contoso.example", stand_in="Robin Startup's Workspace")
+    for org, stand_in in ((mine, STAND_IN), (theirs, "Robin Startup's Workspace")):
+        _stored(org.id, subject=stand_in, source="hackernews", kind="mention", title="Entrepreneurial passion", summary="")
+    _stored(mine.id, subject="PostHog", source="open_alex", kind="research", title="Lithium chloride in rats", summary="")
+    _stored(mine.id, subject="PostHog", source="hackernews", kind="mention", title="PostHog ships", summary="")
+    service.refresh_organization(mine.id, http=FakeHttp(_answers()), llm=_no_model, force=True)
+    assert {r.title for r in _rows(mine.id) if r.source in ("hackernews", "open_alex")} == {"PostHog ships"}
+    assert [r.title for r in _rows(theirs.id)] == ["Entrepreneurial passion"]  # not theirs to touch
+    with tenant_ctx(theirs.id):
+        assert service.signals_for_profile(theirs.id) == []  # shown under their own name, which has none
+        assert service.signals_for_profile(mine.id) == []  # and never another organisation's

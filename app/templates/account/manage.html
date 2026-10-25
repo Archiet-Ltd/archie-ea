@@ -170,7 +170,7 @@
         {% call card() %}
             {% call card_header() %}
                 {% call card_title() %}Public signals{% endcall %}
-                {% call card_description() %}What the public sources say about {{ current_user.organization.name }}, with where each came from and when. Read once a day{% if sig_state.refreshed_at %}; last read {{ sig_state.refreshed_at.strftime('%d %b %Y') }}{% endif %}.{% endcall %}
+                {% call card_description() %}What the public sources say about {{ company.company_name or current_user.organization.name }}, with where each came from and when. Read once a day{% if sig_state.refreshed_at %}; last read {{ sig_state.refreshed_at.strftime('%d %b %Y') }}{% endif %}.{% endcall %}
             {% endcall %}
             {% call card_content() %}
                 {% if company.signals %}
@@ -191,6 +191,8 @@
                     </tr>
                     {% endfor %}
                 {% endcall %}
+                {% elif not company.company_name %}
+                {{ empty_state(icon='newspaper', title='Confirm your company name first', description='The public sources are searched for the company name you confirm from your website, so nothing has been read yet.', compact=True, class='py-6') }}
                 {% else %}
                 {{ empty_state(icon='newspaper', title='No public signals have been read yet', description='Your company agreed to its public footprint being read. The sources are read once a day, and again when you confirm your profile. Read them now to see the first signals.', cta_text='Read the public sources now', cta_href=url_for('account.signals_refresh'), cta_method='post', compact=True, class='py-6') }}
                 {% endif %}

@@ -113,6 +113,7 @@ def settings_card(org) -> Dict[str, Any]:
     return {
         "kinds": KINDS, "industries": INDUSTRIES, "frameworks": FRAMEWORKS, "chosen": choices(org),
         "profile": confirm.profile_entries(org),
+        "company_name": public_signals.company_name(org),
         "signals": public_signals.signals_for_profile(org.id), "signals_state": public_signals.refresh_state(org),
     }
 

@@ -60,12 +60,34 @@ def consenting(org) -> bool:
     return bool(site.get("consent_at"))
 
 
-def _company_name(org) -> str:
+PLACEHOLDER_ENDING = "'s Workspace"  # what a new organisation is called until its company name is confirmed
+
+
+def is_placeholder_name(name: Optional[str]) -> bool:
+    """True for the stand-in name given at sign-up ("Casey Startup's Workspace"), which names no company."""
+    return str(name or "").strip().endswith(PLACEHOLDER_ENDING)
+
+
+def company_name(org) -> str:
+    """The name the person confirmed; else the organisation's own name; empty while that is still the stand-in."""
     from ..website_crawl.confirm import PROFILE_KEY
 
     held = ((org.settings or {}).get(PROFILE_KEY) or {}).get("company_name")
     value = (held or {}).get("value") if isinstance(held, dict) else None
-    return str(value or org.name or "").strip()
+    named = str(value or "").strip()
+    if named:
+        return named
+    own = str(org.name or "").strip()
+    return "" if is_placeholder_name(own) else own
+
+
+def company_domain(org) -> str:
+    """The company's web address from the site it gave at sign-up (no scheme, no www), or empty."""
+    from urllib.parse import urlparse
+
+    url = (((org.settings or {}).get("onboarding") or {}).get("website") or {}).get("url") or ""
+    host = (urlparse(url if "://" in url else "https://" + url).hostname or "").lower() if url else ""
+    return host[4:] if host.startswith("www.") else host
 
 
 def _context(org) -> Dict[str, Any]:
@@ -115,10 +137,42 @@ def _checksum(source: str, url: Optional[str], title: str, subject: str = "") ->
     return hashlib.sha256(("|".join([source, subject, url or "", title])).encode("utf8")).hexdigest()
 
 
+# ----------------------------------------------------------------------------- tidying
+
+def tidy(org_id: int, org=None) -> int:
+    """Remove what should never have been kept: signals stored under the stand-in name, and, for the confirmed
+    company, hits from a free-text search that name neither the company nor its web address. Returns how many went.
+    The caller commits. Works only on this organisation's rows."""
+    from app.models.organization import Organization
+
+    org = org or db.session.get(Organization, org_id)
+    removed = 0
+    rows = OrganizationSignal.query.filter(OrganizationSignal.organization_id == org_id).all()
+    name, domain = (company_name(org), company_domain(org)) if org is not None else ("", "")
+    searched = {s.key for s in src.REGISTRY if s.searched}
+    for row in rows:
+        gone = is_placeholder_name(row.subject) or (
+            bool(name) and row.subject == name and row.source in searched and not src.is_about(row.title, row.summary, name, domain))
+        if gone:
+            db.session.delete(row)
+            removed += 1
+    return removed
+
+
 # ----------------------------------------------------------------------------- writing
+
+def _relevant(source: src.Source, subject: str, domain: str, items: List[src.Item], is_company: bool) -> List[src.Item]:
+    """What a free-text search gave back, less each hit that names neither the company nor its web address.
+    Only the confirmed company is held to this. Sources that already match on the company's own records are left as they are."""
+    if not source.searched or not is_company:
+        return items
+    return [i for i in items if src.is_about(i.title, i.summary, subject, domain)]
+
 
 def _store(org_id: int, source: src.Source, subject: str, items: List[src.Item], is_company: bool, now: datetime) -> int:
     kept = 0
+    if is_placeholder_name(subject):
+        return 0  # a stand-in name is never searched and nothing is ever kept under it
     for item in items[:MAX_PER_SOURCE]:
         if not item.title:
             continue
@@ -197,15 +251,20 @@ def refresh_organization(
     org = db.session.get(Organization, org_id)
     if org is None:
         raise SignalsRefused("That organisation does not exist.")
+    with tenant_scope(org_id):
+        if tidy(org_id):
+            db.session.commit()
+    org = db.session.get(Organization, org_id)  # the scope detached the row loaded above
     if not consenting(org):
         raise SignalsRefused("The organisation has not agreed to its public footprint being read.")
     mine = dict((org.settings or {}).get(SETTINGS_KEY) or {})
     last = _date(mine.get("refreshed_at"))
     if not force and last and now - last < REFRESH_EVERY:
         raise SignalsRefused("The signals were refreshed %s ago; they are read once a day." % _ago(now - last))
-    name, ctx = _company_name(org), _context(org)
+    name, ctx = company_name(org), _context(org)
     if not name:
-        raise SignalsRefused("The organisation has no company name to search for.")
+        raise SignalsRefused("The company name has not been confirmed yet, so there is nothing to search for.")
+    domain = company_domain(org)
     http = http or src.Http()
     if llm is None:
         from ..website_crawl.service import default_model
@@ -226,6 +285,10 @@ def refresh_organization(
                     continue
                 try:
                     items = source.fetch(http, subject, ctx)
+                    if source.searched and is_company and domain:  # the company's web address is searched as well as its name
+                        seen = {(i.url, i.title) for i in items}
+                        items = items + [i for i in source.fetch(http, domain, ctx) if (i.url, i.title) not in seen]
+                    items = _relevant(source, subject, domain, items, is_company)
                 except src.SourceFailed as exc:
                     failure = "%s %s" % (source.label, exc)
                     break
@@ -294,12 +357,12 @@ SIGNALS_TASK = "company_signals_refresh"
 
 
 def queue_signals_refresh(org_id: int):
-    """Queue the first reading for an organisation that agreed to it; None when it has not."""
+    """Queue the first reading for an organisation that agreed to it and has a company name to search for; None when not."""
     from app.models.organization import Organization
     from app.services.job_queue_service import get_job_queue_service
 
     org = db.session.get(Organization, org_id)
-    if org is None or not consenting(org):
+    if org is None or not consenting(org) or not company_name(org):
         return None
     return get_job_queue_service().create_job("Read the company's public signals", SIGNALS_TASK, {}, organization_id=org_id)
 
@@ -332,10 +395,10 @@ def signals_for_profile(org_id: int, limit: int = 50) -> List[Dict[str, Any]]:
     from app.models.organization import Organization
 
     org = db.session.get(Organization, org_id)
-    name = _company_name(org) if org is not None else None
-    query = OrganizationSignal.query.filter(OrganizationSignal.organization_id == org_id)
-    if name:
-        query = query.filter(OrganizationSignal.subject == name)
+    name = company_name(org) if org is not None else None
+    if not name:
+        return []  # until the company is confirmed there is nothing to show
+    query = OrganizationSignal.query.filter(OrganizationSignal.organization_id == org_id, OrganizationSignal.subject == name)
     rows = query.order_by(db.func.coalesce(OrganizationSignal.published_at, OrganizationSignal.fetched_at).desc()).limit(limit).all()
     return [_row(r) for r in rows]
 
