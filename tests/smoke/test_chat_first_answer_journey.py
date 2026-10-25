@@ -6,6 +6,8 @@ Two journeys:
    yet and offers Connect GitHub.
 """
 
+import re
+
 import pytest
 from playwright.sync_api import expect
 
@@ -17,21 +19,13 @@ pytestmark = [pytest.mark.smoke, pytest.mark.journey]
 
 
 def _load_sample_company(page, base):
-    """Click the sample-company button on the first screen after sign-up."""
-    page.goto(base + "/dashboard", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
-    # The sample-company offer appears on the dashboard for an empty org.
-    sample = page.get_by_role("button", name="Sample")
-    if sample.count() and sample.first.is_visible():
-        sample.first.click()
-        page.wait_for_timeout(3000)
-        return True
-    # It may also appear as a link.
-    sample_link = page.get_by_role("link", name="Sample")
-    if sample_link.count() and sample_link.first.is_visible():
-        sample_link.first.click()
-        page.wait_for_timeout(3000)
-        return True
-    return False
+    """Click "See a sample company" on the chat's first screen, as a new sign-up does."""
+    open_chat(page, base)
+    sample = page.get_by_test_id("chat-first-sample")
+    expect(sample.first).to_be_visible(timeout=PAGE_TIMEOUT)
+    sample.first.click()
+    page.wait_for_load_state("domcontentloaded", timeout=PAGE_TIMEOUT)
+    return True
 
 
 def _dismiss_role_dialog(page):
@@ -63,6 +57,33 @@ def test_sample_company_cited_answer_appears(page, live_server):
     catalogue = page.locator("[data-catalogue-cards]")
     expect(answer.or_(catalogue).first).to_be_visible(timeout=PAGE_TIMEOUT)
 
+    # The answer text must not contain "nothing recorded matches" — superlative
+    # phrases name no system, so the reason line must not say nothing matches.
+    answer_text = page.locator("#messages-container").inner_text().lower()
+    assert "nothing recorded matches" not in answer_text, \
+        "answer incorrectly says nothing matches: %s" % answer_text[:200]
+
+    # Every row is a system that says how many things depend on it and where
+    # it came from, so the reader can see why it is a single point of failure.
+    rows = page.locator("[data-catalogue-record]")
+    expect(rows.first).to_be_visible(timeout=PAGE_TIMEOUT)
+    assert rows.count() > 0
+    for i in range(rows.count()):
+        row = rows.nth(i)
+        name = row.locator("a").first.inner_text().strip()
+        count = row.locator("[data-catalogue-count]")
+        assert count.count() == 1, "row %r shows no dependents count" % name
+        assert re.match(r"^\d+ things? depends? on it$", count.inner_text().strip()), count.inner_text()
+        source = row.locator("[data-catalogue-source]")
+        assert source.count() == 1, "row %r names no source" % name
+        assert re.match(r"^(from .+, as of \d{1,2} \w{3} \d{4}|added by hand on \d{1,2} \w{3} \d{4})$",
+                        source.inner_text().strip()), source.inner_text()
+        for process in ("Track customer orders", "Handle customer checkout", "Process online payments", "Fulfil customer order"):
+            assert name != process, "a process is listed as a system: %s" % name
+    counts = [int(re.match(r"\d+", rows.nth(i).locator("[data-catalogue-count]").inner_text()).group())
+              for i in range(rows.count())]
+    assert counts == sorted(counts, reverse=True), "rows are not ordered by dependents: %s" % counts
+
     # The answer must cite at least one record — a link that opens a detail page.
     record_link = page.locator("[data-catalogue-record] a, [data-answer-row] a").first
     expect(record_link).to_be_visible(timeout=PAGE_TIMEOUT)
@@ -77,7 +98,7 @@ def test_sample_company_cited_answer_appears(page, live_server):
     record_link.click()
     page.wait_for_load_state("domcontentloaded", timeout=PAGE_TIMEOUT)
     # The detail page should show the element/application name in a heading.
-    heading = page.locator("h1, h2, [data-element-name], [data-application-name]").first
+    heading = page.locator("main h1:visible, main [data-element-name]:visible, main [data-application-name]:visible").first
     expect(heading).to_be_visible(timeout=PAGE_TIMEOUT)
     heading_text = heading.inner_text().strip()
     assert heading_text, "detail page heading is empty"
@@ -85,12 +106,6 @@ def test_sample_company_cited_answer_appears(page, live_server):
     page_text = page.locator("body").inner_text().lower()
     assert "no data" not in page_text, "detail page shows empty state: %s" % page_text[:200]
     assert "nothing recorded" not in page_text, "detail page shows nothing recorded: %s" % page_text[:200]
-
-    # The answer text must not contain "nothing recorded matches" — superlative
-    # phrases name no system, so the reason line must not say nothing matches.
-    answer_text = page.locator("#messages-container").inner_text().lower()
-    assert "nothing recorded matches" not in answer_text, \
-        "answer incorrectly says nothing matches: %s" % answer_text[:200]
 
 
 def test_no_sample_company_gets_honest_empty_answer(page, live_server):
