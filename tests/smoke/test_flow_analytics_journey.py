@@ -27,6 +27,30 @@ pytestmark = [pytest.mark.smoke, pytest.mark.journey]
 
 PERSONA = "enterprise_architect"
 
+DRAWN_BARS_JS = """() => {
+    const out = {};
+    for (const id of ['cycleTimeChart', 'throughputChart']) {
+        const chart = window.Chart && Chart.getChart(id);
+        if (!chart) { out[id] = {points: 0, painted: 0}; continue; }
+        const values = chart.data.datasets[0].data;
+        const bars = chart.getDatasetMeta(0).data;
+        const ratio = chart.currentDevicePixelRatio || 1;
+        let points = 0, painted = 0;
+        values.forEach((v, i) => {
+            if (!(v > 0)) return;
+            points += 1;
+            const bar = bars[i];
+            if (!bar) return;
+            const x = Math.round(bar.x * ratio);
+            const y = Math.round(((bar.y + bar.base) / 2) * ratio);
+            const px = chart.ctx.getImageData(x, y, 1, 1).data;
+            if (px[3] > 0) painted += 1;
+        });
+        out[id] = {points: points, painted: painted};
+    }
+    return out;
+}"""
+
 
 def _assert_persona(email):
     """The signed-in user is the enterprise architect, not an administrator."""
@@ -69,6 +93,7 @@ def _seed_board_with_cards(org_id, user_id, suffix):
         now = datetime.datetime.utcnow()
         # Completed cards (generates cycle time + throughput + lead time data)
         for i in range(5):
+            created = now - datetime.timedelta(days=24 + i)
             started = now - datetime.timedelta(days=20 + i)
             completed = now - datetime.timedelta(days=7 + i)
             db.session.add(KanbanCard(
@@ -79,7 +104,7 @@ def _seed_board_with_cards(org_id, user_id, suffix):
                 card_type="requirement",
                 status="done",
                 created_by_id=user_id,
-                created_at=started,
+                created_at=created,
                 started_at=started,
                 completed_at=completed,
                 organization_id=org_id,
@@ -166,6 +191,8 @@ def test_flow_analytics_journey(browser, live_server):
     context = browser.new_context(ignore_https_errors=True, viewport={"width": 1440, "height": 1000})
     context.add_init_script("localStorage.setItem('archie_onboarding_ts', Date.now().toString());")
     page = context.new_page()
+    page_errors = []
+    page.on("pageerror", lambda e: page_errors.append(str(e)))
     try:
         sign_in(page, live_server, email)
 
@@ -197,20 +224,27 @@ def test_flow_analytics_journey(browser, live_server):
 
         # 6. The page has rendered data (not empty state) — metric values are shown
         # These assertions implicitly wait for Alpine to finish loading data
+        # Seed: 13 days in progress after 4 days queued, so cycle 13d,
+        # lead 17d, flow efficiency 13 / 17 = 76.5%, 5 cards in one week.
         expect(page.get_by_text("13d").first).to_be_visible()
-        expect(page.get_by_text("5").first).to_be_visible()
-        expect(page.get_by_text("100%").first).to_be_visible()
+        expect(page.get_by_text("17d").first).to_be_visible()
+        expect(page.get_by_text("5", exact=True).first).to_be_visible()
+        expect(page.get_by_text("76.5%").first).to_be_visible()
 
         # 7. The throughput chart has data points (non-zero values)
         # Check after data is rendered via Chart.js instance
-        throughput_has_data = page.evaluate("""() => {
-            const chart = Chart.getChart('throughputChart');
-            if (!chart) return false;
-            const ds = chart.data.datasets;
-            if (!ds || ds.length === 0) return false;
-            return ds[0].data.some(v => v > 0);
-        }""")
-        assert throughput_has_data, "Throughput chart must have data points (non-zero completed cards)"
+        # Each chart must hold the seeded points AND have painted its bars:
+        # sample the canvas at the centre of every non-zero bar and require
+        # a non-transparent pixel there.
+        page.wait_for_timeout(1500)  # let the bar animation finish
+        drawn = page.evaluate(DRAWN_BARS_JS)
+        assert drawn["cycleTimeChart"]["points"] == 5, drawn
+        assert drawn["cycleTimeChart"]["painted"] == 5, \
+            "Cycle time chart must draw 5 bars: %s" % drawn
+        assert drawn["throughputChart"]["points"] >= 1, drawn
+        assert drawn["throughputChart"]["painted"] == drawn["throughputChart"]["points"], \
+            "Throughput chart must draw its bars: %s" % drawn
+        assert not page_errors, "Page raised errors: %s" % page_errors
 
         # 8. The WIP snapshot table renders with column headers
         expect(page.locator("text=WIP Snapshot").first).to_be_visible()
@@ -234,6 +268,9 @@ def test_flow_analytics_journey(browser, live_server):
         wip_heading = page.get_by_role("heading").filter(has_text="WIP Snapshot").first
         expect(wip_heading).to_be_visible()
         expect(wip_heading).to_contain_text("total: 3")
+        # The column is named for a person, not the stored status value
+        expect(page.get_by_role("cell", name="In progress", exact=True)).to_be_visible()
+        expect(page.get_by_text("in_progress")).to_have_count(0)
 
         # 13. Save screenshots if WALK_DIR is set
         walk_dir = os.environ.get("WALK_DIR")

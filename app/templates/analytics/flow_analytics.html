@@ -17,8 +17,7 @@
 <meta name="shadcn-nearest" content="dashboard-01">
 
 <div class="space-y-6"
-     x-data="flowAnalytics({{ selected_board_id or 'null' }})"
-     x-init="init()">
+     x-data="flowAnalytics({{ selected_board_id or 'null' }})">
 
     {% macro _ps_actions() %}
     {% if boards %}
@@ -151,7 +150,7 @@
                                     <template x-for="col in wipData.columns" :key="col.column">
                                         {% call table_row() %}
                                             {% call table_cell() %}
-                                                <span x-text="col.column.replace('_',' ')"></span>
+                                                <span x-text="columnLabel(col.column)"></span>
                                             {% endcall %}
                                             {% call table_cell(class='text-right font-semibold') %}
                                                 <span x-text="col.card_count"></span>
@@ -173,6 +172,14 @@
 <script src="/static/vendor/chart.umd.min.js"></script>
 <script>
 function flowAnalytics(initialBoardId) {
+    // Chart instances live outside Alpine's reactive state: a proxied
+    // Chart.js instance loses its canvas context mid-draw.
+    const charts = { cycle: null, throughput: null };
+    let loadSeq = 0;
+    function destroyCharts() {
+        if (charts.cycle) { charts.cycle.destroy(); charts.cycle = null; }
+        if (charts.throughput) { charts.throughput.destroy(); charts.throughput = null; }
+    }
     return {
         boardId: initialBoardId ? String(initialBoardId) : null,
         cycleData: null,
@@ -199,9 +206,12 @@ function flowAnalytics(initialBoardId) {
             if (!lead) return 0;
             return Math.round((cycle / lead) * 100 * 10) / 10;
         },
-        _cycleChart: null,
-        _throughputChart: null,
+        columnLabel(status) {
+            const text = String(status || '').replace(/_/g, ' ');
+            return text.charAt(0).toUpperCase() + text.slice(1);
+        },
 
+        // Alpine calls init() itself; it must not also be called from x-init.
         async init() {
             if (this.boardId) await this.loadAll();
         },
@@ -222,6 +232,7 @@ function flowAnalytics(initialBoardId) {
 
         async loadAll() {
             if (!this.boardId) return;
+            const seq = ++loadSeq;
             this.loading = true;
             this.loadError = null;
             try {
@@ -231,6 +242,7 @@ function flowAnalytics(initialBoardId) {
                     this._leg('/api/analytics/lead-time?board_id=' + this.boardId + '&days=90', 'lead time'),
                     this._leg('/api/analytics/wip?board_id=' + this.boardId, 'WIP'),
                 ]);
+                if (seq !== loadSeq) return;  // a newer load superseded this one
                 this.cycleData = cycle;
                 this.throughputData = throughput;
                 this.leadData = lead;
@@ -238,16 +250,16 @@ function flowAnalytics(initialBoardId) {
                 await this.$nextTick();
                 this._renderCharts();
             } catch (e) {
+                if (seq !== loadSeq) return;
                 this.cycleData = null;
                 this.throughputData = null;
                 this.leadData = null;
                 this.wipData = null;
-                if (this._cycleChart) { this._cycleChart.destroy(); this._cycleChart = null; }
-                if (this._throughputChart) { this._throughputChart.destroy(); this._throughputChart = null; }
+                destroyCharts();
                 this.loadError = e.message || 'Flow metrics could not be loaded.';
                 Platform.toast.error(this.loadError);
             } finally {
-                this.loading = false;
+                if (seq === loadSeq) this.loading = false;
             }
         },
 
@@ -259,11 +271,11 @@ function flowAnalytics(initialBoardId) {
         _renderCycleChart() {
             const ctx = document.getElementById('cycleTimeChart');
             if (!ctx || !this.cycleData) return;
-            if (this._cycleChart) this._cycleChart.destroy();
+            if (charts.cycle) charts.cycle.destroy();
             const tokens = window.ArchieColorTokens;
             const labels = this.cycleData.data_points.map(d => d.card_title.substring(0, 20));
             const values = this.cycleData.data_points.map(d => d.cycle_days);
-            this._cycleChart = new Chart(ctx, {
+            charts.cycle = new Chart(ctx, {
                 type: 'bar',
                 data: {
                     labels,
@@ -286,11 +298,11 @@ function flowAnalytics(initialBoardId) {
         _renderThroughputChart() {
             const ctx = document.getElementById('throughputChart');
             if (!ctx || !this.throughputData) return;
-            if (this._throughputChart) this._throughputChart.destroy();
+            if (charts.throughput) charts.throughput.destroy();
             const tokens = window.ArchieColorTokens;
             const labels = this.throughputData.periods.map(p => p.label);
             const values = this.throughputData.periods.map(p => p.completed);
-            this._throughputChart = new Chart(ctx, {
+            charts.throughput = new Chart(ctx, {
                 type: 'bar',
                 data: {
                     labels,
