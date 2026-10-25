@@ -47,9 +47,13 @@ import pytest
 
 from app.services.public_pages import (
     IMG_MODULES_DIR,
+    IMG_ROLES_DIR,
     IMG_USE_CASES_DIR,
     MODULE_CAPTURE_PENDING,
     MODULE_CAPTURES,
+    ROLE_CAPTURES,
+    ROLE_FRAME_LABELS,
+    ROLE_MORE_SCREENS,
     USE_CASE_SCREENSHOT_CAPTURES,
     USE_CASE_SCREENSHOT_PENDING,
     USE_CASE_VIDEO_CAPTURES,
@@ -476,3 +480,122 @@ def test_get_page_recording_returns_none_for_an_unrecorded_use_case():
         front_matter={"capture_status": "live"},
     )
     assert get_page_recording(page) is None
+
+
+# ── role screenshots: registry in sync with content ──────────────────────
+
+
+def test_role_capture_registry_matches_every_live_role_content_file():
+    """Every role page marked capture_status: live is in ROLE_CAPTURES with
+    a path, persona, caption and alt text — never missing one."""
+    live_slugs = {
+        p.slug
+        for p in load_all_pages()
+        if p.family == "role" and p.front_matter.get("capture_status") == "live"
+    }
+    registry_slugs = {entry[0] for entry in ROLE_CAPTURES}
+
+    assert live_slugs == registry_slugs, (
+        f"live role(s) missing from ROLE_CAPTURES: {live_slugs - registry_slugs}; "
+        f"ROLE_CAPTURES names slug(s) not live: {registry_slugs - live_slugs}"
+    )
+
+
+def test_role_captures_have_capture_date_in_caption():
+    """Every role capture caption includes the capture date per R29.5."""
+    import re as _re
+    from datetime import date, timedelta, datetime
+
+    for slug, _path, _persona, caption, _alt in ROLE_CAPTURES:
+        assert "Captured" in caption, f"{slug}: caption missing 'Captured' date marker"
+        date_match = _re.search(r"Captured (\d{1,2} \w+ \d{4})", caption)
+        assert date_match, f"{slug}: could not extract capture date from caption"
+        parsed = datetime.strptime(date_match.group(1), "%d %b %Y").date()
+        assert date.today() - timedelta(days=31) <= parsed <= date.today(), (
+            f"{slug}: capture date {parsed} is more than 31 days from today"
+        )
+
+
+def test_module_captures_have_capture_date_in_caption():
+    """Every module capture caption includes the capture date per R29.5."""
+    import re as _re
+    from datetime import date, timedelta, datetime
+
+    for slug, _path, _persona, caption, _alt in MODULE_CAPTURES:
+        assert "Captured" in caption, f"{slug}: caption missing 'Captured' date marker"
+        date_match = _re.search(r"Captured (\d{1,2} \w+ \d{4})", caption)
+        assert date_match, f"{slug}: could not extract capture date from caption"
+        parsed = datetime.strptime(date_match.group(1), "%d %b %Y").date()
+        assert date.today() - timedelta(days=31) <= parsed <= date.today(), (
+            f"{slug}: capture date {parsed} is more than 31 days from today"
+        )
+
+
+def test_role_more_screens_have_capture_date_in_caption():
+    """Every ROLE_MORE_SCREENS entry includes a capture date in its caption."""
+    for _slug, screens in ROLE_MORE_SCREENS.items():
+        for _rel, _density, _label, caption, _alt in screens:
+            assert "Captured" in caption, f"{_slug}: more-screens caption missing 'Captured' date marker"
+
+
+def test_get_role_screenshot_returns_none_for_non_live_capture_status():
+    page = PublicPage(
+        family="role",
+        slug="enterprise-architects",
+        url="/roles/enterprise-architects",
+        title="Enterprise Architects",
+        body_html="",
+        front_matter={"capture_status": "awaiting_capture"},
+    )
+    assert get_page_screenshot(page) is None
+
+
+def test_get_role_screenshot_returns_none_when_no_file_exists():
+    page = PublicPage(
+        family="role",
+        slug="this-role-does-not-exist",
+        url="/roles/this-role-does-not-exist",
+        title="Not Real",
+        body_html="",
+        front_matter={"capture_status": "live"},
+    )
+    assert get_page_screenshot(page) is None
+
+
+def test_every_live_role_page_renders_its_hero_screenshot(app):
+    """Each live role page with a captured image renders a hero screenshot
+    in the browser frame, with the caption and alt text from the registry.
+    Role pages whose captured image does not exist on disk yet skip the
+    hero figure check — the registry entry registers the intended target,
+    and the capture is a separate step."""
+    from app.services.public_pages import MERGED_PAGES, IMG_ROLES_DIR
+
+    with app.test_client() as client:
+        for slug, _path, _persona, caption, alt in ROLE_CAPTURES:
+            if f"/roles/{slug}" in MERGED_PAGES:
+                continue
+            rv = client.get(f"/roles/{slug}")
+            assert rv.status_code == 200, f"/roles/{slug} returned {rv.status_code}"
+            page_html = html.unescape(rv.data.decode())
+            image_path = IMG_ROLES_DIR / f"{slug}.webp"
+            if not image_path.is_file():
+                # No captured image on disk — the hero figure is correctly absent
+                continue
+            assert 'data-testid="landing-hero-figure"' in page_html, (
+                f"{slug}: no hero figure rendered"
+            )
+            assert caption in page_html, f"{slug}: caption text missing from page"
+            assert f'alt="{alt}"' in page_html, f"{slug}: alt text missing or does not match"
+
+
+def test_role_more_screens_rendered_for_live_role_pages(app):
+    """Every live role page with ROLE_MORE_SCREENS entries renders them
+    as figure elements with captions and alt text."""
+    with app.test_client() as client:
+        for slug, screens in ROLE_MORE_SCREENS.items():
+            rv = client.get(f"/roles/{slug}")
+            assert rv.status_code == 200, f"/roles/{slug} returned {rv.status_code}"
+            page_html = html.unescape(rv.data.decode())
+            for _rel, _density, _label, caption, alt in screens:
+                assert caption in page_html, f"{slug}: more-screens caption {caption!r} not found"
+                assert f'alt="{alt}"' in page_html, f"{slug}: more-screens alt text not found for {_rel}"
