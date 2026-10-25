@@ -576,6 +576,59 @@ if (window.__ALPINE_ARCH_LOADED__) {
          * SOLUTION LIST COMPARE
          * --------------------------------------------------------------------- */
 
+        /* -----------------------------------------------------------------------
+         * NEW SOLUTION DIALOG (Slice S2)
+         * --------------------------------------------------------------------- */
+
+        Alpine.data('newSolutionDialog', function () {
+            return {
+                form: { name: '', problem: '', link: '' },
+                creating: false,
+                error: '',
+                create() {
+                    if (!this.form.name.trim() || !this.form.problem.trim()) {
+                        this.error = 'Name and the problem in one sentence are both required.';
+                        return;
+                    }
+                    this.creating = true;
+                    this.error = '';
+                    const meta = document.querySelector('meta[name="csrf-token"]');
+                    const headers = { 'Content-Type': 'application/json', 'Accept': 'application/json' };
+                    if (meta) headers['X-CSRFToken'] = meta.content;
+                    fetch('/architecture/api/solutions', {
+                        method: 'POST',
+                        credentials: 'same-origin',
+                        headers: headers,
+                        body: JSON.stringify({
+                            name: this.form.name.trim(),
+                            description: this.form.problem.trim(),
+                            scope_description: this.form.link.trim() || null
+                        })
+                    }).then((resp) => {
+                        if (!resp.ok) {
+                            return resp.json().catch(() => ({})).then((body) => {
+                                this.error = body.error || 'Could not create the solution.';
+                                this.creating = false;
+                            });
+                        }
+                        return resp.json().then((data) => {
+                            window.location.assign('/solutions/' + data.id);
+                        });
+                    }).catch(() => {
+                        this.error = 'Could not create the solution.';
+                        this.creating = false;
+                    });
+                },
+                reset() {
+                    this.form.name = '';
+                    this.form.problem = '';
+                    this.form.link = '';
+                    this.error = '';
+                    this.creating = false;
+                }
+            };
+        });
+
         Alpine.data('solutionListCompare', function () {
             return Object.assign({}, _asyncMixin(), _tableMixin(), {
                 apiUrl: '/enterprise/api/solutions',
