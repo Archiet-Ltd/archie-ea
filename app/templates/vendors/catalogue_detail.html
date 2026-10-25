@@ -1,5 +1,6 @@
 {# design-block: record-detail #}
 {% extends 'layouts/admin_base.html' %}
+{% from 'macros/page_shell.html' import page_shell %}
 {% from "components/card.html" import card, card_header, card_title, card_description, card_content %}
 {% from "components/table.html" import table, table_header, table_body, table_head %}
 {% from "components/badge.html" import badge %}
@@ -19,18 +20,11 @@
 
 {% block content %}
 <div class="space-y-6" data-testid="catalogue-product" data-slug="{{ product.catalogue_slug }}">
-  <nav aria-label="Breadcrumb">
-    <ol class="flex flex-wrap items-center gap-1.5 text-sm text-muted-foreground">
-      <li class="flex items-center gap-1.5"><a href="{{ url_for('main.index') }}" class="hover:text-foreground transition-colors">Home</a><i data-lucide="chevron-right" class="w-3.5 h-3.5 shrink-0" aria-hidden="true"></i></li>
-      <li class="flex items-center gap-1.5"><a href="{{ url_for('unified_applications.vendors') }}" class="hover:text-foreground transition-colors">Vendors</a><i data-lucide="chevron-right" class="w-3.5 h-3.5 shrink-0" aria-hidden="true"></i></li>
-      <li class="flex items-center gap-1.5"><a href="{{ url_for('unified_applications.vendor_catalogue') }}" class="hover:text-foreground transition-colors">Catalogue</a><i data-lucide="chevron-right" class="w-3.5 h-3.5 shrink-0" aria-hidden="true"></i></li>
-      <li class="flex items-center gap-1.5" aria-current="page"><span class="text-foreground font-medium">{{ product.product_name }}</span></li>
-    </ol>
-  </nav>
-  <div>
-    <h1 class="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">{{ product.product_name }}</h1>
-    {% if grouped.summary %}<p class="mt-1 text-sm text-muted-foreground">{{ grouped.summary[0].detail }}</p>{% endif %}
-  </div>
+  {{ page_shell(
+      title=product.product_name,
+      subtitle=(grouped.summary[0].detail if grouped.summary else None),
+      breadcrumb=[('Home', url_for('main.index')), ('Vendors', url_for('unified_applications.vendors')), ('Catalogue', url_for('unified_applications.vendor_catalogue')), (product.product_name, None)]
+  ) }}
 
   {{ vendor_tabs('catalogue') }}
 
