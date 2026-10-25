@@ -599,6 +599,67 @@ class DataEntity(TenantMixin, db.Model):
         return ensure_archimate_element(self)
 
 
+ERD_CARDINALITIES = ("exactly_one", "zero_or_one", "one_or_many", "zero_or_many")
+
+
+class DataEntityAttribute(TenantMixin, db.Model):
+    """A named, typed attribute of a data entity: one row of its logical model."""
+
+    __tablename__ = "data_entity_attributes"
+
+    id = db.Column(db.Integer, primary_key=True)
+    entity_id = db.Column(
+        db.Integer, db.ForeignKey("data_entities.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    name = db.Column(db.String(200), nullable=False)
+    data_type = db.Column(db.String(60), nullable=True)
+    is_primary_key = db.Column(db.Boolean, nullable=False, default=False)
+    is_foreign_key = db.Column(db.Boolean, nullable=False, default=False)
+    is_nullable = db.Column(db.Boolean, nullable=False, default=True)
+    position = db.Column(db.Integer, nullable=False, default=0)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    entity = db.relationship(
+        "DataEntity",
+        backref=db.backref(
+            "attributes",
+            order_by="DataEntityAttribute.position",
+            cascade="all, delete-orphan",
+            passive_deletes=True,
+        ),
+    )
+
+
+class DataEntityRelationship(TenantMixin, db.Model):
+    """A relationship between two data entities with a cardinality at each end."""
+
+    __tablename__ = "data_entity_relationships"
+
+    id = db.Column(db.Integer, primary_key=True)
+    source_entity_id = db.Column(
+        db.Integer, db.ForeignKey("data_entities.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    target_entity_id = db.Column(
+        db.Integer, db.ForeignKey("data_entities.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    label = db.Column(db.String(200), nullable=True)
+    # How many records of each end take part: the source end and the target end.
+    source_cardinality = db.Column(db.String(20), nullable=False, default="exactly_one")
+    target_cardinality = db.Column(db.String(20), nullable=False, default="zero_or_many")
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    source_entity = db.relationship(
+        "DataEntity",
+        foreign_keys=[source_entity_id],
+        backref=db.backref("outgoing_relationships", cascade="all, delete-orphan", passive_deletes=True),
+    )
+    target_entity = db.relationship(
+        "DataEntity",
+        foreign_keys=[target_entity_id],
+        backref=db.backref("incoming_relationships", cascade="all, delete-orphan", passive_deletes=True),
+    )
+
+
 # DataEntity's ArchiMate element is now created by the shared
 # flush listener in app/services/archimate_backbone.py, which is also the
 # writer used by app/commands/backfill_domain_elements.py. The raw-insert
