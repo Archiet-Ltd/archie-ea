@@ -312,7 +312,8 @@ class TestBothPagesRenderEmpty:
             if zone["empty_reason"] == "canvas_box_not_derived":
                 assert "Composed from the other sections" in reason.get_text()
             else:
-                assert "Nothing here yet" in reason.get_text()
+                text = " ".join(reason.get_text().split())
+                assert text == f"{zone['label']} is empty. Write it in the box below."
 
         unclassified = soup.find(attrs={"data-testid": "canvas-unclassified"})
         assert unclassified is not None

@@ -208,14 +208,13 @@
             <div class="bg-card rounded-lg border border-border p-6">
                 <h3 class="text-lg font-bold mb-3">Budget</h3>
                 <p class="text-2xl font-bold text-primary">
-                    £{{ "{:,.0f}".format(problem.budget_min) if problem.budget_min else 'N/A' }} -
-                    £{{ "{:,.0f}".format(problem.budget_max) if problem.budget_max else 'N/A' }}
+                    {% if problem.budget_min or problem.budget_max %}{{ "£{:,.0f}".format(problem.budget_min) if problem.budget_min else 'No minimum set' }} – {{ "£{:,.0f}".format(problem.budget_max) if problem.budget_max else 'no maximum set' }}{% else %}No budget set{% endif %}
                 </p>
             </div>
             <div class="bg-card rounded-lg border border-border p-6">
                 <h3 class="text-lg font-bold mb-3">Timeline</h3>
                 <p class="text-2xl font-bold text-primary">
-                    {{ problem.timeline_months or 'N/A' }} months
+                    {% if problem.timeline_months %}{{ problem.timeline_months }} months{% else %}No timeline set{% endif %}
                 </p>
             </div>
         </div>
@@ -559,7 +558,7 @@
                                     <div class="flex items-center justify-between text-xs mb-1">
                                         <span class="font-medium text-muted-foreground">Confidence</span>
                                         <span class="font-bold"
-                                              x-text="rec.confidence ? (rec.confidence * 100).toFixed(0) + '%' : 'N/A'"></span>
+                                              x-text="rec.confidence ? (rec.confidence * 100).toFixed(0) + '%' : 'Not rated'"></span>
                                     </div>
                                     <div class="w-full bg-muted rounded-full h-2">
                                         <div class="h-2 rounded-full transition-all duration-300"
