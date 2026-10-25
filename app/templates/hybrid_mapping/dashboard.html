@@ -288,9 +288,15 @@
                             <p class="text-sm text-muted-foreground">{{ mapping.archimate_element_name }}</p>
                             <p class="text-xs text-muted-foreground">{{ mapping.archimate_type }} ({{ mapping.archimate_layer }})</p>
                         </div>
+                        {% if mapping.mapping_strength is not none %}
                         <span class="px-2 py-1 bg-primary/10 text-info-emphasis text-xs rounded-full">
                             {{ mapping.mapping_strength }}/5
                         </span>
+                        {% else %}
+                        <span class="px-2 py-1 bg-muted text-muted-foreground text-xs rounded-full">
+                            Not recorded
+                        </span>
+                        {% endif %}
                     </div>
                 </div>
                 {% endfor %}

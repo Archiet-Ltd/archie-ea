@@ -6,10 +6,12 @@
 
 {% block title %}Gap Analysis{% endblock %}
 
+{% macro _gap_actions() %}
+    {{ button(text='Identify Gap', variant='default', icon='plus') }}
+{% endmacro %}
+
 {% macro status_label(status) %}
     {{ (status|default('identified', true))|replace('_', ' ')|title }}
-{% endmacro %}
-{{ button(text='Identify Gap', variant='default', icon='plus') }}
 {% endmacro %}
 
 {% block content %}

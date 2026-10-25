@@ -126,15 +126,21 @@
                                 {% else %}{{ cap.name|default('N/A') }}{% endif %}
                             </td>
                             <td class="p-3">
+                                {% if cap.strategic_importance is not none %}
                                 <span class="px-2 py-1 text-xs rounded-full
                                     {% if cap.strategic_importance == 'critical' %}bg-destructive/20 text-destructive-emphasis
                                     {% elif cap.strategic_importance == 'high' %}bg-warning/20 text-warning-emphasis
                                     {% else %}bg-muted text-muted-foreground{% endif %}">
-                                    {{ cap.strategic_importance|default('Normal')|title }}
+                                    {{ cap.strategic_importance|title }}
                                 </span>
+                                {% else %}
+                                <span class="px-2 py-1 text-xs rounded-full bg-muted text-muted-foreground">
+                                    Not recorded
+                                </span>
+                                {% endif %}
                             </td>
-                            <td class="p-3">{{ cap.current_maturity_level|default(1) }}</td>
-                            <td class="p-3">{{ cap.target_maturity_level|default(3) }}</td>
+                            <td class="p-3">{{ cap.current_maturity_level|default(1, true) }}</td>
+                            <td class="p-3">{{ cap.target_maturity_level|default(3, true) }}</td>
                         </tr>
                         {% else %}
                         <tr>
