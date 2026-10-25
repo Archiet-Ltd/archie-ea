@@ -947,14 +947,17 @@ def test_demo_old_blanket_total_is_corrected_on_rerun(app, db_session, make_org)
     db_session.flush()
     again = _seed_once()
     assert again["application_figures_agreed"] == 20
+    from app.commands.seed_demo_company import _app_figures
+
     apps = ApplicationComponent.query.filter_by(organization_id=org_id).all()
-    assert {a.total_cost_of_ownership for a in apps} == {42000}
+    assert {a.name: a.total_cost_of_ownership for a in apps} == {a.name: _app_figures(a.name)[2] for a in apps}
+    assert len({a.total_cost_of_ownership for a in apps}) > 5, "each application has its own cost"
     totals = {
         float(f.amount)
         for f in CostFact.query.filter_by(
             organization_id=org_id, element_type="application", category="total")
     }
-    assert totals == {42000.0}
+    assert totals == {float(_app_figures(a.name)[2]) for a in apps}
 
 
 def test_demo_seed_gives_a_second_organisation_nothing(app, db_session, make_org):

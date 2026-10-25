@@ -453,6 +453,33 @@ def metamodel_element_types():
     return sorted(_TYPE_LAYER)
 
 
+_LAYER_ORDER = ("strategy", "business", "application", "technology", "physical", "motivation", "implementation")
+
+
+def element_type_name(element_type):
+    """The plain name a person reads for a stored element type key."""
+    from app.models.archimate_element_types import plain_name_for
+
+    return plain_name_for(normalise_element_type(element_type))
+
+
+def grouped_element_types():
+    """Element types for a picker: ``[(layer name, [(stored key, plain name), ...]), ...]``.
+
+    The stored key is unchanged; only the label is plain. Layers follow the
+    ArchiMate order and names within a layer are alphabetical.
+    """
+    from app.models.archimate_element_types import plain_layer_name
+    from app.services.archimate_validity_service import _TYPE_LAYER
+
+    by_layer = {}
+    for key in metamodel_element_types():
+        by_layer.setdefault(_TYPE_LAYER[key], []).append((key, element_type_name(key)))
+    ordered = [layer for layer in _LAYER_ORDER if layer in by_layer]
+    ordered += sorted(layer for layer in by_layer if layer not in _LAYER_ORDER)
+    return [(plain_layer_name(layer), sorted(by_layer[layer], key=lambda item: item[1])) for layer in ordered]
+
+
 def normalise_element_type(element_type):
     """``application_component`` and ``ApplicationComponent`` name one type."""
     from app.services.archimate_validity_service import _normalize_type
@@ -677,6 +704,18 @@ class GovernedPropertyService:
         organisation's own elements are read (the explicit predicate keeps this
         correct outside a request as well).
         """
+        return [
+            {"id": item["id"], "name": item["name"], "type": item["type"]}
+            for item in self._typed_elements(template, organization_id)
+            if not item["has_value"]
+        ]
+
+    def usage_count(self, template, organization_id):
+        """How many of this organisation's elements carry a value for the definition."""
+        return sum(1 for item in self._typed_elements(template, organization_id) if item["has_value"])
+
+    def _typed_elements(self, template, organization_id):
+        """The organisation's live elements of the definition's type, each with ``has_value``."""
         from app import db
         from app.models import ArchiMateElement
 
@@ -700,8 +739,12 @@ class GovernedPropertyService:
             )
             .order_by(ArchiMateElement.name, ArchiMateElement.id)
         ).all()
-        missing = []
-        for element_id, name, element_type, props in rows:
-            if is_empty_value((props or {}).get(template.property_key)):
-                missing.append({"id": element_id, "name": name, "type": element_type})
-        return missing
+        return [
+            {
+                "id": element_id,
+                "name": name,
+                "type": element_type,
+                "has_value": not is_empty_value((props or {}).get(template.property_key)),
+            }
+            for element_id, name, element_type, props in rows
+        ]
