@@ -60,6 +60,10 @@ def seed_overview_org(label, apps, contracts, with_owner_user=True, spread=True,
                 if spec.get("owner_record"):
                     db.session.add(ApplicationOwner(user_id=ea_id, application_id=row.id, organization_id=org_id,
                                                     ownership_type="primary"))
+                    # the same person recorded again in another role, as the sample company records its owner
+                    for kind in spec.get("also_owns_as", ()):
+                        db.session.add(ApplicationOwner(user_id=ea_id, application_id=row.id, organization_id=org_id,
+                                                        ownership_type=kind))
                 made.append(row)
             db.session.commit()
             elements = [ArchiMateElement.query.get(r.archimate_element_id) for r in made if r.archimate_element_id]
