@@ -42,7 +42,7 @@ time, rather than a slide rebuilt by hand before each board meeting.
 
 ## The screens you will use
 
-- **Ask**, the same plain-language question screen every role starts from, for a quick check before
+- **The AI chat**, the one place every role asks in plain words, for a quick check before
   you open a dashboard.
 - **The CTO scorecard and the health scorecard**, together giving the share of your applications
   still on a supported vendor version, the oldest open architecture exceptions to escalate, and one
@@ -110,7 +110,7 @@ is sold by contract, from $24,000 a year, and adds SAML single sign-on and unlim
 
 ### Can the board see the numbers without a paid seat?
 
-Yes. Anyone who only reads a dashboard or asks a question on the Ask screen is free, on every plan
+Yes. Anyone who only reads a dashboard or asks a question in the AI chat is free, on every plan
 including Enterprise. An editor seat is only needed to change the model itself: updating a roadmap,
 recording a rationalisation decision, or taking a case through the review board.
 
@@ -130,7 +130,7 @@ renewals, plus a read-out call to walk your team through what it found.
 
 ### Do I need to learn ArchiMate to use the CIO dashboard?
 
-No. The CTO and CIO workspace is built around dashboards you read and a plain-language Ask screen,
+No. The CTO and CIO workspace is built around dashboards you read and a plain-language AI chat,
 not a modelling canvas. Architects on your team keep working in ArchiMate underneath; you see the
 scorecards, the consolidation list and the roadmap it produces, not the notation behind it.
 

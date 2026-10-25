@@ -375,6 +375,13 @@ def init_cli(app):
         app.logger.warning(f"Failed to register capability tenancy cutover CLI: {e}")
 
     try:
+        from app.commands.backfill_capability_types import init_app as init_capability_types
+
+        init_capability_types(app)
+    except Exception as e:
+        app.logger.warning(f"Failed to register capability type backfill CLI: {e}")
+
+    try:
         from app.commands.project_capabilities import init_app as init_capability_projection
         init_capability_projection(app)
         app.logger.info("Capability projection CLI command registered")

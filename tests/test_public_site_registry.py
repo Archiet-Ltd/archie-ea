@@ -17,10 +17,12 @@ from app.services.site_registry import items_needing_own_page, raw_registry, sit
 PRODUCT_ITEMS = [
     ("Ask anything", "AI chat", "Ask questions about your model in plain words and read the answer in chat."),
     ("Ask anything", "Twin map", "Pick a system and see the applications and services that depend on it."),
+    ("Ask anything", "Every answer shows its sources", "Open the records behind each answer to check it before you rely on it."),
     ("Ask anything", "Connect your AI assistant", "Connect an AI assistant you already use to your organisation's model."),
     ("Map your business", "Business capability map", ""),
     ("Map your business", "Value streams", "Draw value streams with their stages and map each stage to capabilities."),
     ("Map your business", "Business model canvas", "Create a business model canvas and export it."),
+    ("Know what you run", "Build your model from your tools", "Connect GitHub or Jira at sign-up and start your model from them."),
     ("Know what you run", "Application inventory", "Keep a list of your applications and record the details of each."),
     ("Know what you run", "Architecture model", "Import an ArchiMate file and browse the elements and links it brings in."),
     ("Know what you run", "Diagrams", "Draw architecture diagrams from the elements in your model."),
@@ -35,9 +37,8 @@ PRODUCT_ITEMS = [
     ("Approvals", "AI approval queue", "Review changes an AI assistant proposes, then approve or reject each."),
 ]
 PRODUCT_SOON = [
-    ("Build your model from your tools", "Coming soon: start your model from the tools you already use."),
     ("Scenarios", "Coming soon: compare what-if plans side by side before you commit."),
-    ("Every answer shows its sources", "Coming soon: see the records behind each figure in an answer."),
+    ("Software and tool discovery", "Coming soon: discover the software and tools you actually pay for and use."),
 ]
 SOLUTIONS = [
     ("Application rationalisation", "Find overlapping applications and decide which to keep, consolidate or retire."),
@@ -163,14 +164,12 @@ def test_navbar_renders_every_menu_item_from_the_registry(home_html):
 
 def test_navbar_and_footer_agree_on_every_label(home_html):
     """Every navbar item is in the footer, under the same label. The Roles menu lists
-    roles by family: the footer links the families and the roles hub, which lists
-    every role (checked in test_roles_hub_lists_every_role)."""
+    role pages; the footer links the role families and the roles hub, which lists
+    every role page (checked in test_roles_hub_lists_every_role_page)."""
     nav = _links(home_html, "header")
     foot = _links(home_html, "footer")
-    foot_labels = {text.removesuffix(" Coming soon") for _, text in foot}
-    role_labels = set()
-    with_registry = site_registry_labels_for_roles()
-    role_labels |= with_registry
+    foot_labels = {text for _, text in foot}
+    role_labels = {r.get("card_title", r["label"]) for f in raw_registry()["roles"]["families"] for r in f["roles"]}
     top_level = {"Product", "Solutions", "Roles", "Compare", "Resources", "Pricing"}
     own = {"Sign in", "Talk to us", "Start free", "All features"}
     missing = []
@@ -178,41 +177,53 @@ def test_navbar_and_footer_agree_on_every_label(home_html):
         text = text.strip()
         if not text or text in top_level or text in own or text in role_labels:
             continue
-        if text.startswith("+ "):  # "+ 3 more" opens the family on the roles hub
-            continue
         if text not in foot_labels:
             missing.append(text)
     assert not missing, f"navbar items missing from the footer: {missing}"
-    # and a footer label never differs from the navbar label for the same page
     nav_by_href = {}
     for href, text in nav:
         nav_by_href.setdefault(href, set()).add(text.strip())
     for href, text in foot:
-        label = text.removesuffix(" Coming soon")
-        if href in nav_by_href and label not in nav_by_href[href] and href not in ("/contact", "/pricing", "/features#coming-soon"):
-            if not any(label.startswith(n) or n.startswith(label) for n in nav_by_href[href]):
-                pytest.fail(f"{href}: footer says {label!r}, navbar says {sorted(nav_by_href[href])}")
+        if href in nav_by_href and text not in nav_by_href[href] and href not in ("/contact", "/pricing", "/features#coming-soon"):
+            if not any(text.startswith(n) or n.startswith(text) for n in nav_by_href[href]):
+                pytest.fail(f"{href}: footer says {text!r}, navbar says {sorted(nav_by_href[href])}")
 
 
-def site_registry_labels_for_roles():
-    raw = raw_registry()
-    return {r["label"] for f in raw["roles"]["families"] for r in f["roles"]}
-
-
-def test_roles_hub_lists_every_role_and_every_menu_role_link_lands_on_it(app):
+def test_roles_hub_lists_every_role_page_and_every_menu_role_link_lands_on_it(app):
+    """Cards only for roles that have a page, startup roles first; the menu lists
+    only those pages; no plain-text role name that goes nowhere."""
     with app.test_client() as client:
         html = client.get("/roles").data.decode()
         raw = raw_registry()
-        assert "All 47 roles" in html
-        for family in raw["roles"]["families"]:
-            assert f'id="{family["id"]}"' in html, f"roles hub has no place for {family['label']}"
-            for role in family["roles"]:
-                assert role["label"] in html, f"roles hub does not list {role['label']}"
+        cards = re.findall(r'<a href="([^"]+)"[^>]*data-role-card', html)
+        paged = {r["href"] for f in raw["roles"]["families"] for r in f["roles"] if r.get("href")}
+        assert set(cards) == paged
+        assert cards[0] == "/roles/startup-founder"
+        assert "<h1" in html and "Entelim for your role" in html
+        without_page = [r["label"] for f in raw["roles"]["families"] for r in f["roles"] if not r.get("href")]
+        for label in without_page:
+            assert label not in html, f"{label} has no page and must not be listed"
         nav = _links(client.get("/").data.decode(), "header")
-        anchors = [href for href, _ in nav if href.startswith("/roles#")]
-        assert anchors, "the Roles menu links nowhere on the hub"
-        for href in anchors:
+        role_links = [href for href, _ in nav if href.startswith("/roles/")]
+        assert set(role_links) == paged
+        families = [href for href, _ in nav if href.startswith("/roles#")]
+        assert families
+        for href in families:
             assert f'id="{href.split("#", 1)[1]}"' in html, f"{href} does not exist on the roles hub"
+        for href in paged:
+            assert client.get(href).status_code == 200
+
+
+def test_the_footer_is_one_set_of_columns_with_coming_soon_in_one_group(home_html):
+    foot = _slice(home_html, "footer")
+    columns = re.findall(r'data-footer-column="([^"]+)"', foot)
+    assert columns == ["product", "solutions", "roles", "compare", "resources", "company", "legal", "coming-soon"]
+    assert "Ask anything" not in foot
+    soon = foot[foot.index('data-footer-column="coming-soon"'):]
+    assert "Scenarios" in soon and "Software and tool discovery" in soon
+    for live in ("Build your model from your tools", "Every answer shows its sources"):
+        assert live not in soon
+        assert live in foot
 
 
 def test_every_navbar_and_footer_link_answers_200_with_a_heading(app, home_html):
@@ -263,11 +274,9 @@ def test_coming_soon_items_point_at_a_waiting_list_and_are_never_in_a_plan(app):
             assert not any(n.get("@type") == "SoftwareApplication" and n.get("name") == item["label"] for n in nodes)
             assert item["label"].lower() not in plan_text
         # the pricing page's own content never lists them
-        # The plan cards and comparison table. The page's dated roadmap band ("What every plan
-        # gains as the platform grows") is existing copy that still names Scenarios; it is
-        # reported to the content owner, not asserted here.
+        # The whole pricing page, including any dated band, never lists them.
         pricing_main = re.sub(r"<footer.*?</footer>", "", _slice(client.get("/pricing").data.decode(), "main"), flags=re.DOTALL)
-        pricing_main = re.sub(r'<section[^>]*data-testid="pricing-grow".*?</section>', "", pricing_main, flags=re.DOTALL)
+        assert "pricing-grow" not in pricing_main
         for item in soon:
             assert item["label"] not in pricing_main
 
@@ -281,7 +290,7 @@ def test_the_pages_that_still_need_their_own_page_are_recorded(app):
         assert w["shown_on"].startswith("/")
 
 
-def test_signed_in_visitor_sees_an_account_menu_not_sign_up(app, db_session, make_org, login_as):
+def test_signed_in_visitor_sees_open_entelim_and_the_account_menu_goes_home(app, db_session, make_org, login_as):
     from app.models.user import User
 
     org = make_org("nav")
@@ -294,7 +303,12 @@ def test_signed_in_visitor_sees_an_account_menu_not_sign_up(app, db_session, mak
         html = client.get("/pricing").data.decode()
     header = _slice(html, "header")
     assert 'aria-label="Account menu"' in header
-    assert "Start free" not in header
+    assert "Start free" not in header and "Sign in" not in header
+    assert "Open Entelim" in header
+    links = dict((text, href) for href, text in _links(html, "header"))
+    assert links["Open Entelim"] == "/dashboard/overview"
+    assert links["Dashboard"] == links["Open Entelim"]
+    assert "/admin" not in links["Dashboard"]
     assert "Log out" in header
 
 

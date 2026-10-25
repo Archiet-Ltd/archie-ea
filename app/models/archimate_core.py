@@ -551,6 +551,9 @@ class SavedDiagramElement(db.Model):
     width = db.Column(db.Float, default=180)
     height = db.Column(db.Float, default=64)
     rendering_mode = db.Column(db.String(50), default="black_box")
+    # The box of a framework canvas this element sits in on this view. The box belongs to the view,
+    # not to the element, so one element can sit in a different box on another canvas.
+    canvas_box = db.Column(db.String(64), nullable=True)
 
 
 class SavedDiagramRelationship(db.Model):

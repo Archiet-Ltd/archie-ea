@@ -1,120 +1,136 @@
+{# design-block: record-detail #}
 {% extends "layouts/admin_base.html" %}
 {% from 'components/page_header.html' import page_header %}
+{% from 'components/empty_state.html' import empty_state %}
+{% from 'components/badge.html' import badge %}
+{% from 'components/button.html' import button %}
+{% from 'components/tabs.html' import tabs, tabs_list, tabs_trigger, tabs_content %}
 
-{% block title %}{{ framework.industry_name }} - Industry APQC{% endblock %}
+{% block title %}{{ framework.industry_name }} Process Framework{% endblock %}
+
+{# One node of the hierarchy. Categories and process groups open to show what
+   is inside them; a process with nothing below it is a plain row. #}
+{% macro pcf_node(node) %}
+{% if node.children %}
+<li>
+    <details data-pcf-node="{{ node.code }}" class="group">
+        <summary class="flex cursor-pointer list-none items-baseline gap-3 rounded-md px-2 py-1.5 hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+            <i data-lucide="chevron-right" class="h-4 w-4 shrink-0 self-center text-muted-foreground transition-transform group-open:rotate-90" aria-hidden="true"></i>
+            <span class="w-14 shrink-0 font-mono text-sm tabular-nums text-muted-foreground">{{ node.code }}</span>
+            <span class="{{ 'font-semibold' if node.level == 1 else 'font-medium' }}">{{ node.name }}</span>
+            <span class="ml-auto shrink-0 pl-3 text-xs text-muted-foreground">{{ node.children|length }}</span>
+        </summary>
+        <ul class="ml-6 border-l border-border pl-2">
+            {% for child in node.children %}{{ pcf_node(child) }}{% endfor %}
+        </ul>
+    </details>
+</li>
+{% else %}
+<li data-pcf-node="{{ node.code }}" class="flex items-baseline gap-3 px-2 py-1.5">
+    <span class="w-4 shrink-0" aria-hidden="true"></span>
+    <span class="w-14 shrink-0 font-mono text-sm tabular-nums text-muted-foreground">{{ node.code }}</span>
+    <span>{{ node.name }}</span>
+    {% if node.specific %}{% call badge('info', class='ml-2 shrink-0') %}Industry specific{% endcall %}{% endif %}
+</li>
+{% endif %}
+{% endmacro %}
 
 {% block content %}
 <div class="space-y-6">
-    <!-- Page Header -->
-    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
-        <div>
-            {{ page_header(title=framework.industry_name, breadcrumbs=[{'label': 'Home', 'href': '/'}, {'label': 'Industry APQC', 'href': url_for('industry_apqc.industry_apqc_dashboard')}, {'label': framework.industry_name}]) }}
-            <p class="text-muted-foreground mt-2">{{ framework.description or 'Industry-specific APQC process framework' }}</p>
-        </div>
-    </div>
+    {{ page_header(
+        title=framework.industry_name,
+        description=framework.description,
+        breadcrumbs=[
+            {'label': 'Dashboard', 'href': url_for('main.index')},
+            {'label': 'Industry Process Frameworks', 'href': url_for('industry_apqc.industry_apqc_dashboard')},
+            {'label': framework.industry_name}
+        ]
+    ) }}
 
-    <!-- Statistics Cards -->
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-8">
-        <div class="rounded-xl border-2 border-input bg-background p-5">
-            <p class="text-sm font-medium text-muted-foreground">Total Processes</p>
-            <p class="text-2xl font-bold tracking-tight mt-1">{{ stats.total_processes or 0 }}</p>
-        </div>
-        <div class="rounded-xl border-2 border-input bg-background p-5">
-            <p class="text-sm font-medium text-muted-foreground">Industry Unique</p>
-            <p class="text-2xl font-bold tracking-tight mt-1">{{ stats.unique_processes or 0 }}</p>
-        </div>
-        <div class="rounded-xl border-2 border-input bg-background p-5">
-            <p class="text-sm font-medium text-muted-foreground">Regulatory</p>
-            <p class="text-2xl font-bold tracking-tight mt-1">{{ stats.regulatory_processes or 0 }}</p>
-        </div>
-        <div class="rounded-xl border-2 border-input bg-background p-5">
-            <p class="text-sm font-medium text-muted-foreground">Maturity Target</p>
-            <p class="text-2xl font-bold tracking-tight mt-1">{{ stats.digital_maturity_typical or 3 }}/5</p>
-        </div>
-    </div>
+    <dl class="flex flex-wrap gap-x-8 gap-y-2 text-sm">
+        <div><dt class="text-muted-foreground">Categories</dt><dd class="text-lg font-semibold tabular-nums">{{ summary.categories }}</dd></div>
+        <div><dt class="text-muted-foreground">Processes</dt><dd class="text-lg font-semibold tabular-nums">{{ summary.total }}</dd></div>
+        <div><dt class="text-muted-foreground">Industry specific</dt><dd class="text-lg font-semibold tabular-nums">{{ summary.specific if summary.specific else "None, baseline" }}</dd></div>
+        {% if framework.pcf_version %}<div><dt class="text-muted-foreground">PCF version</dt><dd class="text-lg font-semibold">{{ framework.pcf_version }}</dd></div>{% endif %}
+    </dl>
 
-    <!-- Framework Details -->
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-        <div class="lg:col-span-2 rounded-xl border-2 border-input bg-background p-6">
-            <h2 class="text-xl font-semibold mb-4">Processes by Category</h2>
-            {% if stats.processes_by_category %}
-            <div class="space-y-3">
-                {% for category, count in stats.processes_by_category.items() %}
-                <div class="flex items-center justify-between p-3 rounded-lg bg-muted/50">
-                    <span class="font-medium">{{ category }}</span>
-                    <span class="text-sm text-muted-foreground">{{ count }} processes</span>
-                </div>
-                {% endfor %}
-            </div>
+    {% call tabs(default_value=tab) %}
+        {% call tabs_list() %}
+            {% call tabs_trigger('hierarchy') %}Hierarchy{% endcall %}
+            {% call tabs_trigger('recommendations') %}Recommendations{% endcall %}
+        {% endcall %}
+
+        {% call tabs_content('hierarchy') %}
+        <div class="overflow-x-auto rounded-lg border bg-card p-2" data-pcf-tree>
+            {% if tree %}
+            <ul class="min-w-max">
+                {% for node in tree %}{{ pcf_node(node) }}{% endfor %}
+            </ul>
             {% else %}
-            <p class="text-muted-foreground">No processes mapped yet.</p>
+            {{ empty_state(icon='workflow', title='This framework has no processes loaded', description='Ask a platform administrator to check the installation.') }}
             {% endif %}
         </div>
+        {% endcall %}
 
-        <div class="rounded-xl border-2 border-input bg-background p-6">
-            <h2 class="text-xl font-semibold mb-4">Framework Info</h2>
-            <dl class="space-y-3">
-                <div>
-                    <dt class="text-sm text-muted-foreground">PCF Version</dt>
-                    <dd class="font-medium">{{ framework.pcf_version or 'Not specified' }}</dd>
-                </div>
-                <div>
-                    <dt class="text-sm text-muted-foreground">Regulatory Intensity</dt>
-                    <dd class="font-medium">{{ stats.regulatory_intensity or 'Medium' }}</dd>
-                </div>
-                <div>
-                    <dt class="text-sm text-muted-foreground">Process Complexity</dt>
-                    <dd class="font-medium">{{ stats.process_complexity or 'Moderate' }}</dd>
-                </div>
-                <div>
-                    <dt class="text-sm text-muted-foreground">Status</dt>
-                    <dd>
-                        <span class="inline-flex items-center rounded-full px-2 py-1 text-xs font-medium
-                            {% if framework.is_active %}bg-success/10 text-success-emphasis{% else %}bg-muted text-foreground/80{% endif %}">
-                            {{ 'Active' if framework.is_active else 'Inactive' }}
-                        </span>
-                    </dd>
-                </div>
-            </dl>
-        </div>
-    </div>
+        {% call tabs_content('recommendations') %}
+        <div class="space-y-6" data-recommendations
+             x-data="{ adopted: {{ recommended|selectattr('adopted')|map(attribute='process.id')|list|tojson }}, busy: null,
+                       async adopt(id) {
+                           this.busy = id;
+                           try {
+                               await Platform.fetch.post('{{ url_for('industry_apqc.api_adopt_process', industry_code=framework.industry_code, process_id=0) }}'.replace('/processes/0/', '/processes/' + id + '/'), null, { silent: true });
+                               this.adopted.push(id);
+                               Platform.toast.success('Added to your capability model');
+                           } catch (error) {
+                               Platform.toast.error('Could not add it: ' + error.message);
+                           } finally { this.busy = null; }
+                       } }">
+            <div>
+                <h2 class="text-lg font-semibold">Processes particular to {{ framework.industry_name }}</h2>
+                <p class="text-sm text-muted-foreground">Adopt a process to add it to your capability model.</p>
+            </div>
+            {% if recommended %}
+            <ul class="divide-y rounded-lg border bg-card">
+                {% for item in recommended %}
+                {% set p = item.process %}
+                <li class="flex flex-wrap items-center gap-3 px-4 py-3" data-recommended-process="{{ p.id }}">
+                    <div class="min-w-0 flex-1">
+                        <p class="font-medium">{{ p.industry_process_name }}</p>
+                        <p class="text-sm text-muted-foreground">{{ item.category }}</p>
+                    </div>
+                    <span x-show="adopted.includes({{ p.id }})" x-cloak class="flex items-center gap-3 text-sm">
+                        {% call badge('success') %}In your capability model{% endcall %}
+                        <a class="font-medium text-primary hover:underline" href="{{ url_for('capability_map.hierarchy') }}">Open the capability model</a>
+                    </span>
+                    <span x-show="!adopted.includes({{ p.id }})">
+                        <button type="button" @click="adopt({{ p.id }})" :disabled="busy === {{ p.id }}"
+                                aria-label="Adopt {{ p.industry_process_name }}"
+                                class="inline-flex h-9 items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary px-4 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50">Adopt</button>
+                    </span>
+                </li>
+                {% endfor %}
+            </ul>
+            {% else %}
+            {{ empty_state(icon='lightbulb', title='No processes are particular to this framework', description='The cross-industry framework is the baseline every other framework builds on. Adopt processes from an industry framework, or browse the hierarchy.') }}
+            {% endif %}
 
-    <!-- Process Lists -->
-    {% if processes %}
-    <div class="rounded-xl border-2 border-input bg-background p-6 mb-6">
-        <h2 class="text-xl font-semibold mb-4">All Processes ({{ processes|length }})</h2>
-        <div class="overflow-x-auto">
-            <table class="dense-table w-full">
-                <thead>
-                    <tr class="border-b">
-                        <th class="text-left py-3 px-4 font-medium text-muted-foreground">Code</th>
-                        <th class="text-left py-3 px-4 font-medium text-muted-foreground">Name</th>
-                        <th class="text-left py-3 px-4 font-medium text-muted-foreground">Category</th>
-                        <th class="text-center py-3 px-4 font-medium text-muted-foreground">Status</th>
-                    </tr>
-                </thead>
-                <tbody class="divide-y">{# actionable-rows-ok: APQC reference processes shipped with the industry framework. Read-only
-                     source data -- adopt them into your own model with the import action
-                     above, which creates editable records. #}
-                    {% for process in processes[:20] %}
-                    <tr class="border-b hover:bg-muted/50">
-                        <td class="py-3 px-4 font-mono text-sm">{{ process.industry_process_code }}</td>
-                        <td class="py-3 px-4">{{ process.industry_process_name }}</td>
-                        <td class="py-3 px-4 text-muted-foreground">{{ process.industry_category_1 or '-' }}</td>
-                        <td class="text-center py-3 px-4">
-                            <span class="inline-flex items-center rounded-full px-2 py-1 text-xs font-medium bg-success/10 text-success-emphasis">
-                                Active
-                            </span>
-                        </td>
-                    </tr>
+            {% if pending %}
+            <div>
+                <h2 class="text-lg font-semibold">From your maturity assessments</h2>
+                <ul class="mt-2 divide-y rounded-lg border bg-card">
+                    {% for rec in pending %}
+                    <li class="px-4 py-3">
+                        <p class="font-medium">{{ rec.recommendation_title }}</p>
+                        {% if rec.recommendation_description %}<p class="text-sm text-muted-foreground">{{ rec.recommendation_description }}</p>{% endif %}
+                    </li>
                     {% endfor %}
-                </tbody>
-            </table>
+                </ul>
+            </div>
+            {% endif %}
         </div>
-        {% if processes|length > 20 %}
-        <p class="text-sm text-muted-foreground mt-4">Showing 20 of {{ processes|length }} processes</p>
-        {% endif %}
-    </div>
-    {% endif %}
+        {% endcall %}
+    {% endcall %}
+
+    <p class="text-xs text-muted-foreground">APQC Process Classification Framework (PCF) &copy; APQC. Used under APQC's terms of use. APQC is the owner of the framework and its content.</p>
 </div>
 {% endblock %}

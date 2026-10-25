@@ -233,15 +233,15 @@ class BusinessOutputDisplay {
                     '<div class="space-y-2">' +
                         '<div class="flex justify-between">' +
                             '<span>Customer Impact:</span>' +
-                            '<span class="font-medium">' + (data.stakeholder_value?.customer_impact?.score || 'N/A') + '</span>' +
+                            '<span class="font-medium">' + (data.stakeholder_value?.customer_impact?.score || 'Not assessed') + '</span>' +
                         '</div>' +
                         '<div class="flex justify-between">' +
                             '<span>Business Value:</span>' +
-                            '<span class="font-medium">' + (data.stakeholder_value?.business_value?.score || 'N/A') + '</span>' +
+                            '<span class="font-medium">' + (data.stakeholder_value?.business_value?.score || 'Not assessed') + '</span>' +
                         '</div>' +
                         '<div class="flex justify-between">' +
                             '<span>ROI Analysis:</span>' +
-                            '<span class="font-medium">' + (data.stakeholder_value?.roi_analysis?.roi || 'N/A') + '</span>' +
+                            '<span class="font-medium">' + (data.stakeholder_value?.roi_analysis?.roi || 'Not assessed') + '</span>' +
                         '</div>' +
                     '</div>' +
                 '</div>' +
@@ -392,7 +392,7 @@ class BusinessOutputDisplay {
                     '<div class="space-y-2">' +
                         '<div class="flex justify-between">' +
                             '<span>Strategy Alignment:</span>' +
-                            '<span class="font-medium">' + (data.strategic_alignment?.business_strategy_alignment?.score || 'N/A') + '</span>' +
+                            '<span class="font-medium">' + (data.strategic_alignment?.business_strategy_alignment?.score || 'Not assessed') + '</span>' +
                         '</div>' +
                         '<div class="flex justify-between">' +
                             '<span>Operating Model Impact:</span>' +
@@ -405,7 +405,7 @@ class BusinessOutputDisplay {
                     '<div class="space-y-2">' +
                         '<div class="flex justify-between">' +
                             '<span>Capability Maturity:</span>' +
-                            '<span class="font-medium">' + (data.transformation_roadmap?.capability_maturity?.current_level || 'N/A') + '</span>' +
+                            '<span class="font-medium">' + (data.transformation_roadmap?.capability_maturity?.current_level || 'Not assessed') + '</span>' +
                         '</div>' +
                         '<div class="flex justify-between">' +
                             '<span>Transformation Phases:</span>' +
@@ -471,11 +471,11 @@ class BusinessOutputDisplay {
                     '<div class="space-y-2">' +
                         '<div class="flex justify-between">' +
                             '<span>Digital Transformation:</span>' +
-                            '<span class="font-medium">' + (data.strategic_impact?.digital_transformation?.readiness || 'N/A') + '</span>' +
+                            '<span class="font-medium">' + (data.strategic_impact?.digital_transformation?.readiness || 'Not assessed') + '</span>' +
                         '</div>' +
                         '<div class="flex justify-between">' +
                             '<span>Technology Strategy:</span>' +
-                            '<span class="font-medium">' + (data.strategic_impact?.technology_strategy?.alignment || 'N/A') + '</span>' +
+                            '<span class="font-medium">' + (data.strategic_impact?.technology_strategy?.alignment || 'Not assessed') + '</span>' +
                         '</div>' +
                         '<div class="flex justify-between">' +
                             '<span>Innovation Opportunities:</span>' +
@@ -488,15 +488,15 @@ class BusinessOutputDisplay {
                     '<div class="space-y-2">' +
                         '<div class="flex justify-between">' +
                             '<span>Enterprise Governance:</span>' +
-                            '<span class="font-medium">' + (data.governance_compliance?.enterprise_governance?.maturity || 'N/A') + '</span>' +
+                            '<span class="font-medium">' + (data.governance_compliance?.enterprise_governance?.maturity || 'Not assessed') + '</span>' +
                         '</div>' +
                         '<div class="flex justify-between">' +
                             '<span>Compliance Framework:</span>' +
-                            '<span class="font-medium">' + (data.governance_compliance?.compliance_framework?.coverage || 'N/A') + '</span>' +
+                            '<span class="font-medium">' + (data.governance_compliance?.compliance_framework?.coverage || 'Not assessed') + '</span>' +
                         '</div>' +
                         '<div class="flex justify-between">' +
                             '<span>Audit Readiness:</span>' +
-                            '<span class="font-medium">' + (data.governance_compliance?.audit_readiness?.status || 'N/A') + '</span>' +
+                            '<span class="font-medium">' + (data.governance_compliance?.audit_readiness?.status || 'Not assessed') + '</span>' +
                         '</div>' +
                     '</div>' +
                 '</div>' +
@@ -553,7 +553,7 @@ class BusinessOutputDisplay {
                     '<div class="space-y-2">' +
                         '<div class="flex justify-between">' +
                             '<span>Implementation Approach:</span>' +
-                            '<span class="font-medium">' + (data.technical_analysis?.implementation_approach?.method || 'N/A') + '</span>' +
+                            '<span class="font-medium">' + (data.technical_analysis?.implementation_approach?.method || 'Not assessed') + '</span>' +
                         '</div>' +
                         '<div class="flex justify-between">' +
                             '<span>Integration Points:</span>' +
@@ -574,7 +574,7 @@ class BusinessOutputDisplay {
                         '</div>' +
                         '<div class="flex justify-between">' +
                             '<span>Resource Requirements:</span>' +
-                            '<span class="font-medium">' + (data.delivery_planning?.resource_requirements?.total || 'N/A') + '</span>' +
+                            '<span class="font-medium">' + (data.delivery_planning?.resource_requirements?.total || 'Not assessed') + '</span>' +
                         '</div>' +
                         '<div class="flex justify-between">' +
                             '<span>Technical Debt:</span>' +
@@ -587,7 +587,7 @@ class BusinessOutputDisplay {
                     '<div class="space-y-2">' +
                         '<div class="flex justify-between">' +
                             '<span>Deployment Strategy:</span>' +
-                            '<span class="font-medium">' + (data.operational_considerations?.deployment_strategy?.approach || 'N/A') + '</span>' +
+                            '<span class="font-medium">' + (data.operational_considerations?.deployment_strategy?.approach || 'Not assessed') + '</span>' +
                         '</div>' +
                         '<div class="flex justify-between">' +
                             '<span>Monitoring Requirements:</span>' +

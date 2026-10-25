@@ -151,6 +151,11 @@ if [ -f /tmp/project-capabilities-report.json ]; then
     echo '--- end report ---'
 fi
 
+# Every capability carries a type (strategic, operational or supporting). Untyped rows get
+# the starting rule; a type someone has set is never changed. Idempotent.
+flask --app manage backfill-capability-types --apply \
+    || echo 'WARN capability type backfill failed - some capabilities may show as untyped until it is re-run' >&2
+
 # ADR 0008 -- retire the remaining four superseded capability stores
 # (capabilities, enterprise_capabilities, archimate_capabilities,
 # technical_capabilities) into unified_capabilities. Must run after

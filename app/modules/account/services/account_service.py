@@ -318,6 +318,9 @@ class AccountService:
         # There is no acting session to preserve -- a reset happens
         # while logged out.
         AccountService._revoke_other_sessions(user.id, "password_change", except_sid=None)
+        from app.services import activity_record
+
+        activity_record.record_security_event("password_reset", user)
         return True, "Your password has been updated. Sign in with your new password."
 
     @staticmethod

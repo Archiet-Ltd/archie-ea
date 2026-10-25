@@ -1,0 +1,176 @@
+{% extends 'layouts/admin_base.html' %}
+{# design-block: board #}
+{% from 'macros/page_shell.html' import page_shell %}
+{% from 'components/card.html' import card %}
+{% from 'components/button.html' import button %}
+{% from 'components/input.html' import input, textarea %}
+{% from 'components/select.html' import native_select %}
+{% from 'components/checkbox.html' import checkbox %}
+{% from 'components/modal.html' import modal %}
+{% from 'components/form_field.html' import form_group %}
+{% from 'components/empty_state.html' import empty_state %}
+{% from 'components/confirmation_dialog.html' import confirmation_dialog %}
+{% from 'components/table.html' import table, table_header, table_body, table_row, table_head, table_cell %}
+{% from 'components/diagram/toolbar.html' import diagram_toolbar with context %}
+{% from 'components/diagram/finder.html' import diagram_finder with context %}
+{% from 'components/diagram/legend.html' import diagram_legend with context %}
+{% from 'components/diagram/status_line.html' import diagram_status_line with context %}
+
+{% block title %}Data objects: diagram — {{ config.APP_NAME }}{% endblock %}
+
+{% block breadcrumb %}
+{% from 'components/breadcrumb_nav.html' import breadcrumb_nav %}
+{{ breadcrumb_nav(items=[
+    {'text': 'Home', 'href': url_for('main.index'), 'icon': 'home'},
+    {'text': 'Data Architecture', 'href': url_for('data_architecture.data_architecture_dashboard')},
+    {'text': 'Data objects', 'href': url_for('data_architecture.data_entity_catalog')},
+    {'text': 'Diagram', 'current': true}
+]) }}
+{% endblock %}
+
+{% block content %}
+{% set page_tabs = [('List', url_for('data_architecture.data_entity_catalog'), false), ('Diagram', url_for('data_architecture.data_entity_diagram'), true)] %}
+
+{% macro _actions() %}
+  {% if domains %}
+  <form method="get" action="{{ url_for('data_architecture.data_entity_diagram') }}" class="flex items-center gap-2" data-testid="erd-domain-form">
+    {{ native_select(id='erd-domain', name='domain_id', size='sm', aria_label='Data domain', class='w-48', options=domain_options, selected=domain.id, attrs_dict={'@change': '$el.form.submit()', 'data-testid': 'erd-domain'}) }}
+  </form>
+  {% endif %}
+  {% if domain %}
+  {{ button(text='Add entity', icon='plus', testid='erd-add-entity', attrs_dict={'@click': 'openEdit(null)'}) }}
+  {% endif %}
+{% endmacro %}
+
+{% if not domain %}
+  {{ page_shell(title='Data objects', subtitle='The entities of your data model, and how they relate.', tabs=page_tabs) }}
+  {{ empty_state(icon='database', title='No data domains yet', description='A data domain groups the entities of one subject area, such as Customer or Finance. Add your first data entity and its domain is created with it.', cta_text='Add a data entity', cta_href=url_for('data_architecture.create_data_entity'), cta_icon='plus') }}
+{% else %}
+<div x-data="erdApp()" class="relative" data-testid="erd-page">
+  {{ page_shell(title='Data objects', subtitle=domain.name ~ ': the entities of this domain, their attributes and how they relate.', tabs=page_tabs, actions_caller=_actions) }}
+  {% call card(class='flex h-[calc(100svh-17rem)] min-h-[520px] flex-col overflow-hidden [&>nav]:mb-0') %}
+    {{ diagram_toolbar(menus=false, history=false, export_items=[{'text': 'SVG image', 'icon': 'image', 'onclick': 'exportSvg()'}]) }}
+    <div class="relative flex min-h-0 flex-1">
+      <aside x-show="shellRailOpen" x-cloak class="absolute inset-y-0 left-0 z-30 flex w-72 max-w-full flex-col border-r border-border bg-card md:static" aria-label="Entities" data-testid="erd-rail">
+        {{ diagram_finder(noun='entity', noun_plural='entities', empty_text='This domain has no entities yet. Add one and it is listed here so you can find it again.', empty_action_text='Add an entity', empty_action_click='openEdit(null)') }}
+      </aside>
+      <div class="relative min-w-0 flex-1">
+        <div id="erd-canvas" class="absolute inset-0" role="img" aria-label="Entity relationship diagram of {{ domain.name }}" data-testid="erd-canvas"></div>
+        <div x-show="entities.length === 0" x-cloak class="absolute inset-0 z-10 flex items-center justify-center bg-card/80" data-testid="erd-empty">
+          {{ empty_state(icon='table-2', title='This domain has no entities yet', description='Add an entity, give it attributes, then relate it to the others. Each entity is also a data object in your architecture model.', cta_text='Add the first entity', cta_onclick='openEdit(null)', cta_icon='plus', compact=true) }}
+        </div>
+      </div>
+    </div>
+    {{ diagram_legend() }}
+    {{ diagram_status_line(noun='entity', noun_plural='entities') }}
+  {% endcall %}
+
+  {# Add or edit an entity and its attributes. #}
+  {% call modal(id='erd-edit-modal', title='Entity', size='xl', description='Name the entity and list its attributes. The entity is also a data object in the architecture model.', attrs={'x-init': "Platform.modal.on('erd-edit-modal', 'close', () => { editOpen = false })", 'x-effect': "editOpen ? Platform.modal.open('erd-edit-modal') : Platform.modal.close('erd-edit-modal')"}) %}
+    <form @submit.prevent="saveEntity()" class="flex flex-col gap-4" data-testid="erd-edit-form">
+      <p class="text-sm font-medium text-foreground" x-text="editTitle"></p>
+      {% call form_group(id='erd-entity-name', label='Entity name', required=true) %}
+        {{ input(id='erd-entity-name', placeholder='e.g. Customer', maxlength='200', attrs_dict={'x-model': 'edit.name', 'data-testid': 'erd-entity-name'}) }}
+      {% endcall %}
+      {% call form_group(id='erd-entity-description', label='What it holds') %}
+        {{ textarea(id='erd-entity-description', rows=2, placeholder='Optional: what a record of this entity is', attrs_dict={'x-model': 'edit.description'}) }}
+      {% endcall %}
+      <div class="flex flex-col gap-2">
+        <div class="flex items-center justify-between gap-2">
+          <p class="text-sm font-medium text-foreground">Attributes</p>
+          {{ button(text='Add attribute', variant='outline', size='sm', icon='plus', testid='erd-add-attribute', attrs_dict={'@click': 'addAttributeRow()'}) }}
+        </div>
+        <div class="max-h-[40vh] overflow-auto rounded-md border border-border">
+          {% call table() %}
+            {% call table_header() %}
+              {% call table_row() %}
+                {% call table_head() %}Name{% endcall %}
+                {% call table_head() %}Type{% endcall %}
+                {% call table_head(class='text-center') %}Primary key{% endcall %}
+                {% call table_head(class='text-center') %}Foreign key{% endcall %}
+                {% call table_head(class='text-center') %}Nullable{% endcall %}
+                {% call table_head() %}<span class="sr-only">Remove</span>{% endcall %}
+              {% endcall %}
+            {% endcall %}
+            {% call table_body() %}
+              <template x-for="(attr, index) in edit.attributes" :key="index">
+                {% call table_row(attrs_dict={'data-testid': 'erd-attribute-row'}) %}
+                  {% call table_cell() %}{{ input(size='xs', placeholder='attribute_name', maxlength='200', class='min-w-32 font-mono', attrs_dict={'x-model': 'attr.name', ':aria-label': "'Name of attribute ' + (index + 1)", 'data-testid': 'erd-attribute-name'}) }}{% endcall %}
+                  {% call table_cell() %}{{ native_select(size='xs', class='w-28', options=type_options, attrs_dict={'x-model': 'attr.data_type', ':aria-label': "'Type of attribute ' + (index + 1)", 'data-testid': 'erd-attribute-type'}) }}{% endcall %}
+                  {% call table_cell(class='text-center') %}{{ checkbox(class='justify-center', attrs_dict={'x-model': 'attr.is_primary_key', '@change': 'keyChanged(attr)', ':aria-label': "'Attribute ' + (index + 1) + ' is a primary key'", 'data-testid': 'erd-attribute-pk'}) }}{% endcall %}
+                  {% call table_cell(class='text-center') %}{{ checkbox(class='justify-center', attrs_dict={'x-model': 'attr.is_foreign_key', ':aria-label': "'Attribute ' + (index + 1) + ' is a foreign key'", 'data-testid': 'erd-attribute-fk'}) }}{% endcall %}
+                  {% call table_cell(class='text-center') %}{{ checkbox(class='justify-center', attrs_dict={'x-model': 'attr.is_nullable', ':disabled': 'attr.is_primary_key', ':aria-label': "'Attribute ' + (index + 1) + ' may be empty'", 'data-testid': 'erd-attribute-null'}) }}{% endcall %}
+                  {% call table_cell() %}{{ button(variant='ghost', size='icon-sm', icon='trash-2', aria_label='Remove this attribute', attrs_dict={'@click': 'removeAttributeRow(index)'}) }}{% endcall %}
+                {% endcall %}
+              </template>
+            {% endcall %}
+          {% endcall %}
+          <p x-show="edit.attributes.length === 0" x-cloak class="px-4 py-6 text-center text-sm text-muted-foreground">This entity has no attributes yet. Add the first one to say what it records.</p>
+        </div>
+      </div>
+      <p x-show="editError" x-cloak class="text-sm text-destructive-emphasis" role="alert" x-text="editError" data-testid="erd-edit-error"></p>
+      <div class="flex justify-end gap-2">
+        {{ button(text='Cancel', variant='outline', attrs_dict={'@click': 'editOpen = false'}) }}
+        {{ button(text='Save entity', type='submit', testid='erd-save-entity', attrs_dict={':disabled': 'busy'}) }}
+      </div>
+    </form>
+  {% endcall %}
+
+  {# Relate two entities, or change how they relate. #}
+  {% call modal(id='erd-rel-modal', title='Relationship', size='default', description='Say how many records of each entity take part.', attrs={'x-init': "Platform.modal.on('erd-rel-modal', 'close', () => { relOpen = false })", 'x-effect': "relOpen ? Platform.modal.open('erd-rel-modal') : Platform.modal.close('erd-rel-modal')"}) %}
+    <form @submit.prevent="saveRelationship()" class="flex flex-col gap-4" data-testid="erd-rel-form">
+      <p class="text-sm font-medium text-foreground" data-testid="erd-rel-summary" x-text="relSummary"></p>
+      {% call form_group(id='erd-rel-preset', label='Relationship type') %}
+        {{ native_select(id='erd-rel-preset', class='w-full', options=preset_options, attrs_dict={'x-model': 'rel.preset', '@change': 'presetChanged()', 'data-testid': 'erd-rel-preset'}) }}
+      {% endcall %}
+      <div class="grid gap-4 sm:grid-cols-2">
+        {% call form_group(id='erd-rel-source', label='Records of the first entity') %}
+          {{ native_select(id='erd-rel-source', class='w-full', options=cardinality_options, attrs_dict={'x-model': 'rel.source_cardinality', '@change': 'endChanged()', 'data-testid': 'erd-rel-source'}) }}
+        {% endcall %}
+        {% call form_group(id='erd-rel-target', label='Records of the second entity') %}
+          {{ native_select(id='erd-rel-target', class='w-full', options=cardinality_options, attrs_dict={'x-model': 'rel.target_cardinality', '@change': 'endChanged()', 'data-testid': 'erd-rel-target'}) }}
+        {% endcall %}
+      </div>
+      {% call form_group(id='erd-rel-label', label='Label', help_text='Optional: the verb that joins them, such as places or contains.') %}
+        {{ input(id='erd-rel-label', placeholder='e.g. places', maxlength='200', attrs_dict={'x-model': 'rel.label', 'data-testid': 'erd-rel-label'}) }}
+      {% endcall %}
+      <p x-show="relError" x-cloak class="text-sm text-destructive-emphasis" role="alert" x-text="relError"></p>
+      <div class="flex justify-end gap-2">
+        {{ button(text='Cancel', variant='outline', attrs_dict={'@click': 'relOpen = false'}) }}
+        {{ button(text='Save relationship', type='submit', testid='erd-save-relationship', attrs_dict={':disabled': 'busy'}) }}
+      </div>
+    </form>
+  {% endcall %}
+
+  {{ confirmation_dialog(id='erd-delete', title='Delete from the data model?', message='An entity loses its attributes and relationships, and its data object leaves the architecture model. A relationship is removed on its own.', confirm_text='Delete', variant='destructive') }}
+</div>
+
+<script>
+window.__ERD_CONFIG__ = {
+    domainId: {{ domain.id|tojson }},
+    domainName: {{ domain.name|tojson }},
+    diagram: {{ diagram|tojson }},
+    dataTypes: {{ data_types|list|tojson }},
+};
+</script>
+<script src="{{ url_for('static', filename='vendor/jquery.min.js') }}"
+        integrity="sha384-1H217gwSVyLSIfaLxHbE7dRb3v4mYCKbpQvzx0cegeju1MVsGrX5xXxAvs/HgeFs"
+        crossorigin="anonymous"></script>
+<script src="{{ url_for('static', filename='vendor/lodash.min.js') }}"
+        integrity="sha384-H6KKS1H1WwuERMSm+54dYLzjg0fKqRK5ZRyASdbrI/lwrCc6bXEmtGYr5SwvP1pZ"
+        crossorigin="anonymous"></script>
+<script src="{{ url_for('static', filename='vendor/backbone-min.js') }}"
+        integrity="sha384-siQm2TwNPuj64IKXtePBYPNqmkdFA7rN2a9SVlO+BOPQkLg4za4XutKvETKs4Wnd"
+        crossorigin="anonymous"></script>
+<script src="{{ url_for('static', filename='vendor/joint.min.js') }}"
+        integrity="sha384-7APbXz6bDrvODuBDdzMbzbMDOXyZmarNEHYM40u3GcsHwuH1TwM9LoTU4mSFYSDK"
+        crossorigin="anonymous"></script>
+<link rel="stylesheet" href="{{ url_for('static', filename='vendor/joint.min.css') }}"
+        integrity="sha384-HS0gPIOeFUVN8uq4t4TbaC79ABnRugI9t0Qg3/tNNpzJQ2CPLkPmx8FunElCvMJU"
+        crossorigin="anonymous">
+<script src="{{ url_for('static', filename='vendor/dagre.min.js') }}"
+        integrity="sha384-2IH3T69EIKYC4c+RXZifZRvaH5SRUdacJW7j6HtE5rQbvLhKKdawxq6vpIzJ7j9M"
+        crossorigin="anonymous"></script>
+<script src="{{ url_for('static', filename='js/data/erd.js') }}"></script>
+{% endif %}
+{% endblock %}

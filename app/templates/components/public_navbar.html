@@ -23,7 +23,9 @@
 
     {# Below lg: the one action that never hides, then the Menu button. #}
     <div class="ml-auto flex items-center gap-2 lg:hidden">
-      {% if not current_user.is_authenticated %}
+      {% if current_user.is_authenticated %}
+      {{ button(text='Open Entelim', href=url_for('dashboard.overview'), variant='primary', attrs_dict={'data-site-cta': '', 'data-open-entelim': ''}) }}
+      {% else %}
       {{ button(text='Start free', href=url_for('account.register'), variant='primary', attrs_dict={'data-site-cta': ''}) }}
       {% endif %}
       <button type="button" class="inline-flex h-11 w-11 items-center justify-center rounded-md text-foreground hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
@@ -73,14 +75,13 @@
 
                 {% elif entry.id == 'roles' %}
                 <div class="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-                  {% for family in reg.roles.families %}
+                  {% for family in reg.roles.menu_families %}
                   <div>
                     <p class="px-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">
                       <a href="{{ family.href }}" class="rounded-md hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" data-menu-item data-label="{{ family.label }}">{{ family.label }}</a>
                     </p>
                     <ul class="mt-2">
-                      {% for role in family.shown %}{{ text_link(role.href, role.label) }}{% endfor %}
-                      {% if family.more %}{{ text_link(family.href, '+ ' ~ family.more ~ ' more', 'text-primary') }}{% endif %}
+                      {% for role in family.shown %}{{ text_link(role.href, role.card_title) }}{% endfor %}
                     </ul>
                   </div>
                   {% endfor %}
@@ -116,6 +117,7 @@
 
       <div class="mt-2 flex flex-col gap-2 border-t border-border pt-4 lg:mt-0 lg:flex-row lg:items-center lg:border-0 lg:pt-0">
         {% if current_user.is_authenticated %}
+        <span class="hidden lg:inline-flex">{{ button(text='Open Entelim', href=url_for('dashboard.overview'), variant='primary', attrs_dict={'data-open-entelim': ''}) }}</span>
         <div class="lg:relative">
           <button type="button" class="{{ trigger_class }}" aria-expanded="false" aria-controls="menu-account" aria-label="Account menu" data-menu-trigger>
             <span class="flex h-8 w-8 items-center justify-center rounded-full bg-muted text-sm font-medium text-foreground">{{ current_user.first_name[0] if current_user.first_name else 'U' }}</span>
@@ -125,7 +127,7 @@
             <p class="px-3 py-1.5 text-sm text-muted-foreground">{{ current_user.email }}</p>
             <ul>
               {{ text_link(url_for('account.manage'), 'Profile') }}
-              {{ text_link(url_for('admin.index'), 'Dashboard') }}
+              {{ text_link(url_for('dashboard.overview'), 'Dashboard') }}
               {{ text_link(url_for('account.logout'), 'Log out') }}
             </ul>
           </div>

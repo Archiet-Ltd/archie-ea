@@ -1,707 +1,289 @@
+{# smoke-coverage-ok: covered by tests/smoke/test_overview_dashboard_journey.py #}
+{# design-block: dashboard #}
 {% extends 'layouts/admin_base.html' %}
-{% from 'components/dense_table.html' import dense_table %}
-{% from 'components/dropdown_menu.html' import dropdown_menu %}
-{% from 'macros/page_shell.html' import page_shell, section_card %}
-{% from 'components/empty_state.html' import empty_state %}
-{% from 'components/tabs.html' import tabs_list, tabs_trigger %}
-{% from 'components/company_kind.html' import company_kind_picker %}
-{% from 'components/button.html' import button %}
-{% from 'components/input.html' import input %}
-{% from 'components/card.html' import card, card_header, card_title, card_description, card_content, card_footer %}
-{% from 'components/table.html' import table, table_header, table_body, table_row, table_head, table_cell, table_empty_state %}
-{% block title %}Dashboard{% endblock %}
-{% block guided_mode_steps %}
-<script id="guided-mode-steps-data" type="application/json">
-[
-  {"title": "Step 1 — Key figures", "text": "The figures at the top show live counts. A low number means data enrichment work is needed."},
-  {"title": "Step 2 — What breaks if it fails", "text": "The answer below follows one application's recorded connections. Open a row to see where each connection comes from."},
-  {"title": "Step 3 — Capability coverage", "text": "The table lists capabilities with the gaps first. Open a row to act on it."}
-]
-</script>
-{% endblock %}
+{% import 'basecoat/index.html' as ui %}
+{% import 'dashboards/_overview_parts.html' as d %}
+{% from 'macros/page_shell.html' import page_shell %}
+{% block title %}Overview{% endblock %}
 {% block extra_head_js %}
-<script src="{{ url_for('static', filename='js/intelligence/core.js') }}"></script>
-<script src="{{ url_for('static', filename='js/dashboard/company_kind.js') }}"></script>
+<script src="{{ url_for('static', filename='vendor/basecoat/flask-basecoat-chart.js') }}" defer></script>
+{% endblock %}
+{% block extra_head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/basecoat_components.css') }}">
 {% endblock %}
 {% block content %}
-{% if signup_sources %}
-<div class="mb-6" data-testid="signup-sources">
-{% call card() %}
-    {% call card_header() %}
-        {% call card_title() %}Your sources{% endcall %}
-        {% call card_description() %}What you gave {{ config.APP_NAME }} when you signed up, and how far it has got. This updates when you reload.{% endcall %}
+{# Flask-Basecoat's Overview dashboard (examples/dashboards/overview.html, feat/shadcn-100-compliance b327186c2)
+   filled with the organisation's own figures. One dashboard for every role. #}
+{% set o = overview %}
+{% set links = o.links %}
+{% set apps = o.applications %}
+{% set rel = o.relationships %}
+{% set cost = o.run_cost %}
+{% set act = o.activity %}
+{% set sourced = o.sourced %}
+{% set chart_1 = o.chart_colours[0] %}
+{% set chart_2 = o.chart_colours[1] %}
+
+{#- One of the three icon cards: a figure with its change, and the sentence that says what it means. -#}
+{% macro stat_card(testid, icon, label, value, badge, good, sentence, href, exact=none) %}
+{%- set inner -%}
+  {% call ui.card(class='h-full') %}
+    {% call ui.card_header() %}<span class="flex size-10 items-center justify-center rounded-lg bg-muted text-primary [&_svg]:size-4">{{ lucide(icon) }}</span>{% endcall %}
+    {% call ui.card_content(class='mt-auto flex flex-col gap-1') %}
+      {% if value %}
+      <span class="flex flex-wrap items-center gap-2 text-2xl font-semibold tabular-nums"><span data-testid="{{ testid }}-value"{% if exact %} title="{{ exact }}"{% endif %}>{{ value }}</span>{% if badge %}<span data-testid="{{ testid }}-change">{{ d.delta(badge, good) }}</span>{% endif %}</span>
+      <span class="text-sm font-medium">{{ label }}</span>
+      {% else %}
+      <span class="text-lg font-semibold">{{ label }}</span>
+      {% endif %}
+      <span class="text-sm text-muted-foreground" data-testid="{{ testid }}-sentence">{{ sentence }}</span>
     {% endcall %}
-    {% call card_content(class='space-y-2') %}
-        {% for row in signup_sources %}
-        <p class="text-sm" data-testid="signup-source-{{ row.key }}" data-state="{{ row.state }}"><span class="font-medium">{{ row.label }}.</span> <span class="text-muted-foreground">{{ row.text }}</span></p>
-        {% endfor %}
-    {% endcall %}
-{% endcall %}
-</div>
-{% endif %}
-{% macro question_box() %}
-<form method="get" action="/ai-chat" class="flex flex-col gap-2 sm:flex-row" data-testid="first-question-form">
-    {{ input(name='q', type='text', placeholder='Ask anything, for example: what breaks if our payments service fails?', aria_label='Ask a question about your company', class='sm:flex-1', attrs_dict={'data-testid': 'first-question-input', 'maxlength': '2000', 'autocomplete': 'off'}) }}
-    {{ button(text='Ask', type='submit', icon='arrow-right', icon_position='right', testid='first-question-submit') }}
-</form>
+  {% endcall %}
+{%- endset -%}
+{%- if href -%}
+<a href="{{ href }}" class="block rounded-xl outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50" data-testid="{{ testid }}" aria-label="{{ label }}: {{ sentence }}">{{ inner }}</a>
+{%- else -%}
+<div data-testid="{{ testid }}">{{ inner }}</div>
+{%- endif -%}
 {% endmacro %}
-{# Overview pattern (design/patterns.json: dashboard-01): page header, KPI
-   band, lens tabs, chart, answer cascade, dense table. No navigation card grid. #}
-{% set mode = dashboard_mode|default('data') %}
-{% set role = enterprise_role|default('platform_admin') %}
-{# The dashboard opens on the lens that matches the signed-in user's role. The
-   layer lenses are the ArchiMate 3.2 layers; Overview, CTO and CFO are the
-   executive summary lenses. #}
-{% set _tab_for_role = {
-    'business_architect': 'business',
-    'enterprise_architect': 'strategy',
-    'solution_architect': 'application',
-    'security_architect': 'motivation',
-    'data_architect': 'application',
-    'cto': 'cto',
-} %}
-{% set default_tab = _tab_for_role.get(role, 'overview') %}
-<div class="space-y-8" x-data="{ activeRole: '{{ default_tab }}' }">
-    {{ page_shell(
-        title='Dashboard',
-        subtitle="Architecture health, portfolio insights, and actions needed" if mode == 'data' else "Let's get your workspace ready.",
-        breadcrumb=[('Home', none), ('Dashboard', none)]
-    ) }}
-    {# Workspace links removed from overview per council-07; all links remain reachable from the sidebar my_work zone. #}
-    {% if mode == 'guided' %}
-    {# ══════════════════════════════════════════════════════════════════════
-       GUIDED MODE — sparse org: a setup journey, not a failing report card.
-       ══════════════════════════════════════════════════════════════════════ #}
-    <div class="min-h-screen" data-testid="first-fold"><div data-testid="dashboard-empty-state">
-    {% call card(class='') %}
-    <div data-testid="first-message">
-        {% call card_header() %}
-            {% call card_title(class='text-xl') %}{{ 'Bring in your company, or look around a sample first' if (first_actions.sample or first_actions.connect) else 'Bring your applications in' }}{% endcall %}
-            {% call card_description(class='max-w-[60ch]') %}Connect GitHub or Jira and {{ config.APP_NAME }} maps your services, owners and dependencies, then answers in plain words and cites the source of every fact. Nothing to connect yet? A sample company shows you what that looks like in under a minute.{% endcall %}
-        {% endcall %}
-        {% call card_content(class='space-y-4') %}
-            <div class="flex flex-col gap-3 sm:flex-row" data-testid="first-actions">
-                {% if first_actions.connect %}
-                {{ button(text='Connect GitHub', href=url_for('m365_connector.github_connect'), icon='github', testid='first-action-connect') }}
-                {% endif %}
-                {% if first_actions.sample %}
-                <form method="post" action="{{ url_for('architect_ui.load_sample_company') }}" data-testid="first-action-sample-form"
-                      x-data="{ busy: false }" @submit="if (busy) { $event.preventDefault() } else { busy = true }">
-                    {{ input(type='hidden', name='csrf_token', value=csrf_token()) }}
-                    {{ button(text='See a sample company', type='submit', variant='outline' if first_actions.connect else 'default', testid='first-action-sample', attrs_dict={':disabled': 'busy', ':aria-busy': 'busy'}) }}
-                    <p class="mt-2 text-sm text-muted-foreground" role="status" x-show="busy" x-cloak data-testid="first-action-sample-busy">Loading the sample company. This takes a few seconds.</p>
-                </form>
-                {% endif %}
-                {% if not first_actions.connect and not first_actions.sample %}
-                {{ button(text='Import your applications', href=first_actions.import_href, testid='first-action-import') }}
-                {% endif %}
-            </div>
-            {% if not first_actions.connect %}
-            <p class="text-sm text-muted-foreground">Connecting GitHub or Jira is done by an organisation administrator.</p>
-            {% endif %}
-            {{ question_box() }}
-            {# The one onboarding question, answered inside the card: it keeps Startup unless changed. #}
-            <div class="space-y-1.5" data-testid="company-kind-selector">
-                <p class="text-sm font-medium text-foreground">What kind of company are you?</p>
-                {{ company_kind_picker(kind=company_kind or 'startup') }}
-                {{ button(text='Not now', variant='ghost', size='sm', testid='company-kind-not-now', attrs_dict={'data-company-kind-default': 'startup'}) }}
-            </div>
-        {% endcall %}
-    </div>
-    {% endcall %}
-    </div></div>
 
-    {# The welcome line and the checklist sit beneath the one message, below the fold. #}
-    {% if mode == 'guided' and not current_user.welcome_banner_dismissed_at %}
-    <div x-data="{ show: true, dismiss() {
-                this.show = false;
-                // Use Platform.fetch for automatic CSRF and error handling
-                // silent: true because we don't want a toast if the request fails (banner will reappear on next load)
-                (window.Platform?.fetch || window.apiFetch || fetch)('/dashboard/api/welcome-dismiss', {
-                    method: 'POST',
-                    body: {}, // empty object ensures JSON serialization
-                    silent: true,
-                }).catch(() => { /* swallow-ok: best-effort persist; the banner is already hidden for this visit and simply reappears next load if the POST failed, which is not worth an error toast */ });
-             } }"
-         x-show="show"
-         data-testid="welcome-banner"
-         class="flex h-10 items-center justify-between gap-3 rounded-md border border-border bg-card px-4 text-13">
-        <p class="text-sm text-foreground min-w-0">
-            <span class="font-medium">Welcome to {{ config.APP_NAME }}</span>
-            <span class="text-muted-foreground"> — <a href="/ai-chat" class="text-info hover:underline">ask the AI architect</a> anytime, no setup needed.</span>
-        </p>
-        {{ button(variant='ghost', size='icon', icon='x', on_click='dismiss()', aria_label='Dismiss welcome message', class='shrink-0') }}
-    </div>
-    {% endif %}
-    {% call section_card(title="Set up your workspace") %}
-    <div class="space-y-4" data-testid="guided-setup">
-        <p class="text-sm text-muted-foreground max-w-[60ch]">
-            A few steps to get real signal into your dashboards — health score and
-            visualizations appear once your portfolio has data.
-        </p>
-        <ol class="space-y-3">
-            {% for step in guided_steps %}
-            <li class="flex items-start gap-3 rounded-lg border border-border p-4">
-                <span class="mt-0.5 shrink-0 flex h-6 w-6 items-center justify-center rounded-full {% if step.done %}bg-success/15 text-success-emphasis{% else %}bg-muted text-muted-foreground{% endif %}">
-                    <i data-lucide="{{ 'check' if step.done else 'circle' }}" class="h-3.5 w-3.5" aria-hidden="true"></i>
-                </span>
-                <div class="min-w-0 flex-1">
-                    <p class="text-sm font-medium text-foreground">{{ step.title }}</p>
-                    <p class="text-xs text-muted-foreground mt-0.5">{{ step.description }}</p>
-                </div>
-                {% if step.post %}
-                <form method="post" action="{{ step.href }}" class="shrink-0" data-testid="guided-step-form">
-                    {{ input(type='hidden', name='csrf_token', value=csrf_token()) }}
-                    {{ button(text=step.cta, type='submit', variant='outline', size='sm', testid='guided-step-sample-load') }}
-                </form>
-                {% else %}
-                <a href="{{ step.href }}" class="shrink-0 inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline">
-                    {{ 'Done' if step.done else (step.cta|default('Start')) }} <i data-lucide="arrow-right" class="h-3 w-3" aria-hidden="true"></i>
-                </a>
-                {% endif %}
-            </li>
-            {% endfor %}
-        </ol>
-    </div>
-    {% endcall %}
-    {% else %}
-
-    {# Ask: the question goes to the AI chat and is answered there; this page never renders an answer. #}
-    {% call card() %}
-    <div data-testid="first-message">
-        {% call card_header(class='pb-3') %}
-            {% call card_title(class='text-base') %}Ask your company a question{% endcall %}
-            {% call card_description() %}Opens the AI chat with your question. Answers cite the records they come from.{% endcall %}
-        {% endcall %}
-        {% call card_content() %}
-            {{ question_box() }}
-        {% endcall %}
-    </div>
-    {% endcall %}
-
-    {# Section cards (shadcn dashboard-01): each figure links to the list it counts; the health score opens its workings. #}
-    {% from 'components/explained_value.html' import explained_value %}
-    {% set _now = as_of_date %}
-    {% set _apps_href = url_for('unified_applications.application_list') if 'unified_applications.application_list' in flask.current_app.view_functions else '/applications/' %}
-    {% set _sol_href = url_for('solution_design.list_solutions') if 'solution_design.list_solutions' in flask.current_app.view_functions else '/solutions/' %}
-    {% set _el_href = url_for('archimate_crud.dashboard') if 'archimate_crud.dashboard' in flask.current_app.view_functions else '/architecture/dashboard' %}
-    <section aria-label="Key figures" class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {% for tile_href, tile_id, tile_label, tile_value, tile_source, tile_value_id in [
-            (_apps_href, 'applications', 'Applications', metrics.applications, 'Application portfolio', 'health-kpi-applications'),
-            (_sol_href, 'solutions', 'Solution designs', nav_stats.solutions, 'Solution pipeline', 'health-kpi-solutions'),
-            (_el_href, 'elements', 'Elements in the model', nav_stats.elements, 'ArchiMate repository', 'health-kpi-elements'),
-        ] %}
-        <a href="{{ tile_href }}" class="block rounded-lg transition-colors hover:bg-muted/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" data-testid="kpi-tile-{{ tile_id }}">
-            {% call card(class='h-full') %}
-                {% call card_header(class='pb-2') %}
-                    {% call card_description() %}{{ tile_label }}{% endcall %}
-                    {% call card_title(class='text-3xl tabular-nums') %}<span data-testid="{{ tile_value_id }}">{{ tile_value }}</span>{% endcall %}
-                {% endcall %}
-                {% call card_footer(class='text-xs text-muted-foreground') %}from {{ tile_source }}, as of {{ _now }}{% endcall %}
-            {% endcall %}
-        </a>
-        {% endfor %}
-
-        <div data-testid="kpi-tile-health-score" x-data="{ open: false }">
-            {% call card(class='h-full') %}
-                {% call card_header(class='pb-2') %}
-                    {% call card_description() %}Health score{% endcall %}
-                    {% call card_title(class='text-3xl tabular-nums') %}<span data-testid="health-score-value">{{ health_score_text if health_score is not none else '—' }}</span>{% endcall %}
-                {% endcall %}
-                {% call card_content(class='text-xs text-muted-foreground') %}
-                {% if health_score is not none %}
-                <p>weighted composite, as of {{ _now }}</p>
-                {% call button(variant='link', size='sm', class='mt-2 h-auto px-0 text-xs', on_click='open = !open', testid='health-score-disclosure-button') %}
-                    <span x-show="!open">How this is worked out</span>
-                    <span x-show="open" x-cloak>Hide details</span>
-                {% endcall %}
-                <div x-show="open" x-cloak class="mt-3 space-y-2 border-t border-border pt-3" data-testid="health-score-disclosure">
-                    <p class="text-xs font-medium text-foreground">Weighted from:</p>
-                    <ul class="space-y-1.5 text-xs text-muted-foreground" data-testid="health-score-parts">
-                    {% for key in ['phase_maturity', 'risk_health', 'capability_coverage', 'governance'] %}
-                        {% set part = health_components.get(key, {}) %}
-                        <li class="flex items-start gap-2" data-testid="health-score-part">
-                            {% if part.value is not none %}
-                            <span class="shrink-0 font-medium text-foreground tabular-nums" data-testid="health-part-value">{{ part.value }}%</span>
-                            <span>{{ part.label }}{% if part.weight %}, weight <span class="tabular-nums" data-testid="health-part-weight">{{ '%g'|format(part.weight) }}%</span>{% endif %}</span>
-                            {% else %}
-                            <span class="shrink-0 text-muted-foreground">—</span>
-                            <span>{{ part.label }}: {{ part.basis }}</span>
-                            {% endif %}
-                        </li>
-                    {% endfor %}
-                    </ul>
-                    {% if health_sum %}
-                    <p class="text-xs text-muted-foreground" data-testid="health-score-sum">Sum: <span class="tabular-nums text-foreground">{{ health_sum }}</span></p>
-                    {% endif %}
-                    {% if health_unavailable %}
-                    <p class="text-xs text-muted-foreground mt-2">
-                        Not measured: {{ health_unavailable|join(', ')|replace('_', ' ')|title }}.
-                    </p>
-                    {% endif %}
-                </div>
-                {% else %}
-                {{ explained_value(basis="Health score could not be computed", action="Record data in at least two of the four components to see a score") }}
-                {% endif %}
-                {% endcall %}
-            {% endcall %}
-        </div>
-    </section>
-
-    {# Council-07: Priority actions list directly under the KPI band, max 5 rows with "See all" #}
-    {% if priority_actions and priority_actions.rows %}
-    {% include 'components/priority_actions.html' %}
-    {% endif %}
-
-    {# Activity chart (shadcn dashboard-01 interactive area chart): records added per day, drawn on the server from created_at dates. #}
-    {% macro activity_area(rows, label) %}
-    {% set W = 720 %}{% set H = 260 %}{% set top = 16 %}{% set bottom = 32 %}{% set left = 44 %}{% set right = 12 %}
-    {% set plot_w = W - left - right %}{% set plot_h = H - top - bottom %}
-    {% set n = rows|length %}
-    {% set peak = (rows | map(attribute='total') | max) or 1 %}
-    {% set base = top + plot_h %}
-    {% set ns = namespace(apps_path='', total_path='', apps_top='', total_top='') %}
-    {% for r in rows %}
-        {% set x = left + (plot_w * loop.index0 / (n - 1)) %}
-        {% set y_apps = base - plot_h * r.applications / peak %}
-        {% set y_total = base - plot_h * r.total / peak %}
-        {% set ns.apps_top = ns.apps_top ~ ('M' if loop.first else 'L') ~ (x|round(1)) ~ ',' ~ (y_apps|round(1)) ~ ' ' %}
-        {% set ns.total_top = ns.total_top ~ ('M' if loop.first else 'L') ~ (x|round(1)) ~ ',' ~ (y_total|round(1)) ~ ' ' %}
-    {% endfor %}
-    <svg viewBox="0 0 {{ W }} {{ H }}" class="block h-[260px] w-full" role="img" aria-label="{{ label }}">
-        {% for g in [0, 1, 2, 3] %}
-        {% set gy = top + plot_h - (plot_h * g / 3) %}
-        <line x1="{{ left }}" y1="{{ gy }}" x2="{{ W - right }}" y2="{{ gy }}" class="stroke-border" stroke-width="1" />
-        <text x="{{ left - 6 }}" y="{{ gy + 4 }}" text-anchor="end" class="fill-muted-foreground tabular-nums" font-size="15">{{ (peak * g / 3) | round | int }}</text>
-        {% endfor %}
-        <path d="{{ ns.total_top }}L{{ left + plot_w }},{{ base }} L{{ left }},{{ base }} Z" class="fill-primary/25" />
-        <path d="{{ ns.total_top }}" class="fill-none stroke-primary/60" stroke-width="1.5" />
-        <path d="{{ ns.apps_top }}L{{ left + plot_w }},{{ base }} L{{ left }},{{ base }} Z" class="fill-primary/60" />
-        <path d="{{ ns.apps_top }}" class="fill-none stroke-primary" stroke-width="1.5" />
-        {% set step = ((n / 5) | round(0, 'ceil') | int) or 1 %}
-        {% for r in rows if r.idx % step == 0 or r.idx == n - 1 %}
-        {% set tx = left + (plot_w * r.idx / (n - 1)) %}
-        <text x="{{ tx }}" y="{{ H - 10 }}" text-anchor="{{ 'end' if r.idx == n - 1 else ('start' if r.idx == 0 else 'middle') }}" class="fill-muted-foreground" font-size="15">{{ r.label }}</text>
-        {% endfor %}
-    </svg>
-    {% endmacro %}
-    {% set series = activity_series %}
-    {% call card() %}
-    <div data-testid="activity-chart" x-data="{ range: '90d' }">
-        {% call card_header() %}
-            {% call card_title(class='text-base') %}Records added{% endcall %}
-            {% call card_description() %}Applications and model elements added per day, from the date each was recorded.{% endcall %}
-        {% endcall %}
-        {% call card_content() %}
-        {% if series is none %}
-            <p role="status" class="py-8 text-center text-sm text-muted-foreground">The activity chart could not be drawn because the dates could not be read. Reload the page to try again.</p>
-        {% elif (series | sum(attribute='applications')) + (series | sum(attribute='elements')) == 0 %}
-            {{ empty_state(icon='chart-area', title='Nothing added in the last 90 days', description='Applications and model elements appear here, day by day, as they are imported or created.', cta_text='Import applications', cta_href=_apps_href, padding='py-8') }}
+<div class="p-6 space-y-6">
+{{ page_shell(title='Overview', subtitle='Your applications, relationships, run cost and changes at a glance', breadcrumb=[('Home', none), ('Overview', none)]) }}
+<div class="style-vega flex flex-col gap-4 md:gap-6" data-testid="overview-dashboard">
+  <div class="grid grid-cols-1 gap-4 md:gap-6 sm:grid-cols-3 xl:grid-cols-5">
+    {% call ui.card(class='relative overflow-hidden bg-primary-surface text-primary-surface-foreground sm:col-span-3 xl:col-span-2', attrs={'data-testid': 'overview-welcome'}) %}
+      {% call ui.card_header() %}
+        {{ ui.card_title(text='Welcome back' ~ (', ' ~ o.first_name if o.first_name else ''), class='text-xl') }}
+        {% if o.empty %}
+        {{ ui.card_description(text='Connect GitHub and your model is built for you', class='text-primary-surface-foreground/90') }}
         {% else %}
-            {% call tabs_list(class='mb-4 h-auto w-fit max-w-full flex-wrap') %}
-                {% for key, text in [('90d', 'Last 3 months'), ('30d', 'Last 30 days'), ('7d', 'Last 7 days')] %}
-                {% call tabs_trigger(value='range-' ~ key, click="range = '" ~ key ~ "'", selected="range === '" ~ key ~ "'") %}{{ text }}{% endcall %}
-                {% endfor %}
-            {% endcall %}
-            {% for key, days, text in [('90d', 90, 'last 3 months'), ('30d', 30, 'last 30 days'), ('7d', 7, 'last 7 days')] %}
-            {% set rows = [] %}
-            {% for r in series[-days:] %}{% set _ = rows.append({'label': r.label, 'applications': r.applications, 'total': r.applications + r.elements, 'idx': loop.index0}) %}{% endfor %}
-            <div data-testid="activity-range-{{ key }}" x-show="range === '{{ key }}'"{% if key != '90d' %} x-cloak{% endif %}>
-                {{ activity_area(rows, 'Records added per day, ' ~ text) }}
-            </div>
-            {% endfor %}
-            {% if activity_undated %}<p class="mt-3 text-xs text-muted-foreground" data-testid="activity-undated">{{ activity_undated }} model element{{ 's' if activity_undated != 1 else '' }} {{ 'has' if activity_undated == 1 else 'have' }} no recorded date and {{ 'is' if activity_undated == 1 else 'are' }} not drawn.</p>{% endif %}
-            <p class="mt-3 flex flex-wrap gap-x-6 gap-y-1 text-xs text-muted-foreground">
-                <span class="inline-flex items-center gap-2"><span class="size-2.5 rounded-sm bg-primary/60" aria-hidden="true"></span>Applications</span>
-                <span class="inline-flex items-center gap-2"><span class="size-2.5 rounded-sm bg-primary/25" aria-hidden="true"></span>Model elements, stacked above</span>
-            </p>
+        {{ ui.card_description(text='Here is how your model is doing.', class='text-primary-surface-foreground/90') }}
         {% endif %}
-        {% endcall %}
-    </div>
+      {% endcall %}
+      {% call ui.card_content(class='flex flex-col items-start gap-4') %}
+        {% if o.empty %}
+        {% if links.connect %}{{ ui.button(text='Connect GitHub', href=links.connect, variant='secondary', class='text-secondary-foreground', attrs={'data-testid': 'overview-connect'}) }}{% endif %}
+        {% else %}
+        <div class="inline-flex divide-x divide-primary-surface-foreground/20 rounded-lg bg-primary-surface-foreground/10" data-testid="welcome-figures">
+          <a href="{{ links.applications }}" class="flex flex-col items-center px-5 py-2 outline-none focus-visible:ring-[3px] focus-visible:ring-primary-surface-foreground/50" data-testid="welcome-applications"><span class="text-lg font-semibold tabular-nums">{{ apps.total }}</span><span class="text-xs">Applications</span></a>
+          {% if sourced %}
+          <span class="flex flex-col items-center px-5 py-2" data-testid="welcome-sourced"><span class="text-lg font-semibold tabular-nums">{{ sourced.percent }}%</span><span class="text-xs">Facts with a source</span></span>
+          {% endif %}
+        </div>
+        {% if not sourced %}<p class="text-sm text-primary-surface-foreground/90" data-testid="welcome-sourced-why">The share of facts with a source appears once the model holds elements.</p>{% endif %}
+        {% endif %}
+      {% endcall %}
+      <div aria-hidden="true" class="pointer-events-none absolute -right-4 -bottom-6 hidden sm:block">{{ lucide('layout-dashboard', 'size-36 -rotate-12 text-primary-surface-foreground/15') }}</div>
     {% endcall %}
 
-    {# Data table (shadcn dashboard-01): capability coverage with its tabs and pagination. Gaps first. #}
-    {% set ch = (capability_health|default([]))|sort(attribute='app_count') %}
-    {% set gap_count = ch | selectattr('coverage_status', 'equalto', 'gap') | list | length %}
-    {% set partial_count = ch | selectattr('coverage_status', 'equalto', 'partial') | list | length %}
-    {% set covered_count = ch | selectattr('coverage_status', 'equalto', 'covered') | list | length %}
-    <section aria-labelledby="capability-coverage-heading" data-testid="capability-health-widget"
-             x-data="{ tab: 'all', page: 0, size: 10,
-                       rows() { return Array.from(this.$root.querySelectorAll('[data-row]')); },
-                       matching() { return this.rows().filter(r => this.tab === 'all' || r.dataset.status === this.tab); },
-                       pages() { return Math.max(1, Math.ceil(this.matching().length / this.size)); },
-                       pick(t) { this.tab = t; this.page = 0; },
-                       show() { const keep = this.matching().slice(this.page * this.size, (this.page + 1) * this.size); this.rows().forEach(r => { r.hidden = !keep.includes(r); }); } }"
-             x-effect="show()">
-        {% call card() %}
-        {% call card_header() %}
-            {% call card_title(class='text-base') %}<span id="capability-coverage-heading">Capability coverage</span>{% endcall %}
-            {% call card_description() %}{{ gap_count }} gap{{ 's' if gap_count != 1 else '' }} of {{ ch|length }} capabilities. A capability with no application is a gap, with one it is partial, with two or more it is covered.{% endcall %}
-        {% endcall %}
-        {% call card_content(class='space-y-4') %}
-        {% if ch %}
-            {% call tabs_list(class='h-auto w-fit max-w-full flex-wrap') %}
-                {% for key, text, count in [('all', 'All', ch|length), ('gap', 'Gaps', gap_count), ('partial', 'Partial', partial_count), ('covered', 'Covered', covered_count)] %}
-                {% call tabs_trigger(value='coverage-' ~ key, click="pick('" ~ key ~ "')", selected="tab === '" ~ key ~ "'") %}{{ text }} <span class="ml-1 tabular-nums text-muted-foreground">{{ count }}</span>{% endcall %}
-                {% endfor %}
-            {% endcall %}
-            {% call dense_table(columns=[('Capability', ''), ('Applications', 'hidden text-right sm:table-cell'), ('Coverage', ''), ('', 'text-right')], rows=ch|length, caption='Capability coverage', max_height='none', flush=false) %}{% for cap in ch %}
-                <tr class="group h-12 transition-colors hover:bg-muted/50" data-row data-status="{{ cap.coverage_status }}" data-testid="coverage-row"{% if loop.index > 10 %} hidden{% endif %}>
-                    <td class="px-2 align-middle font-medium text-foreground">{{ cap.name }}</td>
-                    <td class="hidden px-2 text-right align-middle tabular-nums text-muted-foreground sm:table-cell">{{ cap.app_count }}</td>
-                    <td class="px-2 align-middle">
-                        {% if cap.coverage_status == 'covered' %}<span class="text-success-emphasis">Covered</span>
-                        {% elif cap.coverage_status == 'partial' %}<span class="text-warning-emphasis">Partial</span>
-                        {% else %}<span class="text-destructive-emphasis">Gap</span>{% endif %}
-                    </td>
-                    <td class="px-2 text-right align-middle">
-                        <a href="{{ url_for('capability_map.index') }}?cap={{ cap.id }}" class="inline-flex h-8 items-center rounded-md px-2.5 text-13 font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">Open<span class="sr-only"> {{ cap.name }} on the capability map</span></a>
-                    </td>
-                </tr>
-            {% endfor %}{% endcall %}
-            <div class="flex items-center justify-between gap-2">
-                <p class="text-sm text-muted-foreground tabular-nums" data-testid="coverage-page-label" x-text="'Page ' + (page + 1) + ' of ' + pages()">Page 1 of {{ ((ch|length) / 10) | round(0, 'ceil') | int }}</p>
-                <div class="flex items-center gap-2">
-                    {{ button(text='Previous', variant='outline', size='sm', icon='chevron-left', testid='coverage-prev', attrs_dict={':disabled': 'page === 0', '@click': 'page = Math.max(0, page - 1)'}) }}
-                    {{ button(text='Next', variant='outline', size='sm', icon='chevron-right', icon_position='right', testid='coverage-next', attrs_dict={':disabled': 'page >= pages() - 1', '@click': 'page = Math.min(pages() - 1, page + 1)'}) }}
-                </div>
-            </div>
-        {% else %}
-            {{ empty_state(icon='layers', title='No capabilities modelled yet', description='Coverage appears here once capabilities exist and applications are mapped to them.', cta_text='Open the capability map', cta_href=url_for('capability_map.index'), padding='py-8') }}
-        {% endif %}
-        {% endcall %}
-        {% endcall %}
-    </section>
-
-    {# Other ways to read the same model: executive summaries and the ArchiMate layers. Opens on the lens that matches the signed-in role. #}
-    <section aria-labelledby="lens-heading" class="space-y-6">
-    <h2 id="lens-heading" class="text-base font-semibold text-foreground">Read it another way</h2>
-    {# Council-07: Lenses split into two labelled groups: "View as" (executive summaries)
-       and "Layer" (ArchiMate 3.2 layers). At 390 the layer group becomes a select. #}
-    <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:gap-6" aria-label="Dashboard lenses">
-        {# View as group #}
-        <div class="flex flex-col gap-1.5">
-            <label class="text-xs font-medium text-muted-foreground">View as</label>
-            <div class="flex w-fit items-center gap-0.5 rounded-md bg-muted p-0.5">
-                {% for role_key, role_label in [('overview', 'Overview'), ('cto', 'CTO'), ('cfo', 'CFO')] %}
-                {% call button(variant='ghost', size='sm', class='h-7 px-2.5 text-xs', on_click="activeRole = '" ~ role_key ~ "'", testid='layer-tab-' ~ role_key, attrs_dict={':aria-pressed': "activeRole === '" ~ role_key ~ "' ? 'true' : 'false'", ':class': "activeRole === '" ~ role_key ~ "' ? 'bg-background text-foreground' : ''"}) %}{{ role_label }}{% endcall %}
-                {% endfor %}
-            </div>
-        </div>
-
-        {# Layer group #}
-        <div class="flex flex-col gap-1.5">
-            <label class="text-xs font-medium text-muted-foreground">Layer</label>
-            {# Desktop: segmented control #}
-            <div class="hidden sm:flex w-fit items-center gap-0.5 rounded-md bg-muted p-0.5">
-                {% for role_key, role_label in [('motivation', 'Motivation'), ('strategy', 'Strategy'), ('business', 'Business'), ('application', 'Application'), ('technology', 'Technology'), ('implementation', 'Implementation & Migration')] %}
-                {% call button(variant='ghost', size='sm', class='h-7 px-2.5 text-xs whitespace-nowrap', on_click="activeRole = '" ~ role_key ~ "'", testid='layer-tab-' ~ role_key, attrs_dict={':aria-pressed': "activeRole === '" ~ role_key ~ "' ? 'true' : 'false'", ':class': "activeRole === '" ~ role_key ~ "' ? 'bg-background text-foreground' : ''"}) %}{{ role_label }}{% endcall %}
-                {% endfor %}
-            </div>
-            {# Mobile: select #}
-            {{ dropdown_menu(id='layer-select-mobile', trigger_text='Choose a view', position='left', class='sm:hidden', menu_width='w-64', items=[{'text': 'Overview', 'onclick': "activeRole = 'overview'"}, {'text': 'CTO', 'onclick': "activeRole = 'cto'"}, {'text': 'CFO', 'onclick': "activeRole = 'cfo'"}, {'text': 'Motivation', 'onclick': "activeRole = 'motivation'"}, {'text': 'Strategy', 'onclick': "activeRole = 'strategy'"}, {'text': 'Business', 'onclick': "activeRole = 'business'"}, {'text': 'Application', 'onclick': "activeRole = 'application'"}, {'text': 'Technology', 'onclick': "activeRole = 'technology'"}, {'text': 'Implementation & Migration', 'onclick': "activeRole = 'implementation'"}]) }}
-        </div>
-    </div>
-
-    <div x-show="activeRole === 'overview'" class="space-y-8">
-
-    {# Architecture overview: the layered viewpoint as counts and a link, one
-       quiet row (there is no static preview of the composer). #}
-    <div class="flex items-center justify-between gap-4 rounded-lg border border-border bg-card px-4 py-3" data-testid="architecture-overview">
-        <div class="min-w-0">
-            <h2 class="text-sm font-semibold text-foreground">Architecture Overview — Layered Viewpoint</h2>
-            <p class="mt-0.5 text-xs text-muted-foreground tabular-nums">
-                {{ '{:,}'.format(nav_stats.elements) if nav_stats and nav_stats.elements is not none else '—' }} elements ·
-                {{ '{:,}'.format(nav_stats.relationships) if nav_stats and nav_stats.relationships is not none else '—' }} relationships across all ArchiMate layers
-            </p>
-        </div>
-        {{ button(text='Open Composer', href='/archimate/composer?viewpoint=layered', size='sm', icon='arrow-right', icon_position='right', class='shrink-0 gap-1.5 text-xs', testid='open-composer') }}
-    </div>
-
-    {# Council-07: Architecture health — each part shows value with source/date, or the
-       basis sentence and action to measure it. #}
-    <section aria-labelledby="architecture-health-heading" class="rounded-lg border border-border bg-card" data-testid="architecture-health">
-        <div class="flex items-center justify-between border-b border-border px-4 py-2">
-            <h2 id="architecture-health-heading" class="text-base font-semibold text-foreground">Architecture health</h2>
-            <span class="text-2xs font-semibold uppercase tracking-[0.06em] text-muted-foreground">What the score is weighted from</span>
-        </div>
-        <div class="grid grid-cols-1 gap-px bg-border md:grid-cols-2">
-            {% for key in ['phase_maturity', 'risk_health', 'capability_coverage', 'governance'] %}
-            {% set part = health_components.get(key, {}) %}
-            <div class="bg-card px-4 py-3">
-                <p class="text-xs text-muted-foreground">{{ part.label or key|replace('_', ' ')|title }}</p>
-                {% if part.value is not none %}
-                <p class="mt-1 text-lg font-semibold tabular-nums text-foreground">{{ part.value }}%</p>
-                <p class="mt-1 text-xs text-muted-foreground">{{ part.basis }}</p>
-                {% if part.weight %}<p class="mt-0.5 text-xs text-muted-foreground">Counts for {{ '%g'|format(part.weight) }}% of the health score</p>{% endif %}
-                <p class="mt-0.5 text-xs text-muted-foreground">from {{ part.source }}, as of {{ part.as_of }}</p>
-                {% else %}
-                <p class="mt-1 text-lg font-semibold tabular-nums text-foreground">—</p>
-                <p class="mt-1 text-xs text-muted-foreground">{{ part.basis or 'Not measured yet' }}</p>
-                {% endif %}
-            </div>
-            {% endfor %}
-        </div>
-    </section>
-
-    {# Chart: application lifecycle, one series, hairline container, no vertical grid. #}
-    <section aria-labelledby="lifecycle-chart-heading" class="rounded-lg border border-border bg-card" data-testid="lifecycle-distribution">
-        <div class="flex items-center justify-between border-b border-border px-4 py-2">
-            <h2 id="lifecycle-chart-heading" class="text-base font-semibold text-foreground">Applications by lifecycle</h2>
-            <span class="text-2xs font-semibold uppercase tracking-[0.06em] text-muted-foreground tabular-nums">{{ metrics.applications|dash }} in portfolio</span>
-        </div>
-        {% set lc = lifecycle_distribution|default([]) %}
-        {% if lc %}
-        {% set maxc = (lc | map(attribute='count') | max) or 1 %}
-        {% set n = lc|length %}
-        {% set W = 960 %}{% set H = 320 %}{% set top = 24 %}{% set bottom = 48 %}{% set left = 56 %}{% set right = 16 %}
-        {% set plot_h = H - top - bottom %}{% set plot_w = W - left - right %}
-        {% set slot = plot_w / n %}
-        <svg viewBox="0 0 {{ W }} {{ H }}" class="block h-[320px] w-full" role="img" aria-label="Applications by lifecycle stage">
-            {% for g in [0, 1, 2, 3, 4] %}
-            {% set y = top + plot_h - (plot_h * g / 4) %}
-            <line x1="{{ left }}" y1="{{ y }}" x2="{{ W - right }}" y2="{{ y }}" class="stroke-border" stroke-width="1" />
-            <text x="{{ left - 8 }}" y="{{ y + 4 }}" text-anchor="end" class="fill-muted-foreground tabular-nums" font-size="11">{{ ((maxc * g / 4) | round | int) }}</text>
-            {% endfor %}
-            {% for item in lc %}
-            {% set bh = (plot_h * item.count / maxc) if item.count else 0 %}
-            {% set bw = (slot * 0.56) %}
-            {% set x = left + loop.index0 * slot + (slot - bw) / 2 %}
-            <rect x="{{ x }}" y="{{ top + plot_h - bh }}" width="{{ bw }}" height="{{ bh }}" rx="2" class="fill-primary" />
-            <text x="{{ x + bw / 2 }}" y="{{ top + plot_h - bh - 6 }}" text-anchor="middle" class="fill-foreground tabular-nums" font-size="11" font-weight="600">{{ item.count }}</text>
-            <text x="{{ x + bw / 2 }}" y="{{ H - bottom + 20 }}" text-anchor="middle" class="fill-muted-foreground" font-size="11" font-weight="600" letter-spacing="0.06em">{{ (item.label or item.status or '')|upper|truncate(18, true, '…') }}</text>
-            {% endfor %}
-        </svg>
-        {% else %}
-        {{ empty_state(icon='refresh-cw', title='No lifecycle stages recorded', description='Set a lifecycle stage on your applications to see how many sit in each.', cta_text='Open applications', cta_href=_apps_href, padding='py-8') }}
-        {% endif %}
-    </section>
-
-    {# Solution pipeline by ADM phase: one row per phase, hairline bars, the
-       empty and unavailable states as quiet lines. #}
-    {% call section_card(title='Solution Pipeline') %}
-    {# solution_pipeline always has one row per ADM phase A-H (see the route) and
-       arrives as None when the query failed. Gate on the total, not list
-       truthiness: an org with no solutions is an empty state, not eight empty
-       bars; a portfolio bunched in one phase is one sentence, not seven empty
-       bars and one full one. #}
-    {% set sp_rows = solution_pipeline if solution_pipeline else [] %}
-    {% set sp_sum = sp_rows|map(attribute='count')|sum %}
-    {% set sp_active = sp_rows|selectattr('count', 'gt', 0)|list %}
-    {% if solution_pipeline is none %}
-    <p role="status" class="text-sm text-muted-foreground">Pipeline unavailable — solution phase data could not be loaded. Reload the page to try again.</p>
-    {% elif sp_sum > 0 and sp_active|length > 1 %}
-    {% set sp_max = sp_rows|map(attribute='count')|max or 1 %}
-    <ol class="divide-y divide-border">
-        {% for item in sp_rows %}
-        <li class="flex h-10 items-center gap-4">
-            <span class="w-44 shrink-0 truncate text-sm text-foreground">{{ item.label }}</span>
-            <svg class="h-1.5 min-w-0 flex-1" viewBox="0 0 100 4" preserveAspectRatio="none" aria-hidden="true">
-                <rect width="100" height="4" rx="2" class="fill-muted" />
-                <rect width="{{ (item.count / sp_max * 100)|round|int }}" height="4" rx="2" class="fill-primary" />
-            </svg>
-            <span class="w-10 shrink-0 text-right text-sm tabular-nums text-foreground">{{ item.count }}</span>
-        </li>
-        {% endfor %}
-    </ol>
-    <p class="mt-3 text-sm"><a href="{{ url_for('solution_design.list_solutions') }}" class="text-info hover:underline">Open the pipeline</a></p>
-    {% elif sp_sum > 0 %}
-    {% set sp_one = sp_active[0] %}
-    {% if sp_one.phase is none %}
-    <p class="text-sm text-foreground">{{ sp_sum }} solution{{ 's' if sp_sum != 1 else '' }} without a recorded ADM phase.</p>
-    <p class="mt-1 text-sm text-muted-foreground">Set the ADM phase on each solution to see the pipeline. <a href="{{ url_for('solution_design.list_solutions') }}" class="text-info hover:underline">Open the pipeline</a></p>
+    {# Annual run cost #}
+    {% if cost.total is not none %}
+            {% set cost_sentence = (cost.basis | capitalize ~ '. ' ~ cost.top.name ~ ' is ' ~ cost.top.percent ~ '% of it.') if cost.top else (cost.basis | capitalize ~ '.') %}
+      {% if cost.difference %}{% set cost_sentence = cost_sentence ~ ' ' ~ cost.difference %}{% endif %}
+      {% set cost_badge = (('%+d%%' % cost.change) if cost.change else 'No change') if cost.change is not none else none %}
+      {{ stat_card('card-run-cost', 'circle-dollar-sign', 'Annual run cost', cost.total_short, cost_badge, (cost.change <= 0) if cost.change else none, cost_sentence, links.spend, exact=cost.total_exact) }}
     {% else %}
-    {% set _sp_parts = (sp_one.label or '').split(': ', 1) %}{% set sp_letter = _sp_parts[0] if _sp_parts|length == 2 else '' %}{% set sp_name = _sp_parts[1] if _sp_parts|length == 2 else (sp_one.label or '') %}
-    <p class="text-sm text-foreground">Nothing past {{ sp_name }} yet — all {{ sp_sum }} solution{{ 's' if sp_sum != 1 else '' }} {{ 'are' if sp_sum != 1 else 'is' }} in phase {{ sp_letter }}.</p>
-    <p class="mt-1 text-sm text-muted-foreground">Nothing further yet. <a href="{{ url_for('solution_design.list_solutions') }}" class="text-info hover:underline">Open the pipeline</a></p>
+      {{ stat_card('card-run-cost', 'circle-dollar-sign', 'Annual run cost', none, none, none, 'Appears here once a contract states its annual cost.' if not cost.contracts else (cost.contracts ~ (' active contract states' if cost.contracts == 1 else ' active contracts state') ~ ' no annual cost yet.'), links.spend) }}
     {% endif %}
-    {% elif current_user.enterprise_role in ('solution_architect', 'enterprise_architect', 'platform_admin') %}
-    <p class="text-sm text-muted-foreground">No solutions yet. <a href="/solutions/" class="text-info hover:underline">Create your first solution</a> to start tracking ADM phase progress.</p>
+
+    {# Relationships #}
+    {% if rel.total %}
+      {% set rel_sentence = (rel.top.name ~ ' is the most connected, with ' ~ rel.top.count ~ ' relationships.') if rel.top else 'Between the elements of the model.' %}
+      {% set rel_badge = ('+' ~ rel.added_30d) if rel.added_30d else 'No change' %}
+      {{ stat_card('card-relationships', 'share-2', 'Relationships', rel.total, rel_badge, none if not rel.added_30d else true, rel_sentence ~ (' ' ~ rel.added_30d ~ ' added in the last 30 days.' if rel.added_30d else ' None were added in the last 30 days.'), links.model) }}
     {% else %}
-    {# Non-architects cannot start a solution, so no call to action here.
-       empty-state-ok: role-scoped #}
-    <p class="text-sm text-muted-foreground">No solutions in pipeline yet. Phase progress appears here once an architect blueprints one.</p>
+      {{ stat_card('card-relationships', 'share-2', 'Relationships', none, none, none, 'Appear here once a source is connected and the model links its systems.', links.model) }}
     {% endif %}
+
+    {# Applications with no owner #}
+    {% if apps.total %}
+      {% set n = apps.unowned | length %}
+      {% if n %}
+        {% set owner_sentence = apps.unowned[0][1] ~ (' has no owner.' if n == 1 else ' and ' ~ (n - 1) ~ (' other have' if n == 2 else ' others have') ~ ' no owner.') %}
+        {% set owner_badge = ('+' ~ apps.unowned_added_30d) if apps.unowned_added_30d else 'No change' %}
+        {{ stat_card('card-no-owner', 'user-round-x', 'Applications with no owner', n, owner_badge, false if apps.unowned_added_30d else none, owner_sentence ~ (' ' ~ apps.unowned_added_30d ~ ' arrived in the last 30 days.' if apps.unowned_added_30d else ''), links.no_owner) }}
+      {% else %}
+        {{ stat_card('card-no-owner', 'user-check', 'Every application has an owner', none, none, none, 'All ' ~ apps.total ~ ' applications name someone accountable.', links.applications) }}
+      {% endif %}
+    {% else %}
+      {{ stat_card('card-no-owner', 'user-round-x', 'Applications with no owner', none, none, none, 'Appear here once applications are in the model.', links.applications) }}
+    {% endif %}
+  </div>
+
+  <div class="grid grid-cols-1 gap-4 md:gap-6 xl:grid-cols-3">
+    {# Records added #}
+    {% call ui.card(class='xl:col-span-2', attrs={'x-data': "{ range: '" ~ (act.default_range if act else '90d') ~ "' }", 'data-testid': 'activity-chart'}) %}
+        {% call ui.card_header() %}
+          {{ ui.card_title(text='Model records added') }}
+          {{ ui.card_description(text='Added each day (each week over 3 months), from connected sources and by hand') }}
+          {% call ui.card_action() %}
+            {% call ui.native_select_wrapper(class='relative w-fit') %}{% call ui.native_select(id='activity-range', class='h-8 rounded-md border border-input bg-background pl-2.5 pr-8 text-sm', attrs={'aria-label': 'Period', 'x-model': 'range', 'data-testid': 'activity-range'}) %}{% for key, label, days in o.ranges %}{{ ui.native_select_option(text={'90d': '3 months', '30d': '30 days', '7d': '7 days'}[key], value=key) }}{% endfor %}{% endcall %}{{ ui.native_select_icon(class='pointer-events-none absolute') }}{% endcall %}
+          {% endcall %}
+        {% endcall %}
+        {% call ui.card_content(class='grid gap-6 lg:grid-cols-[1fr_14rem]') %}
+          {% if act and act.ranges['90d'].total %}
+          <div>
+            {% for key, label, days in o.ranges %}
+            <div x-show="range === '{{ key }}'" {% if key != act.default_range %}x-cloak{% endif %} data-testid="activity-range-{{ key }}">
+              {{ d.chart('stacked-bar', act.ranges[key].rows, [{'key': 'connected', 'label': 'Connected sources', 'color': chart_1}, {'key': 'manual', 'label': 'By hand', 'color': chart_2}], x='day', class='aspect-auto h-[360px] w-full', label='Model records added per ' ~ act.ranges[key].per ~ ', ' ~ label | lower, legend=true) }}
+            </div>
+            {% endfor %}
+          </div>
+          <div class="flex flex-col gap-6">
+            {% for key, label, days in o.ranges %}
+            <div class="flex flex-col gap-6" x-show="range === '{{ key }}'" {% if key != act.default_range %}x-cloak{% endif %} data-testid="activity-summary-{{ key }}">
+              <div class="flex items-center gap-3">{{ d.icon_tile('layout-grid') }}<div class="grid"><span class="text-2xl font-semibold tabular-nums" data-testid="activity-total-{{ key }}">{{ act.ranges[key].total }}</span><span class="text-sm text-muted-foreground">Records added, {{ label | lower }}</span></div></div>
+              <div class="grid gap-1"><span class="flex items-center gap-2 text-sm text-muted-foreground"><span class="size-2 rounded-full bg-chart-1"></span>From connected sources</span><span class="text-xl font-semibold tabular-nums">{{ act.ranges[key].connected }}</span></div>
+              <div class="grid gap-1"><span class="flex items-center gap-2 text-sm text-muted-foreground"><span class="size-2 rounded-full bg-chart-tint"></span>By hand</span><span class="text-xl font-semibold tabular-nums">{{ act.ranges[key].manual }}</span></div>
+            </div>
+            {% endfor %}
+            {% if links.changes %}{{ ui.button(text='See every change', href=links.changes, class='mt-auto w-full text-primary-foreground') }}{% endif %}
+          </div>
+          {% else %}
+          <p class="py-8 text-sm text-muted-foreground lg:col-span-2" data-testid="activity-empty">{% if act is none %}The change history could not be read, so the daily records cannot be drawn. Reload the page to try again.{% else %}Nothing was added in the last 3 months. Records appear here, day by day, as a connected source or a person adds them.{% endif %}</p>
+          {% endif %}
+        {% endcall %}
     {% endcall %}
 
+    <div class="flex flex-col gap-4 md:gap-6">
+      {% call ui.card() %}
+        {% call ui.card_header() %}{{ ui.card_title(text='Monthly run cost') }}{% call ui.card_action() %}{{ d.icon_tile('circle-dollar-sign') }}{% endcall %}{% endcall %}
+        {% call ui.card_content(class='flex flex-col gap-2') %}
+          {% if cost.total is not none %}
+          <span class="text-2xl font-semibold tabular-nums" data-testid="monthly-cost-value" title="{{ cost.this_month_exact }}">{{ cost.this_month_short }}</span>
+          <span class="flex items-center gap-2 text-sm text-muted-foreground">{% if cost.change %}{{ d.delta('%+d%%' % cost.change, cost.change <= 0) }} than last month{% elif cost.change == 0 %}Same as last month{% else %}Active contracts, per month{% endif %}</span>
+          {{ d.chart('area', cost.series, [{'key': 'value', 'label': 'Run cost', 'color': chart_1}], grid=false, class='aspect-auto h-[110px] w-full', label='Run cost by month') }}
+          {% else %}
+          <p class="text-sm text-muted-foreground" data-testid="monthly-cost-empty">The monthly run cost appears once a contract states its annual cost.</p>
+          {% endif %}
+        {% endcall %}
+      {% endcall %}
+      {% call ui.card(attrs={'data-testid': 'year-card'}) %}
+        {% call ui.card_header() %}{{ ui.card_title(text='This year against last year') }}{% endcall %}
+        {% call ui.card_content(class='flex items-center justify-between gap-4') %}
+          {% if act and act.last_year and act.this_year %}
+          <div class="flex flex-col gap-2">
+            <span class="text-2xl font-semibold tabular-nums" data-testid="year-value">{{ act.this_year }}</span>
+            <span class="flex items-center gap-2 text-sm whitespace-nowrap text-muted-foreground">{% if act.year_change is not none %}{{ d.delta('%+d%%' % act.year_change, none) }} on last year{% endif %}</span>
+            <div class="mt-2 grid gap-1 text-sm text-muted-foreground">
+              <span class="flex items-center gap-1.5"><span class="size-2 rounded-full bg-chart-tint"></span>Last year <span class="font-medium tabular-nums text-foreground" data-testid="year-last">{{ act.last_year }}</span></span>
+              <span class="flex items-center gap-1.5"><span class="size-2 rounded-full bg-chart-1"></span>This year <span class="font-medium tabular-nums text-foreground" data-testid="year-this">{{ act.this_year }}</span></span>
+            </div>
+          </div>
+          {{ d.chart('stacked-bar', act.year_rows, [{'key': 'last', 'label': 'Last year', 'color': chart_2}, {'key': 'this', 'label': 'This year', 'color': chart_1}], x='year', grid=false, class='aspect-auto h-[120px] w-[140px]', label='Records added, this year against last year') }}
+          {% elif act and act.this_year %}
+          <div class="flex flex-col gap-2">
+            <span class="text-2xl font-semibold tabular-nums" data-testid="year-value">{{ act.this_year }}</span>
+            <span class="text-sm text-muted-foreground" data-testid="year-empty">No records were added last year, so there is nothing to set this year against.</span>
+          </div>
+          {% else %}
+          <p class="text-sm text-muted-foreground" data-testid="year-empty">No records were added last year or this year yet. They appear here once a source is connected or you add one.</p>
+          {% endif %}
+        {% endcall %}
+      {% endcall %}
     </div>
 
-    {# ══════════════════════════════════════════════════════════════════════
-       CTO LENS — risk and governance
-       ══════════════════════════════════════════════════════════════════════ #}
-    {% set cto = (persona_metrics or {}).get('cto') or {} %}
-    <div x-show="activeRole === 'cto'" x-cloak class="space-y-8" data-testid="lens-cto">
-        {# Executive summary, lazily loaded; a value the API sends as null is an em dash. #}
-        <section aria-labelledby="executive-summary-heading" class="rounded-lg border border-border bg-card"
-                 x-data="{ execData: null, execLoading: true, execError: '' }"
-                 x-init="Platform.fetch.get('/dashboard/api/executive-summary')
-                    .then(data => { execData = data.data; })
-                    .catch(() => { execError = 'Executive summary is currently unavailable.'; })
-                    .finally(() => { execLoading = false; })">
-            <div>
-            <header class="flex items-center justify-between border-b border-border px-4 py-2">
-                <h2 id="executive-summary-heading" class="text-base font-semibold text-foreground">Executive Summary</h2>
-                <span class="text-2xs font-semibold uppercase tracking-[0.06em] text-muted-foreground">Portfolio at a glance</span>
-            </header>
-            <p x-show="execLoading" class="px-4 py-3 text-sm text-muted-foreground" aria-busy="true">Loading the summary…</p>
-            <p x-show="execError" x-cloak role="status" class="px-4 py-3 text-sm text-destructive-emphasis" x-text="execError"></p>
-            <template x-if="execData">
-                <div class="-mb-px -mr-px grid grid-cols-2 overflow-hidden md:grid-cols-3">
-                    <template x-for="(val, key) in execData" :key="key">
-                        <div class="border-b border-r border-border bg-card px-4 py-3">
-                            <p class="text-xs capitalize text-muted-foreground" x-text="key.replace(/_/g, ' ')"></p>
-                            <p class="mt-1 text-lg font-semibold tabular-nums text-foreground" x-text="typeof val === 'number' ? val.toLocaleString() : (val ?? '—')"></p>
-                        </div>
-                    </template>
-                </div>
-            </template>
-            </div>
-        </section>
+    {# Changes this week #}
+    {% call ui.card() %}
+      {{ d.card_head('Changes this week', 'Everything added, updated or removed in the model') }}
+      {% call ui.card_content(class='flex flex-col gap-4') %}
+        {% if act and act.week.total %}
+        {{ d.chart('area', act.week.rows, [{'key': 'changes', 'label': 'Changes', 'color': chart_1}], x='day', grid=false, class='aspect-auto h-[160px] w-full', label='Changes per day this week') }}
+        {% call ui.item_group(class='gap-1') %}
+          {% for icon, title, count in [('plus', 'Added', act.week.added), ('pencil', 'Updated', act.week.updated), ('trash-2', 'Removed', act.week.removed)] %}
+          {% call ui.item(size='sm', class='px-0') %}{% call ui.item_media() %}{{ d.icon_tile(icon) }}{% endcall %}{% call ui.item_content() %}{{ ui.item_title(text=title) }}{% endcall %}{% call ui.item_actions() %}{{ ui.badge(text=count, variant='secondary') }}{% endcall %}{% endcall %}
+          {% endfor %}
+        {% endcall %}
+        {% else %}
+        <p class="text-sm text-muted-foreground" data-testid="week-empty">{% if act is none %}The change history could not be read. Reload the page to try again.{% else %}No change was recorded this week. Changes appear here as they are made.{% endif %}</p>
+        {% endif %}
+      {% endcall %}
+    {% endcall %}
 
-        <section aria-label="CTO key figures" class="grid grid-cols-2 gap-4 lg:grid-cols-4">
-            {% for label, value, testid, href in [
-                ('Applications', metrics.applications|dash, 'cto-kpi-applications', '/applications/'),
-                ('Health score', health_score_text|default('—'), 'cto-health-score-value', '/dashboard/health'),
-                ('Solutions', nav_stats.solutions|dash, 'cto-kpi-solutions', '/solutions/'),
-                ('ArchiMate elements', nav_stats.elements|dash, 'cto-kpi-elements', '/architecture/dashboard')
-            ] %}
-            <a href="{{ href }}" data-slot="card" class="rounded-lg border border-border bg-card p-4 transition-colors hover:border-ring">
-                <p data-slot="card-description" class="text-2xs font-semibold uppercase tracking-[0.06em] text-muted-foreground">{{ label }}</p>
-                <p data-slot="card-title" class="mt-1 text-28 font-semibold leading-9 tabular-nums text-foreground" data-testid="{{ testid }}">{{ value }}</p>
-            </a>
+    {# Applications by area #}
+    {% call ui.card() %}
+      {{ d.card_head('Applications by area', 'The business area each application serves') }}
+      {% call ui.card_content(class='flex flex-col gap-4') %}
+        {% if o.areas %}
+        {{ d.chart('bar', o.areas, [{'key': 'applications', 'label': 'Applications', 'color': chart_1}], x='area', class='aspect-auto h-[280px] w-full', label='Applications by business area', testid='areas-chart') }}
+        {% else %}
+        <p class="text-sm text-muted-foreground" data-testid="areas-empty">Appears once applications are in the model.</p>
+        {% endif %}
+      {% endcall %}
+    {% endcall %}
+
+    {# Recent changes #}
+    {% call ui.card() %}
+      {{ d.card_head('Recent changes', 'The latest changes to the model') }}
+      {% call ui.card_content() %}
+        {% if act and act.recent %}
+        <div data-testid="recent-changes">
+        {% call ui.item_group(class='gap-1') %}
+          {% for change in act.recent %}
+          {% call ui.item(size='sm', class='px-0') %}{% call ui.item_media() %}{{ d.icon_tile('share-2' if change.kind == 'relationship' else 'box') }}{% endcall %}{% call ui.item_content() %}{{ ui.item_title(text=change.name) }}{{ ui.item_description(text=change.action ~ (' by ' ~ change.by if change.by else '') ~ ', ' ~ change.when.strftime('%d %b %Y')) }}{% endcall %}{% endcall %}
+          {% endfor %}
+        {% endcall %}
+        </div>
+        {% else %}
+        <p class="text-sm text-muted-foreground" data-testid="recent-empty">{% if act is none %}The change history could not be read. Reload the page to try again.{% else %}No change has been recorded yet. The latest changes appear here.{% endif %}</p>
+        {% endif %}
+      {% endcall %}
+      {% if links.changes %}{% call ui.card_footer() %}{{ ui.button(text='See every change', href=links.changes, class='w-full text-primary-foreground', attrs={'data-testid': 'recent-changes-link'}) }}{% endcall %}{% endif %}
+    {% endcall %}
+
+    {# Applications #}
+    <div class="xl:col-span-2" data-testid="applications-table">
+      {% call ui.card(class='gap-4') %}
+        {% call ui.card_header() %}{{ ui.card_title(text='Applications') }}{{ ui.card_description(text='Annual cost recorded for the application') }}{% endcall %}
+        {% call ui.card_content(class='px-0') %}
+          {% if o.table.rows %}
+          {% call ui.table_container() %}{% call ui.table() %}
+            {% call ui.table_header() %}{% call ui.table_row() %}
+              {{ ui.table_head(text='Application', class='pl-6') }}{{ ui.table_head(text='Type') }}{{ ui.table_head(text='Status') }}{{ ui.table_head(text='Owner') }}{{ ui.table_head(text='Annual cost', class='pr-6 text-right') }}
+            {% endcall %}{% endcall %}
+            {% call ui.table_body() %}
+            {% for row in o.table.rows %}
+              {% call ui.table_row(attrs={'data-testid': 'applications-row'}) %}
+                {% call ui.table_cell(class='pl-6') %}<a href="{{ url_for('unified_applications.application_detail', id=row.id) }}" class="font-medium hover:underline">{{ row.name }}</a>{% endcall %}
+                {{ ui.table_cell(text=row.type or 'Not recorded') }}
+                {% call ui.table_cell() %}{{ ui.badge(text=row.status or 'Not recorded', variant='outline') }}{% endcall %}
+                {% call ui.table_cell() %}{% if row.owner %}{{ row.owner }}{% else %}<span class="text-muted-foreground">No owner</span>{% endif %}{% endcall %}
+                {% call ui.table_cell(class='pr-6 text-right tabular-nums') %}{% if row.cost is not none %}{{ row.cost_label }}{% else %}<span class="text-muted-foreground">Not recorded</span>{% endif %}{% endcall %}
+              {% endcall %}
             {% endfor %}
-        </section>
-
-        <section aria-labelledby="risk-arb-heading" class="rounded-lg border border-border bg-card">
-            <div class="flex items-center justify-between border-b border-border px-4 py-2">
-                <h2 id="risk-arb-heading" class="text-base font-semibold text-foreground">Portfolio risk and ARB pipeline</h2>
-                <span class="text-2xs font-semibold uppercase tracking-[0.06em] text-muted-foreground">Open items by level and status</span>
-            </div>
-            <div class="grid grid-cols-1 gap-px bg-border md:grid-cols-2">
-                <div class="bg-card">
-                    <div data-testid="cto-risk-by-impact">
-                    {% call table() %}
-                        <caption class="sr-only">Risks by impact level</caption>
-                        {% call table_header() %}{% call table_row() %}
-                            {% call table_head(class='h-10') %}Risk by impact{% endcall %}
-                            {% call table_head(class='h-10 text-right') %}Open{% endcall %}
-                        {% endcall %}{% endcall %}
-                        {% call table_body() %}
-                            {% for level, tone in [('critical', 'text-destructive-emphasis'), ('high', 'text-warning-emphasis'), ('medium', 'text-info'), ('low', 'text-success-emphasis')] %}
-                            {% call table_row(class='h-10') %}
-                                {% call table_cell(class='py-0 capitalize ' ~ tone) %}{{ level }}{% endcall %}
-                                {% call table_cell(class='py-0 text-right tabular-nums text-foreground') %}{{ ((cto.get('risk_counts') or {}).get(level))|dash }}{% endcall %}
-                            {% endcall %}
-                            {% endfor %}
-                        {% endcall %}
-                    {% endcall %}
-                    </div>
-                </div>
-                <div class="bg-card">
-                    <div data-testid="cto-arb-pipeline">
-                    {% call table() %}
-                        <caption class="sr-only">ARB pipeline by status</caption>
-                        {% call table_header() %}{% call table_row() %}
-                            {% call table_head(class='h-10') %}ARB pipeline{% endcall %}
-                            {% call table_head(class='h-10 text-right') %}Reviews{% endcall %}
-                        {% endcall %}{% endcall %}
-                        {% call table_body() %}
-                            {% for status_key, label, tone in [('pending', 'Pending', 'text-warning-emphasis'), ('approved', 'Approved', 'text-success-emphasis'), ('rejected', 'Rejected', 'text-destructive-emphasis')] %}
-                            {% call table_row(class='h-10') %}
-                                {% call table_cell(class='py-0 ' ~ tone) %}{{ label }}{% endcall %}
-                                {% call table_cell(class='py-0 text-right tabular-nums text-foreground') %}{{ ((cto.get('arb_pipeline') or {}).get(status_key))|dash }}{% endcall %}
-                            {% endcall %}
-                            {% endfor %}
-                        {% endcall %}
-                    {% endcall %}
-                    </div>
-                </div>
-            </div>
-        </section>
-    </div>
-
-    {# ══════════════════════════════════════════════════════════════════════
-       CFO LENS — cost
-       ══════════════════════════════════════════════════════════════════════ #}
-    {% set cfo = (persona_metrics or {}).get('cfo') or {} %}
-    <div x-show="activeRole === 'cfo'" x-cloak class="space-y-8" data-testid="lens-cfo">
-        <section aria-label="CFO key figures" class="grid grid-cols-2 gap-4 lg:grid-cols-4">
-            {% for label, value, testid, href in [
-                ('Applications', metrics.applications|dash, 'cfo-kpi-applications', '/applications/'),
-                ('Vendors', metrics.vendors|dash, 'cfo-kpi-vendors', '/applications/vendors'),
-                ('Health score', health_score_text|default('—'), 'cfo-health-score-value', '/dashboard/health'),
-                ('Solutions', nav_stats.solutions|dash, 'cfo-kpi-solutions', '/solutions/')
-            ] %}
-            <a href="{{ href }}" data-slot="card" class="rounded-lg border border-border bg-card p-4 transition-colors hover:border-ring">
-                <p data-slot="card-description" class="text-2xs font-semibold uppercase tracking-[0.06em] text-muted-foreground">{{ label }}</p>
-                <p data-slot="card-title" class="mt-1 text-28 font-semibold leading-9 tabular-nums text-foreground" data-testid="{{ testid }}">{{ value }}</p>
-            </a>
-            {% endfor %}
-        </section>
-
-        <section aria-labelledby="tco-heading" class="rounded-lg border border-border bg-card">
-            <div class="flex items-center justify-between border-b border-border px-4 py-2">
-                <h2 id="tco-heading" class="text-base font-semibold text-foreground">Total cost of ownership</h2>
-                {% if cfo.get('total_tco') %}
-                <span class="text-2xs font-semibold uppercase tracking-[0.06em] text-muted-foreground tabular-nums">Total ${{ '{:,.0f}'.format(cfo.get('total_tco')) }}</span>
-                {% endif %}
-            </div>
-            <div data-testid="cfo-tco-by-category">
-            {% call table() %}
-                <caption class="sr-only">Total cost of ownership by category</caption>
-                {% call table_header() %}{% call table_row() %}
-                    {% call table_head(class='h-10') %}Category{% endcall %}
-                    {% call table_head(class='h-10 text-right') %}Total cost{% endcall %}
-                {% endcall %}{% endcall %}
-                {% call table_body() %}
-                    {% for cat, amount in (cfo.get('tco_by_category') or {}).items() %}
-                    {% call table_row(class='h-12') %}
-                        {% call table_cell(class='py-0 capitalize text-foreground') %}{{ cat }}{% endcall %}
-                        {% call table_cell(class='py-0 text-right font-medium tabular-nums text-foreground') %}${{ '{:,.0f}'.format(amount) }}{% endcall %}
-                    {% endcall %}
-                    {% else %}
-                    {{ table_empty_state(message='No TCO data recorded yet.', icon='circle-dollar-sign') }}
-                    {% endfor %}
-                {% endcall %}
             {% endcall %}
-            </div>
-        </section>
+          {% endcall %}{% endcall %}
+          {% else %}
+          <p class="px-6 text-sm text-muted-foreground" data-testid="table-empty">Applications appear here once a source is connected or you add one.</p>
+          {% endif %}
+        {% endcall %}
+        {% if o.table.total and links.applications %}{% call ui.card_footer(class='justify-between text-sm text-muted-foreground') %}<span>Showing {{ o.table.rows | length }} of {{ o.table.total }}</span>{{ ui.button(text='See every application', href=links.applications, variant='outline', size='sm', class='text-foreground', attrs={'data-testid': 'applications-table-link'}) }}{% endcall %}{% endif %}
+      {% endcall %}
     </div>
 
-    {# ══════════════════════════════════════════════════════════════════════
-       LAYER LENSES — the six ArchiMate 3.2 layers, one panel driven by the
-       active key; per-layer element counts come from layer_breakdown (route).
-       ══════════════════════════════════════════════════════════════════════ #}
-    <div x-show="Object.keys(_layers).includes(activeRole)" x-cloak data-testid="lens-layer"
-         x-data="{
-           _layers: {
-             motivation:     { label: 'Motivation',   count: {{ layer_breakdown.motivation if layer_breakdown and layer_breakdown.motivation is not none else 'null' }},     blurb: 'Drivers, goals, outcomes, requirements, constraints and principles — why the architecture changes.' },
-             strategy:       { label: 'Strategy',     count: {{ layer_breakdown.strategy if layer_breakdown and layer_breakdown.strategy is not none else 'null' }},         blurb: 'Capabilities, value streams, resources and courses of action — what the enterprise must be able to do.' },
-             business:       { label: 'Business',     count: {{ layer_breakdown.business if layer_breakdown and layer_breakdown.business is not none else 'null' }},         blurb: 'Actors, roles, processes, services and business objects — how the business operates.' },
-             application:    { label: 'Application',  count: {{ layer_breakdown.application if layer_breakdown and layer_breakdown.application is not none else 'null' }},      blurb: 'Application components, services, interfaces and data objects — the software realising the business.' },
-             technology:     { label: 'Technology',   count: {{ layer_breakdown.technology if layer_breakdown and layer_breakdown.technology is not none else 'null' }},       blurb: 'Nodes, system software, technology services and physical equipment — the platform the software runs on.' },
-             implementation: { label: 'Implementation & Migration', count: {{ layer_breakdown.implementation if layer_breakdown and layer_breakdown.implementation is not none else 'null' }}, blurb: 'Work packages, deliverables, plateaus and gaps — the transition from the as-is to the to-be architecture.' }
-           }
-         }">
-        <section aria-labelledby="layer-heading" class="rounded-lg border border-border bg-card">
-            <div class="flex items-center justify-between border-b border-border px-4 py-2">
-                <h2 id="layer-heading" class="text-base font-semibold text-foreground" x-text="(_layers[activeRole]||{label:''}).label + ' layer'"></h2>
-                <span class="text-2xs font-semibold uppercase tracking-[0.06em] text-muted-foreground tabular-nums"><span x-text="((c) => c == null ? '—' : c.toLocaleString())((_layers[activeRole]||{}).count)"></span> elements</span>
-            </div>
-            <div class="px-4 py-3">
-                <p class="max-w-2xl text-sm text-muted-foreground" x-text="(_layers[activeRole]||{blurb:''}).blurb"></p>
-                <div class="mt-4 flex flex-wrap gap-2">
-                    <a :href="'/archimate/composer?viewpoint=layered&layer=' + activeRole" class="inline-flex h-8 items-center gap-1.5 rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90">
-                        Open in composer <i data-lucide="pen-tool" class="h-3.5 w-3.5" aria-hidden="true"></i>
-                    </a>
-                    {{ button(text='Browse elements', variant='outline', size='sm', icon='boxes', icon_position='right', class='gap-1.5 text-xs', href='/architecture/dashboard') }}
-                    {{ button(text='Capability map', variant='outline', size='sm', icon='layers', icon_position='right', class='gap-1.5 text-xs', href='/capability-map/', attrs_dict={'x-show': "activeRole === 'strategy' || activeRole === 'business'"}) }}
-                </div>
-            </div>
-        </section>
-    </div>
-    </section>
-    {% endif %}
+    {# Facts with a source #}
+    {% call ui.card(attrs={'data-testid': 'sourced-card'}) %}
+      {{ d.card_head('Facts with a source', 'Model elements that say where they came from') }}
+      {% call ui.card_content(class='flex flex-col gap-2') %}
+        {% if sourced %}
+        <span class="text-2xl font-semibold tabular-nums" data-testid="sourced-value">{{ sourced.percent }}%</span>
+        <span class="text-sm text-muted-foreground" data-testid="sourced-sentence">{% if sourced.layers %}Across {{ sourced.total }} elements. The layers with the fewest sourced facts:{% else %}Every one of the {{ sourced.total }} elements names its source.{% endif %}</span>
+        {% if sourced.layers %}
+        {% call ui.item_group(class='gap-1') %}
+          {% for row in sourced.layers %}
+          {% call ui.item(size='sm', class='px-0', attrs={'data-testid': 'sourced-layer'}) %}
+            {% call ui.item_content() %}{% if row.href %}<a href="{{ row.href }}" class="text-sm font-medium hover:underline">{{ row.layer | capitalize }} layer</a>{% else %}{{ ui.item_title(text=row.layer | capitalize ~ ' layer') }}{% endif %}{{ ui.item_description(text=row.count ~ ' elements') }}{% endcall %}
+            {% call ui.item_actions() %}{{ ui.badge(text=row.percent ~ '%', variant='secondary') }}{% endcall %}
+          {% endcall %}
+          {% endfor %}
+        {% endcall %}
+        {% endif %}
+        {% else %}
+        <p class="text-sm text-muted-foreground" data-testid="sourced-empty">Appears once the model holds elements that a source can be named for.</p>
+        {% endif %}
+      {% endcall %}
+    {% endcall %}
+  </div>
+</div>
 </div>
 {% endblock %}
-{# design-block: dashboard #}
