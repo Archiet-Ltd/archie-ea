@@ -6,6 +6,7 @@
 {% from 'components/empty_state.html' import empty_state %}
 {% from 'components/input.html' import input, label %}
 {% from 'components/select.html' import native_select %}
+{% from 'components/checkbox.html' import checkbox %}
 
 {% block title %}Data Subject Requests — {{ config.APP_NAME }}{% endblock %}
 {# design-block: data-table #}
@@ -37,7 +38,7 @@
         <p class="text-xs text-muted-foreground mt-1">Choose a person in your organisation for access or erasure of what this platform holds about them, or name an outside data subject to scope the search of your own systems.</p>
       </div>
       <form method="POST" action="{{ url_for('gdpr_bp.dsr_create') }}" class="p-4 space-y-4" data-testid="dsr-create-form">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        {{ input(type='hidden', name='csrf_token', value=csrf_token()) }}
         <div class="grid gap-4 sm:grid-cols-2">
           <div>
             {% call label(for='dsr-type', required=true) %}Request type{% endcall %}
@@ -68,7 +69,7 @@
           <div class="flex flex-wrap gap-3">
             {% for c in categories %}
             <label class="inline-flex items-center gap-1.5 text-sm">
-              <input type="checkbox" name="category_ids" value="{{ c.id }}" class="rounded border-input h-4 w-4">
+              {{ checkbox(name='category_ids', value=c.id|string, attrs_dict={'class': 'rounded border-input h-4 w-4'}) }}
               {{ c.name }}
             </label>
             {% endfor %}

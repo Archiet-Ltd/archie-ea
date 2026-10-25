@@ -6,6 +6,7 @@
 {% from 'components/empty_state.html' import empty_state %}
 {% from 'components/input.html' import input, label %}
 {% from 'components/select.html' import native_select %}
+{% from 'components/checkbox.html' import checkbox %}
 
 {% block title %}{{ req.type_label }} request — {{ config.APP_NAME }}{% endblock %}
 {# design-block: record-detail #}
@@ -84,8 +85,8 @@
           {% if item.status != 'done' %}
           <div class="flex flex-wrap gap-3">
             <form method="POST" action="{{ url_for('gdpr_bp.dsr_assign', request_id=req.id) }}" class="flex items-center gap-2">
-              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-              <input type="hidden" name="key" value="{{ item.key }}">
+              {{ input(type='hidden', name='csrf_token', value=csrf_token()) }}
+              {{ input(type='hidden', name='key', value=item.key) }}
               {% call label(for='assignee-' ~ loop.index, class='sr-only') %}Search owner for {{ item.name }}{% endcall %}
               {% call native_select(id='assignee-' ~ loop.index, name='assignee_id', attrs_dict={'data-testid': 'dsr-assignee-' ~ loop.index, 'required': ''}) %}
                 <option value="" selected disabled>Search owner…</option>
@@ -96,8 +97,8 @@
               {{ button(text='Assign', variant='outline', type='submit', testid='dsr-assign-' ~ loop.index, size='sm') }}
             </form>
             <form method="POST" action="{{ url_for('gdpr_bp.dsr_complete', request_id=req.id) }}">
-              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-              <input type="hidden" name="key" value="{{ item.key }}">
+              {{ input(type='hidden', name='csrf_token', value=csrf_token()) }}
+              {{ input(type='hidden', name='key', value=item.key) }}
               {{ button(text='Mark search done', type='submit', testid='dsr-complete-' ~ loop.index, size='sm') }}
             </form>
           </div>
@@ -131,7 +132,7 @@
         <p class="text-foreground" data-testid="dsr-access-fulfilled">Provided {{ scope.get('access_fulfilled_at') }}.</p>
         {% endif %}
         <form method="POST" action="{{ url_for('gdpr_bp.dsr_access', request_id=req.id) }}">
-          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          {{ input(type='hidden', name='csrf_token', value=csrf_token()) }}
           {{ button(text='Download the subject\'s data', type='submit', testid='dsr-access-run') }}
         </form>
       </div>
@@ -155,17 +156,14 @@
         </dl>
         {% if not review %}
         <form method="POST" action="{{ url_for('gdpr_bp.dsr_erasure_review', request_id=req.id) }}">
-          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          {{ input(type='hidden', name='csrf_token', value=csrf_token()) }}
           {{ button(text='I have reviewed what will be removed', variant='outline', type='submit', testid='dsr-erasure-review') }}
         </form>
         {% else %}
         <p class="text-xs text-muted-foreground" data-testid="dsr-erasure-reviewed">Reviewed {{ review.reviewed_at }}.</p>
         <form method="POST" action="{{ url_for('gdpr_bp.dsr_erasure_run', request_id=req.id) }}" class="space-y-2">
-          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-          <label class="inline-flex items-center gap-2 text-sm">
-            <input type="checkbox" name="confirm" value="erase" required data-testid="dsr-erasure-confirm" class="rounded border-input h-4 w-4">
-            Erase this person's data now
-          </label>
+          {{ input(type='hidden', name='csrf_token', value=csrf_token()) }}
+          {{ checkbox(name='confirm', value='erase', attrs_dict={'data-testid': 'dsr-erasure-confirm', 'required': ''}, label='Erase this person\'s data now') }}
           <div>
             {{ button(text='Run erasure', variant='destructive', type='submit', testid='dsr-erasure-run') }}
           </div>
