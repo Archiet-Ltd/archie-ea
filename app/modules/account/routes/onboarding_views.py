@@ -41,12 +41,14 @@ def add_routes(bp, access) -> None:
     @access
     def welcome():
         org = _org()
-        step = 3 if request.args.get("step") == "3" else 2
+        step = request.args.get("step", type=int)
+        step = step if step in (3, 4) else 2
         return render_template(
             "account/register.html",
             form=None,
             step=step,
             org=org,
+            kinds=onboarding.KINDS,
             industries=onboarding.INDUSTRIES,
             frameworks=onboarding.FRAMEWORKS,
             chosen=onboarding.choices(org),
@@ -109,7 +111,7 @@ def add_routes(bp, access) -> None:
     def welcome_choices():
         data = request.get_json(silent=True) or {}
         try:
-            saved = onboarding.save_choices(_org(), data.get("industry"), data.get("frameworks") or [])
+            saved = onboarding.save_choices(_org(), data.get("industry"), data.get("frameworks") or [], data.get("kind"))
         except ValueError as exc:
             return _problem(str(exc))
         return jsonify({"ok": True, **saved})
