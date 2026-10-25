@@ -143,8 +143,8 @@
         {# Record access: an application from the portfolio and the operations it performs. #}
         <form method="post" action="{{ url_for('data_architecture.record_data_entity_access', entity_id=entity.id) }}"
               class="border-t border-border px-5 py-4 space-y-3" x-data="entityAccessPicker()" data-record-access>
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <input type="hidden" name="application_id" :value="selected ? selected.id : ''">
+            {{ input(type='hidden', name='csrf_token', value=csrf_token()) }}
+            {{ input(type='hidden', name='application_id', attrs_dict={':value': "selected ? selected.id : ''"}) }}
             <h3 class="text-sm font-semibold text-foreground">Record application access</h3>
             <div class="flex flex-wrap items-end gap-4">
                 <div class="relative w-72">
