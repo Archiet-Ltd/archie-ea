@@ -19,13 +19,26 @@ from playwright.sync_api import expect
 
 from .chat_ask import ask
 from .conftest import PAGE_TIMEOUT
-from .test_signup_brings_the_company_in_journey import (  # noqa: F401  (people is a fixture)
+from .test_signup_brings_the_company_in_journey import (  # noqa: F401  (these are fixtures)
     assert_is_a_startup_cto_not_an_administrator,
     people,
+    provider,
+    server,
     sign_up,
 )
 
 pytestmark = [pytest.mark.smoke, pytest.mark.journey]
+
+
+@pytest.fixture(scope="module")
+def live_server(server):
+    """These journeys use the same server as the sign-up journeys in the other file, one at a time.
+
+    Two servers on one database each pick up the other's background reads, and each holds its own
+    encryption key, so a GitHub token written by one cannot be read by the other.
+    """
+    return server
+
 
 WALK = os.environ.get("ONB_WALK_DIR")
 QUESTION = "What breaks if Payments service fails"

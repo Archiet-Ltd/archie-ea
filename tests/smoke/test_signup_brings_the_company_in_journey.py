@@ -263,7 +263,10 @@ def test_a_startup_cto_signs_up_gives_github_and_asks_about_their_own_systems(br
         deadline = time.monotonic() + 240
         while time.monotonic() < deadline:
             page.goto(str(server) + "/account/welcome", wait_until="domcontentloaded")
-            if "items added to your model" in page.get_by_test_id("signup-status-github").inner_text():
+            if (
+                "items added to your model" in page.get_by_test_id("signup-status-github").inner_text()
+                and "facts wait for you to confirm" in page.get_by_test_id("signup-status-website").inner_text()
+            ):
                 break
             page.wait_for_timeout(3000)
         github_line = page.get_by_test_id("signup-status-github").inner_text()
