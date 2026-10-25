@@ -76,7 +76,7 @@ def test_startup_cto_reads_okta_in_the_catalogue_and_links_it(page, live_server,
 
     arch = page.get_by_test_id("catalogue-architecture")
     assert arch.get_by_text("Single sign-on", exact=True).count() == 1
-    assert arch.get_by_text("SCIM 2.0", exact=True).count() == 1
+    assert arch.locator("tr[data-testid=fact-interface] td:first-child", has_text="SCIM 2.0").count() == 1
     assert page.get_by_test_id("catalogue-certification").get_by_text("SOC 2 Type II").count() == 1
     lifecycle = page.get_by_test_id("catalogue-lifecycle")
     assert lifecycle.locator("a[href='https://endoflife.date/']").count() == 1
