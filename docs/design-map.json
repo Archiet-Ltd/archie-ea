@@ -9882,7 +9882,7 @@
    "controls": {
     "button": 32,
     "form": 3,
-    "link": 3,
+    "link": 2,
     "modal": 3,
     "testid": 11
    },
@@ -30826,105 +30826,6 @@
    "tier": "B",
    "type_changed": false
   },
-  "app/templates/solutions/architect_synthesis.html": {
-   "allowed_macros": [
-    "components/accessibility_helpers.html",
-    "components/alert.html",
-    "components/avatar.html",
-    "components/badge.html",
-    "components/breadcrumb.html",
-    "components/breadcrumb_nav.html",
-    "components/button.html",
-    "components/canvas_box.html",
-    "components/card.html",
-    "components/checkbox.html",
-    "components/confirmation_dialog.html",
-    "components/data_card.html",
-    "components/dense_table.html",
-    "components/detail_meta.html",
-    "components/dialog.html",
-    "components/dropdown_menu.html",
-    "components/empty_state.html",
-    "components/error_boundary.html",
-    "components/form_field.html",
-    "components/inline_hint.html",
-    "components/input.html",
-    "components/loading_state.html",
-    "components/metrics_card.html",
-    "components/modal.html",
-    "components/page_header.html",
-    "components/progress.html",
-    "components/provenance.html",
-    "components/select.html",
-    "components/skeleton.html",
-    "components/status_badge.html",
-    "components/status_indicator.html",
-    "components/tabs.html",
-    "components/traceability_panel.html",
-    "macros/form_macros.html",
-    "macros/page_shell.html"
-   ],
-   "basis": "rule",
-   "block": "record-detail",
-   "charts": [],
-   "components": [
-    "alert",
-    "badge",
-    "breadcrumb",
-    "button",
-    "card",
-    "empty",
-    "page-header",
-    "page-shell",
-    "provenance",
-    "tabs",
-    "item",
-    "collapsible",
-    "hover-card",
-    "table"
-   ],
-   "confidence": "high",
-   "controls": {
-    "button": 1,
-    "link": 5
-   },
-   "extends": [
-    "layouts/admin_base.html"
-   ],
-   "frame": "dashboard-01",
-   "inhouse_components": [
-    "card:Replace",
-    "empty_state:Replace",
-    "metrics_card:Replace",
-    "provenance:Compose",
-    "page-shell:Replace"
-   ],
-   "macros": [
-    "components/card.html",
-    "components/empty_state.html",
-    "components/metrics_card.html",
-    "components/provenance.html",
-    "macros/page_shell.html"
-   ],
-   "original": "dashboard-01",
-   "page_type": "dashboard",
-   "persona": "solution_architect",
-   "reason": "Synthesis overview with about ten sections (posture, attention queue, domains, briefing, coverage, programme, governance, delivery, conformance, risks); must be cut to six regions with the rest in tabs.",
-   "reference": {
-    "shadcn": {
-     "name": "shadcn examples: mail (reading pane)",
-     "url": "https://ui.shadcn.com/examples/mail"
-    },
-    "basecoat": {
-     "name": "flask-basecoat examples: product detail",
-     "image": "docs/design/reference/basecoat-product-detail.webp"
-    }
-   },
-   "spec": null,
-   "status": "mapped",
-   "tier": "B",
-   "type_changed": true
-  },
   "app/templates/solutions/blueprint.html": {
    "allowed_macros": [
     "components/accessibility_helpers.html",
@@ -31473,97 +31374,6 @@
    "status": "mapped",
    "tier": "B",
    "type_changed": false
-  },
-  "app/templates/solutions/ea_briefing.html": {
-   "allowed_macros": [
-    "components/accessibility_helpers.html",
-    "components/alert.html",
-    "components/avatar.html",
-    "components/badge.html",
-    "components/breadcrumb.html",
-    "components/breadcrumb_nav.html",
-    "components/button.html",
-    "components/canvas_box.html",
-    "components/card.html",
-    "components/checkbox.html",
-    "components/confirmation_dialog.html",
-    "components/data_card.html",
-    "components/dense_table.html",
-    "components/detail_meta.html",
-    "components/dialog.html",
-    "components/dropdown_menu.html",
-    "components/empty_state.html",
-    "components/error_boundary.html",
-    "components/form_field.html",
-    "components/inline_hint.html",
-    "components/input.html",
-    "components/loading_state.html",
-    "components/metrics_card.html",
-    "components/modal.html",
-    "components/page_header.html",
-    "components/progress.html",
-    "components/provenance.html",
-    "components/select.html",
-    "components/skeleton.html",
-    "components/status_badge.html",
-    "components/status_indicator.html",
-    "components/tabs.html",
-    "components/traceability_panel.html",
-    "macros/form_macros.html",
-    "macros/page_shell.html"
-   ],
-   "basis": "rule",
-   "block": "record-detail",
-   "charts": [],
-   "components": [
-    "alert",
-    "badge",
-    "breadcrumb",
-    "button",
-    "card",
-    "empty",
-    "page-header",
-    "tabs",
-    "table",
-    "separator",
-    "dropdown-menu"
-   ],
-   "confidence": "high",
-   "controls": {
-    "button": 2,
-    "link": 2,
-    "table": 1
-   },
-   "extends": [
-    "layouts/admin_base.html"
-   ],
-   "frame": "dashboard-01",
-   "inhouse_components": [
-    "arb-escalate-button:Compose",
-    "page-header:Replace"
-   ],
-   "macros": [
-    "components/arb_escalate_button.html",
-    "components/page_header.html"
-   ],
-   "original": "gap:G-4",
-   "page_type": "document",
-   "persona": "enterprise_architect",
-   "reason": "EA briefing; answer-first report with export.",
-   "reference": {
-    "shadcn": {
-     "name": "shadcn examples: mail (reading pane)",
-     "url": "https://ui.shadcn.com/examples/mail"
-    },
-    "basecoat": {
-     "name": "flask-basecoat examples: product detail",
-     "image": "docs/design/reference/basecoat-product-detail.webp"
-    }
-   },
-   "spec": null,
-   "status": "mapped",
-   "tier": "C5",
-   "type_changed": true
   },
   "app/templates/solutions/edit.html": {
    "allowed_macros": [
@@ -34090,6 +33900,89 @@
    "status": "mapped",
    "tier": "B",
    "type_changed": true
+  },
+  "app/templates/solutions/weekly_briefing.html": {
+   "allowed_macros": [
+    "components/accessibility_helpers.html",
+    "components/alert.html",
+    "components/answer_cascade.html",
+    "components/app_stats_grid.html",
+    "components/badge.html",
+    "components/breadcrumb.html",
+    "components/breadcrumb_nav.html",
+    "components/button.html",
+    "components/card.html",
+    "components/confirmation_dialog.html",
+    "components/data_card.html",
+    "components/dense_table.html",
+    "components/dialog.html",
+    "components/dropdown_menu.html",
+    "components/empty_state.html",
+    "components/error_boundary.html",
+    "components/filter_bar.html",
+    "components/gantt_timeline.html",
+    "components/inline_hint.html",
+    "components/loading_state.html",
+    "components/metrics_card.html",
+    "components/modal.html",
+    "components/page_header.html",
+    "components/priority_actions.html",
+    "components/progress.html",
+    "components/provenance.html",
+    "components/review_queue_panel.html",
+    "components/skeleton.html",
+    "components/status_badge.html",
+    "components/status_indicator.html",
+    "components/tabs.html",
+    "macros/page_shell.html"
+   ],
+   "basis": "declared",
+   "block": "dashboard",
+   "components": [
+    "alert",
+    "badge",
+    "breadcrumb",
+    "button",
+    "card",
+    "empty",
+    "page-header",
+    "page-shell",
+    "progress"
+   ],
+   "controls": {
+    "link": 5,
+    "testid": 3
+   },
+   "extends": [
+    "layouts/admin_base.html"
+   ],
+   "macros": [
+    "macros/page_shell.html"
+   ],
+   "persona": "solution_architect",
+   "reference": {
+    "shadcn": {
+     "name": "shadcn blocks: dashboard-01",
+     "url": "https://ui.shadcn.com/blocks#dashboard-01"
+    },
+    "basecoat": {
+     "name": "flask-basecoat examples: dashboard",
+     "image": "docs/design/reference/basecoat-dashboard.webp"
+    }
+   },
+   "spec": null,
+   "status": "mapped",
+   "tier": "B",
+   "confidence": "high",
+   "charts": [],
+   "frame": "dashboard-01",
+   "inhouse_components": [
+    "page-shell:Replace"
+   ],
+   "original": "dashboard-01",
+   "page_type": "dashboard",
+   "reason": "Weekly briefing: a headline and four short linked lists, no chart.",
+   "type_changed": false
   },
   "app/templates/sprints/charts.html": {
    "allowed_macros": [
