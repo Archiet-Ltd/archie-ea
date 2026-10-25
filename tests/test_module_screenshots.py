@@ -538,6 +538,96 @@ def test_role_more_screens_have_capture_date_in_caption():
             assert "Captured" in caption, f"{_slug}: more-screens caption missing 'Captured' date marker"
 
 
+def _git_commit_date(path: Path) -> date | None:
+    """Return the commit date of the most recent commit touching path, or None."""
+    import subprocess
+    try:
+        result = subprocess.run(
+            ["git", "log", "-1", "--format=%ad", "--date=short", "--", str(path)],
+            capture_output=True, text=True, cwd=path.parent.parent.parent.parent
+        )
+        if result.returncode == 0 and result.stdout.strip():
+            return datetime.strptime(result.stdout.strip(), "%Y-%m-%d").date()
+    except Exception:
+        pass
+    return None
+
+
+def _extract_capture_date(caption: str) -> date | None:
+    """Extract the capture date from a caption, or return None if no date present."""
+    import re as _re
+    match = _re.search(r"Captured (\d{1,2} \w+ \d{4})", caption)
+    if match:
+        return datetime.strptime(match.group(1), "%d %b %Y").date()
+    return None
+
+
+def test_caption_dates_match_git_commit_dates():
+    """Every caption that includes a 'Captured <date>' marker must have that date
+    equal to the git commit date of its image file. Captions without a date
+    (e.g. the four Ask-page role heroes) are allowed and skipped."""
+    from app.services.public_pages import (
+        IMG_MODULES_DIR, IMG_ROLES_DIR, IMG_USE_CASES_DIR,
+        MODULE_CAPTURES, ROLE_CAPTURES, ROLE_MORE_SCREENS,
+        USE_CASE_SCREENSHOT_CAPTURES,
+    )
+
+    # Roles whose hero image shows the retired Ask page — these captions
+    # deliberately carry no date until the images are re-captured.
+    ask_page_roles = {"enterprise-architects", "cto-and-cio", "it-portfolio-managers", "solution-architects"}
+
+    # Check ROLE_CAPTURES (hero images)
+    for slug, _path, _persona, caption, _alt in ROLE_CAPTURES:
+        if slug in ask_page_roles:
+            # These must NOT have a capture date
+            assert "Captured" not in caption, (
+                f"{slug}: Ask-page role caption must not contain a capture date"
+            )
+            continue
+        caption_date = _extract_capture_date(caption)
+        assert caption_date is not None, f"{slug}: caption missing capture date"
+        image_path = IMG_ROLES_DIR / f"{slug}.webp"
+        git_date = _git_commit_date(image_path)
+        assert git_date is not None, f"{slug}: could not determine git commit date for {image_path}"
+        assert caption_date == git_date, (
+            f"{slug}: caption date {caption_date} does not match git commit date {git_date}"
+        )
+
+    # Check MODULE_CAPTURES
+    for slug, _path, _persona, caption, _alt in MODULE_CAPTURES:
+        caption_date = _extract_capture_date(caption)
+        assert caption_date is not None, f"{slug}: caption missing capture date"
+        image_path = IMG_MODULES_DIR / f"{slug}.webp"
+        git_date = _git_commit_date(image_path)
+        assert git_date is not None, f"{slug}: could not determine git commit date for {image_path}"
+        assert caption_date == git_date, (
+            f"{slug}: caption date {caption_date} does not match git commit date {git_date}"
+        )
+
+    # Check USE_CASE_SCREENSHOT_CAPTURES
+    for slug, _path, _persona, caption, _alt in USE_CASE_SCREENSHOT_CAPTURES:
+        caption_date = _extract_capture_date(caption)
+        assert caption_date is not None, f"{slug}: caption missing capture date"
+        image_path = IMG_USE_CASES_DIR / f"{slug}.webp"
+        git_date = _git_commit_date(image_path)
+        assert git_date is not None, f"{slug}: could not determine git commit date for {image_path}"
+        assert caption_date == git_date, (
+            f"{slug}: caption date {caption_date} does not match git commit date {git_date}"
+        )
+
+    # Check ROLE_MORE_SCREENS
+    for slug, screens in ROLE_MORE_SCREENS.items():
+        for rel, _density, _label, caption, _alt in screens:
+            caption_date = _extract_capture_date(caption)
+            assert caption_date is not None, f"{slug}: more-screens caption missing capture date for {rel}"
+            image_path = Path(__file__).parent.parent / "app" / "static" / "img" / rel
+            git_date = _git_commit_date(image_path)
+            assert git_date is not None, f"{slug}: could not determine git commit date for {image_path}"
+            assert caption_date == git_date, (
+                f"{slug} ({rel}): caption date {caption_date} does not match git commit date {git_date}"
+            )
+
+
 def test_get_role_screenshot_returns_none_for_non_live_capture_status():
     page = PublicPage(
         family="role",
