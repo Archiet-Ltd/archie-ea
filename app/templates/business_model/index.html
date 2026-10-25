@@ -39,6 +39,7 @@
           {% endcall %}
           {% call card.card_content(class='flex flex-wrap items-center gap-2') %}
             <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-secondary text-secondary-foreground" data-testid="bmc-canvas-type-{{ c.id }}">{{ type_names.get(c.canvas_type or 'business_model_canvas', 'Canvas') }}</span>
+            {% if not c.canvas_type or c.canvas_type == 'lean_canvas' %}
             {% if c.operating_model_type %}
             <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-info-emphasis border border-primary/30">
               {{ c.operating_model_type | capitalize }}
@@ -47,6 +48,7 @@
             <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-muted text-muted-foreground border border-border">
               No operating model set
             </span>
+            {% endif %}
             {% endif %}
           {% endcall %}
           {% call card.card_footer() %}
