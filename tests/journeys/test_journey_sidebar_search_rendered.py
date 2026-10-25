@@ -671,3 +671,68 @@ def test_fragment_org_other_org_sees_none(app, client, browser):
             f"Org B should not see ZZZebra Inventory Hub, got {records} records"
     finally:
         pg.close()
+
+
+# ---- exact name ordering: "Customer" among 150+ names containing "customer" -------------------
+
+
+def _persona_with_customer_org(app, enterprise_role):
+    """Organisation with ~150 elements containing 'customer' plus one named exactly 'Customer'."""
+    from datetime import datetime
+
+    from app import db
+    from app.models.user import User
+    from app.models.application_portfolio import ApplicationComponent
+
+    with app.app_context():
+        org_id = make_org(db, "SearchCustomerOrg")
+        user_id = make_user(db, org_id, "u", enterprise_role, role_name="Architect")
+        User.query.filter_by(id=user_id).update({"onboarding_completed_at": datetime.utcnow()})
+
+        # ~150 elements containing "customer" in their name
+        for i in range(150):
+            db.session.add(ApplicationComponent(
+                name=f"Customer Portal {i:03d}",
+                component_type="Application",
+                organization_id=org_id,
+            ))
+
+        # One named exactly "Customer" — must be the first result
+        db.session.add(ApplicationComponent(
+            name="Customer",
+            component_type="Application",
+            organization_id=org_id,
+        ))
+
+        db.session.commit()
+        return user_id, org_id
+
+
+def test_customer_exact_name_is_first_result(app, client, browser):
+    """~150 elements containing 'customer' plus one named exactly 'Customer': it is the first result."""
+    user_id, _org_id = _persona_with_customer_org(app, "solution_architect")
+
+    from .conftest import login
+    login(client, user_id)
+
+    page_path = "/dashboard/overview"
+    document = client.get(page_path).get_data(as_text=True)
+
+    pg = browser.new_page(viewport={"width": 1440, "height": 900})
+    try:
+        _serve_app_in_browser(pg, client, document, page_path)
+        pg.goto("http://app.test" + page_path)
+
+        pg.fill("#sidebar-search", "Customer")
+        pg.wait_for_selector('[data-testid="sidebar-search-record"]', timeout=10000)
+        records = pg.locator('[data-testid="sidebar-search-record"]').all()
+        assert len(records) > 0, "No records found for 'Customer'"
+
+        # The first record must be the exact match "Customer"
+        first_text = records[0].inner_text()
+        assert "Customer" in first_text, f"First record is not 'Customer': {first_text}"
+        # Verify it's the exact "Customer" (not "Customer Portal 042" etc.)
+        lines = [line.strip() for line in first_text.split("\n") if line.strip()]
+        assert lines[0] == "Customer", f"First record name is not exactly 'Customer': {lines}"
+    finally:
+        pg.close()

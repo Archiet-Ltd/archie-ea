@@ -492,21 +492,27 @@ def get_quick_access_items():
 def _search_filter(query, model_class, column, org_id, limit=100):
     """
     Two-pass candidate search so an exact name is never lost to a limit:
-    1. Exact-substring match on the normalised name (ilike %query%) — up to `limit`.
+    1. Exact-substring match on the normalised name (ilike %query%) — up to `limit`,
+       ordered so exact and prefix matches come first.
     2. Fill the remainder from a 3-letter-chunk OR query ordered by the number of
-       chunks matched (CASE sum DESC, then name ASC), excluding ids already found.
+       chunks matched (CASE sum DESC), then exact/prefix/name, excluding ids already found.
     Returns at most `limit` rows from the model, with exact matches first.
     """
-    from sqlalchemy import case, or_
+    from sqlalchemy import case, func, or_
     from app.utils.search_text import normalise_search_text
 
     q_norm = normalise_search_text(query)
+
+    # Ordering for both passes: exact match first, then prefix, then shorter names, then alphabetical
+    exact_order = case((func.lower(column) == q_norm, 0), else_=1)
+    prefix_order = case((func.lower(column).ilike(q_norm + "%"), 0), else_=1)
 
     # Pass 1: exact-substring match — catches exact names and close spellings
     exact_matches = (
         model_class.query
         .filter(model_class.organization_id == org_id)
         .filter(column.ilike(f"%{q_norm}%"))
+        .order_by(exact_order, prefix_order, func.length(column), column)
         .limit(limit)
         .all()
     )
@@ -517,7 +523,7 @@ def _search_filter(query, model_class, column, org_id, limit=100):
 
     exact_ids = {row.id for row in exact_matches}
 
-    # Pass 2: 3-letter chunks, ordered by how many chunks hit, then by name
+    # Pass 2: 3-letter chunks, ordered by how many chunks hit, then exact/prefix/name
     words = [w for w in q_norm.split() if len(w) >= 3]
     if not words:
         return list(exact_matches)
@@ -556,7 +562,7 @@ def _search_filter(query, model_class, column, org_id, limit=100):
 
     chunk_matches = (
         base
-        .order_by(chunk_sum.desc(), column)
+        .order_by(chunk_sum.desc(), exact_order, prefix_order, func.length(column), column)
         .limit(remaining)
         .all()
     )
