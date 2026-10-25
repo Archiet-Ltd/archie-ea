@@ -1,193 +1,218 @@
+{# design-block: record-detail #}
 {% extends "layouts/admin_base.html" %}
 {% from 'components/page_header.html' import page_header %}
-{% from 'components/metrics_card.html' import metrics_card %}
+{% from 'components/card.html' import card, card_header, card_title, card_description, card_content %}
+{% from 'components/badge.html' import badge %}
+{% from 'components/breadcrumb.html' import breadcrumb, breadcrumb_item, breadcrumb_separator %}
+{% from 'components/progress.html' import progress %}
 
 {% block title %}{{ instance.instance_name }} — Instance Details{% endblock %}
 
 {% block content %}
-<div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+<div class="flex flex-1 flex-col @container/main">
+    <div class="flex flex-1 flex-col gap-2">
+        <div class="flex flex-col gap-4 py-4 md:gap-6 md:py-6">
+            <div class="px-4 lg:px-6">
+                {% call breadcrumb() %}
+                    {% call breadcrumb_item(href=url_for('framework_config_ui.instances')) %}Framework Instances{% endcall %}
+                    {% call breadcrumb_separator() %}{% endcall %}
+                    {% call breadcrumb_item(active=true) %}{{ instance.instance_name }}{% endcall %}
+                {% endcall %}
 
-    {{ page_header(
-        title=instance.instance_name,
-        description=instance.instance_description or 'Framework configuration instance',
-        breadcrumbs=[
-            {'label': 'Framework Instances', 'href': url_for('framework_config_ui.instances')},
-            {'label': instance.instance_name}
-        ]
-    ) }}
+                {{ page_header(
+                    title=instance.instance_name,
+                    description=instance.instance_description or 'Framework configuration instance'
+                ) }}
+            </div>
 
-    <!-- Summary metric cards -->
-    <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
-        {{ metrics_card(title='Maturity Level', value=(instance.current_maturity_level or 1) ~ '/5', icon='gauge') }}
-        {{ metrics_card(title='Implementation', value=(instance.implementation_percentage or 0)|int ~ '%', icon='target') }}
-        {{ metrics_card(title='Active Users', value=instance.active_users or 0, icon='users') }}
-        {{ metrics_card(
-            title='Open Issues',
-            value=instance.open_issues or 0,
-            icon='alert-circle',
-            value_class='text-destructive' if instance.critical_issues and instance.critical_issues > 0 else '',
-            description=(instance.critical_issues ~ ' critical') if instance.critical_issues and instance.critical_issues > 0 else ''
-        ) }}
+            <!-- Stat cards row - P24 key numbers -->
+            <div class="grid grid-cols-1 gap-4 px-4 lg:px-6 @xl/main:grid-cols-2 @5xl/main:grid-cols-4">
+                {% call card() %}
+                    {% call card_header() %}
+                        <div class="text-2xl font-bold tabular-nums">{{ (instance.current_maturity_level or 1) }}/5</div>
+                        {% call card_description() %}Maturity Level{% endcall %}
+                    {% endcall %}
+                {% endcall %}
+                {% call card() %}
+                    {% call card_header() %}
+                        <div class="text-2xl font-bold tabular-nums">{{ (instance.implementation_percentage or 0)|int }}%</div>
+                        {% call card_description() %}Implementation{% endcall %}
+                    {% endcall %}
+                {% endcall %}
+                {% call card() %}
+                    {% call card_header() %}
+                        <div class="text-2xl font-bold tabular-nums">{{ instance.active_users or 0 }}</div>
+                        {% call card_description() %}Active Users{% endcall %}
+                    {% endcall %}
+                {% endcall %}
+                {% call card() %}
+                    {% call card_header() %}
+                        <div class="text-2xl font-bold tabular-nums{% if instance.critical_issues and instance.critical_issues > 0 %} text-destructive{% endif %}">{{ instance.open_issues or 0 }}</div>
+                        {% call card_description() %}
+                            Open Issues
+                            {% if instance.critical_issues and instance.critical_issues > 0 %}
+                            <span class="block text-xs text-destructive">{{ instance.critical_issues }} critical</span>
+                            {% endif %}
+                        {% endcall %}
+                    {% endcall %}
+                {% endcall %}
+            </div>
+
+            <!-- Detail section - P25 key-value cards -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 px-4 lg:px-6">
+                <!-- Organisation -->
+                {% call card() %}
+                    {% call card_header() %}
+                        <div class="flex items-center gap-2">
+                            <i data-lucide="building-2" class="w-4 h-4 text-muted-foreground shrink-0" aria-hidden="true"></i>
+                            {% call card_title(class='text-sm') %}Organisation{% endcall %}
+                        </div>
+                    {% endcall %}
+                    {% call card_content() %}
+                        <dl class="space-y-3 text-sm">
+                            <div class="flex justify-between">
+                                <dt class="text-muted-foreground">Unit</dt>
+                                <dd class="text-foreground font-medium">{{ instance.organization_unit or '—' }}</dd>
+                            </div>
+                            <div class="flex justify-between">
+                                <dt class="text-muted-foreground">Location</dt>
+                                <dd class="text-foreground">{{ instance.geographic_location or '—' }}</dd>
+                            </div>
+                            <div class="flex justify-between">
+                                <dt class="text-muted-foreground">Scope</dt>
+                                <dd class="text-foreground">{{ (instance.implementation_scope or '—') | title }}</dd>
+                            </div>
+                            <div class="flex justify-between items-center">
+                                <dt class="text-muted-foreground">Status</dt>
+                                <dd>
+                                    {% set s = instance.status or 'planning' %}
+                                    {% if s == 'operational' %}
+                                        {% call badge(variant='success') %}Operational{% endcall %}
+                                    {% elif s == 'implementing' %}
+                                        {% call badge(variant='info') %}Implementing{% endcall %}
+                                    {% elif s == 'optimizing' %}
+                                        {% call badge(variant='info') %}Optimizing{% endcall %}
+                                    {% elif s == 'retiring' %}
+                                        {% call badge(variant='warning') %}Retiring{% endcall %}
+                                    {% else %}
+                                        {% call badge(variant='neutral') %}{{ s | title }}{% endcall %}
+                                    {% endif %}
+                                </dd>
+                            </div>
+                        </dl>
+                    {% endcall %}
+                {% endcall %}
+
+                <!-- Ownership -->
+                {% call card() %}
+                    {% call card_header() %}
+                        <div class="flex items-center gap-2">
+                            <i data-lucide="users" class="w-4 h-4 text-muted-foreground shrink-0" aria-hidden="true"></i>
+                            {% call card_title(class='text-sm') %}Ownership{% endcall %}
+                        </div>
+                    {% endcall %}
+                    {% call card_content() %}
+                        <dl class="space-y-3 text-sm">
+                            <div class="flex justify-between">
+                                <dt class="text-muted-foreground">Instance Owner</dt>
+                                <dd class="text-foreground font-medium">{{ instance.instance_owner or '—' }}</dd>
+                            </div>
+                            <div class="flex justify-between">
+                                <dt class="text-muted-foreground">Technical Contact</dt>
+                                <dd class="text-foreground">{{ instance.technical_contact or '—' }}</dd>
+                            </div>
+                            <div class="flex justify-between">
+                                <dt class="text-muted-foreground">Business Sponsor</dt>
+                                <dd class="text-foreground">{{ instance.business_sponsor or '—' }}</dd>
+                            </div>
+                        </dl>
+                    {% endcall %}
+                {% endcall %}
+
+                <!-- Implementation -->
+                {% call card() %}
+                    {% call card_header() %}
+                        <div class="flex items-center gap-2">
+                            <i data-lucide="git-branch" class="w-4 h-4 text-muted-foreground shrink-0" aria-hidden="true"></i>
+                            {% call card_title(class='text-sm') %}Implementation{% endcall %}
+                        </div>
+                    {% endcall %}
+                    {% call card_content() %}
+                        <dl class="space-y-3 text-sm">
+                            <div class="flex justify-between">
+                                <dt class="text-muted-foreground">Date</dt>
+                                <dd class="text-foreground">{{ instance.implementation_date.strftime('%d %b %Y') if instance.implementation_date else '—' }}</dd>
+                            </div>
+                            <div class="flex justify-between">
+                                <dt class="text-muted-foreground">Team</dt>
+                                <dd class="text-foreground">{{ instance.implementation_team or '—' }}</dd>
+                            </div>
+                            <div class="flex justify-between">
+                                <dt class="text-muted-foreground">Capabilities</dt>
+                                <dd class="text-foreground">{{ instance.capabilities_implemented or 0 }} / {{ instance.capabilities_total or 0 }}</dd>
+                            </div>
+                            <div>
+                                <div class="flex justify-between mb-1">
+                                    <dt class="text-muted-foreground">Progress</dt>
+                                    <dd class="text-foreground">{{ (instance.implementation_percentage or 0) | int }}%</dd>
+                                </div>
+                                {{ progress(value=(instance.implementation_percentage or 0)|int) }}
+                            </div>
+                        </dl>
+                    {% endcall %}
+                {% endcall %}
+
+                <!-- Quality Scores -->
+                {% call card() %}
+                    {% call card_header() %}
+                        <div class="flex items-center gap-2">
+                            <i data-lucide="bar-chart-2" class="w-4 h-4 text-muted-foreground shrink-0" aria-hidden="true"></i>
+                            {% call card_title(class='text-sm') %}Quality Scores{% endcall %}
+                        </div>
+                    {% endcall %}
+                    {% call card_content() %}
+                        <dl class="space-y-3 text-sm">
+                            {% if instance.user_adoption_rate is not none %}
+                            <div>
+                                <div class="flex justify-between mb-1">
+                                    <dt class="text-muted-foreground">User Adoption</dt>
+                                    <dd class="text-foreground">{{ (instance.user_adoption_rate) | int }}%</dd>
+                                </div>
+                                {{ progress(value=(instance.user_adoption_rate)|int) }}
+                            </div>
+                            {% endif %}
+                            {% if instance.data_quality_score is not none %}
+                            <div>
+                                <div class="flex justify-between mb-1">
+                                    <dt class="text-muted-foreground">Data Quality</dt>
+                                    <dd class="text-foreground">{{ (instance.data_quality_score) | int }}%</dd>
+                                </div>
+                                {{ progress(value=(instance.data_quality_score)|int) }}
+                            </div>
+                            {% endif %}
+                            {% if instance.compliance_score is not none %}
+                            <div>
+                                <div class="flex justify-between mb-1">
+                                    <dt class="text-muted-foreground">Compliance</dt>
+                                    <dd class="text-foreground">{{ (instance.compliance_score) | int }}%</dd>
+                                </div>
+                                {{ progress(value=(instance.compliance_score)|int) }}
+                            </div>
+                            {% endif %}
+                        </dl>
+                    {% endcall %}
+                {% endcall %}
+            </div>
+
+            <!-- Timestamps -->
+            <div class="px-4 lg:px-6">
+                <p class="text-xs text-muted-foreground text-right">
+                    Created {{ instance.created_at.strftime('%d %b %Y %H:%M') if instance.created_at else '—' }}
+                    &nbsp;&middot;&nbsp;
+                    Updated {{ instance.updated_at.strftime('%d %b %Y %H:%M') if instance.updated_at else '—' }}
+                </p>
+            </div>
+        </div>
     </div>
-
-    <!-- Detail cards grid -->
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-
-        <!-- Organisation -->
-        <div data-slot="card" class="rounded-lg border border-border bg-card p-6">
-            <h2 class="text-sm font-semibold text-foreground mb-4 flex items-center gap-2">
-                <i data-lucide="building-2" class="w-4 h-4 text-muted-foreground" aria-hidden="true"></i>
-                Organisation
-            </h2>
-            <dl class="space-y-3 text-sm">
-                <div class="flex justify-between">
-                    <dt class="text-muted-foreground">Unit</dt>
-                    <dd class="text-foreground font-medium">{{ instance.organization_unit or '—' }}</dd>
-                </div>
-                <div class="flex justify-between">
-                    <dt class="text-muted-foreground">Location</dt>
-                    <dd class="text-foreground">{{ instance.geographic_location or '—' }}</dd>
-                </div>
-                <div class="flex justify-between">
-                    <dt class="text-muted-foreground">Scope</dt>
-                    <dd class="text-foreground">{{ (instance.implementation_scope or '—') | title }}</dd>
-                </div>
-                <div class="flex justify-between">
-                    <dt class="text-muted-foreground">Status</dt>
-                    <dd>
-                        {% set s = instance.status or 'planning' %}
-                        {% if s == 'operational' %}
-                        <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-success/10 text-success-emphasis border border-success/30">Operational</span>
-                        {% elif s == 'implementing' %}
-                        <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-info-emphasis border border-primary/30">Implementing</span>
-                        {% elif s == 'optimizing' %}
-                        <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-info-emphasis border border-primary/30">Optimizing</span>
-                        {% elif s == 'retiring' %}
-                        <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-warning/10 text-warning-emphasis border border-warning/30">Retiring</span>
-                        {% else %}
-                        <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-muted text-muted-foreground border border-border">{{ s | title }}</span>
-                        {% endif %}
-                    </dd>
-                </div>
-            </dl>
-        </div>
-
-        <!-- Ownership -->
-        <div data-slot="card" class="rounded-lg border border-border bg-card p-6">
-            <h2 class="text-sm font-semibold text-foreground mb-4 flex items-center gap-2">
-                <i data-lucide="users" class="w-4 h-4 text-muted-foreground" aria-hidden="true"></i>
-                Ownership
-            </h2>
-            <dl class="space-y-3 text-sm">
-                <div class="flex justify-between">
-                    <dt class="text-muted-foreground">Instance Owner</dt>
-                    <dd class="text-foreground font-medium">{{ instance.instance_owner or '—' }}</dd>
-                </div>
-                <div class="flex justify-between">
-                    <dt class="text-muted-foreground">Technical Contact</dt>
-                    <dd class="text-foreground">{{ instance.technical_contact or '—' }}</dd>
-                </div>
-                <div class="flex justify-between">
-                    <dt class="text-muted-foreground">Business Sponsor</dt>
-                    <dd class="text-foreground">{{ instance.business_sponsor or '—' }}</dd>
-                </div>
-            </dl>
-        </div>
-
-        <!-- Implementation -->
-        <div data-slot="card" class="rounded-lg border border-border bg-card p-6">
-            <h2 class="text-sm font-semibold text-foreground mb-4 flex items-center gap-2">
-                <i data-lucide="git-branch" class="w-4 h-4 text-muted-foreground" aria-hidden="true"></i>
-                Implementation
-            </h2>
-            <dl class="space-y-3 text-sm">
-                <div class="flex justify-between">
-                    <dt class="text-muted-foreground">Date</dt>
-                    <dd class="text-foreground">{{ instance.implementation_date.strftime('%d %b %Y') if instance.implementation_date else '—' }}</dd>
-                </div>
-                <div class="flex justify-between">
-                    <dt class="text-muted-foreground">Team</dt>
-                    <dd class="text-foreground">{{ instance.implementation_team or '—' }}</dd>
-                </div>
-                <div class="flex justify-between">
-                    <dt class="text-muted-foreground">Capabilities</dt>
-                    <dd class="text-foreground">{{ instance.capabilities_implemented or 0 }} / {{ instance.capabilities_total or 0 }}</dd>
-                </div>
-                <div>
-                    <div class="flex justify-between mb-1">
-                        <dt class="text-muted-foreground">Progress</dt>
-                        <dd class="text-foreground">{{ (instance.implementation_percentage or 0) | int }}%</dd>
-                    </div>
-                    <div class="w-full bg-muted rounded-full h-2">
-                        <div class="bg-primary h-2 rounded-full" style="width: {{ [instance.implementation_percentage or 0, 100] | min }}%"></div>
-                    </div>
-                </div>
-            </dl>
-        </div>
-
-        <!-- Quality Scores -->
-        <div data-slot="card" class="rounded-lg border border-border bg-card p-6">
-            <h2 class="text-sm font-semibold text-foreground mb-4 flex items-center gap-2">
-                <i data-lucide="bar-chart-2" class="w-4 h-4 text-muted-foreground" aria-hidden="true"></i>
-                Quality Scores
-            </h2>
-            <dl class="space-y-3 text-sm">
-                {% if instance.user_adoption_rate is not none %}
-                <div>
-                    <div class="flex justify-between mb-1">
-                        <dt class="text-muted-foreground">User Adoption</dt>
-                        <dd class="text-foreground">{{ (instance.user_adoption_rate) | int }}%</dd>
-                    </div>
-                    <div class="w-full bg-muted rounded-full h-1.5">
-                        <div class="bg-primary h-1.5 rounded-full" style="width: {{ [instance.user_adoption_rate, 100] | min }}%"></div>
-                    </div>
-                </div>
-                {% endif %}
-                {% if instance.data_quality_score is not none %}
-                <div>
-                    <div class="flex justify-between mb-1">
-                        <dt class="text-muted-foreground">Data Quality</dt>
-                        <dd class="text-foreground">{{ (instance.data_quality_score) | int }}%</dd>
-                    </div>
-                    <div class="w-full bg-muted rounded-full h-1.5">
-                        <div class="bg-success h-1.5 rounded-full" style="width: {{ [instance.data_quality_score, 100] | min }}%"></div>
-                    </div>
-                </div>
-                {% endif %}
-                {% if instance.compliance_score is not none %}
-                <div>
-                    <div class="flex justify-between mb-1">
-                        <dt class="text-muted-foreground">Compliance</dt>
-                        <dd class="text-foreground">{{ (instance.compliance_score) | int }}%</dd>
-                    </div>
-                    <div class="w-full bg-muted rounded-full h-1.5">
-                        <div class="bg-primary h-1.5 rounded-full" style="width: {{ [instance.compliance_score, 100] | min }}%"></div>
-                    </div>
-                </div>
-                {% endif %}
-            </dl>
-        </div>
-    </div>
-
-    <!-- Operations row -->
-    <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
-        {{ metrics_card(title='Active Users', value=instance.active_users or 0, icon='users') }}
-        {{ metrics_card(title='Daily Transactions', value=instance.daily_transactions or 0, icon='activity') }}
-        {{ metrics_card(title='Open Issues', value=instance.open_issues or 0, icon='alert-circle') }}
-        {{ metrics_card(
-            title='Critical Issues',
-            value=instance.critical_issues or 0,
-            icon='alert-triangle',
-            value_class='text-destructive' if instance.critical_issues and instance.critical_issues > 0 else ''
-        ) }}
-    </div>
-
-    <!-- Timestamps -->
-    <p class="text-xs text-muted-foreground text-right">
-        Created {{ instance.created_at.strftime('%d %b %Y %H:%M') if instance.created_at else '—' }}
-        &nbsp;·&nbsp;
-        Updated {{ instance.updated_at.strftime('%d %b %Y %H:%M') if instance.updated_at else '—' }}
-    </p>
-
 </div>
 {% endblock %}
