@@ -27,7 +27,7 @@
 
         {% if error.get('recovery_action') %}
         <div class="flex justify-center">
-            {{ alert('info', text=error.get('recovery_action')) }}
+            {{ alert('info', text=error.get('recovery_action')) }} {# ui-contract-ok: recovery action shown as an alert, not a dialog #}
         </div>
         {% endif %}
 
