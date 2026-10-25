@@ -1,4 +1,4 @@
-{# smoke-coverage-ok: plain-language filter wiring — el.type, pt.type, pt.layer, row.application.type now use |plain_name and |plain_layer filters #}
+{# smoke-coverage-ok: trace02 — subtitle to plain language, element check moved into filter bar as input + button #}
 {# design-block: data-table #}
 {% extends "layouts/admin_base.html" %}
 {% from 'components/dense_table.html' import dense_table %}
@@ -13,6 +13,7 @@
 {% from 'components/tabs.html' import tabs, tabs_list, tabs_trigger, tabs_content %}
 {% import 'components/card.html' as card %}
 {% from 'intelligence/_entity_picker.html' import entity_picker with context %}
+{# trace02: element check moved into filter bar as input + button #}
 
 {# DEF-032, Capgemini dry-run: the browser tab title said "Requirements
    Traceability" while the page's own H1 (page_header below) and
@@ -92,8 +93,9 @@
         {% endif %}
         {% if el.relationship_type %}
         <span class="font-semibold uppercase tracking-wide">{{ rel_abbrev.get(el.relationship_type, el.relationship_type | replace('Relationship', '')) }}</span>
-        {% endif %}
-    {% endcall %}
+{% endif %}
+            </div>
+            {% endcall %}
     {% endfor %}
     {% if not elements %}
     <span class="text-xs text-muted-foreground">Not traced</span>
@@ -119,16 +121,10 @@
 <div class="space-y-6">
     {{ page_header(
         title="Cross-Layer Traceability Matrix",
-        description="Shows how ApplicationComponent elements trace upward to Strategy/Business and downward to Technology layers"
+        description="Follow each system up to the business capabilities it supports and down to the technology it runs on."
     ) }}
 
-    <div class="space-y-6" x-data="traceabilitySurface()" data-page-url="{{ trace_url }}" data-testid="trace-focus">
-        {% call card.card(class='p-4') %}
-        <div class="mx-auto max-w-xl space-y-1">
-            <p class="text-sm font-medium text-foreground">Check one element</p>
-            {{ entity_picker('trace') }}
-        </div>
-        {% endcall %}
+    <div class="space-y-6" data-testid="trace-focus">
 
         {% if element_id is not none %}
             {% if element_check is none or element_check.state != 'checked' %}
@@ -154,6 +150,7 @@
 
             {% call card.card(class='p-4 space-y-3') %}
                 <h2 class="text-base font-semibold text-foreground">Suggested relationships</h2>
+                <div x-data="traceabilitySurface()" data-page-url="{{ trace_url }}">
                 <p role="alert" x-show="addError" x-cloak x-text="addError"
                    class="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive"></p>
                 {% if element_check.candidates %}
@@ -260,6 +257,14 @@
         {{ input(name='pivot_type', type='hidden', value=current_pivot_type, class='hidden') }}
         {{ input(name='plateau', type='hidden', value=current_plateau or '', class='hidden') }}
         {{ input(name='scope', type='hidden', value=current_scope, class='hidden') }}
+        <!-- trace02: element check row — entity_picker with autocomplete + Trace button -->
+        <div class="flex flex-wrap items-center gap-3 w-full" x-data="traceabilitySurface()" data-page-url="{{ trace_url }}">
+            <label class="text-sm font-medium text-foreground shrink-0">Check one element</label>
+            <div class="flex-1 min-w-0">
+                {{ entity_picker('trace', prompt='Search a system, capability or technology') }}
+            </div>
+            {{ button('Trace', variant='primary', attrs_dict={'@click': 'onSelect({id: $refs.pickerInput.value})'}) }}
+        </div>
         <div class="relative flex-1 max-w-sm">
             <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" aria-hidden="true"></i>
             {{ input(id='search', name='search', placeholder='Search by element name…', value=current_search, aria_label='Search by element name…', class='pl-9') }}

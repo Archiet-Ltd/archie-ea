@@ -10,7 +10,7 @@ import uuid
 import pytest
 from playwright.sync_api import expect
 
-from tests.smoke.conftest import PASSWORD
+from tests.smoke.conftest import PASSWORD, type_and_wait
 
 PAGE_TIMEOUT = 30000
 
@@ -243,5 +243,61 @@ def test_traceability_cells_open_their_element_and_counts_name_their_store(brows
         page.goto(live_server + "/architecture/traceability?search=Counted+Ledger+" + suffix,
                   wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
         assert "Counted Foreign Goal %s" % suffix not in page.inner_text("body")
+    finally:
+        context.close()
+
+
+@pytest.mark.smoke
+def test_traceability_element_check_shows_chain_and_links_land_on_content(
+    browser, live_server, seeded, linked_chain
+):
+    """As the enterprise architect: open the matrix, read the plain-language
+    subtitle, type a system name into the element check, press Trace, see only
+    that element's chain, and follow every link to a page with content."""
+    email = seeded["emails"]["enterprise_architect"]
+    suffix = linked_chain["suffix"]
+    context = browser.new_context(ignore_https_errors=True, viewport={"width": 1440, "height": 900})
+    try:
+        page = context.new_page()
+        _login(page, live_server, email)
+        page.goto(live_server + "/architecture/traceability",
+                  wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+
+        # The subtitle is a plain sentence a startup CTO understands.
+        body = page.inner_text("body")
+        assert "Follow each system up to the business capabilities it supports" in body
+        assert "down to the technology it runs on" in body
+        assert "ApplicationComponent" not in body.split("Follow each system")[0]
+
+        # Type a seeded system name into the element check and press Trace.
+        type_and_wait(page, "trace", "Tracer Ledger %s" % suffix)
+        option = page.locator("#trace-picker-listbox [role=option]",
+                              has_text="Tracer Ledger %s" % suffix)
+        expect(option).to_be_visible(timeout=PAGE_TIMEOUT)
+        option.click()
+        page.wait_for_url(lambda url: "element=" in url, timeout=PAGE_TIMEOUT)
+
+        # The chain for that element is shown, naming the linked elements.
+        body = page.inner_text("body")
+        assert "Tracer Ledger %s" % suffix in body
+        assert "Tracer Billing Service %s" % suffix in body
+        assert "Tracer Faster Close %s" % suffix in body
+
+        # The foreign element from another organisation is not shown.
+        assert "foreign" not in body
+
+        # Every link in the chain lands on a page with content.
+        trace_focus = page.locator('[data-testid="trace-focus"]')
+        for link_text in ("Tracer Billing Service %s" % suffix,
+                          "Tracer Faster Close %s" % suffix):
+            link = trace_focus.get_by_role("link", name=link_text)
+            if link.count():
+                link.first.click()
+                page.wait_for_url(lambda url: "/architecture/traceability/" in url,
+                                  timeout=PAGE_TIMEOUT)
+                landed = page.inner_text("body")
+                assert landed.strip(), "landing page for %s is empty" % link_text
+                page.goto(live_server + "/architecture/traceability",
+                          wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
     finally:
         context.close()
