@@ -174,13 +174,28 @@ class AuditLog(db.Model):
                 self.new_value.get("tool") or "unknown",
                 self.new_value.get("rule_description") or "",
             )
+        if self.action in ("request", "security") and isinstance(self.new_value, dict):
+            return self._activity_sentence()
         _rec = f"#{self.record_id}" if self.record_id else ""
         return f"{self.action} {self.table_name or ''}{_rec}".strip()
+
+    def _activity_sentence(self):
+        """What a person reads for a page-use or security entry."""
+        detail = self.new_value
+        if self.action == "request":
+            return "%s %s, %s" % (detail.get("method", ""), detail.get("route", ""), detail.get("outcome", ""))
+        from app.services.activity_record import EVENTS
+
+        label = EVENTS.get(detail.get("event"), detail.get("event") or "Security event")
+        route = detail.get("route")
+        return "%s (%s)" % (label, route) if route else label
 
     @property
     def status(self):
         if self.action == "tool_refused":
             return "refused"
+        if self.action == "request" and isinstance(self.new_value, dict):
+            return self.new_value.get("outcome") or ""
         return ""  # not tracked
 
     @property
@@ -371,6 +386,10 @@ class AuditLog(db.Model):
                         result["unsealed"] += 1
                         continue
                     return cls._broken(result, row["id"], "This entry carries no seal.")
+                if not sealed_seen and row["prev_hash"] is not None and cls._follows_retention(org_id, row["prev_hash"]):
+                    # The entries before this one were removed at the end of
+                    # their retention period, and that removal was recorded.
+                    prev = row["prev_hash"]
                 sealed_seen = True
                 if row["prev_hash"] != prev:
                     return cls._broken(
@@ -389,6 +408,16 @@ class AuditLog(db.Model):
                 result["last_row_hash"] = prev
         result["status"] = "intact" if sealed_seen else "empty"
         return result
+
+    @classmethod
+    def _follows_retention(cls, org_id, seal):
+        """True when a recorded retention removal ended exactly at ``seal``."""
+        for entry in cls.query.filter(
+            cls.org_predicate(org_id), cls.action == "retention", cls.table_name == cls.__tablename__
+        ).all():
+            if isinstance(entry.new_value, dict) and entry.new_value.get("through_row_hash") == seal:
+                return True
+        return False
 
     @staticmethod
     def _broken(result, row_id, reason):

@@ -19,15 +19,12 @@ your canvas.*
 ## What this module does
 
 The canvas your business model actually lives on — updated one block at a time instead of a whole
-document you have to reopen and redo. Each canvas also carries an operating model archetype
-(coordination, unification, replication or diversification) and can be exported as an image of the
-canvas. Mermaid, Lucidchart and Archi downloads export a saved diagram of the canvas, not its nine
-text blocks, and come out empty until one has been saved.
+document you have to reopen and redo. Open Canvases from the sidebar to start one, and export it as an
+image of the canvas when someone asks to see it.
 
 Where AI is enabled, a draft button proposes text for a single block from the blocks you have
-already filled in and the number of applications in your estate. The draft is advice only: it
-appears for you to edit and save, and nothing is written until you do. It does not read your
-capability data.
+already filled in. The draft is advice only: it appears for you to edit and save, and nothing is
+written until you do.
 
 ## Where you'll meet it
 

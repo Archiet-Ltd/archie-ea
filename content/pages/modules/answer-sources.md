@@ -1,27 +1,40 @@
 ---
 page_family: module
 module_label: "Every answer shows its sources"
-state: briefed
-cta: waiting_list
-capture_status: not_applicable_not_yet_built
+endpoint: unified_ai_chat.index
+state: on_main
+cta: plans
+capture_status: live
 icon: search
+description: "Every answer in the Entelim AI chat names the records behind it, each with a record to open, so you can check a figure before you rely on it."
 ---
 
 # Every answer shows its sources
 
-*Coming soon: see the records behind each figure in an answer.*
+*See the records behind each figure in an answer.*
 
-## What Entelim is building
+## What it does
 
-Entelim is building answers that point to the records behind each figure, so you can open any number in an answer and see where it came from before you rely on it.
+When you ask the [AI chat](/modules/ai-chat) a question, the answer lists the records it was built from. Each one shows its owner, where it was recorded and when, and opens the record itself. A figure you cannot trace is not shown as if you could.
 
-## What you can do today
+## Who it is for
 
-Pick a system in the [twin map](/modules/digital-twin) and read the applications and services that depend on it, then open each one in the [application inventory](/modules/applications).
+A CTO, architect or risk owner who has to defend an answer in a meeting and needs to point at where it came from.
 
-Coming soon. Join the waiting list and we will tell you the day it ships.
+## What you can do
+
+1. Ask the AI chat a question about a system, a supplier or a risk.
+2. Read the answer, then open any record listed beneath it.
+3. Check the owner and the date it was recorded.
+
+To see how one system reaches another, open it on the [twin map](/modules/digital-twin).
+
+## Plan
+
+Cited answers are part of every plan, including the free Community plan for up to three people. [See Entelim pricing](/pricing).
 
 ## Related
 
+- [AI chat](/modules/ai-chat)
 - [Twin map](/modules/digital-twin)
 - [Application inventory](/modules/applications)
