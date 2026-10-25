@@ -84,12 +84,12 @@
                     {% if entity.business_name and entity.business_name != entity.name %}<div class="text-xs text-muted-foreground">{{ entity.business_name }}</div>{% endif %}
                     {% if entity.description %}<div class="line-clamp-1 text-xs text-muted-foreground">{{ entity.description[:80] }}</div>{% endif %}
                 {% endcall %}
-                {% call table_cell() %}{% if entity.entity_type %}{% call badge('info' if entity.entity_type == 'master' else ('success' if entity.entity_type == 'transactional' else ('warning' if entity.entity_type == 'reference' else 'neutral'))) %}{{ entity.entity_type }}{% endcall %}{% else %}—{% endif %}{% endcall %}
-                {% call table_cell() %}{% if entity.data_classification %}{% call badge('danger' if entity.data_classification == 'restricted' else ('warning' if entity.data_classification == 'confidential' else ('info' if entity.data_classification == 'internal' else 'success'))) %}{{ entity.data_classification }}{% endcall %}{% else %}—{% endif %}{% endcall %}
-                {% call table_cell() %}{% if entity.contains_pii %}{% call badge('danger') %}PII{% endcall %}{% else %}—{% endif %}{% endcall %}
-                {% call table_cell() %}{% if entity.data_quality_score is not none %}{{ entity.data_quality_score }}%{% else %}—{% endif %}{% endcall %}
+                {% call table_cell() %}{% if entity.entity_type %}{% call badge('info' if entity.entity_type == 'master' else ('success' if entity.entity_type == 'transactional' else ('warning' if entity.entity_type == 'reference' else 'neutral'))) %}{{ entity.entity_type|capitalize }}{% endcall %}{% else %}<span class="text-muted-foreground">Not recorded</span>{% endif %}{% endcall %}
+                {% call table_cell() %}{% if entity.data_classification %}{% call badge('danger' if entity.data_classification == 'restricted' else ('warning' if entity.data_classification == 'confidential' else ('info' if entity.data_classification == 'internal' else 'success'))) %}{{ entity.data_classification|capitalize }}{% endcall %}{% else %}<span class="text-muted-foreground">Not recorded</span>{% endif %}{% endcall %}
+                {% call table_cell() %}{% if entity.contains_pii %}{% call badge('danger') %}PII{% endcall %}{% else %}<span class="text-muted-foreground">No</span>{% endif %}{% endcall %}
+                {% call table_cell() %}{% if entity.data_quality_score is not none %}{{ entity.data_quality_score }}%{% else %}<span class="text-muted-foreground">Not measured</span>{% endif %}{% endcall %}
                 {% call table_cell(class='text-muted-foreground') %}
-                    {% if entity.system_of_record_application %}{{ entity.system_of_record_application.name }}{% elif entity.system_of_record %}{{ entity.system_of_record }} (legacy label){% else %}—{% endif %}
+                    {% if entity.system_of_record_application %}{{ entity.system_of_record_application.name }}{% elif entity.system_of_record %}{{ entity.system_of_record }}{% else %}Not recorded{% endif %}
                 {% endcall %}
                 {% call table_cell(class='text-right') %}{{ button(text='Edit', variant='outline', size='sm', href=url_for('data_architecture.edit_data_entity', entity_id=entity.id)) }}{% endcall %}
             {% endcall %}

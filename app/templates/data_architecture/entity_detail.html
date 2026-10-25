@@ -13,7 +13,7 @@
 {{ breadcrumb_nav(items=[
     {'text': 'Home', 'href': url_for('main.index'), 'icon': 'home'},
     {'text': 'Data Architecture', 'href': url_for('data_architecture.data_architecture_dashboard')},
-    {'text': 'Entity Catalog', 'href': url_for('data_architecture.data_entity_catalog')},
+    {'text': 'Data objects', 'href': url_for('data_architecture.data_entity_catalog')},
     {'text': entity.name, 'current': true}
 ]) }}
 {% endblock %}
@@ -31,18 +31,26 @@
     {% endmacro %}
     {{ page_shell(title=entity.name, subtitle=entity.description or 'Data entity', actions_caller=_ps_actions) }}
 
-    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+    {# A value that is not recorded says so and offers the form that records it, rather than a dash. #}
+    {% set edit_href = url_for('data_architecture.edit_data_entity', entity_id=entity.id) %}
+    {% macro _not_recorded(what) %}<span class="font-normal text-muted-foreground">Not recorded</span> <a href="{{ edit_href }}" class="text-xs font-normal text-primary hover:underline">Record the {{ what }}</a>{% endmacro %}
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4" data-testid="entity-facts">
         <div class="rounded-lg border border-border bg-card p-4">
             <div class="text-xs font-medium text-muted-foreground uppercase tracking-wide">Type</div>
-            <div class="text-sm font-semibold text-foreground mt-1">{{ entity.entity_type or '—' }}</div>
+            <div class="text-sm font-semibold text-foreground mt-1" data-testid="entity-type">{% if entity.entity_type %}{{ entity.entity_type|capitalize }}{% else %}{{ _not_recorded('type') }}{% endif %}</div>
         </div>
         <div class="rounded-lg border border-border bg-card p-4">
             <div class="text-xs font-medium text-muted-foreground uppercase tracking-wide">Classification</div>
-            <div class="text-sm font-semibold text-foreground mt-1">{{ entity.data_classification or '—' }}</div>
+            <div class="text-sm font-semibold text-foreground mt-1" data-testid="entity-classification">{% if entity.data_classification %}{{ entity.data_classification|capitalize }}{% else %}{{ _not_recorded('classification') }}{% endif %}</div>
         </div>
         <div class="rounded-lg border border-border bg-card p-4">
             <div class="text-xs font-medium text-muted-foreground uppercase tracking-wide">System of record</div>
-            <div class="text-sm font-semibold text-foreground mt-1">{{ entity.system_of_record or '—' }}</div>
+            <div class="text-sm font-semibold text-foreground mt-1" data-testid="entity-system-of-record">
+                {% if entity.system_of_record_application %}
+                {% if 'unified_applications.application_detail' in flask.current_app.view_functions %}<a href="{{ url_for('unified_applications.application_detail', id=entity.system_of_record_application.id) }}" class="hover:underline">{{ entity.system_of_record_application.name }}</a>{% else %}{{ entity.system_of_record_application.name }}{% endif %}
+                {% elif entity.system_of_record %}{{ entity.system_of_record }}
+                {% else %}{{ _not_recorded('system of record') }}{% endif %}
+            </div>
         </div>
         <div class="rounded-lg border border-border bg-card p-4">
             <div class="text-xs font-medium text-muted-foreground uppercase tracking-wide">Contains PII</div>
@@ -63,7 +71,7 @@
             <tr class="h-10 border-b border-border">
                 <td class="px-4 align-middle font-mono text-sm">{{ attr.name }}</td>
                 <td class="px-4 align-middle font-mono text-sm">{{ attr.data_type or '—' }}</td>
-                <td class="px-4 align-middle text-sm">{% if attr.is_primary_key %}{% call badge('info') %}PK{% endcall %} {% endif %}{% if attr.is_foreign_key %}{% call badge('neutral') %}FK{% endcall %}{% endif %}{% if not attr.is_primary_key and not attr.is_foreign_key %}—{% endif %}</td>
+                <td class="px-4 align-middle text-sm">{% if attr.is_primary_key %}{% call badge('info') %}PK{% endcall %} {% endif %}{% if attr.is_foreign_key %}{% call badge('neutral') %}FK{% endcall %}{% endif %}{% if not attr.is_primary_key and not attr.is_foreign_key %}<span class="text-muted-foreground" aria-hidden="true">—</span><span class="sr-only">Not a key</span>{% endif %}</td>
                 <td class="px-4 align-middle text-sm">{{ 'Yes' if attr.is_nullable else 'No' }}</td>
             </tr>
             {% endfor %}

@@ -61,14 +61,63 @@
         </div>
       </div>
     </div>
+    {# The selection bar: what is selected, and where it leads. Every entity opens its own record from here. #}
+    <div x-show="selected" x-cloak class="flex min-h-10 shrink-0 flex-wrap items-center gap-x-3 gap-y-1 border-t border-border bg-card px-4 py-1 text-sm" data-testid="erd-selection">
+      <template x-if="selectedEntity">
+        <span class="flex min-w-0 flex-wrap items-center gap-x-2">
+          <span class="truncate font-medium text-foreground" x-text="selectedEntity.name" data-testid="erd-selection-name"></span>
+          <span class="text-xs text-muted-foreground" x-text="selectedEntity.attributes.length + (selectedEntity.attributes.length === 1 ? ' attribute' : ' attributes') + ', a data object in the architecture model'"></span>
+        </span>
+      </template>
+      <template x-if="selectedRelationship">
+        <span class="truncate font-medium text-foreground" x-text="selectedRelationship.text" data-testid="erd-selection-name"></span>
+      </template>
+      <span class="ml-auto flex flex-wrap items-center gap-1.5">
+        <template x-if="selectedEntity">
+          <span class="flex items-center gap-1.5">
+            {{ button(text='Open record', variant='outline', size='sm', icon='arrow-up-right', href='#', testid='erd-open-record', attrs_dict={':href': 'selectedEntity.url'}) }}
+            {{ button(text='Edit attributes', variant='outline', size='sm', icon='pencil', testid='erd-selection-edit', attrs_dict={'@click': 'openEdit(selectedEntity.id)'}) }}
+          </span>
+        </template>
+        <template x-if="selectedRelationship">
+          {{ button(text='Edit relationship', variant='outline', size='sm', icon='pencil', testid='erd-selection-edit', attrs_dict={'@click': 'openRelationship(selectedRelationship.id)'}) }}
+        </template>
+        {{ button(text='Clear', variant='ghost', size='sm', testid='erd-selection-clear', attrs_dict={'@click': 'clearSelection()'}) }}
+      </span>
+    </div>
     {{ diagram_legend() }}
     {{ diagram_status_line(noun='entity', noun_plural='entities') }}
+  {% endcall %}
+
+  {# The shortcuts this page answers to; the status line's help button opens it. #}
+  {% call modal(id='erd-shortcuts-modal', title='Keyboard shortcuts', size='default', description='What the keyboard and the mouse do on this diagram.', attrs={'x-init': "Platform.modal.on('erd-shortcuts-modal', 'close', () => { showShortcutsModal = false })", 'x-effect': "showShortcutsModal ? Platform.modal.open('erd-shortcuts-modal') : Platform.modal.close('erd-shortcuts-modal')"}) %}
+    <dl class="flex flex-col gap-2 text-sm" data-testid="erd-shortcuts">
+      {% for keys, what in [
+        ('Enter', 'Edit the selected entity or relationship'),
+        ('Delete', 'Remove the selected entity or relationship, after confirming'),
+        ('Esc', 'Back to the Select tool'),
+        ('Space + drag', 'Pan the diagram'),
+        ('?', 'This help'),
+        ('Click', 'Select an entity or a relationship'),
+        ('Double-click', 'Edit an entity and its attributes'),
+        ('Drag', 'Move an entity; the layout is remembered in this browser'),
+        ('Connect tool', 'Click one entity, then the entity it relates to'),
+      ] %}
+      <div class="flex items-start gap-3">
+        <dt class="w-28 shrink-0"><kbd class="rounded-sm border border-border bg-muted px-1 font-mono text-xs">{{ keys }}</kbd></dt>
+        <dd class="text-foreground">{{ what }}</dd>
+      </div>
+      {% endfor %}
+    </dl>
   {% endcall %}
 
   {# Add or edit an entity and its attributes. #}
   {% call modal(id='erd-edit-modal', title='Entity', size='xl', description='Name the entity and list its attributes. The entity is also a data object in the architecture model.', attrs={'x-init': "Platform.modal.on('erd-edit-modal', 'close', () => { editOpen = false })", 'x-effect': "editOpen ? Platform.modal.open('erd-edit-modal') : Platform.modal.close('erd-edit-modal')"}) %}
     <form @submit.prevent="saveEntity()" class="flex flex-col gap-4" data-testid="erd-edit-form">
-      <p class="text-sm font-medium text-foreground" x-text="editTitle"></p>
+      <div class="flex flex-wrap items-center justify-between gap-2">
+        <p class="text-sm font-medium text-foreground" x-text="editTitle"></p>
+        <a x-show="editRecordUrl" x-cloak :href="editRecordUrl" class="text-sm text-primary hover:underline" data-testid="erd-edit-open-record">Open this entity's record</a>
+      </div>
       {% call form_group(id='erd-entity-name', label='Entity name', required=true) %}
         {{ input(id='erd-entity-name', placeholder='e.g. Customer', maxlength='200', attrs_dict={'x-model': 'edit.name', 'data-testid': 'erd-entity-name'}) }}
       {% endcall %}

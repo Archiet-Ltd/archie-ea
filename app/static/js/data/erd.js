@@ -114,6 +114,7 @@ function erdApp() {
         pendingSource: null,
         busy: false,
         panning: null,
+        spaceHeld: false,
 
         editOpen: false,
         editError: '',
@@ -135,6 +136,23 @@ function erdApp() {
             return this.finderItems.filter(function(r) { return r.name.toLowerCase().indexOf(q) !== -1; });
         },
         get editTitle() { return this.edit.id ? 'Edit entity' : 'Add entity'; },
+        /* The selected entity, with the address of its record, for the selection bar and the edit dialog. */
+        get selectedEntity() {
+            if (!this.selected || this.selected.kind !== 'entity') return null;
+            return this.entityById(this.selected.id) || null;
+        },
+        get selectedRelationship() {
+            if (!this.selected || this.selected.kind !== 'relationship') return null;
+            let id = this.selected.id;
+            let r = this.relationships.find(function(x) { return x.id === id; });
+            if (!r) return null;
+            let s = this.entityById(r.source_id), t = this.entityById(r.target_id);
+            return { id: r.id, text: (s ? s.name : '') + ' ' + (r.label || 'relates to') + ' ' + (t ? t.name : '') };
+        },
+        get editRecordUrl() {
+            let e = this.edit.id ? this.entityById(this.edit.id) : null;
+            return e ? e.url : '';
+        },
         get relSummary() {
             return this.rel.sourceName + ' to ' + this.rel.targetName;
         },
@@ -157,6 +175,12 @@ function erdApp() {
                 if (tag === 'input' || tag === 'select' || tag === 'textarea') return;
                 if (ev.key === 'Delete' && self.selected) { ev.preventDefault(); self.deleteSelected(); }
                 if (ev.key === 'Escape') { self.pendingSource = null; self.shellSetTool('select'); self.say('Ready'); }
+                if (ev.key === 'Enter' && self.selected && !self.editOpen && !self.relOpen) { ev.preventDefault(); self.shellOpenProperties(); }
+                if (ev.key === '?' && !self.editOpen && !self.relOpen) { ev.preventDefault(); self.showShortcutsModal = true; }
+                if (ev.key === ' ' && !self.spaceHeld) { ev.preventDefault(); self.spaceHeld = true; }
+            });
+            document.addEventListener('keyup', function(ev) {
+                if (ev.key === ' ') { self.spaceHeld = false; self.panning = null; }
             });
         },
 
@@ -185,7 +209,7 @@ function erdApp() {
             self.paper.on('link:pointerclick', function(view) { self.selectRelationship(view.model.get('relId')); });
             self.paper.on('blank:pointerclick', function() { self.clearSelection(); });
             self.paper.on('blank:pointerdown', function(ev) {
-                if (self.shellTool === 'pan') {
+                if (self.shellTool === 'pan' || self.spaceHeld) {
                     self.panning = { x: ev.clientX, y: ev.clientY, tx: self.paper.translate().tx, ty: self.paper.translate().ty };
                 }
             });
@@ -343,8 +367,10 @@ function erdApp() {
             this.relationships.forEach(function(r) { kinds[r.source_cardinality] = true; kinds[r.target_cardinality] = true; });
             this.legendTypes = Object.keys(END_LABELS).filter(function(k) { return kinds[k]; })
                 .map(function(k) { return { type: k, label: END_LABELS[k] }; });
-            self.selectedNode = self.selected && self.selected.kind === 'entity'
-                ? { label: (self.entities.find(function(e) { return e.id === self.selected.id; }) || {}).name }
+            let picked = self.selected && self.selected.kind === 'entity'
+                ? self.entities.find(function(e) { return e.id === self.selected.id; }) : null;
+            self.selectedNode = picked
+                ? { label: picked.name, url: picked.url }
                 : (self.selected ? { label: 'a relationship' } : null);
         },
 

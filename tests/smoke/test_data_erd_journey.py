@@ -226,6 +226,74 @@ def test_empty_domain_says_why_and_offers_the_next_step(page, live_server, world
     expect(page.get_by_test_id("status-counts")).to_have_text("0 entities, 0 relationships")
 
 
+def test_a_selected_entity_opens_its_record_and_every_control_does_something(page, live_server, world):
+    """From the diagram, one click on an entity shows what it is and opens its
+    record; the record names the list it belongs to and says plainly which
+    facts are not recorded yet; the help button opens real help."""
+    org = world["a"]
+    page.set_viewport_size({"width": 1440, "height": 900})
+    _sign_in(page, str(live_server), org["email"])
+    _open_customer_diagram(page, str(live_server))
+
+    # Nothing is selected: the selection bar is out of the way.
+    expect(page.get_by_test_id("erd-selection")).to_be_hidden()
+    _entities_on_canvas(page).filter(has_text="legal_name").click()
+    bar = page.get_by_test_id("erd-selection")
+    expect(bar).to_be_visible()
+    expect(page.get_by_test_id("erd-selection-name")).to_have_text("Customer")
+    expect(bar).to_contain_text("4 attributes")
+    expect(page.get_by_test_id("status-selection")).to_have_text("Selected: Customer")
+    open_record = page.get_by_test_id("erd-open-record")
+    expect(open_record).to_have_attribute("href", re.compile(r"/architecture/data-entities/\d+$"))
+
+    # The toolbar's Properties button edits the selected entity, and the dialog links to the record too.
+    page.get_by_test_id("action-properties").click()
+    expect(page.get_by_test_id("erd-entity-name")).to_have_value("Customer")
+    expect(page.get_by_test_id("erd-edit-open-record")).to_have_attribute("href", re.compile(r"/architecture/data-entities/\d+$"))
+    page.get_by_role("button", name="Cancel").first.click()
+    expect(page.get_by_test_id("erd-edit-form")).to_be_hidden()
+
+    # The help button opens the shortcuts this page answers to.
+    page.get_by_role("button", name="Keyboard Shortcuts").click()
+    shortcuts = page.get_by_test_id("erd-shortcuts")
+    expect(shortcuts).to_be_visible()
+    expect(shortcuts).to_contain_text("Space + drag")
+    expect(shortcuts).to_contain_text("Double-click")
+    page.keyboard.press("Escape")
+    expect(shortcuts).to_be_hidden()
+
+    # The record: its list is "Data objects" everywhere, and a fact that is not recorded says so.
+    expect(page.get_by_test_id("erd-selection")).to_be_visible()
+    page.screenshot(path=str(SHOTS / "journey-1440-light-selected.png"))
+    open_record.click()
+    page.wait_for_url(re.compile(r"/architecture/data-entities/\d+$"), timeout=PAGE_TIMEOUT)
+    expect(page.get_by_role("heading", name="Customer").first).to_be_visible()
+    expect(page.get_by_role("link", name="Data objects")).to_be_visible()
+    expect(page.get_by_text("Entity Catalog")).to_have_count(0)
+    facts = page.get_by_test_id("entity-facts")
+    expect(facts).to_contain_text("Not recorded")
+    expect(facts).not_to_contain_text("—")
+    record_it = facts.get_by_role("link", name=re.compile(r"^Record the")).first
+    record_it.click()
+    page.wait_for_url(re.compile(r"/data-entities/\d+/edit$"), timeout=PAGE_TIMEOUT)
+    expect(page.get_by_role("heading").first).to_be_visible()
+
+
+def test_on_a_phone_a_selected_entity_still_opens_its_record(page, live_server, world):
+    org = world["b"]
+    page.set_viewport_size({"width": 390, "height": 844})
+    _sign_in(page, str(live_server), org["email"])
+    _open_customer_diagram(page, str(live_server))
+    _entities_on_canvas(page).filter(has_text="legal_name").click()
+    expect(page.get_by_test_id("erd-selection-name")).to_have_text("Customer")
+    assert page.evaluate("document.documentElement.scrollWidth <= window.innerWidth + 1")
+    page.screenshot(path=str(SHOTS / "journey-390-light-selected.png"))
+    page.get_by_test_id("erd-open-record").click()
+    page.wait_for_url(re.compile(r"/architecture/data-entities/\d+$"), timeout=PAGE_TIMEOUT)
+    expect(page.get_by_role("heading", name="Customer").first).to_be_visible()
+    assert page.evaluate("document.documentElement.scrollWidth <= window.innerWidth + 1")
+
+
 def test_diagram_fits_a_phone(page, live_server, world):
     org = world["b"]
     page.set_viewport_size({"width": 390, "height": 844})

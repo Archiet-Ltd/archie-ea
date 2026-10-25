@@ -1608,6 +1608,23 @@ _DATA_MODEL = {
     },
 }
 
+# What each demonstration entity is: (type, classification, holds personal data, system of record).
+_DATA_FACTS = {
+    "Customer": ("master", "confidential", True, "Customer Portal"),
+    "Contact": ("master", "confidential", True, "Customer Portal"),
+    "Delivery Address": ("master", "confidential", True, "Customer Portal"),
+    "Consent": ("transactional", "restricted", True, "Customer Portal"),
+    "Sales Order": ("transactional", "internal", False, "Dispatch Planner"),
+    "Order Line": ("transactional", "internal", False, "Dispatch Planner"),
+    "Product": ("master", "internal", False, "Inventory Manager"),
+    "Shipment": ("transactional", "internal", False, "Dispatch Planner"),
+    "Return": ("transactional", "internal", False, "Dispatch Planner"),
+    "Invoice": ("transactional", "confidential", False, "Finance System"),
+    "Payment": ("transactional", "confidential", False, "Finance System"),
+    "Cost Centre": ("reference", "internal", False, "Finance System"),
+    "Ledger Entry": ("transactional", "confidential", False, "Finance System"),
+}
+
 
 def _seed_data_model(org_id) -> dict:
     """Fill the demonstration organisation's data domains so each opens with a
@@ -1644,6 +1661,7 @@ def _seed_data_model(org_id) -> dict:
                 entity = erd.create_entity(domain, entity_name, attributes)
                 stats["data_entities_created"] += 1
             by_name[entity_name] = entity
+            _fill_entity_facts(entity, org_id)
         for source, target, preset, label in spec["relationships"]:
             exists = DataEntityRelationship.query.filter_by(
                 organization_id=org_id, source_entity_id=by_name[source].id,
@@ -1653,6 +1671,28 @@ def _seed_data_model(org_id) -> dict:
                 stats["data_relationships_created"] += 1
     db.session.flush()
     return stats
+
+
+def _fill_entity_facts(entity, org_id):
+    """Record the entity's type, classification, personal-data flag and system
+    of record when they are not recorded yet; never overwrite a person's entry."""
+    facts = _DATA_FACTS.get(entity.name)
+    if facts is None:
+        return
+    entity_type, classification, pii, system_name = facts
+    if not entity.entity_type:
+        entity.entity_type = entity_type
+        entity.is_master_data = entity_type == "master"
+    if not entity.data_classification:
+        entity.data_classification = classification
+    if pii and not entity.contains_pii:
+        entity.contains_pii = True
+    if entity.system_of_record_application_id is None:
+        from app.models.application_portfolio import ApplicationComponent
+
+        system = ApplicationComponent.query.filter_by(organization_id=org_id, name=system_name).first()
+        if system is not None:
+            entity.system_of_record_application_id = system.id
 
 
 def _seed_boards(org_id, demo_user_id) -> dict:
