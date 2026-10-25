@@ -289,8 +289,8 @@ def test_gaps_point_at_the_one_gap_register():
 
 
 @pytest.mark.parametrize("role", VALID_ROLES)
-def test_changes_holds_the_gaps_work_packages_and_business_cases(ctx, role):
+def test_changes_holds_the_business_cases(ctx, role):
     nav = _nav(_Person(role))
     changes = next(item for item in nav["main"] if item.key == "changes")
-    assert _labels(changes.children) == ["Gaps", "Work packages", "Business cases"]
-    assert changes.children[-1].href == "/business-case/"
+    assert _labels(changes.children) == ["Business cases"]
+    assert changes.children[0].href == "/business-case/"

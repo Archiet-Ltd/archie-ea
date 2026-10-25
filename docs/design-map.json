@@ -17118,6 +17118,184 @@
    "tier": "C4",
    "type_changed": true
   },
+  "app/templates/business_case/document.html": {
+   "allowed_macros": [
+    "components/accessibility_helpers.html",
+    "components/alert.html",
+    "components/avatar.html",
+    "components/badge.html",
+    "components/breadcrumb.html",
+    "components/breadcrumb_nav.html",
+    "components/button.html",
+    "components/canvas_box.html",
+    "components/card.html",
+    "components/checkbox.html",
+    "components/confirmation_dialog.html",
+    "components/data_card.html",
+    "components/dense_table.html",
+    "components/detail_meta.html",
+    "components/dialog.html",
+    "components/dropdown_menu.html",
+    "components/empty_state.html",
+    "components/error_boundary.html",
+    "components/form_field.html",
+    "components/inline_hint.html",
+    "components/input.html",
+    "components/loading_state.html",
+    "components/metrics_card.html",
+    "components/modal.html",
+    "components/page_header.html",
+    "components/progress.html",
+    "components/provenance.html",
+    "components/select.html",
+    "components/skeleton.html",
+    "components/status_badge.html",
+    "components/status_indicator.html",
+    "components/tabs.html",
+    "components/traceability_panel.html",
+    "macros/form_macros.html",
+    "macros/page_shell.html"
+   ],
+   "basis": "declared",
+   "block": "record-detail",
+   "charts": [],
+   "components": [
+    "alert",
+    "badge",
+    "breadcrumb",
+    "button",
+    "card",
+    "dialog",
+    "empty",
+    "page-header",
+    "tabs"
+   ],
+   "confidence": "high",
+   "controls": {
+    "button": 1,
+    "link": 4,
+    "table": 1,
+    "testid": 8
+   },
+   "extends": [
+    "layouts/admin_base.html"
+   ],
+   "frame": "dashboard-01",
+   "inhouse_components": [
+    "page-header:Replace"
+   ],
+   "macros": [
+    "components/card.html",
+    "components/modal.html",
+    "components/page_header.html"
+   ],
+   "original": "gap:G-4",
+   "page_type": "document",
+   "persona": "portfolio_manager",
+   "reason": "Business case read as a document: recommendation, problem, options, costs, risks, decision.",
+   "reference": {
+    "shadcn": {
+     "name": "shadcn examples: mail (reading pane)",
+     "url": "https://ui.shadcn.com/examples/mail"
+    },
+    "basecoat": {
+     "name": "flask-basecoat examples: product detail",
+     "image": "docs/design/reference/basecoat-product-detail.webp"
+    }
+   },
+   "spec": null,
+   "status": "mapped",
+   "tier": "C4",
+   "type_changed": false
+  },
+  "app/templates/business_case/edit.html": {
+   "allowed_macros": [
+    "components/accessibility_helpers.html",
+    "components/alert.html",
+    "components/badge.html",
+    "components/breadcrumb.html",
+    "components/breadcrumb_nav.html",
+    "components/button.html",
+    "components/card.html",
+    "components/checkbox.html",
+    "components/confirmation_dialog.html",
+    "components/dialog.html",
+    "components/dropdown_menu.html",
+    "components/empty_state.html",
+    "components/error_boundary.html",
+    "components/file_upload.html",
+    "components/form_field.html",
+    "components/inline_hint.html",
+    "components/input.html",
+    "components/loading_state.html",
+    "components/modal.html",
+    "components/modal_form.html",
+    "components/page_header.html",
+    "components/provenance.html",
+    "components/radio_group.html",
+    "components/select.html",
+    "components/skeleton.html",
+    "components/status_badge.html",
+    "components/stepper.html",
+    "components/switch.html",
+    "components/tabs.html",
+    "macros/check_password.html",
+    "macros/form_macros.html",
+    "macros/page_shell.html"
+   ],
+   "basis": "declared",
+   "block": "form",
+   "charts": [],
+   "components": [
+    "alert",
+    "badge",
+    "breadcrumb",
+    "button",
+    "card",
+    "checkbox",
+    "empty",
+    "field",
+    "input",
+    "page-header",
+    "select"
+   ],
+   "confidence": "high",
+   "controls": {
+    "form": 1,
+    "link": 2,
+    "testid": 1
+   },
+   "extends": [
+    "layouts/admin_base.html"
+   ],
+   "frame": "dashboard-01",
+   "inhouse_components": [
+    "page-header:Replace"
+   ],
+   "macros": [
+    "components/card.html",
+    "components/form_field.html",
+    "components/page_header.html"
+   ],
+   "original": "gap:G-4",
+   "page_type": "form",
+   "persona": "portfolio_manager",
+   "reason": "Business case form: problem, options with figures, risks, decision.",
+   "reference": {
+    "shadcn": {
+     "name": "shadcn examples: forms",
+     "url": "https://ui.shadcn.com/examples/forms"
+    },
+    "basecoat": {
+     "name": "flask-basecoat gallery: form validation",
+     "image": "docs/design/reference/basecoat-form.webp"
+    }
+   },
+   "spec": null,
+   "status": "mapped",
+   "tier": "C4",
+   "type_changed": false
+  },
   "app/templates/business_case/index.html": {
    "allowed_macros": [
     "components/accessibility_helpers.html",
@@ -17174,7 +17352,7 @@
    "controls": {
     "button": 3,
     "form": 1,
-    "link": 1,
+    "link": 2,
     "modal": 1,
     "table": 1,
     "testid": 4
@@ -17189,8 +17367,8 @@
     "page-header:Replace"
    ],
    "macros": [
-    "components/card.html",
     "components/empty_state.html",
+    "components/form_field.html",
     "components/modal.html",
     "components/page_header.html"
    ],

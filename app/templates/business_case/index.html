@@ -3,7 +3,6 @@
 {% from 'components/empty_state.html' import empty_state %}
 {% from 'components/modal.html' import modal %}
 {% from 'components/form_field.html' import form_group %}
-{% import 'components/card.html' as card %}
 
 {% block title %}Business Cases{% endblock %}
 
@@ -28,8 +27,7 @@
 
   <div class="p-6 space-y-6">
     {% if business_cases %}
-    {% call card.card() %}
-      {% call card.card_content(class='p-0') %}
+    <div class="rounded-lg border bg-card text-card-foreground">
         <div class="overflow-x-auto">
           <table class="dense-table w-full text-sm" data-testid="bc-table">
             <thead>
@@ -70,8 +68,7 @@
             </tbody>
           </table>
         </div>
-      {% endcall %}
-    {% endcall %}
+</div>
     {% else %}
     {{ empty_state(
         icon='file-text',
@@ -161,3 +158,4 @@ function businessCaseSeed(prefillUrl) {
 }
 </script>
 {% endblock %}
+{# design-block: data-table #}

@@ -42,7 +42,10 @@
     [x-cloak] { display: none !important; }
 
     @media print {
-      .admin-sidebar, .admin-header, [x-data], button, .no-print { display: none !important; }
+      /* The page wrapper itself carries x-data, so hiding every [x-data] printed a blank page. */
+      .admin-sidebar, #admin-sidebar, .admin-header, [x-data]:not(:has(main)), button, .no-print { display: none !important; }
+      .h-screen { height: auto !important; }
+      .overflow-hidden, .overflow-y-auto, .overflow-x-hidden { overflow: visible !important; }
       main { margin: 0 !important; padding: 0 !important; width: 100% !important; }
       body { background: white !important; color: black !important; font-size: 12pt; }
       table { border-collapse: collapse; width: 100%; }

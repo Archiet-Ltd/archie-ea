@@ -202,8 +202,9 @@ def save_options(business_case, rows):
             option = BusinessCaseOption(organization_id=org_id)
             business_case.options.append(option)
         option.name = (row.get("name") or "").strip() or None
-        for key in ("summary", "advantages", "drawbacks"):
-            setattr(option, key, (row.get(key) or "").strip() or None)
+        option.summary = (row.get("summary") or "").strip() or None
+        option.advantages = (row.get("advantages") or "").strip() or None
+        option.drawbacks = (row.get("drawbacks") or "").strip() or None
         option.is_recommended = bool(row.get("recommended"))
         option.position = index
         db.session.flush()

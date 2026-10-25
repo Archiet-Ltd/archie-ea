@@ -112,9 +112,6 @@ _SPEND_CHILDREN = (
 )
 
 _CHANGES_CHILDREN = (
-    _l("gaps", "Gaps", "enterprise.gap_analysis", job="4", aliases=("Gap", "Gap analysis")),
-    _l("change_work_packages", "Work packages", "enterprise.work_packages", job="4",
-       aliases=("Work package", "WorkPackage", "Projects")),
     _l("business_cases", "Business cases", "business_case.index", job="4",
        aliases=("Business case", "Case for change", "Options", "Payback", "Investment case")),
 )

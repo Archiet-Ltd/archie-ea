@@ -160,10 +160,9 @@ def test_a_startup_cto_sees_exactly_ten_entries_and_the_connect_card(app, db_ses
     _, sidebar_html, links = _sidebar(client)
     entries = _entries(links)
     assert _labels(entries) == MAIN + SECONDARY
-    # The only sub-items are the three under Changes: no Spend, no procurement pages.
+    # The only sub-item is Business cases under Changes: no Spend, no procurement pages.
     subitems = [link["href"] for link in links if link["slot"] == "sidebar-subitem"]
-    assert subitems == ["/enterprise/implementation/gap-analysis", "/enterprise/implementation/work-packages",
-                        "/business-case/"], subitems
+    assert subitems == ["/business-case/"], subitems
     assert "Architecture" not in sidebar_html
     assert 'data-testid="connect-source-card"' in sidebar_html
     assert "Connect GitHub or Jira to build your model" in sidebar_html

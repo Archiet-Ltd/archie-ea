@@ -84,6 +84,8 @@ def test_a_case_that_never_pays_back_says_why_instead_of_a_number():
 
     months, note = payback(Decimal(100), Decimal(50), Decimal(40))
     assert months is None and "running cost" in note
+    months, note = payback(Decimal(0), Decimal(10), Decimal(0))
+    assert months is None and "Nothing is invested" in note
     months, note = payback(None, None, Decimal(40))
     assert months is None and "Add the one-off cost" in note
 

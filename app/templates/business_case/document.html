@@ -2,7 +2,12 @@
 {% from 'components/page_header.html' import page_header %}
 {% from 'components/modal.html' import modal %}
 {% import 'components/card.html' as card %}
-{% import 'components/table.html' as tbl %}
+{% macro _table(attrs_dict={}) %}<div class="relative w-full overflow-auto"><table class="dense-table w-full caption-bottom text-sm" {{ attrs_dict|xmlattr }}>{{ caller() }}</table></div>{% endmacro %}
+{% macro _thead() %}<thead class="[&_tr]:border-b">{{ caller() }}</thead>{% endmacro %}
+{% macro _tbody() %}<tbody class="[&_tr:last-child]:border-0">{{ caller() }}</tbody>{% endmacro %}
+{% macro _tr(class='', attrs_dict={}) %}<tr class="border-b {{ class }}" {{ attrs_dict|xmlattr }}>{{ caller() }}</tr>{% endmacro %}
+{% macro _th(class='') %}<th class="h-12 px-4 text-left align-middle font-medium text-muted-foreground {{ class }}">{{ caller() }}</th>{% endmacro %}
+{% macro _td(class='') %}<td class="p-4 align-middle {{ class }}">{{ caller() }}</td>{% endmacro %}
 
 {% block title %}{{ business_case.title or 'Business case' }}{% endblock %}
 
@@ -102,21 +107,21 @@
       {% call card.card_content() %}
         <div data-testid="bc-section-options">
         {% if doc.options %}
-          {% call tbl.table(attrs_dict={'data-testid': 'bc-options-table'}) %}
-            {% call tbl.table_header() %}
-              {% call tbl.table_row() %}
-                {% call tbl.table_head() %}<span class="sr-only">Attribute</span>{% endcall %}
+          {% call _table(attrs_dict={'data-testid': 'bc-options-table'}) %}
+            {% call _thead() %}
+              {% call _tr() %}
+                {% call _th() %}<span class="sr-only">Attribute</span>{% endcall %}
                 {% for o in doc.options %}
-                {% call tbl.table_head() %}{{ o.option.name or 'Unnamed option' }}{% if o.recommended %} <span class="ml-1 text-xs font-medium text-primary">Recommended</span>{% endif %}{% endcall %}
+                {% call _th() %}{{ o.option.name or 'Unnamed option' }}{% if o.recommended %} <span class="ml-1 text-xs font-medium text-primary">Recommended</span>{% endif %}{% endcall %}
                 {% endfor %}
               {% endcall %}
             {% endcall %}
-            {% call tbl.table_body() %}
+            {% call _tbody() %}
               {% for label, key in [('What it is', 'summary'), ('Advantages', 'advantages'), ('Drawbacks', 'drawbacks')] %}
-              {% call tbl.table_row() %}
-                {% call tbl.table_cell(class='font-medium text-muted-foreground') %}{{ label }}{% endcall %}
+              {% call _tr() %}
+                {% call _td(class='font-medium text-muted-foreground') %}{{ label }}{% endcall %}
                 {% for o in doc.options %}
-                {% call tbl.table_cell(class='whitespace-pre-line align-top') %}{{ o.option[key] or 'Not described yet' }}{% endcall %}
+                {% call _td(class='whitespace-pre-line align-top') %}{{ o.option[key] or 'Not described yet' }}{% endcall %}
                 {% endfor %}
               {% endcall %}
               {% endfor %}
@@ -138,23 +143,23 @@
       {% call card.card_content() %}
         <div data-testid="bc-section-costs">
         {% if doc.options %}
-          {% call tbl.table(attrs_dict={'data-testid': 'bc-costs-table'}) %}
-            {% call tbl.table_header() %}
-              {% call tbl.table_row() %}
-                {% call tbl.table_head() %}<span class="sr-only">Figure</span>{% endcall %}
-                {% for o in doc.options %}{% call tbl.table_head(class='text-right') %}{{ o.option.name or 'Unnamed option' }}{% endcall %}{% endfor %}
+          {% call _table(attrs_dict={'data-testid': 'bc-costs-table'}) %}
+            {% call _thead() %}
+              {% call _tr() %}
+                {% call _th() %}<span class="sr-only">Figure</span>{% endcall %}
+                {% for o in doc.options %}{% call _th(class='text-right') %}{{ o.option.name or 'Unnamed option' }}{% endcall %}{% endfor %}
               {% endcall %}
             {% endcall %}
-            {% call tbl.table_body() %}
+            {% call _tbody() %}
               {% for label, key in [('One-off cost', 'one_off'), ('Annual running cost', 'run_annual'), ('Annual benefit', 'benefit_annual'), ('Three-year cost', 'three_year_cost')] %}
-              {% call tbl.table_row() %}
-                {% call tbl.table_cell(class='font-medium text-muted-foreground') %}{{ label }}{% endcall %}
-                {% for o in doc.options %}{% call tbl.table_cell(class='text-right tabular-nums') %}<span data-figure="{{ key }}-{{ o.option.id }}">{{ money(o[key]) }}</span>{% endcall %}{% endfor %}
+              {% call _tr() %}
+                {% call _td(class='font-medium text-muted-foreground') %}{{ label }}{% endcall %}
+                {% for o in doc.options %}{% call _td(class='text-right tabular-nums') %}<span data-figure="{{ key }}-{{ o.option.id }}">{{ money(o[key]) }}</span>{% endcall %}{% endfor %}
               {% endcall %}
               {% endfor %}
-              {% call tbl.table_row(class='font-semibold') %}
-                {% call tbl.table_cell(class='text-muted-foreground') %}Payback{% endcall %}
-                {% for o in doc.options %}{% call tbl.table_cell(class='text-right tabular-nums') %}<span data-figure="payback-{{ o.option.id }}">{{ months(o) }}</span>{% endcall %}{% endfor %}
+              {% call _tr(class='font-semibold') %}
+                {% call _td(class='text-muted-foreground') %}Payback{% endcall %}
+                {% for o in doc.options %}{% call _td(class='text-right tabular-nums') %}<span data-figure="payback-{{ o.option.id }}">{{ months(o) }}</span>{% endcall %}{% endfor %}
               {% endcall %}
             {% endcall %}
           {% endcall %}
@@ -177,22 +182,22 @@
       {% call card.card_content() %}
         <div data-testid="bc-section-risks">
         {% if doc.risks %}
-          {% call tbl.table(attrs_dict={'data-testid': 'bc-risks-table'}) %}
-            {% call tbl.table_header() %}
-              {% call tbl.table_row() %}
-                {% call tbl.table_head() %}Risk{% endcall %}
-                {% call tbl.table_head() %}Level{% endcall %}
-                {% call tbl.table_head() %}Owner{% endcall %}
-                {% call tbl.table_head() %}Mitigation{% endcall %}
+          {% call _table(attrs_dict={'data-testid': 'bc-risks-table'}) %}
+            {% call _thead() %}
+              {% call _tr() %}
+                {% call _th() %}Risk{% endcall %}
+                {% call _th() %}Level{% endcall %}
+                {% call _th() %}Owner{% endcall %}
+                {% call _th() %}Mitigation{% endcall %}
               {% endcall %}
             {% endcall %}
-            {% call tbl.table_body() %}
+            {% call _tbody() %}
               {% for r in doc.risks %}
-              {% call tbl.table_row(attrs_dict={'data-risk-row': r.id}) %}
-                {% call tbl.table_cell(class='font-medium') %}<a href="{{ url_for('risk.risk_page', risk_id=r.id) }}" class="text-primary hover:underline">{{ r.title }}</a>{% endcall %}
-                {% call tbl.table_cell() %}{{ r.risk_level | capitalize }}{% endcall %}
-                {% call tbl.table_cell() %}{{ r.owner or 'No owner yet' }}{% endcall %}
-                {% call tbl.table_cell(class='whitespace-pre-line') %}{{ r.mitigation_plan or 'No mitigation written yet' }}{% endcall %}
+              {% call _tr(attrs_dict={'data-risk-row': r.id}) %}
+                {% call _td(class='font-medium') %}<a href="{{ url_for('risk.risk_page', risk_id=r.id) }}" class="text-primary hover:underline">{{ r.title }}</a>{% endcall %}
+                {% call _td() %}{{ r.risk_level | capitalize }}{% endcall %}
+                {% call _td() %}{{ r.owner or 'No owner yet' }}{% endcall %}
+                {% call _td(class='whitespace-pre-line') %}{{ r.mitigation_plan or 'No mitigation written yet' }}{% endcall %}
               {% endcall %}
               {% endfor %}
             {% endcall %}
@@ -230,3 +235,4 @@
   </div>
 </div>
 {% endblock %}
+{# design-block: record-detail #}

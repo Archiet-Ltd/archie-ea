@@ -66,9 +66,9 @@ def payback(one_off, run_annual, benefit_annual):
     """(months, note). Months are None, with the reason in words, when they cannot be worked out."""
     if one_off is None or benefit_annual is None:
         return None, "Add the one-off cost and the annual benefit to see payback."
-    net = Decimal(benefit_annual) - Decimal(run_annual or 0)
     if Decimal(one_off) <= 0:
-        return 0, ""
+        return None, "Nothing is invested, so there is no payback to work out."
+    net = Decimal(benefit_annual) - Decimal(run_annual or 0)
     if net <= 0:
         return None, "The annual benefit does not cover the running cost, so the investment is not paid back."
     return int(math.ceil(Decimal(one_off) / net * 12)), ""
