@@ -132,8 +132,8 @@ def _decisions_due(now: datetime):
             {
                 "title": f"{review.review_number} · {review.title}",
                 "detail": (
-                    f"Past its {entry['threshold']}-day limit by "
-                    f"{_plural(late, 'day')}"
+                    f"Submitted, {_plural(late, 'day')} past its "
+                    f"{entry['threshold']}-day limit"
                 ),
                 "date": review.submitted_at.date(),
                 "href": f"/arb/reviews/{review.id}",
@@ -243,7 +243,7 @@ def _risks_rising(org_id, start: datetime, end: datetime) -> List[Dict[str, Any]
             {
                 "title": risk.title,
                 "detail": (
-                    f"{movement['kind'].title()} score up from "
+                    f"{movement['kind'].title()} risk score up from "
                     f"{movement['was']} to {movement['now']}"
                 ),
                 "date": movement["at"].date(),

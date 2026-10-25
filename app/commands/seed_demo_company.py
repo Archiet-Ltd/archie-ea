@@ -762,6 +762,10 @@ _ARB_REVIEWS = [
      "standards_exception", "medium", "submitted", 5, None, None),
     ("LQ-ARB-2026-009", "Introduce a vendor risk score into supplier selection",
      "architecture_change", "low", "submitted", 2, None, None),
+    ("LQ-ARB-2026-010", "Adopt a single customer identifier across the estate",
+     "architecture_change", "high", "under_review", 18, None, None),
+    ("LQ-ARB-2026-011", "Exception to the approved database standard for Field Service",
+     "standards_exception", "medium", "submitted", 26, None, None),
 ]
 
 # ── application owners ─────────────────────────────────────────────────────
@@ -943,6 +947,12 @@ _CAPABILITIES = [
 ]
 
 # ── risks ──────────────────────────────────────────────────────────────────
+
+# (risk title, earlier residual (likelihood, impact), residual now)
+_RISING_RISKS = [
+    ("Event Relay single point of failure", (3, 4), (4, 5)),
+    ("Calibration Ledger data corruption", (2, 4), (4, 4)),
+]
 
 _RISKS = [
     # (title, likelihood, impact, status, owner, mitigation, archimate_element_name)
@@ -2571,6 +2581,34 @@ def seed_demo_company() -> dict:
         if risks_created:
             db.session.flush()
         stats["risks_created"] = risks_created
+
+        # Two risks whose score has risen in the last week, so the weekly
+        # briefing has movement to report. Skipped once a risk has history.
+        from app.models.risk_score_history import RiskScoreHistory
+
+        rising_created = 0
+        for title, was, now_score in _RISING_RISKS:
+            risk = (
+                db.session.query(Risk)
+                .filter(Risk.organization_id == org_id, Risk.title == title)
+                .first()
+            )
+            if risk is None or db.session.query(RiskScoreHistory).filter(
+                RiskScoreHistory.risk_id == risk.id
+            ).first():
+                continue
+            risk.residual_likelihood, risk.residual_impact = now_score
+            for (likelihood, impact), days_ago in ((was, 21), (now_score, 2)):
+                db.session.add(RiskScoreHistory(
+                    risk_id=risk.id, score_kind="residual",
+                    likelihood=likelihood, impact=impact,
+                    recorded_at=_dt.datetime.utcnow() - _dt.timedelta(days=days_ago),
+                    organization_id=org_id,
+                ))
+            rising_created += 1
+        if rising_created:
+            db.session.flush()
+        stats["rising_risks_created"] = rising_created
 
         # ── 9. programmes ───────────────────────────────────────────────
         existing_progs = {
