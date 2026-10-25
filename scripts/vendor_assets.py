@@ -71,7 +71,9 @@ ASSETS = {
 # Committed but not fetched by this script (pre-existing bundle; licence text
 # accompanying the Inter font files, hashed manually rather than downloaded on
 # every run since it never changes with a pinned font version).
-UNMANAGED = {"pptxgenjs.bundle.js", "inter-LICENSE.txt"}
+# "basecoat" is a directory copied from the flask-basecoat repository (its chart script, with the source
+# commit named in the file header), not downloaded from a CDN.
+UNMANAGED = {"pptxgenjs.bundle.js", "inter-LICENSE.txt", "basecoat"}
 
 MIN_BYTES = 500
 

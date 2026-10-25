@@ -1,5 +1,9 @@
+{# design-block: data-table #}
 {% extends 'layouts/admin_base.html' %}
-{% from 'macros/page_shell.html' import page_shell, empty_state %}
+{% from 'components/dense_table.html' import dense_table %}
+{% from 'components/button.html' import button %}
+{% from 'components/empty_state.html' import empty_state %}
+{% from 'macros/page_shell.html' import page_shell %}
 
 {% block title %}Undeclared copies — {{ config.APP_NAME }}{% endblock %}
 
@@ -12,36 +16,28 @@
       tabs=tabs
   ) }}
   {% if rows %}
-  <div class="rounded-lg border border-border bg-card overflow-hidden">
-    <div class="overflow-x-auto">
-      <table class="dense-table w-full text-sm" data-testid="copies-table">
-        <thead class="bg-muted/50 text-xs text-muted-foreground uppercase tracking-wide">
-          <tr>
-            <th class="text-left px-4 py-2.5">Data entity</th>
-            <th class="text-left px-4 py-2.5">Held by</th>
-            <th class="text-right px-4 py-2.5">Consumer applications</th>
-            <th class="text-right px-4 py-2.5">Actions</th>
-          </tr>
-        </thead>
-        <tbody class="divide-y divide-border">
-          {% for row in rows %}
-          <tr data-testid="copies-row-{{ row.entity.id }}">
-            <td class="px-4 py-2.5 font-medium">{{ row.entity.name }}</td>
-            <td class="px-4 py-2.5">{{ row.applications | join(', ') }}</td>
-            <td class="px-4 py-2.5 text-right tabular-nums">{{ row.consumer_count }}</td>
-            <td class="px-4 py-2.5 text-right">
-              <a href="{{ url_for('data_governance.entity_detail', entity_id=row.entity.id) }}"
-                 class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">Declare</a>
-            </td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-  </div>
+  {% call dense_table(
+      columns=[('Data entity', ''), ('Held by', ''), ('Consumer applications', 'text-right'), ('', 'text-right')],
+      rows=rows|length,
+      empty_text='No undeclared copies.',
+      caption='Undeclared copies',
+      testid='copies-table'
+  ) %}
+    {% for row in rows %}
+    <tr data-testid="copies-row-{{ row.entity.id }}">
+      <td class="px-2 align-middle font-medium text-foreground">{{ row.entity.name }}</td>
+      <td class="px-2 align-middle">{{ row.applications | join(', ') }}</td>
+      <td class="px-2 align-middle text-right tabular-nums">{{ row.consumer_count }}</td>
+      <td class="px-2 align-middle text-right">
+        {{ button(text='Declare', variant='outline', size='sm',
+                  href=url_for('data_governance.entity_detail', entity_id=row.entity.id)) }}
+      </td>
+    </tr>
+    {% endfor %}
+  {% endcall %}
   {% else %}
-  {{ empty_state(icon='copy-check', headline='No undeclared copies',
-      body='No data entity is held by more than one application without a declared system of record.') }}
+  {{ empty_state(icon='copy-check', title='No undeclared copies',
+      description='No data entity is held by more than one application without a declared system of record.') }}
   {% endif %}
 </div>
 {% endblock %}

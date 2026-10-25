@@ -2627,13 +2627,15 @@ def test_modules_integrations_301_to_connectors(app):
     assert "/modules/integrations" not in feed_page_paths()
 
 
-def test_assistant_connector_page_is_held():
+def test_assistant_connector_page_is_live_and_listed():
+    """Connecting the customer's own AI assistant works on every plan, so its page is
+    indexable and the /connectors hub lists it."""
     page = load_page("connector", slug="ai-assistants")
     assert page is not None, "ai-assistants connector page not found"
-    assert _is_held(page), (
-        "ai-assistants connector page should be held (its own front matter "
-        "sets state: held)"
-    )
+    assert not _is_held(page), "ai-assistants connector page should be live, not held"
+    from app.services.public_pages import feed_page_paths
+
+    assert "/connectors/ai-assistants" in feed_page_paths()
 
 
 def test_features_page_shows_captured_module_screenshots(app):

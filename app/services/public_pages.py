@@ -98,9 +98,9 @@ PROCUREMENT_PERSONA = "taylor.procurement@lantern-quay.example.com"
 def _role_capture(slug: str, role: str) -> tuple[str, str, str, str, str]:
     article = "an" if role[0] in "AEIOUaeiou" or role.startswith("IT ") else "a"
     return (
-        slug, "/intelligence/ask", DEMO_PERSONA,
-        f"The Ask panel as {article} {role} sees it: the impact question put to Calibration Ledger, with the first row of the answer showing what depends on it.",
-        f"Screenshot of the Ask panel signed in as {article} {role}, with the impact question asked of Calibration Ledger and the first result row displayed.",
+        slug, "/ai-chat/", DEMO_PERSONA,
+        f"The AI chat as {article} {role} sees it: the impact question put to Calibration Ledger, with the first row of the answer showing what depends on it.",
+        f"Screenshot of the AI chat signed in as {article} {role}, with the impact question asked of Calibration Ledger and the first result row displayed.",
     )
 
 
@@ -213,6 +213,14 @@ MODULE_CAPTURES: list[tuple[str, str, str, str, str]] = [
 # slug back to the matching *_CAPTURES list above -- the two are meant to
 # be mutually exclusive, never both.
 MODULE_CAPTURE_PENDING: dict[str, str] = {
+    "build-your-model-from-your-tools": (
+        "the connection step happens at sign-up in a new organisation, so there is "
+        "no seeded screen to photograph yet; capture it from a fresh sign-up"
+    ),
+    "answer-sources": (
+        "shown inside the AI chat answer, which the home page already photographs; "
+        "a module-specific capture is owed"
+    ),
     "integrations": (
         "connector health dashboard throws \"An internal error occurred\" on any "
         "data: app/routes/connector_routes.py api_list_connectors() calls .value "
@@ -1040,8 +1048,8 @@ def _breadcrumb_list_items(page: PublicPage, site_url: str) -> list[dict[str, An
 # lands in a final "More" group.
 
 ROLE_GROUPS: tuple[tuple[str, str], ...] = (
-    ("architecture", "Architecture"),
     ("technology-leadership", "Technology leadership"),
+    ("architecture", "Architecture"),
     ("portfolio-procurement-finance", "Portfolio, procurement and finance"),
     ("security-risk-compliance", "Security, risk and compliance"),
     ("owners", "Owners"),

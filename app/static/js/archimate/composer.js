@@ -61,6 +61,8 @@ function composerApp() {
         _redo: [],
         _MAX: 50,
         _recording: true,
+        onChange: null,
+        _changed: function() { if (typeof this.onChange === 'function') this.onChange(); },
 
         pause: function() { this._recording = false; },
         resume: function() { this._recording = true; },
@@ -70,6 +72,7 @@ function composerApp() {
             this._undo.push(action);
             if (this._undo.length > this._MAX) this._undo.shift();
             this._redo = [];
+            this._changed();
         },
 
         canUndo: function() { return this._undo.length > 0; },
@@ -81,6 +84,7 @@ function composerApp() {
             this._recording = false;
             try { a.undo(); } finally { this._recording = true; }
             this._redo.push(a);
+            this._changed();
         },
 
         redo: function() {
@@ -89,9 +93,10 @@ function composerApp() {
             this._recording = false;
             try { a.redo(); } finally { this._recording = true; }
             this._undo.push(a);
+            this._changed();
         },
 
-        clear: function() { this._undo = []; this._redo = []; },
+        clear: function() { this._undo = []; this._redo = []; this._changed(); },
     };
 
     /* ── Layer Y-band ordering ────────────────────────────── */
@@ -565,6 +570,7 @@ function composerApp() {
         applyLayerBanding: applyLayerBanding,
         VIEWPOINT_PALETTE_MAP: VIEWPOINT_PALETTE_MAP,
         applyCustomLabel: _applyCustomLabel,
+        PALETTE: PALETTE,
     };
 
     let _base = {
@@ -1061,6 +1067,7 @@ function composerApp() {
         init: function() {
             let self = this;
 
+            ComposerRenderer.useNotation(true);
             defineArchiMateShape();
 
             this.graph = new joint.dia.Graph();
@@ -1123,13 +1130,15 @@ function composerApp() {
             });
 
             /* ── Pan / rubber-band select: drag on blank canvas ── */
+            this.shellInit();
+
             this.paper.on('blank:pointerdown', function(evt) {
                 /* CMP-06: middle-mouse drag always pans, in any mode. Plain
                    left-drag in edit mode is rubber-band select (below), so
                    off-screen content was only reachable via Space+drag — an
                    undiscoverable gesture. Middle-mouse pan is the universal
                    diagram-tool convention and conflicts with nothing. */
-                if (evt.button === 1 || self._spaceDown || self.mode === 'view') {
+                if (evt.button === 1 || self._spaceDown || self.shellPan || self.mode === 'view') {
                     if (evt.button === 1 && evt.preventDefault) evt.preventDefault();
                     self._isPanning = true;
                     self._panStart = { x: evt.clientX, y: evt.clientY };
@@ -3406,16 +3415,27 @@ function composerApp() {
             let rect = document.getElementById('composer-canvas').getBoundingClientRect();
             let scale = this.paper.scale();
             let translate = this.paper.translate();
-            this.dropX = (event.clientX - rect.left - translate.tx) / scale.sx;
-            this.dropY = (event.clientY - rect.top - translate.ty) / scale.sy;
+            this._beginAddAt(
+                this.dragType,
+                (event.clientX - rect.left - translate.tx) / scale.sx,
+                (event.clientY - rect.top - translate.ty) / scale.sy
+            );
+        },
 
-            /* Centre element on cursor (element is 200×130) and snap to 12px grid */
+        /* Open the add dialog for a type at a point in diagram coordinates. Used by the
+           palette drop and by the palette's click/Enter add. */
+        _beginAddAt: function(typeObj, x, y) {
+            this.dropX = x;
+            this.dropY = y;
+
+            /* Centre element on the point (element is 200×130) and snap to 12px grid */
             let GRID = 12;
             this.dropX = Math.round((this.dropX - 100) / GRID) * GRID;
             this.dropY = Math.round((this.dropY - 65) / GRID) * GRID;
 
-            this.searchType = this.dragType.label;
-            this.searchTypeFilter = this.dragType.type;
+            this.dragType = typeObj;
+            this.searchType = typeObj.label;
+            this.searchTypeFilter = typeObj.type;
             this.searchQuery = '';
             this.searchResults = [];
             this.searchLayerFilter = '';
@@ -3512,6 +3532,7 @@ function composerApp() {
             let pos = this._placementFor(this.dropX, this.dropY);
             let node = createNode(item.id, item.name, item.type, layer, pos.x, pos.y);
             this.graph.addCell(node);
+            this.shellRecordPlacement(node);
             this.canvasElements[item.id] = item;
             this.elementCount++;
             this.statusText = 'Added: ' + item.name;
@@ -4169,7 +4190,10 @@ function composerApp() {
                 padding: { top: topPadding, bottom: 40, left: 40, right: rightPadding },
                 maxScale: 1,
                 minScale: 0.1,
-                useModelGeometry: true
+                useModelGeometry: true,
+                /* Centre the diagram in the space the padding leaves; the default hugs the top-left corner. */
+                horizontalAlign: 'middle',
+                verticalAlign: 'middle'
             });
             this.zoomPercent = Math.round(this.paper.scale().sx * 100);
             this._scheduleMiniMapUpdate();
@@ -7241,11 +7265,14 @@ function composerApp() {
     };
 
     /* Merge all module methods into the base data object */
-    return Object.assign(_base,
+    Object.assign(_base,
         ComposerAI.getMethods(_helpers),
         ComposerPersistence.getMethods(_helpers),
         ComposerGraph.getMethods(_helpers),
         ComposerSearch.getMethods(_helpers)
     );
+    /* The shell module has getters (Alpine computed properties); Object.assign would run them once
+       and freeze the result, so copy its property descriptors instead. */
+    return Object.defineProperties(_base, Object.getOwnPropertyDescriptors(ComposerShell.getMethods(_helpers)));
 
 }

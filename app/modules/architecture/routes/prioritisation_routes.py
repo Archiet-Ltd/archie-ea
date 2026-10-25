@@ -2,7 +2,9 @@
 import logging
 
 from flask import Blueprint, jsonify, render_template, request
-from flask_login import login_required
+from flask_login import current_user, login_required
+
+from app.core.auth.permissions import may_change_model_element
 
 from app.services import prioritisation_service
 
@@ -29,6 +31,8 @@ def get_prioritised_backlog():
 @login_required
 def patch_moscow(req_id: int):
     """PATCH /api/backlog/<req_id>/moscow — set MoSCoW priority."""
+    if not may_change_model_element(current_user, "edit"):
+        return jsonify({"error": "Your role can view the backlog but not change it."}), 403
     data = request.get_json(force=True) or {}
     priority = data.get("priority", "")
     try:
@@ -42,6 +46,8 @@ def patch_moscow(req_id: int):
 @login_required
 def patch_wsjf(req_id: int):
     """PATCH /api/backlog/<req_id>/wsjf — set WSJF components."""
+    if not may_change_model_element(current_user, "edit"):
+        return jsonify({"error": "Your role can view the backlog but not change it."}), 403
     data = request.get_json(force=True) or {}
     try:
         result = prioritisation_service.set_wsjf_components(
@@ -60,6 +66,8 @@ def patch_wsjf(req_id: int):
 @login_required
 def patch_rice(req_id: int):
     """PATCH /api/backlog/<req_id>/rice — set RICE components."""
+    if not may_change_model_element(current_user, "edit"):
+        return jsonify({"error": "Your role can view the backlog but not change it."}), 403
     data = request.get_json(force=True) or {}
     try:
         result = prioritisation_service.set_rice_components(
@@ -77,4 +85,4 @@ def patch_rice(req_id: int):
 @login_required
 def prioritisation_view():
     """GET /backlog/prioritisation — render backlog prioritisation UI."""
-    return render_template("backlog/prioritisation.html")
+    return render_template("backlog/prioritisation.html", can_write=may_change_model_element(current_user, "edit"))

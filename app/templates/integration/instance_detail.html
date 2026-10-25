@@ -1,188 +1,227 @@
-{% extends 'layouts/admin_base.html' %}
+{# shadcn-reference: preview@e55b60b #}
+{# design-block: record-detail #}
+{% extends "layouts/admin_base.html" %}
+{% block head %}<meta name="shadcn-nearest" content="dashboard-01">{% endblock %}
 {% from 'components/page_header.html' import page_header %}
-{% from 'components/metrics_card.html' import metrics_card %}
+{% from 'components/button.html' import button %}
+{% from 'components/card.html' import card, card_header, card_title, card_description, card_content %}
+{% from 'components/badge.html' import badge %}
+{% from 'components/modal.html' import modal %}
+{% from 'components/alert.html' import alert %}
+{% from 'components/progress.html' import progress %}
+{% from 'components/input.html' import input, textarea %}
+{% from 'components/empty_state.html' import empty_state %}
 
-{% block title %}Instance {{ instance.instance_code[:8] }} - Details{% endblock %}
+{% block title %}Instance {{ instance.instance_code }}{% endblock %}
 
 {% block content %}
+{% set status_variants = {
+    'pending': 'neutral',
+    'running': 'info',
+    'paused': 'neutral',
+    'waiting_approval': 'warning',
+    'completed': 'success',
+    'failed': 'danger',
+    'cancelled': 'neutral',
+} %}
+{% set step_variants = {
+    'pending': 'neutral',
+    'running': 'info',
+    'waiting_approval': 'warning',
+    'completed': 'success',
+    'failed': 'danger',
+    'skipped': 'neutral',
+} %}
+{% set step_icons = {
+    'pending': 'circle-dashed',
+    'running': 'loader',
+    'waiting_approval': 'clock',
+    'completed': 'check-circle-2',
+    'failed': 'circle-x',
+    'skipped': 'circle-dashed',
+} %}
+{% set step_tones = {
+    'pending': 'text-muted-foreground',
+    'running': 'text-primary',
+    'waiting_approval': 'text-warning-emphasis',
+    'completed': 'text-success-emphasis',
+    'failed': 'text-destructive-emphasis',
+    'skipped': 'text-muted-foreground',
+} %}
+
 <div class="space-y-6">
     {{ page_header(
         title='Instance ' ~ instance.instance_code,
+        description=instance.definition.workflow_name|dash,
         breadcrumbs=[
-            {'label': 'Instances', 'href': url_for('integration.list_instances')},
-            {'label': 'Instance Details'}
+            {'label': 'Home', 'href': url_for('main.index')},
+            {'label': 'Workflow Instances', 'href': url_for('integration.list_instances')},
+            {'label': 'Instance ' ~ instance.instance_code}
         ]
     ) }}
 
-    <!-- Status & Actions -->
-    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 -mt-2">
-        <div class="flex items-center gap-2">
-            <span class="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2
-                {% if instance.status == 'running' %}border-transparent bg-primary/10 text-info-emphasis
-                {% elif instance.status == 'completed' %}border-transparent bg-success/10 text-success-emphasis
-                {% elif instance.status == 'failed' %}border-transparent bg-destructive/10 text-destructive-emphasis
-                {% elif instance.status == 'waiting_approval' %}border-transparent bg-warning/10 text-warning-emphasis
-                {% else %}border-transparent bg-muted text-foreground{% endif %}">
-                {{ instance.status|replace('_', ' ')|title }}
-            </span>
-            <span class="text-sm text-muted-foreground">
-                Workflow: <a href="{{ url_for('integration.workflow_detail', workflow_code=instance.workflow_code) }}" class="text-primary hover:underline">{{ instance.workflow_definition.workflow_name }}</a>
-            </span>
-        </div>
-        <div class="flex gap-2">
-            {% if instance.status == 'running' or instance.status == 'waiting_approval' %}
-                <form action="{{ url_for('integration.cancel_workflow', instance_id=instance.id) }}" method="post" @submit.prevent="Platform.modal.confirmSubmit($event, 'Are you sure you want to cancel this workflow?')">
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                    <button type="submit" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center" aria-label="Submit">
-                        Cancel Workflow
-                    </button>
-                </form>
-            {% endif %}
-            
-            {% if instance.status == 'waiting_approval' %}
-                <button type="button" data-modal-open="approval-modal" class="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-success text-primary-foreground hover:bg-success h-10 px-4 py-2" aria-label="Action">
-                    Approve Step
-                </button>
-                
-                <div id="approval-modal" hidden role="dialog" aria-modal="true" aria-labelledby="approval-modal-title" class="modal-root fixed inset-0 z-50 items-center justify-center p-4">
-                    <div data-modal-backdrop="approval-modal" class="absolute inset-0 bg-overlay/50" aria-hidden="true"></div>
-                    <div data-modal-panel class="relative w-full max-w-md bg-background border border-border rounded-lg p-6">
-                        <h3 id="approval-modal-title" class="text-base font-semibold text-foreground text-foreground mb-2">Approve Workflow Step</h3>
-                        <p class="text-sm text-muted-foreground mb-4">Provide optional comments for this approval.</p>
-                        <form action="{{ url_for('integration.approve_workflow_step', instance_id=instance.id) }}" method="post">
-                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                            <textarea name="comments" class="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 mb-4" placeholder="Approval comments..." aria-label="Approval comments..."></textarea>
-                            <div class="flex justify-end gap-2">
-                                <button type="button" data-modal-close="approval-modal" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4" aria-label="Action">Cancel</button>
-                                <button type="submit" class="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-success text-primary-foreground hover:bg-success h-10 px-4 py-2" aria-label="Submit">Approve & Resume</button>
-                            </div>
-                        </form>
+    {# Status and actions for this instance (P01 page header actions, P23 status badge). #}
+    <div class="flex flex-wrap items-center gap-3">
+        <span data-testid="instance-status-badge">{% call badge(variant=status_variants.get(instance.status, 'neutral')) %}{{ instance.status|replace('_', ' ')|title }}{% endcall %}</span>
+        <span class="text-sm text-muted-foreground">
+            Workflow:
+            <a href="{{ url_for('integration.workflow_detail', workflow_code=instance.definition.workflow_code) }}"
+               class="font-medium text-foreground hover:underline">{{ instance.definition.workflow_name|dash }}</a>
+        </span>
+        <span class="text-sm text-muted-foreground">{{ instance.progress_percent|dash }}% complete</span>
+        {% if instance.status == 'waiting_approval' %}
+        <div class="ml-auto flex flex-wrap items-center gap-2">
+            {{ button(text='Approve Step', icon='check', attrs_dict={'data-modal-open': 'approve-step-modal'}) }}
+            {% call modal(id='approve-step-modal', title='Approve Workflow Step', description='This step is waiting for your confirmation. Add a note for the record, then approve to resume the workflow.') %}
+                <form method="post" action="{{ url_for('integration.approve_workflow_step', instance_id=instance.id) }}" class="space-y-4">
+                    {{ input(type='hidden', name='csrf_token', value=csrf_token()) }}
+                    {% call textarea(id='comments', name='comments', placeholder='Approval comments (optional).', aria_label='Approval comments') %}{% endcall %}
+                    <div class="flex justify-end gap-2">
+                        {{ button(text='Cancel', variant='ghost', attrs_dict={'data-modal-close': 'approve-step-modal'}) }}
+                        {{ button(text='Approve & Resume', type='submit') }}
                     </div>
-                </div>
-            {% endif %}
+                </form>
+            {% endcall %}
         </div>
+        {% endif %}
+        {% if instance.status in ('running', 'waiting_approval') %}
+        <form method="post" action="{{ url_for('integration.cancel_workflow', instance_id=instance.id) }}" data-confirm="Cancel this workflow instance? It will stop here and cannot be resumed." class="ml-auto flex items-center gap-2">
+            {{ input(type='hidden', name='csrf_token', value=csrf_token()) }}
+            {{ button(text='Cancel Workflow', type='submit', variant='outline', icon='square') }}
+        </form>
+        {% endif %}
     </div>
 
-    <div class="grid gap-6 md:grid-cols-3">
-        <!-- Main Content: Steps -->
-        <div class="md:col-span-2 space-y-6">
-            <div data-slot="card" class="rounded-lg border border-border bg-card text-card-foreground">
-                <div class="flex flex-col space-y-1.5 p-6">
-                    <div class="flex items-center justify-between">
-                        <h3 class="font-semibold leading-none tracking-tight">Execution History</h3>
-                        <span class="text-sm text-muted-foreground">{{ instance.progress_percent }}% Complete</span>
+    {% if load_error %}
+    <div>
+        {{ empty_state(
+            icon='triangle-alert',
+            title='Instance details could not be read',
+            description='The instance record could not be loaded. Refresh the page to try again.',
+            cta_text='Back to instances',
+            cta_href=url_for('integration.list_instances'),
+            cta_icon='arrow-left'
+        ) }}
+    </div>
+    {% else %}
+    <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
+        {# Key-value summary for this instance (P25). #}
+        {% call card() %}
+            {% call card_header() %}
+                {% call card_title() %}Instance Details{% endcall %}
+            {% endcall %}
+            {% call card_content() %}
+                <dl class="space-y-3 text-sm">
+                    <div class="flex items-center justify-between gap-4">
+                        <dt class="text-muted-foreground">Started</dt>
+                        <dd class="text-right font-medium">{{ instance.started_at.strftime('%Y-%m-%d %H:%M') if instance.started_at else 'Not started' }}</dd>
                     </div>
-                    <div class="mt-2 h-2 w-full bg-secondary rounded-full overflow-hidden">
-                        <div class="h-full bg-primary transition-all duration-300" style="width: {{ instance.progress_percent }}%"></div>
+                    <div class="flex items-center justify-between gap-4">
+                        <dt class="text-muted-foreground">Triggered by</dt>
+                        <dd class="text-right font-medium">{{ 'User' if instance.triggered_by_user_id else 'System' }}{% if instance.triggered_by %} <span class="text-muted-foreground">({{ instance.triggered_by|title }})</span>{% endif %}</dd>
+                    </div>
+                    <div class="flex items-center justify-between gap-4">
+                        <dt class="text-muted-foreground">Completed</dt>
+                        <dd class="text-right font-medium">{{ instance.completed_at.strftime('%Y-%m-%d %H:%M') if instance.completed_at else 'Not completed' }}</dd>
+                    </div>
+                    <div class="flex items-center justify-between gap-4">
+                        <dt class="text-muted-foreground">Duration</dt>
+                        <dd class="text-right font-medium">{{ instance.duration_seconds|dash('s') }}</dd>
+                    </div>
+                </dl>
+            {% endcall %}
+        {% endcall %}
+
+        {# Execution progress (P24). #}
+        {% call card(class='lg:col-span-2') %}
+            {% call card_header() %}
+                {% call card_title() %}Execution Progress{% endcall %}
+                {% call card_description() %}
+                    {{ instance.completed_steps|dash }} of {{ instance.total_steps|dash }} steps complete.
+                    {% if instance.failed_steps %} {{ instance.failed_steps|dash }} failed.{% endif %}
+                {% endcall %}
+            {% endcall %}
+            {% call card_content() %}
+                <div class="space-y-4">
+                    {{ progress(value=instance.progress_percent or 0) }}
+                    <div class="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
+                        {% if instance.current_step_id %}
+                        <span class="text-muted-foreground">Current step <span class="font-medium text-foreground">{{ instance.current_step_id }}</span></span>
+                        {% endif %}
+                        {% if instance.pending_approval_step_id %}
+                        <span class="inline-flex items-center gap-1.5 text-warning-emphasis">
+                            <i data-lucide="clock" class="h-4 w-4" aria-hidden="true"></i>
+                            Waiting for approval at step {{ instance.pending_approval_step_id }}
+                        </span>
+                        {% endif %}
+                        {% if instance.error_message and instance.status == 'failed' %}
+                        <span class="inline-flex items-center gap-1.5 text-destructive-emphasis">
+                            <i data-lucide="circle-x" class="h-4 w-4" aria-hidden="true"></i>
+                            Failed with an error
+                        </span>
+                        {% endif %}
                     </div>
                 </div>
-                <div class="p-6 pt-0">
-                    <div class="relative">
-                        <div class="absolute left-4 top-0 bottom-0 w-px bg-border"></div>
-                        <div class="space-y-8">
-                            {% for step in step_executions %}
-                            <div class="relative pl-10 group">
-                                <div class="absolute left-0 top-1 flex h-8 w-8 items-center justify-center rounded-full border text-xs font-medium z-10 transition-colors
-                                    {% if step.status == 'completed' %}bg-success/10 text-success-emphasis border-success/20
-                                    {% elif step.status == 'failed' %}bg-destructive/10 text-destructive-emphasis border-destructive/20
-                                    {% elif step.status == 'running' %}bg-primary/10 text-primary border-primary/20 animate-pulse
-                                    {% elif step.status == 'waiting_approval' %}bg-warning/10 text-warning-emphasis border-warning/20
-                                    {% else %}bg-background text-muted-foreground border-border{% endif %}">
-                                    {% if step.status == 'completed' %}
-                                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-                                    {% elif step.status == 'failed' %}
-                                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-                                    {% else %}
-                                        {{ step.step_index + 1 }}
-                                    {% endif %}
-                                </div>
-                                
-                                <div class="flex flex-col gap-1">
-                                    <div class="flex items-center justify-between">
-                                        <h4 class="text-sm font-semibold">{{ step.step_name }}</h4>
-                                        <span class="text-xs text-muted-foreground">{{ step.completed_at.strftime('%H:%M:%S') if step.completed_at else (step.started_at.strftime('%H:%M:%S') if step.started_at else '') }}</span>
-                                    </div>
-                                    <p class="text-xs text-muted-foreground">{{ step.step_type|title }} • {{ step.duration_seconds if step.duration_seconds else 0 }}s</p>
-                                    
-                                    {% if step.error_message %}
-                                        <div class="mt-2 rounded-md bg-destructive/10 px-3 py-2 text-xs text-destructive-emphasis">
-                                            <p class="font-semibold">Error:</p>
-                                            <p>{{ step.error_message }}</p>
-                                        </div>
-                                    {% endif %}
-                                    
-                                    {% if step.status == 'waiting_approval' %}
-                                        <div class="mt-2 rounded-md bg-warning/10 px-3 py-2 text-xs text-warning-emphasis border border-warning/40">
-                                            <p class="font-semibold">Waiting for Approval</p>
-                                            <p>This step requires manual confirmation to proceed.</p>
-                                        </div>
-                                    {% endif %}
-                                </div>
-                            </div>
-                            {% endfor %}
-                            
-                            {% if instance.status == 'running' or instance.status == 'waiting_approval' %}
-                            <div class="relative pl-10 opacity-50">
-                                <div class="absolute left-0 top-1 flex h-8 w-8 items-center justify-center rounded-full border bg-background text-xs font-medium text-muted-foreground z-10">
-                                    ...
-                                </div>
-                                <div>
-                                    <h4 class="text-sm font-semibold">Remaining Steps...</h4>
-                                </div>
-                            </div>
+            {% endcall %}
+        {% endcall %}
+    </div>
+
+    {# Step-by-step execution record (P15 activity feed). #}
+    {% call card() %}
+        {% call card_header() %}
+            {% call card_title() %}Execution History{% endcall %}
+            {% call card_description() %}Every step this instance has executed, in order.{% endcall %}
+        {% endcall %}
+        {% call card_content() %}
+            {% if step_executions %}
+            <ol class="space-y-3">
+                {% for step in step_executions %}
+                <li class="flex items-start gap-3 rounded-md border border-border bg-card p-4">
+                    <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted/50">
+                        <i data-lucide="{{ step_icons.get(step.status, 'circle-dashed') }}" class="h-4 w-4 {{ step_tones.get(step.status, 'text-muted-foreground') }}" aria-hidden="true"></i>
+                    </div>
+                    <div class="min-w-0 flex-1">
+                        <div class="flex flex-wrap items-center gap-2">
+                            <span class="font-medium text-foreground">{{ step.step_name|dash }}</span>
+                            {% call badge(variant=step_variants.get(step.status, 'neutral')) %}{{ step.status|replace('_', ' ')|title }}{% endcall %}
+                            {% if step.step_type %}
+                            <span class="text-xs text-muted-foreground">{{ step.step_type }}{% if step.duration_seconds %} · {{ step.duration_seconds }}s{% endif %}</span>
                             {% endif %}
                         </div>
+                        <p class="mt-1 text-sm text-muted-foreground">
+                            {%- if step.completed_at -%}
+                                Completed {{ step.completed_at.strftime('%Y-%m-%d %H:%M') }}
+                            {%- elif step.started_at -%}
+                                Started {{ step.started_at.strftime('%Y-%m-%d %H:%M') }}
+                            {%- else -%}
+                                Not started
+                            {%- endif -%}
+                        </p>
+                        {% if step.status == 'waiting_approval' %}
+                        <div class="mt-2">
+                            {% call alert('warning', title='Waiting for approval') %}This step needs manual confirmation before the workflow continues.{% endcall %} {# ui-contract-ok: the alert macro, not a native dialog #}
+                        </div>
+                        {% endif %}
+                        {% if step.error_message %}
+                        <div class="mt-2">
+                            {% call alert('danger', title='Step failed') %}{{ step.error_message }}{% endcall %} {# ui-contract-ok: the alert macro, not a native dialog #}
+                        </div>
+                        {% endif %}
                     </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Sidebar: Context & Metadata -->
-        <div class="space-y-6">
-            <div data-slot="card" class="rounded-lg border border-border bg-card text-card-foreground">
-                <div class="flex flex-col space-y-1.5 p-6">
-                    <h3 class="font-semibold leading-none tracking-tight">Instance Details</h3>
-                </div>
-                <div class="p-6 pt-0">
-                    <dl class="space-y-4">
-                        <div>
-                            <dt class="text-sm font-medium text-muted-foreground">Started By</dt>
-                            <dd class="text-sm mt-1">
-                                {% if instance.triggered_by_user_id %}
-                                    User ID: {{ instance.triggered_by_user_id }}
-                                {% else %}
-                                    System
-                                {% endif %}
-                                <span class="text-xs text-muted-foreground ml-1">({{ instance.triggered_by }})</span>
-                            </dd>
-                        </div>
-                        <div>
-                            <dt class="text-sm font-medium text-muted-foreground">Start Time</dt>
-                            <dd class="text-sm mt-1">{{ instance.started_at.strftime('%Y-%m-%d %H:%M:%S') if instance.started_at else '-' }}</dd>
-                        </div>
-                        <div>
-                            <dt class="text-sm font-medium text-muted-foreground">Completion Time</dt>
-                            <dd class="text-sm mt-1">{{ instance.completed_at.strftime('%Y-%m-%d %H:%M:%S') if instance.completed_at else '-' }}</dd>
-                        </div>
-                        <div>
-                            <dt class="text-sm font-medium text-muted-foreground">Total Duration</dt>
-                            <dd class="text-sm mt-1">{{ instance.duration_seconds }}s</dd>
-                        </div>
-                    </dl>
-                </div>
-            </div>
-
-            <div data-slot="card" class="rounded-lg border border-border bg-card text-card-foreground">
-                <div class="flex flex-col space-y-1.5 p-6">
-                    <h3 class="font-semibold leading-none tracking-tight">Context Data</h3>
-                </div>
-                <div class="p-6 pt-0">
-                    <div class="bg-muted rounded-md p-4 overflow-x-auto">
-                        <pre class="text-xs font-mono">{{ instance.context | tojson(indent=2) }}</pre>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
+                </li>
+                {% endfor %}
+            </ol>
+            {% else %}
+            {# empty-state-ok: nothing to act on while a fresh instance is pending; the run itself fills this feed #}
+            {{ empty_state(
+                icon='activity',
+                title='No steps recorded yet',
+                description='Step executions appear here as the workflow runs.',
+                compact=True
+            ) }}
+            {% endif %}
+        {% endcall %}
+    {% endcall %}
+    {% endif %}
 </div>
 {% endblock %}

@@ -1,17 +1,12 @@
 {% extends "layouts/admin_base.html" %}
-{% from 'components/page_header.html' import page_header %}
+{% from 'macros/page_shell.html' import page_shell, empty_state, stat_card, section_card %}
+{% from 'components/table.html' import table, table_header, table_body, table_row, table_head, table_cell, table_empty_state %}
 {% from 'components/badge.html' import badge %}
+{% from 'components/button.html' import button %}
+{% from 'components/select.html' import native_select %}
+{% from 'components/card.html' import card, card_header, card_title, card_description, card_content, card_footer %}
 
 {% block title %}Impact Analysis{% endblock %}
-
-{% block breadcrumb %}
-{% from 'components/breadcrumb_nav.html' import breadcrumb_nav %}
-{{ breadcrumb_nav(items=[
-    {'text': 'Home', 'href': url_for('main.index'), 'icon': 'home'},
-    {'text': 'Enterprise Architecture', 'href': url_for('enterprise.enterprise_dashboard')},
-    {'text': 'Impact Analysis', 'current': true}
-]) }}
-{% endblock %}
 
 {% block content %}
 {# Builds the href for a row's record, or an empty string when the blueprint that
@@ -22,218 +17,185 @@
 {% macro row_href(endpoint) %}{% if endpoint in flask.current_app.view_functions %}{{ url_for(endpoint, **kwargs) }}{% endif %}{% endmacro %}
 
 <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-    {{ page_header(
+    {{ page_shell(
         title='Impact Analysis',
-        subtitle='Assess downstream impact of architecture changes'
+        subtitle='Assess downstream impact of architecture changes',
+        breadcrumb=[('Home', url_for('main.index')), ('Enterprise Architecture', url_for('enterprise.enterprise_dashboard')), ('Impact Analysis', None)]
     ) }}
 
     <!-- Filter Form -->
-    <div data-slot="card" class="rounded-lg border border-border bg-card p-6 mb-6">
-        <h3 class="text-base font-semibold text-foreground mb-4">Filter by Element</h3>
-        <form method="GET" action="{{ url_for('enterprise.impact_analysis') }}" class="grid grid-cols-1 gap-4">
-            <div>
-                <label for="element_type" class="block text-sm font-medium text-muted-foreground mb-1">Element Type</label>
-                <select 
-                    id="element_type" 
-                    name="element_type" 
-                    class="h-9 w-full px-3 border border-input bg-background rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                    @change="toggleElementSelect(this.value)"
-                >
-                    <option value="">All Types</option>
-                    <option value="application" {% if selected_element_type == 'application' %}selected{% endif %}>Application</option>
-                    <option value="capability" {% if selected_element_type == 'capability' %}selected{% endif %}>Capability</option>
-                </select>
-            </div>
+    {% call card() %}
+        {% call card_header() %}
+            {% call card_title() %}Filter by Element{% endcall %}
+        {% endcall %}
+        {% call card_content() %}
+            <form method="GET" action="{{ url_for('enterprise.impact_analysis') }}" class="grid grid-cols-1 gap-4">
+                <div>
+                    <label for="element_type" class="block text-sm font-medium text-muted-foreground mb-1">Element Type</label>
+                    {% call native_select(id='element_type', name='element_type', attrs_dict={'@change': 'toggleElementSelect(this.value)'}) %}
+                        <option value="">All Types</option>
+                        <option value="application" {% if selected_element_type == 'application' %}selected{% endif %}>Application</option>
+                        <option value="capability" {% if selected_element_type == 'capability' %}selected{% endif %}>Capability</option>
+                    {% endcall %}
+                </div>
 
-            <div id="application_select_wrapper" {% if selected_element_type != 'application' %} class="hidden" {% endif %}>
-                <label for="application_id" class="block text-sm font-medium text-muted-foreground mb-1">Application</label>
-                <select 
-                    id="application_id" 
-                    name="element_id" 
-                    class="h-9 w-full px-3 border border-input bg-background rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                >
-                    <option value="">Select Application</option>
-                    {% for app in applications %}
-                    <option value="{{ app.id }}" {% if selected_element_type == 'application' and selected_element_id == app.id %}selected{% endif %}>
-                        {{ app.name }}
-                    </option>
-                    {% endfor %}
-                </select>
-            </div>
+                <div id="application_select_wrapper" {% if selected_element_type != 'application' %} class="hidden" {% endif %}>
+                    <label for="application_id" class="block text-sm font-medium text-muted-foreground mb-1">Application</label>
+                    {% call native_select(id='application_id', name='element_id', attrs_dict={'x-ref': 'app-select'}) %}
+                        <option value="">Select Application</option>
+                        {% for app in applications %}
+                        <option value="{{ app.id }}" {% if selected_element_type == 'application' and selected_element_id == app.id %}selected{% endif %}>
+                            {{ app.name }}
+                        </option>
+                        {% endfor %}
+                    {% endcall %}
+                </div>
 
-            <div id="capability_select_wrapper" {% if selected_element_type != 'capability' %} class="hidden" {% endif %}>
-                <label for="capability_id" class="block text-sm font-medium text-muted-foreground mb-1">Capability</label>
-                <select 
-                    id="capability_id" 
-                    name="element_id" 
-                    class="h-9 w-full px-3 border border-input bg-background rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                >
-                    <option value="">Select Capability</option>
-                    {% for cap in capabilities %}
-                    <option value="{{ cap.id }}" {% if selected_element_type == 'capability' and selected_element_id == cap.id %}selected{% endif %}>
-                        {{ cap.name }}
-                    </option>
-                    {% endfor %}
-                </select>
-            </div>
+                <div id="capability_select_wrapper" {% if selected_element_type != 'capability' %} class="hidden" {% endif %}>
+                    <label for="capability_id" class="block text-sm font-medium text-muted-foreground mb-1">Capability</label>
+                    {% call native_select(id='capability_id', name='element_id') %}
+                        <option value="">Select Capability</option>
+                        {% for cap in capabilities %}
+                        <option value="{{ cap.id }}" {% if selected_element_type == 'capability' and selected_element_id == cap.id %}selected{% endif %}>
+                            {{ cap.name }}
+                        </option>
+                        {% endfor %}
+                    {% endcall %}
+                </div>
 
-            <div class="flex items-end">
-                <button type="submit" class="px-4 py-2 text-sm font-medium bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 w-full md:w-auto" aria-label="Submit">
-                    Apply Filter
-                </button>
-                {% if selected_element_type %}
-                <a href="{{ url_for('enterprise.impact_analysis') }}" class="ml-2 px-4 py-2 text-sm font-medium border border-input bg-background text-foreground rounded-lg hover:bg-accent w-full md:w-auto text-center">
-                    Clear
-                </a>
-                {% endif %}
-            </div>
-        </form>
-    </div>
+                <div class="flex items-end">
+                    {{ button(text='Apply Filter', variant='default', type='submit', class='w-full md:w-auto') }}
+                    {% if selected_element_type %}
+                    <a href="{{ url_for('enterprise.impact_analysis') }}" class="ml-2 inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
+                        Clear
+                    </a>
+                    {% endif %}
+                </div>
+            </form>
+        {% endcall %}
+    {% endcall %}
 
     <!-- Summary Metrics -->
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <div data-slot="card" class="rounded-lg border border-border bg-card p-6">
-            <div class="flex items-center justify-between">
-                <div>
-                    <p class="text-sm font-medium text-muted-foreground">Total Analyses Run</p>
-                    <p class="text-2xl font-bold text-foreground mt-1">{{ total_analyses }}</p>
+        {% call card() %}
+            {% call card_content() %}
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm font-medium text-muted-foreground">Total Analyses Run</p>
+                        <p class="text-2xl font-bold text-foreground mt-1">{{ total_analyses }}</p>
+                    </div>
+                    <div class="rounded-md bg-primary/10 px-3 py-2">
+                        <i data-lucide="activity" class="w-5 h-5 text-primary" aria-hidden="true"></i>
+                    </div>
                 </div>
-                <div class="rounded-md bg-primary/10 px-3 py-2">
-                    <i data-lucide="activity" class="w-5 h-5 text-primary" aria-hidden="true"></i>
-                </div>
-            </div>
-        </div>
+            {% endcall %}
+        {% endcall %}
 
-        <div data-slot="card" class="rounded-lg border border-border bg-card p-6">
-            <div class="flex items-center justify-between">
-                <div>
-                    <p class="text-sm font-medium text-muted-foreground">Critical Impact</p>
-                    <p class="text-2xl font-bold text-foreground mt-1">{{ critical_count }}</p>
+        {% call card() %}
+            {% call card_content() %}
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm font-medium text-muted-foreground">Critical Impact</p>
+                        <p class="text-2xl font-bold text-foreground mt-1">{{ critical_count }}</p>
+                    </div>
+                    <div class="rounded-md bg-destructive/10 px-3 py-2">
+                        <i data-lucide="alert-triangle" class="w-5 h-5 text-destructive" aria-hidden="true"></i>
+                    </div>
                 </div>
-                <div class="rounded-md bg-destructive/10 px-3 py-2">
-                    <i data-lucide="alert-triangle" class="w-5 h-5 text-destructive" aria-hidden="true"></i>
-                </div>
-            </div>
-        </div>
+            {% endcall %}
+        {% endcall %}
 
-        <div data-slot="card" class="rounded-lg border border-border bg-card p-6">
-            <div class="flex items-center justify-between">
-                <div>
-                    <p class="text-sm font-medium text-muted-foreground">High Impact</p>
-                    <p class="text-2xl font-bold text-foreground mt-1">{{ high_count }}</p>
+        {% call card() %}
+            {% call card_content() %}
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm font-medium text-muted-foreground">High Impact</p>
+                        <p class="text-2xl font-bold text-foreground mt-1">{{ high_count }}</p>
+                    </div>
+                    <div class="rounded-md bg-warning/10 px-3 py-2">
+                        <i data-lucide="alert-circle" class="w-5 h-5 text-warning" aria-hidden="true"></i>
+                    </div>
                 </div>
-                <div class="rounded-md bg-warning/10 px-3 py-2">
-                    <i data-lucide="alert-circle" class="w-5 h-5 text-warning" aria-hidden="true"></i>
-                </div>
-            </div>
-        </div>
+            {% endcall %}
+        {% endcall %}
 
-        <div data-slot="card" class="rounded-lg border border-border bg-card p-6">
-            <div class="flex items-center justify-between">
-                <div>
-                    <p class="text-sm font-medium text-muted-foreground">Avg Affected Apps</p>
-                    <p class="text-2xl font-bold text-foreground mt-1">{{ avg_affected_applications }}</p>
+        {% call card() %}
+            {% call card_content() %}
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm font-medium text-muted-foreground">Avg Affected Apps</p>
+                        <p class="text-2xl font-bold text-foreground mt-1">{{ avg_affected_applications }}</p>
+                    </div>
+                    <div class="rounded-md bg-primary/10 px-3 py-2">
+                        <i data-lucide="layers" class="w-5 h-5 text-primary" aria-hidden="true"></i>
+                    </div>
                 </div>
-                <div class="rounded-md bg-primary/10 px-3 py-2">
-                    <i data-lucide="layers" class="w-5 h-5 text-primary" aria-hidden="true"></i>
-                </div>
-            </div>
-        </div>
+            {% endcall %}
+        {% endcall %}
     </div>
 
     <!-- Results Table -->
-    <div data-slot="card" class="rounded-lg border border-border bg-card overflow-hidden">
-        <div class="p-6 border-b border-border">
-            <h3 class="text-base font-semibold text-foreground">
-                {% if filtered_analyses is not none %}
-                    Filtered Impact Analysis Results ({{ filtered_analyses|length }})
-                {% else %}
-                    Recent Impact Analysis Results ({{ recent_analyses|length }})
-                {% endif %}
-            </h3>
-        </div>
-
+    {% call section_card(title='Impact Analysis Results') %}
         {% set analyses_to_display = filtered_analyses if filtered_analyses is not none else recent_analyses %}
-
         {% if analyses_to_display %}
-        <div class="overflow-x-auto">
-            <table class="dense-table w-full">
-                <thead class="bg-muted/50">
-                    <tr>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Date</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Analysis Type</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Trigger Element</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Severity</th>
-                        <th class="px-6 py-3 text-center text-xs font-medium text-muted-foreground uppercase tracking-wider">Capabilities</th>
-                        <th class="px-6 py-3 text-center text-xs font-medium text-muted-foreground uppercase tracking-wider">Applications</th>
-                        <th class="px-6 py-3 text-center text-xs font-medium text-muted-foreground uppercase tracking-wider">Processes</th>
-                    </tr>
-                </thead>
-                <tbody class="divide-y divide-border">
-                    {% for analysis in analyses_to_display %}
-                    <tr class="hover:bg-muted/30">
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-foreground">
-                            {{ analysis.created_at.strftime('%Y-%m-%d') if analysis.created_at else '-' }}
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm">
-                            {% call badge('info') %}{{ analysis.analysis_type or 'unknown' }}{% endcall %}
-                        </td>
-                        <td class="px-6 py-4 text-sm text-foreground">
-                            <div class="text-xs text-muted-foreground">{{ analysis.trigger_element_type or '—' }}</div>
-                            {# Every analysis for this element, which is the next thing you do
-                               with a row in a history table. #}
-                            {% if analysis.trigger_element_type and analysis.trigger_element_id %}
-                            {% set _h = row_href('enterprise.impact_analysis', element_type=analysis.trigger_element_type, element_id=analysis.trigger_element_id)|trim %}{% if _h %}<a href="{{ _h }}" class="font-medium text-primary hover:underline">{{ 'ID: ' ~ analysis.trigger_element_id }}</a>{% else %}{{ 'ID: ' ~ analysis.trigger_element_id }}{% endif %}
-                            {% else %}
-                            <div>ID: &mdash;</div>
-                            {% endif %}
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm">
-                            {% if analysis.overall_severity == 'critical' %}
-                                {% call badge('destructive') %}{{ 'critical' }}{% endcall %}
-                            {% elif analysis.overall_severity == 'high' %}
-                                {% call badge('warning') %}{{ 'high' }}{% endcall %}
-                            {% elif analysis.overall_severity == 'medium' %}
-                                {% call badge('info') %}{{ 'medium' }}{% endcall %}
-                            {% elif analysis.overall_severity == 'low' %}
-                                {% call badge('success') %}{{ 'low' }}{% endcall %}
-                            {% else %}
-                                {% call badge('secondary') %}{{ 'unknown' }}{% endcall %}
-                            {% endif %}
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-center text-foreground">
-                            {{ analysis.affected_capabilities_count or 0 }}
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-center text-foreground">
-                            {{ analysis.affected_applications_count or 0 }}
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-center text-foreground">
-                            {{ analysis.affected_processes_count or 0 }}
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
+        {% call table() %}
+            {% call table_header() %}
+                <tr>
+                    {% call table_head() %}Date{% endcall %}
+                    {% call table_head() %}Analysis Type{% endcall %}
+                    {% call table_head() %}Trigger Element{% endcall %}
+                    {% call table_head() %}Severity{% endcall %}
+                    {% call table_head(class='text-center') %}Capabilities{% endcall %}
+                    {% call table_head(class='text-center') %}Applications{% endcall %}
+                    {% call table_head(class='text-center') %}Processes{% endcall %}
+                </tr>
+            {% endcall %}
+            {% call table_body() %}
+                {% for analysis in analyses_to_display %}
+                <tr class="hover:bg-muted/30">
+                    {% call table_cell() %}
+                        <span class="whitespace-nowrap text-sm text-foreground">{{ analysis.created_at.strftime('%Y-%m-%d') if analysis.created_at else '-' }}</span>
+                    {% endcall %}
+                    {% call table_cell() %}
+                        {% call badge('info') %}{{ analysis.analysis_type or 'unknown' }}{% endcall %}
+                    {% endcall %}
+                    {% call table_cell() %}
+                        <div class="text-xs text-muted-foreground">{{ analysis.trigger_element_type or '—' }}</div>
+                        {% if analysis.trigger_element_type and analysis.trigger_element_id %}
+                        {% set _h = row_href('enterprise.impact_analysis', element_type=analysis.trigger_element_type, element_id=analysis.trigger_element_id)|trim %}{% if _h %}<a href="{{ _h }}" class="font-medium text-primary hover:underline">{{ 'ID: ' ~ analysis.trigger_element_id }}</a>{% else %}{{ 'ID: ' ~ analysis.trigger_element_id }}{% endif %}
+                        {% else %}
+                        <div>ID: &mdash;</div>
+                        {% endif %}
+                    {% endcall %}
+                    {% call table_cell() %}
+                        {% if analysis.overall_severity == 'critical' %}
+                            {% call badge('destructive') %}critical{% endcall %}
+                        {% elif analysis.overall_severity == 'high' %}
+                            {% call badge('warning') %}high{% endcall %}
+                        {% elif analysis.overall_severity == 'medium' %}
+                            {% call badge('info') %}medium{% endcall %}
+                        {% elif analysis.overall_severity == 'low' %}
+                            {% call badge('success') %}low{% endcall %}
+                        {% else %}
+                            {% call badge('neutral') %}unknown{% endcall %}
+                        {% endif %}
+                    {% endcall %}
+                    {% call table_cell(class='text-center') %}{{ analysis.affected_capabilities_count or 0 }}{% endcall %}
+                    {% call table_cell(class='text-center') %}{{ analysis.affected_applications_count or 0 }}{% endcall %}
+                    {% call table_cell(class='text-center') %}{{ analysis.affected_processes_count or 0 }}{% endcall %}
+                </tr>
+                {% endfor %}
+            {% endcall %}
+        {% endcall %}
         {% else %}
-        <div class="p-12 text-center">
-            <div class="rounded-lg bg-muted/30 p-3 inline-block mb-4">
-                <i data-lucide="git-branch" class="w-8 h-8 text-muted-foreground" aria-hidden="true"></i>
-            </div>
-            <h3 class="text-base font-semibold text-foreground mb-2">No Impact Analyses Found</h3>
-            <p class="text-sm text-muted-foreground mb-4">
-                {% if selected_element_type %}
-                    No impact analyses recorded for the selected element. Try a different filter.
-                {% else %}
-                    No impact analyses have been recorded yet. Select an element above to run an analysis.
-                {% endif %}
-            </p>
-            <button type="button" id="startImpact" class="px-4 py-2 text-sm font-medium bg-primary text-primary-foreground rounded-lg hover:bg-primary/90" aria-label="Action">
-                Begin Assessment
-            </button>
-        </div>
+        {{ empty_state(
+            icon='git-branch',
+            headline='No Impact Analyses Found',
+            body='No impact analyses have been recorded yet. Select an element above to run an analysis.',
+            cta_label='Begin Assessment'
+        ) }}
         {% endif %}
-    </div>
+    {% endcall %}
 </div>
 
 <script>
@@ -266,4 +228,3 @@ document.getElementById('startImpact')?.addEventListener('click', function() {
 });
 </script>
 {% endblock %}
-
