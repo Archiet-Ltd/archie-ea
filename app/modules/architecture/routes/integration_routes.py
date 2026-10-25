@@ -200,7 +200,7 @@ def workflow_detail(workflow_code):
         from app.models.workflow_models import EAWorkflowInstance
 
         recent_instances = (
-            EAWorkflowInstance.query.filter_by(workflow_code=workflow_code)
+            EAWorkflowInstance.query.filter_by(workflow_definition_id=definition.id)
             .order_by(EAWorkflowInstance.started_at.desc())
             .limit(10)
             .all()
@@ -231,7 +231,7 @@ def instance_detail(instance_id):
         # Get step executions
         step_executions = (
             EAWorkflowStepExecution.query.filter_by(instance_id=instance_id)
-            .order_by(EAWorkflowStepExecution.step_sequence)
+            .order_by(EAWorkflowStepExecution.step_index)
             .all()
         )
 
