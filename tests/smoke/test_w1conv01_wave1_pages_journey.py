@@ -247,13 +247,17 @@ def test_status_health_and_modules_pages_have_their_content(admin_page, live_ser
     _visit(page, live_server, "/dashboard/health")
     _no_template_failure(page)
     expect(page.get_by_role("button", name="Generate AI executive briefing")).to_be_visible()
+    response, _state = _visit(page, live_server, "/pricing")
+    assert response.status == 200, "pricing opens when signed in"
     _visit(page, live_server, "/modules/")
     _no_template_failure(page)
     box = page.locator("#modules-directory-search")
     expect(box).to_be_visible()
     box.fill("zzzzzz-no-module")
-    clear = page.get_by_role("button", name="Clear")
-    box.fill("")
+    clear = page.get_by_role("button", name="Clear the module filter")
+    expect(clear).to_be_visible()
+    clear.click()
+    assert box.input_value() == "", "the clear button empties the filter"
 
 
 def test_applications_create_fact_sheet_and_ownership_coverage(admin_page, live_server, seeded):
@@ -274,7 +278,8 @@ def test_public_pricing_comparison_hub_and_demo_company(browser, live_server):
     ctx = browser.new_context(viewport={"width": 1440, "height": 900}, ignore_https_errors=True)
     ctx.set_default_timeout(PAGE_TIMEOUT)
     page = ctx.new_page()
-    _visit(page, live_server, "/pricing")
+    response, _state = _visit(page, live_server, "/pricing")
+    assert response.status == 200, "pricing opens when signed out"
     _no_template_failure(page)
     year = page.locator("input[name='pp-interval'][value='year']")
     month = page.locator("input[name='pp-interval'][value='month']")
@@ -284,7 +289,6 @@ def test_public_pricing_comparison_hub_and_demo_company(browser, live_server):
     assert month.is_checked() and not year.is_checked(), "the billing interval toggle still switches"
     _visit(page, live_server, "/vs")
     _no_template_failure(page)
-    links = page.locator("main a[href*='/vs/'], main a[href^='http']").all()
     hrefs = []
     for link in page.locator("main li a").all():
         href = link.get_attribute("href")
