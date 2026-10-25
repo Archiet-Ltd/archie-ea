@@ -5,6 +5,7 @@
 {% from 'components/badge.html' import badge %}
 {% from 'components/card.html' import card %}
 {% from 'components/dense_table.html' import dense_table %}
+{% from 'components/table.html' import table, table_header, table_body, table_row, table_head, table_cell %}
 {% from 'components/input.html' import input %}
 {% from 'components/checkbox.html' import checkbox %}
 {% from 'components/form_field.html' import form_group %}
@@ -106,18 +107,22 @@
             <p class="text-xs text-muted-foreground mt-0.5">Which applications create, read, update or delete {{ entity.name }}.</p>
         </div>
         {% if access_rows %}
-        {% call dense_table(columns=[('Application', ''), ('Create', 'text-center'), ('Read', 'text-center'), ('Update', 'text-center'), ('Delete', 'text-center')], caption='Applications and the operations they perform on ' ~ entity.name, rows=access_rows|length, flush=true) %}
+        {% call table(attrs_dict={'data-testid': 'crud-matrix-table'}) %}
+            {% call table_header() %}{% call table_row() %}
+                {% call table_head() %}Application{% endcall %}
+                {% for letter, label in crud_labels %}{% call table_head(class='text-center') %}{{ label }}{% endcall %}{% endfor %}
+            {% endcall %}{% endcall %}
+            {% call table_body() %}
             {% for row in access_rows %}
-            <tr class="h-10 border-b border-border" data-crud-row="{{ row.name }}">
-                <th scope="row" class="px-4 text-left align-middle text-sm font-medium text-foreground">
+            {% call table_row(attrs_dict={'data-crud-row': row.name}) %}
+                {% call table_cell(class='font-medium text-foreground') %}
                     {% if row.application_id and 'unified_applications.application_detail' in flask.current_app.view_functions %}
                     <a href="{{ url_for('unified_applications.application_detail', id=row.application_id) }}" class="hover:underline">{{ row.name }}</a>
                     {% else %}{{ row.name }}{% endif %}
-                </th>
+                {% endcall %}
                 {% for letter, label in crud_labels %}
                 {% set value = row.cells.get(letter) %}
-                <td class="px-4 text-center align-middle text-sm" data-crud-cell="{{ letter }}"
-                    data-crud-value="{{ 'yes' if value is sameas true else ('no' if value is sameas false else 'unspecified') }}">
+                {% call table_cell(class='text-center', attrs_dict={'data-crud-cell': letter, 'data-crud-value': ('yes' if value is sameas true else ('no' if value is sameas false else 'unspecified'))}) %}
                     {% if value is sameas true %}
                     {% call badge('info') %}{{ letter }}{% endcall %}
                     <span class="sr-only">{{ label }}s</span>
@@ -128,10 +133,11 @@
                     <span class="text-xs text-muted-foreground" title="Writes, but whether it creates, updates or deletes is not recorded">W?</span>
                     <span class="sr-only">Writes; {{ label|lower }} not recorded</span>
                     {% endif %}
-                </td>
+                {% endcall %}
                 {% endfor %}
-            </tr>
+            {% endcall %}
             {% endfor %}
+            {% endcall %}
         {% endcall %}
         {% else %}
         <div class="px-5 py-8 text-center" data-crud-empty>

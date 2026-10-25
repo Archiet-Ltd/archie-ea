@@ -7,6 +7,7 @@
 {% from 'components/select.html' import native_select %}
 {% from 'components/checkbox.html' import checkbox %}
 {% from 'components/modal.html' import modal %}
+{% from 'components/dialog.html' import dialog %}
 {% from 'components/form_field.html' import form_group %}
 {% from 'components/empty_state.html' import empty_state %}
 {% from 'components/confirmation_dialog.html' import confirmation_dialog %}
@@ -90,7 +91,7 @@
   {% endcall %}
 
   {# The shortcuts this page answers to; the status line's help button opens it. #}
-  {% call modal(id='erd-shortcuts-modal', title='Keyboard shortcuts', size='default', description='What the keyboard and the mouse do on this diagram.', attrs={'x-init': "Platform.modal.on('erd-shortcuts-modal', 'close', () => { showShortcutsModal = false })", 'x-effect': "showShortcutsModal ? Platform.modal.open('erd-shortcuts-modal') : Platform.modal.close('erd-shortcuts-modal')"}) %}
+  {% call dialog(open_expr='showShortcutsModal', close_expr='showShortcutsModal = false', title='Keyboard shortcuts', description='What the keyboard and the mouse do on this diagram.', start_hidden=false) %}
     <dl class="flex flex-col gap-2 text-sm" data-testid="erd-shortcuts">
       {% for keys, what in [
         ('Enter', 'Edit the selected entity or relationship'),

@@ -26807,7 +26807,10 @@
     "page-shell",
     "tabs",
     "item",
-    "table"
+    "table",
+    "input",
+    "checkbox",
+    "field"
    ],
    "confidence": "high",
    "controls": {
@@ -26871,7 +26874,10 @@
    ],
    "status": "mapped",
    "tier": "B",
-   "type_changed": false
+   "type_changed": false,
+   "extra_macros": [
+    "components/table.html"
+   ]
   },
   "app/templates/data_architecture/entity_diagram.html": {
    "allowed_macros": [
@@ -27000,7 +27006,32 @@
    "spec": null,
    "status": "mapped",
    "tier": "C1",
-   "type_changed": true
+   "type_changed": true,
+   "patterns": [
+    "P01-page-header",
+    "P20-inspect-side-panel",
+    "P09-form-in-dialog",
+    "P08-confirm-destructive",
+    "P29-export-share"
+   ],
+   "states": [
+    "empty-first-use",
+    "populated",
+    "list-view",
+    "confirm-error"
+   ],
+   "departures": [
+    {
+     "rule": "C-form",
+     "what": "Accessible alternative: the List tab shows every entity as a table, the finder lists each entity with its attribute count, and the canvas carries a summary aria-label."
+    },
+    {
+     "rule": "R10",
+     "what": "Form control borders use the raised --input token (3:1) in place of shadcn's pale border."
+    }
+   ],
+   "grid": "G4",
+   "note": "Shares the Composer shell (toolbar, finder, legend, status line) by the design decision of 25 Oct; the port-map fields follow the Composer's."
   },
   "app/templates/data_architecture/entity_form.html": {
    "allowed_macros": [
