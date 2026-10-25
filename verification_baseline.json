@@ -25,7 +25,7 @@
   "ratchets": {
     "air_gap": 0,
     "background_mechanisms_thread": 21,
-    "background_mechanisms_thread_instances": 29,
+    "background_mechanisms_thread_instances": 28,
     "brand_raw_colour": 53,
     "broken_surfaces": 0,
     "canonical_store": 0,

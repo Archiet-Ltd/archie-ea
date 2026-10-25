@@ -306,10 +306,9 @@ mechanisms:
 - kind: thread
   file: app/services/job_queue_service.py
   entry: JobQueueService.start_worker
-  purpose: The one database-backed job queue and its two worker threads (fast and slow for crawls)
+  purpose: The one database-backed job queue and its worker thread
   class: queue
   disposition: keep
-  instances: 2
   tenant_context: jobs carry organisation_id in their payload; model-health jobs run under tenant_scope
 - kind: thread
   file: app/services/webhook_service.py
