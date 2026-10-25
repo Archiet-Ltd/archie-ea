@@ -53,7 +53,7 @@ to read it from the tools that already hold it.
   and how many have a vendor recorded, and a fact sheet for each application showing the owner recorded
   against it.
 - **The AI chat**, where you ask in plain words what breaks if a system fails. It lists what is recorded as
-  connected to it, each connection with its source. Where nothing is recorded it says so plainly instead of
+  connected to it and cites the record behind each line. Where nothing is recorded it says so plainly instead of
   guessing, and *Work them out now* extends the answer to indirect connections. Any element opens in the
   Composer — see
   [Digital twin of your organisation](/modules/digital-twin).

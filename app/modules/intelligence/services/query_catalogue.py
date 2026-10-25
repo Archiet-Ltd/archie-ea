@@ -548,21 +548,56 @@ def _resolve_service_element(organization_id: int, service: Optional[str]):
     ).first()
 
 
+def _first_recorded(element_ids: List[int], organization_id: int) -> Dict[int, Any]:
+    """When each element was first written, from the one change history."""
+    from app.models.entity_history import EntityHistory
+
+    rows = (
+        db.session.query(EntityHistory.record_id, db.func.min(EntityHistory.valid_from))
+        .filter(
+            EntityHistory.table_name == "archimate_elements",
+            EntityHistory.organization_id == organization_id,
+            EntityHistory.record_id.in_(element_ids),
+        )
+        .group_by(EntityHistory.record_id)
+        .all()
+    )
+    return {record_id: first for record_id, first in rows}
+
+
+def _source_line(element, first_recorded=None) -> str:
+    """Where an element came from and when, in the words the dashboard uses:
+    "from <source>, as of <date>", or "added by hand on <date>" when no source
+    is recorded. Never blank."""
+    when = element.source_recorded_at or element.recorded_at or first_recorded
+    date = "%d %s" % (when.day, when.strftime("%b %Y")) if when else None
+    label = (element.source_label or "").strip()
+    if label:
+        return "from %s, as of %s" % (label, date) if date else "from %s" % label
+    return "added by hand on %s" % date if date else "added by hand"
+
+
 def _single_points_of_failure(organization_id: int, limit: int = 10) -> Dict[str, Any]:
     """The systems the most other things depend on, by how many
     relationships point at them (their in-degree) in the one relationship
     store. These are the single points of failure; each is a record to open."""
     from app.models.archimate_core import ArchiMateElement, ArchiMateRelationship
 
-    # In-degree per target element, scoped to this organisation's relationships.
+    from app.models.archimate_element_types import system_kind_types
+
+    # In-degree per target element, scoped to this organisation's relationships;
+    # only systems count, so a process or function is never listed as one.
     counts = (
         db.session.query(
             ArchiMateRelationship.target_id,
             db.func.count(ArchiMateRelationship.id).label("in_degree"),
         )
+        .join(ArchiMateElement, ArchiMateElement.id == ArchiMateRelationship.target_id)
         .filter(
             ArchiMateRelationship.organization_id == organization_id,
-            ArchiMateRelationship.target_id.isnot(None),
+            ArchiMateElement.organization_id == organization_id,
+            ArchiMateElement.type.in_(system_kind_types()),
+            ArchiMateElement.deleted_at.is_(None),
         )
         .group_by(ArchiMateRelationship.target_id)
         .having(db.func.count(ArchiMateRelationship.id) > 1)
@@ -588,6 +623,7 @@ def _single_points_of_failure(organization_id: int, limit: int = 10) -> Dict[str
         ).all()
     }
 
+    first_recorded = _first_recorded(target_ids, organization_id)
     rows = []
     citations: List[Dict[str, Any]] = []
     for target_id, in_degree in counts:
@@ -599,6 +635,7 @@ def _single_points_of_failure(organization_id: int, limit: int = 10) -> Dict[str
                 "id": element.id,
                 "name": element.name,
                 "depends_on_count": int(in_degree),
+                "source_line": _source_line(element, first_recorded.get(element.id)),
                 "source_table": "archimate_relationships",
                 "truth_class": truth_class_for("archimate_relationships"),
             }
