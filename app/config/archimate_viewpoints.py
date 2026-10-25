@@ -1334,23 +1334,23 @@ _LEAN_ZONES = [
 # a box_key equals the record column where one exists.
 _BMC_ZONES = [
     _canvas_zone(
-        "customer_segments", "Customer Segments", 1, ["Stakeholder"], "customer_segment",
+        "customer_segments", "Customer Segments", 1, ["BusinessActor"], "customer_segment",
         "type_profile", "motivation",
     ),
     _canvas_zone(
-        "value_propositions", "Value Propositions", 2, ["Value"], "value_proposition",
+        "value_propositions", "Value Propositions", 2, ["Value", "BusinessService"], "value_proposition",
         "type_profile_anchor", "motivation",
         anchor_box="customer_segments",
         fill_relationship={"type": "association", "direction": "out"},
     ),
     _canvas_zone(
-        "channels", "Channels", 3, ["BusinessInterface"], "channel",
+        "channels", "Channels", 3, ["BusinessInterface", "ApplicationInterface"], "channel",
         "type_profile_anchor", "business",
         anchor_box="customer_segments",
         fill_relationship={"type": "association", "direction": "out"},
     ),
     _canvas_zone(
-        "customer_relationships", "Customer Relationships", 4, ["BusinessService"],
+        "customer_relationships", "Customer Relationships", 4, ["BusinessService", "BusinessInteraction"],
         "customer_relationship", "type_profile_anchor", "business",
         anchor_box="customer_segments",
         fill_relationship={"type": "association", "direction": "out"},
@@ -1362,7 +1362,7 @@ _BMC_ZONES = [
         attribute_keys=["revenue_model", "revenue_amount", "currency"],
     ),
     _canvas_zone(
-        "key_activities", "Key Activities", 6, ["Capability"], "key_activity",
+        "key_activities", "Key Activities", 6, ["BusinessProcess", "BusinessFunction", "Capability"], "key_activity",
         "type_profile_anchor", "strategy",
         fill_relationship={"type": "realization", "direction": "out"},
     ),
@@ -1558,10 +1558,14 @@ CANVAS_PROFILE_OPTIONS_BY_TYPE: Dict[str, List[str]] = {
     "Requirement": ["solution_feature"],
     "Outcome": ["key_metric", "benefit", "disbenefit"],
     "BusinessInterface": ["channel"],
+    "ApplicationInterface": ["channel"],
+    "BusinessInteraction": ["customer_relationship"],
+    "BusinessProcess": ["key_activity"],
+    "BusinessFunction": ["key_activity"],
     "Resource": ["unfair_advantage", "key_resource"],
     "Capability": ["key_activity"],
-    "BusinessService": ["customer_relationship"],
-    "BusinessActor": ["key_partner"],
+    "BusinessService": ["customer_relationship", "value_proposition"],
+    "BusinessActor": ["customer_segment", "key_partner"],
     "CourseOfAction": ["option"],
     "WorkPackage": ["plan_item"],
     "ImplementationEvent": ["milestone"],

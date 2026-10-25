@@ -111,8 +111,8 @@ and motivation layers.
 
 ### Can I submit a design to the review board from it?
 
-Yes. A design in Solutions goes to the review board as a change proposal with its impact evidence
-attached, is discussed in a recorded session, and comes back with a decision — approved, approved
+Yes. A design in Solutions goes to the review board as a change proposal with its evidence pinned
+to the decision, is discussed in a recorded session, and comes back with a decision — approved, approved
 with conditions, rejected or deferred — recorded against that same design rather than a separate
 document.
 
