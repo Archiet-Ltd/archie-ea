@@ -174,6 +174,53 @@ def may_open_spend(user):
     )
 
 
+def may_see_contract_pages(user):
+    """True when ``user`` may read the contract pages (contracts, renewals): the procurement
+    roles, and whoever may see cost figures (the one cost-visibility rule)."""
+    from app.utils.role_access import can_see_costs
+
+    return bool(may_open_procurement(user) or can_see_costs(user))
+
+
+def may_see_spend_pages(user):
+    """True when ``user`` may read the spend and licence pages: the people the spend page is
+    opened to, and whoever may see cost figures."""
+    from app.utils.role_access import can_see_costs
+
+    return bool(may_open_spend(user) or can_see_costs(user))
+
+
+def _requires_visibility(predicate):
+    """A route guard for a read-only page: login, then ``predicate(current_user)``."""
+
+    def decorator(f):
+        @wraps(f)
+        def decorated_function(*args, **kwargs):
+            if not current_user.is_authenticated:
+                abort(401)
+            if not predicate(current_user):
+                current_app.logger.warning(
+                    f"Access denied: user {current_user.id} attempted to read {request.path}"
+                )
+                abort(403, description="Access denied. Your role does not include cost visibility.")
+            return f(*args, **kwargs)
+
+        return decorated_function
+
+    return decorator
+
+
+def requires_contract_visibility(f):
+    """The contract pages (list, detail, renewals): procurement roles and cost viewers read them;
+    creating and editing stays with ``requires_procurement``."""
+    return _requires_visibility(may_see_contract_pages)(f)
+
+
+def requires_spend_visibility(f):
+    """The spend and licence pages: the spend roles and cost viewers read them."""
+    return _requires_visibility(may_see_spend_pages)(f)
+
+
 def requires_procurement(f):
     """
     Shorthand decorator for procurement routes.

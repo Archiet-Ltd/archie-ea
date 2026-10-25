@@ -1,4 +1,4 @@
-"""Journey: the sidebar's search box ("Search or ask...") returns individual pages, each labelled with
+"""Journey: the sidebar's search box returns individual pages, each labelled with
 the sidebar entry it sits under,
 matches either spelling of a variant word, and never lists a page the persona cannot open.
 
@@ -36,8 +36,9 @@ def _modules(client, q):
 def test_impact_analysis_is_found_by_name_and_opens_the_right_page(app, client):
     login(client, _persona(app, "solution_architect"))
     hits = _modules(client, "impact")
-    # Navigation v3: "Impact" is the job entry, landing on the canonical impact page (ADR-0015).
-    assert hits[0]["name"] == "Impact" and hits[0]["url"] == "/enterprise/analysis/impact-analysis", hits
+    # Navigation 3.1: the page is "Impact analysis", filed under the Impact item, on the canonical impact page.
+    assert hits[0]["name"] == "Impact analysis" and hits[0]["url"] == "/enterprise/analysis/impact-analysis", hits
+    assert hits[0]["zone"] == "Impact", hits[0]
 
 
 def test_a_hit_carries_the_persona_own_zone_name(app, client):
@@ -45,8 +46,8 @@ def test_a_hit_carries_the_persona_own_zone_name(app, client):
     hits = _modules(client, "vendor")
     matched = [h for h in hits if h["name"] == "Vendors"]
     assert matched, hits
-    # Labelled with the sidebar entry the page sits under (navigation v3).
-    assert matched[0]["zone"] == "Systems", matched[0]
+    # Labelled with the sidebar item the page sits under (navigation 3.1: Vendors is a Spend page).
+    assert matched[0]["zone"] == "Spend", matched[0]
 
 
 def test_a_page_with_no_entry_of_its_own_is_labelled_with_the_entry_it_sits_under(app, client):
@@ -57,7 +58,7 @@ def test_a_page_with_no_entry_of_its_own_is_labelled_with_the_entry_it_sits_unde
     assert all(h["zone"] == "Systems" for h in hits), hits
 
 
-@pytest.mark.parametrize("query,expected_name", [("license", "Licences"), ("licence", "Licences")])
+@pytest.mark.parametrize("query,expected_name", [("license", "Contracts and licences"), ("licence", "Contracts and licences")])
 def test_either_spelling_finds_the_same_page(app, client, query, expected_name):
     login(client, _persona(app, "procurement"))
     hits = _modules(client, query)

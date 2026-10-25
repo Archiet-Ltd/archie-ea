@@ -1,4 +1,4 @@
-"""Every supported role can use the actual application's brand-home link."""
+"""Every supported role can use the sidebar's Home entry to get back to the dashboard."""
 
 import pytest
 from playwright.sync_api import expect
@@ -18,18 +18,20 @@ def test_brand_home_click_reaches_dashboard_for_every_role(browser, live_server,
         response = page.goto(live_server + "/dashboard/overview", timeout=PAGE_TIMEOUT)
         assert response.status == 200
         sidebar = page.get_by_test_id("sidebar")
-        # Locate the actual brand, not the separate Dashboard Overview nav item.
-        brand = sidebar.get_by_role("link").filter(has=page.locator(".sidebar-app-name"))
-        expect(brand).to_have_count(1)
-        expect(brand).to_be_visible()
+        # The library's shell has an organisation switcher on top, not a brand link; Home is the way back.
+        expect(sidebar.get_by_role("button", name="Switch organisation")).to_have_count(1)
+        home = sidebar.locator('a[data-nav-key="home"]')
+        expect(home).to_have_count(1)
+        expect(home).to_be_visible()
         with page.expect_navigation(wait_until="domcontentloaded", timeout=PAGE_TIMEOUT) as navigation:
-            brand.click()
-        assert navigation.value.status == 200, f"Brand home rejected {role}"
+            home.click()
+        assert navigation.value.status == 200, f"Home rejected {role}"
         expect(page).to_have_url(live_server + "/dashboard/overview")
-        expect(page.get_by_role("heading", name="Dashboard", exact=True, level=1)).to_be_visible()
+        expect(page.get_by_role("heading", name="Overview", exact=True, level=1)).to_be_visible()
         if role == "platform_admin":
-            command_center = page.get_by_test_id("sidebar").get_by_role("link", name="Command Center", exact=True)
-            expect(command_center).to_be_visible()
-            expect(command_center).to_have_attribute("href", "/admin/")
+            page.get_by_test_id("user-menu").click()
+            settings = page.get_by_test_id("user-menu-settings")
+            expect(settings).to_be_visible()
+            expect(settings).to_have_attribute("href", "/admin/")
     finally:
         page.close()

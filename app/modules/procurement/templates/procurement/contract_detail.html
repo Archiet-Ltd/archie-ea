@@ -12,9 +12,9 @@
             {'label': 'Vendor Contracts', 'href': url_for('procurement.contracts_list')},
             {'label': contract.contract_name}
         ],
-        actions=[
-            {'text': 'Edit contract', 'icon': 'pencil', 'href': url_for('procurement.contract_edit', contract_id=contract.id), 'variant': 'outline'}
-        ]
+        actions=(
+            [{'text': 'Edit contract', 'icon': 'pencil', 'href': url_for('procurement.contract_edit', contract_id=contract.id), 'variant': 'outline'}] if may_open_procurement() else []
+        )
     ) }}
 
     <div class="flex items-center gap-2 -mt-4">
