@@ -45,20 +45,31 @@
 
     {% if vpc %}
     <section aria-labelledby="vpc-segments" class="flex flex-col gap-2" data-testid="vpc-segments">
-      <h2 id="vpc-segments" class="text-sm font-medium">Customer segments</h2>
+      <h2 id="vpc-segments" class="text-sm font-medium">Customer segment</h2>
       {% if segments %}
       <ul class="flex flex-wrap gap-2">
-        {% for s in segments %}<li class="rounded-md border bg-muted px-2 py-1.5 text-sm"><a href="{{ s.href }}" class="text-primary hover:underline">{{ s.text }}</a></li>{% endfor %}
+        {% for s in segments %}<li>{{ button(text=s.name, variant='default' if segment and s.id == segment.id else 'outline', size='sm', href=url_for('business_model.value_proposition', canvas_id=canvas.id, segment=s.id)) }}</li>{% endfor %}
       </ul>
       {% else %}
-      {{ empty_state(icon='users', title='No customer segments yet', description='Add a segment on the business model canvas and it appears here.', cta_text='Open the business model canvas', cta_href=url_for('business_model.detail', canvas_id=canvas.id)) }}
+      {{ empty_state(icon='users', title='No customer segments yet', description='A value proposition canvas shows one customer segment at a time. Add a segment on the business model canvas and it appears here.', cta_text='Add a segment', cta_href=url_for('business_model.detail', canvas_id=canvas.id) ~ '#box-customer-segments') }}
       {% endif %}
     </section>
     {{ canvas_lib.value_proposition_canvas({
          'title': '',
          'subtitle': 'Products, services and the value they give, from your model.',
          'boxes': boxes,
+         'roomy': true,
+         'editable': can_edit and segment is not none,
+         'editable_boxes': ['pain-relievers', 'gains', 'pains', 'customer-jobs'],
        }) }}
+    {% if fits %}
+    <section aria-labelledby="vpc-fit" class="flex flex-col gap-2" data-testid="vpc-fit">
+      <h2 id="vpc-fit" class="text-sm font-medium">Where the offer meets the customer</h2>
+      <ul class="flex flex-col gap-1.5 text-sm">
+        {% for f in fits %}<li data-testid="vpc-fit-item"><a class="text-primary hover:underline" href="{{ f.from.href }}">{{ f.from.text }}</a> <span class="text-muted-foreground">{{ 'relieves' if 'Pain' in f.kind else 'creates' }}</span> <a class="text-primary hover:underline" href="{{ f.to.href }}">{{ f.to.text }}</a></li>{% endfor %}
+      </ul>
+    </section>
+    {% endif %}
     {% else %}
     <div class="flex flex-wrap items-end justify-between gap-x-6 gap-y-3" role="group" aria-label="Canvas options" data-testid="bmc-toolbar">
       {% if vision %}
@@ -66,16 +77,20 @@
       {% endif %}
       <div class="ml-auto flex flex-wrap items-end gap-4">
       {% if canvas_key in ('business_model_canvas', 'lean_canvas') %}
+      {% if can_edit %}
       <form method="post" action="{{ url_for('business_model.update_canvas', canvas_id=canvas.id) }}" class="flex items-end gap-2" data-testid="bmc-operating-model-panel">
         {{ input(type='hidden', name='csrf_token', value=csrf_token()) }}
         <div class="flex flex-col gap-1.5">
           {% call label(for='bmc-operating-model') %}Operating model{% endcall %}
-          {% call native_select(id='bmc-operating-model', name='operating_model_type', size='sm', attrs_dict={'data-testid': 'bmc-operating-model-select', 'x-on:change': '$el.form.requestSubmit()'}, disabled=not can_edit) %}
+          {% call native_select(id='bmc-operating-model', name='operating_model_type', size='sm', attrs_dict={'data-testid': 'bmc-operating-model-select', 'x-on:change': '$el.form.requestSubmit()'}) %}
             <option value="">Not set</option>
             {% for t in operating_model_types %}<option value="{{ t }}"{% if canvas.operating_model_type == t %} selected{% endif %}>{{ t | capitalize }}</option>{% endfor %}
           {% endcall %}
         </div>
       </form>
+      {% elif canvas.operating_model_type %}
+      <p class="flex h-9 items-center gap-1 text-sm text-muted-foreground" data-testid="bmc-operating-model-text">Operating model: <span class="font-medium text-foreground">{{ canvas.operating_model_type | capitalize }}</span></p>
+      {% endif %}
       {% endif %}
       <form method="get" action="{{ url_for('business_model.export_canvas', canvas_id=canvas.id) }}" class="flex items-end gap-2" data-testid="bmc-export-panel">
         <div class="flex flex-col gap-1.5">
@@ -100,6 +115,36 @@
     {% endif %}
   </div>
 </div>
+
+{% if can_edit and vpc and segment %}
+{% for key, zone in vpc_zones.items() %}
+{% set slug = key | replace('_', '-') %}
+{% call modal(id='add-' ~ slug, title='Add to ' ~ zone.label, description='Name a new one. It belongs to ' ~ segment.name ~ '.', size='sm') %}
+<form method="post" action="{{ url_for('business_model.add_entry', canvas_id=canvas.id) }}" class="flex flex-col gap-4" data-testid="vpc-add-form-{{ key }}">
+  {{ input(type='hidden', name='csrf_token', value=csrf_token()) }}
+  {{ input(type='hidden', name='box', value=key) }}
+  {{ input(type='hidden', name='segment', value=segment.id) }}
+  <div class="flex flex-col gap-1.5">
+    {% call label(for='name-' ~ slug) %}{{ zone.label }}{% endcall %}
+    {{ input(id='name-' ~ slug, name='name', required=true, attrs_dict={'data-testid': 'vpc-name-' ~ key, 'autocomplete': 'off'}) }}
+  </div>
+  {% if key == 'pain_relievers' and pain_options %}
+  <div class="flex flex-col gap-1.5">
+    {% call label(for='fits-' ~ slug) %}The pain it relieves{% endcall %}
+    {% call native_select(id='fits-' ~ slug, name='fits', attrs_dict={'data-testid': 'vpc-fits'}) %}
+      <option value="">Not yet chosen</option>
+      {% for p in pain_options %}<option value="{{ p.id }}">{{ p.name }}</option>{% endfor %}
+    {% endcall %}
+  </div>
+  {% endif %}
+  <div class="flex justify-end gap-3">
+    {{ button(text='Cancel', variant='ghost', attrs_dict={'data-modal-close': 'add-' ~ slug}) }}
+    {{ button(text='Add', type='submit', testid='vpc-add-submit-' ~ key) }}
+  </div>
+</form>
+{% endcall %}
+{% endfor %}
+{% endif %}
 
 {% if can_edit and not vpc %}
 {% for key, zone in zones.items() if zone.membership != 'attribute' %}

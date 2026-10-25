@@ -172,20 +172,35 @@ def detail(canvas_id):
 @business_model_bp.route("/<int:canvas_id>/value-proposition")
 @login_required
 def value_proposition(canvas_id):
-    """The Value Proposition Canvas over the same segment and value elements."""
+    """The Value Proposition Canvas over the same segment and value elements, for one customer segment."""
     canvas = service.get_canvas_or_none(canvas_id)
     if canvas is None or model_service.template_key(canvas) != model_service.TEMPLATE_KEY:
         return render_template("business_model/not_found.html", canvas_id=canvas_id), 404
     from app.modules.business_model_canvas import vpc_service
 
+    editable = _can_edit()
+    segment = vpc_service.chosen_segment(canvas, request.args.get("segment", type=int))
+    boxes, fits = vpc_service.profile(canvas, segment, note=lambda box, el: _note_entry(canvas, box, el, editable))
     return render_template(
         "business_model/detail.html", framework="value_proposition", canvas=canvas,
-        boxes=vpc_service.boxes(canvas), segments=vpc_service.segments(canvas), can_edit=False,
+        boxes=boxes, fits=fits, segments=vpc_service.segments(canvas), segment=segment,
+        pain_options=vpc_service.options(canvas, segment), vpc_zones=vpc_service.ZONES, can_edit=editable,
     )
 
 
-def _back(canvas_id, box=None):
+def _back(canvas_id, box=None, segment_id=None):
+    from app.modules.business_model_canvas import vpc_service
+
+    if box and box.replace("-", "_") in vpc_service.ZONES:
+        return redirect(url_for("business_model.value_proposition", canvas_id=canvas_id, segment=segment_id) + f"#box-{box.replace('_', '-')}")
     return redirect(url_for("business_model.detail", canvas_id=canvas_id) + (f"#box-{box}" if box else ""))
+
+
+def _owner(canvas, element_id):
+    """The customer segment that owns a profile entry, so a change returns to that segment's canvas."""
+    from app.modules.business_model_canvas import vpc_service
+
+    return vpc_service.owner_segment(canvas, element_id) if canvas is not None else None
 
 
 def _canvas_write(canvas_id, action):
@@ -209,9 +224,10 @@ def add_entry(canvas_id):
         canvas_id,
         lambda c: model_service.add_entry(
             c, box, element_id=request.form.get("element_id") or None, name=request.form.get("name"),
+            segment_id=request.form.get("segment", type=int), fits_id=request.form.get("fits", type=int),
         ),
     )
-    return missing or _back(canvas_id, box.replace("_", "-"))
+    return missing or _back(canvas_id, box.replace("_", "-"), request.form.get("segment", type=int))
 
 
 @business_model_bp.route("/<int:canvas_id>/entries/<int:element_id>/rename", methods=["POST"])
@@ -222,7 +238,7 @@ def rename_entry(canvas_id, element_id):
     canvas, missing = _canvas_write(
         canvas_id, lambda c: model_service.rename_entry(c, box, element_id, request.form.get("name"))
     )
-    return missing or _back(canvas_id, box.replace("_", "-"))
+    return missing or _back(canvas_id, box.replace("_", "-"), _owner(canvas, element_id))
 
 
 @business_model_bp.route("/<int:canvas_id>/entries/<int:element_id>/remove", methods=["POST"])
@@ -230,8 +246,9 @@ def rename_entry(canvas_id, element_id):
 @require_roles(*EDIT_ROLES)
 def remove_entry(canvas_id, element_id):
     box = request.form.get("box", "")
+    owner = _owner(service.get_canvas_or_none(canvas_id), element_id)
     canvas, missing = _canvas_write(canvas_id, lambda c: model_service.remove_entry(c, box, element_id))
-    return missing or _back(canvas_id, box.replace("_", "-"))
+    return missing or _back(canvas_id, box.replace("_", "-"), owner)
 
 
 @business_model_bp.route("/<int:canvas_id>/prices/add", methods=["POST"])

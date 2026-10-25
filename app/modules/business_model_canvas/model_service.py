@@ -18,6 +18,7 @@ from app import db
 from app.config.archimate_viewpoints import CANVAS_TEMPLATES
 from app.models.archimate_core import ArchiMateElement, SavedDiagram, SavedDiagramElement
 from app.models.price_plan import BILLING_PERIODS, PRICING_MECHANISMS, PricePlan
+from app.models.cost_fact import CATEGORY_TOTAL
 from app.services import cost_fact_store
 from app.services.archimate_backbone import create_backbone_element
 
@@ -39,7 +40,7 @@ _LAYER_BY_TYPE = {
     "Equipment": "physical", "Facility": "physical", "Material": "physical",
     "Value": "motivation", "Assessment": "motivation", "Driver": "motivation", "Goal": "motivation",
     "Outcome": "motivation", "Principle": "motivation", "Constraint": "motivation", "Metric": "motivation",
-    "Risk": "motivation", "Stakeholder": "motivation",
+    "Risk": "motivation", "Stakeholder": "motivation", "Requirement": "motivation",
     "Resource": "strategy", "Capability": "strategy", "CourseOfAction": "strategy", "Skill": "strategy",
     "WorkPackage": "implementation", "Gap": "implementation",
 }
@@ -60,6 +61,13 @@ def template_key(canvas):
 def canvas_types():
     """The framework canvases a person can create: key and name, in the order they are offered."""
     return [(k, t["name"]) for k, t in CANVAS_TEMPLATES.items() if t["record"] == TEMPLATE_KEY]
+
+
+def _zone(canvas, box_key):
+    """A box of the canvas, or of the Value Proposition Canvas drawn over it."""
+    from . import vpc_service
+
+    return zones(canvas).get(box_key) or vpc_service.ZONES.get(box_key)
 
 
 def zones(canvas=None):
@@ -148,7 +156,7 @@ def _boxes_by_profile(canvas):
 
 def entries(canvas, box_key):
     """Elements in one box of one canvas."""
-    zone = zones(canvas)[box_key]
+    zone = _zone(canvas, box_key)
     by_profile = _boxes_by_profile(canvas)
     return [
         el for row, el in _view_rows(canvas)
@@ -159,7 +167,7 @@ def entries(canvas, box_key):
 def candidates(canvas, box_key):
     """Existing elements of the box's types that this canvas does not show yet.
     An element has one box on a canvas."""
-    zone = zones(canvas)[box_key]
+    zone = _zone(canvas, box_key)
     shown = {el.id for el in _view_elements(canvas)}
     rows = ArchiMateElement.query.filter(
         ArchiMateElement.organization_id == canvas.organization_id,
@@ -181,10 +189,10 @@ def place(canvas, box_key, el):
     return row.canvas_box == box_key
 
 
-def add_entry(canvas, box_key, element_id=None, name=None):
+def add_entry(canvas, box_key, element_id=None, name=None, segment_id=None, fits_id=None):
     """Put an element in a box: the chosen existing one, else one found by
     name among the box's types, else a new one."""
-    zone = zones(canvas).get(box_key)
+    zone = _zone(canvas, box_key)
     if zone is None or zone["membership"] == "attribute":
         raise CanvasError("This box takes its entries from the cost and price records, not from elements.")
     org_id = canvas.organization_id
@@ -210,11 +218,15 @@ def add_entry(canvas, box_key, element_id=None, name=None):
         if el is None:
             el_type = zone["element_types"][0]
             el = create_backbone_element(
-                element_type=el_type, layer=_LAYER_BY_TYPE.get(el_type, "business"), name=name,
+                element_type=el_type, layer=zone.get("layer") or _LAYER_BY_TYPE.get(el_type, "business"), name=name,
                 organization_id=org_id, provenance={"created_from": template_key(canvas)},
             )
     if not place(canvas, box_key, el):
         raise CanvasError("That element is already in another box on this canvas.")
+    from . import vpc_service
+
+    if box_key in vpc_service.ZONES:
+        vpc_service.add_links(canvas, el, box_key, segment_id, fits_id)
     db.session.commit()
     return el
 
@@ -294,12 +306,12 @@ def remove_price_plan(canvas, plan_id):
 
 
 def cost_lines(canvas):
-    """Recorded annual actual costs of the organisation's applications,
-    largest first, from the one cost fact store."""
+    """Each application's recorded annual total cost, largest first, from the one cost fact store.
+    The total already contains its licence and infrastructure parts, so only the total is read."""
     from app.models.application_portfolio import ApplicationComponent
 
     facts = cost_fact_store.list_facts(
-        canvas.organization_id, element_type="application", kind="actual", period="annual"
+        canvas.organization_id, element_type="application", category=CATEGORY_TOTAL, kind="actual", period="annual"
     )
     names = {
         a.id: a.name
