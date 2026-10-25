@@ -13,7 +13,7 @@ icon: phone-call
 
 **For scale-up CTOs and VPs of Engineering, 50-500 people.**
 
-On the Ask page, choose "What breaks if ___ fails or is under-resourced?", pick the service or platform, and Entelim lists everything connected to it, up to three steps away. Each line names its owner, or says "Not recorded" rather than guessing one. Lines Entelim worked out from other connections are labelled as such, and a Why? button shows the links behind them.
+Ask the AI chat in your own words: "what breaks if the payments service fails, and who gets called?" You get everything connected to it, closest first, up to three steps away, each with its owner and the links behind it. A line with no recorded owner says so rather than guessing one.
 
 ## The question
 
@@ -23,21 +23,20 @@ that hurts.
 
 ## What Entelim answers
 
-Pick a system with the search box ("Type a team, service or system name") and the **Results** list fills in, closest connections first. An explicit connection, one somebody recorded, comes before a worked-out one at the same distance. Each line shows:
+The chat answers with a card for the answer and one card for each connection, closest first. An explicit connection, one somebody recorded, comes before a worked-out one at the same distance. Each connection card shows:
 
-- the **name** of the connected element
-- **Owner**: the names of the people recorded as owners, or a "Not recorded" badge
-- **Health**, which reads "Not recorded yet", because the answer carries no health signal
-- "We worked this out — nobody drew it directly." on a connection Entelim derived from others
-- a **Why?** button, which opens a panel with the sentence in plain terms, the chain of links it came from, who drew each link and when, and any decisions recorded about those elements
-- a **View on twin map** link, which opens the map centred on that element
-- a **Full detail** control with the ArchiMate type, layer and depth and, for worked-out connections, the rule and confidence
+- the **name** of the connected element, which opens it in the Composer
+- its **type** and its **health**, or "Health not recorded"
+- the **owner**: the names of the people recorded as owners, or a plain "No owner recorded"
+- the **source** of the connection: the repository, file and commit it was read from, or "Worked out from the model"
+- **The links behind this** on a connection Entelim worked out from others, with the chain of links, who drew each one and when, and any decisions recorded about those elements
+- **Where this link came from** on a recorded connection, with a link to its relationship record
 
-If nothing is recorded as depending on the system, the page says "Nothing is recorded as depending on this yet". If your indirect connections have never been calculated, it says "We haven't worked out the indirect connections for your model yet" and offers **Work them out now**. If some may be out of date, a notice says so and offers the same button. The **Indirect connections** panel at the foot of Ask shows when they were last worked out and how many may be out of date.
+If nothing is recorded as depending on the system, the answer says "Nothing is recorded as depending on this yet". If your indirect connections have never been worked out, it says "We haven't worked out the indirect connections for your model yet" and offers **Work them out now**. If some may be out of date, a notice says so and offers the same button. **Open this answer** opens the answer at its own address.
 
-The owner on each line belongs to that connected element, not to the system you picked. To find who to call for the failing system itself, open the question "Who's accountable for ___, and can they take on more?" and pick the same system. It lists the recorded owners of that system and of what it affects, one card per distinct owner.
+The owner on each line belongs to that connected element, not to the system you picked. To find who to call for the failing system itself, ask the chat "who is accountable for the payments service?" and name the same system. It lists the recorded owners of that system and of what it affects.
 
-The **Impact Analysis** page, under the Strategy Layer, is a separate tool for planned change. Pick an element, choose a change type (Full Replacement, Upgrade / Version Change, Decommission / Retirement or Minor Modification) and click **Analyze Impact**. The report gives a severity, counts of Capabilities, Processes and TCO at Risk, and a table of affected elements with Name, Type, Application, Owner, Health and Relationship.
+The **Impact Analysis** page is the screen for planned change. Pick an element, choose a change type (Full Replacement, Upgrade / Version Change, Decommission / Retirement or Minor Modification) and click **Analyze Impact**. The report gives a severity, counts of Capabilities, Processes and TCO at Risk, and a table of affected elements with Name, Type, Application, Owner, Health and Relationship.
 
 ## Who asks it
 
@@ -45,11 +44,10 @@ The CTO or head of platform who is asked "what depends on this?" before a migrat
 
 ## How to get your answer
 
-1. Record your applications and platforms, the relationships between them, and their owners. Import them, or add them by hand in Applications.
-2. Open **Ask a question** from the sidebar and choose the first question.
-3. Search for the service and pick it from the list.
-4. Read the lines from the top. Open **Why?** on any worked-out line before you rely on it.
-5. Pick the same system under the accountability question to see who owns it.
+1. Connect GitHub or import a file. Entelim reads your repositories and proposes the services, dependencies and owners it finds, and you approve them. A model you already keep comes in as an Open Exchange, Archi or spreadsheet file.
+2. Open the **AI chat** from the sidebar and ask what breaks if the service fails.
+3. Read the cards from the top. Open **The links behind this** on any worked-out connection before you rely on it.
+4. Ask who is accountable for the same system to see who owns it.
 
 ## Doing this without Entelim
 
@@ -59,9 +57,9 @@ A dependency diagram and a service catalogue spreadsheet. In an incident the dia
 
 - Owners come from the ownership records on applications and capabilities. Other element types have no owner record, so their lines read "Not recorded".
 - The answer follows relationships in one direction, away from the system you pick, to three steps.
-- Health is not measured by this screen.
+- Health is shown as recorded; the answer does not measure it.
 - Worked-out connections need to have been calculated. Until then you see only the connections somebody recorded.
-- This screen does not page anyone or open an incident. It tells you who is recorded as responsible.
+- The chat does not page anyone or open an incident. It tells you who is recorded as responsible.
 
 ## Frequently asked questions
 
@@ -75,7 +73,7 @@ No. It reads the model you keep in Entelim. Incident and monitoring feeds are no
 
 ### How do I know a worked-out connection is right?
 
-Open **Why?**. It lists the links the connection came from, who drew them and when. If one of those is wrong, correct it in the model and work the connections out again.
+Open **The links behind this**. It lists the links the connection came from, who drew them and when. If one of those is wrong, correct it in the model and work the connections out again.
 
 ## Related questions and modules
 

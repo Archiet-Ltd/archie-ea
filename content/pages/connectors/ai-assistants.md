@@ -2,7 +2,7 @@
 page_family: connector
 connector_group: "ai-assistants"
 connector_label: "AI assistants"
-state: held
+state: on_main
 capture_status: awaiting_capture
 cta: plans
 description: "Entelim's MCP server lets an AI assistant such as Claude read your architecture model and answer what it affects, read-only and scoped to your own data."
@@ -54,7 +54,7 @@ Once connected, an assistant can call nine tools, each a read of something alrea
 An element with nothing recorded against it comes back as an honest empty answer, the same way it
 would on screen, rather than the assistant guessing at a connection that is not there. These are the
 same questions behind Entelim's [digital twin of your organisation](/modules/digital-twin), so an
-assistant and a person on the Ask screen read from one model, never two.
+assistant and a person in the AI chat read from one model, never two.
 
 ## Who uses it
 
@@ -81,8 +81,8 @@ are already having, rather than opening a separate screen — see the workspaces
 
 The answer appears inside your own AI assistant, not on an Entelim screen: the assistant names the
 element it read and what it found linked to it, in its own words rather than a raw export. The
-connection changes nothing about what you see signed in to Entelim itself — the model, the Ask screen
-and [AI Chat](/modules/ai-chat) all read the same data the assistant just did.
+connection changes nothing about what you see signed in to Entelim itself — the model and the
+[AI chat](/modules/ai-chat) read the same data the assistant just did.
 
 ## Reading the same model from your own scripts
 
@@ -107,7 +107,7 @@ with the old connection. Read more about how Entelim protects your data on [Secu
 
 The connector answers only from what is already recorded in your model; it does not discover
 anything outside it. It does not answer who is accountable for an element — use
-[AI Chat](/modules/ai-chat) or the Ask screen for that question, or record ownership directly on the
+the [AI chat](/modules/ai-chat) for that question, or record ownership directly on the
 element instead. The assistant uses your own AI assistant subscription: Entelim's side of the
 connection adds nothing to your bill.
 
