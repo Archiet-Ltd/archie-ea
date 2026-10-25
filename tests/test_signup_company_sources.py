@@ -88,8 +88,12 @@ def test_the_website_needs_consent_and_is_kept_for_this_organisation_only(client
     assert ok.status_code == 200
     rows = {row["key"]: row for row in ok.get_json()["sources"]}
     assert rows["website"]["state"] == "waiting"
-    assert "https://acme.com will be read soon" in rows["website"]["text"]
+    assert "Company website is connected" in rows["website"]["text"]
     from app.modules.account.services import onboarding_service as onboarding
+    from app.services.job_queue_service import get_job_queue_service
+
+    assert len(get_job_queue_service().list_jobs(two["one"].id, limit=5, task=onboarding.WEBSITE_TASK)) == 1
+    assert get_job_queue_service().list_jobs(two["two"].id, limit=5, task=onboarding.WEBSITE_TASK) == []
 
     assert {r["key"]: r["state"] for r in onboarding.sources(two["two"])}["website"] == "not_given"
 

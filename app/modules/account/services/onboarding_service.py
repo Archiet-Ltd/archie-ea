@@ -10,6 +10,7 @@ queue, so this page and the dashboard read one record of how far each source has
 
 from __future__ import annotations
 
+import logging
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 from urllib.parse import urlparse
@@ -18,8 +19,11 @@ from sqlalchemy.orm.attributes import flag_modified
 
 from app import db
 
+_log = logging.getLogger(__name__)
+
 GITHUB_TASK = "onboarding_github_import"
 JIRA_TASK = "onboarding_jira_import"
+WEBSITE_TASK = "website_profile_crawl"
 
 # (key, label, starter capability model). The model is the one starter set the industry picks
 # later; this round only records the choice.
@@ -49,6 +53,27 @@ FRAMEWORKS = (
 )
 
 KINDS = (("startup", "Startup"), ("scaleup", "Scale-up"), ("enterprise", "Enterprise"))
+
+# Which frameworks suit a first goal and a company kind; the sign-up step offers only these (the rest stay in Settings).
+FRAMEWORKS_FOR_GOAL = {
+    "understand": ("archimate", "togaf"),
+    "change": ("togaf", "safe", "archimate"),
+    "cost": ("itil4", "cobit2019"),
+    "audit": ("iso27001", "soc2", "gdpr", "nistcsf"),
+    "strategy": ("togaf", "archimate"),
+}
+FRAMEWORKS_FOR_KIND = {
+    "startup": ("soc2", "safe"),
+    "scaleup": ("soc2", "iso27001", "safe"),
+    "enterprise": ("iso27001", "cobit2019", "itil4", "togaf"),
+}
+
+
+def suggested_frameworks(kind: Optional[str], goal: Optional[str]) -> List[str]:
+    """The framework keys worth offering for this goal and company kind, goal first."""
+    keys = list(FRAMEWORKS_FOR_GOAL.get(goal or "understand", ())) + list(FRAMEWORKS_FOR_KIND.get(kind or "startup", ()))
+    return list(dict.fromkeys(keys))
+
 
 _KIND_KEYS = {key for key, _label in KINDS}
 _INDUSTRY_KEYS = {key for key, _label, _model in INDUSTRIES}
@@ -134,7 +159,20 @@ def save_website(org, raw: Optional[str], consent: bool, user_id: Optional[int])
     state["website"] = {"url": url, "consent_by": user_id, "consent_at": datetime.utcnow().isoformat()}
     _write(org, "onboarding", state)
     db.session.commit()
+    _queue_reading(org.id)
     return url
+
+
+def _queue_reading(org_id: int) -> None:
+    """Start reading the site in the background. A queue that is down never stops the person moving on."""
+    from app.modules.organization.website_crawl import CrawlRefused, queue_website_crawl
+
+    try:
+        queue_website_crawl(org_id)
+    except CrawlRefused:
+        _log.info("website not read for organisation %s", org_id, exc_info=True)
+    except Exception:
+        _log.warning("could not queue the website reading for organisation %s", org_id, exc_info=True)
 
 
 def mark_finished(org) -> None:
@@ -275,12 +313,16 @@ def sources(org) -> List[Dict[str, Any]]:
     jira = _source_state(org.id, JIRA_TASK, "Jira", lambda r: "Read %s issues." % r.get("issues", 0))
     rows.append({"key": "jira", "label": "Jira", **jira})
     site = _onboarding(org).get("website")
-    rows.append({
-        "key": "website",
-        "label": "Company website",
-        "state": "waiting" if site else "not_given",
-        "text": "%s will be read soon. Nothing from it is in your model yet." % site["url"] if site else "Not given.",
-    })
+    if site:
+        state = _source_state(
+            org.id, WEBSITE_TASK, "Company website",
+            lambda r: "Read %s pages; %s facts wait for you to confirm in the next step." % (r.get("pages_read", 0), r.get("proposals", 0)),
+        )
+        if state["state"] == "not_given":
+            state = {"state": "waiting", "text": "%s will be read in a moment. Nothing from it is in your model until you confirm it." % site["url"]}
+    else:
+        state = {"state": "not_given", "text": "Not given."}
+    rows.append({"key": "website", "label": "Company website", **state})
     return rows
 
 
