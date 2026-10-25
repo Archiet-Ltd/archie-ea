@@ -85,7 +85,7 @@
 
   <div class="flex min-h-0 flex-1 flex-col md:flex-row">
     {# Left: shapes to add, and the shapes already drawn #}
-    <aside x-show="railOpen" x-cloak class="flex max-h-72 w-full shrink-0 flex-col border-b border-border bg-card md:max-h-none md:w-64 md:border-b-0 md:border-r" aria-label="Shapes" data-testid="bpmn-rail">
+    <section x-show="railOpen" x-cloak class="flex max-h-72 w-full shrink-0 flex-col border-b border-border bg-card md:max-h-none md:w-64 md:border-b-0 md:border-r" aria-label="Shapes" data-testid="bpmn-rail">
       <div class="inline-flex shrink-0 border-b border-border" role="group" aria-label="Shapes list">
         {% call button(variant='ghost', size='sm', class='h-10 flex-1 rounded-none', attrs_dict={'@click': "railTab = 'add'", ':aria-pressed': "railTab === 'add'", ':class': "railTab === 'add' ? 'bg-accent text-foreground' : ''", 'data-testid': 'rail-tab-add'}) %}Add{% endcall %}
         {% call button(variant='ghost', size='sm', class='h-10 flex-1 rounded-none', attrs_dict={'@click': "railTab = 'view'", ':aria-pressed': "railTab === 'view'", ':class': "railTab === 'view' ? 'bg-accent text-foreground' : ''", 'data-testid': 'rail-tab-view'}) %}In this diagram{% endcall %}
@@ -124,7 +124,7 @@
           {% call button(variant='outline', size='sm', class='mt-2', attrs_dict={'@click': "railTab = 'add'"}) %}Open the shapes{% endcall %}
         </div>
       </div>
-    </aside>
+    </section>
 
     {# The drawing #}
     <section class="relative min-h-[360px] min-w-0 flex-1 bg-background" aria-label="Process diagram" data-testid="bpmn-canvas">
@@ -137,7 +137,7 @@
     </section>
 
     {# Right: what is selected #}
-    <aside class="flex max-h-72 w-full shrink-0 flex-col overflow-y-auto border-t border-border bg-card md:max-h-none md:w-72 md:border-l md:border-t-0" aria-label="Selection" data-testid="bpmn-properties">
+    <section class="flex max-h-72 w-full shrink-0 flex-col overflow-y-auto border-t border-border bg-card md:max-h-none md:w-72 md:border-l md:border-t-0" aria-label="Selection" data-testid="bpmn-properties">
       <div class="flex flex-col gap-4 p-4">
         <template x-if="!selected">
           <div class="text-sm text-muted-foreground" data-testid="props-empty">
@@ -235,7 +235,7 @@
           </div>
         </template>
       </div>
-    </aside>
+    </section>
   </div>
 
   {# Key to the two kinds of flow #}

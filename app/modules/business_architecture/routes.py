@@ -21,17 +21,14 @@ def redirect_to_architecture_journey():
 
 # ── Business processes: the list, and each process drawn as BPMN 2.0 ───────────────────────────────────
 
-from flask import Response, abort, g, jsonify, render_template, request  # noqa: E402
+from flask import Response, abort, jsonify, render_template, request  # noqa: E402
 from flask_login import current_user  # noqa: E402
 
 from app import db  # noqa: E402
 from app.core.auth.permissions import may_change_model_element  # noqa: E402
+from app.middleware.tenant_context import current_org_id as _org_id  # noqa: E402
 from app.models.process_data import BusinessProcess  # noqa: E402
 from app.modules.business_architecture import bpmn_service  # noqa: E402
-
-
-def _org_id():
-    return getattr(g, "current_org_id", None) or getattr(current_user, "organization_id", None)
 
 
 def _process_or_404(process_id):

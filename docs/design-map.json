@@ -37136,6 +37136,206 @@
       "status": "mapped",
       "tier": "C3",
       "type_changed": true
+    },
+    "app/templates/business_architecture/process_diagram.html": {
+      "allowed_macros": [
+        "components/accessibility_helpers.html",
+        "components/alert.html",
+        "components/badge.html",
+        "components/breadcrumb.html",
+        "components/breadcrumb_nav.html",
+        "components/button.html",
+        "components/card.html",
+        "components/checkbox.html",
+        "components/confirmation_dialog.html",
+        "components/data_card.html",
+        "components/dense_table.html",
+        "components/dialog.html",
+        "components/dropdown_menu.html",
+        "components/empty_state.html",
+        "components/error_boundary.html",
+        "components/filter_bar.html",
+        "components/form_field.html",
+        "components/inline_hint.html",
+        "components/input.html",
+        "components/loading_state.html",
+        "components/modal.html",
+        "components/page_header.html",
+        "components/provenance.html",
+        "components/search_bar.html",
+        "components/select.html",
+        "components/skeleton.html",
+        "components/status_badge.html",
+        "components/tabs.html",
+        "macros/page_shell.html"
+      ],
+      "basis": "declared",
+      "block": "board",
+      "charts": [],
+      "components": [
+        "alert",
+        "badge",
+        "breadcrumb",
+        "button",
+        "card",
+        "checkbox",
+        "dialog",
+        "empty",
+        "input",
+        "page-header",
+        "select",
+        "table",
+        "button-group",
+        "toggle-group",
+        "tooltip",
+        "sidebar",
+        "sheet",
+        "field",
+        "resizable"
+      ],
+      "confidence": "high",
+      "controls": {
+        "button": 40,
+        "link": 0,
+        "modal": 0,
+        "table": 0,
+        "testid": 0
+      },
+      "extends": [
+        "layouts/composer_base.html"
+      ],
+      "extra_macros": [],
+      "frame": "dashboard-01",
+      "inhouse_components": [
+        "breadcrumb_nav:Replace",
+        "dense_table:Replace",
+        "empty_state:Replace",
+        "modal:Replace"
+      ],
+      "macros": [
+        "components/badge.html",
+        "components/breadcrumb_nav.html",
+        "components/button.html",
+        "components/dialog.html",
+        "components/diagram/header.html",
+        "components/diagram/status_line.html",
+        "components/diagram/toolbar.html",
+        "components/empty_state.html",
+        "components/input.html",
+        "components/select.html"
+      ],
+      "original": "gap:G-4",
+      "page_type": "diagram-canvas",
+      "persona": "business_architect",
+      "reason": "Business process as a BPMN 2.0 diagram: pools, lanes, shapes and flows in the shared diagram shell.",
+      "reference": {
+        "shadcn": {
+          "name": "shadcn examples: cards",
+          "url": "https://ui.shadcn.com/examples/cards"
+        },
+        "basecoat": {
+          "name": "flask-basecoat examples: Kanban",
+          "image": "docs/design/reference/basecoat-kanban.webp"
+        }
+      },
+      "spec": null,
+      "status": "mapped",
+      "tier": "C1",
+      "type_changed": true
+    },
+    "app/templates/business_architecture/processes.html": {
+      "allowed_macros": [
+        "components/accessibility_helpers.html",
+        "components/alert.html",
+        "components/answer_cascade.html",
+        "components/app_stats_grid.html",
+        "components/badge.html",
+        "components/breadcrumb.html",
+        "components/breadcrumb_nav.html",
+        "components/button.html",
+        "components/card.html",
+        "components/confirmation_dialog.html",
+        "components/data_card.html",
+        "components/dense_table.html",
+        "components/dialog.html",
+        "components/dropdown_menu.html",
+        "components/empty_state.html",
+        "components/error_boundary.html",
+        "components/filter_bar.html",
+        "components/gantt_timeline.html",
+        "components/inline_hint.html",
+        "components/loading_state.html",
+        "components/metrics_card.html",
+        "components/modal.html",
+        "components/page_header.html",
+        "components/priority_actions.html",
+        "components/progress.html",
+        "components/provenance.html",
+        "components/review_queue_panel.html",
+        "components/skeleton.html",
+        "components/status_badge.html",
+        "components/status_indicator.html",
+        "components/tabs.html",
+        "macros/page_shell.html"
+      ],
+      "basis": "declared",
+      "block": "dashboard",
+      "charts": [],
+      "components": [
+        "alert",
+        "badge",
+        "breadcrumb",
+        "button",
+        "card",
+        "empty",
+        "page-header",
+        "page-shell",
+        "progress",
+        "table",
+        "select"
+      ],
+      "confidence": "low",
+      "controls": {
+        "button": 2,
+        "link": 4,
+        "modal": 0,
+        "table": 1,
+        "testid": 0
+      },
+      "extends": [
+        "layouts/admin_base.html"
+      ],
+      "frame": "dashboard-01",
+      "inhouse_components": [
+        "page-shell:Replace"
+      ],
+      "macros": [
+        "components/badge.html",
+        "components/button.html",
+        "components/card.html",
+        "components/dense_table.html",
+        "components/empty_state.html",
+        "macros/page_shell.html"
+      ],
+      "original": "dashboard-01",
+      "page_type": "list",
+      "persona": "business_architect",
+      "reason": "Business processes as a list or as diagram cards, with the page header tabs.",
+      "reference": {
+        "shadcn": {
+          "name": "shadcn blocks: dashboard-01",
+          "url": "https://ui.shadcn.com/blocks#dashboard-01"
+        },
+        "basecoat": {
+          "name": "flask-basecoat examples: dashboard",
+          "image": "docs/design/reference/basecoat-dashboard.webp"
+        }
+      },
+      "spec": null,
+      "status": "mapped",
+      "tier": "B",
+      "type_changed": false,
+      "extra_macros": []
     }
   }
 }

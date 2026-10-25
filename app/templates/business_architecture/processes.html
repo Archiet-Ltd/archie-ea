@@ -1,4 +1,4 @@
-{# design-block: data-table #}
+{# design-block: dashboard #}
 {% extends 'layouts/admin_base.html' %}
 {% from 'macros/page_shell.html' import page_shell %}
 {% from 'components/dense_table.html' import dense_table %}
@@ -6,21 +6,15 @@
 {% from 'components/card.html' import card, card_header, card_title, card_description, card_content %}
 {% from 'components/badge.html' import badge %}
 {% from 'components/button.html' import button %}
-{% from 'components/tabs.html' import tabs, tabs_list, tabs_trigger %}
 
 {% block title %}Business processes{% endblock %}
 
 {% block content %}
 <div class="space-y-6">
   {{ page_shell('Business processes', 'Each process, as a list or drawn as a BPMN 2.0 diagram with the business roles that carry it out.',
-     breadcrumb=[('Home', url_for('main.index')), ('Business processes', None)]) }}
-
-  <nav aria-label="Business process views">
-    {% call tabs_list() %}
-      {% call tabs_trigger(value='list', click="window.location.assign('" ~ url_for('business_architecture.processes') ~ "')", selected='true' if view == 'list' else 'false') %}List{% endcall %}
-      {% call tabs_trigger(value='diagram', click="window.location.assign('" ~ url_for('business_architecture.processes', view='diagram') ~ "')", selected='true' if view == 'diagram' else 'false') %}Diagram{% endcall %}
-    {% endcall %}
-  </nav>
+     breadcrumb=[('Home', url_for('main.index')), ('Business processes', None)],
+     tabs=[('List', url_for('business_architecture.processes'), view == 'list'),
+           ('Diagram', url_for('business_architecture.processes', view='diagram'), view == 'diagram')]) }}
 
   {% if not items %}
     {{ empty_state(icon='workflow', title='No business processes yet',

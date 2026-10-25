@@ -139,7 +139,7 @@ def test_analyst_draws_the_delivery_flow_exports_and_imports_it_back(browser, li
         page.goto(live_server + "/business-architecture/processes", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
         row = page.get_by_test_id("process-row").filter(has_text=process_ids["main_name"]).first  # its sub-process row names it as its parent
         expect(row).to_contain_text("18 steps")
-        page.get_by_role("tab", name="Diagram").click()
+        page.get_by_role("link", name="Diagram", exact=True).click()
         page.wait_for_url(re.compile(r"view=diagram"), timeout=PAGE_TIMEOUT)
         card = page.get_by_test_id("process-diagram-cards").locator("div", has_text=process_ids["main_name"]).last
         expect(card).to_contain_text("lanes")

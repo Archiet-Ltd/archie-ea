@@ -800,6 +800,8 @@ entries:
         reason: a diagram canvas whose palette items are dragged onto a drawing, not a board of columns
       - path: app/templates/codegen/workflow_designer.html
         reason: a diagram canvas whose nodes are dragged onto a flow, not a board of columns
+      - path: app/templates/business_architecture/process_diagram.html
+        reason: a diagram canvas whose shapes are dragged from the shapes list into a process lane, not a board of columns
 
   - id: public-site-registry
     concept: The public navbar, its menus, the footer and the roles hub link lists (one registry file, one reader)
