@@ -1,17 +1,18 @@
 {% extends "layouts/admin_base.html" %}
+{# design-block: dashboard #}
 {% from "components/page_header.html" import page_header %}
 
 {% block title %}Application Report Builder{% endblock %}
 
 {% block content %}
 <div class="p-6 space-y-6 mx-auto max-w-7xl">
-    {{ page_header(
+    {{ page_shell(
         title='Application Report Builder',
-        description='Filter and export application data for portfolio analysis',
-        breadcrumbs=[
-            {'label': 'Dashboard', 'href': url_for('main.index')},
-            {'label': 'Admin', 'href': url_for('admin.dashboard')},
-            {'label': 'Reports'}
+        subtitle='Filter and export application data for portfolio analysis',
+        breadcrumb=[
+            ('Dashboard', url_for('main.index')),
+            ('Admin', url_for('admin.dashboard')),
+            ('Reports', None)
         ]
     ) }}
 

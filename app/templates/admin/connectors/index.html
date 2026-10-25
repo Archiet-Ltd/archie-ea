@@ -1,16 +1,16 @@
 {# design-block: settings #}
 {% extends 'layouts/admin_base.html' %}
 {% block title %}Connectors{% endblock %}
-{% from 'components/page_header.html' import page_header %}
+{% from 'macros/page_shell.html' import page_shell %}
 
 {% block content %}
 <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-    {{ page_header(
+    {{ page_shell(
         title='Connectors',
-        description='Every connector of your organisation: health, last synchronisation, and the change queue each edit goes through.',
-        breadcrumbs=[
-            ({'label': 'Admin', 'href': url_for('admin.index')} if current_user.is_admin() else {'label': 'Workspace'}),
-            {'label': 'Connectors'}
+        subtitle='Every connector of your organisation: health, last synchronisation, and the change queue each edit goes through.',
+        breadcrumb=[
+            ('Admin', url_for('admin.index')) if current_user.is_admin() else ('Workspace', None),
+            ('Connectors', None)
         ]
     ) }}
 

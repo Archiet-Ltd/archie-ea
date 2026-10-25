@@ -1,17 +1,18 @@
 {% extends "layouts/admin_base.html" %}
+{# design-block: data-table #}
 {% from "components/page_header.html" import page_header %}
 
 {% block title %}Connection Gaps Report{% endblock %}
 
 {% block content %}
 <div class="p-6 space-y-6 mx-auto max-w-7xl">
-    {{ page_header(
+    {{ page_shell(
         title='Connection Gaps Report',
-        description='Portfolio-wide view of solution data completeness — sorted by lowest score first',
-        breadcrumbs=[
-            {'label': 'Dashboard', 'href': url_for('main.index')},
-            {'label': 'Admin', 'href': url_for('admin.index')},
-            {'label': 'Connection Gaps'}
+        subtitle='Portfolio-wide view of solution data completeness — sorted by lowest score first',
+        breadcrumb=[
+            ('Dashboard', url_for('main.index')),
+            ('Admin', url_for('admin.index')),
+            ('Connection Gaps', None)
         ]
     ) }}
 

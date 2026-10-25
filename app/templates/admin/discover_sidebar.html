@@ -1,12 +1,13 @@
 {% extends 'layouts/admin_base.html' %}
+{# design-block: settings #}
 {% block title %}Discover Sidebar Items{% endblock %}
-{% from 'components/page_header.html' import page_header %}
+{% from 'macros/page_shell.html' import page_shell %}
 
 {% block content %}
 <div class="space-y-6">
-    {{ page_header(
-        title='Discover Sidebar Items', breadcrumbs=[{'label': 'Home', 'href': '/'}, {'label': 'Discover Sidebar Items'}],
-        description='Select sidebar menu items to create feature flags for visibility control',
+    {{ page_shell(
+        title='Discover Sidebar Items', breadcrumb=[('Home', '/'), ('Discover Sidebar Items', None)],
+        subtitle='Select sidebar menu items to create feature flags for visibility control',
         actions=[
             {'text': 'Back to Feature Flags', 'icon': 'arrow-left', 'href': url_for('admin.feature_flags'), 'variant': 'outline'}
         ]

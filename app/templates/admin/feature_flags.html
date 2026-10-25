@@ -1,16 +1,17 @@
 {% extends 'layouts/admin_base.html' %}
+{# design-block: settings #}
 {% block title %}Feature Flags{% endblock %}
-{% from 'components/page_header.html' import page_header %}
+{% from 'macros/page_shell.html' import page_shell %}
 {% from 'components/button.html' import button %}
 
 {% block content %}
 <div class="space-y-6">
-    {{ page_header(
+    {{ page_shell(
         title='Feature Flags',
-        description='Control which features are visible to users (' ~ (pagination.total if pagination else 0) ~ ' total)',
-        breadcrumbs=[
-            {'label': 'Admin', 'href': url_for('admin.index')},
-            {'label': 'Feature Flags'}
+        subtitle='Control which features are visible to users (' ~ (pagination.total if pagination else 0) ~ ' total)',
+        breadcrumb=[
+            ('Admin', url_for('admin.index')),
+            ('Feature Flags', None)
         ],
         actions=[
             {'text': 'New Feature Flag', 'icon': 'plus', 'href': url_for('admin.feature_flag_new'), 'variant': 'default'}

@@ -1,12 +1,13 @@
 {% extends 'layouts/admin_base.html' %}
+{# design-block: settings #}
 {% block title %}ServiceNow CMDB Integration{% endblock %}
-{% from 'components/page_header.html' import page_header %}
+{% from 'macros/page_shell.html' import page_shell %}
 
 {% block content %}
 <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-    {{ page_header(
-        title='ServiceNow CMDB Integration', breadcrumbs=[{'label': 'Home', 'href': '/'}, {'label': 'ServiceNow CMDB Integration'}],
-        description='Sync Configuration Items from ServiceNow CMDB to automatically discover and maintain your application portfolio.'
+    {{ page_shell(
+        title='ServiceNow CMDB Integration', breadcrumb=[('Home', '/'), ('ServiceNow CMDB Integration', None)],
+        subtitle='Sync Configuration Items from ServiceNow CMDB to automatically discover and maintain your application portfolio.'
     ) }}
 
     <!-- Flash Messages -->

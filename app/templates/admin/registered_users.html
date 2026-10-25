@@ -1,4 +1,5 @@
 {% extends 'layouts/admin_base.html' %}
+{# design-block: data-table #}
 {% block title %}Registered Users{% endblock %}
 {% from "components/page_header.html" import page_header %}
 {% from "components/filter_bar.html" import filter_bar %}
@@ -7,13 +8,13 @@
 {% block content %}
 <div class="space-y-6">
     {# Scoped to the current organisation: the count is the number of rows listed. #}
-    {{ page_header(
+    {{ page_shell(
         title='Registered Users',
-        description='View and manage users registered to ' ~ (current_org.name if current_org else 'this organization')
+        subtitle='View and manage users registered to ' ~ (current_org.name if current_org else 'this organization')
             ~ ' (' ~ users|length ~ ' ' ~ ('user' if users|length == 1 else 'users') ~ ').',
-        breadcrumbs=[
-            {'label': 'Admin', 'href': url_for('admin.index')},
-            {'label': 'Registered Users'}
+        breadcrumb=[
+            ('Admin', url_for('admin.index')),
+            ('Registered Users', None)
         ]
     ) }}
 

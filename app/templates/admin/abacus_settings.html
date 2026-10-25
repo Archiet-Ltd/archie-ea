@@ -1,16 +1,17 @@
 {% extends 'layouts/admin_base.html' %}
-{% from 'components/page_header.html' import page_header %}
+{# design-block: settings #}
+{% from 'macros/page_shell.html' import page_shell %}
 
 {% block title %}Abacus Integration Settings{% endblock %}
 
 {% block content %}
 <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-    {{ page_header(
+    {{ page_shell(
         title='Abacus Integration Settings',
-        description='Configure Avolution Abacus EA repository integration for automatic synchronization of applications, capabilities, and relationships.',
-        breadcrumbs=[
-            {'label': 'Admin', 'href': url_for('admin.index')},
-            {'label': 'Abacus Settings'}
+        subtitle='Configure Avolution Abacus EA repository integration for automatic synchronization of applications, capabilities, and relationships.',
+        breadcrumb=[
+            ('Admin', url_for('admin.index')),
+            ('Abacus Settings', None)
         ]
     ) }}
 

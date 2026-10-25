@@ -1,18 +1,19 @@
 {% extends 'layouts/admin_base.html' %}
+{# design-block: dashboard #}
 {% block title %}Abacus Sync Dashboard{% endblock %}
-{% from 'components/page_header.html' import page_header %}
+{% from 'macros/page_shell.html' import page_shell %}
 {% from 'components/metrics_card.html' import metrics_card %}
 {% from 'components/card.html' import card, card_header, card_title, card_content %}
 
 {% block content %}
 <div class="space-y-6">
-    {{ page_header(
+    {{ page_shell(
         title='Abacus Sync Dashboard',
-        description='Monitor sync health, view statistics, and track integration status for Avolution Abacus.',
-        breadcrumbs=[
-            {'label': 'Dashboard', 'href': url_for('main.index')},
-            {'label': 'Admin', 'href': url_for('admin.index')},
-            {'label': 'Abacus Dashboard'}
+        subtitle='Monitor sync health, view statistics, and track integration status for Avolution Abacus.',
+        breadcrumb=[
+            ('Dashboard', url_for('main.index')),
+            ('Admin', url_for('admin.index')),
+            ('Abacus Dashboard', None)
         ]
     ) }}
 
@@ -92,26 +93,26 @@
                 title='Auto Sync',
                 value='Enabled' if sync_status.sync_enabled else 'Disabled',
                 icon='repeat',
-                description=('Every ' + (sync_status.sync_interval_minutes or 1440)|string + ' minutes') if sync_status.sync_enabled else 'Manual sync only',
+                subtitle=('Every ' + (sync_status.sync_interval_minutes or 1440)|string + ' minutes') if sync_status.sync_enabled else 'Manual sync only',
                 value_class='text-success' if sync_status.sync_enabled else 'text-muted-foreground'
             ) }}
             {{ metrics_card(
                 title='Last Sync',
                 value=sync_status.last_sync_at[11:16] if sync_status.last_sync_at else 'Never',
                 icon='clock',
-                description=sync_status.last_sync_at[:10] if sync_status.last_sync_at else 'No sync history'
+                subtitle=sync_status.last_sync_at[:10] if sync_status.last_sync_at else 'No sync history'
             ) }}
             {{ metrics_card(
                 title='Applications',
                 value=(stats.applications_synced or 0)|string,
                 icon='layers',
-                description='Total in Abacus'
+                subtitle='Total in Abacus'
             ) }}
             {{ metrics_card(
                 title='Capabilities',
                 value=(stats.capabilities_synced or 0)|string,
                 icon='hexagon',
-                description='Total in Abacus'
+                subtitle='Total in Abacus'
             ) }}
         </div>
 

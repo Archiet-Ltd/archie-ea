@@ -1,16 +1,17 @@
 {% extends 'layouts/admin_base.html' %}
-{% from 'components/page_header.html' import page_header %}
+{# design-block: data-table #}
+{% from 'macros/page_shell.html' import page_shell %}
 
 {% block title %}Organizations — {{ config.APP_NAME }}{% endblock %}
 
 {% block content %}
 <div class="space-y-6">
-    {{ page_header(
+    {{ page_shell(
         title='Organizations',
-        description='Manage tenant organizations (' ~ organizations|length ~ ' total)',
-        breadcrumbs=[
-            {'label': 'Admin', 'href': url_for('admin.index')},
-            {'label': 'Organizations'}
+        subtitle='Manage tenant organizations (' ~ organizations|length ~ ' total)',
+        breadcrumb=[
+            ('Admin', url_for('admin.index')),
+            ('Organizations', None)
         ],
         actions=[
             {'text': 'New Organization', 'icon': 'plus', 'href': url_for('admin.organization_create'), 'variant': 'default'}

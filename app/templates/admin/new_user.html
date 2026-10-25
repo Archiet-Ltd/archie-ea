@@ -1,6 +1,7 @@
 {% extends 'layouts/admin_base.html' %}
+{# design-block: form #}
 {% block title %}Add New User{% endblock %}
-{% from 'components/page_header.html' import page_header %}
+{% from 'macros/page_shell.html' import page_shell %}
 {% import 'macros/form_macros.html' as f %}
 {% import 'macros/check_password.html' as check with context %}
 
@@ -9,12 +10,12 @@
 
 {% block content %}
 <div class="max-w-2xl mx-auto space-y-6">
-    {{ page_header(
+    {{ page_shell(
         title='Add New User',
-        description='Create a new user account',
-        breadcrumbs=[
-            {'label': 'Admin', 'href': url_for('admin.index')},
-            {'label': 'New User'}
+        subtitle='Create a new user account',
+        breadcrumb=[
+            ('Admin', url_for('admin.index')),
+            ('New User', None)
         ]
     ) }}
 

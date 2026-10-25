@@ -9,7 +9,7 @@
 {% extends 'layouts/admin_base.html' %}
 {% from 'components/disabled_action.html' import disabled_action %}
 {% from 'macros/page_shell.html' import page_shell, stat_card %}
-{% from 'macros/shadcn_compat.html' import shadcn_select %}
+{% from 'components/select.html' import native_select %}
 {% from 'components/modal.html' import modal %}
 {% from 'components/badge.html' import badge %}
 {% from 'components/button.html' import button %}
@@ -368,7 +368,9 @@
             </p>
         </div>
         <div x-show="selectedTarget" x-cloak>
-            {% call shadcn_select('relationship_type', label='Relationship type', id='rel-type-select', placeholder='Select a type…', attrs={'x-model': 'relType'}) %}
+            <label for="rel-type-select" class="text-sm font-medium leading-none">Relationship type</label>
+            {% call native_select(name='relationship_type', id='rel-type-select', aria_label='Relationship type', attrs_dict={'x-model': 'relType'}) %}
+            <option value="">Select a type…</option>
             <template x-for="t in validTypes" :key="t.type">
                 <option :value="t.type" x-text="t.type"></option>
             </template>

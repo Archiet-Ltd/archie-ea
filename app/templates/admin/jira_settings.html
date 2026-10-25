@@ -1,12 +1,13 @@
 {% extends 'layouts/admin_base.html' %}
+{# design-block: settings #}
 {% block title %}Jira Push Integration{% endblock %}
-{% from 'components/page_header.html' import page_header %}
+{% from 'macros/page_shell.html' import page_shell %}
 
 {% block content %}
 <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-    {{ page_header(
-        title='Jira Push Integration', breadcrumbs=[{'label': 'Home', 'href': '/'}, {'label': 'Jira Push Integration'}],
-        description='Push enriched application portfolio data to Jira for cross-team collaboration on architecture decisions.'
+    {{ page_shell(
+        title='Jira Push Integration', breadcrumb=[('Home', '/'), ('Jira Push Integration', None)],
+        subtitle='Push enriched application portfolio data to Jira for cross-team collaboration on architecture decisions.'
     ) }}
 
     <!-- Flash Messages -->

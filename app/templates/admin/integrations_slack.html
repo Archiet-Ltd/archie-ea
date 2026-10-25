@@ -1,17 +1,18 @@
 {% extends 'layouts/admin_base.html' %}
-{% from 'components/page_header.html' import page_header %}
+{# design-block: settings #}
+{% from 'macros/page_shell.html' import page_shell %}
 
 {% block title %}Slack AI Architect{% endblock %}
 
 {% block content %}
 <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-    {{ page_header(
+    {{ page_shell(
         title='Slack AI Architect',
-        description='Connect Entelim to Slack. The AI Architect listens for @entelim mentions and passively monitors channels for portfolio application names.',
-        breadcrumbs=[
-            {'label': 'Home', 'href': url_for('main.index')},
-            {'label': 'Admin', 'href': url_for('admin.index')},
-            {'label': 'Slack AI Architect'}
+        subtitle='Connect Entelim to Slack. The AI Architect listens for @entelim mentions and passively monitors channels for portfolio application names.',
+        breadcrumb=[
+            ('Home', url_for('main.index')),
+            ('Admin', url_for('admin.index')),
+            ('Slack AI Architect', None)
         ]
     ) }}
 

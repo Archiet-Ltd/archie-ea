@@ -1,15 +1,16 @@
 {% extends 'layouts/admin_base.html' %}
+{# design-block: settings #}
 {% block title %}Webhook Settings{% endblock %}
-{% from 'components/page_header.html' import page_header %}
+{% from 'macros/page_shell.html' import page_shell %}
 
 {% block content %}
 <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-    {{ page_header(
+    {{ page_shell(
         title='Webhook Settings',
-        description='Configure Slack and Microsoft Teams webhook integrations for real-time event notifications.',
-        breadcrumbs=[
-            {'label': 'Admin', 'href': url_for('admin.index')},
-            {'label': 'Webhook Settings'}
+        subtitle='Configure Slack and Microsoft Teams webhook integrations for real-time event notifications.',
+        breadcrumb=[
+            ('Admin', url_for('admin.index')),
+            ('Webhook Settings', None)
         ]
     ) }}
 

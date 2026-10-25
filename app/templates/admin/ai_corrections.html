@@ -1,18 +1,19 @@
 {% extends 'layouts/admin_base.html' %}
+{# design-block: data-table #}
 {% block title %}AI Extraction Corrections{% endblock %}
-{% from 'components/page_header.html' import page_header %}
+{% from 'macros/page_shell.html' import page_shell %}
 {% from 'components/metrics_card.html' import metrics_card %}
 {% from 'components/card.html' import card, card_header, card_title, card_content %}
 
 {% block content %}
 <div class="space-y-6">
-    {{ page_header(
+    {{ page_shell(
         title='AI Extraction Corrections',
-        description='Review and confirm AI-generated ArchiMate elements to train the correction flywheel.',
-        breadcrumbs=[
-            {'label': 'Dashboard', 'href': url_for('main.index')},
-            {'label': 'Admin', 'href': url_for('admin.index')},
-            {'label': 'AI Corrections'}
+        subtitle='Review and confirm AI-generated ArchiMate elements to train the correction flywheel.',
+        breadcrumb=[
+            ('Dashboard', url_for('main.index')),
+            ('Admin', url_for('admin.index')),
+            ('AI Corrections', None)
         ]
     ) }}
 
@@ -35,20 +36,20 @@
             title='Elements Reviewed',
             value=total_with_elements|string,
             icon='layers',
-            description='Apps with AI-assigned ArchiMate elements'
+            subtitle='Apps with AI-assigned ArchiMate elements'
         ) }}
         {{ metrics_card(
             title='Corrections Logged',
             value=correction_count|string,
             icon='check-circle',
-            description='Total corrections submitted',
+            subtitle='Total corrections submitted',
             value_class=('text-success' if correction_count > 0 else 'text-muted-foreground')
         ) }}
         {{ metrics_card(
             title='Pending Review',
             value=((total_with_elements - correction_count) if total_with_elements > correction_count else 0)|string,
             icon='clock',
-            description='Elements awaiting confirmation'
+            subtitle='Elements awaiting confirmation'
         ) }}
     </div>
 

@@ -1,18 +1,18 @@
 {# design-block: settings #}
 {% extends 'layouts/admin_base.html' %}
 {% block title %}Connect GitHub{% endblock %}
-{% from 'components/page_header.html' import page_header %}
+{% from 'macros/page_shell.html' import page_shell %}
 {% from 'components/alert.html' import alert as quiet_alert %}
 
 {% block content %}
 <div class="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8">
-    {{ page_header(
+    {{ page_shell(
         title='Connect GitHub',
-        description='Paste a read-only token. Entelim reads your repositories and proposes a first model of your company: its applications, their parts, who owns them and how they depend on each other.',
-        breadcrumbs=[
-            ({'label': 'Admin', 'href': url_for('admin.index')} if current_user.is_admin() else {'label': 'Workspace'}),
-            {'label': 'Connectors', 'href': url_for('m365_connector.connectors_index')},
-            {'label': 'GitHub'}
+        subtitle='Paste a read-only token. Entelim reads your repositories and proposes a first model of your company: its applications, their parts, who owns them and how they depend on each other.',
+        breadcrumb=[
+            ('Admin', url_for('admin.index')) if current_user.is_admin() else ('Workspace', None),
+            ('Connectors', url_for('m365_connector.connectors_index')),
+            ('GitHub', None)
         ]
     ) }}
 

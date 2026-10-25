@@ -1,13 +1,14 @@
 {% extends 'layouts/admin_base.html' %}
+{# design-block: form #}
 {% block title %}Feature Flag{% endblock %}
-{% from 'components/page_header.html' import page_header %}
+{% from 'macros/page_shell.html' import page_shell %}
 
 {% block content %}
 <div class="space-y-6">
-    {{ page_header(
+    {{ page_shell(
         title=action ~ ' Feature Flag',
-        breadcrumbs=[
-            {'label': 'Feature Flags', 'href': url_for('admin.feature_flags')},
+        breadcrumb=[
+            ('Feature Flags', url_for('admin.feature_flags')),
             {'label': action ~ ' Feature Flag'}
         ]
     ) }}

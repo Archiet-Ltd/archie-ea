@@ -1,16 +1,17 @@
 {% extends 'layouts/admin_base.html' %}
-{% from 'components/page_header.html' import page_header %}
+{# design-block: form #}
+{% from 'macros/page_shell.html' import page_shell %}
 
 {% block title %}{{ 'Edit' if org else 'New' }} Organization — {{ config.APP_NAME }}{% endblock %}
 
 {% block content %}
 <div class="space-y-6">
-    {{ page_header(
+    {{ page_shell(
         title=('Edit Organization' if org else 'New Organization'),
-        description=('Update organization settings' if org else 'Create a new tenant organization'),
-        breadcrumbs=[
-            {'label': 'Admin', 'href': url_for('admin.index')},
-            {'label': 'Organizations', 'href': url_for('admin.organizations_list')},
+        subtitle=('Update organization settings' if org else 'Create a new tenant organization'),
+        breadcrumb=[
+            ('Admin', url_for('admin.index')),
+            ('Organizations', url_for('admin.organizations_list')),
             {'label': 'Edit' if org else 'New'}
         ]
     ) }}

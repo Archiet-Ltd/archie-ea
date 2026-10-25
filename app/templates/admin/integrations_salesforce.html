@@ -1,17 +1,18 @@
 {% extends 'layouts/admin_base.html' %}
-{% from 'components/page_header.html' import page_header %}
+{# design-block: settings #}
+{% from 'macros/page_shell.html' import page_shell %}
 
 {% block title %}Salesforce Org Discovery{% endblock %}
 
 {% block content %}
 <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8" x-data="salesforceIntegration()">
-    {{ page_header(
+    {{ page_shell(
         title='Salesforce Org Discovery',
-        description='Scan a Salesforce org for Lightning apps and installed AppExchange packages, and import them into the Entelim application portfolio — optionally straight into a Transformation Programme baseline.',
-        breadcrumbs=[
-            {'label': 'Home', 'href': url_for('main.index')},
-            {'label': 'Admin', 'href': url_for('admin.index')},
-            {'label': 'Salesforce Discovery'}
+        subtitle='Scan a Salesforce org for Lightning apps and installed AppExchange packages, and import them into the Entelim application portfolio — optionally straight into a Transformation Programme baseline.',
+        breadcrumb=[
+            ('Home', url_for('main.index')),
+            ('Admin', url_for('admin.index')),
+            ('Salesforce Discovery', None)
         ]
     ) }}
 

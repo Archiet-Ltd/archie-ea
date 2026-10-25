@@ -1,5 +1,6 @@
 {% extends 'layouts/admin_base.html' %}
-{% from 'components/page_header.html' import page_header %}
+{# design-block: dashboard #}
+{% from 'macros/page_shell.html' import page_shell %}
 {% from 'components/metrics_card.html' import metrics_card %}
 
 {% block title %}Seed Management{% endblock %}
@@ -8,9 +9,9 @@
 <div class="max-w-5xl mx-auto" x-data="seedManager()">
     <!-- Header (page_header renders the single breadcrumb for this page -- M5) -->
     <div class="flex items-center justify-between mb-6">
-        {{ page_header(
-        title='Seed Management', breadcrumbs=[{'label': 'Home', 'href': '/'}, {'label': 'Seed Management'}],
-        description='View seed data status and trigger seeding operations'
+        {{ page_shell(
+        title='Seed Management', breadcrumb=[('Home', '/'), ('Seed Management', None)],
+        subtitle='View seed data status and trigger seeding operations'
     ) }}
         <button type="button" @click="seedAll()"
                 :disabled="seeding"

@@ -1,5 +1,6 @@
 {% extends 'layouts/admin_base.html' %}
-{% from 'components/page_header.html' import page_header %}
+{# design-block: settings #}
+{% from 'macros/page_shell.html' import page_shell %}
 
 {% block title %}Governance Gates{% endblock %}
 
@@ -8,14 +9,14 @@
      data-governance-mode="{{ 'manage' if can_manage_governance_gates else 'read-only' }}"
      x-data="governanceGates()">
 
-    {{ page_header(
+    {{ page_shell(
         title='Governance Gates',
-        description=('Configure hard gates that block solution progression until completeness thresholds are met.'
+        subtitle=('Configure hard gates that block solution progression until completeness thresholds are met.'
                      if can_manage_governance_gates else
                      'Review the hard gates that block solution progression until completeness thresholds are met.'),
-        breadcrumbs=[
-            {'label': 'Admin', 'href': url_for('admin.index')},
-            {'label': 'Governance Gates'}
+        breadcrumb=[
+            ('Admin', url_for('admin.index')),
+            ('Governance Gates', None)
         ]
     ) }}
 
