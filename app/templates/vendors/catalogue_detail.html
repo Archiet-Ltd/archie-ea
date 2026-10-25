@@ -12,8 +12,8 @@
 {% block title %}{{ product.product_name }} · Vendor catalogue{% endblock %}
 
 {% macro source_cell(fact) %}
-<td class="px-2 whitespace-nowrap text-xs">
-  <a class="text-primary hover:underline underline-offset-4" href="{{ fact.source_url }}" target="_blank" rel="noopener noreferrer" data-testid="fact-source">{{ fact.source_url|replace('https://', '')|truncate(42, true, '…') }}</a>
+<td class="px-2 py-2 align-top text-xs">
+  <a class="text-primary hover:underline underline-offset-4" href="{{ fact.source_url }}" target="_blank" rel="noopener noreferrer" data-testid="fact-source">{{ fact.source_url|replace('https://', '')|truncate(34, true, '…') }}</a>
   <span class="block text-muted-foreground" data-testid="fact-checked">Checked {{ fact.checked_on.strftime('%-d %b %Y') }}</span>
 </td>
 {% endmacro %}
@@ -45,12 +45,11 @@
           {% set arch = grouped.component + grouped.service + grouped.interface %}
           {% if arch %}
           <div class="rounded-lg border border-border overflow-hidden"><div class="overflow-x-auto">
-          {% call table(attrs_dict={'data-testid': 'catalogue-architecture'}) %}{% call table_header() %}<tr>{% call table_head() %}Element{% endcall %}{% call table_head() %}ArchiMate type{% endcall %}{% call table_head() %}What it is{% endcall %}{% call table_head() %}Protocol{% endcall %}{% call table_head() %}Source{% endcall %}</tr>{% endcall %}{% call table_body() %}
+          {% call table(attrs_dict={'data-testid': 'catalogue-architecture'}) %}{% call table_header() %}<tr>{% call table_head() %}Element and ArchiMate type{% endcall %}{% call table_head() %}What it is{% endcall %}{% call table_head() %}Protocol{% endcall %}{% call table_head() %}Source{% endcall %}</tr>{% endcall %}{% call table_body() %}
             {% for fact in arch %}
             <tr class="h-12" data-testid="fact-{{ fact.kind }}">
-              <td class="px-2 font-medium text-foreground">{{ fact.name }}</td>
-              <td class="px-2">{% call badge(variant='outline') %}{{ fact.archimate_type }}{% endcall %}</td>
-              <td class="px-2 text-muted-foreground min-w-72">{{ fact.detail or '' }}</td>
+              <td class="px-2 py-2 align-top"><span class="block font-medium text-foreground">{{ fact.name }}</span><span class="mt-1 inline-block">{% call badge(variant='outline') %}{{ fact.archimate_type }}{% endcall %}</span></td>
+              <td class="px-2 py-2 align-top text-muted-foreground"><div class="w-56">{{ fact.detail or '' }}</div></td>
               <td class="px-2 text-muted-foreground">{{ (fact.attributes or {}).get('protocol', '') }}</td>
               {{ source_cell(fact) }}
             </tr>
@@ -107,7 +106,7 @@
                   {%- elif kind == 'integration' %}{% if a.get('related_slug') in related %}<a class="text-primary hover:underline underline-offset-4" href="{{ url_for('unified_applications.vendor_catalogue_product', slug=a.get('related_slug')) }}">{{ related[a.get('related_slug')] }}</a>{% else %}Not in the catalogue yet{% endif %}
                   {%- else %}{{ a.get('scope', '') }}{% endif -%}
                 </td>
-                <td class="px-2 text-muted-foreground min-w-72">{{ fact.detail or '' }}</td>
+                <td class="px-2 py-2 align-top text-muted-foreground"><div class="w-56">{{ fact.detail or '' }}</div></td>
                 {{ source_cell(fact) }}
               </tr>
               {% endfor %}
