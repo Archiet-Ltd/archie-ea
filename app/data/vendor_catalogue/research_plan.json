@@ -173,7 +173,7 @@
     "kind": "certification",
     "name": "SOC 2 Type II",
     "detail": "",
-    "source_url": "https://www.okta.com/trustandcompliance/",
+    "source_url": "https://trust.okta.com/compliance",
     "evidence": "soc 2",
     "attributes": {
      "scope": "Okta services"
@@ -183,7 +183,7 @@
     "kind": "certification",
     "name": "ISO/IEC 27001",
     "detail": "",
-    "source_url": "https://www.okta.com/trustandcompliance/",
+    "source_url": "https://trust.okta.com/compliance",
     "evidence": "iso 27001|iso/iec 27001",
     "attributes": {
      "scope": "Okta services"
@@ -193,7 +193,7 @@
     "kind": "certification",
     "name": "FedRAMP",
     "detail": "",
-    "source_url": "https://www.okta.com/trustandcompliance/",
+    "source_url": "https://trust.okta.com/compliance",
     "evidence": "fedramp",
     "attributes": {
      "scope": "Okta for US government"
@@ -201,41 +201,41 @@
    },
    {
     "kind": "data_region",
-    "name": "United States",
-    "detail": "",
+    "name": "Regional cells",
+    "detail": "Each Okta org is hosted in one cell, a separate instance of the service.",
     "source_url": "https://developer.okta.com/docs/concepts/okta-organizations/",
-    "evidence": "cell|region",
+    "evidence": "cell",
     "attributes": {
-     "scope": "Okta cells"
+     "scope": "Each Okta org"
     }
    },
    {
     "kind": "price_tier",
-    "name": "Single Sign-On",
-    "detail": "Workforce single sign-on, billed annually.",
+    "name": "Starter",
+    "detail": "Entry suite for workforce identity.",
     "source_url": "https://www.okta.com/pricing/",
-    "evidence": "single sign-on;$2",
-    "attributes": {
-     "price": "$2",
-     "unit": "per user per month"
-    }
-   },
-   {
-    "kind": "price_tier",
-    "name": "Adaptive MFA",
-    "detail": "Risk-based second-factor checks, billed annually.",
-    "source_url": "https://www.okta.com/pricing/",
-    "evidence": "adaptive mfa;$6",
+    "evidence": "starter;$6 per user",
     "attributes": {
      "price": "$6",
-     "unit": "per user per month"
+     "unit": "per user per month, billed annually"
+    }
+   },
+   {
+    "kind": "price_tier",
+    "name": "Essentials",
+    "detail": "Suite with more identity features.",
+    "source_url": "https://www.okta.com/pricing/",
+    "evidence": "essentials;$17 per user",
+    "attributes": {
+     "price": "$17",
+     "unit": "per user per month, billed annually"
     }
    },
    {
     "kind": "integration",
     "name": "Slack",
     "detail": "Okta signs people in to Slack and provisions their accounts.",
-    "source_url": "https://www.okta.com/products/single-sign-on/",
+    "source_url": "https://www.okta.com/integrations/slack/",
     "evidence": "slack",
     "attributes": {
      "related_slug": "slack"
@@ -486,7 +486,7 @@
     "archimate_type": "ApplicationService",
     "detail": "Channel and direct messages between people and apps.",
     "source_url": "https://api.slack.com/apis",
-    "evidence": "message"
+    "evidence": "conversation|channel"
    },
    {
     "kind": "interface",
@@ -533,17 +533,6 @@
     "source_url": "https://slack.com/trust/compliance",
     "evidence": "fedramp",
     "attributes": {}
-   },
-   {
-    "kind": "price_tier",
-    "name": "Pro",
-    "detail": "Paid plan for small teams.",
-    "source_url": "https://slack.com/pricing",
-    "evidence": "pro",
-    "attributes": {
-     "price": "",
-     "unit": "per user per month"
-    }
    },
    {
     "kind": "price_tier",
@@ -645,44 +634,11 @@
    },
    {
     "kind": "certification",
-    "name": "SOC reports",
+    "name": "SOC 2",
     "detail": "",
     "source_url": "https://github.com/security",
-    "evidence": "soc",
+    "evidence": "soc 2",
     "attributes": {}
-   },
-   {
-    "kind": "price_tier",
-    "name": "Free",
-    "detail": "Public and private repositories.",
-    "source_url": "https://github.com/pricing",
-    "evidence": "free",
-    "attributes": {
-     "price": "$0",
-     "unit": ""
-    }
-   },
-   {
-    "kind": "price_tier",
-    "name": "Team",
-    "detail": "Team features.",
-    "source_url": "https://github.com/pricing",
-    "evidence": "team",
-    "attributes": {
-     "price": "",
-     "unit": "per user per month"
-    }
-   },
-   {
-    "kind": "price_tier",
-    "name": "Enterprise",
-    "detail": "Enterprise controls.",
-    "source_url": "https://github.com/pricing",
-    "evidence": "enterprise",
-    "attributes": {
-     "price": "",
-     "unit": "per user per month"
-    }
    }
   ]
  },
@@ -1085,10 +1041,10 @@
    },
    {
     "kind": "certification",
-    "name": "ISO and SOC audits",
+    "name": "ISO/IEC 27001",
     "detail": "",
     "source_url": "https://workspace.google.com/security/",
-    "evidence": "iso|soc",
+    "evidence": "iso/iec 27001|iso 27001",
     "attributes": {}
    },
    {
@@ -1367,10 +1323,10 @@
    },
    {
     "kind": "certification",
-    "name": "SOC and ISO audits",
+    "name": "SOC 1",
     "detail": "",
     "source_url": "https://compliance.salesforce.com/en",
-    "evidence": "soc|iso",
+    "evidence": "soc 1",
     "attributes": {}
    },
    {
@@ -1447,17 +1403,6 @@
     "source_url": "https://legal.hubspot.com/security",
     "evidence": "soc 2",
     "attributes": {}
-   },
-   {
-    "kind": "price_tier",
-    "name": "Free",
-    "detail": "",
-    "source_url": "https://www.hubspot.com/pricing/crm",
-    "evidence": "free",
-    "attributes": {
-     "price": "$0",
-     "unit": ""
-    }
    }
   ]
  },
@@ -1511,28 +1456,6 @@
     "source_url": "https://docs.datadoghq.com/getting_started/site/",
     "evidence": "us1;eu1",
     "attributes": {}
-   },
-   {
-    "kind": "price_tier",
-    "name": "Pro",
-    "detail": "",
-    "source_url": "https://www.datadoghq.com/pricing/",
-    "evidence": "pro",
-    "attributes": {
-     "price": "",
-     "unit": "per host per month"
-    }
-   },
-   {
-    "kind": "price_tier",
-    "name": "Enterprise",
-    "detail": "",
-    "source_url": "https://www.datadoghq.com/pricing/",
-    "evidence": "enterprise",
-    "attributes": {
-     "price": "",
-     "unit": "per host per month"
-    }
    }
   ]
  },
@@ -1584,17 +1507,6 @@
     "evidence": "free",
     "attributes": {
      "price": "$0",
-     "unit": ""
-    }
-   },
-   {
-    "kind": "price_tier",
-    "name": "Pro",
-    "detail": "",
-    "source_url": "https://grafana.com/pricing/",
-    "evidence": "pro",
-    "attributes": {
-     "price": "",
      "unit": ""
     }
    }
@@ -1714,28 +1626,6 @@
     "source_url": "https://www.pagerduty.com/security/",
     "evidence": "soc 2",
     "attributes": {}
-   },
-   {
-    "kind": "price_tier",
-    "name": "Free",
-    "detail": "",
-    "source_url": "https://www.pagerduty.com/pricing/",
-    "evidence": "free",
-    "attributes": {
-     "price": "$0",
-     "unit": ""
-    }
-   },
-   {
-    "kind": "price_tier",
-    "name": "Professional",
-    "detail": "",
-    "source_url": "https://www.pagerduty.com/pricing/",
-    "evidence": "professional",
-    "attributes": {
-     "price": "",
-     "unit": "per user per month"
-    }
    }
   ]
  },
@@ -1807,28 +1697,6 @@
     "attributes": {
      "price": "$0",
      "unit": ""
-    }
-   },
-   {
-    "kind": "price_tier",
-    "name": "Team",
-    "detail": "",
-    "source_url": "https://sentry.io/pricing/",
-    "evidence": "team",
-    "attributes": {
-     "price": "",
-     "unit": "per month"
-    }
-   },
-   {
-    "kind": "price_tier",
-    "name": "Business",
-    "detail": "",
-    "source_url": "https://sentry.io/pricing/",
-    "evidence": "business",
-    "attributes": {
-     "price": "",
-     "unit": "per month"
     }
    }
   ]
@@ -2044,17 +1912,6 @@
      "price": "$0",
      "unit": ""
     }
-   },
-   {
-    "kind": "price_tier",
-    "name": "Pro",
-    "detail": "",
-    "source_url": "https://www.cloudflare.com/plans/",
-    "evidence": "pro",
-    "attributes": {
-     "price": "",
-     "unit": "per month"
-    }
    }
   ]
  },
@@ -2103,10 +1960,10 @@
    },
    {
     "kind": "certification",
-    "name": "SOC 2 and ISO",
+    "name": "ISO/IEC 27000-series certification",
     "detail": "",
     "source_url": "https://www.twilio.com/en-us/trust-center",
-    "evidence": "soc 2|iso",
+    "evidence": "iso/iec 2700",
     "attributes": {}
    }
   ]
@@ -2156,10 +2013,10 @@
    },
    {
     "kind": "certification",
-    "name": "SOC 2 and ISO",
+    "name": "SOC 2 Type II",
     "detail": "",
     "source_url": "https://www.zendesk.com/trust-center/",
-    "evidence": "soc 2|iso",
+    "evidence": "soc 2",
     "attributes": {}
    },
    {
@@ -2220,10 +2077,18 @@
    },
    {
     "kind": "certification",
-    "name": "SOC 2 and ISO",
+    "name": "SOC 2 Type II",
     "detail": "",
     "source_url": "https://www.intercom.com/security",
-    "evidence": "soc 2|iso",
+    "evidence": "soc 2",
+    "attributes": {}
+   },
+   {
+    "kind": "certification",
+    "name": "ISO/IEC 27001",
+    "detail": "",
+    "source_url": "https://www.intercom.com/security",
+    "evidence": "iso 27001",
     "attributes": {}
    },
    {
@@ -2231,9 +2096,9 @@
     "name": "Essential",
     "detail": "",
     "source_url": "https://www.intercom.com/pricing",
-    "evidence": "essential",
+    "evidence": "$29 per seat",
     "attributes": {
-     "price": "",
+     "price": "$29",
      "unit": "per seat per month"
     }
    },
@@ -2242,9 +2107,9 @@
     "name": "Advanced",
     "detail": "",
     "source_url": "https://www.intercom.com/pricing",
-    "evidence": "advanced",
+    "evidence": "$99 per seat",
     "attributes": {
-     "price": "",
+     "price": "$99",
      "unit": "per seat per month"
     }
    }
@@ -2295,10 +2160,10 @@
    },
    {
     "kind": "certification",
-    "name": "SOC 2 and ISO",
+    "name": "SOC 2",
     "detail": "",
     "source_url": "https://www.notion.com/security",
-    "evidence": "soc 2|iso",
+    "evidence": "soc 2",
     "attributes": {}
    },
    {
@@ -2381,10 +2246,10 @@
    },
    {
     "kind": "certification",
-    "name": "SOC 2 and ISO",
+    "name": "SOC 2 Type 2",
     "detail": "",
     "source_url": "https://www.figma.com/security/",
-    "evidence": "soc 2|iso",
+    "evidence": "soc 2",
     "attributes": {}
    },
    {

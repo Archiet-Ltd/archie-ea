@@ -340,7 +340,9 @@ def _upsert_fact(product: VendorProductDetail, spec: dict) -> VendorCatalogueFac
         product_detail_id=product.id, kind=spec["kind"], name=spec["name"]
     ).first()
     if fact is None:
-        fact = VendorCatalogueFact(product_detail_id=product.id, kind=spec["kind"], name=spec["name"])
+        fact = VendorCatalogueFact(
+            product_detail_id=product.id, kind=spec["kind"], name=spec["name"], review_state="draft"
+        )
         db.session.add(fact)
     fact.archimate_type = spec.get("archimate_type")
     fact.detail = spec.get("detail")
@@ -362,7 +364,14 @@ def research_product(
     pages: dict = {}
     fetch = fetch or (lambda url: http_fetch(url, cache))
     product = ensure_product(entry)
-    report = {"slug": entry["slug"], "confirmed": [], "unconfirmed": []}
+    report = {"slug": entry["slug"], "confirmed": [], "unconfirmed": [], "withdrawn": []}
+    planned = {(s["kind"], s["name"]) for s in entry["facts"]}
+    for old in list(product.catalogue_facts):
+        if (old.kind, old.name) not in planned:
+            # No longer in the plan: withdrawn, so it can never be shown again.
+            report["withdrawn"].append(old.name)
+            db.session.delete(old)
+    db.session.flush()
     for spec in entry["facts"]:
         url = spec.get("source_url")
         fact = _upsert_fact(product, spec)
