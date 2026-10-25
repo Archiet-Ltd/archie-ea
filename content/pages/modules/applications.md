@@ -18,7 +18,7 @@ icon: app-window
 
 # Application portfolio management tool
 
-Application portfolio management is keeping one true list of every application you run, with its owner, cost, lifecycle stage and risk, and using that list to decide what to renew, consolidate or retire. Entelim's Applications module is that list: an application inventory you type in or import, with a fact sheet for each application that shows its record completeness, capabilities, dependencies and linked risks. It is for the CIO, head of architecture or portfolio manager who needs a current answer when an audit, a budget round or an acquirer asks what you run.
+Application portfolio management is keeping one true list of every application you run, with its owner, cost, lifecycle stage and risk, and using that list to decide what to renew, consolidate or retire. Entelim's Applications module is that list: an application inventory built from your repositories or imported, not typed in, with a fact sheet for each application that shows its record completeness, capabilities, dependencies and linked risks. It is for the CIO, head of architecture or portfolio manager who needs a current answer when an audit, a budget round or an acquirer asks what you run.
 
 ## What application portfolio management is
 
@@ -37,7 +37,7 @@ A portfolio that holds up has ownership and cost attached to every application, 
 
 ## How it works in Entelim
 
-1. **Add or import the applications.** Add an application by hand with its name, code, type, business criticality, deployment status, lifecycle status, business owner and description. Or import a spreadsheet: CSV and Excel files are supported, with a preview before anything is saved, an import history, and a rollback for an import you did not mean to make. You can also bring in an existing ArchiMate model, which is covered in [importing an ArchiMate model](/use-cases/import-archimate-model).
+1. **Connect GitHub or import a file.** Connect GitHub or Jira at sign-up and Entelim proposes your applications, owners and dependencies; nothing enters the inventory until a person approves it. Or import a spreadsheet: CSV and Excel files are supported, with a preview before anything is saved, an import history, and a rollback for an import you did not mean to make. You can also bring in an existing ArchiMate model, which is covered in [importing an ArchiMate model](/use-cases/import-archimate-model). To record a single application yourself, add it with its name, code, type, business criticality, deployment status, lifecycle status, business owner and description.
 2. **Read the list.** The Applications page shows every application with its type, lifecycle status, criticality, business owner, vendor and capability. Filter by search text, type, lifecycle status, business domain and capability level, sort the columns, and switch decommissioned applications on or off. A data quality strip above the list states how many applications in the portfolio have a named owner and a vendor recorded.
 3. **Fill the gaps in bulk.** Select several applications and set their lifecycle stage, assign an owner or add a tag in one step. An application can carry several owners: primary, backup, technical and business. Entelim also suggests business capabilities for an application, and you accept or ignore each suggestion.
 4. **Record the cost.** Cost fields on the application include total cost of ownership and annual licence cost, and the Data Enrichment screen under [Rationalization](/modules/rationalization) lets you add cost, ownership and criticality to many applications in one pass.
@@ -63,7 +63,7 @@ An application dependency is a connection where one application relies on anothe
 
 ## Limits
 
-The inventory is what you enter or import. Entelim has no discovery agent that scans your network and finds applications by itself.
+The inventory is what your connected repositories and Jira propose and a person approves, plus what you import or add. Entelim does not scan your network for applications.
 
 Dependencies appear for applications linked to an element in your ArchiMate model. An application with no link shows no dependencies, and the fact sheet says so instead of guessing.
 
@@ -88,7 +88,7 @@ Application portfolio management is keeping a single, current list of every appl
 
 ### How do I build an application inventory?
 
-Add applications one at a time, or import a CSV or Excel spreadsheet. The import shows a preview, keeps a history and can be rolled back. Then use bulk actions to set lifecycle stages and owners, and the completeness score on each fact sheet to see what is still missing.
+Connect GitHub or Jira and approve the applications Entelim proposes, or import a CSV or Excel spreadsheet. The import shows a preview, keeps a history and can be rolled back. Then use bulk actions to set lifecycle stages and owners, and the completeness score on each fact sheet to see what is still missing.
 
 ### Can I import from a spreadsheet?
 
@@ -100,7 +100,7 @@ Link the application to its element in your ArchiMate model. Its fact sheet then
 
 ### Does it find applications on my network automatically?
 
-No. The inventory is what you add or import. Entelim does not run a discovery agent. If you already hold a list in a spreadsheet, an ArchiMate model or another tool that can export CSV or Excel, you can bring it in.
+Not by scanning it. Connect GitHub or Jira and Entelim proposes applications from what it reads there, and nothing enters the inventory until a person approves it. If you already hold a list in a spreadsheet, an ArchiMate model or another tool that can export CSV or Excel, you can bring it in.
 
 ### Is there a free plan?
 
