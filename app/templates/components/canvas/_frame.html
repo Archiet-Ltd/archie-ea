@@ -183,8 +183,10 @@
 {% endcall %}
 {%- endmacro %}
 
-{#- A canvas that is a grid of boxes. spec = {'id', 'form', 'name', 'grid' (grid classes), 'boxes': [...], 'hint', 'credit', 'width'}. -#}
+{#- A canvas that is a grid of boxes. spec = {'id', 'form', 'name', 'grid' (grid classes), 'boxes': [...], 'hint', 'credit', 'width'}.
+    A layout that draws more than boxes (axis headings, arrows, the 7S lines) passes them as the call body: they are placed inside the grid, before the boxes. -#}
 {% macro grid_canvas(spec, data, id) -%}
+{%- set decoration = caller() if caller else '' -%}
 {%- set boxes = data.boxes or {} -%}
 {%- set rows = [] -%}
 {%- for b in spec.boxes -%}
@@ -193,6 +195,7 @@
 {%- endfor -%}
 {% call frame(id, spec.form, spec.name, data, rows, spec.hint, credit=spec.credit, width=spec.width or 'min-w-240') %}
   <div class="grid gap-2 rounded-lg border bg-muted/30 p-2 {{ spec.grid }}">
+    {{ decoration }}
     {% for b in spec.boxes %}{{ box(id, b, boxes, data.editable) }}{% endfor %}
   </div>
 {% endcall %}
