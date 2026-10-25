@@ -476,6 +476,19 @@ entries:
       app/static/img/archimate-notation.svg and the layer colours are the --notation-* tokens. Do not build a second
       toolbar or palette on a page, and do not write a layer colour in a template or script.
 
+  - id: data-model-diagram
+    concept: The logical data model of a data domain (entities, their attributes, relationships with a cardinality at each end) as an entity relationship diagram
+    status: active
+    canonical:
+      path: app/modules/architecture/services/data_erd_service.py
+      symbols: [domain_diagram, create_entity, update_entity, relate]
+    reuse: >
+      An entity is the existing DataEntity record (linked to its ArchiMate data object by archimate_element_id);
+      its attributes are DataEntityAttribute rows and its relationships are DataEntityRelationship rows. Read and
+      write them through data_erd_service and the /architecture/api/data-erd routes, and draw them with
+      app/static/js/data/erd.js on the shared diagram components. Do not add a second store of entities or
+      attributes, and do not draw an entity relationship diagram with another renderer.
+
   - id: public-button
     concept: The public site button (primary and outline, 40px, 2px solid focus outline)
     status: active
