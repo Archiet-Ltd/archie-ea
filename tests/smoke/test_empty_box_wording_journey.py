@@ -2,6 +2,8 @@
 and where to write; writing in one persists, and the same wording rules hold on the
 chat's data answer. The words "Nothing here yet", "No data" and "N/A" never appear."""
 
+import os
+
 import pytest
 from playwright.sync_api import expect
 
@@ -64,6 +66,10 @@ def test_empty_business_case_boxes_name_themselves_and_writing_persists(browser,
             texts = [t.strip() for t in reasons.all_inner_texts()]
             assert texts and all(t.endswith(" is empty. Write it in the box below.") for t in texts), texts
             assert len(set(texts)) == len(texts), "each empty box names itself: %s" % texts
+            shots = os.environ.get("SMOKE_SHOT_DIR")
+            if shots:
+                os.makedirs(shots, exist_ok=True)
+                page.screenshot(path=os.path.join(shots, f"business-case-empty-{width}.png"), full_page=True)
             body = page.locator("main").inner_text()
             for phrase in BANNED:
                 assert phrase not in body, (width, phrase)

@@ -12,6 +12,10 @@ Excluded: vendored code and ``js/bundles/*`` (a concatenation of ``js/core/*``,
 so counting both counts the same source twice). A line carrying a
 ``placeholder-ok: <reason>`` marker is excluded and thereby made reviewable.
 
+Proven-against: a template containing the bare word "N/A" -- the count rises by
+one and the content-placeholders gate fails; removing the file returns it to the
+recorded baseline.
+
 Usage:
     python scripts/check_content_placeholders.py            # list occurrences
     python scripts/check_content_placeholders.py --count    # count only
