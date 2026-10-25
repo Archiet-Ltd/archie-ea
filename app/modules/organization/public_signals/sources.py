@@ -140,10 +140,40 @@ def link_is_on(link: Optional[str], domain: Optional[str]) -> bool:
     return found == host or found.endswith("." + host)
 
 
+_LAUNCH_POST = re.compile(r"^\s*(show|launch|ask|tell)\s+hn\s*:", re.I)
+_COMPARING_BEFORE = re.compile(r"(\+|&|\bfor|\bvs\.?|\bversus|\blike|\bmeets|\binstead of|\b(alternatives?|competitors?|rivals?|replacement|clone) (to|of|for))\s*$", re.I)
+
+
+def _named_as_subject(title: str, variant: str) -> bool:
+    """True when the name stands in the title as the thing the title is about, not as a comparison.
+
+    A comparison is the name after "for", "+", "&", "vs", "like", "instead of" or "alternative to" ("DataDog +
+    PostHog for LLM Apps"), and, in a Show HN or Launch HN post for another product, the name followed by "for"
+    ("Posthog for Prompts"). "Launch HN: PostHog (YC W20)" names its own subject and is not one."""
+    for hit in re.finditer(r"(?<![a-z0-9])%s(?![a-z0-9])" % re.escape(variant).replace(r"\ ", r"[^a-z0-9]+"), title, re.I):
+        before, after = title[:hit.start()].rstrip(), title[hit.end():]
+        if _COMPARING_BEFORE.search(before):
+            continue
+        if _LAUNCH_POST.match(title) and re.match(r"^\s*\)?\s*for\s+\w", after, re.I):
+            continue
+        return True
+    return False
+
+
+def uses_name_as_comparison(title: str, company: str) -> bool:
+    """True when the company's name is in the title only as a comparison to some other product."""
+    variants = name_variants(company)
+    present = [v for v in variants if names_company(title, v)]
+    return bool(present) and not any(_named_as_subject(title, v) for v in present)
+
+
 def is_about(title: str, company: str, domain: Optional[str] = None, link: Optional[str] = None) -> bool:
     """A hit is kept only when the company's name or web address is in its title, or the story's own link is on
-    the company's domain. A link to the company inside someone else's post is not enough."""
-    return any(names_company(title, v) for v in name_variants(company)) or names_domain(title, domain) or link_is_on(link, domain)
+    the company's domain. A link to the company inside someone else's post is not enough, and neither is a title
+    that uses the name only as a comparison ("Open-Source DataDog + PostHog for LLM Apps")."""
+    if link_is_on(link, domain) or names_domain(title, domain):
+        return True
+    return any(names_company(title, v) for v in name_variants(company)) and not uses_name_as_comparison(title, company)
 
 
 def _strip_html(text: str) -> str:
