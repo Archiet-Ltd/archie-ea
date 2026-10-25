@@ -4792,9 +4792,9 @@
       "controls": {
         "button": 54,
         "form": 1,
-        "link": 1,
-        "modal": 4,
-        "testid": 6
+        "link": 4,
+        "modal": 3,
+        "testid": 2
       },
       "extends": [
         "layouts/admin_base.html"
@@ -8043,7 +8043,7 @@
       "confidence": "high",
       "controls": {
         "link": 1,
-        "testid": 1
+        "testid": 2
       },
       "extends": [
         "layouts/admin_base.html"
@@ -9888,7 +9888,7 @@
         "form": 2,
         "link": 3,
         "modal": 2,
-        "testid": 10
+        "testid": 9
       },
       "extends": [
         "layouts/admin_base.html"
@@ -17351,10 +17351,10 @@
       ],
       "confidence": "high",
       "controls": {
-        "button": 4,
-        "form": 1,
-        "link": 2,
-        "modal": 1,
+        "button": 6,
+        "form": 4,
+        "link": 3,
+        "modal": 9,
         "testid": 8
       },
       "extends": [
@@ -17369,7 +17369,12 @@
       "macros": [
         "components/canvas_box.html",
         "components/modal.html",
-        "components/page_header.html"
+        "components/page_header.html",
+        "components/button.html",
+        "components/canvas/index.html",
+        "components/empty_state.html",
+        "components/input.html",
+        "components/select.html"
       ],
       "original": "gap:G-4",
       "page_type": "board-canvas",
@@ -17388,7 +17393,10 @@
       "spec": null,
       "status": "mapped",
       "tier": "C4",
-      "type_changed": true
+      "type_changed": true,
+      "extra_macros": [
+        "components/canvas/index.html"
+      ]
     },
     "app/templates/business_model/index.html": {
       "allowed_macros": [
@@ -17482,7 +17490,10 @@
       "spec": null,
       "status": "mapped",
       "tier": "B",
-      "type_changed": false
+      "type_changed": false,
+      "extra_macros": [
+        "components/card.html"
+      ]
     },
     "app/templates/business_model/not_found.html": {
       "allowed_macros": [
@@ -30765,7 +30776,8 @@
         "components/modal.html",
         "macros/kanban_board.html",
         "macros/page_shell.html",
-        "components/dropdown_menu.html"
+        "components/dropdown_menu.html",
+        "components/select.html"
       ],
       "original": "gap:G-4",
       "page_type": "board",
@@ -32739,7 +32751,7 @@
       "controls": {
         "button": 4,
         "link": 1,
-        "modal": 2,
+        "modal": 1,
         "table": 1,
         "testid": 5
       },
