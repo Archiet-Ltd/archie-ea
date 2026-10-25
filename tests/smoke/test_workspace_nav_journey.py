@@ -1,4 +1,4 @@
-"""Connections and Billing have a lasting place in the sidebar, under Workspace.
+"""Connections and Billing have a lasting place in the sidebar: Connections at the bottom, Billing in the account menu.
 
 The people: a startup CTO who has just signed up (the owner of a new organisation)
 and an enterprise architect who administers theirs. The goal: find where to connect
@@ -15,7 +15,7 @@ from tests.smoke.fresh_org import create_fresh_org, sign_in
 
 pytestmark = [pytest.mark.smoke, pytest.mark.journey]
 
-SIDEBAR = "#sidebar-nav"
+SIDEBAR_ALL = "#admin-sidebar"
 
 
 def _sign_up_owner():
@@ -67,36 +67,39 @@ def world():
     return {"owner": owner, "architects": architects}
 
 
-def _workspace_group(page):
-    group = page.locator("%s [data-sidebar='group']:has-text('Workspace')" % SIDEBAR)
-    return group
-
-
-def _walk(page, base, name, path_fragment, heading):
-    """Click a sidebar entry under Workspace and check it opens a page with content."""
-    link = page.locator("%s a:has-text('%s')" % (SIDEBAR, name)).first
+def _walk_connections(page):
+    """Click Connections at the bottom of the sidebar and check it opens a page with content."""
+    link = page.locator('%s a[data-nav-key="connections"]' % SIDEBAR_ALL)
+    expect(link).to_have_count(1)
     expect(link).to_be_visible()
     link.click()
-    page.wait_for_url(lambda url: path_fragment in url, timeout=PAGE_TIMEOUT)
-    body = page.locator("main").first
-    expect(body).to_contain_text(heading)
-    marked = page.locator("%s a[aria-current='page']" % SIDEBAR)
-    expect(marked).to_have_count(1)
-    expect(marked).to_contain_text(name)
+    page.wait_for_url(lambda url: "/admin/connectors" in url, timeout=PAGE_TIMEOUT)
+    expect(page.locator("main").first).to_contain_text("GitHub")
+    expect(page.locator('%s a[data-nav-key="connections"]' % SIDEBAR_ALL)).to_have_attribute("aria-current", "page")
     assert "403" not in page.title() and "Not Found" not in page.title()
+
+
+def _walk_billing(page):
+    """Open the account menu in the sidebar footer, choose Billing, and read the plan."""
+    page.get_by_test_id("user-menu").click()
+    billing = page.get_by_test_id("user-menu-billing")
+    expect(billing).to_be_visible()
+    billing.click()
+    page.wait_for_url(lambda url: "/admin/billing" in url, timeout=PAGE_TIMEOUT)
+    expect(page.locator("main").first).to_contain_text("Plan")
 
 
 def _journey(page, base, email):
     sign_in(page, base, email)
     page.goto(base + "/dashboard/", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
-    nav = page.locator(SIDEBAR)
-    expect(nav).to_contain_text("Workspace")
-    _walk(page, base, "Connections", "/admin/connectors", "GitHub")
-    _walk(page, base, "Billing", "/admin/billing", "Plan")
+    expect(page.locator(SIDEBAR_ALL)).to_contain_text("Connections")
+    _walk_connections(page)
+    _walk_billing(page)
     # Still there from a page deep in the product, not only from the overview.
     page.goto(base + "/applications/", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
-    expect(page.locator("%s a:has-text('Connections')" % SIDEBAR).first).to_be_visible()
-    expect(page.locator("%s a:has-text('Billing')" % SIDEBAR).first).to_be_visible()
+    expect(page.locator('%s a[data-nav-key="connections"]' % SIDEBAR_ALL)).to_be_visible()
+    page.get_by_test_id("user-menu").click()
+    expect(page.get_by_test_id("user-menu-billing")).to_be_visible()
 
 
 def test_startup_cto_finds_connections_and_billing(page, live_server, world):
@@ -134,10 +137,11 @@ def colleagues():
 def _reaches_connections_not_billing(page, base, email):
     sign_in(page, base, email)
     page.goto(base + "/dashboard/", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
-    nav = page.locator(SIDEBAR)
-    expect(nav).to_contain_text("Workspace")
-    expect(nav).not_to_contain_text("Billing")
-    _walk(page, base, "Connections", "/admin/connectors", "GitHub")
+    page.get_by_test_id("user-menu").click()
+    expect(page.get_by_test_id("user-menu-account")).to_be_visible()
+    expect(page.get_by_test_id("user-menu-billing")).to_have_count(0)
+    page.keyboard.press("Escape")
+    _walk_connections(page)
     page.goto(base + "/admin/billing/", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
     expect(page.locator("main").first).not_to_contain_text("Plan")
 
@@ -159,9 +163,10 @@ def test_security_architect_is_shown_neither(page, live_server, colleagues):
     _assert_persona(email, "security_architect", administers=False)
     sign_in(page, live_server, email)
     page.goto(live_server + "/dashboard/", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
-    nav = page.locator(SIDEBAR)
-    expect(nav).not_to_contain_text("Billing")
+    nav = page.locator(SIDEBAR_ALL)
     expect(nav).not_to_contain_text("Connections")
+    page.get_by_test_id("user-menu").click()
+    expect(page.get_by_test_id("user-menu-billing")).to_have_count(0)
     page.goto(live_server + "/admin/connectors", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
     expect(page.locator("main").first).not_to_contain_text("GitHub")
 
@@ -169,11 +174,11 @@ def test_security_architect_is_shown_neither(page, live_server, colleagues):
 def test_owner_reads_the_plans_prices_and_a_plain_renewal_line(page, live_server, world):
     """The owner opens Billing: every plan shows what it costs, the same figures
     /pricing shows; the renewal tile says there is no renewal yet instead of a
-    dash; the sidebar still carries the Entelim wordmark."""
+    dash; the sidebar still carries the Entelim name."""
     _assert_startup_cto(world["owner"]["email"])
     sign_in(page, live_server, world["owner"]["email"])
     page.goto(live_server + "/admin/billing/", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
-    expect(page.locator("#admin-sidebar .sidebar-app-name")).to_have_text("Entelim")
+    expect(page.locator("#admin-sidebar .sidebar-app-name")).to_contain_text("Entelim")
     expect(page.get_by_test_id("billing-renewal")).to_have_text("No renewal yet")
     shown = {}
     for key in ("free", "startup", "team", "enterprise"):
