@@ -1,0 +1,54 @@
+{# design-block: dashboard #}
+{% extends 'layouts/admin_base.html' %}
+{% from 'macros/page_shell.html' import page_shell %}
+{% from 'components/dense_table.html' import dense_table %}
+{% from 'components/empty_state.html' import empty_state %}
+{% from 'components/card.html' import card, card_header, card_title, card_description, card_content %}
+{% from 'components/badge.html' import badge %}
+{% from 'components/button.html' import button %}
+
+{% block title %}Business processes{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+  {{ page_shell('Business processes', 'Each process, as a list or drawn as a BPMN 2.0 diagram with the business roles that carry it out.',
+     breadcrumb=[('Home', url_for('main.index')), ('Business processes', None)],
+     tabs=[('List', url_for('business_architecture.processes'), view == 'list'),
+           ('Diagram', url_for('business_architecture.processes', view='diagram'), view == 'diagram')]) }}
+
+  {% if not items %}
+    {{ empty_state(icon='workflow', title='No business processes yet',
+       description='Processes appear here once they are in the model. Add one from the architecture elements, then draw how it runs.',
+       cta_text='Open architecture elements', cta_href=url_for('archimate_crud.dashboard', layer='business', element_type='BusinessProcess')) }}
+  {% elif view == 'list' %}
+    {% call dense_table(columns=[('Process', ''), ('Part of', ''), ('Owner', ''), ('Diagram', ''), ('', 'text-right')],
+                        caption='Business processes', testid='processes-table', rows=items|length) %}
+      {% for p in items %}
+      <tr class="group h-12 transition-colors hover:bg-muted/50" data-testid="process-row">
+        <td class="px-2 align-middle font-medium text-foreground"><a class="hover:underline" href="{{ url_for('business_architecture.process_diagram', process_id=p.id) }}">{{ p.name }}</a></td>
+        <td class="px-2 align-middle text-muted-foreground">{% if p.parent %}<a class="hover:underline" href="{{ url_for('business_architecture.process_diagram', process_id=p.parent_id) }}">{{ p.parent }}</a>{% else %}Top level{% endif %}</td>
+        <td class="px-2 align-middle text-muted-foreground">{{ p.owner or 'No owner recorded' }}</td>
+        <td class="px-2 align-middle">{% if p.drawn %}{% call badge('info') %}{{ p.steps }} {{ 'step' if p.steps == 1 else 'steps' }}{% endcall %}{% else %}{% call badge('neutral') %}Not drawn{% endcall %}{% endif %}</td>
+        <td class="px-2 align-middle text-right">{{ button(text='Open diagram', variant='outline', size='sm', href=url_for('business_architecture.process_diagram', process_id=p.id)) }}</td>
+      </tr>
+      {% endfor %}
+    {% endcall %}
+  {% else %}
+    <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3" data-testid="process-diagram-cards">
+      {% for p in items %}
+      {% call card(class='flex flex-col') %}
+        {% call card_header() %}
+          {% call card_title() %}<a class="hover:underline" href="{{ url_for('business_architecture.process_diagram', process_id=p.id) }}">{{ p.name }}</a>{% endcall %}
+          {% call card_description() %}{% if p.drawn %}{{ p.steps }} {{ 'step' if p.steps == 1 else 'steps' }} across {{ p.lanes|length }} {{ 'lane' if p.lanes|length == 1 else 'lanes' }}{% else %}Not drawn yet. Open it to add the first step.{% endif %}{% endcall %}
+        {% endcall %}
+        {% call card_content(class='mt-auto flex flex-wrap items-center gap-2') %}
+          {% for lane in p.lanes[:3] %}{% call badge('neutral') %}{{ lane }}{% endcall %}{% endfor %}
+          {% if p.lanes|length > 3 %}{% call badge('outline') %}+{{ p.lanes|length - 3 }} more{% endcall %}{% endif %}
+          {{ button(text='Open diagram', variant='outline', size='sm', class='ml-auto', href=url_for('business_architecture.process_diagram', process_id=p.id)) }}
+        {% endcall %}
+      {% endcall %}
+      {% endfor %}
+    </div>
+  {% endif %}
+</div>
+{% endblock %}

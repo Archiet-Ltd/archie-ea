@@ -1,0 +1,30 @@
+/* BPMN process diagram: shapes drawn by the diagram engine take their colours from the token file only. */
+.bpmn-paper svg { display: block; }
+.bpmn-pool { fill: hsl(var(--card)); stroke: hsl(var(--border)); stroke-width: 1.5; }
+.bpmn-lane { fill: hsl(var(--background)); stroke: hsl(var(--border)); stroke-width: 1; }
+.bpmn-lane-head { fill: hsl(var(--muted)); stroke: hsl(var(--border)); stroke-width: 1; cursor: pointer; }
+.bpmn-lane-head:hover, .bpmn-lane-selected .bpmn-lane-head { fill: hsl(var(--accent)); }
+.bpmn-lane-text { fill: hsl(var(--foreground)); font-size: 13px; font-weight: 600; text-anchor: middle; dominant-baseline: middle; pointer-events: none; }
+.bpmn-lane-unlinked { fill: hsl(var(--muted-foreground)); font-weight: 400; }
+.bpmn-shape { fill: hsl(var(--card)); stroke: hsl(var(--foreground)); stroke-width: 1.5; }
+.bpmn-end { stroke-width: 4; }
+.bpmn-inner { fill: none; stroke: hsl(var(--foreground)); stroke-width: 1.5; }
+.bpmn-mark { fill: none; stroke: hsl(var(--foreground)); stroke-width: 3; stroke-linecap: round; }
+.bpmn-box-mark { fill: none; stroke: hsl(var(--foreground)); stroke-width: 1.2; }
+.bpmn-text { fill: hsl(var(--foreground)); font-size: 13px; text-anchor: middle; dominant-baseline: middle; pointer-events: none; }
+.bpmn-caption { fill: hsl(var(--foreground)); font-size: 13px; text-anchor: middle; pointer-events: none; }
+.bpmn-node { cursor: grab; }
+.bpmn-selected .bpmn-shape, .bpmn-selected .bpmn-inner { stroke: hsl(var(--primary)); }
+.bpmn-selected .bpmn-shape { stroke-width: 3; }
+.bpmn-source .bpmn-shape { stroke: hsl(var(--primary)); stroke-dasharray: 4 3; }
+.bpmn-flow { stroke: hsl(var(--foreground)); stroke-width: 1.5; fill: none; }
+.bpmn-flow-message { stroke-dasharray: 6 4; }
+.bpmn-flow-selected .bpmn-flow { stroke: hsl(var(--primary)); stroke-width: 3; }
+.bpmn-arrow { fill: hsl(var(--foreground)); stroke: hsl(var(--foreground)); }
+.bpmn-arrow-open { fill: hsl(var(--card)); stroke: hsl(var(--foreground)); }
+.bpmn-label-bg { fill: hsl(var(--card)); stroke: none; }
+.bpmn-flow-text { fill: hsl(var(--foreground)); font-size: 13px; }
+.bpmn-key-line { stroke: hsl(var(--foreground)); stroke-width: 1.5; fill: none; }
+.bpmn-key-dash { stroke-dasharray: 5 3; }
+.bpmn-key-fill { fill: hsl(var(--foreground)); }
+.bpmn-key-open { fill: hsl(var(--card)); stroke: hsl(var(--foreground)); stroke-width: 1.5; }

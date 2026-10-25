@@ -121,6 +121,8 @@ class BusinessProcess(TenantMixin, db.Model):
 
     # Documentation
     bpmn_model_url = db.Column(db.String(500))  # Link to BPMN diagram
+    # The drawn flow (pools, lanes, events, tasks, gateways, flows); nullable, a process with no drawing has none.
+    bpmn_flow = db.Column(db.JSON, nullable=True)
     process_documentation_url = db.Column(db.String(500))
     sop_url = db.Column(db.String(500))  # Standard Operating Procedure
 
