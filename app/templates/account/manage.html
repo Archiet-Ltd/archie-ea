@@ -4,6 +4,11 @@
 {% from 'components/page_header.html' import page_header %}
 {% from 'components/company_kind.html' import company_kind_picker %}
 {% block extra_head_js %}<script src="{{ url_for('static', filename='js/dashboard/company_kind.js') }}"></script>{% endblock %}
+{% from 'components/card.html' import card, card_header, card_title, card_description, card_content, card_footer %}
+{% from 'components/button.html' import button %}
+{% from 'components/select.html' import native_select %}
+{% from 'components/checkbox.html' import checkbox %}
+{% from 'components/input.html' import label %}
 {% import 'macros/form_macros.html' as f %}
 {% import 'macros/check_password.html' as check with context %}
 
@@ -112,6 +117,27 @@
             {{ company_kind_picker(kind=(user.organization.settings or {}).get('company_context', {}).get('kind', 'startup')) }}
         </div>
     </div>
+
+    {# Industry and frameworks: chosen at sign-up, changed here. #}
+    {% if company %}
+    <div class="mt-6" data-signup-steps data-url-choices="{{ url_for('account.welcome_choices') }}" data-testid="company-choices-card">
+        {% set kinds = company.kinds %}{% set industries = company.industries %}{% set frameworks = company.frameworks %}{% set chosen = company.chosen %}
+        {% call card() %}
+            {% call card_header() %}
+                {% call card_title() %}Company, industry and frameworks{% endcall %}
+                {% call card_description() %}Your industry picks the starter capability model. The frameworks are the ones your company already works with.{% endcall %}
+            {% endcall %}
+            {% call card_content(class='space-y-6') %}
+                {% include 'account/_company_choices.html' %}
+                <p class="text-sm text-muted-foreground" role="status" aria-live="polite" data-say="choices"></p>
+            {% endcall %}
+            {% call card_footer() %}
+                {{ button(text='Save', testid='company-choices-save', attrs_dict={'data-action': 'save-choices'}) }}
+            {% endcall %}
+        {% endcall %}
+    </div>
+    <script src="{{ url_for('static', filename='js/account/signup_steps.js') }}"></script>
+    {% endif %}
 
     {# Security Information — Last Login #}
     <div class="rounded-lg border border-border bg-card text-card-foreground mt-6">

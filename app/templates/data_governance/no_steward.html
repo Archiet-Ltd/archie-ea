@@ -1,55 +1,62 @@
 {% extends 'layouts/admin_base.html' %}
-{% from 'macros/page_shell.html' import page_shell, empty_state %}
+{% from 'components/dense_table.html' import dense_table %}
+{% from 'components/badge.html' import badge %}
+{% from 'components/button.html' import button %}
+{% from 'components/empty_state.html' import empty_state %}
+{% from 'components/_breadcrumb_root.html' import crumb_label %}
 
 {% block title %}Critical entities with no steward — {{ config.APP_NAME }}{% endblock %}
 
 {% block content %}
 <div class="flex-1 overflow-auto p-6">
-  {{ page_shell(
-      title='Critical entities with no steward',
-      subtitle='Data entities in a critical domain (mission-critical or business-critical) that have no steward assigned.',
-      breadcrumb=[('Home', url_for('main.index')), ('Data governance', None)],
-      tabs=tabs
-  ) }}
-  {% if entities %}
-  <div class="rounded-lg border border-border bg-card overflow-hidden">
-    <div class="overflow-x-auto">
-      <table class="dense-table w-full text-sm" data-testid="no-steward-table">
-        <thead class="bg-muted/50 text-xs text-muted-foreground uppercase tracking-wide">
-          <tr>
-            <th class="text-left px-4 py-2.5">Data entity</th>
-            <th class="text-left px-4 py-2.5">Domain</th>
-            <th class="text-left px-4 py-2.5">Criticality</th>
-            <th class="text-right px-4 py-2.5">Actions</th>
-          </tr>
-        </thead>
-        <tbody class="divide-y divide-border">
-          {% for e in entities %}
-          <tr data-testid="no-steward-row-{{ e.entity_id }}">
-            <td class="px-4 py-2.5 font-medium">{{ e.entity_name }}</td>
-            <td class="px-4 py-2.5">{{ e.domain_name }}</td>
-            <td class="px-4 py-2.5">
-              {% if e.criticality == 'mission_critical' %}
-              <span class="inline-flex rounded-md bg-destructive/10 text-destructive-emphasis px-2 py-0.5 text-xs font-medium">Mission critical</span>
-              {% else %}
-              <span class="inline-flex rounded-md bg-warning/10 text-warning-emphasis px-2 py-0.5 text-xs font-medium">Business critical</span>
-              {% endif %}
-            </td>
-            <td class="px-4 py-2.5 text-right">
-              <a href="{{ url_for('data_governance.entity_detail', entity_id=e.entity_id) }}"
-                 class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
-                Assign steward
-              </a>
-            </td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
+  <div class="mb-6">
+    <nav aria-label="Breadcrumb" class="mb-3">
+      <ol class="flex items-center gap-1.5 text-sm text-muted-foreground">
+        <li class="flex items-center gap-1.5"><a href="{{ url_for('main.index') }}" class="hover:text-foreground transition-colors">{{ crumb_label('Home', True) }}</a><i data-lucide="chevron-right" class="w-3.5 h-3.5 shrink-0" aria-hidden="true"></i></li>
+        <li class="flex items-center gap-1.5" aria-current="page"><span class="text-foreground font-medium">Data governance</span></li>
+      </ol>
+    </nav>
+    <div class="flex flex-col gap-4">
+      <div>
+        <h1 class="text-3xl font-bold tracking-[-0.02em] text-foreground">Critical entities with no steward</h1>
+        <p class="mt-1 text-sm text-muted-foreground">Data entities in a critical domain (mission-critical or business-critical) that have no steward assigned.</p>
+      </div>
     </div>
+    <ul class="mt-4 flex items-center gap-1 border-b border-border text-sm">
+      {% for label, href, active in tabs %}
+      <li><a href="{{ href }}" class="inline-flex items-center px-3 py-2 border-b-2 -mb-px transition-colors {% if active %}border-primary text-foreground font-medium{% else %}border-transparent text-muted-foreground hover:text-foreground{% endif %}" {% if active %}aria-current="page"{% endif %}>{{ label }}</a></li>
+      {% endfor %}
+    </ul>
   </div>
+  {% if entities %}
+  {% call dense_table(
+      columns=[('Data entity', ''), ('Domain', ''), ('Criticality', ''), ('', 'text-right')],
+      rows=entities|length,
+      empty_text='All critical entities have a steward.',
+      caption='Critical entities with no steward',
+      testid='no-steward-table'
+  ) %}
+    {% for e in entities %}
+    <tr data-testid="no-steward-row-{{ e.entity_id }}">
+      <td class="px-2 align-middle font-medium text-foreground">{{ e.entity_name }}</td>
+      <td class="px-2 align-middle">{{ e.domain_name }}</td>
+      <td class="px-2 align-middle">
+        {% if e.criticality == 'mission_critical' %}
+        {% call badge('destructive') %}Mission critical{% endcall %}
+        {% else %}
+        {% call badge('warning') %}Business critical{% endcall %}
+        {% endif %}
+      </td>
+      <td class="px-2 align-middle text-right">
+        {{ button(text='Assign steward', variant='outline', size='sm',
+                  href=url_for('data_governance.entity_detail', entity_id=e.entity_id)) }}
+      </td>
+    </tr>
+    {% endfor %}
+  {% endcall %}
   {% else %}
-  {{ empty_state(icon='users', headline='All critical entities have a steward',
-      body='Every data entity in a mission-critical or business-critical domain has at least one steward assigned.') }}
+  {{ empty_state(icon='users', title='All critical entities have a steward',
+      description='Every data entity in a mission-critical or business-critical domain has at least one steward assigned.') }}
   {% endif %}
 </div>
 {% endblock %}

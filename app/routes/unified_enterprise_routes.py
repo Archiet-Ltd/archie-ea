@@ -32,6 +32,7 @@ from flask import (
 )
 from flask_login import current_user, login_required  # dead-code-ok
 from app.middleware.tenant_context import current_org_id
+from app.modules.genome.services.roadmap_links import redirect_to_roadmap
 from sqlalchemy import case, or_  # dead-code-ok
 from sqlalchemy.exc import SQLAlchemyError
 
@@ -509,28 +510,8 @@ def risk_assessment():
 @enterprise_bp.route("/strategic/technology-roadmap")
 @login_required
 def technology_roadmap():
-    """Technology Roadmap"""
-    try:
-        workpackages = WorkPackage.query.limit(500).all()
-
-        return render_template(
-            "enterprise/technology_roadmap.html", workpackages=workpackages
-        )
-    except SQLAlchemyError as e:
-        current_app.logger.error(f"Database error loading technology roadmap: {e}")
-        raise DatabaseError(
-            message=f"Failed to load technology roadmap: {str(e)}",
-            user_message="Unable to load technology roadmap.",
-            recovery_action="Return to the dashboard and try again.",
-        )
-
-
-# ============================================================================
-# IMPLEMENTATION PLANNING ROUTES
-# ============================================================================
-
-
-# implementation_planning_dashboard removed — empty shell page, frozen sidebar link
+    """The enterprise technology roadmap is the one roadmap, Technology view."""
+    return redirect_to_roadmap("technology")
 
 
 @enterprise_bp.route("/implementation/work-packages")

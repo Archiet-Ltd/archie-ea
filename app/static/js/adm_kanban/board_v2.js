@@ -29,6 +29,16 @@
                 card_type: '',
             },
 
+            // Requirements: the panel beside the board (a sheet when narrow), the one picked, the phase shown
+            requirements: [],
+            requirementsLoaded: false,
+            requirementsError: null,
+            linkError: null,
+            selectedReq: null,
+            phaseFilter: '',
+            wide: false,
+            panelOpen: true,
+
             // Detail modal
             detailCard: null,
 
@@ -109,6 +119,10 @@
 
             init: function () {
                 let self = this;
+                let query = global.matchMedia('(min-width: 1280px)');
+                self.wide = query.matches;
+                query.addEventListener('change', function (e) { self.wide = e.matches; });
+                self.loadRequirements();
                 _fetch('/api/adm-kanban/v2/config').then(function (cfg) {
                     if (cfg && cfg.wip_limits) self.wipLimits = cfg.wip_limits;
                 });
@@ -145,9 +159,10 @@
                 return s && s[colId] ? s[colId] : null;
             },
 
-            reload: function () {
+            // quiet: refresh the cards in place, without the loading skeleton
+            reload: function (quiet) {
                 let self = this;
-                self.loading = true;
+                if (quiet !== true) self.loading = true;
                 self.error = null;
 
                 let params = new URLSearchParams();
@@ -165,14 +180,14 @@
                 let qs = params.toString();
                 if (qs) url += '?' + qs;
 
-                _fetch(url).then(function (data) {
+                _fetch(url, { silent: true }).then(function (data) {
                     self.loading = false;
                     if (!data) {
-                        self.error = 'Failed to load board';
+                        self.error = 'The board could not load. Try again.';
                         return;
                     }
                     if (data.success === false) {
-                        self.error = (data && data.error) || 'Failed to load board';
+                        self.error = 'The board could not load. Try again.';
                         return;
                     }
                     self.cards = Array.isArray(data)
@@ -189,11 +204,126 @@
                     self.totalCardCount = self.cards.length;
                 }).catch(function (err) {
                     self.loading = false;
-                    self.error = (err && err.message) || 'Network error';
+                    self.error = 'The board could not load. Try again.';
                 });
             },
 
             // -- Lanes: the ADM cycle, one lane per phase --------------
+
+            // -- Requirements and the cycle ----------------------------
+
+            loadRequirements: function () {
+                let self = this;
+                self.requirementsError = null;
+                _fetch('/api/adm-kanban/v2/requirements', { silent: true }).then(function (data) {
+                    if (!data || data.success === false) throw new Error('load');
+                    self.requirements = data.requirements || [];
+                    self.requirementsLoaded = true;
+                }).catch(function () {
+                    self.requirementsError = 'The requirements could not load. Try again.';
+                });
+            },
+
+            requirementTotal: function () {
+                return this.requirements.length;
+            },
+
+            solutionCards: function () {
+                return this.cards.filter(function (c) { return c.card_type === 'solution'; });
+            },
+
+            // The line on a card: its count, then its two highest-priority names.
+            requirementChipText: function (card) {
+                let n = card.requirement_total || 0;
+                return n ? this.plural(n, 'requirement') : 'No requirements';
+            },
+
+            topRequirements: function (card) {
+                return (card.requirements || []).slice(0, 2);
+            },
+
+            requirementPhaseText: function (r) {
+                return r.phase_label ? r.phase_label : 'No phase set';
+            },
+
+            isHighlighted: function (card) {
+                if (this.selectedReq === null || card.card_type !== 'solution') return false;
+                let r = this.requirements.find(function (x) { return x.id === this.selectedReq; }, this);
+                return !!r && r.solution_id === card.entity_id;
+            },
+
+            selectRequirement: function (r) {
+                this.selectedReq = this.selectedReq === r.id ? null : r.id;
+                if (!this.wide) global.closeDrawer('adm-requirements');
+            },
+
+            openRequirements: function () {
+                if (this.wide) {
+                    this.panelOpen = !this.panelOpen;
+                } else {
+                    global.openDrawer('adm-requirements');
+                }
+            },
+
+            linkRequirement: function (r, value) {
+                let self = this;
+                self.linkError = null;
+                _fetch('/api/adm-kanban/v2/requirements/' + r.id + '/solution', {
+                    method: 'PATCH',
+                    body: { solution_id: value === '' ? null : parseInt(value, 10) },
+                    silent: true,
+                }).then(function (data) {
+                    if (!data || data.success === false || !data.requirement) throw new Error('save');
+                    Object.assign(r, data.requirement);
+                    self.reload(true);
+                }).catch(function () {
+                    self.linkError = 'The link could not be saved. Try again.';
+                    self.loadRequirements();
+                });
+            },
+
+            cycleCards: function (code) {
+                return this.visibleCards().filter(function (c) { return c.phase === code; });
+            },
+
+            cycleCount: function (code) {
+                return this.cycleCards(code).length;
+            },
+
+            cycleLabel: function (code) {
+                let p = this.phases.find(function (x) { return x.code === code; });
+                let n = this.cycleCount(code);
+                let name = p ? p.label : code;
+                let prefix = (code === 'PRELIM') ? '' : code + ': ';
+                return prefix + name + ', ' + this.plural(n, 'card');
+            },
+
+            cycleTip: '',
+
+            cycleName: function (code) {
+                let p = this.phases.find(function (x) { return x.code === code; });
+                return (code === 'PRELIM' ? '' : code + ': ') + (p ? p.label : code);
+            },
+
+            chooseCycle: function (code) {
+                this.phaseFilter = this.phaseFilter === code ? '' : code;
+            },
+
+            // The lanes on the board: the whole cycle, or the one phase chosen in the ring.
+            // Requirements Management is the panel, not a lane; a lane appears for it only
+            // while cards recorded against it exist.
+            lanes: function () {
+                let self = this;
+                return this.phases.filter(function (p) {
+                    if (self.phaseFilter) return p.code === self.phaseFilter;
+                    return p.code !== 'REQ' || self.cycleCount('REQ') > 0;
+                });
+            },
+
+            shownCards: function () {
+                let f = this.phaseFilter;
+                return this.visibleCards().filter(function (c) { return !f || c.phase === f; });
+            },
 
             plural: function (n, word) {
                 return n + ' ' + word + (n === 1 ? '' : 's');

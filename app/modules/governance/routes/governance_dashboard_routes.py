@@ -9,6 +9,7 @@ from flask import Blueprint, jsonify, redirect, render_template, url_for
 from flask_login import login_required
 
 from app import db
+from app.modules.genome.services.roadmap_links import redirect_to_roadmap
 from app.decorators import require_roles
 
 logger = logging.getLogger(__name__)
@@ -350,5 +351,5 @@ def standards():
 @governance_bp.route("/roadmap")
 @login_required
 def roadmap():
-    """Enterprise Roadmap page."""
-    return render_template("governance/roadmap.html")
+    """The governance roadmap is the one roadmap, Strategic view."""
+    return redirect_to_roadmap("strategic")

@@ -135,7 +135,7 @@
                             <div class="rounded-lg border bg-card p-3 shadow-sm cursor-pointer hover:bg-accent transition-colors"
                                  data-action="select-context" data-id="${escape(el.id)}" data-type="archimate_element">
                                 <div class="flex items-center gap-2 mb-1">
-                                    <span class="bg-muted text-foreground text-xs px-1.5 py-0.5 rounded font-medium">${escape(el.type)}</span>
+                                    <span class="bg-muted text-foreground text-xs px-1.5 py-0.5 rounded font-medium">${escape(plainTypeName(el.type))}</span>
                                     <span class="font-medium text-sm">${escape(el.name)}</span>
                                 </div>
                             </div>
@@ -377,6 +377,33 @@
     }
 
 
+    /* An ArchiMate type in plain words: ApplicationComponent reads Application, and any other
+       CamelCase name reads as separate words (BusinessCapability, Business capability). */
+    function plainTypeName(type) {
+        if (!type) return '—';
+        if (type === 'ApplicationComponent') return 'Application';
+        const words = String(type).replace(/([a-z0-9])([A-Z])/g, '$1 $2');
+        return words.charAt(0) + words.slice(1).toLowerCase();
+    }
+
+    /* One suggestion card per question. */
+    const cardRows = (items) => items.map((it, i) => {
+        const question = it.question;
+        const detail = ArchieChat.render.escapeForHtml((it.detail || '').slice(0, 120));
+        return '<button type="button" class="js-briefing-item group h-auto w-full rounded-lg border ' +
+                 'border-border bg-background p-4 text-left transition-colors hover:border-primary ' +
+                 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" ' +
+                 'data-index="' + i + '" data-question="' + ArchieChat.render.escapeForHtml(question) + '" data-testid="first-question-suggestion">' +
+                 '<span class="flex items-start justify-between gap-3">' +
+                   '<span class="min-w-0">' +
+                     '<span class="block text-sm font-medium text-foreground">' + ArchieChat.render.escapeForHtml(question) + '</span>' +
+                     (detail ? '<span class="mt-1 block text-xs text-muted-foreground">' + detail + '</span>' : '') +
+                   '</span>' +
+                   '<i data-lucide="arrow-up-right" class="h-4 w-4 shrink-0 text-muted-foreground group-hover:text-primary" aria-hidden="true"></i>' +
+                 '</span>' +
+               '</button>';
+    }).join('');
+
     /* ── Opening screen: this tenant's portfolio, not 21 generic buttons ─────
        Uses /ai-chat/recommendations, which the page already called into a
        sidebar tab nobody opens.
@@ -411,10 +438,53 @@
             // Platform.fetch.get throws on non-ok responses, so we only reach here on success.
 
             const alerts = Array.isArray(data.alerts) ? data.alerts : [];
-            const recs = Array.isArray(data.recommendations) ? data.recommendations : [];
-            const items = alerts.concat(recs);
 
-            if (items.length === 0) {
+            /* A card is a question about one application in this organisation's own records, because
+               only a question that names a recorded element is answered from the records with its
+               sources. Findings that name an application come first; the rest of the four are the
+               organisation's other applications. Generic programme advice is not a question about
+               the records and never becomes a card. */
+            const named = alerts.filter((it) => it.entity_name);
+            const seen = new Set(named.map((it) => it.entity_name));
+            const questions = named.map((it) => ({
+                question: 'What breaks if ' + it.entity_name + ' fails?',
+                detail: it.description || it.detail || ''
+            }));
+            if (questions.length < 4) {
+                try {
+                    const list = await Platform.fetch.get('/applications/api/list',
+                        { per_page: 12, sort: 'relevance' }, { silent: true });
+                    const apps = Array.isArray(list) ? list : (list && (list.applications || list.items)) || [];
+                    apps.forEach((a) => {
+                        if (questions.length < 4 && a && a.name && !seen.has(a.name)) {
+                            seen.add(a.name);
+                            questions.push({ question: 'What breaks if ' + a.name + ' fails?', detail: '' });
+                        }
+                    });
+                } catch (listErr) {
+                    /* swallow-ok: the cards are a convenience; the findings above still stand and the box below still works */
+                }
+            }
+            const shown = questions.slice(0, 4);
+
+            const startupSteps = document.getElementById('startup-first-steps');
+            if (shown.length === 0 && startupSteps) {
+                /* A startup with nothing recorded: the next step first, then four questions that need no records. */
+                const startupQuestions = [
+                    { question: 'What should a startup write down about its software first?', detail: '' },
+                    { question: 'Which architecture decisions are worth recording early?', detail: '' },
+                    { question: 'When does a monolith stop being enough?', detail: '' },
+                    { question: 'What should a first architecture review cover?', detail: '' }
+                ];
+                done('<div data-startup-next-step></div>' +
+                    '<div class="mt-6 grid grid-cols-1 gap-3 md:grid-cols-2">' + cardRows(startupQuestions) + '</div>' +
+                    '<p class="mt-3 text-center text-xs text-muted-foreground">General questions to start with. Once your applications are in, these become questions about them.</p>');
+                host.querySelector('[data-startup-next-step]').appendChild(startupSteps.content.cloneNode(true));
+                host._items = startupQuestions;
+                return;
+            }
+
+            if (shown.length === 0) {
                 done(
                     '<div class="text-center py-2">' +
                       '<p class="text-sm font-medium text-foreground">Nothing flagged in your portfolio yet.</p>' +
@@ -434,53 +504,20 @@
                 return;
             }
 
-            /* The denominator matters. Surfacing 3 items out of an unstated
-               total is an editorial claim: the user cannot see what was ranked
-               above what, or how much was left out. */
             const total = (data.summary && typeof data.summary.total === 'number')
                 ? data.summary.total : null;
-            const shown = items.slice(0, 3);
             const scope = total === null
-                ? shown.length + (shown.length === 1 ? ' item' : ' items')
-                : shown.length + ' of ' + total + ' open finding' + (total === 1 ? '' : 's');
+                ? named.length + (named.length === 1 ? ' item' : ' items')
+                : named.length + ' of ' + total + ' open finding' + (total === 1 ? '' : 's');
 
-            const rows = shown.map((it, i) => {
-                const title = ArchieChat.render.escapeForHtml(it.title || it.message || 'Untitled');
-                const detail = ArchieChat.render.escapeForHtml(
-                    (it.description || it.detail || '').slice(0, 140));
-                const sev = String(it.severity || it.priority || '').toLowerCase();
-                const tone = sev === 'critical' ? 'text-destructive-emphasis'
-                           : sev === 'high' ? 'text-warning-emphasis'
-                           : 'text-muted-foreground';
-                return '<button type="button" class="js-briefing-item w-full text-left rounded-lg border ' +
-                         /* No hover:bg-accent: --muted-foreground scores 4.42 on --accent
-                            versus 4.76 on --background, so tinting the row on hover
-                            pushed the detail line under WCAG AA (axe measured 4.41,
-                            expected 4.5). The border carries the affordance. The same
-                            pattern fails anywhere hover:bg-accent sits under
-                            text-muted-foreground, and only while hovering — which is
-                            why no screenshot would ever show it. */
-                         'border-border bg-background px-3 py-2 hover:border-primary ' +
-                         'transition-colors focus-visible:outline-none focus-visible:ring-2 ' +
-                         'focus-visible:ring-ring" data-index="' + i + '">' +
-                         '<div class="flex items-start gap-2">' +
-                           '<i data-lucide="alert-circle" class="h-3.5 w-3.5 mt-0.5 shrink-0 ' + tone + '" aria-hidden="true"></i>' +
-                           '<span class="min-w-0">' +
-                             '<span class="block text-sm font-medium text-foreground">' + title + '</span>' +
-                             (detail ? '<span class="block text-xs text-muted-foreground truncate">' + detail + '</span>' : '') +
-                           '</span>' +
-                         '</div>' +
-                       '</button>';
-            }).join('');
+            const rows = cardRows(shown);
 
             done(
-                '<div class="flex items-center justify-between mb-2">' +
-                  '<span class="text-xs font-semibold uppercase tracking-wider text-muted-foreground">' +
-                    'In your portfolio</span>' +
-                  '<span class="text-xs text-muted-foreground">' +
-                    ArchieChat.render.escapeForHtml(scope) + ', ranked by impact</span>' +
-                '</div>' +
-                '<div class="space-y-1.5">' + rows + '</div>'
+                '<div class="grid grid-cols-1 gap-3 md:grid-cols-2">' + rows + '</div>' +
+                '<p class="mt-3 text-center text-xs text-muted-foreground">' +
+                  (named.length
+                    ? 'Questions from your own records: ' + ArchieChat.render.escapeForHtml(scope) + ', ranked by impact'
+                    : 'Questions about the applications in your records') + '</p>'
             );
 
             host._items = shown;
@@ -525,8 +562,7 @@
         if (!input || !form) return;
         /* Ask about the finding in the user's own terms; the assistant then
            looks it up rather than being handed a conclusion to agree with. */
-        input.value = 'Tell me about this finding and what you would do about it: ' +
-                      (picked.title || picked.message || '');
+        input.value = picked.question;
         form.requestSubmit();
     });
 
