@@ -42,7 +42,8 @@
     error=none,
     help_text=none,
     rows=3,
-    class=''
+    class='',
+    attrs=''
 ) %}
     {% set field_name = name or id %}
     <div class="{{ class }}">
@@ -57,6 +58,7 @@
             {% if error %}aria-invalid="true"{% endif %}
             {% if error %}aria-describedby="{{ id }}-error"{% elif help_text %}aria-describedby="{{ id }}-help"{% endif %}
             rows="{{ rows }}"
+            {{ attrs|safe }}
             class="flex min-h-[80px] w-full rounded-md border {% if error %}border-destructive{% else %}border-input{% endif %} bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
         >{{ value }}</textarea>
         {% else %}
@@ -70,6 +72,7 @@
             {% if required %}required aria-required="true"{% endif %}
             {% if error %}aria-invalid="true"{% endif %}
             {% if error %}aria-describedby="{{ id }}-error"{% elif help_text %}aria-describedby="{{ id }}-help"{% endif %}
+            {{ attrs|safe }}
             class="flex h-9 w-full rounded-md border {% if error %}border-destructive{% else %}border-input{% endif %} bg-background px-3 text-sm file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
         />
         {% endif %}
