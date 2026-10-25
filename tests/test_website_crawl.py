@@ -35,7 +35,8 @@ HOME = """<!doctype html><html><head><title>Acme Robotics | Warehouse robots</ti
 <a href="%(other)s/elsewhere">Partner site</a>
 </nav></header>
 <main><h1>Acme Robotics</h1><p>We build warehouse robots that pick and pack orders for logistics
-operators, delivered as a monthly subscription to businesses.</p></main></body></html>"""
+operators, delivered as a monthly subscription to businesses.</p>
+<p>Our robots work alongside people in busy distribution centres, learn a new layout in a day and need no changes to your racking or conveyors.</p></main></body></html>"""
 
 ABOUT = """<html><head><title>About Acme Robotics</title></head><body><main>
 <h1>About us</h1><p>Founded in 2014, we are a team of about 40 people.</p>
@@ -136,7 +137,26 @@ def _path(url):
     return re.sub(r"^https?://[^/]+", "", url or "") or "/"
 
 
-def fake_model(prompt):
+def batched(page_model):
+    """A model that reads the batched request (every page in one prompt) by asking a stand-in that
+    answers for one page at a time, and answers the way the prompt asks: one object with a ``pages``
+    list and an ``inference`` reading."""
+
+    def ask(prompt):
+        if "=== PAGE " not in prompt:
+            return page_model(prompt)
+        pages = re.findall(r"=== PAGE \d+: (\S+) ===\n(.*?)(?=\n\n=== PAGE |\Z)", prompt, re.S)
+        out = {"pages": [], "inference": json.loads(page_model("Business Model Inference"))}
+        for url, html in pages:
+            html = html.split("\n```", 1)[0]
+            one = json.loads(page_model("**Page URL**: %s\n```html\n%s\n```" % (url, html)))
+            out["pages"].append({**one, "url": url})
+        return json.dumps(out)
+
+    return ask
+
+
+def _page_model(prompt):
     """Answers only from the page handed over, like a careful reader would."""
     if "Business Model Inference" in prompt:
         return json.dumps({
@@ -181,6 +201,9 @@ def fake_model(prompt):
     out["case_studies"] = re.findall(r"Case study: ([^<]+?)(?:\.|<)", html)
     out["links"] = []
     return json.dumps(out)
+
+
+fake_model = batched(_page_model)
 
 
 def _org(make_org, website, consent=True):
@@ -502,7 +525,7 @@ def test_the_company_name_comes_from_the_home_page_not_a_sub_page(make_org):
     site = _Site(_HOME_DOCS_PAGES)
     try:
         org = _org(make_org, site.url)
-        crawl_organization_website(org.id, llm=model)
+        crawl_organization_website(org.id, llm=batched(model))
         names = [r for r in pending_website_proposals(org.id) if r["field"] == "company_name"]
         assert names, "no company name was proposed"
         name_row = names[0]
@@ -554,7 +577,7 @@ def test_the_name_confidence_is_not_100_percent_when_the_home_page_gives_none(ma
     site = _Site(_NO_NAME_PAGES)
     try:
         org = _org(make_org, site.url)
-        crawl_organization_website(org.id, llm=model)
+        crawl_organization_website(org.id, llm=batched(model))
         names = [r for r in pending_website_proposals(org.id) if r["field"] == "company_name"]
         assert names, "no company name was proposed"
         assert names[0]["value"] == "Mystery Corp"
@@ -618,9 +641,96 @@ def test_the_crawl_proposes_the_brand_from_a_branded_title_ticked_for_the_person
     site = _Site(_BRAND_PAGES)
     try:
         org = _org(make_org, site.url)
-        crawl_organization_website(org.id, llm=model)
+        crawl_organization_website(org.id, llm=batched(model))
         names = [r for r in pending_website_proposals(org.id) if r["field"] == "company_name"]
         assert [r["value"] for r in names] == ["Brand"], names
         assert names[0]["confidence"] >= 0.5  # the sign-up ticks a fact from half up
     finally:
         site.stop()
+
+
+# ----------------------------------------------------------------------------- two passes (QA-026)
+
+SLOW_MODEL_SECONDS = 8  # stands in for a free model that takes its time; the point is the order, not the wait
+
+
+class _SlowModel:
+    """A model that takes SLOW_MODEL_SECONDS per call and notes, as each call starts, how long the reading has
+    taken so far and which facts a person could already see."""
+
+    def __init__(self, org_id_of, started):
+        self.calls = 0
+        self.started = started
+        self.org_id_of = org_id_of
+        self.seen = None
+        self.at = None
+
+    def __call__(self, prompt):
+        from app.modules.organization.website_crawl import pending_website_proposals
+
+        self.calls += 1
+        if self.seen is None:
+            self.at = time.monotonic() - self.started
+            self.seen = {row["field"]: row["value"] for row in pending_website_proposals(self.org_id_of())}
+        time.sleep(SLOW_MODEL_SECONDS)
+        return fake_model(prompt)
+
+
+def test_the_facts_that_need_no_model_are_proposed_before_the_model_is_asked_once_for_the_rest(make_org, site):
+    """QA-026: with a slow model the person used to wait for one call per page. Now the name and the
+    other stated facts are proposed first, and the model is asked once, for every page together."""
+    org = _org(make_org, site.url)
+    model = _SlowModel(lambda: org.id, time.monotonic())
+    summary = _crawl(org, llm=model)
+
+    assert model.calls == 1, "the model was asked %d times; it should be asked once for all the pages" % model.calls
+    assert model.at < 10, "the first facts took %.1f s" % model.at
+    assert model.seen["company_name"] == "Acme Robotics Ltd", model.seen
+    assert "contact_email" in model.seen and "linkedin_url" in model.seen
+    assert "category" not in model.seen, "a model-only fact was there before the model was asked"
+    assert summary["pages_read"] >= 5
+
+    found = _by_field(org.id)
+    assert [r["value"] for r in found["company_name"]] == ["Acme Robotics Ltd"], "the name was proposed twice"
+    assert found["category"][0]["value"] == "Transportation & Logistics", "the model's reading was not added"
+    assert found["product"] and found["key_person"] and found["hq_city"]
+    assert summary["proposals"] == sum(len(rows) for rows in found.values())
+
+
+def test_a_model_that_fails_leaves_the_facts_already_proposed(make_org, site):
+    org = _org(make_org, site.url)
+
+    def broken(prompt):
+        raise TimeoutError("the provider did not answer in time")
+
+    summary = _crawl(org, llm=broken)
+    assert summary["model_errors"] == 1
+    found = _by_field(org.id)
+    assert found["company_name"][0]["value"] == "Acme Robotics Ltd"
+    assert "category" not in found and summary["proposals"] == sum(len(rows) for rows in found.values()) > 0
+
+
+def test_thirty_pages_are_read_with_one_model_call_however_slow_it_is(make_org):
+    links = " ".join('<a href="/p%d">page %d</a>' % (i, i) for i in range(45))
+    pages = {"/": _html("<html><head><title>Big Co | Things</title></head><body>%s</body></html>" % links),
+             "/robots.txt": (404, "text/plain", "")}
+    for i in range(45):
+        pages["/p%d" % i] = _html("<html><body><p>page %d with warehouse robots text</p></body></html>" % i)
+    big = _Site(pages)
+    try:
+        org = _org(make_org, big.url)
+        model = _SlowModel(lambda: org.id, time.monotonic())
+        summary = _crawl(org, llm=model)
+        assert summary["pages_read"] == 30
+        assert model.calls == 1
+        assert model.at < 10 and model.seen.get("company_name") == "Big Co"
+    finally:
+        big.stop()
+
+
+def test_the_progress_says_when_the_first_facts_are_ready(make_org, site):
+    org = _org(make_org, site.url)
+    stages = []
+    _crawl(org, progress=lambda state: stages.append(state["stage"]))
+    assert "facts_ready" in stages
+    assert stages.index("facts_ready") < stages.index("working_out")

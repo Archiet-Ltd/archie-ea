@@ -1,10 +1,11 @@
 """Read an organisation's consented website into profile proposals.
 
-``crawl_organization_website`` fetches up to 30 pages of the one site the organisation
-agreed to be read (robots.txt respected, a time limit), has a model read each page with
-OperateIQ's website-analysis prompt, adds what the pages state outright, asks the
-website-inference prompt for the business-level reading, and stores each fact as one
-pending proposal: ``ai_chat_crud_approvals`` rows with ``source_table = "website_crawler"``,
+``crawl_organization_website`` reads in two passes. Pass 1 fetches up to 30 pages of the one site
+the organisation agreed to be read (robots.txt respected, a time limit), takes what the pages state
+outright (name, site name, contact details, links, technologies) with no model, and stores those
+facts at once. Pass 2 hands the pages read to a model in one batched call (OperateIQ's
+website-analysis prompt for every page, and the website-inference reading) and stores what it adds,
+under its own time limit. Each fact is one pending proposal: ``ai_chat_crud_approvals`` rows with ``source_table = "website_crawler"``,
 the same store the GitHub connector's proposals use. Nothing is written to the model or
 to the organisation's settings; a person confirming a proposal is a later step.
 """
@@ -35,7 +36,9 @@ PROPOSAL_SOURCE = "website_crawler"
 OP_PROFILE_FACT = "website_profile_fact"
 PROPOSAL_DUE_DAYS = 14
 MAX_PAGES = 30
-TIME_LIMIT_SECONDS = 120.0
+TIME_LIMIT_SECONDS = 120.0  # each pass has its own
+MODEL_TIMEOUT_SECONDS = 120.0  # the one batched model call
+PROMPT_PAGE_CHARS = 120000  # the pages handed to the model together, shared between them
 DEFAULT_CONFIDENCE = 0.3  # the floor of OperateIQ's own scale ("weak inference") when a model gives none
 
 TAXONOMY = (
@@ -88,13 +91,13 @@ class CrawlRefused(ValueError):
 
 # ----------------------------------------------------------------------------- model
 
-def default_model() -> Callable[[str], str]:
+def default_model(timeout: float = MODEL_TIMEOUT_SECONDS) -> Callable[[str], str]:
     """The model call: the organisation's own provider first, then the free ones, through the
-    one provider chain the assistant uses."""
+    one provider chain the assistant uses. The call is given ``timeout`` seconds."""
     from app.modules.ai_chat.services.llm_service_impl import LLMService
 
     def ask(prompt: str) -> str:
-        return LLMService.generate_from_prompt(prompt, use_cache=False, timeout=90)
+        return LLMService.generate_from_prompt(prompt, use_cache=False, timeout=timeout)
 
     return ask
 
@@ -133,25 +136,37 @@ def _consented_site(org_id: int) -> Tuple[Any, str]:
 
 # ----------------------------------------------------------------------------- reading pages
 
-def _analyse(page_url: str, html: str, title: str, hint: str, model) -> Dict[str, Any]:
-    prompt = prompts.render("website_analysis", {"url": page_url, "title": title, "html_content": trimmed_html(html)})
-    return parse_json(model(prompt + ADDENDUM + hint))
+BATCH_ADDENDUM = """
+
+## This request holds several pages (Entelim)
+The HTML above is not one page: it is several pages of the same website, each introduced by a line
+"=== PAGE <n>: <address> ===". Read each page on its own and return ONE JSON object of this shape:
+{"pages": [{"url": "<the page address, exactly as given>", <all the keys above, for that page only>}, ...],
+ "inference": {<the business-level reading below>}}
+Use only what each page states. Give a page you learned nothing from an empty object.
+
+### The "inference" object
+- "business_model": {"revenue_model": "", "target_market": "", "market_segment": "", "geographic_focus": "", "confidence": 0.0-1.0}
+- "company_stage": {"stage": "", "confidence": 0.0-1.0}
+- "technology_stack": {"<kind, e.g. frontend>": ["names"]}
+- "competitive_positioning": {"value_proposition": "", "competitive_advantages": [""], "market_position": ""}
+- "data_quality": {"completeness_score": 0.0-1.0, "reliability_score": 0.0-1.0}
+"""
 
 
-def _discover(page_url: str, html: str, title: str, model) -> str:
-    """OperateIQ's structure-discovery step: where on this kind of page the business facts sit.
-    Its answer is handed to the analysis as a hint; a failure only means no hint."""
-    try:
-        found = parse_json(model(prompts.render(
-            "html_structure_discovery", {"url": page_url, "title": title, "html_snippet": trimmed_html(html, 30000)})))
-        selectors = ((found.get("extraction_strategy") or {}).get("recommended_selectors") or [])[:10]
-    except Exception:
-        logger.info("structure discovery unavailable for %s", page_url, exc_info=True)
-        return ""
-    if not selectors:
-        return ""
-    lines = ["- %s (%s)" % (s.get("selector"), s.get("purpose")) for s in selectors if isinstance(s, dict)]
-    return "\n\n## Where the business facts sit on this site (from structure discovery)\n" + "\n".join(lines)
+def _batched_prompt(pages: List[Dict[str, Any]]) -> str:
+    """One prompt for every page read: OperateIQ's analysis prompt over all of them, then the inference."""
+    share = max(3000, min(12000, PROMPT_PAGE_CHARS // max(1, len(pages))))
+    body = "\n\n".join(
+        "=== PAGE %d: %s ===\n%s" % (i, page["url"], trimmed_html(page["html"] or "", share))
+        for i, page in enumerate(pages, 1))
+    first = pages[0]
+    return prompts.render("website_analysis", {"url": first["url"], "title": first["static"]["title"],
+                                               "html_content": body}) + ADDENDUM + BATCH_ADDENDUM
+
+
+def _no_model(prompt: str) -> str:
+    raise RuntimeError("pass 1 reads without a model")
 
 
 def _tell(progress: Optional[Callable[[Dict[str, Any]], None]], **state: Any) -> None:
@@ -164,8 +179,9 @@ def _tell(progress: Optional[Callable[[Dict[str, Any]], None]], **state: Any) ->
         logger.info("crawl progress could not be reported", exc_info=True)
 
 
-def _read_site(site: str, model, max_pages: int, time_limit: float, delay: float,
+def _read_site(site: str, max_pages: int, time_limit: float, delay: float,
                progress: Optional[Callable[[Dict[str, Any]], None]] = None) -> Dict[str, Any]:
+    """Pass 1: fetch the pages and take what they state outright. No model is called."""
     started = time.monotonic()
     fetcher = Fetcher(site)
     browser = Browser(site)
@@ -174,7 +190,6 @@ def _read_site(site: str, model, max_pages: int, time_limit: float, delay: float
     queue: List[str] = [site]
     queued = {site}
     attempts = 0
-    hint = ""
     try:
         while queue and attempts < max_pages:
             remaining = time_limit - (time.monotonic() - started)
@@ -198,7 +213,7 @@ def _read_site(site: str, model, max_pages: int, time_limit: float, delay: float
                 result["failed"].append({"url": url, "reason": "status %s" % page.status})
                 continue
             html, final_url = page.text, page.url
-            if needs_browser(final_url, html, page.status, model):
+            if needs_browser(final_url, html, page.status, _no_model):
                 try:
                     rendered = browser.render(final_url, max(1.0, min(30.0, time_limit - (time.monotonic() - started))))
                     html = rendered.text
@@ -208,18 +223,10 @@ def _read_site(site: str, model, max_pages: int, time_limit: float, delay: float
                     result["unrendered"].append(final_url)
             fetched_at = datetime.utcnow().isoformat(timespec="seconds")
             static = extract_static(final_url, html, site)
-            if not result["pages"]:
-                hint = _discover(final_url, html, static["title"], model)
-            try:
-                analysis = _analyse(final_url, html, static["title"], hint, model)
-            except Exception:
-                logger.info("page analysis failed for %s", final_url, exc_info=True)
-                analysis = {}
-                result["model_errors"] += 1
             result["pages"].append({"url": final_url, "fetched_at": fetched_at, "static": static,
-                                    "analysis": analysis, "html": html if not result["pages"] else None})
+                                    "analysis": {}, "html": html})
             _tell(progress, stage="reading", pages_read=len(result["pages"]), limit=max_pages, current=final_url)
-            for link in list(static["links"]) + [item for item in (analysis.get("links") or []) if isinstance(item, str)]:
+            for link in static["links"]:
                 link = urldefrag(urljoin(final_url, link))[0]
                 if link not in queued and same_site(link, site):
                     queued.add(link)
@@ -343,29 +350,6 @@ def _from_static(facts: _Facts, url: str, at: str, s: Dict[str, Any]) -> None:
         facts.add("technology", {"name": tech["name"], "type": tech["type"]}, url, at, tech["confidence"], "page")
 
 
-def _merged_for_inference(pages: List[Dict[str, Any]], facts: _Facts) -> Dict[str, Any]:
-    def values(field):
-        return [r["value"] for r in facts.rows.values() if r["field"] == field]
-
-    def one(field):
-        found = values(field)
-        return found[0] if found else None
-
-    size = one("team_size")
-    return {
-        "company": {"name": one("company_name"), "website": pages[0]["url"], "description": one("tagline"),
-                    "founded_year": one("founded_year")},
-        "category": one("category"),
-        "location": {"country": one("hq_country"), "city": one("hq_city"), "region": one("hq_region")},
-        "technologies": values("technology"),
-        "social_media": values("social_profile"),
-        "team_size": size,
-        "people": values("key_person"),
-        "links": [p["url"] for p in pages[1:]][:20],
-        "raw_html_snippet": trimmed_html(pages[0]["html"] or "", 6000) if pages[0].get("html") else None,
-    }
-
-
 def _from_inference(facts: _Facts, url: str, at: str, inferred: Dict[str, Any]) -> None:
     quality = inferred.get("data_quality") if isinstance(inferred.get("data_quality"), dict) else {}
     reliability = _number(quality.get("reliability_score"))
@@ -402,15 +386,16 @@ def _display(value: Any) -> str:
     return str(value)
 
 
-def _store(org_id: int, facts: List[Dict[str, Any]], crawl_id: str) -> int:
+def _store(org_id: int, facts: List[Dict[str, Any]], crawl_id: str, replace: bool = True) -> int:
     from app.models.ai_chat_crud_approval import AIChatCRUDApproval, ApprovalStatus
     from app.modules.ai_chat.services.ai_chat_approval_service import create_approval_record
 
-    for old in AIChatCRUDApproval.query.filter_by(
-        organization_id=org_id, source_table=PROPOSAL_SOURCE, status=ApprovalStatus.PENDING
-    ).all():
-        old.status = ApprovalStatus.EXPIRED
-        old.rejected_reason = "Replaced by a newer reading of the website."
+    if replace:
+        for old in AIChatCRUDApproval.query.filter_by(
+            organization_id=org_id, source_table=PROPOSAL_SOURCE, status=ApprovalStatus.PENDING
+        ).all():
+            old.status = ApprovalStatus.EXPIRED
+            old.rejected_reason = "Replaced by a newer reading of the website."
     for fact in facts:
         create_approval_record(
             organization_id=org_id,
@@ -534,6 +519,32 @@ def _cap_company_name_confidence(facts: _Facts, home_url: str) -> None:
             row["confidence_basis"] = "default"
 
 
+def _row_key(row: Dict[str, Any]) -> str:
+    value = row["value"]
+    return _norm(value) if not isinstance(value, dict) else _norm(sorted(value.items()))
+
+
+def _facts_from(pages: List[Dict[str, Any]]) -> _Facts:
+    """Every fact the pages give: what they state and, once the model has read them, what it took from them.
+
+    The company name comes from the home page, not a sub-page whose title or heading may differ
+    (e.g. "Cal.com Docs" read from the docs page): the home page's site name or title, with the suffix
+    after a separator ("Acme | Home" becomes "Acme") dropped. When the home page gives no name at all the
+    confidence of any other name is lowered to the default floor rather than reported at 100%."""
+    facts = _Facts()
+    for page in pages:
+        _from_static(facts, page["url"], page["fetched_at"], page["static"])
+        _from_analysis(facts, page["url"], page["fetched_at"], page["analysis"])
+    first = pages[0]
+    home_name = _home_page_company_name(first)
+    if home_name:
+        _replace_company_name(facts, home_name["value"], first["url"], first["fetched_at"],
+                              home_name["confidence"], home_name["basis"])
+    else:
+        _cap_company_name_confidence(facts, first["url"])
+    return facts
+
+
 def pending_website_proposals(org_id: int) -> List[Dict[str, Any]]:
     """The profile facts read from the organisation's website that wait for a person, in profile order."""
     import json
@@ -570,10 +581,10 @@ def crawl_organization_website(
     read or found. Returns what was read, not the pages.
     """
     org, site = _consented_site(org_id)
-    model = _scoped(llm or default_model(), org_id)
+    model = _scoped(llm or default_model(timeout=float(time_limit_seconds)), org_id)
     max_pages = max(1, min(int(max_pages), MAX_PAGES))
     _tell(progress, stage="reading", pages_read=0, limit=max_pages, current=site)
-    read = _read_site(site, model, max_pages, float(time_limit_seconds), float(delay_seconds), progress)
+    read = _read_site(site, max_pages, float(time_limit_seconds), float(delay_seconds), progress)
     if not read["pages"]:
         reason = "; ".join("%s (%s)" % (f["url"], f["reason"]) for f in read["failed"][:3])
         if read["skipped_by_robots"] and not read["failed"] and not read["robots_unanswered"]:
@@ -582,42 +593,48 @@ def crawl_organization_website(
                        if f["reason"].startswith("status ") and f["reason"].split()[1].isdigit()), None)
         raise CrawlRefused("Nothing could be read from %s: %s." % (site, reason or "it did not answer"),
                            "no_answer", status)
-    _tell(progress, stage="working_out", pages_read=len(read["pages"]), limit=max_pages, current=None)
-
-    facts = _Facts()
-    for page in read["pages"]:
-        _from_static(facts, page["url"], page["fetched_at"], page["static"])
-        _from_analysis(facts, page["url"], page["fetched_at"], page["analysis"])
     first = read["pages"][0]
-
-    # The company name must come from the home page, not a sub-page whose title or
-    # heading may differ (e.g. "Cal.com Docs" read from the docs page). Take the home
-    # page's site_name or title, and drop the suffix after a separator so "Acme | Home"
-    # becomes "Acme". When the home page gives no name at all the confidence is lowered
-    # to the default floor rather than reported at 100%.
-    _home_name = _home_page_company_name(first)
-    if _home_name:
-        _replace_company_name(facts, _home_name["value"], first["url"], first["fetched_at"],
-                              _home_name["confidence"], _home_name["basis"])
-    else:
-        _cap_company_name_confidence(facts, first["url"])
-    inferred: Dict[str, Any] = {}
-    try:
-        inferred = parse_json(model(prompts.render("website_inference", _merged_for_inference(read["pages"], facts))))
-    except Exception:
-        logger.info("website inference failed for organisation %s", org_id, exc_info=True)
-        read["model_errors"] += 1
-    _from_inference(facts, first["url"], first["fetched_at"], inferred)
-    if not facts.rows:
-        raise CrawlRefused(
-            "%d page(s) of %s were read and no fact could be taken from them." % (len(read["pages"]), site),
-            "script_only" if read["unrendered"] else "nothing_found")
-
     crawl_id = uuid.uuid4().hex
     from app.jobs.tenant_safe_job import tenant_scope
 
-    with tenant_scope(org_id):
-        stored = _store(org_id, facts.ordered(), crawl_id)
+    # Pass 1 facts: what the pages state outright, proposed now so the person sees them without waiting.
+    facts = _facts_from(read["pages"])
+    stored = 0
+    if facts.rows:
+        with tenant_scope(org_id):
+            stored = _store(org_id, facts.ordered(), crawl_id)
+    held = {(row["field"], _row_key(row)) for row in facts.rows.values()}
+    held_scalars = {row["field"] for row in facts.rows.values() if row["field"] not in _MANY}
+    _tell(progress, stage="facts_ready" if stored else "working_out", pages_read=len(read["pages"]),
+          limit=max_pages, current=None)
+
+    # Pass 2: one model call over every page read; what it adds is proposed when it arrives.
+    inferred: Dict[str, Any] = {}
+    try:
+        answer = parse_json(model(_batched_prompt(read["pages"])))
+        entries = [entry for entry in (answer.get("pages") or []) if isinstance(entry, dict)]
+        by_url = {str(entry.get("url")): entry for entry in entries}
+        for position, page in enumerate(read["pages"]):
+            entry = by_url.get(page["url"])
+            if entry is None and len(entries) == len(read["pages"]):
+                entry = entries[position]
+            page["analysis"] = entry or {}
+        inferred = answer.get("inference") if isinstance(answer.get("inference"), dict) else {}
+    except Exception:
+        logger.info("website reading by the model failed for organisation %s", org_id, exc_info=True)
+        read["model_errors"] += 1
+    _tell(progress, stage="working_out", pages_read=len(read["pages"]), limit=max_pages, current=None)
+    facts = _facts_from(read["pages"])
+    _from_inference(facts, first["url"], first["fetched_at"], inferred)
+    added = [row for row in facts.ordered()
+             if (row["field"], _row_key(row)) not in held and row["field"] not in held_scalars]
+    if added:
+        with tenant_scope(org_id):
+            stored += _store(org_id, added, crawl_id, replace=False)
+    if not stored:
+        raise CrawlRefused(
+            "%d page(s) of %s were read and no fact could be taken from them." % (len(read["pages"]), site),
+            "script_only" if read["unrendered"] else "nothing_found")
     return {
         "crawl_id": crawl_id, "site": site, "pages_read": len(read["pages"]),
         "rendered": read["rendered"], "skipped_by_robots": read["skipped_by_robots"], "failed": read["failed"],
