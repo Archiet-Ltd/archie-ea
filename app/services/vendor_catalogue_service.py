@@ -30,6 +30,7 @@ from typing import Callable, Optional
 from urllib.parse import urlparse
 
 from app import db
+from app.middleware.tenant_context import current_org_id
 from app.models.vendor.vendor_catalogue import (
     FACT_KINDS,
     VendorCatalogueFact,
@@ -162,11 +163,11 @@ def organisation_vendor_products():
             ApplicationComponent,
             ApplicationComponent.id == ApplicationVendorProductMapping.application_component_id,
         )
-        .filter(ApplicationComponent.organization_id == _org_id())
+        .filter(ApplicationComponent.organization_id == current_org_id())
     )
     vendor_ids = (
         db.session.query(VendorContract.vendor_id)
-        .filter(VendorContract.organization_id == _org_id())
+        .filter(VendorContract.organization_id == current_org_id())
         .filter(VendorContract.vendor_id.isnot(None))
     )
     ids = {r[0] for r in via_apps.all()}
@@ -183,16 +184,10 @@ def organisation_vendor_products():
     return VendorProduct.query.filter(VendorProduct.id.in_(ids)).order_by(VendorProduct.name).all()
 
 
-def _org_id() -> Optional[int]:
-    from app.middleware.tenant_context import current_org_id
-
-    return current_org_id()
-
-
 def organisation_links_to(product: VendorProductDetail):
     """This organisation's links to one catalogue product."""
     return (
-        VendorCatalogueLink.query.filter_by(product_detail_id=product.id, organization_id=_org_id())
+        VendorCatalogueLink.query.filter_by(product_detail_id=product.id, organization_id=current_org_id())
         .order_by(VendorCatalogueLink.linked_at.desc())
         .all()
     )
@@ -204,7 +199,7 @@ def link_for_vendor_product(vendor_product_id: int) -> Optional[VendorCatalogueL
     This is the read the per-organisation vendor record uses to show catalogue
     facts beside the organisation's own data."""
     return VendorCatalogueLink.query.filter_by(
-        vendor_product_id=vendor_product_id, organization_id=_org_id()
+        vendor_product_id=vendor_product_id, organization_id=current_org_id()
     ).first()
 
 
@@ -220,7 +215,7 @@ def link_vendor_product(vendor_product_id: int, product: VendorProductDetail, us
     allowed = {vp.id for vp in organisation_vendor_products()}
     if vendor_product_id not in allowed:
         raise LinkRefused("That vendor product is not one your organisation uses.")
-    org_id = _org_id()
+    org_id = current_org_id()
     link = VendorCatalogueLink.query.filter_by(
         vendor_product_id=vendor_product_id, organization_id=org_id
     ).first()

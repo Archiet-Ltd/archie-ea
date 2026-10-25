@@ -1,3 +1,4 @@
+{# design-block: record-detail #}
 {% extends 'layouts/admin_base.html' %}
 {% from "components/page_header.html" import page_header %}
 {% from "components/card.html" import card, card_header, card_title, card_description, card_content %}
@@ -5,7 +6,7 @@
 {% from "components/badge.html" import badge %}
 {% from "components/button.html" import button %}
 {% from "components/select.html" import native_select %}
-{% from "components/empty_state.html" import empty_state %}
+{% from "components/input.html" import input %}
 {% from "vendors/_catalogue_tabs.html" import vendor_tabs with context %}
 
 {% block title %}{{ product.product_name }} · Vendor catalogue{% endblock %}
@@ -149,13 +150,14 @@
           {% endif %}
           {% if org_options %}
           <form method="post" action="{{ url_for('unified_applications.vendor_catalogue_link', slug=product.catalogue_slug) }}" class="space-y-2" data-testid="catalogue-link-form">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            {{ input(type='hidden', name='csrf_token', value=csrf_token()) }}
             <label for="vendor_product_id" class="text-sm font-medium text-foreground">Vendor product</label>
             {{ native_select(id='vendor_product_id', name='vendor_product_id', class='w-full', options=org_options) }}
             {{ button(text='Link to ' ~ product.product_name, type='submit', variant='default', class='w-full', testid='catalogue-link-submit') }}
           </form>
           {% else %}
-            {{ empty_state(icon='link', title='No vendor products to link', description='Vendor products appear here once one of your applications or contracts names them.', cta_text='Go to your vendors', cta_href=url_for('unified_applications.vendors'), padding='py-4') }}
+            <p class="text-sm text-muted-foreground">None of your applications or contracts names a vendor product yet, so there is nothing to link. Vendor products appear here once one does.</p>
+            {{ button(text='Go to your vendors', href=url_for('unified_applications.vendors'), variant='outline', class='w-full') }}
           {% endif %}
         {% endcall %}
       {% endcall %}
