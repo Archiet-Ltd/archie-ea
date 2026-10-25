@@ -1,8 +1,6 @@
 {# design-block: data-table #}
 {% extends 'layouts/admin_base.html' %}
-{% from "components/page_header.html" import page_header %}
 {% from "components/table.html" import table, table_header, table_body, table_row, table_head, table_cell %}
-{% from "components/empty_state.html" import empty_state %}
 {% from "components/badge.html" import badge %}
 {% from "components/input.html" import input %}
 {% from "components/button.html" import button %}
@@ -12,15 +10,17 @@
 
 {% block content %}
 <div class="space-y-6" data-testid="vendor-catalogue">
-  {{ page_header(
-      title='Vendor catalogue',
-      description='Known architectures of common products: what each one is made of, what it connects to, where it holds data and what it costs. Every fact links to the public page it came from.',
-      breadcrumbs=[
-          {'label': 'Dashboard', 'href': url_for('main.index')},
-          {'label': 'Vendors', 'href': url_for('unified_applications.vendors')},
-          {'label': 'Catalogue'}
-      ]
-  ) }}
+  <nav aria-label="Breadcrumb">
+    <ol class="flex flex-wrap items-center gap-1.5 text-sm text-muted-foreground">
+      <li class="flex items-center gap-1.5"><a href="{{ url_for('main.index') }}" class="hover:text-foreground transition-colors">Home</a><i data-lucide="chevron-right" class="w-3.5 h-3.5 shrink-0" aria-hidden="true"></i></li>
+      <li class="flex items-center gap-1.5"><a href="{{ url_for('unified_applications.vendors') }}" class="hover:text-foreground transition-colors">Vendors</a><i data-lucide="chevron-right" class="w-3.5 h-3.5 shrink-0" aria-hidden="true"></i></li>
+      <li class="flex items-center gap-1.5" aria-current="page"><span class="text-foreground font-medium">Catalogue</span></li>
+    </ol>
+  </nav>
+  <div>
+    <h1 class="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">Vendor catalogue</h1>
+    <p class="mt-1 text-sm text-muted-foreground">Known architectures of common products: what each one is made of, what it connects to, where it holds data and what it costs. Every fact links to the public page it came from.</p>
+  </div>
 
   {{ vendor_tabs('catalogue') }}
 
@@ -59,11 +59,17 @@
   <p class="text-xs text-muted-foreground">{{ rows|length }} product{{ '' if rows|length == 1 else 's' }}. The catalogue is maintained by Entelim and is the same for every organisation; link a product you use to it from the product's page.</p>
   {% else %}
   <div data-slot="card" class="rounded-lg border border-border bg-card">
+    <div class="p-6 space-y-3 text-center" role="status">
     {% if search %}
-      {{ empty_state(icon='search-x', title='No catalogue products match "' ~ search ~ '"', description='Try a product or vendor name, such as Okta or Stripe.', cta_text='Clear search', cta_href=url_for('unified_applications.vendor_catalogue')) }}
+      <p class="text-sm font-medium text-foreground">No catalogue products match "{{ search }}".</p>
+      <p class="text-sm text-muted-foreground">Try a product or vendor name, such as Okta or Stripe.</p>
+      {{ button(text='Clear search', href=url_for('unified_applications.vendor_catalogue'), variant='outline') }}
     {% else %}
-      {{ empty_state(icon='library', title='The catalogue has no reviewed products yet', description='Products appear here once every fact shown has been checked against its public source.', cta_text='Back to your vendors', cta_href=url_for('unified_applications.vendors')) }}
+      <p class="text-sm font-medium text-foreground">The catalogue has no reviewed products yet.</p>
+      <p class="text-sm text-muted-foreground">Products appear here once every fact shown has been checked against its public source.</p>
+      {{ button(text='Back to your vendors', href=url_for('unified_applications.vendors'), variant='outline') }}
     {% endif %}
+    </div>
   </div>
   {% endif %}
 </div>

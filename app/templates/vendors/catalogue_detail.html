@@ -1,8 +1,7 @@
 {# design-block: record-detail #}
 {% extends 'layouts/admin_base.html' %}
-{% from "components/page_header.html" import page_header %}
 {% from "components/card.html" import card, card_header, card_title, card_description, card_content %}
-{% from "components/dense_table.html" import dense_table %}
+{% from "components/table.html" import table, table_header, table_body, table_head %}
 {% from "components/badge.html" import badge %}
 {% from "components/button.html" import button %}
 {% from "components/select.html" import native_select %}
@@ -20,16 +19,18 @@
 
 {% block content %}
 <div class="space-y-6" data-testid="catalogue-product" data-slug="{{ product.catalogue_slug }}">
-  {{ page_header(
-      title=product.product_name,
-      description=(grouped.summary[0].detail if grouped.summary else ''),
-      breadcrumbs=[
-          {'label': 'Dashboard', 'href': url_for('main.index')},
-          {'label': 'Vendors', 'href': url_for('unified_applications.vendors')},
-          {'label': 'Catalogue', 'href': url_for('unified_applications.vendor_catalogue')},
-          {'label': product.product_name}
-      ]
-  ) }}
+  <nav aria-label="Breadcrumb">
+    <ol class="flex flex-wrap items-center gap-1.5 text-sm text-muted-foreground">
+      <li class="flex items-center gap-1.5"><a href="{{ url_for('main.index') }}" class="hover:text-foreground transition-colors">Home</a><i data-lucide="chevron-right" class="w-3.5 h-3.5 shrink-0" aria-hidden="true"></i></li>
+      <li class="flex items-center gap-1.5"><a href="{{ url_for('unified_applications.vendors') }}" class="hover:text-foreground transition-colors">Vendors</a><i data-lucide="chevron-right" class="w-3.5 h-3.5 shrink-0" aria-hidden="true"></i></li>
+      <li class="flex items-center gap-1.5"><a href="{{ url_for('unified_applications.vendor_catalogue') }}" class="hover:text-foreground transition-colors">Catalogue</a><i data-lucide="chevron-right" class="w-3.5 h-3.5 shrink-0" aria-hidden="true"></i></li>
+      <li class="flex items-center gap-1.5" aria-current="page"><span class="text-foreground font-medium">{{ product.product_name }}</span></li>
+    </ol>
+  </nav>
+  <div>
+    <h1 class="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">{{ product.product_name }}</h1>
+    {% if grouped.summary %}<p class="mt-1 text-sm text-muted-foreground">{{ grouped.summary[0].detail }}</p>{% endif %}
+  </div>
 
   {{ vendor_tabs('catalogue') }}
 
@@ -49,7 +50,8 @@
         {% call card_content(class='space-y-4') %}
           {% set arch = grouped.component + grouped.service + grouped.interface %}
           {% if arch %}
-          {% call dense_table(columns=['Element', 'ArchiMate type', 'What it is', 'Protocol', 'Source'], caption='Architecture elements', testid='catalogue-architecture') %}
+          <div class="rounded-lg border border-border overflow-hidden"><div class="overflow-x-auto">
+          {% call table(attrs_dict={'data-testid': 'catalogue-architecture'}) %}{% call table_header() %}<tr>{% call table_head() %}Element{% endcall %}{% call table_head() %}ArchiMate type{% endcall %}{% call table_head() %}What it is{% endcall %}{% call table_head() %}Protocol{% endcall %}{% call table_head() %}Source{% endcall %}</tr>{% endcall %}{% call table_body() %}
             {% for fact in arch %}
             <tr class="h-12" data-testid="fact-{{ fact.kind }}">
               <td class="px-2 font-medium text-foreground">{{ fact.name }}</td>
@@ -59,12 +61,14 @@
               {{ source_cell(fact) }}
             </tr>
             {% endfor %}
-          {% endcall %}
+          {% endcall %}{% endcall %}
+          </div></div>
           {% else %}
           <p class="text-sm text-muted-foreground">No architecture elements have been reviewed for this product yet.</p>
           {% endif %}
           {% if grouped.relationship %}
-          {% call dense_table(columns=['From', 'Relationship', 'To', 'Source'], caption='Relationships between elements', testid='catalogue-relationships') %}
+          <div class="rounded-lg border border-border overflow-hidden"><div class="overflow-x-auto">
+          {% call table(attrs_dict={'data-testid': 'catalogue-relationships'}) %}{% call table_header() %}<tr>{% call table_head() %}From{% endcall %}{% call table_head() %}Relationship{% endcall %}{% call table_head() %}To{% endcall %}{% call table_head() %}Source{% endcall %}</tr>{% endcall %}{% call table_body() %}
             {% for fact in grouped.relationship %}
             <tr class="h-12" data-testid="fact-relationship">
               <td class="px-2 text-foreground">{{ (fact.attributes or {}).get('source', '') }}</td>
@@ -73,7 +77,8 @@
               {{ source_cell(fact) }}
             </tr>
             {% endfor %}
-          {% endcall %}
+          {% endcall %}{% endcall %}
+          </div></div>
           {% endif %}
         {% endcall %}
       {% endcall %}
@@ -96,7 +101,8 @@
             {% else %}
               {% set cols = ['Sub-processor', 'Scope', 'Purpose', 'Source'] %}
             {% endif %}
-            {% call dense_table(columns=cols, caption=heading, testid='catalogue-' ~ kind) %}
+            <div class="rounded-lg border border-border overflow-hidden"><div class="overflow-x-auto">
+          {% call table(attrs_dict={'data-testid': 'catalogue-' ~ kind}) %}{% call table_header() %}<tr>{% for c in cols %}{% call table_head() %}{{ c }}{% endcall %}{% endfor %}</tr>{% endcall %}{% call table_body() %}
               {% for fact in grouped[kind] %}
               {% set a = fact.attributes or {} %}
               <tr class="h-12" data-testid="fact-{{ kind }}">
@@ -111,7 +117,8 @@
                 {{ source_cell(fact) }}
               </tr>
               {% endfor %}
-            {% endcall %}
+            {% endcall %}{% endcall %}
+          </div></div>
           {% endcall %}
         {% endcall %}
         {% endif %}

@@ -143,6 +143,8 @@ MAIN: tuple = (
                 "Investment", "Savings"),
        children=_SPEND_CHILDREN,
        owns=("procurement.", "consolidation_list.", "formula_register.",
+             "unified_applications.vendor_catalogue", "unified_applications.vendor_catalogue_product",
+             "unified_applications.vendor_catalogue_link",
              "dashboard_pages.rationalization_scorecard", "enterprise.investment_matrix")),
 _l("compliance", "Compliance", "risk.risk_register", "shield-check", job="5",
        aliases=("Risks", "Risk register", "Controls", "Decisions", "Evidence", "Audit", "Policies",

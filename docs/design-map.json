@@ -44264,7 +44264,11 @@
    },
    "spec": null,
    "status": "mapped",
-   "tier": "B"
+   "tier": "B",
+   "extra_macros": [
+    "components/table.html"
+   ],
+   "note": "Fact tables use the table macro, not the legacy dense_table."
   },
   "app/templates/vendors/catalogue_list.html": {
    "allowed_macros": [
