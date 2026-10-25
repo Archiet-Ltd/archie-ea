@@ -2,8 +2,7 @@
 {% from 'components/page_header.html' import page_header %}
 {% from 'components/button.html' import button %}
 {% from 'components/card.html' import card, card_content %}
-{% from 'components/input.html' import label, input, textarea %}
-{% from 'components/select.html' import native_select %}
+{% from 'components/input.html' import label %}
 
 {% block title %}Create Vendor{% endblock %}
 
@@ -25,7 +24,7 @@
                 <div class="grid grid-cols-1 gap-6">
                     <div class="space-y-2">
                         {% call label(for='name', required=true) %}Vendor Name{% endcall %}
-                        {{ input(id='name', name='name', placeholder='Enter vendor name', class='flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2', required=true, aria_label='Enter vendor name') }}
+                        {{ input(id='name', name='name', placeholder='Enter vendor name', required=true, class='flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2', aria_label='Enter vendor name') }}
                     </div>
                     <div class="space-y-2">
                         {% call label(for='vendor_type') %}Vendor Type{% endcall %}
@@ -43,13 +42,13 @@
 
                 <div class="space-y-2">
                     {% call label(for='description') %}Description{% endcall %}
-                    {{ textarea(id='description', name='description', placeholder='Describe the vendor and their offerings', class='flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2', rows=3, aria_label='Describe the vendor and their offerings') }}
+                    {{ textarea(id='description', name='description', placeholder='Describe the vendor and their offerings', rows=3, class='flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2', aria_label='Describe the vendor and their offerings') }}
                 </div>
 
                 <div class="grid grid-cols-1 gap-6">
                     <div class="space-y-2">
                         {% call label(for='website') %}Website{% endcall %}
-                        {{ input(id='website', name='website', placeholder='https://vendor.com', class='flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2', type='url', aria_label='https://vendor.com') }}
+                        {{ input(id='website', name='website', type='url', placeholder='https://vendor.com', class='flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2', aria_label='https://vendor.com') }}
                     </div>
                     <div class="space-y-2">
                         {% call label(for='headquarters_location') %}Headquarters Location{% endcall %}

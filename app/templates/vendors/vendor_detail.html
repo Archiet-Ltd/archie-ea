@@ -6,9 +6,6 @@
 {% from "components/data_card.html" import data_card %}
 {% from "components/status_badge.html" import status_badge %}
 {% from "components/document_analyzer.html" import document_analyzer_upload with context %}
-{% from "components/button.html" import button %}
-{% from "components/input.html" import input, textarea %}
-{% from "components/select.html" import native_select %}
 
 {% set product_count = vendor.products|length if vendor.products else 0 %}
 {% set capability_count = vendor_capabilities|length if vendor_capabilities else 0 %}
@@ -70,7 +67,7 @@
             <i data-lucide="bot" class="w-4 h-4 mr-1.5" aria-hidden="true"></i>
             Ask AI
         </a>
-        {{ button('Score Vendor', attrs_dict={'data-vendor-id': '{{ vendor.id }}'}) }}
+        {{ button('Score Vendor', type='button', class='inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center', icon='bar-chart-2', attrs_dict={'id': 'score-vendor-btn', 'data-vendor-id': vendor.id}) }}
         {% if contract_status == 'catalog' %}
         <a href="#contract-lifecycle"
            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
@@ -78,9 +75,9 @@
             Activate Contract
         </a>
         {% endif %}
-        {{ button('Map to Architecture', on_click='openUnifiedMappingModalDiscovery({ context: \'archimate\' })', aria_label='Map to architecture elements') }}
-        {{ button('Map to APQC', on_click='openUnifiedMappingModalDiscovery({ context: \'apqc\' })', aria_label='Map to APQC processes') }}
-        {{ button('Analyze Document', on_click='analyzerOpen = !analyzerOpen', aria_label='Toggle document analyzer') }}
+        {{ button('Map to Architecture', type='button', class='inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center', icon='layers', on_click="openUnifiedMappingModalDiscovery({ context: 'archimate' })", aria_label='Map to architecture elements') }}
+        {{ button('Map to APQC', type='button', class='inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center', icon='git-branch', on_click="openUnifiedMappingModalDiscovery({ context: 'apqc' })", aria_label='Map to APQC processes') }}
+        {{ button('Analyze Document', type='button', class='inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center', icon='scan-line', on_click='analyzerOpen = !analyzerOpen', aria_label='Toggle document analyzer') }}
     </div>
 
     <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
@@ -270,17 +267,17 @@
                     <p class="text-xs text-muted-foreground -mt-2">Moves this vendor's contract lifecycle out of "Catalog" — separate from the Operational Status above, which is already Active for most catalog vendors.</p>
                     <div>
                         <label for="contract_start_date" class="block text-sm font-medium text-muted-foreground mb-1">Contract Start Date</label>
-                        {{ input(id='contract_start_date', name='contract_start_date', class='w-full h-9 rounded-md border border-input bg-background px-3 text-sm', type='date') }}
+                        {{ input(id='contract_start_date', name='contract_start_date', type='date', class='w-full h-9 rounded-md border border-input bg-background px-3 text-sm') }}
                     </div>
                     <div>
                         <label for="contract_end_date" class="block text-sm font-medium text-muted-foreground mb-1">Contract End Date</label>
-                        {{ input(id='contract_end_date', name='contract_end_date', class='w-full h-9 rounded-md border border-input bg-background px-3 text-sm', type='date') }}
+                        {{ input(id='contract_end_date', name='contract_end_date', type='date', class='w-full h-9 rounded-md border border-input bg-background px-3 text-sm') }}
                     </div>
                     <div>
                         <label for="contract_value_annual" class="block text-sm font-medium text-muted-foreground mb-1">Annual Contract Value (USD)</label>
-                        {{ input(id='contract_value_annual', name='contract_value_annual', placeholder='100000', class='w-full h-9 rounded-md border border-input bg-background px-3 text-sm', type='number') }}
+                        {{ input(id='contract_value_annual', name='contract_value_annual', type='number', placeholder='100000', class='w-full h-9 rounded-md border border-input bg-background px-3 text-sm', attrs_dict={'step': '0.01', 'min': '0'}) }}
                     </div>
-                    {{ button('Activate Contract', type='submit', aria_label='Submit') }}
+                    {{ button('Activate Contract', type='submit', class='w-full inline-flex items-center justify-center h-9 px-3 rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors', icon='rocket', aria_label='Submit') }}
                 </form>
                 {% endif %}
             {% endcall %}
@@ -294,7 +291,7 @@
                 <div>
                     <h2 class="text-lg font-semibold leading-none tracking-tight">Products & Deployment</h2>
                 </div>
-                {{ button('Add Product', data_action='openAddProduct') }}
+                {{ button('Add Product', type='button', class='inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center', icon='plus', data_action='openAddProduct') }}
             </div>
             {% call card_description() %}Product portfolio with lifecycle and deployment metadata.{% endcall %}
         {% endcall %}
@@ -398,7 +395,7 @@
                 <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                     <h2 class="text-lg font-semibold leading-none tracking-tight">Deployed Applications</h2>
                     {% if vendor.products %}
-                    {{ button('Deploy Product as Application', aria_label='Deploy Product as Application', attrs_dict={'data-modal-open': 'deployProductModal'}) }}
+                    {{ button('Deploy Product as Application', type='button', class='inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center', icon='rocket', aria_label='Deploy Product as Application', attrs_dict={'data-modal-open': 'deployProductModal'}) }}
                     {% endif %}
                 </div>
             {% endcall %}
@@ -428,7 +425,7 @@
                     <h3 class="font-semibold">No deployed applications</h3>
                     <p class="text-sm text-muted-foreground mt-1">Deploy a product to start tracking architecture and lifecycle metadata.</p>
                     {% if vendor.products %}
-                    {{ button('Deploy Product as Application', aria_label='Deploy Product as Application', attrs_dict={'data-modal-open': 'deployProductModal'}) }}
+                    {{ button('Deploy Product as Application', type='button', class='inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 mt-4 items-center justify-center', icon='rocket', aria_label='Deploy Product as Application', attrs_dict={'data-modal-open': 'deployProductModal'}) }}
                     {% endif %}
                 </div>
                 {% endif %}
@@ -441,7 +438,7 @@
          x-data="concentrationRiskPanel('{{ vendor.id }}')"
          x-init="init()">
         <div class="rounded-lg border border-border bg-card">
-            {% call button(on_click='open = !open') %}<div class="flex items-center gap-3">
+            {% call button(type='button', class='flex w-full items-center justify-between px-6 py-4 text-left', on_click='open = !open') %}<div class="flex items-center gap-3">
                     <i data-lucide="alert-triangle" class="h-4 w-4 text-warning"></i>
                     <span class="font-semibold text-sm">Capability Concentration Risk</span>
                     <template x-if="loaded && soleCount > 0">
@@ -585,7 +582,7 @@
     <div class="space-y-4">
         <div>
             <label for="product_selection" class="block text-sm font-medium text-muted-foreground mb-1">Product <span class="text-destructive-emphasis">*</span></label>
-            {% call native_select(id='product_selection', name='product_selection', class='flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm', attrs_dict={'@change': 'window.updateDeployFormAction && window.updateDeployFormAction()'}) %}
+            {% call native_select(id='product_selection', name='product_selection', class='flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm', attrs_dict={'required': '', '@change': 'window.updateDeployFormAction && window.updateDeployFormAction()'}) %}
 <option value="">Select a product...</option>
                 {% for product in vendor.products %}
                 <option value="{{ product.id }}">{{ product.name }}</option>
@@ -594,11 +591,11 @@
         </div>
         <div>
             <label for="application_name" class="block text-sm font-medium text-muted-foreground mb-1">Application Name <span class="text-destructive-emphasis">*</span></label>
-            {{ input(id='application_name', name='application_name', placeholder='e.g., ServiceNow Production', class='flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm', required=true) }}
+            {{ input(id='application_name', name='application_name', placeholder='e.g., ServiceNow Production', required=true, class='flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm') }}
         </div>
         <div>
             <label for="description" class="block text-sm font-medium text-muted-foreground mb-1">Description</label>
-            {{ textarea(id='description', name='description', placeholder='Optional description', class='flex w-full rounded-md border border-input bg-background px-3 py-1 text-sm min-h-[80px]', rows=3) }}
+            {{ textarea(id='description', name='description', placeholder='Optional description', rows=3, class='flex w-full rounded-md border border-input bg-background px-3 py-1 text-sm min-h-[80px]') }}
         </div>
         <div>
             <label for="deployment_type" class="block text-sm font-medium text-muted-foreground mb-1">Deployment Type</label>
@@ -633,8 +630,8 @@
         </div>
     </div>
     <div class="mt-4 flex justify-end gap-2">
-        {{ button('Cancel', attrs_dict={'data-modal-close': 'deployProductModal'}) }}
-        {{ button('Deploy', type='submit') }}
+        {{ button('Cancel', type='button', class='inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4', attrs_dict={'data-modal-close': 'deployProductModal'}) }}
+        {{ button('Deploy', type='submit', class='inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center') }}
     </div>
 </form>
 {% endcall %}
@@ -664,7 +661,7 @@
     <div class="bg-card border border-border rounded-lg w-full max-w-md mx-4 p-6 space-y-4">
         <div class="flex items-center justify-between">
             <h3 class="text-lg font-semibold">Add Product</h3>
-            {{ button(data_action='closeAddProduct', aria_label='Close') }}
+            {{ button(type='button', class='inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring', icon='x', aria_label='Close', data_action='closeAddProduct') }}
         </div>
         <div class="space-y-3">
             <div>
@@ -699,8 +696,8 @@
         </div>
         <div id="add-product-error" class="hidden text-sm text-destructive-emphasis"></div>
         <div class="flex gap-2 justify-end pt-2">
-            {{ button('Cancel', data_action='closeAddProduct') }}
-            {{ button('Add Product', attrs_dict={'data-vendor-id': '{{ vendor.id }}'}) }}
+            {{ button('Cancel', type='button', class='inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center', data_action='closeAddProduct') }}
+            {{ button('Add Product', type='button', class='inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center', attrs_dict={'id': 'add-product-submit', 'data-vendor-id': vendor.id}) }}
         </div>
     </div>
 </div>

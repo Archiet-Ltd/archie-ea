@@ -4,8 +4,24 @@
 Converts raw <button>, <input>, <select> and <textarea> tags in Jinja2
 templates into the existing component macros (button, input, native_select,
 textarea) where the mapping is one-to-one.  Hidden inputs (type="hidden")
-are left alone.  Controls with attributes the macro cannot carry are left
-alone and listed.
+are left alone.
+
+Behaviour-preservation rules (the defects the first pass introduced, and that
+this pass fixes):
+
+* Every attribute the macro cannot carry as a first-class keyword is passed
+  through ``attrs_dict`` untouched — ``id``, ``name``, ``form``, ``formaction``,
+  ``value`` and any ``@event.modifier`` / ``x-*`` / ``:attr`` / ``data-*``.
+* A Jinja ``{{ expr }}`` inside an attribute value becomes the bare expression,
+  and a value that mixes text with ``{{ expr }}`` becomes a ``~`` concatenation,
+  so it is never rendered as the literal string ``{{ expr }}``.
+* A lucide icon inside a button is preserved through the macro's ``icon``
+  parameter (or the call-block form when the inner markup is complex).
+* A ``<button>`` with no ``type`` keeps the HTML default of ``submit``.
+* ``on_click`` is used only for a plain ``@click``; ``@click.stop`` and
+  friends pass through ``attrs_dict`` with their modifier intact.
+
+Controls with attributes the macro cannot express are left alone and listed.
 
 Usage:
     python scripts/qa/convert_raw_controls.py app/templates/vendors/  # convert
@@ -24,34 +40,52 @@ TPL_ROOT = ROOT / "app" / "templates"
 # Attribute helpers
 # ---------------------------------------------------------------------------
 
-# Attributes the button macro accepts as first-class keyword arguments
-BUTTON_KWARGS = {"type", "class", "disabled", "aria_label", "data_action", "testid"}
-
-# Attributes the input macro accepts as first-class keyword arguments
-INPUT_KWARGS = {
-    "id", "name", "type", "placeholder", "value", "disabled", "required",
-    "class", "aria_label", "aria_describedby", "inputmode", "pattern",
-    "autocomplete", "maxlength", "autofocus", "size",
+# Attributes the button macro accepts as first-class keyword arguments, keyed
+# by the HTML attribute name they come from.  `@click` is handled separately
+# (only a plain `@click` becomes on_click).
+BUTTON_STRING_ATTRS = {
+    "class": "class",
+    "aria-label": "aria_label",
+    "data-action": "data_action",
+    "data-testid": "testid",
 }
+BUTTON_FLAG_ATTRS = {"disabled": "disabled"}
 
-# Attributes the native_select macro accepts as first-class keyword arguments
-SELECT_KWARGS = {
-    "id", "name", "size", "class", "aria_label", "disabled",
-    "multiple", "visible_rows",
+# Attributes the input macro accepts as first-class keyword arguments.
+INPUT_STRING_ATTRS = {
+    "id": "id",
+    "name": "name",
+    "placeholder": "placeholder",
+    "value": "value",
+    "class": "class",
+    "inputmode": "inputmode",
+    "pattern": "pattern",
+    "autocomplete": "autocomplete",
+    "maxlength": "maxlength",
+    "aria-label": "aria_label",
+    "aria-describedby": "aria_describedby",
 }
+INPUT_FLAG_ATTRS = {"disabled": "disabled", "required": "required", "autofocus": "autofocus"}
 
-# Attributes the textarea macro accepts as first-class keyword arguments
-TEXTAREA_KWARGS = {
-    "id", "name", "placeholder", "rows", "disabled", "required",
-    "class", "aria_label", "aria_describedby",
+# Attributes the native_select macro accepts as first-class keyword arguments.
+SELECT_STRING_ATTRS = {
+    "id": "id",
+    "name": "name",
+    "class": "class",
+    "aria-label": "aria_label",
 }
+SELECT_FLAG_ATTRS = {"disabled": "disabled", "multiple": "multiple"}
 
-# Alpine.js / data-* attributes that must go through attrs_dict
-ALPINE_PREFIXES = ("x-", "@", ":", "data-", "aria-")
-
-
-def _is_alpine_or_data_attr(name: str) -> bool:
-    return any(name.startswith(p) for p in ALPINE_PREFIXES)
+# Attributes the textarea macro accepts as first-class keyword arguments.
+TEXTAREA_STRING_ATTRS = {
+    "id": "id",
+    "name": "name",
+    "placeholder": "placeholder",
+    "class": "class",
+    "aria-label": "aria_label",
+    "aria-describedby": "aria_describedby",
+}
+TEXTAREA_FLAG_ATTRS = {"disabled": "disabled", "required": "required"}
 
 
 def _parse_attrs(attrs_str: str) -> list[tuple[str, str]]:
@@ -62,7 +96,7 @@ def _parse_attrs(attrs_str: str) -> list[tuple[str, str]]:
     """
     attrs = []
     pattern = r'''
-        ([@:]*[\w][\w.-]*)            # attribute name (may start with @ or :, may contain dots)
+        ([@:]*[\w][\w:.-]*)            # attribute name (may start with @ or :, may contain : or dots)
         (?:
             \s*=\s*
             (?:
@@ -81,55 +115,97 @@ def _parse_attrs(attrs_str: str) -> list[tuple[str, str]]:
     return attrs
 
 
-def _build_attrs_dict(attrs: list[tuple[str, str]], exclude: set) -> str:
-    """Build a Jinja attrs_dict={...} expression from parsed attributes.
-
-    Only attributes that are NOT in `exclude` and that are Alpine/data-*
-    attributes are included.
-    """
-    items = []
-    for name, value in attrs:
-        if name in exclude:
-            continue
-        if not _is_alpine_or_data_attr(name):
-            continue
-        escaped = value.replace("\\", "\\\\").replace("'", "\\'")
-        items.append(f"'{name}': '{escaped}'")
-    if not items:
-        return ""
-    return "{" + ", ".join(items) + "}"
-
-
 def _jinja_escape(value: str) -> str:
     """Escape a value for use in a Jinja string literal."""
     return value.replace("\\", "\\\\").replace("'", "\\'")
 
 
-def _is_simple_button_text(inner_html: str) -> bool:
-    """Check if inner HTML is simple text (optionally with an icon)."""
-    # Strip whitespace/newlines
-    cleaned = inner_html.strip()
-    # If empty or just text, it's simple
-    if not cleaned or not re.search(r'<[a-z]', cleaned, re.IGNORECASE):
-        return True
-    # If it's just an icon + text, it's simple enough
-    icon_pattern = r'^\s*(?:<i\s+[^>]*></i>\s*)?[^<]*$'
-    if re.match(icon_pattern, cleaned, re.DOTALL):
-        return True
-    return False
+def _quote_literal(s: str) -> str:
+    """Quote a plain string for use as a Jinja string literal."""
+    if "'" in s and '"' not in s:
+        return '"' + s.replace("\\", "\\\\").replace('"', '\\"') + '"'
+    return "'" + _jinja_escape(s) + "'"
+
+
+def _jinja_value(value: str) -> str:
+    """Turn a raw attribute value into a Jinja expression.
+
+    A plain value becomes a string literal.  A value that is exactly one
+    ``{{ expr }}`` becomes the bare expression.  A value mixing literal text
+    and ``{{ expr }}`` becomes a ``~`` concatenation, so the template renders
+    the evaluated expression rather than the literal ``{{ ... }}`` braces.
+    """
+    if "{{" not in value and "{%" not in value:
+        return _quote_literal(value)
+
+    # A value that is exactly one {{ expr }} becomes the bare expression.
+    stripped = value.strip()
+    if stripped.startswith("{{") and stripped.endswith("}}"):
+        inner = stripped[2:-2].strip()
+        if "{{" not in inner and "{%" not in inner:
+            return inner
+
+    parts = re.split(r"(\{\{.*?\}\}|\{%.*?%\})", value)
+    segments = []
+    for part in parts:
+        if not part:
+            continue
+        if part.startswith("{{") and part.endswith("}}"):
+            segments.append(part[2:-2].strip())
+        elif part.startswith("{%") and part.endswith("%}"):
+            # A statement tag inside an attribute value is not an expression;
+            # keep it as literal text (this never occurs in practice).
+            segments.append(_quote_literal(part))
+        else:
+            segments.append(_quote_literal(part))
+    if not segments:
+        return "''"
+    return "(" + " ~ ".join(segments) + ")"
+
+
+def _build_attrs_dict(attrs: list[tuple[str, str]]) -> str:
+    """Build a Jinja ``attrs_dict={...}`` literal from parsed attributes."""
+    items = []
+    for name, value in attrs:
+        if not name:
+            continue
+        items.append(f"'{_jinja_escape(name)}': {_jinja_value(value)}")
+    if not items:
+        return ""
+    return "{" + ", ".join(items) + "}"
+
+
+# ---------------------------------------------------------------------------
+# Button inner-content helpers
+# ---------------------------------------------------------------------------
+
+ICON_TAG = re.compile(r"<i\b[^>]*\bdata-lucide\s*=\s*[\"']([^\"']+)[\"'][^>]*>", re.IGNORECASE)
+
+
+def _extract_button_icon(inner_html: str) -> str | None:
+    """Return the lucide icon name of the first <i data-lucide> in inner_html."""
+    m = ICON_TAG.search(inner_html)
+    return m.group(1) if m else None
+
+
+def _is_simple_button_inner(inner_html: str) -> bool:
+    """True when the inner markup is text plus at most one lucide icon.
+
+    Anything else (nested tags, or text that itself carries a Jinja
+    expression) must be preserved verbatim through the call-block form.
+    """
+    stripped = ICON_TAG.sub("", inner_html)
+    if re.search(r"<[a-z][^>]*>", stripped, re.IGNORECASE):
+        return False
+    text = re.sub(r"<[^>]+>", "", stripped).strip()
+    return "{{" not in text and "{%" not in text
 
 
 def _extract_button_text(inner_html: str) -> str:
-    """Extract visible text from a button's inner HTML.
-
-    Strips HTML tags and trims whitespace. Returns empty string if the
-    button has no static text (e.g. only Alpine x-text or icons).
-    """
-    # Remove HTML tags
-    text = re.sub(r'<[^>]+>', '', inner_html)
+    """Extract the visible static text from a button's inner HTML."""
+    text = re.sub(r"<[^>]+>", "", inner_html)
     text = text.strip()
-    # If the only content is Alpine expressions or whitespace, return empty
-    if not text or text.startswith('{{') or text.startswith('{%'):
+    if not text or text.startswith("{{") or text.startswith("{%"):
         return ""
     return text
 
@@ -139,10 +215,7 @@ def _extract_button_text(inner_html: str) -> str:
 # ---------------------------------------------------------------------------
 
 def _convert_button(match: re.Match) -> str | None:
-    """Convert a <button> tag to a {{ button(...) }} call.
-
-    Returns the replacement string, or None if the button cannot be converted.
-    """
+    """Convert a <button> tag to a {{ button(...) }} call (or call block)."""
     full_tag = match.group(0)
     tag_match = re.match(
         r'<button\s+([^>]*)>(.*?)</button>',
@@ -158,108 +231,67 @@ def _convert_button(match: re.Match) -> str | None:
     attrs = _parse_attrs(attrs_str)
     attr_dict = dict(attrs)
 
-    # Alpine @click or @click.stop → on_click
-    on_click = None
-    click_keys = []
-    for click_attr in ("@click", "@click.stop", "x-on:click"):
-        if click_attr in attr_dict:
-            on_click = attr_dict.pop(click_attr)
-            click_keys.append(click_attr)
-            break
-
-    # Alpine :disabled
-    alpine_disabled = attr_dict.pop(":disabled", None)
-
-    # data-action → data_action
-    data_action = attr_dict.pop("data-action", None)
-
-    # aria-label → aria_label
-    aria_label = attr_dict.pop("aria-label", None)
-
-    # Extract text content
+    icon = _extract_button_icon(inner_html)
     text_content = _extract_button_text(inner_html)
+    has_complex_inner = not _is_simple_button_inner(inner_html)
 
-    # Check if inner HTML is complex (has nested tags beyond simple text)
-    has_complex_inner = bool(re.search(r'<[a-z][^>]*>', inner_html)) and not _is_simple_button_text(inner_html)
-
-    # Build kwargs
     kwargs = {}
+    # The HTML default type for a <button> is submit; keep it.
+    kwargs["type"] = attr_dict.get("type") or "submit"
 
-    btn_type = attr_dict.get("type", "button")
-    if btn_type != "button":
-        kwargs["type"] = btn_type
+    for attr, kwarg in BUTTON_STRING_ATTRS.items():
+        if attr in attr_dict:
+            kwargs[kwarg] = attr_dict[attr]
 
-    if attr_dict.get("disabled") is not None:
-        kwargs["disabled"] = "true"
+    if "disabled" in attr_dict:
+        kwargs["disabled"] = True
 
-    if on_click:
-        kwargs["on_click"] = on_click
+    # A plain @click becomes on_click; @click.modifier stays in attrs_dict.
+    if "@click" in attr_dict:
+        kwargs["on_click"] = attr_dict["@click"]
 
-    if data_action:
-        kwargs["data_action"] = data_action
+    if icon and not has_complex_inner:
+        kwargs["icon"] = icon
 
-    if aria_label:
-        kwargs["aria_label"] = aria_label
-
-    # Build attrs_dict from remaining Alpine/data-* attrs
-    skip_attrs = set(BUTTON_KWARGS) | {"type"}
-    skip_attrs.update(click_keys)
-    skip_attrs.add(":disabled")
-    skip_attrs.add("data-action")
-    skip_attrs.add("aria-label")
-
-    remaining = []
-    for name, value in attrs:
-        if name in skip_attrs:
-            continue
-        if _is_alpine_or_data_attr(name):
-            remaining.append((name, value))
-
-    # Add back :disabled through attrs_dict
-    if alpine_disabled:
-        remaining.append((":disabled", alpine_disabled))
-
-    attrs_dict = _build_attrs_dict(remaining, set())
-
+    # Everything not mapped above passes through attrs_dict.
+    handled = set(BUTTON_STRING_ATTRS) | set(BUTTON_FLAG_ATTRS) | {"type", "@click"}
+    remaining = [(n, v) for (n, v) in attrs if n not in handled]
+    attrs_dict = _build_attrs_dict(remaining)
     if attrs_dict:
         kwargs["attrs_dict"] = attrs_dict
 
-    # Build the macro call
     args = []
-    if text_content and not has_complex_inner:
-        args.append(f"'{_jinja_escape(text_content)}'")
-
-    for k, v in kwargs.items():
-        if k == "attrs_dict":
-            args.append(f"attrs_dict={v}")
-        elif k == "on_click":
-            args.append(f"on_click='{_jinja_escape(v)}'")
-        elif k == "disabled":
-            args.append("disabled=true")
-        elif k == "data_action":
-            args.append(f"data_action='{_jinja_escape(v)}'")
-        elif k == "aria_label":
-            args.append(f"aria_label='{_jinja_escape(v)}'")
-        else:
-            args.append(f"{k}='{_jinja_escape(v)}'")
-
+    if not has_complex_inner and text_content:
+        args.append(_quote_literal(text_content))
+    args.extend(_render_button_kwargs(kwargs))
     macro_args = ", ".join(args)
+
     if has_complex_inner:
         return f"{{% call button({macro_args}) %}}{inner_html}{{% endcall %}}"
     return "{{ button(" + macro_args + ") }}"
 
 
-def _convert_input(match: re.Match) -> str | None:
-    """Convert an <input> tag to a {{ input(...) }} call.
+def _render_button_kwargs(kwargs: dict) -> list[str]:
+    order = ["type", "class", "disabled", "icon", "on_click",
+             "aria_label", "data_action", "testid", "attrs_dict"]
+    parts = []
+    for key in order:
+        if key not in kwargs:
+            continue
+        value = kwargs[key]
+        if key == "disabled":
+            parts.append("disabled=true")
+        elif key == "attrs_dict":
+            parts.append(f"attrs_dict={value}")
+        else:
+            parts.append(f"{key}={_jinja_value(value)}")
+    return parts
 
-    Returns the replacement string, or None if the input cannot be converted.
-    """
+
+def _convert_input(match: re.Match) -> str | None:
+    """Convert an <input> tag to a {{ input(...) }} call."""
     full_tag = match.group(0)
-    tag_match = re.match(
-        r'<input\s+([^>]*)>',
-        full_tag,
-        re.DOTALL | re.IGNORECASE,
-    )
+    tag_match = re.match(r'<input\s+([^>]*)>', full_tag, re.DOTALL | re.IGNORECASE)
     if not tag_match:
         return None
 
@@ -267,68 +299,54 @@ def _convert_input(match: re.Match) -> str | None:
     attrs = _parse_attrs(attrs_str)
     attr_dict = dict(attrs)
 
-    # Leave hidden inputs alone
+    # Leave hidden inputs alone.
     if attr_dict.get("type") == "hidden":
         return None
 
-    # Build kwargs
     kwargs = {}
+    for attr, kwarg in INPUT_STRING_ATTRS.items():
+        if attr in attr_dict:
+            kwargs[kwarg] = attr_dict[attr]
 
-    for key in ("id", "name", "placeholder", "value", "class", "inputmode",
-                "pattern", "autocomplete", "maxlength"):
-        if key in attr_dict:
-            kwargs[key] = attr_dict[key]
-
+    # type defaults to "text" in both HTML and the macro; emit only when set
+    # to something else so the intent is explicit.
     if attr_dict.get("type") and attr_dict["type"] != "text":
         kwargs["type"] = attr_dict["type"]
 
-    if attr_dict.get("disabled") is not None:
-        kwargs["disabled"] = "true"
+    for attr in INPUT_FLAG_ATTRS:
+        if attr in attr_dict:
+            kwargs[INPUT_FLAG_ATTRS[attr]] = True
 
-    if attr_dict.get("required") is not None:
-        kwargs["required"] = "true"
-
-    if attr_dict.get("aria-label"):
-        kwargs["aria_label"] = attr_dict["aria-label"]
-
-    if attr_dict.get("aria-describedby"):
-        kwargs["aria_describedby"] = attr_dict["aria-describedby"]
-
-    if attr_dict.get("autofocus") is not None:
-        kwargs["autofocus"] = "true"
-
-    # Build attrs_dict from remaining Alpine/data-* attrs
-    remaining = []
-    for name, value in attrs:
-        if name in INPUT_KWARGS:
-            continue
-        if name in ("aria-label", "aria-describedby", "autofocus"):
-            continue
-        if _is_alpine_or_data_attr(name):
-            remaining.append((name, value))
-
-    attrs_dict = _build_attrs_dict(remaining, set())
+    handled = set(INPUT_STRING_ATTRS) | set(INPUT_FLAG_ATTRS) | {"type"}
+    remaining = [(n, v) for (n, v) in attrs if n not in handled]
+    attrs_dict = _build_attrs_dict(remaining)
     if attrs_dict:
         kwargs["attrs_dict"] = attrs_dict
 
-    # Build the macro call
-    args = []
-    for k, v in kwargs.items():
-        if k == "attrs_dict":
-            args.append(f"attrs_dict={v}")
-        elif k in ("disabled", "required", "autofocus"):
-            args.append(f"{k}=true")
-        else:
-            args.append(f"{k}='{_jinja_escape(v)}'")
+    return "{{ input(" + ", ".join(_render_input_kwargs(kwargs)) + ") }}"
 
-    return "{{ input(" + ", ".join(args) + ") }}"
+
+def _render_input_kwargs(kwargs: dict) -> list[str]:
+    order = ["id", "name", "type", "placeholder", "value", "disabled",
+             "required", "class", "aria_label", "aria_describedby",
+             "inputmode", "pattern", "autocomplete", "maxlength",
+             "autofocus", "attrs_dict"]
+    parts = []
+    for key in order:
+        if key not in kwargs:
+            continue
+        value = kwargs[key]
+        if key in ("disabled", "required", "autofocus"):
+            parts.append(f"{key}=true")
+        elif key == "attrs_dict":
+            parts.append(f"attrs_dict={value}")
+        else:
+            parts.append(f"{key}={_jinja_value(value)}")
+    return parts
 
 
 def _convert_select(match: re.Match) -> str | None:
-    """Convert a <select> tag to a {% call native_select(...) %}...{% endcall %}.
-
-    Returns the replacement string, or None if the select cannot be converted.
-    """
+    """Convert a <select> tag to a {% call native_select(...) %}...{% endcall %}."""
     full_tag = match.group(0)
     tag_match = re.match(
         r'<select\s+([^>]*)>(.*?)</select>',
@@ -345,57 +363,48 @@ def _convert_select(match: re.Match) -> str | None:
     attr_dict = dict(attrs)
 
     kwargs = {}
+    for attr, kwarg in SELECT_STRING_ATTRS.items():
+        if attr in attr_dict:
+            kwargs[kwarg] = attr_dict[attr]
 
-    for key in ("id", "name", "class"):
-        if key in attr_dict:
-            kwargs[key] = attr_dict[key]
+    for attr in SELECT_FLAG_ATTRS:
+        if attr in attr_dict:
+            kwargs[SELECT_FLAG_ATTRS[attr]] = True
 
-    if attr_dict.get("aria-label"):
-        kwargs["aria_label"] = attr_dict["aria-label"]
-
-    if attr_dict.get("disabled") is not None:
-        kwargs["disabled"] = "true"
-
-    if attr_dict.get("multiple") is not None:
-        kwargs["multiple"] = "true"
-
+    # The macro's `size` is the control height (sm/xs); the HTML size (list
+    # box rows) maps to `visible_rows`.
     if attr_dict.get("size"):
         kwargs["visible_rows"] = attr_dict["size"]
 
-    # Build attrs_dict from remaining Alpine/data-* attrs
-    remaining = []
-    for name, value in attrs:
-        if name in SELECT_KWARGS:
-            continue
-        if name in ("aria-label",):
-            continue
-        if _is_alpine_or_data_attr(name):
-            remaining.append((name, value))
-
-    attrs_dict = _build_attrs_dict(remaining, set())
+    handled = set(SELECT_STRING_ATTRS) | set(SELECT_FLAG_ATTRS) | {"size"}
+    remaining = [(n, v) for (n, v) in attrs if n not in handled]
+    attrs_dict = _build_attrs_dict(remaining)
     if attrs_dict:
         kwargs["attrs_dict"] = attrs_dict
 
-    # Build the macro call
-    args = []
-    for k, v in kwargs.items():
-        if k == "attrs_dict":
-            args.append(f"attrs_dict={v}")
-        elif k in ("disabled", "multiple"):
-            args.append(f"{k}=true")
-        else:
-            args.append(f"{k}='{_jinja_escape(v)}'")
+    macro_call = "{% call native_select(" + ", ".join(_render_select_kwargs(kwargs)) + ") %}"
+    return f"{macro_call}\n{inner_html}\n{{% endcall %}}"
 
-    macro_call = "{% call native_select(" + ", ".join(args) + ") %}"
-    end_call = "{% endcall %}"
-    return f"{macro_call}\n{inner_html}\n{end_call}"
+
+def _render_select_kwargs(kwargs: dict) -> list[str]:
+    order = ["id", "name", "class", "aria_label", "disabled", "multiple",
+             "visible_rows", "attrs_dict"]
+    parts = []
+    for key in order:
+        if key not in kwargs:
+            continue
+        value = kwargs[key]
+        if key in ("disabled", "multiple"):
+            parts.append(f"{key}=true")
+        elif key == "attrs_dict":
+            parts.append(f"attrs_dict={value}")
+        else:
+            parts.append(f"{key}={_jinja_value(value)}")
+    return parts
 
 
 def _convert_textarea(match: re.Match) -> str | None:
-    """Convert a <textarea> tag to a {{ textarea(...) }} call.
-
-    Returns the replacement string, or None if the textarea cannot be converted.
-    """
+    """Convert a <textarea> tag to a {{ textarea(...) }} call (or call block)."""
     full_tag = match.group(0)
     tag_match = re.match(
         r'<textarea\s+([^>]*)>(.*?)</textarea>',
@@ -412,55 +421,46 @@ def _convert_textarea(match: re.Match) -> str | None:
     attr_dict = dict(attrs)
 
     kwargs = {}
-
-    for key in ("id", "name", "placeholder", "class"):
-        if key in attr_dict:
-            kwargs[key] = attr_dict[key]
+    for attr, kwarg in TEXTAREA_STRING_ATTRS.items():
+        if attr in attr_dict:
+            kwargs[kwarg] = attr_dict[attr]
 
     if attr_dict.get("rows"):
         kwargs["rows"] = attr_dict["rows"]
 
-    if attr_dict.get("disabled") is not None:
-        kwargs["disabled"] = "true"
+    for attr in TEXTAREA_FLAG_ATTRS:
+        if attr in attr_dict:
+            kwargs[TEXTAREA_FLAG_ATTRS[attr]] = True
 
-    if attr_dict.get("required") is not None:
-        kwargs["required"] = "true"
-
-    if attr_dict.get("aria-label"):
-        kwargs["aria_label"] = attr_dict["aria-label"]
-
-    if attr_dict.get("aria-describedby"):
-        kwargs["aria_describedby"] = attr_dict["aria-describedby"]
-
-    # Build attrs_dict from remaining Alpine/data-* attrs
-    remaining = []
-    for name, value in attrs:
-        if name in TEXTAREA_KWARGS:
-            continue
-        if name in ("aria-label", "aria-describedby"):
-            continue
-        if _is_alpine_or_data_attr(name):
-            remaining.append((name, value))
-
-    attrs_dict = _build_attrs_dict(remaining, set())
+    handled = set(TEXTAREA_STRING_ATTRS) | set(TEXTAREA_FLAG_ATTRS) | {"rows"}
+    remaining = [(n, v) for (n, v) in attrs if n not in handled]
+    attrs_dict = _build_attrs_dict(remaining)
     if attrs_dict:
         kwargs["attrs_dict"] = attrs_dict
 
-    # Build the macro call
-    args = []
-    for k, v in kwargs.items():
-        if k == "attrs_dict":
-            args.append(f"attrs_dict={v}")
-        elif k in ("disabled", "required"):
-            args.append(f"{k}=true")
-        elif k == "rows":
-            args.append(f"rows={v}")
-        else:
-            args.append(f"{k}='{_jinja_escape(v)}'")
-
+    args = _render_textarea_kwargs(kwargs)
     if inner_text:
-        return f"{{% call textarea(" + ", ".join(args) + ") %}}{inner_text}{{% endcall %}}"
+        return "{% call textarea(" + ", ".join(args) + ") %}" + inner_text + "{% endcall %}"
     return "{{ textarea(" + ", ".join(args) + ") }}"
+
+
+def _render_textarea_kwargs(kwargs: dict) -> list[str]:
+    order = ["id", "name", "placeholder", "rows", "disabled", "required",
+             "class", "aria_label", "aria_describedby", "attrs_dict"]
+    parts = []
+    for key in order:
+        if key not in kwargs:
+            continue
+        value = kwargs[key]
+        if key in ("disabled", "required"):
+            parts.append(f"{key}=true")
+        elif key == "rows":
+            parts.append(f"rows={value}")
+        elif key == "attrs_dict":
+            parts.append(f"attrs_dict={value}")
+        else:
+            parts.append(f"{key}={_jinja_value(value)}")
+    return parts
 
 
 # ---------------------------------------------------------------------------

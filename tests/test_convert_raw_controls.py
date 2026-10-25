@@ -96,11 +96,11 @@ class TestButtonConversion:
         assert len(converted) == 1
 
     def test_button_with_click_stop(self):
-        """@click.stop becomes on_click."""
+        """@click.stop passes through attrs_dict (on_click is only for @click)."""
         html = '<button type="button" @click.stop="handleClick($event)">Stop</button>'
         output, converted, skipped = _convert_text(html)
-        assert "on_click=" in output
-        assert "handleClick($event)" in output
+        assert "on_click=" not in output
+        assert "'@click.stop': 'handleClick($event)'" in output
         assert len(converted) == 1
 
     def test_button_with_aria_label(self):
