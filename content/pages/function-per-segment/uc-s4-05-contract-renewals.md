@@ -13,7 +13,7 @@ icon: calendar
 
 **For owner-operators and managing directors running a services business.**
 
-The Renewal Alerts screen lists every vendor contract coming up for renewal or already past it, soonest first, with the vendor, the annual cost and the renewal date. What depends on a contract is a second step on a second screen. From the contract you can open its element in the model, or you can ask "What breaks if ___ fails or is under-resourced?" on Ask. Entelim does not join the two into a single answer.
+The Renewal Alerts screen lists every vendor contract coming up for renewal or already past it, soonest first, with the vendor, the annual cost and the renewal date. To see what depends on a contract, open its element in the model from the contract, or ask "What breaks if ___ fails or is under-resourced?" in the AI chat, which answers with the records it read.
 
 ## The question
 
@@ -35,7 +35,7 @@ A contract with neither a renewal date nor an end date is counted under No Date 
 
 **License Entitlements** lists each product with its vendor and the numbers Entitled, Consumed and Used, plus Utilization and Status. These are the terms inside the contracts.
 
-**Vendor Catalogue** shows tiles for Total Vendors, Active Vendors, Strategic Vendors, Product Portfolio, Portfolio ACV and Renewals Due (90d).
+**Your vendors** shows tiles for Total Vendors, Active Vendors, Strategic Vendors, Product Portfolio, Portfolio ACV and Renewals Due (90d).
 
 ## Who asks it
 
@@ -46,7 +46,7 @@ The managing director, or whoever signs off spend, in the weeks before a renewal
 1. Record each contract with its vendor, annual cost and renewal or end date.
 2. Open **Renewal Alerts** and choose the window you care about.
 3. Read the badges and the days remaining. Open **View Details** on the first contract.
-4. To see what depends on it, follow the **Contract element** link under Architecture model, or open **Ask**, choose "What breaks if ___ fails or is under-resourced?" and type the system or supplier name.
+4. To see what depends on it, follow the **Contract element** link under Architecture model, or open the AI chat and ask "What breaks if ___ fails or is under-resourced?" with the system or supplier name. The answer links the records it read.
 5. Check **License Entitlements** for the quantities you pay for against those you use.
 
 ## Doing this without Entelim
@@ -56,7 +56,7 @@ A contracts folder, a renewal calendar kept by one person and a separate list of
 ## Limits
 
 - Procurement, Vendor Contracts and Renewal Alerts are built for the procurement and portfolio manager roles. License Entitlements is open to the finance role too.
-- Going from a contract to what depends on it takes two screens. The vendor record itself is not a point in the model, so Ask finds a system, a product or a supplier only if it has been modelled as an element.
+- Your vendors and the contracts behind them are recorded in Procurement. The AI chat finds a system, a product or a supplier only if it has been modelled as an element.
 - The AI brief is a draft to work from. It does not replace reading the contract.
 - A contract without a date is never flagged as renewing.
 - Entelim holds the dates and terms you record. On the contract form, "Extract from contract text" reads text you paste in and proposes fields for you to review and apply. It does not go and find contract documents itself.
@@ -73,7 +73,7 @@ It appears in the No Date tile and is left out of the list. Add a date to see it
 
 ### Can it tell me what breaks if I cancel?
 
-It shows what is recorded as depending on the contract's element or the system it supports. That is two steps, not one answer, and it is only as complete as your model.
+It shows what is recorded as depending on the contract's element or the system it supports. It is only as complete as your model.
 
 ### Where do licence quantities come from?
 
