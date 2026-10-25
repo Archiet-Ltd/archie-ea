@@ -1,6 +1,10 @@
+{# design-block: board #}
 {% extends "layouts/admin_base.html" %}
 {% from 'components/page_header.html' import page_header %}
 {% from 'components/empty_state.html' import empty_state %}
+{% from 'components/metrics_card.html' import metrics_card %}
+{% from 'components/badge.html' import badge %}
+{% import 'components/card.html' as card %}
 
 {% block title %}Simple View - Capability Map{% endblock %}
 
@@ -18,7 +22,7 @@
 <div class="space-y-6">
     {{ page_header(
         title='Capability Overview',
-        description='A flat, read-only list of the capability hierarchy — Level 1 capabilities and their direct sub-capabilities.'
+        description='Every capability, grouped by what it is for: strategic, operational or supporting.'
     ) }}
     {% with active_view = 'simple' %}{% include 'capability_map/_view_switcher.html' %}{% endwith %}
 
@@ -28,110 +32,62 @@
     </div>
     {% endif %}
 
-    <!-- Statistics -->
     <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <div class="bg-card rounded-lg border border-border p-6">
-            <div class="flex items-center">
-                <div class="p-2 bg-primary/10 rounded-lg">
-                    <i data-lucide="layers" class="w-6 h-6 text-primary"></i>
-                </div>
-                <div class="ml-4">
-                    <h3 class="text-sm font-medium text-muted-foreground">Total Capabilities</h3> <!-- frontend-quality-ok: h3 in stat card, pre-existing content -->
-                    <p class="text-2xl font-bold text-foreground">{{ stats.total|dash }}</p>
-                </div>
-            </div>
-        </div>
-
-        <div class="bg-card rounded-lg border border-border p-6">
-            <div class="flex items-center">
-                <div class="p-2 bg-primary/10 rounded-lg">
-                    <i data-lucide="folder-tree" class="w-6 h-6 text-primary"></i>
-                </div>
-                <div class="ml-4">
-                    <h3 class="text-sm font-medium text-muted-foreground">Level 1 Capabilities</h3>
-                    <p class="text-2xl font-bold text-foreground">{{ stats.l1_count|dash }}</p>
-                </div>
-            </div>
-        </div>
-
-        <div class="bg-card rounded-lg border border-border p-6">
-            <div class="flex items-center">
-                <div class="p-2 bg-primary/10 rounded-lg">
-                    <i data-lucide="git-branch" class="w-6 h-6 text-primary"></i>
-                </div>
-                <div class="ml-4">
-                    <h3 class="text-sm font-medium text-muted-foreground">Max Depth</h3>
-                    <p class="text-2xl font-bold text-foreground">{{ stats.max_depth|dash }}</p>
-                </div>
-            </div>
-        </div>
-
-        <div class="bg-card rounded-lg border border-border p-6">
-            <div class="flex items-center">
-                <div class="p-2 bg-primary/10 rounded-lg">
-                    <i data-lucide="globe" class="w-6 h-6 text-primary"></i>
-                </div>
-                <div class="ml-4">
-                    <h3 class="text-sm font-medium text-muted-foreground">Domains</h3>
-                    <p class="text-2xl font-bold text-foreground">{{ stats.domain_count|dash }}</p>
-                </div>
-            </div>
-        </div>
+        {{ metrics_card(title='Total Capabilities', value=(stats.total|dash), icon='layers') }}
+        {{ metrics_card(title='Level 1 Capabilities', value=(stats.l1_count|dash), icon='folder-tree') }}
+        {{ metrics_card(title='Max Depth', value=(stats.max_depth|dash), icon='git-branch') }}
+        {{ metrics_card(title='Domains', value=(stats.domain_count|dash if stats.domain_count else '—'), description=('' if stats.domain_count else 'No domain assigned yet'), icon='globe') }}
     </div>
 
-    <!-- Capability List -->
-    <div class="bg-card rounded-lg border border-border">
-        <div class="px-6 py-4 border-b">
-            <h2 class="text-lg font-medium text-foreground">Capability Overview</h2>
-            <p class="text-sm text-muted-foreground mt-1">Level 1 capabilities and their direct sub-capabilities.</p>
-        </div>
-
-        {% if capability_groups %}
-        <div class="p-6 space-y-6">
-            {% for group in capability_groups %}
-            <div class="border-l-4 border-primary pl-4">
-                <h3 class="text-lg font-medium text-foreground">{{ group.name }}</h3>
-                {% if group.description %}
-                <p class="text-sm text-muted-foreground mt-1">{{ group.description }}</p>
-                {% endif %}
-                <div class="mt-3 flex items-center flex-wrap gap-3">
-                    <span class="text-sm text-muted-foreground">Level {{ group.level }}</span>
-                    {% if group.domain %}
-                    <span class="px-2 py-1 text-xs font-semibold rounded-full bg-primary/10 text-info-emphasis">{{ group.domain }}</span>
-                    {% endif %}
-                </div>
-
-                {% if group.children %}
-                <div class="mt-4 ml-4 space-y-3">
-                    {% for child in group.children %}
-                    <div class="border-l-2 border-border pl-4">
-                        <h4 class="text-base font-medium text-foreground">{{ child.name }}</h4>
-                        {% if child.description %}
-                        <p class="text-sm text-muted-foreground">{{ child.description }}</p>
-                        {% endif %}
-                        <div class="mt-2 flex items-center gap-2">
-                            <span class="px-2 py-0.5 text-xs font-semibold rounded-full bg-muted text-muted-foreground">Level {{ child.level }}</span>
-                            {% if child.domain %}
-                            <span class="text-xs text-muted-foreground">{{ child.domain }}</span>
+    {% if capability_groups and stats.total %}
+    <div class="space-y-6">
+        {% for group in capability_groups %}
+        <section data-testid="type-group-{{ group.key }}" aria-labelledby="group-{{ group.key }}">
+        {% call card.card() %}
+            {% call card.card_header() %}
+                {% call card.card_title() %}<span id="group-{{ group.key }}">{{ group.name }}</span>{% endcall %}
+                {% call card.card_description() %}{{ group.description }}{% endcall %}
+                {% call card.card_action() %}
+                    {% call badge('neutral') %}{{ group.capabilities|length }}{% endcall %}
+                {% endcall %}
+            {% endcall %}
+            {% call card.card_content() %}
+                {% if group.capabilities %}
+                <ul class="divide-y divide-border">
+                    {% for cap in group.capabilities %}
+                    <li class="flex flex-wrap items-center justify-between gap-2 py-3" data-testid="capability-row">
+                        <div class="min-w-0">
+                            {% if cap.fact_sheet_id %}
+                            <a href="{{ url_for('enterprise_crud.capability_fact_sheet', capability_id=cap.fact_sheet_id) }}" class="text-sm font-medium text-foreground hover:text-primary hover:underline">{{ cap.name }}</a>
+                            {% else %}
+                            <span class="text-sm font-medium text-foreground">{{ cap.name }}</span>
                             {% endif %}
+                            {% if cap.description %}<p class="text-sm text-muted-foreground">{{ cap.description }}</p>{% endif %}
                         </div>
-                    </div>
+                        <div class="flex items-center gap-2">
+                            {% call badge('neutral') %}Level {{ cap.level }}{% endcall %}
+                            {% if cap.domain %}<span class="text-xs text-muted-foreground">{{ cap.domain }}</span>{% endif %}
+                        </div>
+                    </li>
                     {% endfor %}
-                </div>
+                </ul>
+                {% else %}
+                <p class="text-sm text-muted-foreground">No {{ group.name|lower }} capabilities yet. Open a capability and set its type to place it here.</p>
                 {% endif %}
-            </div>
-            {% endfor %}
-        </div>
-        {% else %}
-        {{ empty_state(
-            icon='layers',
-            title='No capabilities yet',
-            description='Business capabilities modelled for this organization will appear here once created.',
-            cta_text='Go to Capability Map',
-            cta_href=url_for('capability_map.index'),
-            cta_icon='arrow-right'
-        ) }}
-        {% endif %}
+            {% endcall %}
+        {% endcall %}
+        </section>
+        {% endfor %}
     </div>
+    {% else %}
+    {{ empty_state(
+        icon='layers',
+        title='No capabilities yet',
+        description='Business capabilities modelled for this organization will appear here once created.',
+        cta_text='Go to Capability Map',
+        cta_href=url_for('capability_map.index'),
+        cta_icon='arrow-right'
+    ) }}
+    {% endif %}
 </div>
 {% endblock %}

@@ -74,6 +74,10 @@ class BusinessModelCanvas(TenantMixin, db.Model):
     saved_diagram_id = db.Column(db.Integer, nullable=True)
     vision_element_id = db.Column(db.Integer, nullable=True)
 
+    # Which framework this canvas draws (a CANVAS_TEMPLATES key). NULL is the
+    # Business Model Canvas, which is what every canvas was before this column.
+    canvas_type = db.Column(db.String(64), nullable=True)
+
     # Timestamps
     created_at = db.Column(db.DateTime, default=utcnow, nullable=True)
     updated_at = db.Column(db.DateTime, default=utcnow, onupdate=utcnow, nullable=True)

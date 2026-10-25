@@ -24,6 +24,35 @@
 {% endblock %}
 
 {% block content %}
+{% if role_catalogue %}
+{% from 'components/card.html' import card, card_header, card_title, card_description %}
+<div class="mx-auto max-w-5xl px-4 py-12 sm:px-6 sm:py-16" data-role-hub>
+  {% if jsonld %}
+  <script type="application/ld+json">{{ jsonld }}</script>
+  {% endif %}
+  <h1 class="text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">Entelim for your role</h1>
+  <p class="mt-3 max-w-2xl text-base text-muted-foreground">Pick the role closest to yours to see what Entelim does for it. If yours is not here, <a href="{{ url_for('main.public_site_page', slug='contact') }}" class="text-primary underline-offset-4 hover:underline">talk to us</a>.</p>
+  {% for family in role_catalogue.cards %}
+  <section class="mt-10" aria-labelledby="{{ family.id }}">
+    <h2 id="{{ family.id }}" class="text-lg font-semibold text-foreground">{{ family.label }}</h2>
+    <ul class="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      {% for item in family.cards %}
+      <li>
+        <a href="{{ item.href }}" class="block h-full rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" data-role-card>
+          {% call card(class='h-full transition-colors hover:bg-accent') %}
+            {% call card_header() %}
+              {% call card_title(class='text-lg') %}{{ item.title }}{% endcall %}
+              {% call card_description() %}{{ item.blurb }}{% endcall %}
+            {% endcall %}
+          {% endcall %}
+        </a>
+      </li>
+      {% endfor %}
+    </ul>
+  </section>
+  {% endfor %}
+</div>
+{% else %}
 <div class="mx-auto max-w-3xl px-4 sm:px-6 py-12 sm:py-16">
   <article class="public-page-content public-prose public-hub public-hub-feed prose max-w-none">
     {% if jsonld %}
@@ -45,24 +74,9 @@
     {% set show_descriptions = false %}
     {% include 'public/_hub_groups.html' %}
 
-    {% if role_catalogue %}
-    {# The roles Entelim is built for, from the site registry (the same list as the
-       Roles menu and the footer). A role with a page links to it. #}
-    <section aria-labelledby="role-catalogue-heading" data-role-catalogue>
-      <h2 id="role-catalogue-heading">All {{ role_catalogue.count }} roles</h2>
-      <p>The roles Entelim is built for, by family. A role with its own page links to it. For the others, <a href="{{ url_for('main.public_site_page', slug='contact') }}">talk to us</a> about your role.</p>
-      {% for family in role_catalogue.families %}
-      <h3 id="{{ family.id }}">{{ family.label }}</h3>
-      <ul>
-        {% for role in family.roles %}
-        <li id="{{ role.id }}">{% if role.has_page %}<a href="{{ role.href }}">{{ role.label }}</a>{% else %}{{ role.label }}{% endif %}</li>
-        {% endfor %}
-      </ul>
-      {% endfor %}
-    </section>
-    {% endif %}
   </article>
 </div>
+{% endif %}
 {% include 'components/public_footer.html' %}
 {% endblock %}
 {# design-block: public #}

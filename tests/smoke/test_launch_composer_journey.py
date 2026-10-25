@@ -1,7 +1,7 @@
 """Application architects model a component landscape in the ArchiMate Composer,
 and a solution architect asks the AI chat why two things are connected.
 
-Composer: a fresh organisation. Elements are added through the Components
+Composer: a fresh organisation. Elements are added through the element
 palette (drag onto the canvas, then name a new one or pick an existing one
 from the live search), relationships are drawn in connect mode through the
 relationship-type picker, a connection the metamodel forbids is refused with
@@ -38,16 +38,19 @@ def _new_page(browser):
 def _open_composer(page, base, query=""):
     page.goto(base + "/archimate/composer" + query, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
     expect(page.locator("nav[aria-label='Composer toolbar']")).to_be_visible(timeout=PAGE_TIMEOUT)
-    expect(page.locator("[data-testid='composer-capabilities-panel']")).to_be_visible(timeout=PAGE_TIMEOUT)
+    expect(page.locator("[data-testid='diagram-palette']")).to_be_visible(timeout=PAGE_TIMEOUT)
+
+
+# The palette names every type in full; these tests speak of the two they use by their short names.
+_PALETTE_TYPE = {"Application": "ApplicationComponent", "App Interface": "ApplicationInterface"}
 
 
 def _drop_from_palette(page, label, x, y):
-    """Drag a palette chip onto the canvas; the add-element search opens.
+    """Drag an element type from the palette onto the canvas; the add-element search opens.
 
-    The empty canvas shows starter-template cards across its upper half, so
-    drops land in the lower half."""
-    chip = page.locator("[data-testid='composer-capabilities-panel'] .palette-chip").filter(
-        has=page.get_by_text(label, exact=True)).first
+    The empty canvas shows starter-template cards across the middle of its
+    upper half, so drops land in the lower half or out at the sides."""
+    chip = page.locator("[data-testid='palette-item-%s']" % _PALETTE_TYPE[label])
     chip.drag_to(page.locator("#composer-canvas"), target_position={"x": x, "y": y})
     overlay = page.locator("#search-overlay")
     expect(overlay).to_be_visible(timeout=PAGE_TIMEOUT)
@@ -131,13 +134,13 @@ def test_application_architect_models_components_and_interfaces(browser, live_se
     # An interface already in the organisation's catalogue, made in an earlier
     # Composer session, to be picked through live search below.
     _open_composer(page, base)
-    _add_new(page, "App Interface", payments_api, 700, 700)
+    _add_new(page, "App Interface", payments_api, 1250, 700)
 
     _open_composer(page, base)
     expect(_node(page, payments_api)).to_have_count(0)
     _add_new(page, "Application", order, 250, 700)
-    _add_new(page, "Application", billing, 650, 700)
-    _add_existing(page, "App Interface", payments_api, 650, 400)
+    _add_new(page, "Application", billing, 1100, 700)
+    _add_existing(page, "App Interface", payments_api, 1250, 400)
     expect(page.locator(".joint-element")).to_have_count(3, timeout=PAGE_TIMEOUT)
 
     # Ordering passes order data to Billing (flow); the interface serves Billing.

@@ -754,6 +754,10 @@ let ComposerPersistence = (function() {
                     link.router('normal');
                     link.connector('smooth');
                     link.set('routingStyle', savedRouting);
+                } else if (savedRouting === 'straight') {
+                    link.router('normal');
+                    link.connector('normal');
+                    link.set('routingStyle', savedRouting);
                 }
                 if (decorateLink) decorateLink(link, rel);
                 self.graph.addCell(link);

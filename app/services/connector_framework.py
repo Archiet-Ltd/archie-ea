@@ -26,6 +26,7 @@ Credentials live only in the per-organisation store
 configuration rows hold settings, never secrets.
 """
 
+from app.services.change_source import records_changes_as
 import json
 import logging
 from abc import ABC, abstractmethod
@@ -1246,6 +1247,7 @@ def run_coroutine_sync(coro):
         events._set_running_loop(outer)
 
 
+@records_changes_as("connector")
 def run_connector_sync(
     *,
     org_id: int,

@@ -124,13 +124,20 @@ def test_cmp09_closing_scratch_tab_deletes_server_row():
 def test_cmp10_menus_use_opacity_only_transition():
     """Toolbar dropdowns must fade (opacity only), not scale/translate, so menu
     items don't shift under the cursor mid-animation and swallow the click."""
-    toolbar = (JS.parents[1] / "templates" / "archimate" / "partials"
-               / "_composer_toolbar.html").read_text(encoding="utf-8")
     import re
-    # No bare `x-transition` (default = scale+translate) should remain.
-    bare = re.findall(r"x-transition(?!\.)", toolbar)
-    assert not bare, "toolbar menus must use opacity-only transitions, not the default"
-    assert "x-transition.opacity" in toolbar
+    root = JS.parents[1] / "templates"
+    toolbar = (root / "archimate" / "partials" / "_composer_toolbar.html").read_text(encoding="utf-8")
+    shell = (root / "components" / "diagram" / "toolbar.html").read_text(encoding="utf-8")
+    macro = (root / "components" / "dropdown_menu.html").read_text(encoding="utf-8")
+    # Every menu the composer draws asks the dropdown macro for the opacity-only fade.
+    calls = re.findall(r"dropdown_menu\(", toolbar + shell)
+    assert calls and len(calls) == len(re.findall(r"transition='opacity'", toolbar + shell)), \
+        "every composer menu must pass transition='opacity'"
+    # No bare `x-transition` (default = scale+translate) in the composer's own markup.
+    assert not re.findall(r"x-transition(?!\.)", toolbar + shell), \
+        "toolbar menus must use opacity-only transitions, not the default"
+    # The macro turns that request into an opacity-only transition with no scale.
+    assert "x-transition.opacity" in macro
 
 
 def test_cmp14_hover_raises_only_on_overlap_and_keeps_links_on_top():
@@ -151,20 +158,22 @@ def test_cmp07_single_save_indicator():
     src = _read("archimate/composer.js")
     assert "get saveIndicator()" in src, "unified saveIndicator getter must exist"
     composer_html = (JS.parents[1] / "templates" / "archimate" / "composer.html").read_text(encoding="utf-8")
-    assert "saveIndicator.text" in composer_html, "footer must render the unified indicator"
+    status_line = (JS.parents[1] / "templates" / "components" / "diagram" / "status_line.html").read_text(encoding="utf-8")
+    assert "diagram_status_line()" in composer_html, "the page must draw the status line component"
+    assert "saveIndicator.text" in status_line, "footer must render the unified indicator"
     # The old competing footer strings must be gone.
-    assert "'Autosave: ' + _autosaveLabel" not in composer_html, \
+    assert "'Autosave: ' + _autosaveLabel" not in composer_html + status_line, \
         "the separate 'Autosave: <label>' footer block must be removed"
 
 
 def test_cmp12_narrow_width_media_query():
     """A narrow-width media query must hide the overlapping minimap and let the
     toolbar scroll instead of clipping."""
-    composer_html = (JS.parents[1] / "templates" / "archimate" / "composer.html").read_text(encoding="utf-8")
-    assert "@media (max-width: 1100px)" in composer_html
+    css = (JS.parents[1] / "static" / "css" / "archimate_composer.css").read_text(encoding="utf-8")
+    assert "@media (max-width: 1100px)" in css
     # Within the narrow block, the minimap is hidden and the toolbar scrolls.
-    idx = composer_html.index("@media (max-width: 1100px)")
-    block = composer_html[idx:idx + 500]
+    idx = css.index("@media (max-width: 1100px)")
+    block = css[idx:idx + 500]
     assert ".mini-map { display: none" in block
     assert "overflow-x: auto" in block
 
@@ -181,8 +190,8 @@ def test_cmp03_audit_failure_not_toasted():
 
 def test_cmp03_minimap_storage_failure_is_an_explicit_optional_exception():
     """Storage denial must not break minimap toggling or look like a silent API failure."""
-    composer_html = (JS.parents[1] / "templates" / "archimate" / "composer.html").read_text(encoding="utf-8")
-    minimap_toggle = composer_html[composer_html.index("archie.composer.miniMapExpanded"):]
+    minimap = (JS.parents[1] / "templates" / "components" / "diagram" / "minimap.html").read_text(encoding="utf-8")
+    minimap_toggle = minimap[minimap.index("archie.composer.miniMapExpanded"):]
     assert "swallow-ok: localStorage is unavailable in private browsing" in minimap_toggle, \
         "the optional local preference failure must be reviewed and explicitly bounded"
 
