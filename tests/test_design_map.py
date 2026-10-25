@@ -1,8 +1,10 @@
 """The design map: every page follows one block, and the merge check refuses a page outside it."""
+import copy
 import importlib.util
 import json
 import subprocess
 import sys
+from collections import Counter
 from pathlib import Path
 
 import pytest
@@ -251,3 +253,67 @@ def test_the_gate_reports_each_tier_and_holds_every_tier_check_at_its_baseline()
     for check, found in data["tier_checks"].items():
         assert found["count"] <= baseline["design_map_tier_" + check], check
     assert "A2-A5" in data["tier_checks_pending"] and "B7" in data["tier_checks_pending"]
+
+
+# ---------------------------------------------------------------- patterns, states, departures and grid
+
+def test_every_row_carries_patterns_states_departures_and_a_grid_in_the_counts_of_the_final_port_map(design_map):
+    rows = design_map["pages"].values()
+    assert len(design_map["pages"]) == 406
+    assert all(r["states"] and isinstance(r["departures"], list) and "grid" in r for r in rows)
+    departures = Counter(d["rule"] for r in rows for d in r["departures"])
+    assert departures == {"R10": 214, "C-form": 55, "R9": 38, "brand": 23}
+    empty = sorted(rel for rel, r in design_map["pages"].items() if not r["patterns"])
+    assert len(empty) == 7 and all(design_map["pages"][rel]["pattern_gap"] for rel in empty)
+    assert sum(1 for r in rows if r["grid"] == "G4") == sum(1 for r in rows if r["tier"].startswith("C"))
+    assert {r["grid"] for r in rows} == {"G1", "G3", "G4", None}
+
+
+def test_a_row_with_a_missing_or_unknown_pattern_state_departure_or_grid_is_an_error(tool, design_map):
+    row = copy.deepcopy(design_map["pages"][LIST_PAGE])
+    assert tool.port_map_problems(LIST_PAGE, row, design_map) == []
+    for field, value, text in (("patterns", ["P99-nothing"], "not in the pattern register"),
+                               ("patterns", [], "does not say which gap"),
+                               ("states", [], "no states"),
+                               ("departures", [{"rule": "R1", "what": "x"}], "needs a rule"),
+                               ("grid", "G9", "not one of")):
+        broken = {**row, field: value}
+        assert any(text in p for p in tool.port_map_problems(LIST_PAGE, broken, design_map)), field
+    no_grid = {k: v for k, v in row.items() if k != "grid"}
+    assert any("no content grid" in p for p in tool.port_map_problems(LIST_PAGE, no_grid, design_map))
+    gap = {**row, "patterns": [], "pattern_gap": "G-1: no pattern yet"}
+    assert tool.port_map_problems(LIST_PAGE, gap, design_map) == []
+
+
+def _with(design_map, tier="B", **fields):
+    broken = _tier_row(design_map, tier)
+    broken["pages"][LIST_PAGE].update(fields)
+    return broken
+
+
+def test_a_page_doing_a_job_its_patterns_do_not_cover_is_counted(tool, design_map):
+    table = '<table class="w-full"></table>'
+    uncovered = _with(design_map, patterns=["P01-page-header"], grid="G1")
+    assert _measure_source(tool, uncovered, table)["pattern_outside_named"]["by_tier"] == {"B": 1}
+    covered = _with(design_map, patterns=["P01-page-header", "P03-data-table"], grid="G1")
+    assert _measure_source(tool, covered, table)["pattern_outside_named"]["count"] == 0
+    tabs = '<div role="tablist"></div>'
+    assert _measure_source(tool, uncovered, tabs)["pattern_outside_named"]["count"] == 1
+    assert _measure_source(tool, _with(design_map, patterns=["P02-section-tabs"]), tabs)["pattern_outside_named"]["count"] == 0
+
+
+def test_a_region_wrapper_outside_the_named_grid_or_a_grey_box_or_a_bento_span_is_counted(tool, design_map):
+    row = _with(design_map, patterns=["P03-data-table"], grid="G1")
+    inside = ('<div class="flex flex-col gap-4 py-4 md:gap-6 md:py-6">'
+              '<div class="grid grid-cols-1 gap-4 @xl/main:grid-cols-2"></div></div>')
+    assert _measure_source(tool, row, inside)["grid_outside_named"]["count"] == 0
+    for source in ('<div class="flex flex-col gap-3"></div>',
+                   '<div class="grid gap-4 grid-cols-5"></div>',
+                   '<div class="aspect-video rounded-xl bg-muted/50"></div>',
+                   '<div class="grid gap-4"><div class="col-span-2"></div></div>'):
+        assert _measure_source(tool, row, source)["grid_outside_named"]["count"] == 1, source
+    pair = '<div class="grid grid-cols-2 gap-4"></div>'
+    form = _with(design_map, patterns=["P10-sectioned-form"], grid="G3")
+    assert _measure_source(tool, form, pair)["grid_outside_named"]["count"] == 0
+    assert _measure_source(tool, _with(design_map, patterns=["P03-data-table"], grid="G3"), pair)["grid_outside_named"]["count"] == 1
+    assert _measure_source(tool, _with(design_map, grid=None), '<div class="grid gap-9"></div>')["grid_outside_named"]["count"] == 0
