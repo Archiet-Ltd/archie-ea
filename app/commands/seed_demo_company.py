@@ -849,11 +849,26 @@ _APP_OWNERS = [
 
 # ── application cost: the total is derived from its components ─────────────
 
-_APP_LICENSE_ANNUAL = 12000
+# The organisation's own currency: costs, prices and the canvases all read in it.
+_ORG_CURRENCY = "GBP"
+# What each application costs: (licence a year, infrastructure a month). The total is the one place the annual
+# figure is computed. The figures differ because the systems do: a licensed package costs more than an in-house tool.
+_APP_COSTS = {
+    "Event Relay": (38000, 3100), "Calibration Ledger": (0, 1450), "Dispatch Planner": (64000, 2200),
+    "Inventory Manager": (86000, 3400), "Field Service Scheduler": (52000, 1800), "Compliance Reporter": (21000, 950),
+    "Supplier Portal": (17500, 1200), "Workforce Planner": (29000, 700), "Quality Monitor": (12500, 1050),
+    "Sensor Data Hub": (24000, 4600), "Firmware Distribution Service": (0, 1900), "Customer Portal": (31000, 2750),
+    "Finance System": (118000, 3900), "Document Management": (26500, 850), "Identity Provider": (19800, 600),
+    "Monitoring Dashboard": (9400, 1300), "Alert Manager": (7200, 450), "Reporting Engine": (33000, 1500),
+    "Integration Bus": (72000, 3800), "Data Warehouse": (58000, 6200),
+}
+_APP_LICENSE_ANNUAL = 12000  # the one flat figure an earlier seed wrote on every application
 _APP_INFRASTRUCTURE_MONTHLY = 2500
-# The one place the annual total is computed; the applications below are
-# created with it and an earlier seed's blanket figure is brought back to it.
-_APP_TOTAL_COST = _APP_LICENSE_ANNUAL + 12 * _APP_INFRASTRUCTURE_MONTHLY
+
+
+def _app_total_cost(license_annual, infrastructure_monthly):
+    return license_annual + 12 * infrastructure_monthly
+
 
 # Organisation units that own the applications (one per owner role).
 _OWNER_UNITS = [
@@ -1142,6 +1157,52 @@ _CANVAS_LINKS = [
     ("Recovered assemblies recertified instead of scrapped", "Environmental survey firms", "Serving"),
 ]
 
+# ── the value proposition canvas: what each customer segment is trying to do, suffers and wants ──
+# segment -> (jobs, pains, gains, pain relievers with the pain each one relieves, the gain the trust value meets)
+_CANVAS_PROFILES = {
+    "Municipal water utilities": {
+        "jobs": ["Prove every sample point meets the drinking-water rules",
+                 "Keep treatment-works sensors reading true between audits",
+                 "Report water quality to the regulator each quarter"],
+        "pains": ["Sensors drift and nobody notices until an audit",
+                  "A failed sensor means an emergency site visit",
+                  "Certificates from several suppliers cannot be compared"],
+        "gains": ["Regulator accepts the readings without re-testing",
+                  "Fewer out-of-hours call-outs",
+                  "One certificate trail for every sensor"],
+        "relievers": [("Certificate with every batch of sensors", "Certificates from several suppliers cannot be compared"),
+                      ("Drift alerts before a reading leaves tolerance", "Sensors drift and nobody notices until an audit")],
+        "trust_gain": "Regulator accepts the readings without re-testing",
+    },
+    "Industrial process-water operators": {
+        "jobs": ["Keep the process line running without unplanned stops",
+                 "Control the chemistry of water entering the plant",
+                 "Show customers and auditors the line is monitored"],
+        "pains": ["Downtime while a faulty sensor is replaced",
+                  "Remote sites are costly to reach",
+                  "Calibration takes weeks and the line cannot wait"],
+        "gains": ["Fewer stops caused by sensor faults",
+                  "Faults found and fixed from the control room",
+                  "Replacement sensors that arrive already calibrated"],
+        "relievers": [("Remote diagnostics before anyone travels", "Remote sites are costly to reach"),
+                      ("Recalibration in five days", "Calibration takes weeks and the line cannot wait")],
+        "trust_gain": "Fewer stops caused by sensor faults",
+    },
+    "Environmental survey firms": {
+        "jobs": ["Collect defensible field data for a client report",
+                 "Deploy sensors at remote survey sites",
+                 "Recover and reuse equipment between surveys"],
+        "pains": ["Data is challenged because the calibration cannot be shown",
+                  "Equipment is thrown away after one survey",
+                  "Sensors lose accuracy in the field"],
+        "gains": ["Reports that stand up to a challenge",
+                  "Lower equipment cost per survey",
+                  "Readings that stay accurate for the whole survey"],
+        "relievers": [("Recertified assemblies instead of new purchases", "Equipment is thrown away after one survey")],
+        "trust_gain": "Reports that stand up to a challenge",
+    },
+}
+
 # ── work packages ──────────────────────────────────────────────────────────
 
 _WORK_PACKAGES = [
@@ -1268,6 +1329,49 @@ _GAP_PLACEMENT = {
 #  seed function
 # ═════════════════════════════════════════════════════════════════════════════
 
+def _seed_profiles(org_id, canvas, element, by_key):
+    """The customer profile of each segment (jobs, pains, gains), its pain relievers, and the links the fit
+    arrows list. Elements are found by name and type first, so running it twice adds nothing."""
+    from app.models import ArchiMateRelationship
+    from app.modules.business_model_canvas import model_service
+
+    trust = by_key.get(("Operators know their readings can be trusted", "Value"))
+    made = 0
+
+    def link(source, target, rel_type):
+        nonlocal made
+        if not db.session.query(ArchiMateRelationship.id).filter_by(
+            source_id=source.id, target_id=target.id, type=rel_type, organization_id=org_id
+        ).first():
+            db.session.add(ArchiMateRelationship(
+                source_id=source.id, target_id=target.id, type=rel_type, organization_id=org_id,
+            ))
+            made += 1
+
+    for segment_name, profile in _CANVAS_PROFILES.items():
+        segment = by_key.get((segment_name, "BusinessActor"))
+        if segment is None:
+            continue
+        mine = {}
+        for box, type_, layer, names in (
+            ("customer_jobs", "BusinessProcess", "business", profile["jobs"]),
+            ("pains", "Assessment", "motivation", profile["pains"]),
+            ("gains", "Outcome", "motivation", profile["gains"]),
+            ("pain_relievers", "Requirement", "motivation", [n for n, _p in profile["relievers"]]),
+        ):
+            for name in names:
+                el = element(name, type_, layer)
+                model_service.place(canvas, box, el)
+                mine[name] = el
+                link(segment, el, "Association")
+        for reliever, pain in profile["relievers"]:
+            link(mine[reliever], mine[pain], "Influence")
+        if trust is not None:
+            link(trust, mine[profile["trust_gain"]], "Influence")
+    db.session.flush()
+    return made
+
+
 def _seed_canvas_model(org_id, canvas):
     """Fill the canvas from the organisation's model: elements per box, links
     to the seeded capabilities, price plans, and the vision as a Goal.
@@ -1319,6 +1423,7 @@ def _seed_canvas_model(org_id, canvas):
                 source_id=src.id, target_id=tgt.id, type=rel_type, organization_id=org_id,
             ))
             created += 1
+    created += _seed_profiles(org_id, canvas, element, by_key)
     for service_name, plan_name, price, currency, period, mechanism in _CANVAS_PRICES:
         service = by_key.get((service_name, "BusinessService"))
         if service is None or db.session.query(PricePlan.id).filter_by(
@@ -2239,7 +2344,7 @@ def seed_demo_company() -> dict:
     if org is None:
         from app.services.billing_plans import set_contract_plan
 
-        org = Organization(name=_ORG_NAME, slug=_ORG_SLUG)
+        org = Organization(name=_ORG_NAME, slug=_ORG_SLUG, reporting_currency=_ORG_CURRENCY)
         db.session.add(org)
         db.session.flush()
         # Enterprise has no people limit, so the demo cast below fits.
@@ -2247,6 +2352,8 @@ def seed_demo_company() -> dict:
         stats["organization_created"] = 1
     else:
         stats["organization_created"] = 0
+    if not org.reporting_currency:
+        org.reporting_currency = _ORG_CURRENCY
     org_id = org.id
     # Commit the org row before tenant_scope, which calls db.session.remove()
     # and would otherwise detach the org, breaking FK validation downstream.
@@ -2333,6 +2440,7 @@ def seed_demo_company() -> dict:
                 continue
             el = elements.get(el_name)
             profile = _APP_PROFILE.get(app_name)
+            license_annual, infrastructure_monthly = _APP_COSTS.get(app_name, (_APP_LICENSE_ANNUAL, _APP_INFRASTRUCTURE_MONTHLY))
             app = ApplicationComponent(
                 name=app_name,
                 organization_id=org_id,
@@ -2344,9 +2452,9 @@ def seed_demo_company() -> dict:
                 application_code=f"LQ-{app_name.upper().replace(' ', '-')[:20]}",
                 implementation_date=_dt.date(2022, 3, 15),
                 go_live_date=_dt.date(2022, 6, 1),
-                total_cost_of_ownership=_APP_TOTAL_COST,
-                license_cost_annual=_APP_LICENSE_ANNUAL,
-                infrastructure_cost_monthly=_APP_INFRASTRUCTURE_MONTHLY,
+                total_cost_of_ownership=_app_total_cost(license_annual, infrastructure_monthly),
+                license_cost_annual=license_annual,
+                infrastructure_cost_monthly=infrastructure_monthly,
                 business_criticality="high",
                 strategic_importance="high",
             )
@@ -2515,19 +2623,22 @@ def seed_demo_company() -> dict:
                 ))
                 held.add((app.id, unit.id, "Business Owner"))
                 changed = True
-            # The total is the sum of its components, whatever an earlier
-            # seed wrote.
-            if (app.license_cost_annual == _APP_LICENSE_ANNUAL
-                    and app.infrastructure_cost_monthly == _APP_INFRASTRUCTURE_MONTHLY
-                    and app.total_cost_of_ownership != _APP_TOTAL_COST):
-                app.total_cost_of_ownership = _APP_TOTAL_COST
+            # An earlier seed wrote one flat figure on every application: give each its own. The total is the
+            # sum of its components, whatever an earlier seed wrote.
+            own = _APP_COSTS.get(app_name)
+            if own and (app.license_cost_annual, app.infrastructure_cost_monthly) == (
+                    _APP_LICENSE_ANNUAL, _APP_INFRASTRUCTURE_MONTHLY):
+                app.license_cost_annual, app.infrastructure_cost_monthly = own
+                changed = True
+            if own and app.total_cost_of_ownership != _app_total_cost(app.license_cost_annual, app.infrastructure_cost_monthly):
+                app.total_cost_of_ownership = _app_total_cost(app.license_cost_annual, app.infrastructure_cost_monthly)
                 changed = True
             agreed += changed
         db.session.flush()
         for app in _resolve_apps(org_id).values():
             for column in ("total_cost_of_ownership", "license_cost_annual",
                            "infrastructure_cost_monthly"):
-                sync_cost_fact(app, column, "USD")
+                sync_cost_fact(app, column, _ORG_CURRENCY)
         db.session.flush()
         stats["application_figures_agreed"] = agreed
 

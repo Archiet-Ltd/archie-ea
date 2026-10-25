@@ -937,24 +937,25 @@ def test_demo_does_not_write_the_retired_cost_table(app, db_session, make_org):
 
 
 def test_demo_old_blanket_total_is_corrected_on_rerun(app, db_session, make_org):
+    from app.commands import seed_demo_company as demo
     from app.models.application_portfolio import ApplicationComponent
     from app.models.cost_fact import CostFact
 
     _seed_once()
     org_id = _get_lantern_org_id()
     for a in ApplicationComponent.query.filter_by(organization_id=org_id):
+        a.license_cost_annual, a.infrastructure_cost_monthly = 12000, 2500
         a.total_cost_of_ownership = 85000
     db_session.flush()
     again = _seed_once()
     assert again["application_figures_agreed"] == 20
     apps = ApplicationComponent.query.filter_by(organization_id=org_id).all()
-    assert {a.total_cost_of_ownership for a in apps} == {42000}
-    totals = {
-        float(f.amount)
-        for f in CostFact.query.filter_by(
-            organization_id=org_id, element_type="application", category="total")
-    }
-    assert totals == {42000.0}
+    assert {a.name: float(a.total_cost_of_ownership) for a in apps} == {
+        n: float(demo._app_total_cost(*c)) for n, c in demo._APP_COSTS.items()}
+    assert len({a.total_cost_of_ownership for a in apps}) == len(apps)
+    facts = CostFact.query.filter_by(organization_id=org_id, element_type="application", category="total").all()
+    assert {f.currency for f in facts} == {"GBP"}
+    assert {float(f.amount) for f in facts} == {float(a.total_cost_of_ownership) for a in apps}
 
 
 def test_demo_seed_gives_a_second_organisation_nothing(app, db_session, make_org):
