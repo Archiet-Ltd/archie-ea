@@ -5,6 +5,7 @@
 {% from 'components/modal.html' import modal %}
 {% import 'components/card.html' as card %}
 {% from 'components/button.html' import button %}
+{% from 'components/badge.html' import badge %}
 {% from 'components/input.html' import input, label, textarea %}
 {% from 'components/select.html' import native_select %}
 
@@ -12,10 +13,10 @@
 
 {% block content %}
 <div class="flex-1 overflow-auto">
-  <div class="p-6 space-y-6">
+  <div class="space-y-6">
     {{ page_header(
         title='Canvases',
-        description='Strategy canvases drawn from your ArchiMate model: the same elements appear on every canvas that shows them.',
+        description='Your business model on one page, built from your model. An entry you add to one canvas shows on every other canvas that takes it.',
         breadcrumbs=[
             {'label': 'Home', 'href': url_for('main.index')},
             {'label': 'Canvases'}
@@ -38,17 +39,9 @@
             {% endif %}
           {% endcall %}
           {% call card.card_content(class='flex flex-wrap items-center gap-2') %}
-            <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-secondary text-secondary-foreground" data-testid="bmc-canvas-type-{{ c.id }}">{{ type_names.get(c.canvas_type or 'business_model_canvas', 'Canvas') }}</span>
-            {% if not c.canvas_type or c.canvas_type == 'lean_canvas' %}
-            {% if c.operating_model_type %}
-            <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-info-emphasis border border-primary/30">
-              {{ c.operating_model_type | capitalize }}
-            </span>
-            {% else %}
-            <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-muted text-muted-foreground border border-border">
-              No operating model set
-            </span>
-            {% endif %}
+            <span data-testid="bmc-canvas-type-{{ c.id }}">{% call badge(variant='secondary') %}{{ type_names.get(c.canvas_type or 'business_model_canvas', 'Canvas') }}{% endcall %}</span>
+            {% if (not c.canvas_type or c.canvas_type == 'lean_canvas') and c.operating_model_type %}
+            {% call badge(variant='outline') %}{{ c.operating_model_type | capitalize }} operating model{% endcall %}
             {% endif %}
           {% endcall %}
           {% call card.card_footer() %}
