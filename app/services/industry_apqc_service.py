@@ -201,144 +201,18 @@ class IndustryAPQCService:
         return framework
 
     def seed_default_frameworks(self) -> List[IndustryAPQCFramework]:
-        """
-        Seed the database with default industry frameworks.
+        """Load any default framework that is missing (the one loader the
+        migration and a new organisation also use). Returns those added."""
+        from app.modules.industry_apqc.framework_data import (
+            FRAMEWORKS,
+            load_default_frameworks,
+        )
 
-        Returns:
-            List of created frameworks
-        """
-        created = []
-
-        default_frameworks = [
-            {
-                "industry_code": "CRS",
-                "industry_name": "Cross-Industry",
-                "description": "APQC Cross-Industry Process Classification Framework - the baseline PCF applicable to all industries.",
-                "pcf_version": "8.0.0",
-                "regulatory_intensity": "low",
-                "digital_maturity_typical": 3,
-                "process_complexity": "moderate",
-            },
-            {
-                "industry_code": "MFG",
-                "industry_name": "Manufacturing",
-                "industry_subcategory": "General Manufacturing",
-                "description": "APQC Manufacturing PCF - tailored processes for manufacturing operations including discrete, process, and hybrid manufacturing.",
-                "pcf_version": "7.3.0",
-                "regulatory_intensity": "medium",
-                "digital_maturity_typical": 3,
-                "process_complexity": "complex",
-                "key_differentiators": [
-                    "Supply chain and logistics optimization",
-                    "Production planning and scheduling",
-                    "Quality management and control",
-                    "Equipment and asset management",
-                    "Product lifecycle management",
-                ],
-                "unique_process_areas": [
-                    "Shop floor management",
-                    "Material requirements planning (MRP)",
-                    "Production execution and control",
-                    "Lean/Six Sigma process improvement",
-                ],
-            },
-            {
-                "industry_code": "BFS",
-                "industry_name": "Banking & Financial Services",
-                "description": "APQC Banking PCF - comprehensive processes for retail banking, commercial banking, and financial services.",
-                "pcf_version": "7.2.0",
-                "regulatory_intensity": "very_high",
-                "digital_maturity_typical": 4,
-                "process_complexity": "highly_complex",
-                "key_differentiators": [
-                    "Regulatory compliance (SOX, Basel III, Dodd-Frank)",
-                    "Risk management and credit assessment",
-                    "Customer onboarding and KYC/AML",
-                    "Payment and transaction processing",
-                    "Wealth management and advisory",
-                ],
-                "unique_process_areas": [
-                    "Credit risk modeling",
-                    "Treasury and liquidity management",
-                    "Regulatory reporting (CCAR, DFAST)",
-                    "Fraud detection and prevention",
-                ],
-            },
-            {
-                "industry_code": "HCP",
-                "industry_name": "Healthcare Provider",
-                "description": "APQC Healthcare Provider PCF - processes for hospitals, clinics, and healthcare delivery organizations.",
-                "pcf_version": "7.1.0",
-                "regulatory_intensity": "very_high",
-                "digital_maturity_typical": 3,
-                "process_complexity": "highly_complex",
-                "key_differentiators": [
-                    "Patient care delivery and safety",
-                    "Clinical documentation and EMR",
-                    "HIPAA and regulatory compliance",
-                    "Revenue cycle management",
-                    "Care coordination and population health",
-                ],
-                "unique_process_areas": [
-                    "Patient registration and scheduling",
-                    "Clinical decision support",
-                    "Medical records and health information management",
-                    "Utilization management and case management",
-                ],
-            },
-            {
-                "industry_code": "PHA",
-                "industry_name": "Pharmaceutical & Life Sciences",
-                "description": "APQC Pharmaceutical PCF - processes for drug development, manufacturing, and commercialization.",
-                "pcf_version": "7.0.0",
-                "regulatory_intensity": "very_high",
-                "digital_maturity_typical": 4,
-                "process_complexity": "highly_complex",
-                "key_differentiators": [
-                    "FDA and regulatory compliance (21 CFR Part 11)",
-                    "Clinical trial management",
-                    "Drug development and discovery",
-                    "Pharmacovigilance and safety",
-                    "Good Manufacturing Practice (GMP)",
-                ],
-                "unique_process_areas": [
-                    "Clinical trial design and execution",
-                    "Regulatory submission management",
-                    "Batch record management",
-                    "Adverse event reporting",
-                ],
-            },
-            {
-                "industry_code": "RET",
-                "industry_name": "Retail",
-                "description": "APQC Retail PCF - processes for retail operations, merchandising, and customer experience.",
-                "pcf_version": "7.2.0",
-                "regulatory_intensity": "low",
-                "digital_maturity_typical": 4,
-                "process_complexity": "moderate",
-                "key_differentiators": [
-                    "Omnichannel customer experience",
-                    "Merchandise planning and allocation",
-                    "Store operations and management",
-                    "E-commerce and digital commerce",
-                    "Customer loyalty and engagement",
-                ],
-                "unique_process_areas": [
-                    "Assortment planning",
-                    "Price and promotion management",
-                    "Store layout and visual merchandising",
-                    "Last-mile delivery and fulfillment",
-                ],
-            },
-        ]
-
-        for fw_data in default_frameworks:
-            existing = self.get_framework_by_code(fw_data["industry_code"])
-            if not existing:
-                framework = self.create_framework(**fw_data)
-                created.append(framework)
-
-        return created
+        before = {fw.industry_code for fw in self.get_all_frameworks(active_only=False)}
+        load_default_frameworks(db.session.connection())
+        db.session.commit()
+        added = [f["industry_code"] for f in FRAMEWORKS if f["industry_code"] not in before]
+        return [self.get_framework_by_code(code) for code in added]
 
     # =========================================================================
     # INDUSTRY PROCESS MANAGEMENT
@@ -700,6 +574,142 @@ class IndustryAPQCService:
         db.session.commit()
 
         return {"success": True, "recommendation_id": recommendation_id}
+
+    # =========================================================================
+    # HIERARCHY AND ADOPTION
+    # =========================================================================
+
+    def framework_summaries(self) -> List[Dict]:
+        """One entry per framework with its process counts, for the list page."""
+        from sqlalchemy import func
+
+        counts = {
+            row.industry_framework_id: row
+            for row in db.session.query(
+                IndustryAPQCProcess.industry_framework_id.label("industry_framework_id"),
+                func.count(IndustryAPQCProcess.id).label("total"),
+                func.count(IndustryAPQCProcess.id)
+                .filter(IndustryAPQCProcess.is_industry_unique.is_(True))
+                .label("specific"),
+            )
+            .filter(IndustryAPQCProcess.is_active.is_(True))
+            .group_by(IndustryAPQCProcess.industry_framework_id)
+            .all()
+        }
+        summaries = []
+        for fw in self.get_all_frameworks():
+            row = counts.get(fw.id)
+            summaries.append(
+                {
+                    "framework": fw,
+                    "total": row.total if row else 0,
+                    "specific": row.specific if row else 0,
+                    "categories": 13,
+                }
+            )
+        return summaries
+
+    def build_hierarchy(self, industry_code: str) -> List[Dict]:
+        """The framework as the PCF tree: categories, each holding its levels.
+
+        Every node is ``{"id", "code", "name", "level", "specific", "children"}``.
+        Industry specific processes sit directly under their category.
+        """
+        from app.modules.industry_apqc.framework_data import process_level
+
+        processes = self.get_industry_processes(industry_code)
+        nodes = {}
+        for p in processes:
+            nodes[p.industry_process_code] = {
+                "id": p.id,
+                "code": p.industry_process_code,
+                "name": p.industry_process_name,
+                "level": 2 if p.is_industry_unique else process_level(p.industry_process_code),
+                "specific": bool(p.is_industry_unique),
+                "children": [],
+            }
+
+        def parent_code(p):
+            if p.is_industry_unique:
+                return (p.industry_category_1 or "").split(" ", 1)[0]
+            parts = p.industry_process_code.split(".")
+            if process_level(p.industry_process_code) == 1:
+                return None
+            if len(parts) == 2:
+                return parts[0] + ".0"
+            return ".".join(parts[:-1])
+
+        roots = []
+        for p in processes:
+            parent = nodes.get(parent_code(p)) if parent_code(p) else None
+            (parent["children"] if parent else roots).append(nodes[p.industry_process_code])
+
+        def order(node):
+            if node["specific"]:
+                return (1, 0, node["code"])
+            return (0, [int(x) for x in node["code"].split(".")], "")
+
+        def sort(items):
+            items.sort(key=order)
+            for item in items:
+                sort(item["children"])
+
+        sort(roots)
+        roots.sort(key=lambda n: [int(x) for x in n["code"].split(".")])
+        return roots
+
+    def recommended_processes(self, industry_code: str, organization_id: int) -> List[Dict]:
+        """The processes particular to this industry, and whether the
+        organisation's capability model already holds each one."""
+        from app.models.unified_capability import UnifiedCapability
+
+        processes = [
+            p for p in self.get_industry_processes(industry_code) if p.is_industry_unique
+        ]
+        held = {
+            (name or "").strip().lower()
+            for (name,) in db.session.query(UnifiedCapability.name).filter(
+                UnifiedCapability.organization_id == organization_id
+            )
+        }
+        return [
+            {
+                "process": p,
+                "category": p.industry_category_1,
+                "adopted": p.industry_process_name.strip().lower() in held,
+            }
+            for p in processes
+        ]
+
+    def adopt_process(self, industry_code: str, process_id: int, organization_id: int):
+        """Add an industry process to the organisation's capability model
+        through the one capability writer. Returns (capability, created)."""
+        from app.modules.capabilities.services.capability_service import (
+            ensure_capability_record,
+        )
+
+        process = (
+            IndustryAPQCProcess.query.join(IndustryAPQCFramework)
+            .filter(
+                IndustryAPQCProcess.id == process_id,
+                IndustryAPQCFramework.industry_code == industry_code.upper(),
+            )
+            .first()
+        )
+        if process is None:
+            return None, False
+        capability, created = ensure_capability_record(
+            name=process.industry_process_name,
+            level=2,
+            description=(
+                "Adopted from the %s process framework (%s)."
+                % (process.framework.industry_name, process.industry_process_code)
+            ),
+            organization_id=organization_id,
+            scope="tenant",
+        )
+        db.session.commit()
+        return capability, created
 
     # =========================================================================
     # ANALYTICS
