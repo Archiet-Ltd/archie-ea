@@ -12,7 +12,8 @@
 {% from 'components/detail_meta.html' import detail_meta_item %}
 {% from 'components/skeleton.html' import skeleton_table %}
 
-{% block title %}Import Job: {{ job.name if job else 'Loading...' }}{% endblock %}
+{% set job_label = ((job.name or job.filename or ('Import job ' ~ (job.created_at.strftime('%d %b %Y') if job.created_at else ''))) | trim) if job else 'Import job' %}
+{% block title %}Import Job: {{ job_label }}{% endblock %}
 
 {% block content %}
 <div class="space-y-6" x-data="jobDetail({{ job.id if job else 0 }})">
@@ -21,11 +22,11 @@
        the live status tile, badge, meta row and actions, which are job state, not
        page identity. #}
     {{ page_shell(
-        title=job.name if job else 'Import Job',
+        title=job_label,
         breadcrumb=[
             ('Home', home_url()),
             ('Batch Import', url_for('batch_import_view.dashboard')),
-            (job.name if job else 'Import Job', None)
+            (job_label, None)
         ]
     ) }}
 

@@ -64,21 +64,26 @@ def import_rows(app, seeded):
         for index, (name, layer, element_type, confidence) in enumerate([
                 ("Ledger service %s" % suffix, "application", "application_component", 0.92),
                 ("Billing team %s" % suffix, "business", "business_actor", 0.55),
-                ("Ledger database %s" % suffix, "technology", "node", 0.31)]):
+                ("Ledger database %s" % suffix, "technology", "node", 0.31),
+                ("Unscored thing %s" % suffix, None, "node", None)]):
             names.append(name)
             db.session.add(BatchImportElement(
                 batch_id=batch.id, application_id=application.id, element_type=element_type,
                 element_name=name, element_data={"name": name}, archimate_layer=layer,
                 confidence_score=confidence))
+        unnamed = BatchImportJob(user_id=admin.id, name=None, filename="orphan-%s.csv" % suffix,
+                                 total_applications=1, total_batches=1, batch_size=1)
+        db.session.add(unnamed)
         db.session.commit()
-        ids = {"job": job.id, "batch": batch.id, "job_name": job.name, "names": names, "suffix": suffix}
+        ids = {"unnamed_job": unnamed.id, "orphan_file": "orphan-%s.csv" % suffix, "job": job.id, "batch": batch.id, "job_name": job.name, "names": names, "suffix": suffix}
         db.session.remove()
     yield ids
     with app.app_context():
-        job = BatchImportJob.query.get(ids["job"])
-        if job is not None:
-            db.session.delete(job)
-            db.session.commit()
+        for key in ("job", "unnamed_job"):
+            job = BatchImportJob.query.get(ids[key])
+            if job is not None:
+                db.session.delete(job)
+        db.session.commit()
         db.session.remove()
 
 
@@ -136,6 +141,11 @@ def test_reviewing_an_import_batch_filters_opens_and_closes(admin_page, live_ser
     bars = page.locator("[role='progressbar']")
     assert bars.count() >= 3
     # open the detail dialog from the first element and close it with Escape
+    body = _body(page)
+    assert "Review Batch #1" in body, "the header names the batch"
+    assert "Not scored" in body, "an element with no score says so, not 0%"
+    assert "Not set" in body, "an element with no layer says so"
+    assert "undefined" not in body and "null" not in body
     page.get_by_text(import_rows["names"][0]).first.click()
     dialog = page.locator("[role='dialog']:visible").first
     expect(dialog).to_be_visible()
@@ -157,6 +167,9 @@ def test_import_dashboard_lists_the_job_and_its_detail_page_opens(admin_page, li
     _no_template_failure(page)
     assert import_rows["job_name"] in page.title()
     expect(page.get_by_role("heading", name=import_rows["job_name"]).first).to_be_visible()
+    _visit(page, live_server, "/batch-import/jobs/%d" % import_rows["unnamed_job"])
+    assert "None" not in _body(page) and "None" not in page.title()
+    assert import_rows["orphan_file"] in page.title(), "an unnamed job is called by its file"
 
 
 def test_new_import_offers_the_modes_and_a_working_form(admin_page, live_server):
@@ -167,6 +180,7 @@ def test_new_import_offers_the_modes_and_a_working_form(admin_page, live_server)
     # a person can pick an ArchiMate mode: the radios are real and exactly one is checked
     radios = page.locator("input[type='radio'][x-model='form.archimate_mode']")
     assert radios.count() >= 2
+    assert page.locator("#programme-target option", has_text="No programme").count() == 1
     labels = page.locator("label:has(input[type='radio'][x-model='form.archimate_mode'])")
     labels.nth(1).click()
     assert page.locator("input[type='radio'][x-model='form.archimate_mode']:checked").count() == 1
@@ -238,6 +252,7 @@ def test_status_health_and_modules_pages_have_their_content(admin_page, live_ser
     box = page.locator("#modules-directory-search")
     expect(box).to_be_visible()
     box.fill("zzzzzz-no-module")
+    clear = page.get_by_role("button", name="Clear")
     box.fill("")
 
 
@@ -261,14 +276,15 @@ def test_public_pricing_comparison_hub_and_demo_company(browser, live_server):
     page = ctx.new_page()
     _visit(page, live_server, "/pricing")
     _no_template_failure(page)
-    year = page.locator("#pp-bill-year")
-    month = page.locator("#pp-bill-month")
+    year = page.locator("input[name='pp-interval'][value='year']")
+    month = page.locator("input[name='pp-interval'][value='month']")
     assert year.count() == 1 and month.count() == 1
     assert year.is_checked() and not month.is_checked()
-    page.locator("label[for='pp-bill-month']").first.click()
+    page.get_by_text("Monthly", exact=True).first.click()
     assert month.is_checked() and not year.is_checked(), "the billing interval toggle still switches"
     _visit(page, live_server, "/vs")
     _no_template_failure(page)
+    links = page.locator("main a[href*='/vs/'], main a[href^='http']").all()
     hrefs = []
     for link in page.locator("main li a").all():
         href = link.get_attribute("href")
@@ -330,4 +346,23 @@ def test_walk_screenshots(browser, live_server, seeded, import_rows, width, them
         page.screenshot(path=os.path.join(SHOT_DIR, "%s_%dw_%s.png" % (name, width, theme)), full_page=True)
     with open(os.path.join(SHOT_DIR, "walk_%dw_%s.txt" % (width, theme)), "w") as handle:
         handle.write("\n".join(report) + "\n")
+    ctx.close()
+
+
+def test_registered_users_on_a_phone_shows_whose_row_it_is(browser, live_server, seeded):
+    ctx = browser.new_context(viewport={"width": 390, "height": 844}, ignore_https_errors=True)
+    ctx.set_default_timeout(PAGE_TIMEOUT)
+    ctx.add_init_script("try { localStorage.setItem('theme', 'dark'); } catch (e) {}")
+    page = ctx.new_page()
+    email = seeded["emails"]["platform_admin"]
+    _login(page, live_server, email)
+    _visit(page, live_server, "/admin/users")
+    cell = page.locator("td", has_text=email).first
+    expect(cell).to_be_visible()
+    box = cell.bounding_box()
+    assert box["x"] >= 0 and box["x"] < 390, "the email cell starts on screen: %s" % box
+    # the actions wrap inside the row instead of pushing the identity off screen
+    actions = page.locator("tr", has_text=email).first.locator("td").last.bounding_box()
+    assert actions["width"] < 250, "actions wrapped: %s" % actions
+    assert page.evaluate("document.documentElement.scrollWidth <= window.innerWidth + 1")
     ctx.close()

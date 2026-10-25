@@ -85,7 +85,7 @@
                             <div>
                                 <label for="programme-target" class="block text-sm font-medium text-muted-foreground mb-1">Transformation Programme <span class="text-muted-foreground font-normal">(optional)</span></label>
                                 {% call native_select(id=("programme-target"), size='sm', class="w-full mt-1", attrs_dict={"x-model": ("form.programme_initiative_id")}) %}
-                                    <option value="">— None — import without programme linkage —</option>
+                                    <option value="">No programme</option>
                                     {# DEF-042, Capgemini dry-run: p.initiative_type is nullable
                                        (StrategicInitiative), and this always interpolated it
                                        even when null, rendering the option text literally as

@@ -28,7 +28,7 @@
         {% endcall %}
         {{ breadcrumb.breadcrumb_separator() }}
         {% call breadcrumb.breadcrumb_item(href=url_for('batch_import_view.job_detail', job_id=job.id) if job else '#') %}
-            <span x-text="job?.name || 'Job'"></span>
+            <span x-text="job?.name || job?.filename || 'Import job'"></span>
         {% endcall %}
         {{ breadcrumb.breadcrumb_separator() }}
         {% call breadcrumb.breadcrumb_item(active=true) %}
@@ -45,11 +45,12 @@
                         <i data-lucide="layers" class="h-6 w-6 text-primary-foreground" aria-hidden="true"></i>
                     </div>
                     <div>
-                        {{ page_header(title='Review Batch #', breadcrumbs=[{'label': 'Home', 'href': '/'}, {'label': 'Review Batch #'}]) }}
+                        {% set batch_title = 'Review Batch #' ~ (batch.batch_number if batch else '') %}
+                        {{ page_header(title=batch_title, breadcrumbs=[{'label': 'Home', 'href': '/'}, {'label': batch_title}]) }}
                         <div class="flex items-center gap-4 mt-2 text-sm text-muted-foreground">
                             <span class="flex items-center gap-1">
                                 <i data-lucide="folder" class="h-4 w-4" aria-hidden="true"></i>
-                                Job: <span x-text="job?.name" class="font-medium text-foreground"></span>
+                                Job: <span x-text="job?.name || job?.filename || 'Import job'" class="font-medium text-foreground"></span>
                             </span>
                             <span class="flex items-center gap-1">
                                 <i data-lucide="package" class="h-4 w-4" aria-hidden="true"></i>
@@ -276,8 +277,13 @@
                                 </td>
                                 <td class="p-4 align-middle">
                                     <div class="flex items-center gap-2">
-                                        {{ progress_bound('element.confidence', bar_class_expr='getConfidenceBarClass(element.confidence)', bar_class='', class='w-16') }}
-                                        <span class="text-xs font-medium" :class="getConfidenceTextClass(element.confidence)" x-text="element.confidence + '%'"></span>
+                                        <template x-if="element.confidence !== null">
+                                            <div class="flex items-center gap-2">
+                                                {{ progress_bound('element.confidence', bar_class_expr='getConfidenceBarClass(element.confidence)', bar_class='', class='w-16') }}
+                                                <span class="text-xs font-medium" :class="getConfidenceTextClass(element.confidence)" x-text="element.confidence + '%'"></span>
+                                            </div>
+                                        </template>
+                                        <span x-show="element.confidence === null" x-cloak class="text-xs text-muted-foreground">Not scored</span>
                                     </div>
                                 </td>
                                 <td class="p-4 align-middle">
@@ -397,8 +403,13 @@
                         <div>
                             <span class="text-muted-foreground">Confidence Score</span>
                             <div class="flex items-center gap-2 mt-1">
-                                {{ progress_bound('selectedElement?.confidence || 0', bar_class_expr='getConfidenceBarClass(selectedElement?.confidence)', bar_class='', class='w-20') }}
-                                <span class="font-medium" x-text="(selectedElement?.confidence || 0) + '%'"></span>
+                                <template x-if="selectedElement?.confidence !== null">
+                                    <div class="flex items-center gap-2">
+                                        {{ progress_bound('selectedElement?.confidence || 0', bar_class_expr='getConfidenceBarClass(selectedElement?.confidence)', bar_class='', class='w-20') }}
+                                        <span class="font-medium" x-text="selectedElement?.confidence + '%'"></span>
+                                    </div>
+                                </template>
+                                <span x-show="selectedElement?.confidence === null" x-cloak class="text-muted-foreground">Not scored</span>
                             </div>
                         </div>
                         <div>
@@ -680,8 +691,8 @@ function batchReview(jobId, batchId) {
             return Object.assign({}, e, {
                 name: e.name !== undefined ? e.name : (e.element_name || ''),
                 element_type: e.element_type || '',
-                layer: layer ? layer.charAt(0).toUpperCase() + layer.slice(1) : '',
-                confidence: score === undefined || score === null ? 0 : (score <= 1 ? Math.round(score * 100) : Math.round(score)),
+                layer: layer ? layer.charAt(0).toUpperCase() + layer.slice(1) : 'Not set',
+                confidence: score === undefined || score === null ? null : (score <= 1 ? Math.round(score * 100) : Math.round(score)),
                 description: e.description !== undefined ? e.description : (e.element_description || '')
             });
         },
