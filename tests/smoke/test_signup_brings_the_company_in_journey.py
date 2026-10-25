@@ -1,12 +1,14 @@
 """Sign up, bring the company in, and land on your own data -- in a real browser.
 
 A new person (a startup CTO, who owns the organisation sign-up makes for them) creates an
-account through the sign-up form, then goes through the stepper's other two steps: they give
-GitHub and the industry and a framework, and finish on the built-in AI. The read runs in the
-background; the dashboard shows how far it has got; the first question about their own systems
-is answered and cited. A second person skips everything and lands on the dashboard exactly as
-before, with the sample company on offer. A third pays, adds their own AI key first, and it is
-tested before it is kept.
+account through the sign-up form and goes through the other three steps of the welcome: they give
+GitHub, a website they allow to be read, the industry and a framework, and finish on the built-in
+AI. The read runs in the background; the sources step shows how far it has got and the dashboard
+shows the figures from it; the first question about their own systems is answered and cited. A
+second person skips everything, lands on a dashboard that asks for a source, and is offered the
+sample company in the chat. A third pays, adds their own AI key first, and it is tested before it
+is kept. A fourth gives a website: the facts read from it are shown with the page each came from,
+nothing is written until they confirm, and a correction is kept as their own value.
 
 GitHub is never called: the recorded organisation of the service tests answers, through the same
 sitecustomize the connect-GitHub journey uses. The AI provider is a small local server that
@@ -37,18 +39,28 @@ pytestmark = [pytest.mark.smoke, pytest.mark.journey]
 
 SHOTS = os.environ.get("SIGNUP_JOURNEY_SHOTS")
 GOOD_KEY = "sk-journey-good-key-0001"
+READER_KEY = "sk-journey-reader-0001"  # the server's own key: it reads the pages of a website
 
 
 class _Provider(BaseHTTPRequestHandler):
-    """The AI provider: it accepts GOOD_KEY and refuses every other key."""
+    """The AI provider: it accepts GOOD_KEY and refuses every other key; the server's own key reads website pages."""
 
     def do_POST(self):
         self.server.calls.append((self.path, self.headers.get("Authorization")))
-        self.rfile.read(int(self.headers.get("Content-Length", "0")))
-        ok = self.headers.get("Authorization") == "Bearer " + GOOD_KEY
+        asked = json.loads(self.rfile.read(int(self.headers.get("Content-Length", "0"))) or b"{}")
+        reading = self.headers.get("Authorization") == "Bearer " + READER_KEY
+        ok = reading or self.headers.get("Authorization") == "Bearer " + GOOD_KEY
+        text = "ok"
+        if reading:
+            from tests.test_website_crawl import fake_model
+
+            try:
+                text = fake_model("\n".join(str(m.get("content")) for m in asked.get("messages", [])))
+            except Exception:
+                text = "{}"
         body = json.dumps(
             {"id": "x", "object": "chat.completion", "created": 0, "model": "gpt-4o-mini",
-             "choices": [{"index": 0, "finish_reason": "stop", "message": {"role": "assistant", "content": "ok"}}],
+             "choices": [{"index": 0, "finish_reason": "stop", "message": {"role": "assistant", "content": text}}],
              "usage": {"prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2}}
             if ok else {"error": {"message": "Incorrect API key provided", "type": "invalid_request_error", "code": "invalid_api_key"}}
         ).encode()
@@ -81,6 +93,7 @@ def server(request, app, tmp_path_factory, provider):
         extra_env={
             "PYTHONPATH": path,
             "ALLOW_EXTERNAL_API_CALLS": "true",
+            "OPENAI_API_KEY": READER_KEY,
             "OPENAI_BASE_URL": "http://127.0.0.1:%d/v1" % provider.server_port,
             "NO_PROXY": "127.0.0.1,localhost",
             "no_proxy": "127.0.0.1,localhost",
@@ -188,7 +201,7 @@ def the_cited_answer(page, base):
     return cards
 
 
-def test_a_startup_cto_signs_up_gives_github_and_asks_about_their_own_systems(browser, server, people, app):
+def test_a_startup_cto_signs_up_gives_github_and_asks_about_their_own_systems(browser, server, people, app, company_site):
     context, page = new_page(browser)
     try:
         email, started = sign_up(page, str(server), people)
@@ -201,19 +214,26 @@ def test_a_startup_cto_signs_up_gives_github_and_asks_about_their_own_systems(br
         shoot(page, "step2-company")
 
         # The site is only recorded, with permission, and the page says so plainly.
-        page.get_by_label("Website address").fill("acme.com")
+        page.get_by_label("Website address").fill(company_site.url)
         page.get_by_role("button", name="Save website").click()
         expect(page.get_by_text("You may read this website")).to_be_visible()
         expect(page.get_by_text("Tick the box to let us read this site.")).to_be_visible()
         page.get_by_label("You may read this website").check()
         page.get_by_role("button", name="Save website").click()
-        expect(page.get_by_test_id("signup-status-website")).to_contain_text("Company website is connected")
+        expect(page.get_by_test_id("signup-status-website")).to_contain_text(re.compile("Reading Company website now|Company website is connected|Read "))
 
         # GitHub starts at once and the person carries on.
         page.get_by_label("GitHub organisation").fill("acme")
         page.get_by_label("Read-only token").fill(TOKEN)
         page.get_by_role("button", name="Connect GitHub").click()
         expect(page.get_by_test_id("signup-status-github")).to_contain_text(re.compile(r"GitHub is connected\. Reading starts in a moment|Reading GitHub now|Read 16 repositories"))
+
+        # Jira is offered on the same step, with the three things it needs; it was left alone here.
+        jira = page.get_by_test_id("signup-jira")
+        for label in ("Jira site address", "Jira email", "Jira API token"):
+            expect(jira.get_by_label(label)).to_be_visible()
+        expect(jira.get_by_role("button", name="Connect Jira")).to_be_visible()
+        expect(page.get_by_test_id("signup-status-jira")).to_have_text("")
 
         shoot(page, "step2-sources")
         page.get_by_test_id("signup-continue").click()
@@ -238,20 +258,37 @@ def test_a_startup_cto_signs_up_gives_github_and_asks_about_their_own_systems(br
         page.get_by_role("button", name="Finish").click()
         page.wait_for_url("**/dashboard/**")
 
-        # The dashboard shows each source's progress; no sample company is offered.
-        sources = page.get_by_test_id("signup-sources")
-        expect(sources).to_contain_text("GitHub.")
-        expect(sources).to_contain_text("Company website")
-        expect(page.get_by_test_id("first-action-sample")).to_have_count(0)
+        # Reading carries on in the background. The person comes back to the sources step and sees how far it
+        # has got, then the dashboard shows the figures from what was read instead of asking for a source.
         deadline = time.monotonic() + 240
         while time.monotonic() < deadline:
-            if "items added to your model" in page.get_by_test_id("signup-source-github").inner_text():
+            page.goto(str(server) + "/account/welcome", wait_until="domcontentloaded")
+            if "items added to your model" in page.get_by_test_id("signup-status-github").inner_text():
                 break
             page.wait_for_timeout(3000)
-            page.reload(wait_until="domcontentloaded")
-        github_line = page.get_by_test_id("signup-source-github").inner_text()
+        github_line = page.get_by_test_id("signup-status-github").inner_text()
         assert re.search(r"Read 16 repositories; 22 items added to your model\.", github_line), github_line
-        shoot(page, "dashboard-sources")
+        expect(page.get_by_test_id("signup-status-website")).to_contain_text(re.compile(r"Read 5 pages; \d+ facts wait for you to confirm"))
+        shoot(page, "sources-read")
+
+        page.goto(str(server) + "/dashboard/overview", wait_until="domcontentloaded")
+        expect(page.get_by_test_id("overview-connect")).to_have_count(0)
+        expect(page.get_by_test_id("connect-source-card")).to_have_count(0)
+        applications = page.get_by_test_id("welcome-applications")
+        expect(applications).to_be_visible()
+        total = int(applications.locator("span").first.inner_text())
+        assert total >= 3, total
+        shoot(page, "dashboard-after-reading")
+        # The figure is a link, and it lands on a list that holds the same number of applications by name.
+        applications.click()
+        listed = page.locator("main")
+        expect(listed).to_contain_text("%d shown" % total)
+        for name in ("Auth", "Billing Api", "Customer Portal", "Gateway", "Inventory Service", "Mobile App", "Orders Worker", "Payments Service"):
+            expect(listed.get_by_text(name, exact=True).first).to_be_visible()
+        assert total == 8, total
+        # No sample company is offered to someone who has brought their own.
+        page.goto(str(server) + "/ai-chat", wait_until="networkidle")
+        expect(page.get_by_test_id("chat-first-sample")).to_have_count(0)
 
         # The first answer about their own systems, cited to the repository and file.
         cards = the_cited_answer(page, str(server))
@@ -288,19 +325,22 @@ def test_a_second_cto_skips_everything_and_lands_on_the_dashboard_as_before(brow
         page.wait_for_url("**/account/welcome?step=4")
         page.get_by_role("button", name="Finish").click()
         page.wait_for_url("**/dashboard/**")
-        expect(page.get_by_test_id("signup-sources")).to_have_count(0)
-        # The dashboard says plainly what was skipped and offers GitHub, and the offer lands on content.
-        skipped = page.get_by_test_id("signup-sources-skipped")
-        expect(skipped).to_contain_text("You skipped GitHub, Jira and the company website")
-        # The kind was answered in the company step, so the dashboard does not ask it again.
+        # Nothing was given, so the dashboard asks for a source and the offer lands on a page with content.
+        expect(page.get_by_test_id("overview-welcome")).to_contain_text("Connect GitHub and your model is built for you")
+        expect(page.get_by_test_id("connect-source-card")).to_contain_text("Connect GitHub or Jira")
+        expect(page.get_by_test_id("welcome-applications")).to_have_count(0)
+        # The kind was answered in the company step, so nothing asks it again.
         expect(page.get_by_test_id("company-kind-selector")).to_have_count(0)
-        # Nothing was given, so the sample company is on offer, exactly as before.
-        sample = page.get_by_test_id("first-action-sample")
+        shoot(page, "dashboard-skipped")
+        # Nothing was given, so the chat offers the sample company as well as Connect GitHub.
+        page.goto(str(server) + "/ai-chat", wait_until="networkidle")
+        steps = page.get_by_test_id("startup-first-steps")
+        expect(steps.get_by_role("link", name="Connect GitHub")).to_be_visible(timeout=PAGE_TIMEOUT)
+        sample = steps.get_by_role("button", name="See a sample company")
         expect(sample).to_be_visible()
+        shoot(page, "chat-offer")
         sample.click()
-        deadline = time.monotonic() + 180
-        while time.monotonic() < deadline and not page.get_by_test_id("first-action-sample").count() == 0:
-            page.wait_for_timeout(1000)
+        expect(page.get_by_test_id("sample-company-indicator")).to_be_visible(timeout=PAGE_TIMEOUT * 2)
         answer = ask(page, str(server), "What breaks if Payments service fails")
         expect(answer.locator("[data-answer-row]").first).to_be_visible()
         print("\nSIGN-UP TO FIRST SAMPLE-COMPANY ANSWER: %.1f seconds" % (time.monotonic() - started))
@@ -443,11 +483,115 @@ def test_the_company_kind_chosen_at_sign_up_is_kept_and_not_asked_again(browser,
         page.goto(str(server) + "/account/manage", wait_until="domcontentloaded")
         expect(page.get_by_label("What kind of company are you?")).to_have_value("enterprise")
         expect(page.get_by_label("ISO 27001")).to_be_checked()
-        # The skipped panel's offer lands on the GitHub connection page, with content.
+        # Nothing was connected, so the dashboard's offer lands on the GitHub connection page, with content.
         page.goto(str(server) + "/dashboard/", wait_until="domcontentloaded")
-        connect = page.get_by_test_id("first-action-connect")
+        connect = page.get_by_test_id("overview-connect")
         expect(connect).to_be_visible()
         connect.click()
-        expect(page.get_by_role("heading", name=re.compile("GitHub"))).to_be_visible()
+        expect(page.get_by_role("heading", name=re.compile("GitHub")).first).to_be_visible()
+        assert page.locator("main").inner_text().strip()
+    finally:
+        context.close()
+
+
+@pytest.fixture(scope="module")
+def company_site():
+    """The fixture company's own website, served locally."""
+    from tests.test_website_crawl import ABOUT, APP_SHELL, CONTACT, HOME, PRODUCTS, ROBOTS, _html, _Site
+
+    other = _Site({"/elsewhere": _html("<p>another company</p>")})
+    pages = {
+        "/": _html(HOME % {"linkedin": "https://www.linkedin.com/company/acme-robotics", "other": other.url}),
+        "/about": _html(ABOUT), "/products": _html(PRODUCTS), "/contact": _html(CONTACT), "/app": _html(APP_SHELL),
+        "/robots.txt": (200, "text/plain", ROBOTS),
+    }
+    site = _Site(pages)
+    yield site
+    site.stop()
+    other.stop()
+
+
+def _fact(page, label):
+    return page.locator("[data-fact]").filter(has=page.get_by_test_id("fact-label").get_by_text(label, exact=True))
+
+
+def _elements_of(app, email):
+    with app.app_context():
+        from app import db
+        from app.models.archimate_core import ArchiMateElement
+        from app.models.user import User
+
+        org_id = User.query.filter_by(email=email).one().organization_id
+        held = {(e.type, e.name) for e in ArchiMateElement.query.filter_by(organization_id=org_id).all()}
+        db.session.remove()
+    return held
+
+
+@pytest.mark.parametrize("width", [1440, 390], ids=["1440", "390"])
+def test_a_website_is_read_shown_with_its_pages_and_written_only_when_confirmed(browser, server, people, app, company_site, width):
+    site = company_site
+    context, page = new_page(browser, width)
+    page.set_viewport_size({"width": width, "height": 900 if width > 500 else 844})
+    try:
+        email, _started = sign_up(page, str(server), people)
+        assert_is_a_startup_cto_not_an_administrator(app, email)
+
+        # The site is given with permission to read it.
+        page.get_by_label("Website address").fill(site.url)
+        page.get_by_label("You may read this website").check()
+        page.get_by_role("button", name="Save website").click()
+        expect(page.get_by_test_id("signup-status-website")).to_contain_text(re.compile("Company website|Reading|Read "))
+        page.get_by_test_id("signup-continue").click()
+
+        # Its facts are waiting in the company step, each with the page it came from, and nothing is in the model yet.
+        page.wait_for_url("**/account/welcome?step=3")
+        facts = page.get_by_test_id("signup-facts")
+        expect(facts).to_be_visible(timeout=120000)
+        expect(facts).to_contain_text("What we read on " + site.url)
+        assert not _elements_of(app, email), "the model must hold nothing until the person confirms"
+        name = _fact(page, "Company name")
+        expect(name.locator("[data-fact-value]")).to_have_value("Acme Robotics Ltd")
+        for label, path in (("Key person", "/about"), ("Product", "/products"), ("Compliance mention", "/products")):
+            link = _fact(page, label).first.get_by_test_id("fact-source")
+            assert (link.get_attribute("href") or "").endswith(path), (label, link.get_attribute("href"))
+        # The page a fact names opens, and it is the company's own page with content.
+        landing = context.new_page()
+        landing.goto(name.get_by_test_id("fact-source").get_attribute("href"))
+        expect(landing.locator("body")).to_contain_text("Acme Robotics")
+        landing.close()
+        shoot(page, "website-facts-%d" % width)
+
+        # The person corrects the name, leaves one person out, and ticks the facts the reader was unsure of.
+        name.locator("[data-fact-value]").fill("Acme Robotics Group")
+        _fact(page, "Key person").filter(has=page.locator("input[data-fact-value][value*='Priya']")).get_by_role("checkbox").uncheck()
+        for label in ("Product", "Compliance mention", "Integration partner"):
+            for box in _fact(page, label).get_by_role("checkbox").all():
+                box.check()
+        page.get_by_label("Company size").select_option(label="11 to 50 people")
+        page.get_by_label("Your role").fill("CTO")
+        page.get_by_label("What do you want first?").select_option(label="Prepare for an audit")
+        assert not _elements_of(app, email), "choosing is not confirming"
+        page.get_by_role("button", name="Continue").click()
+        page.wait_for_url("**/account/welcome?step=4")
+
+        # Confirming writes what was ticked, and only that.
+        held = _elements_of(app, email)
+        assert {("BusinessService", "PickBot"), ("BusinessActor", "Dana Whitfield"),
+                ("Requirement", "Comply with ISO 27001"), ("ApplicationComponent", "SAP")} <= held, held
+        assert ("BusinessActor", "Priya Raman") not in held
+        page.get_by_role("button", name="Finish").click()
+        page.wait_for_url("**/dashboard/**")
+
+        # The correction is the person's own value, named as theirs, beside the pages the others came from.
+        page.goto(str(server) + "/account/manage", wait_until="domcontentloaded")
+        profile = page.get_by_test_id("company-profile-card")
+        profile.scroll_into_view_if_needed()
+        expect(profile).to_contain_text("Acme Robotics Group")
+        expect(profile).to_contain_text("Corrected by Casey Founder")
+        expect(profile).not_to_contain_text("Acme Robotics Ltd")
+        expect(profile).to_contain_text("Dana Whitfield, Chief Executive Officer")
+        expect(profile).not_to_contain_text("Priya Raman")
+        expect(profile.locator("a[href]").first).to_have_attribute("href", re.compile("^http://127.0.0.1"))
+        shoot(page, "website-settings-%d" % width)
     finally:
         context.close()
