@@ -162,7 +162,7 @@ def tidy(org_id: int, org=None) -> int:
     for row in rows:
         gone = is_placeholder_name(row.subject) or (
             bool(name) and row.subject == name and row.source in searched
-            and not src.is_about(row.title, name, domain, src.own_link(row.url, row.details), row.summary or ""))
+            and not src.is_about(row.title, name, domain, src.own_link(row.url, row.details)))
         if gone:
             db.session.delete(row)
             removed += 1
@@ -182,11 +182,11 @@ def tidy(org_id: int, org=None) -> int:
 
 def _relevant(source: src.Source, subject: str, domain: str, items: List[src.Item], is_company: bool) -> List[src.Item]:
     """What a free-text search gave back, less each hit that names neither the company nor its web address
-    in its title or summary.
+    in its title.
     Only the confirmed company is held to this. Sources that already match on the company's own records are left as they are."""
     if not source.searched or not is_company:
         return items
-    return [i for i in items if src.is_about(i.title, subject, domain, src.own_link(i.url, i.details), i.summary or "")]
+    return [i for i in items if src.is_about(i.title, subject, domain, src.own_link(i.url, i.details))]
 
 
 def _store(org_id: int, source: src.Source, subject: str, items: List[src.Item], is_company: bool, now: datetime) -> int:

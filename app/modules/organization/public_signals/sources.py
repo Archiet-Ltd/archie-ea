@@ -140,11 +140,10 @@ def link_is_on(link: Optional[str], domain: Optional[str]) -> bool:
     return found == host or found.endswith("." + host)
 
 
-def is_about(title: str, company: str, domain: Optional[str] = None, link: Optional[str] = None, summary: str = "") -> bool:
-    """A hit is kept only when the company's name appears in its title or summary, or its web address appears in its title,
-    or the story's own link is on the company's domain. A link to the company inside someone else's post is not enough."""
-    text = " ".join(filter(None, [title, summary]))
-    return any(names_company(text, v) for v in name_variants(company)) or names_domain(title, domain) or link_is_on(link, domain)
+def is_about(title: str, company: str, domain: Optional[str] = None, link: Optional[str] = None) -> bool:
+    """A hit is kept only when the company's name or web address is in its title, or the story's own link is on
+    the company's domain. A link to the company inside someone else's post is not enough."""
+    return any(names_company(title, v) for v in name_variants(company)) or names_domain(title, domain) or link_is_on(link, domain)
 
 
 def _strip_html(text: str) -> str:
