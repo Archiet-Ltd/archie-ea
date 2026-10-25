@@ -1,206 +1,223 @@
+{# design-block: form #}
+{# shadcn-reference: preview@e55b60b #}
 {% extends "layouts/admin_base.html" %}
 {% from "components/page_header.html" import page_header %}
+{% from "components/form_field.html" import form_field, form_group, form_footer %}
+{% from "components/button.html" import button %}
 
 {% block title %}{% if decision %}Edit {{ decision.decision_id }}{% else %}New Architecture Decision{% endif %}{% endblock %}
 
 {% block content %}
-<div class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8"
-     x-data="elementPicker()">
+<meta name="shadcn-nearest" content="dashboard-01">
+<div class="@container/main flex flex-1 flex-col gap-2">
+    <div class="flex flex-col gap-4 py-4 md:gap-6 md:py-6">
+        <div class="px-4 lg:px-6">
+            {{ page_header(
+                title=('Edit ' ~ decision.decision_id) if decision else 'New Architecture Decision',
+                breadcrumbs=[
+                    {'label': 'Dashboard', 'href': url_for('main.index')},
+                    {'label': 'Architecture Decisions', 'href': url_for('arch_decisions.list_decisions')},
+                    {'label': 'Edit' if decision else 'New'}
+                ]
+            ) }}
+        </div>
 
-    {{ page_header(
-        title=('Edit ' ~ decision.decision_id) if decision else 'New Architecture Decision',
-        breadcrumbs=[
-            {'label': 'Dashboard', 'href': url_for('main.index')},
-            {'label': 'Architecture Decisions', 'href': url_for('arch_decisions.list_decisions')},
-            {'label': 'Edit' if decision else 'New'}
-        ]
-    ) }}
+        <div class="px-4 lg:px-6 max-w-3xl">
+            <form method="POST"
+                  action="{{ url_for('arch_decisions.edit_decision', decision_id=decision.id) if decision else url_for('arch_decisions.create_decision') }}"
+                  class="space-y-6"
+                  x-data="elementPicker()">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
-    <form method="POST"
-          action="{{ url_for('arch_decisions.edit_decision', decision_id=decision.id) if decision else url_for('arch_decisions.create_decision') }}"
-          class="space-y-6">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <!-- Title -->
+                <div class="bg-card border border-border rounded-lg p-6 space-y-5">
+                    {{ form_field(
+                        id='title',
+                        label='Title',
+                        name='title',
+                        required=true,
+                        value=decision.title if decision else '',
+                        placeholder='e.g. Adopt microservices for order management domain',
+                        help_text=''
+                    ) }}
 
-        <!-- Title -->
-        <div class="bg-card border border-border rounded-lg p-6 space-y-5">
-            <div>
-                <label class="block text-sm font-medium text-muted-foreground mb-1" for="title">Title <span class="text-destructive-emphasis">*</span></label>
-                <input type="text" id="title" name="title" required
-                       value="{{ decision.title if decision else '' }}"
-                       placeholder="e.g. Adopt microservices for order management domain"
-                       class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring" autofocus>
-            </div>
+                    <div class="grid grid-cols-1 gap-4">
+                        <!-- Status -->
+                        {% call form_group(id='status', label='Status') %}
+                        <select id="status" name="status"
+                                class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                            {% for val, label in [('proposed','Proposed'),('accepted','Accepted'),('deprecated','Deprecated'),('superseded','Superseded')] %}
+                            <option value="{{ val }}" {% if decision and decision.status == val %}selected{% elif not decision and val == 'proposed' %}selected{% endif %}>{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                        {% endcall %}
 
-            <div class="grid grid-cols-1 gap-4">
-                <!-- Status -->
-                <div>
-                    <label class="block text-sm font-medium text-muted-foreground mb-1" for="status">Status</label>
-                    <select id="status" name="status"
-                            class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
-                        {% for val, label in [('proposed','Proposed'),('accepted','Accepted'),('deprecated','Deprecated'),('superseded','Superseded')] %}
-                        <option value="{{ val }}" {% if decision and decision.status == val %}selected{% elif not decision and val == 'proposed' %}selected{% endif %}>{{ label }}</option>
-                        {% endfor %}
-                    </select>
+                        <!-- ADM Phase -->
+                        {% call form_group(id='adm_phase', label='TOGAF ADM Phase') %}
+                        <select id="adm_phase" name="adm_phase"
+                                class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                            <option value="">None</option>
+                            {% for ph, label in [
+                                ('A','Phase A: Architecture Vision'),
+                                ('B','Phase B: Business Architecture'),
+                                ('C','Phase C: Information Systems'),
+                                ('D','Phase D: Technology Architecture'),
+                                ('E','Phase E: Opportunities & Solutions'),
+                                ('F','Phase F: Migration Planning'),
+                                ('G','Phase G: Implementation Governance'),
+                                ('H','Phase H: Change Management')
+                            ] %}
+                            <option value="{{ ph }}" {% if decision and decision.adm_phase == ph %}selected{% endif %}>{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                        {% endcall %}
+                    </div>
                 </div>
 
-                <!-- ADM Phase -->
-                <div>
-                    <label class="block text-sm font-medium text-muted-foreground mb-1" for="adm_phase">TOGAF ADM Phase</label>
-                    <select id="adm_phase" name="adm_phase"
-                            class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
-                        <option value="">— None —</option>
-                        {% for ph, label in [
-                            ('A','Phase A: Architecture Vision'),
-                            ('B','Phase B: Business Architecture'),
-                            ('C','Phase C: Information Systems'),
-                            ('D','Phase D: Technology Architecture'),
-                            ('E','Phase E: Opportunities & Solutions'),
-                            ('F','Phase F: Migration Planning'),
-                            ('G','Phase G: Implementation Governance'),
-                            ('H','Phase H: Change Management')
-                        ] %}
-                        <option value="{{ ph }}" {% if decision and decision.adm_phase == ph %}selected{% endif %}>{{ label }}</option>
-                        {% endfor %}
-                    </select>
+                <!-- Recorded by the AI chat, workbench or solution-options-advisor
+                     creation paths, not by this form -- read-only here, since this
+                     form's POST has nothing to persist a change to them with. -->
+                {% if decision and (decision.assumptions or decision.affected_systems or decision.decided_by_label or decision.review_outcome) %}
+                <div class="bg-muted/40 border border-border rounded-lg p-6 space-y-3 text-sm">
+                    <p class="text-xs font-medium text-muted-foreground">Recorded elsewhere, read-only</p>
+                    {% if decision.decided_by_label %}
+                    <div class="flex gap-2">
+                        <dt class="text-muted-foreground shrink-0">Recorded by</dt>
+                        <dd class="text-foreground">{{ decision.decided_by_label }}</dd>
+                    </div>
+                    {% endif %}
+                    {% if decision.assumptions %}
+                    <div>
+                        <dt class="text-muted-foreground mb-1">Assumptions</dt>
+                        <dd class="whitespace-pre-wrap text-foreground">{{ decision.assumptions }}</dd>
+                    </div>
+                    {% endif %}
+                    {% if decision.affected_systems %}
+                    <div>
+                        <dt class="text-muted-foreground mb-1">Affected systems</dt>
+                        <dd class="text-foreground">{{ decision.affected_systems | join(', ') }}</dd>
+                    </div>
+                    {% endif %}
+                    {% if decision.review_outcome %}
+                    <div>
+                        <dt class="text-muted-foreground mb-1">Last review outcome</dt>
+                        <dd class="whitespace-pre-wrap text-foreground">{{ decision.review_outcome }}</dd>
+                    </div>
+                    {% endif %}
                 </div>
-            </div>
+                {% endif %}
+
+                <!-- Content sections -->
+                <div class="bg-card border border-border rounded-lg p-6 space-y-5">
+                    {{ form_field(
+                        id='context',
+                        label='Context',
+                        name='context',
+                        input_type='textarea',
+                        rows=4,
+                        value=decision.context if decision else '',
+                        placeholder='Describe the situation and context...',
+                        help_text='Why was this decision needed? What forces or constraints drove it?'
+                    ) }}
+
+                    {{ form_field(
+                        id='decision',
+                        label='Decision',
+                        name='decision',
+                        input_type='textarea',
+                        rows=4,
+                        required=true,
+                        value=decision.decision if decision else '',
+                        placeholder='We will...',
+                        help_text='What was decided? Be specific and unambiguous.'
+                    ) }}
+
+                    {{ form_field(
+                        id='consequences',
+                        label='Consequences',
+                        name='consequences',
+                        input_type='textarea',
+                        rows=4,
+                        value=decision.consequences if decision else '',
+                        placeholder='Positive: ...\nNegative: ...\nRisks: ...',
+                        help_text='What are the resulting context, trade-offs, and implications?'
+                    ) }}
+
+                    {{ form_field(
+                        id='alternatives',
+                        label='Alternatives Considered',
+                        name='alternatives',
+                        input_type='textarea',
+                        rows=4,
+                        value=decision.alternatives if decision else '',
+                        placeholder='Option A: ...\nOption B: ...',
+                        help_text='What other options were evaluated and why were they rejected?'
+                    ) }}
+
+                    {{ form_field(
+                        id='review_date',
+                        label='Review Date',
+                        name='review_date',
+                        type='date',
+                        value=decision.review_date.isoformat() if decision and decision.review_date else '',
+                        help_text='Come back to this decision on or after this date. Leave blank if this decision does not need a future review.'
+                    ) }}
+                </div>
+
+                <!-- ArchiMate Element Picker -->
+                <div class="bg-card border border-border rounded-lg p-6">
+                    <h3 class="text-sm font-semibold text-foreground mb-4 flex items-center gap-2">
+                        <i data-lucide="share-2" class="h-4 w-4 text-muted-foreground"></i>
+                        Impacted ArchiMate Elements
+                    </h3>
+
+                    <!-- Hidden field with selected IDs -->
+                    <input type="hidden" name="archimate_element_ids" :value="JSON.stringify(selectedIds)">
+
+                    <!-- Selected elements -->
+                    <div class="flex flex-wrap gap-2 mb-3 min-h-[2rem]" x-show="selectedElements.length > 0" x-cloak>
+                        <template x-for="el in selectedElements" :key="el.id">
+                            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-primary/10 text-info-emphasis border border-primary/20">
+                                <span x-text="el.name"></span>
+                                <button aria-label="Remove" type="button" @click="removeElement(el.id)" class="hover:text-destructive-emphasis ml-0.5">
+                                    <i data-lucide="x" class="h-3 w-3"></i>
+                                </button>
+                            </span>
+                        </template>
+                    </div>
+
+                    <!-- Search input -->
+                    <div class="relative">
+                        <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none"></i>
+                        <input type="text" x-model="searchQuery" @input.debounce.300ms="searchElements()"
+                               placeholder="Search ArchiMate elements..."
+                               class="flex h-9 w-full rounded-md border border-input bg-background pl-9 pr-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Search ArchiMate elements">
+                    </div>
+
+                    <!-- Search results dropdown -->
+                    <div x-show="searchError" x-cloak class="mt-1 border border-border rounded-md bg-popover px-3 py-2 text-sm text-destructive-emphasis" x-text="searchError"></div>
+                    <div x-show="!searchError && searchResults.length > 0" x-cloak class="mt-1 border border-border rounded-md bg-popover divide-y divide-border max-h-48 overflow-y-auto">
+                        <template x-for="el in searchResults" :key="el.id">
+                            <button type="button" @click="addElement(el)"
+                                    class="w-full text-left flex items-center justify-between px-3 py-2 text-sm hover:bg-accent transition-colors">
+                                <span x-text="el.name" class="font-medium text-foreground"></span>
+                                <div class="flex gap-1.5">
+                                    <span x-show="el.layer" x-cloak x-text="el.layer" class="text-xs px-1.5 py-0.5 rounded bg-secondary text-secondary-foreground"></span>
+                                    <span x-show="el.element_type" x-cloak x-text="el.element_type" class="text-xs px-1.5 py-0.5 rounded bg-muted text-muted-foreground"></span>
+                                </div>
+                            </button>
+                        </template>
+                    </div>
+                </div>
+
+                <!-- Submit -->
+                {{ form_footer(
+                    submit_text='Save Changes' if decision else 'Create Decision',
+                    cancel_attrs={'onclick': 'window.location.href=\'' ~ url_for('arch_decisions.list_decisions') ~ '\''}
+                ) }}
+            </form>
         </div>
-
-        <!-- Recorded by the AI chat, workbench or solution-options-advisor
-             creation paths, not by this form -- read-only here, since this
-             form's POST has nothing to persist a change to them with. -->
-        {% if decision and (decision.assumptions or decision.affected_systems or decision.decided_by_label or decision.review_outcome) %}
-        <div class="bg-muted/40 border border-border rounded-lg p-6 space-y-3 text-sm">
-            <p class="text-xs font-medium text-muted-foreground uppercase tracking-wide">Recorded elsewhere, read-only</p>
-            {% if decision.decided_by_label %}
-            <div class="flex gap-2">
-                <dt class="text-muted-foreground shrink-0">Recorded by</dt>
-                <dd class="text-foreground">{{ decision.decided_by_label }}</dd>
-            </div>
-            {% endif %}
-            {% if decision.assumptions %}
-            <div>
-                <dt class="text-muted-foreground mb-1">Assumptions</dt>
-                <dd class="whitespace-pre-wrap text-foreground">{{ decision.assumptions }}</dd>
-            </div>
-            {% endif %}
-            {% if decision.affected_systems %}
-            <div>
-                <dt class="text-muted-foreground mb-1">Affected systems</dt>
-                <dd class="text-foreground">{{ decision.affected_systems | join(', ') }}</dd>
-            </div>
-            {% endif %}
-            {% if decision.review_outcome %}
-            <div>
-                <dt class="text-muted-foreground mb-1">Last review outcome</dt>
-                <dd class="whitespace-pre-wrap text-foreground">{{ decision.review_outcome }}</dd>
-            </div>
-            {% endif %}
-        </div>
-        {% endif %}
-
-        <!-- Content sections -->
-        <div class="bg-card border border-border rounded-lg p-6 space-y-5">
-            <div>
-                <label class="block text-sm font-medium text-muted-foreground mb-1" for="context">Context</label>
-                <p class="text-xs text-muted-foreground mb-2">Why was this decision needed? What forces or constraints drove it?</p>
-                <textarea id="context" name="context" rows="4"
-                          class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring resize-y font-mono"
-                          placeholder="Describe the situation and context...">{{ decision.context if decision else '' }}</textarea>
-            </div>
-
-            <div>
-                <label class="block text-sm font-medium text-muted-foreground mb-1" for="decision">Decision <span class="text-destructive-emphasis">*</span></label>
-                <p class="text-xs text-muted-foreground mb-2">What was decided? Be specific and unambiguous.</p>
-                <textarea id="decision" name="decision" rows="4"
-                          class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring resize-y font-mono"
-                          placeholder="We will...">{{ decision.decision if decision else '' }}</textarea>
-            </div>
-
-            <div>
-                <label class="block text-sm font-medium text-muted-foreground mb-1" for="consequences">Consequences</label>
-                <p class="text-xs text-muted-foreground mb-2">What are the resulting context, trade-offs, and implications?</p>
-                <textarea id="consequences" name="consequences" rows="4"
-                          class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring resize-y font-mono"
-                          placeholder="Positive: ...\nNegative: ...\nRisks: ...">{{ decision.consequences if decision else '' }}</textarea>
-            </div>
-
-            <div>
-                <label class="block text-sm font-medium text-muted-foreground mb-1" for="alternatives">Alternatives Considered</label>
-                <p class="text-xs text-muted-foreground mb-2">What other options were evaluated and why were they rejected?</p>
-                <textarea id="alternatives" name="alternatives" rows="4"
-                          class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring resize-y font-mono"
-                          placeholder="Option A: ...\nOption B: ...">{{ decision.alternatives if decision else '' }}</textarea>
-            </div>
-
-            <div>
-                <label class="block text-sm font-medium text-muted-foreground mb-1" for="review_date">Review Date</label>
-                <p class="text-xs text-muted-foreground mb-2">Come back to this decision on or after this date -- a vendor renewal, a deviation granted "for now". Leave blank if this decision does not need a future review.</p>
-                <input type="date" id="review_date" name="review_date"
-                       value="{{ decision.review_date.isoformat() if decision and decision.review_date else '' }}"
-                       class="h-9 w-full max-w-xs rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
-            </div>
-        </div>
-
-        <!-- ArchiMate Element Picker -->
-        <div class="bg-card border border-border rounded-lg p-6">
-            <h3 class="text-sm font-semibold text-foreground mb-4 flex items-center gap-2">
-                <i data-lucide="share-2" class="h-4 w-4 text-muted-foreground"></i>
-                Impacted ArchiMate Elements
-            </h3>
-
-            <!-- Hidden field with selected IDs -->
-            <input type="hidden" name="archimate_element_ids" :value="JSON.stringify(selectedIds)">
-
-            <!-- Selected elements -->
-            <div class="flex flex-wrap gap-2 mb-3 min-h-[2rem]" x-show="selectedElements.length > 0" x-cloak>
-                <template x-for="el in selectedElements" :key="el.id">
-                    <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-primary/10 text-info-emphasis border border-primary/20">
-                        <span x-text="el.name"></span>
-                        <button aria-label="Remove" type="button" @click="removeElement(el.id)" class="hover:text-destructive-emphasis ml-0.5">
-                            <i data-lucide="x" class="h-3 w-3"></i>
-                        </button>
-                    </span>
-                </template>
-            </div>
-
-            <!-- Search input -->
-            <div class="relative">
-                <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none"></i>
-                <input type="text" x-model="searchQuery" @input.debounce.300ms="searchElements()"
-                       placeholder="Search ArchiMate elements..."
-                       class="h-9 w-full pl-9 pr-3 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring" aria-label="Search ArchiMate elements...">
-            </div>
-
-            <!-- Search results dropdown -->
-            <div x-show="searchError" x-cloak class="mt-1 border border-border rounded-md bg-popover px-3 py-2 text-sm text-destructive-emphasis" x-text="searchError"></div>
-            <div x-show="!searchError && searchResults.length > 0" x-cloak class="mt-1 border border-border rounded-md bg-popover divide-y divide-border max-h-48 overflow-y-auto">
-                <template x-for="el in searchResults" :key="el.id">
-                    <button type="button" @click="addElement(el)"
-                            class="w-full text-left flex items-center justify-between px-3 py-2 text-sm hover:bg-accent transition-colors">
-                        <span x-text="el.name" class="font-medium text-foreground"></span>
-                        <div class="flex gap-1.5">
-                            <span x-show="el.layer" x-cloak x-text="el.layer" class="text-xs px-1.5 py-0.5 rounded bg-secondary text-secondary-foreground"></span>
-                            <span x-show="el.element_type" x-cloak x-text="el.element_type" class="text-xs px-1.5 py-0.5 rounded bg-muted text-muted-foreground"></span>
-                        </div>
-                    </button>
-                </template>
-            </div>
-        </div>
-
-        <!-- Submit -->
-        <div class="flex items-center justify-between">
-            <a href="{{ url_for('arch_decisions.list_decisions') }}"
-               class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
-                Cancel
-            </a>
-            <button type="submit"
-                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
-                <i data-lucide="save" class="h-4 w-4"></i>
-                {% if decision %}Save Changes{% else %}Create Decision{% endif %}
-            </button>
-        </div>
-    </form>
+    </div>
 </div>
 
 <script>
@@ -228,22 +245,15 @@ function elementPicker() {
         async searchElements() {
             if (this.searchQuery.length < 2) { this.searchResults = []; return; }
             try {
-                // Canonical element search (the old /architecture/decisions/api/element-search route no longer exists)
                 const data = await Platform.fetch.get(`/archimate/api/elements/search?q=${encodeURIComponent(this.searchQuery)}&limit=20`, { silent: true });
-                // Platform.fetch.get returns parsed data directly; it throws on non-ok responses.
-                // The endpoint returns either an array or an object with a data property.
                 const payload = Array.isArray(data) ? data : (data.data || []);
                 this.searchResults = payload
                     .map(el => ({ id: el.id, name: el.name, layer: el.layer || '', element_type: el.element_type || el.type || '' }))
                     .filter(el => !this.selectedIds.includes(el.id));
                 this.searchError = null;
             } catch (e) {
-                // Debounced typeahead: an inline message, not a toast on every keystroke.
-                // Platform.fetch already shows a toast unless silent:true, but we passed silent:true.
-                // We still need to surface the error inline, not swallow it.
                 this.searchResults = [];
                 this.searchError = e.message || 'Element search failed';
-                // Do NOT add console calls (forbidden). The error is already visible via searchError.
             }
         },
 
