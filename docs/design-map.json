@@ -2148,42 +2148,40 @@
    "allowed_macros": [
     "components/accessibility_helpers.html",
     "components/alert.html",
-    "components/avatar.html",
     "components/badge.html",
     "components/breadcrumb.html",
     "components/breadcrumb_nav.html",
     "components/button.html",
-    "components/canvas_box.html",
     "components/card.html",
     "components/checkbox.html",
     "components/confirmation_dialog.html",
-    "components/data_card.html",
+    "components/data_table.html",
     "components/dense_table.html",
-    "components/detail_meta.html",
     "components/dialog.html",
     "components/dropdown_menu.html",
     "components/empty_state.html",
     "components/error_boundary.html",
+    "components/filter_bar.html",
+    "components/filter_panel.html",
     "components/form_field.html",
     "components/inline_hint.html",
     "components/input.html",
     "components/loading_state.html",
-    "components/metrics_card.html",
     "components/modal.html",
     "components/page_header.html",
-    "components/progress.html",
+    "components/pagination_controls.html",
     "components/provenance.html",
+    "components/search_bar.html",
     "components/select.html",
     "components/skeleton.html",
     "components/status_badge.html",
-    "components/status_indicator.html",
+    "components/table.html",
     "components/tabs.html",
-    "components/traceability_panel.html",
-    "macros/form_macros.html",
+    "components/workbench_table.html",
     "macros/page_shell.html"
    ],
    "basis": "rule",
-   "block": "record-detail",
+   "block": "data-table",
    "charts": [],
    "components": [
     "alert",
@@ -2252,12 +2250,12 @@
    "reason": "The model as it stood on a date: a date form, then an elements table and a relationships table.",
    "reference": {
     "shadcn": {
-     "name": "shadcn examples: mail (reading pane)",
-     "url": "https://ui.shadcn.com/examples/mail"
+     "name": "shadcn examples: tasks",
+     "url": "https://ui.shadcn.com/examples/tasks"
     },
     "basecoat": {
-     "name": "flask-basecoat examples: product detail",
-     "image": "docs/design/reference/basecoat-product-detail.webp"
+     "name": "flask-basecoat examples: tasks",
+     "image": "docs/design/reference/basecoat-tasks.webp"
     }
    },
    "spec": null,
@@ -2277,42 +2275,40 @@
    "allowed_macros": [
     "components/accessibility_helpers.html",
     "components/alert.html",
-    "components/avatar.html",
     "components/badge.html",
     "components/breadcrumb.html",
     "components/breadcrumb_nav.html",
     "components/button.html",
-    "components/canvas_box.html",
     "components/card.html",
     "components/checkbox.html",
     "components/confirmation_dialog.html",
-    "components/data_card.html",
+    "components/data_table.html",
     "components/dense_table.html",
-    "components/detail_meta.html",
     "components/dialog.html",
     "components/dropdown_menu.html",
     "components/empty_state.html",
     "components/error_boundary.html",
+    "components/filter_bar.html",
+    "components/filter_panel.html",
     "components/form_field.html",
     "components/inline_hint.html",
     "components/input.html",
     "components/loading_state.html",
-    "components/metrics_card.html",
     "components/modal.html",
     "components/page_header.html",
-    "components/progress.html",
+    "components/pagination_controls.html",
     "components/provenance.html",
+    "components/search_bar.html",
     "components/select.html",
     "components/skeleton.html",
     "components/status_badge.html",
-    "components/status_indicator.html",
+    "components/table.html",
     "components/tabs.html",
-    "components/traceability_panel.html",
-    "macros/form_macros.html",
+    "components/workbench_table.html",
     "macros/page_shell.html"
    ],
    "basis": "rule",
-   "block": "record-detail",
+   "block": "data-table",
    "charts": [],
    "components": [
     "alert",
@@ -2384,12 +2380,12 @@
    "reason": "What changed between two dates: a date form and a change list.",
    "reference": {
     "shadcn": {
-     "name": "shadcn examples: mail (reading pane)",
-     "url": "https://ui.shadcn.com/examples/mail"
+     "name": "shadcn examples: tasks",
+     "url": "https://ui.shadcn.com/examples/tasks"
     },
     "basecoat": {
-     "name": "flask-basecoat examples: product detail",
-     "image": "docs/design/reference/basecoat-product-detail.webp"
+     "name": "flask-basecoat examples: tasks",
+     "image": "docs/design/reference/basecoat-tasks.webp"
     }
    },
    "spec": null,
@@ -9693,10 +9689,12 @@
     "link": 1,
     "testid": 1
    },
+   "departures": [],
    "extends": [
     "layouts/admin_base.html"
    ],
    "frame": "dashboard-01",
+   "grid": "G1",
    "inhouse_components": [],
    "macros": [
     "components/card.html",
@@ -9705,6 +9703,10 @@
    ],
    "original": "dashboard-01",
    "page_type": "dashboard",
+   "patterns": [
+    "P01-page-header",
+    "P17-empty-state"
+   ],
    "persona": "platform_admin",
    "reason": "The platform administration area: one card per cross-organisation tool, opened from the Platform admin entry of the user menu.",
    "reference": {
@@ -9718,6 +9720,11 @@
     }
    },
    "spec": null,
+   "states": [
+    "empty-first-use",
+    "empty-no-permission",
+    "populated"
+   ],
    "status": "mapped",
    "tier": "B",
    "type_changed": false
@@ -21365,7 +21372,7 @@
     "form": 1,
     "link": 1,
     "modal": 1,
-    "testid": 1
+    "testid": 2
    },
    "departures": [
     {
@@ -21552,7 +21559,10 @@
    ],
    "confidence": "high",
    "controls": {
-    "link": 3
+    "button": 1,
+    "form": 1,
+    "link": 3,
+    "testid": 1
    },
    "departures": [
     {
@@ -21575,9 +21585,13 @@
     "page-header:Replace"
    ],
    "macros": [
+    "components/badge.html",
+    "components/button.html",
     "components/empty_state.html",
+    "components/form_field.html",
     "components/metrics_card.html",
-    "components/page_header.html"
+    "components/page_header.html",
+    "components/select.html"
    ],
    "original": "preview",
    "page_type": "record-detail",
@@ -22458,10 +22472,12 @@
     "modal": 1,
     "table": 1
    },
+   "departures": [],
    "extends": [
     "layouts/admin_base.html"
    ],
    "frame": "shadcn",
+   "grid": "G1",
    "macros": [
     "components/badge.html",
     "components/button.html",
@@ -22475,6 +22491,12 @@
    ],
    "original": "shadcn examples: cards",
    "page_type": "board",
+   "patterns": [
+    "P01-page-header",
+    "P04-filter-search-toolbar",
+    "P30-hierarchy-browse",
+    "P23-status-badge"
+   ],
    "persona": "business_architect",
    "reason": "Consolidated capability map rebuilt from component macros with six lenses and three bands",
    "reference": {
@@ -22488,8 +22510,16 @@
     }
    },
    "spec": null,
+   "states": [
+    "loading",
+    "empty-first-use",
+    "empty-filtered",
+    "error-region",
+    "populated"
+   ],
    "status": "mapped",
-   "tier": "B"
+   "tier": "B",
+   "type_changed": false
   },
   "app/templates/capability_map/error.html": {
    "allowed_macros": [
@@ -23113,7 +23143,10 @@
     "toggle-group"
    ],
    "confidence": "high",
-   "controls": {},
+   "controls": {
+    "link": 1,
+    "testid": 2
+   },
    "departures": [
     {
      "rule": "C-form",
@@ -23131,8 +23164,11 @@
     "page-header:Replace"
    ],
    "macros": [
+    "components/badge.html",
     "components/breadcrumb_nav.html",
+    "components/card.html",
     "components/empty_state.html",
+    "components/metrics_card.html",
     "components/page_header.html"
    ],
    "original": "gap:G-4",
@@ -24132,7 +24168,8 @@
     "components/input.html",
     "components/select.html",
     "components/skeleton.html",
-    "components/table.html"
+    "components/table.html",
+    "macros/page_shell.html"
    ],
    "original": "gap:G-4",
    "page_type": "timeline",
@@ -27597,7 +27634,6 @@
    "confidence": "high",
    "controls": {
     "button": 1,
-    "link": 2,
     "table": 1,
     "testid": 1
    },
@@ -27616,11 +27652,11 @@
     "page-shell:Replace"
    ],
    "macros": [
-    "components/_breadcrumb_root.html",
     "components/badge.html",
     "components/button.html",
     "components/dense_table.html",
-    "components/empty_state.html"
+    "components/empty_state.html",
+    "macros/page_shell.html"
    ],
    "original": "example:tasks",
    "page_type": "data-table",
@@ -27709,7 +27745,6 @@
    ],
    "confidence": "high",
    "controls": {
-    "link": 3,
     "table": 1,
     "testid": 1
    },
@@ -27723,9 +27758,9 @@
     "page-shell:Replace"
    ],
    "macros": [
-    "components/_breadcrumb_root.html",
     "components/dense_table.html",
-    "components/empty_state.html"
+    "components/empty_state.html",
+    "macros/page_shell.html"
    ],
    "original": "example:tasks",
    "page_type": "data-table",
@@ -27814,7 +27849,6 @@
    "confidence": "high",
    "controls": {
     "button": 1,
-    "link": 3,
     "table": 1,
     "testid": 1
    },
@@ -27828,10 +27862,10 @@
     "page-shell:Replace"
    ],
    "macros": [
-    "components/_breadcrumb_root.html",
     "components/button.html",
     "components/dense_table.html",
-    "components/empty_state.html"
+    "components/empty_state.html",
+    "macros/page_shell.html"
    ],
    "original": "example:tasks",
    "page_type": "data-table",
@@ -28205,6 +28239,7 @@
     "components/skeleton.html",
     "components/status_badge.html",
     "components/status_indicator.html",
+    "components/table.html",
     "components/tabs.html",
     "components/traceability_panel.html",
     "macros/form_macros.html",
@@ -28227,7 +28262,7 @@
    ],
    "confidence": "high",
    "controls": {
-    "button": 5,
+    "button": 2,
     "link": 1,
     "table": 4
    },
@@ -28240,13 +28275,22 @@
    "extends": [
     "layouts/admin_base.html"
    ],
+   "extra_macros": [
+    "components/table.html"
+   ],
    "frame": "dashboard-01",
    "grid": "G3",
    "inhouse_components": [
     "page-header:Replace"
    ],
    "macros": [
-    "components/page_header.html"
+    "components/badge.html",
+    "components/button.html",
+    "components/card.html",
+    "components/checkbox.html",
+    "components/page_header.html",
+    "components/table.html",
+    "components/tabs.html"
    ],
    "original": "preview",
    "page_type": "record-detail",
@@ -31343,7 +31387,7 @@
    "confidence": "high",
    "controls": {
     "button": 1,
-    "link": 2
+    "testid": 1
    },
    "departures": [
     {
@@ -31360,6 +31404,9 @@
     "page-shell:Replace"
    ],
    "macros": [
+    "components/alert.html",
+    "components/button.html",
+    "components/empty_state.html",
     "macros/page_shell.html"
    ],
    "original": "empty",
@@ -37095,6 +37142,7 @@
     "public-navbar:Compose"
    ],
    "macros": [
+    "components/card.html",
     "components/public_footer.html",
     "components/public_navbar.html"
    ],
@@ -37235,7 +37283,7 @@
    "controls": {
     "link": 9,
     "table": 1,
-    "testid": 10
+    "testid": 9
    },
    "departures": [
     {
@@ -41684,10 +41732,12 @@
     "link": 5,
     "testid": 3
    },
+   "departures": [],
    "extends": [
     "layouts/admin_base.html"
    ],
    "frame": "dashboard-01",
+   "grid": "G1",
    "inhouse_components": [
     "page-shell:Replace"
    ],
@@ -41696,6 +41746,12 @@
    ],
    "original": "dashboard-01",
    "page_type": "dashboard",
+   "patterns": [
+    "P01-page-header",
+    "P03-data-table",
+    "P23-status-badge",
+    "P27-evidence-line"
+   ],
    "persona": "solution_architect",
    "reason": "Weekly briefing: a headline and four short linked lists, no chart.",
    "reference": {
@@ -41709,6 +41765,12 @@
     }
    },
    "spec": null,
+   "states": [
+    "empty-first-use",
+    "empty-no-permission",
+    "error-region",
+    "populated"
+   ],
    "status": "mapped",
    "tier": "B",
    "type_changed": false
@@ -42662,7 +42724,7 @@
    "controls": {
     "button": 8,
     "table": 1,
-    "testid": 3
+    "testid": 5
    },
    "departures": [
     {
