@@ -70,7 +70,7 @@ def test_business_architect_creates_gap_plateau_and_work_package(browser, live_s
         page.reload(wait_until="domcontentloaded")
 
         # The plateau name is visible
-        expect(page.locator("text=" + plateau_name)).to_be_visible(timeout=PAGE_TIMEOUT)
+        expect(page.locator("#capability-roadmap-app p", has_text=plateau_name).first).to_be_visible(timeout=PAGE_TIMEOUT)
 
         # The work package name is visible in the table
         expect(page.locator("text=" + wp_name)).to_be_visible(timeout=PAGE_TIMEOUT)
@@ -90,7 +90,7 @@ def test_business_architect_creates_gap_plateau_and_work_package(browser, live_s
                   wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
 
         # The metrics show the created items
-        expect(page.locator("text=" + plateau_name)).to_be_visible(timeout=PAGE_TIMEOUT)
+        expect(page.locator("#capability-roadmap-app p", has_text=plateau_name).first).to_be_visible(timeout=PAGE_TIMEOUT)
 
         # The work package row shows the gap
         wp_row = page.locator("tr").filter(has_text=wp_name)

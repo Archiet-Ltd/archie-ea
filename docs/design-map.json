@@ -2374,7 +2374,8 @@
     "P04-filter-search-toolbar",
     "P15-activity-comment-feed",
     "P23-status-badge",
-    "P27-evidence-line"
+    "P27-evidence-line",
+    "P03-data-table"
    ],
    "persona": "enterprise_architect",
    "reason": "What changed between two dates: a date form and a change list.",
@@ -23116,6 +23117,7 @@
     "components/inline_hint.html",
     "components/input.html",
     "components/loading_state.html",
+    "components/metrics_card.html",
     "components/modal.html",
     "components/page_header.html",
     "components/provenance.html",
@@ -23155,6 +23157,9 @@
    ],
    "extends": [
     "layouts/admin_base.html"
+   ],
+   "extra_macros": [
+    "components/metrics_card.html"
    ],
    "frame": "dashboard-01",
    "grid": "G4",
@@ -28008,6 +28013,7 @@
     "components/breadcrumb.html",
     "components/breadcrumb_nav.html",
     "components/button.html",
+    "components/card.html",
     "components/checkbox.html",
     "components/confirmation_dialog.html",
     "components/data_table.html",
@@ -28059,6 +28065,9 @@
    "departures": [],
    "extends": [
     "layouts/admin_base.html"
+   ],
+   "extra_macros": [
+    "components/card.html"
    ],
    "frame": "dashboard-01",
    "grid": "G1",
@@ -28299,7 +28308,8 @@
     "P25-key-value-summary",
     "P23-status-badge",
     "P08-confirm-destructive",
-    "P22-toast-feedback"
+    "P22-toast-feedback",
+    "P03-data-table"
    ],
    "persona": "data_architect",
    "reason": "One group of duplicates with merge action.",
@@ -42671,6 +42681,7 @@
     "components/alert.html",
     "components/answer_cascade.html",
     "components/app_stats_grid.html",
+    "components/arb_submission_modal.html",
     "components/badge.html",
     "components/breadcrumb.html",
     "components/breadcrumb_nav.html",
@@ -42685,7 +42696,9 @@
     "components/error_boundary.html",
     "components/filter_bar.html",
     "components/gantt_timeline.html",
+    "components/initiative_modal.html",
     "components/inline_hint.html",
+    "components/llm_recommendations.html",
     "components/loading_state.html",
     "components/metrics_card.html",
     "components/modal.html",
@@ -42694,6 +42707,8 @@
     "components/progress.html",
     "components/provenance.html",
     "components/review_queue_panel.html",
+    "components/roi_calculator_modal.html",
+    "components/scenario_comparison_modal.html",
     "components/skeleton.html",
     "components/status_badge.html",
     "components/status_indicator.html",
@@ -42738,6 +42753,13 @@
    ],
    "extends": [
     "layouts/admin_base.html"
+   ],
+   "extra_macros": [
+    "components/arb_submission_modal.html",
+    "components/initiative_modal.html",
+    "components/llm_recommendations.html",
+    "components/roi_calculator_modal.html",
+    "components/scenario_comparison_modal.html"
    ],
    "frame": "dashboard-01",
    "grid": "G4",
@@ -43026,7 +43048,9 @@
     "components/error_boundary.html",
     "components/filter_bar.html",
     "components/gantt_timeline.html",
+    "components/initiative_modal.html",
     "components/inline_hint.html",
+    "components/llm_recommendations.html",
     "components/loading_state.html",
     "components/metrics_card.html",
     "components/modal.html",
@@ -43035,6 +43059,7 @@
     "components/progress.html",
     "components/provenance.html",
     "components/review_queue_panel.html",
+    "components/risk_detail_modal.html",
     "components/skeleton.html",
     "components/status_badge.html",
     "components/status_indicator.html",
@@ -43069,6 +43094,11 @@
    ],
    "extends": [
     "layouts/admin_base.html"
+   ],
+   "extra_macros": [
+    "components/initiative_modal.html",
+    "components/llm_recommendations.html",
+    "components/risk_detail_modal.html"
    ],
    "frame": "dashboard-01",
    "grid": "G1",

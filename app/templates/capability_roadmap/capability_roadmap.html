@@ -297,7 +297,7 @@
           <form class="space-y-4" @submit.prevent="submitGapForm()">
             <div>
               {% call label(for='rdm-gap-name', required=true) %}Gap Name{% endcall %}
-              {% call input(id='rdm-gap-name', attrs_dict={'x-model': 'form.name', 'aria-label': 'Gap Name'}) %}{% endcall %}
+              {{ input(id='rdm-gap-name', attrs_dict={'x-model': 'form.name', 'aria-label': 'Gap Name'}) }}
             </div>
             <div class="grid gap-4 grid-cols-1">
               <div>
@@ -351,16 +351,16 @@
           <form class="space-y-4" @submit.prevent="submitPlateauForm()">
             <div>
               {% call label(for='rdm-plateau-name', required=true) %}Plateau Name{% endcall %}
-              {% call input(id='rdm-plateau-name', placeholder='e.g. Plateau 1 — Foundation', attrs_dict={'x-model': 'form.name', 'aria-label': 'Plateau Name'}) %}{% endcall %}
+              {{ input(id='rdm-plateau-name', placeholder='e.g. Plateau 1 — Foundation', attrs_dict={'x-model': 'form.name', 'aria-label': 'Plateau Name'}) }}
             </div>
             <div class="grid gap-4 grid-cols-1">
               <div>
                 {% call label(for='rdm-plateau-order', required=true) %}Sequence Order{% endcall %}
-                {% call input(id='rdm-plateau-order', type='number', attrs_dict={'min': '1', 'x-model.number': 'form.sequence_order', 'aria-label': 'Sequence Order'}) %}{% endcall %}
+                {{ input(id='rdm-plateau-order', type='number', attrs_dict={'min': '1', 'x-model.number': 'form.sequence_order', 'aria-label': 'Sequence Order'}) }}
               </div>
               <div>
                 {% call label(for='rdm-plateau-date') %}Target Date{% endcall %}
-                {% call input(id='rdm-plateau-date', type='date', attrs_dict={'x-model': 'form.target_date', 'aria-label': 'Target Date'}) %}{% endcall %}
+                {{ input(id='rdm-plateau-date', type='date', attrs_dict={'x-model': 'form.target_date', 'aria-label': 'Target Date'}) }}
               </div>
             </div>
             <div>
@@ -394,7 +394,7 @@
           <form class="space-y-4" @submit.prevent="submitWpForm()">
             <div>
               {% call label(for='rdm-wp-name', required=true) %}Name{% endcall %}
-              {% call input(id='rdm-wp-name', attrs_dict={'x-model': 'form.name', 'aria-label': 'Name'}) %}{% endcall %}
+              {{ input(id='rdm-wp-name', attrs_dict={'x-model': 'form.name', 'aria-label': 'Name'}) }}
             </div>
             <div class="grid gap-4 grid-cols-1">
               <div>
@@ -418,16 +418,16 @@
               </div>
               <div>
                 {% call label(for='rdm-wp-start', required=true) %}Start Date{% endcall %}
-                {% call input(id='rdm-wp-start', type='date', attrs_dict={'x-model': 'form.start_date', 'aria-label': 'Start Date'}) %}{% endcall %}
+                {{ input(id='rdm-wp-start', type='date', attrs_dict={'x-model': 'form.start_date', 'aria-label': 'Start Date'}) }}
               </div>
               <div>
                 {% call label(for='rdm-wp-target', required=true) %}Target Date{% endcall %}
-                {% call input(id='rdm-wp-target', type='date', attrs_dict={'x-model': 'form.target_date', 'aria-label': 'Target Date'}) %}{% endcall %}
+                {{ input(id='rdm-wp-target', type='date', attrs_dict={'x-model': 'form.target_date', 'aria-label': 'Target Date'}) }}
               </div>
               <div>
                 {% call label(for='rdm-wp-gap') %}Linked Gap{% endcall %}
                 <div class="relative">
-                  {% call input(id='rdm-wp-gap', type='search', placeholder='Search gaps by name', attrs_dict={'autocomplete': 'off', 'x-model': 'gapQuery', '@input.debounce.300ms': 'searchGaps()', 'data-testid': 'wp-modal-gap-input'}) %}{% endcall %}
+                  {{ input(id='rdm-wp-gap', type='search', placeholder='Search gaps by name', attrs_dict={'autocomplete': 'off', 'x-model': 'gapQuery', '@input.debounce.300ms': 'searchGaps()', 'data-testid': 'wp-modal-gap-input'}) }}
                   <p class="mt-1 text-xs text-muted-foreground">
                     <span x-show="form.gap_id" x-cloak>Linked: <span x-text="gapName"></span></span>
                     <button type="button" x-show="form.gap_id" x-cloak class="ml-2 underline" @click="form.gap_id = null; gapName = ''; gapQuery = ''">Clear</button>
