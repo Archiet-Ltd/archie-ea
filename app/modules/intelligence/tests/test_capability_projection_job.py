@@ -97,6 +97,11 @@ def cleanup(db):
         from tests._outbox_cleanup import purge_outbox_events
 
         purge_outbox_events(db.session, created["organizations"])
+        # The capabilities this test wrote are in the audit trail, which holds the organisation.
+        db.session.execute(
+            db.text("DELETE FROM soc2_audit_log WHERE organization_id = ANY(:ids)"),
+            {"ids": list(created["organizations"])},
+        )
         Organization.query.filter(Organization.id.in_(created["organizations"])).delete(
             synchronize_session=False
         )

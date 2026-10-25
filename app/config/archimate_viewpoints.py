@@ -1274,60 +1274,6 @@ def _canvas_zone(
     }
 
 
-# ── Lean Canvas — one row per box the standard's own mapping gives, in the
-# design's stated screen order ──────────────────────────────────────────
-_LEAN_ZONES = [
-    _canvas_zone(
-        "problem", "Problem", 1, ["Driver", "Assessment"], "problem",
-        "type_profile_anchor", "motivation",
-        anchor_box="customer_segments",
-        fill_relationship={"type": "association", "direction": "out"},
-    ),
-    _canvas_zone(
-        "customer_segments", "Customer Segments", 2, ["Stakeholder"], "customer_segment",
-        "type_profile", "motivation",
-    ),
-    _canvas_zone(
-        "value_propositions", "Unique Value Proposition", 3, ["Value"], "value_proposition",
-        "type_profile_anchor", "motivation",
-        anchor_box="customer_segments",
-        fill_relationship={"type": "association", "direction": "out"},
-    ),
-    _canvas_zone(
-        "solution", "Solution", 4, ["Requirement"], "solution_feature",
-        "type_profile_anchor", "motivation",
-        fill_relationship={"type": "realization", "direction": "in"},
-    ),
-    _canvas_zone(
-        "channels", "Channels", 5, ["BusinessInterface"], "channel",
-        "type_profile_anchor", "business",
-        anchor_box="customer_segments",
-        fill_relationship={"type": "association", "direction": "out"},
-    ),
-    _canvas_zone(
-        "revenue_streams", "Revenue Streams", 6, ["Value"], None,
-        "attribute", "motivation",
-        anchor_box="value_propositions",
-        attribute_keys=["revenue_model", "revenue_amount", "currency"],
-    ),
-    _canvas_zone(
-        "cost_structure", "Cost Structure", 7, ["Resource", "Capability"], None,
-        "attribute", "strategy",
-        attribute_keys=["cost_type", "cost_amount", "currency"],
-    ),
-    _canvas_zone(
-        "key_metrics", "Key Metrics", 8, ["Outcome"], "key_metric",
-        "type_profile_anchor", "motivation",
-        anchor_box="value_propositions",
-        fill_relationship={"type": "association", "direction": "out"},
-    ),
-    _canvas_zone(
-        "unfair_advantage", "Unfair Advantage", 9, ["Resource"], "unfair_advantage",
-        "type_profile_anchor", "strategy",
-        fill_relationship={"type": "assignment", "direction": "out"},
-    ),
-]
-
 # ── Business Model Canvas — one row per box the standard's own mapping
 # gives, in the design's stated screen order. Every box_key equals its
 # BusinessModelCanvas column (app/models/business_model.py CANVAS_BLOCKS) —
@@ -1338,7 +1284,7 @@ _BMC_ZONES = [
         "type_profile", "motivation",
     ),
     _canvas_zone(
-        "value_propositions", "Value Propositions", 2, ["Value", "BusinessService"], "value_proposition",
+        "value_propositions", "Value Propositions", 2, ["Value", "BusinessService", "Product"], "value_proposition",
         "type_profile_anchor", "motivation",
         anchor_box="customer_segments",
         fill_relationship={"type": "association", "direction": "out"},
@@ -1384,6 +1330,133 @@ _BMC_ZONES = [
         attribute_keys=["cost_type", "cost_amount", "currency"],
     ),
 ]
+
+
+def _boxes(rows):
+    """Zones for a framework canvas from ``(box_key, label, element_types, colour)`` rows, in layout order.
+    A row whose element types are empty-marked ``None`` reads a record store (costs, prices), never elements.
+    The box an entry sits in is kept on the canvas's own view row, so an element can sit in a different box of
+    another canvas; ``profile`` is only the box's name."""
+    zones = []
+    for order, (box_key, label, types, colour) in enumerate(rows, start=1):
+        if types is None:
+            zones.append(_canvas_zone(
+                box_key, label, order, ["Resource", "Capability"] if box_key == "cost_structure" else ["Value"],
+                None, "attribute", colour,
+                attribute_keys=["cost_type", "cost_amount", "currency"] if box_key == "cost_structure"
+                else ["revenue_model", "revenue_amount", "currency"],
+            ))
+        else:
+            zones.append(_canvas_zone(box_key, label, order, types, box_key, "type_profile", colour))
+    return zones
+
+
+_WARDLEY_COMPONENTS = [
+    "BusinessService", "ApplicationComponent", "ApplicationService", "Capability", "Resource", "BusinessProcess",
+    "Facility", "DataObject", "Material", "TechnologyService",
+]
+
+# ── The Lean Canvas and the eleven other framework canvases. Box keys are the layout's box keys with underscores;
+# element types follow the canvas mapping (ArchiMate 3.2). ──────────────────────────────────────────────────────
+_LEAN_ZONES = _boxes([
+    ("problem", "Problem", ["Assessment"], "motivation"),
+    ("existing_alternatives", "Existing alternatives", ["BusinessActor", "Product", "BusinessProcess"], "business"),
+    ("solution", "Solution", ["BusinessService", "ApplicationService", "Product"], "business"),
+    ("key_metrics", "Key Metrics", ["Metric", "Outcome"], "motivation"),
+    ("unique_value_proposition", "Unique Value Proposition", ["Value"], "motivation"),
+    ("high_level_concept", "High-level concept", ["Value"], "motivation"),
+    ("unfair_advantage", "Unfair Advantage", ["Resource", "Capability"], "strategy"),
+    ("channels", "Channels", ["BusinessInterface", "ApplicationInterface"], "business"),
+    ("customer_segments", "Customer Segments", ["BusinessActor"], "business"),
+    ("early_adopters", "Early adopters", ["BusinessActor"], "business"),
+    ("cost_structure", "Cost Structure", None, "strategy"),
+    ("revenue_streams", "Revenue Streams", None, "motivation"),
+])
+_EMPATHY_ZONES = _boxes([
+    ("user", "User", ["BusinessRole", "Stakeholder"], "business"),
+    ("says", "Says", ["EvidenceRecord"], "motivation"),
+    ("thinks", "Thinks", ["EvidenceRecord"], "motivation"),
+    ("does", "Does", ["BusinessProcess"], "business"),
+    ("feels", "Feels", ["EvidenceRecord"], "motivation"),
+    ("pains", "Pains", ["Assessment"], "motivation"),
+    ("gains", "Gains", ["Goal", "Outcome"], "motivation"),
+])
+_SWOT_ZONES = _boxes([
+    ("strengths", "Strengths", ["Assessment"], "motivation"),
+    ("weaknesses", "Weaknesses", ["Assessment"], "motivation"),
+    ("opportunities", "Opportunities", ["Assessment"], "motivation"),
+    ("threats", "Threats", ["Assessment"], "motivation"),
+])
+_PESTLE_ZONES = _boxes([
+    ("political", "Political", ["Driver"], "motivation"),
+    ("economic", "Economic", ["Driver"], "motivation"),
+    ("social", "Social", ["Driver"], "motivation"),
+    ("technological", "Technological", ["Driver"], "motivation"),
+    ("legal", "Legal", ["Driver"], "motivation"),
+    ("environmental", "Environmental", ["Driver", "Risk"], "motivation"),
+])
+_PORTER_ZONES = _boxes([
+    ("new_entrants", "Threat of New Entrants", ["Driver", "Assessment", "BusinessActor"], "motivation"),
+    ("suppliers", "Bargaining Power of Suppliers", ["Driver", "Assessment", "BusinessActor"], "motivation"),
+    ("rivalry", "Rivalry among Existing Competitors", ["Driver", "Assessment", "BusinessActor"], "motivation"),
+    ("buyers", "Bargaining Power of Buyers", ["Driver", "Assessment", "BusinessActor"], "motivation"),
+    ("substitutes", "Threat of Substitutes", ["Driver", "Assessment", "Product"], "motivation"),
+])
+_ANSOFF_ZONES = _boxes([
+    ("market_penetration", "Market Penetration", ["CourseOfAction", "Outcome"], "strategy"),
+    ("product_development", "Product Development", ["CourseOfAction", "Product", "Outcome"], "strategy"),
+    ("market_development", "Market Development", ["CourseOfAction", "BusinessActor", "WorkPackage"], "strategy"),
+    ("diversification", "Diversification", ["CourseOfAction", "Product", "BusinessActor", "WorkPackage"], "strategy"),
+])
+_SEVEN_S_ZONES = _boxes([
+    ("shared_values", "Shared Values", ["Principle"], "motivation"),
+    ("strategy", "Strategy", ["CourseOfAction", "Goal", "Outcome"], "strategy"),
+    ("structure", "Structure", ["BusinessActor", "BusinessRole", "Location"], "business"),
+    ("systems", "Systems", ["BusinessProcess", "ApplicationComponent", "Equipment"], "business"),
+    ("skills", "Skills", ["Capability", "Skill", "Assessment", "Gap"], "strategy"),
+    ("style", "Style", ["Assessment"], "motivation"),
+    ("staff", "Staff", ["Resource", "Outcome", "WorkPackage"], "strategy"),
+])
+_BLUE_OCEAN_ZONES = _boxes([
+    ("factors", "Competing factors", ["Value"], "motivation"),
+    ("eliminate", "Eliminate", ["CourseOfAction"], "strategy"),
+    ("raise", "Raise", ["CourseOfAction"], "strategy"),
+    ("reduce", "Reduce", ["CourseOfAction"], "strategy"),
+    ("create", "Create", ["CourseOfAction", "BusinessService"], "strategy"),
+])
+_WARDLEY_ZONES = _boxes([
+    ("user", "User", ["BusinessActor", "BusinessRole"], "business"),
+    ("user_need", "User need", ["Goal", "Value"], "motivation"),
+    ("genesis", "Genesis", _WARDLEY_COMPONENTS, "business"),
+    ("custom_built", "Custom-built", _WARDLEY_COMPONENTS, "business"),
+    ("product", "Product (+rental)", _WARDLEY_COMPONENTS, "business"),
+    ("commodity", "Commodity (+utility)", _WARDLEY_COMPONENTS, "business"),
+    ("movement", "Movement", ["WorkPackage"], "implementation"),
+    ("inertia", "Inertia", ["Assessment", "Constraint"], "motivation"),
+])
+_BSC_ZONES = _boxes([
+    ("financial", "Financial", ["Goal"], "motivation"),
+    ("internal", "Internal Business Processes", ["Goal"], "motivation"),
+    ("vision", "Vision", ["Goal"], "motivation"),
+    ("customer", "Customer", ["Goal"], "motivation"),
+    ("strategy", "Strategy", ["CourseOfAction"], "strategy"),
+    ("learning", "Learning and Growth", ["Goal"], "motivation"),
+    ("measures", "Measures", ["Metric"], "motivation"),
+    ("targets", "Targets", ["Outcome"], "motivation"),
+    ("initiatives", "Initiatives", ["WorkPackage"], "implementation"),
+])
+_OKR_ZONES = _boxes([
+    ("objective", "Objective", ["Goal"], "motivation"),
+    ("key_results", "Key Results", ["Outcome"], "motivation"),
+    ("initiatives", "Initiatives", ["WorkPackage"], "implementation"),
+])
+_VISION_BOARD_ZONES = _boxes([
+    ("vision", "Vision", ["Goal"], "motivation"),
+    ("target_group", "Target Group", ["BusinessActor", "BusinessRole"], "business"),
+    ("needs", "Needs", ["Goal", "Assessment"], "motivation"),
+    ("product", "Product", ["Product", "BusinessService"], "business"),
+    ("business_goals", "Business Goals", ["Goal", "Outcome"], "motivation"),
+])
 
 # ── Business case — one row per box the standard's own mapping gives, in
 # record order. box_key equals the BusinessCase column where one exists
@@ -1455,6 +1528,17 @@ CANVAS_TEMPLATES: Dict[str, dict] = {
         "projects": ["motivation", "strategy", "product"],
         "zones": _BMC_ZONES,
     },
+    "empathy_map": {"key": "empathy_map", "name": "Empathy Map", "record": "business_model_canvas", "projects": ["motivation", "strategy"], "zones": _EMPATHY_ZONES},
+    "swot_analysis": {"key": "swot_analysis", "name": "SWOT", "record": "business_model_canvas", "projects": ["motivation", "strategy"], "zones": _SWOT_ZONES},
+    "pestle_analysis": {"key": "pestle_analysis", "name": "PESTLE", "record": "business_model_canvas", "projects": ["motivation", "strategy"], "zones": _PESTLE_ZONES},
+    "porters_five_forces": {"key": "porters_five_forces", "name": "Porter's Five Forces", "record": "business_model_canvas", "projects": ["motivation", "strategy"], "zones": _PORTER_ZONES},
+    "ansoff_matrix": {"key": "ansoff_matrix", "name": "Ansoff Matrix", "record": "business_model_canvas", "projects": ["motivation", "strategy"], "zones": _ANSOFF_ZONES},
+    "mckinsey_7s": {"key": "mckinsey_7s", "name": "McKinsey 7S", "record": "business_model_canvas", "projects": ["motivation", "strategy"], "zones": _SEVEN_S_ZONES},
+    "blue_ocean": {"key": "blue_ocean", "name": "Blue Ocean", "record": "business_model_canvas", "projects": ["motivation", "strategy"], "zones": _BLUE_OCEAN_ZONES},
+    "wardley_mapping": {"key": "wardley_mapping", "name": "Wardley Map", "record": "business_model_canvas", "projects": ["motivation", "strategy"], "zones": _WARDLEY_ZONES},
+    "balanced_scorecard": {"key": "balanced_scorecard", "name": "Balanced Scorecard", "record": "business_model_canvas", "projects": ["motivation", "strategy"], "zones": _BSC_ZONES},
+    "okr": {"key": "okr", "name": "OKR", "record": "business_model_canvas", "projects": ["motivation", "strategy"], "zones": _OKR_ZONES},
+    "product_vision_board": {"key": "product_vision_board", "name": "Product Vision Board", "record": "business_model_canvas", "projects": ["motivation", "strategy"], "zones": _VISION_BOARD_ZONES},
     "business_case": {
         "key": "business_case",
         "name": "Business case",
@@ -1571,3 +1655,13 @@ CANVAS_PROFILE_OPTIONS_BY_TYPE: Dict[str, List[str]] = {
     "ImplementationEvent": ["milestone"],
     "Plateau": ["target_state"],
 }
+
+# Every box of a framework canvas names its own profile on the types it takes, so the seeded `profile` property
+# template lists it too.
+for _tpl in CANVAS_TEMPLATES.values():
+    for _zone in _tpl["zones"]:
+        if _zone["profile"]:
+            for _type in _zone["element_types"]:
+                _options = CANVAS_PROFILE_OPTIONS_BY_TYPE.setdefault(_type, [])
+                if _zone["profile"] not in _options:
+                    _options.append(_zone["profile"])

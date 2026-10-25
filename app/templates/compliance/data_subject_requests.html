@@ -1,117 +1,123 @@
 {% extends "layouts/admin_base.html" %}
-{% from 'components/page_header.html' import page_header %}
+{% from 'components/breadcrumb.html' import breadcrumb, breadcrumb_item, breadcrumb_separator %}
+{% from 'components/button.html' import button %}
+{% from 'components/badge.html' import badge %}
+{% from 'components/dense_table.html' import dense_table %}
 {% from 'components/empty_state.html' import empty_state %}
+{% from 'components/input.html' import input, label %}
+{% from 'components/select.html' import native_select %}
+{% from 'components/checkbox.html' import checkbox %}
 
 {% block title %}Data Subject Requests — {{ config.APP_NAME }}{% endblock %}
-
+{# design-block: data-table #}
+{# shadcn-reference: preview@e55b60b #}
 {% block content %}
-<div class="space-y-6">
-    {{ page_header(
-        title='Data Subject Requests',
-        description='Record a request, see which systems and suppliers hold the personal data it concerns, and give each search to an owner. Every step is kept in the audit trail.',
-        breadcrumbs=[
-            {'label': 'Home', 'href': url_for('main.index')},
-            {'label': 'Data Subject Requests'}
-        ],
-        actions=[{'text': 'Trace a personal-data category', 'icon': 'git-fork', 'href': url_for('gdpr_bp.dsr_trace'), 'variant': 'outline'}]
-    ) }}
+<meta name="shadcn-nearest" content="dashboard-01">
+<div class="flex-1 overflow-auto">
+  <nav aria-label="Breadcrumb" class="px-4 lg:px-6 pt-4 mb-3">
+    <ol class="flex items-center gap-1.5 text-sm text-muted-foreground">
+      <li class="flex items-center gap-1.5"><a href="{{ url_for('main.index') }}" class="hover:text-foreground transition-colors">Home</a><i data-lucide="chevron-right" class="w-3.5 h-3.5 shrink-0" aria-hidden="true"></i></li>
+      <li class="flex items-center gap-1.5" aria-current="page"><span class="text-foreground font-medium">Data subject requests</span></li>
+    </ol>
+  </nav>
 
-    <div class="rounded-lg border border-border bg-card overflow-hidden">
-        <div class="p-4 border-b border-border bg-muted/30">
-            <h2 class="text-lg font-semibold">New request</h2>
-            <p class="text-xs text-muted-foreground mt-1">Choose a person in your organisation for access or erasure of what this platform holds about them, or name an outside data subject to scope the search of your own systems.</p>
-        </div>
-        <form method="POST" action="{{ url_for('gdpr_bp.dsr_create') }}" class="p-4 grid grid-cols-1 gap-4" data-testid="dsr-create-form">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <div>
-                <label for="dsr-type" class="block text-sm font-medium text-muted-foreground mb-1">Request type</label>
-                <select id="dsr-type" name="request_type" required data-testid="dsr-type"
-                    class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm">
-                    <option value="" selected disabled>Select…</option>
-                    {% for value, label in request_types.items() %}
-                    <option value="{{ value }}">{{ label }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-            <div>
-                <label for="dsr-subject-user" class="block text-sm font-medium text-muted-foreground mb-1">Person in your organisation</label>
-                <select id="dsr-subject-user" name="subject_user_id" data-testid="dsr-subject-user"
-                    class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm">
-                    <option value="">Not a platform user</option>
-                    {% for p in people %}
-                    <option value="{{ p.id }}">{{ p.email }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-            <div>
-                <label for="dsr-subject-reference" class="block text-sm font-medium text-muted-foreground mb-1">Outside data subject</label>
-                <input id="dsr-subject-reference" name="subject_reference" type="text" maxlength="255"
-                    data-testid="dsr-subject-reference" placeholder="Reference or description of the person"
-                    class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm">
-            </div>
-            <div>
-                <span class="block text-sm font-medium mb-1">Personal-data categories</span>
-                {% if categories %}
-                <div class="flex flex-wrap gap-3 text-sm">
-                    {% for c in categories %}
-                    <label class="inline-flex items-center gap-1.5">
-                        <input type="checkbox" name="category_ids" value="{{ c.id }}" class="rounded border-input">
-                        {{ c.name }}
-                    </label>
-                    {% endfor %}
-                </div>
-                <p class="text-xs text-muted-foreground mt-1">Leave all unticked to scope every category.</p>
-                {% else %}
-                <p class="text-sm text-muted-foreground">No data entity is recorded as holding personal data yet. Mark one in the data entity catalogue to scope requests against it.</p>
-                {% endif %}
-            </div>
-            <div class="">
-                <button type="submit" data-testid="dsr-create-submit"
-                    class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
-                    Record and scope
-                </button>
-            </div>
-        </form>
+  <div class="px-4 lg:px-6 pb-6 space-y-6">
+    <div class="flex items-center justify-between gap-4">
+      <div>
+        <h1 class="text-2xl font-bold text-foreground">Data Subject Requests</h1>
+        <p class="mt-1 text-sm text-muted-foreground">Record a request, see which systems and suppliers hold the personal data it concerns, and give each search to an owner. Every step is kept in the audit trail.</p>
+      </div>
+      <div class="shrink-0">
+        {{ button(text='Trace a personal-data category', variant='outline', icon='git-fork', href=url_for('gdpr_bp.dsr_trace')) }}
+      </div>
     </div>
 
-    <div class="rounded-lg border border-border bg-card overflow-hidden" data-testid="dsr-list">
-        <div class="p-4 border-b border-border bg-muted/30">
-            <h2 class="text-lg font-semibold">Requests</h2>
+    <div class="rounded-lg border border-border bg-card">
+      <div class="p-4 border-b border-border">
+        <h2 class="text-lg font-semibold text-foreground">New request</h2>
+        <p class="text-xs text-muted-foreground mt-1">Choose a person in your organisation for access or erasure of what this platform holds about them, or name an outside data subject to scope the search of your own systems.</p>
+      </div>
+      <form method="POST" action="{{ url_for('gdpr_bp.dsr_create') }}" class="p-4 space-y-4" data-testid="dsr-create-form">
+        {{ input(type='hidden', name='csrf_token', value=csrf_token()) }}
+        <div class="grid gap-4 sm:grid-cols-2">
+          <div>
+            {% call label(for='dsr-type', required=true) %}Request type{% endcall %}
+            {% call native_select(id='dsr-type', name='request_type', attrs_dict={'data-testid': 'dsr-type', 'required': ''}) %}
+              <option value="" selected disabled>Select…</option>
+              {% for value, label in request_types.items() %}
+              <option value="{{ value }}">{{ label }}</option>
+              {% endfor %}
+            {% endcall %}
+          </div>
+          <div>
+            {% call label(for='dsr-subject-user') %}Person in your organisation{% endcall %}
+            {% call native_select(id='dsr-subject-user', name='subject_user_id', attrs_dict={'data-testid': 'dsr-subject-user'}) %}
+              <option value="">Not a platform user</option>
+              {% for p in people %}
+              <option value="{{ p.id }}">{{ p.email }}</option>
+              {% endfor %}
+            {% endcall %}
+          </div>
         </div>
-        {% if requests %}
-        <table class="dense-table w-full text-sm">
-            <thead class="text-left text-muted-foreground">
-                <tr>
-                    <th class="px-4 py-2 font-medium">Recorded</th>
-                    <th class="px-4 py-2 font-medium">Type</th>
-                    <th class="px-4 py-2 font-medium">Subject</th>
-                    <th class="px-4 py-2 font-medium">In scope</th>
-                    <th class="px-4 py-2 font-medium">Status</th>
-                </tr>
-            </thead>
-            <tbody class="divide-y divide-border">
-                {% for r in requests %}
-                {% set items = (r.scope_json or {}).get('items') or [] %}
-                <tr>
-                    <td class="px-4 py-2">
-                        <a class="text-primary hover:underline" href="{{ url_for('gdpr_bp.dsr_detail', request_id=r.id) }}" data-testid="dsr-row-{{ r.id }}">{{ r.requested_at.strftime('%Y-%m-%d %H:%M') if r.requested_at else '—' }}</a>
-                    </td>
-                    <td class="px-4 py-2">{{ r.type_label }}</td>
-                    <td class="px-4 py-2">{{ r.subject_reference or ('Platform user' if r.has_platform_account else '—') }}</td>
-                    <td class="px-4 py-2">{{ items | length if r.scope_json else '—' }}</td>
-                    <td class="px-4 py-2">{{ r.status }}</td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-        {% else %}
-        {{ empty_state(
-            icon='inbox',
-            title='No requests recorded yet',
-            description='Record a request above to see which systems and suppliers to search.',
-            cta_text=None
-        ) }}
-        {% endif %}
+        <div>
+          {% call label(for='dsr-subject-reference') %}Outside data subject{% endcall %}
+          {{ input(id='dsr-subject-reference', name='subject_reference', type='text', maxlength='255', placeholder='Reference or description of the person', attrs_dict={'data-testid': 'dsr-subject-reference'}) }}
+        </div>
+        <div>
+          <span class="block text-sm font-medium text-foreground mb-1.5">Personal-data categories</span>
+          {% if categories %}
+          <div class="flex flex-wrap gap-3">
+            {% for c in categories %}
+            <label class="inline-flex items-center gap-1.5 text-sm">
+              {{ checkbox(name='category_ids', value=c.id|string, attrs_dict={'class': 'rounded border-input h-4 w-4'}) }}
+              {{ c.name }}
+            </label>
+            {% endfor %}
+          </div>
+          <p class="text-xs text-muted-foreground mt-2">Leave all unticked to scope every category.</p>
+          {% else %}
+          <p class="text-sm text-muted-foreground">No data entity is recorded as holding personal data yet. Mark one in the data entity catalogue to scope requests against it.</p>
+          {% endif %}
+        </div>
+        <div>
+          {{ button(text='Record and scope', type='submit', testid='dsr-create-submit') }}
+        </div>
+      </form>
     </div>
+
+    <div class="rounded-lg border border-border bg-card" data-testid="dsr-list">
+      <div class="p-4 border-b border-border">
+        <h2 class="text-lg font-semibold text-foreground">Requests</h2>
+      </div>
+      {% if requests %}
+      {% call dense_table(
+          columns=[('Recorded', ''), ('Type', ''), ('Subject', ''), ('In scope', ''), ('Status', '')],
+          rows=requests|length,
+          caption='Data subject requests',
+          testid='dsr-table'
+      ) %}
+        {% for r in requests %}
+        {% set items = (r.scope_json or {}).get('items') or [] %}
+        <tr class="group h-12 transition-colors hover:bg-muted/50">
+          <td class="px-2 align-middle">
+            <a class="text-primary hover:underline" href="{{ url_for('gdpr_bp.dsr_detail', request_id=r.id) }}" data-testid="dsr-row-{{ r.id }}">{{ r.requested_at.strftime('%Y-%m-%d %H:%M') if r.requested_at else '—' }}</a>
+          </td>
+          <td class="px-2 align-middle">{{ r.type_label }}</td>
+          <td class="px-2 align-middle">{{ r.subject_reference or ('Platform user' if r.has_platform_account else '—') }}</td>
+          <td class="px-2 align-middle tabular-nums">{{ items | length if r.scope_json else '—' }}</td>
+          <td class="px-2 align-middle">{{ r.status }}</td>
+        </tr>
+        {% endfor %}
+      {% endcall %}
+      {% else %}
+      {{ empty_state(
+          icon='inbox',
+          title='No requests recorded yet',
+          description='Record a request above to see which systems and suppliers to search.',
+          cta_text=None
+      ) }}
+      {% endif %}
+    </div>
+  </div>
 </div>
 {% endblock %}

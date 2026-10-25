@@ -462,6 +462,33 @@ entries:
         scope: [app/static/js, app/templates]
         suffixes: [.js, .html]
 
+  - id: diagram-editor-shell
+    concept: The editor chrome around an ArchiMate diagram (toolbar, element palette, finder, relationship legend, minimap, status line, header, properties sheet)
+    status: active
+    canonical:
+      path: app/templates/components/diagram/toolbar.html
+      symbols: [diagram_toolbar]
+    reuse: >
+      A diagram page draws its chrome with the macros under app/templates/components/diagram/ (diagram_toolbar,
+      diagram_palette, diagram_finder, diagram_legend, diagram_status_line, diagram_minimap, diagram_header,
+      diagram_properties_sheet) and drives the one engine through composerApp. The state those macros read lives in
+      app/static/js/archimate/composer_shell.js; the notation icons are one sprite at
+      app/static/img/archimate-notation.svg and the layer colours are the --notation-* tokens. Do not build a second
+      toolbar or palette on a page, and do not write a layer colour in a template or script.
+
+  - id: data-model-diagram
+    concept: The logical data model of a data domain (entities, their attributes, relationships with a cardinality at each end) as an entity relationship diagram
+    status: active
+    canonical:
+      path: app/modules/architecture/services/data_erd_service.py
+      symbols: [domain_diagram, create_entity, update_entity, relate]
+    reuse: >
+      An entity is the existing DataEntity record (linked to its ArchiMate data object by archimate_element_id);
+      its attributes are DataEntityAttribute rows and its relationships are DataEntityRelationship rows. Read and
+      write them through data_erd_service and the /architecture/api/data-erd routes, and draw them with
+      app/static/js/data/erd.js on the shared diagram components. Do not add a second store of entities or
+      attributes, and do not draw an entity relationship diagram with another renderer.
+
   - id: public-button
     concept: The public site button (primary and outline, 40px, 2px solid focus outline)
     status: active
@@ -489,6 +516,8 @@ entries:
         scope: [app/static/css, app/templates]
         suffixes: [.css, .html]
     known_exceptions:
+      - path: app/static/css/basecoat_components.css
+        reason: "the Overview dashboard's own stylesheet, the flask-basecoat component rules (.cn-*), loaded on that one page only"
       - path: app/static/css/archimate_composer.css
         reason: authenticated-app composer toolbar and search buttons, moved unchanged out of the composer page where the baseline already recorded them; not a public-site button
       - path: app/static/css/vendor/
@@ -518,6 +547,8 @@ entries:
         scope: [app/static/css, app/templates/public, app/templates/main, app/templates/layouts]
         suffixes: [.css, .html]
     known_exceptions:
+      - path: app/static/css/basecoat_components.css
+        reason: "the Overview dashboard's own stylesheet, the flask-basecoat component rules (.cn-*), loaded on that one page only"
       - path: app/static/css/accessibility.css
         reason: authenticated-app skip-link and focus styles, not the public inline link
       - path: app/static/css/app.css
@@ -556,6 +587,8 @@ entries:
         scope: [app/static/css, app/templates]
         suffixes: [.css, .html]
     known_exceptions:
+      - path: app/static/css/basecoat_components.css
+        reason: "the Overview dashboard's own stylesheet, the flask-basecoat component rules (.cn-*), loaded on that one page only"
       - path: app/static/css/vendor/
         reason: third-party stylesheets, not ours to change
       - path: app/static/css/tailwind-output*
@@ -588,6 +621,8 @@ entries:
         scope: [app/static/css, app/templates]
         suffixes: [.css, .html]
     known_exceptions:
+      - path: app/static/css/basecoat_components.css
+        reason: "the Overview dashboard's own stylesheet, the flask-basecoat component rules (.cn-*), loaded on that one page only"
       - path: app/static/css/vendor/
         reason: third-party stylesheets, not ours to change
       - path: app/static/css/tailwind-output*

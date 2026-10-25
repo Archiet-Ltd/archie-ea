@@ -8,8 +8,8 @@
     rows, each with up to three flag chips and an "Open" link — nothing here
     invents that state early.
 
-    Empty boxes show a single short line "Nothing here yet" above the typing
-    area — no large repeated icon. #}
+    Empty boxes show a single short line naming the box and pointing at the
+    typing area below — no large repeated icon. #}
 
 {% macro canvas_box_entries(zone) %}
 {# The entries list itself: present, empty. A later change is the only
@@ -18,7 +18,7 @@
 {% if zone.empty_reason == 'canvas_box_not_derived' %}
 <p data-testid="canvas-box-reason-{{ zone.box_key }}" data-reason="canvas_box_not_derived" role="status" class="text-xs text-muted-foreground mb-2">Composed from the other sections — nothing to show yet</p>
 {% else %}
-<p data-testid="canvas-box-reason-{{ zone.box_key }}" data-reason="canvas_box_empty" role="status" class="text-xs text-muted-foreground mb-2">Nothing here yet</p>
+<p data-testid="canvas-box-reason-{{ zone.box_key }}" data-reason="canvas_box_empty" role="status" class="text-xs text-muted-foreground mb-2">{{ zone.label }} is empty. Write it in the box below.</p>
 {% endif %}
 {% endmacro %}
 
