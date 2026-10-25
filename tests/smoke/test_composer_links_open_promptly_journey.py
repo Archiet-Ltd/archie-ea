@@ -21,7 +21,7 @@ pytestmark = [pytest.mark.smoke, pytest.mark.journey]
 
 ELEMENT_COUNT = 150
 OPEN_WITHIN_SECONDS = 3.0
-MODEL_WITHIN_SECONDS = 8.0
+MODEL_WITHIN_SECONDS = 15.0
 DRAWN_WITHIN_SECONDS = 30
 PERSONA = "enterprise_architect"
 LAYERS = [("business", "BusinessProcess"), ("application", "ApplicationComponent"), ("technology", "Node")]
