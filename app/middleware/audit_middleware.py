@@ -32,7 +32,21 @@ _CONTROLLED_MODELS = [
         "architecture_review_board",
     ),
     ("app.models.user", "User", "user"),
+    # The model itself: every create, update and delete of an element or a
+    # relationship, who owns an application, and the capability store.
+    ("app.models.archimate_core", "ArchiMateElement", "archimate_elements"),
+    ("app.models.archimate_core", "ArchiMateRelationship", "archimate_relationships"),
+    ("app.models.application_owner", "ApplicationOwner", "application_owners"),
+    ("app.models.enterprise_intelligence", "ApplicationOwnership", "application_ownership"),
+    ("app.models.unified_capability", "UnifiedCapability", "unified_capabilities"),
+    ("app.models.business_capabilities", "BusinessCapability", "business_capability"),
 ]
+
+# Columns the database or the ORM stamps on every write; a change to only
+# these is not a change a person made.
+_BOOKKEEPING_COLUMNS = frozenset(
+    ["updated_at", "modified_at", "recorded_at", "valid_from", "valid_to", "superseded_at"]
+)
 
 _EXCLUDED_COLUMNS = frozenset(
     ["password_hash", "token", "secret", "api_key", "fernet_key"]
@@ -69,10 +83,39 @@ def _json_safe(value):
     """Coerce a value into something the JSON audit columns can store."""
     if value is None or isinstance(value, (bool, int, float, str)):
         return value
+    # Structured values stay structured, so a recorded change can be applied again.
+    if isinstance(value, dict):
+        return {str(k): _json_safe(v) for k, v in value.items()}
+    if isinstance(value, (list, tuple, set)):
+        return [_json_safe(v) for v in value]
     return str(value)
 
 
-def _write_audit(connection, action, table_label, record_id, old_value=None, new_value=None):
+def _label_of(connection, target):
+    """What a person calls the changed record: its name, or for a relationship its two ends."""
+    if target is None:
+        return None
+    for attr in ("name", "title"):
+        label = getattr(target, attr, None)
+        if label:
+            return label
+    source_id = getattr(target, "source_id", None)
+    target_id = getattr(target, "target_id", None)
+    if source_id is not None and target_id is not None and hasattr(target, "type"):
+        from sqlalchemy import text
+
+        names = dict(connection.execute(
+            text("SELECT id, name FROM archimate_elements WHERE id IN (:a, :b)"),  # tenancy-ok: names of the two ends of the row being audited, read by their own keys
+            {"a": source_id, "b": target_id},
+        ).all())
+        return "%s: %s to %s" % (
+            target.type, names.get(source_id, "element %s" % source_id),
+            names.get(target_id, "element %s" % target_id),
+        )
+    return None
+
+
+def _write_audit(connection, action, table_label, record_id, old_value=None, new_value=None, target=None):
     """Insert one audit row using the flush's own connection.
 
     Mapper events (after_insert/update/delete) fire mid-flush, so we must NOT use
@@ -82,7 +125,18 @@ def _write_audit(connection, action, table_label, record_id, old_value=None, new
     """
     from app.models.audit_log import chain_insert
 
+    from app.services.change_source import current_change_context
+
     user_id, org_id, ip, ua = _get_request_context()
+    context = current_change_context()
+    if user_id is None:
+        user_id = context["user_id"]
+    # The row's own organisation wins over the request's: an importer or a
+    # connector writes for the organisation it was run for.
+    owner_org = getattr(target, "organization_id", None) if target is not None else None
+    if owner_org is not None:
+        org_id = owner_org
+    label = _label_of(connection, target)
     # Sealed into the organisation's integrity chain like every other entry.
     chain_insert(
         connection,
@@ -95,6 +149,11 @@ def _write_audit(connection, action, table_label, record_id, old_value=None, new
         organization_id=org_id,
         ip_address=ip,
         user_agent=ua,
+        extra_json={
+            "source": context["source"],
+            "correlation_id": context["correlation_id"],
+            "label": _json_safe(label),
+        },
     )
 
 
@@ -108,13 +167,27 @@ def _column_snapshot(target):
     return snap
 
 
+_LISTENERS: dict = {}
+
+
+def _listeners_for(table_label: str):
+    """The three listeners for a table, made once so installing twice adds no second copy."""
+    if table_label not in _LISTENERS:
+        _LISTENERS[table_label] = (
+            _make_after_insert(table_label),
+            _make_after_update(table_label),
+            _make_after_delete(table_label),
+        )
+    return _LISTENERS[table_label]
+
+
 def _make_after_insert(table_label: str):
     def _after_insert(mapper, connection, target):
         try:
             record_id = getattr(target, "id", None)
             _write_audit(
                 connection, "create", table_label, record_id,
-                new_value=_column_snapshot(target),
+                new_value=_column_snapshot(target), target=target,
             )
         except Exception:
             logger.debug("audit after_insert failed for %s", table_label, exc_info=True)
@@ -135,15 +208,21 @@ def _make_after_update(table_label: str):
                     key = attr.key
                     if key in _EXCLUDED_COLUMNS:
                         continue
-                    old_val[key] = _json_safe(hist.deleted[0] if hist.deleted else None)
-                    new_val[key] = _json_safe(hist.added[0] if hist.added else None)
+                    if key in _BOOKKEEPING_COLUMNS:
+                        continue
+                    before = _json_safe(hist.deleted[0] if hist.deleted else None)
+                    after = _json_safe(hist.added[0] if hist.added else None)
+                    if before in (None, "") and after in (None, ""):
+                        continue  # empty to empty is not a change
+                    old_val[key] = before
+                    new_val[key] = after
 
             if not old_val and not new_val:
                 return  # nothing auditable changed
 
             _write_audit(
                 connection, "update", table_label, record_id,
-                old_value=old_val, new_value=new_val,
+                old_value=old_val, new_value=new_val, target=target,
             )
         except Exception:
             logger.debug("audit after_update failed for %s", table_label, exc_info=True)
@@ -157,7 +236,7 @@ def _make_after_delete(table_label: str):
             record_id = getattr(target, "id", None)
             _write_audit(
                 connection, "delete", table_label, record_id,
-                old_value=_column_snapshot(target),
+                old_value=_column_snapshot(target), target=target,
             )
         except Exception:
             logger.debug("audit after_delete failed for %s", table_label, exc_info=True)
@@ -176,9 +255,10 @@ def install_audit_logging(app):
             module = importlib.import_module(module_path)
             model_cls = getattr(module, class_name)
 
-            event.listen(model_cls, "after_insert", _make_after_insert(table_label))
-            event.listen(model_cls, "after_update", _make_after_update(table_label))
-            event.listen(model_cls, "after_delete", _make_after_delete(table_label))
+            inserted, updated, deleted = _listeners_for(table_label)
+            for name, fn in (("after_insert", inserted), ("after_update", updated), ("after_delete", deleted)):
+                if not event.contains(model_cls, name, fn):
+                    event.listen(model_cls, name, fn)
 
             registered += 1
             logger.debug("audit_middleware: registered events for %s.%s", module_path, class_name)

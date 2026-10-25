@@ -21,6 +21,7 @@ Duplicate detection is by (name, element_type) case-insensitive match
 against the ``archimate_elements`` table.
 """
 
+from app.services.change_source import records_changes_as
 from app.utils import safe_xml  # untrusted XML: entity-expansion safe
 import re
 import logging
@@ -939,6 +940,7 @@ class ArchiMateImportService:
     # Execute import
     # ------------------------------------------------------------------
 
+    @records_changes_as("import")
     def execute_import(
         self,
         parsed_data: Dict[str, Any],
