@@ -24,7 +24,7 @@
 {% call button(variant='outline', size='sm' if text else 'icon-sm', icon=icon, aria_label=label, testid=testid, class='rounded-none first:rounded-l-md last:rounded-r-md', attrs_dict={'@click': click, ':aria-pressed': value_expr, ':class': value_expr ~ " ? 'bg-accent text-foreground' : ''"}) %}{% if text %}<span class="hidden 2xl:inline">{{ text }}</span>{% endif %}{% endcall %}
 {% endmacro %}
 
-{% macro diagram_toolbar(import_items=[], export_items=[], more_items=[]) %}
+{% macro diagram_toolbar(import_items=[], export_items=[], more_items=[], menus=true) %}
 <nav aria-label="Composer toolbar" class="shrink-0 border-b border-border bg-card px-3 py-2" data-testid="diagram-toolbar">
   <div class="flex items-center gap-2" role="toolbar" aria-label="Diagram tools">
     {# On a phone the tools scroll sideways in one row and the menus stay put, so a menu is never clipped. #}
@@ -61,9 +61,11 @@
     </div>
     </div>
     <div class="inline-flex shrink-0 items-center gap-2">
-      {{ dropdown_menu(id='composer-import-menu', class='hidden md:block', trigger_text='Import', trigger_icon='upload', trigger_size='sm', transition='opacity', menu_width='w-56', trigger_testid='menu-import', trigger_aria_label='Import', items=import_items) }}
+      {%- if menus %}
+      {{ dropdown_menu(id='composer-import-menu', class='hidden md:block', trigger_text='Import', trigger_icon='upload', trigger_size='sm', transition='opacity', menu_width='w-56', trigger_testid='menu-import', trigger_aria_label='Import', items=import_items) }}{% endif %}
       {{ dropdown_menu(id='composer-export-menu', class='hidden md:block', trigger_text='Export', trigger_icon='download', trigger_variant='primary', trigger_size='sm', transition='opacity', menu_width='w-56', trigger_testid='menu-export', trigger_aria_label='Export', items=export_items) }}
-      {{ dropdown_menu(id='composer-more-menu', trigger_icon='more-horizontal', trigger_icon_only=true, trigger_size='sm', transition='opacity', menu_width='w-64', trigger_testid='menu-more', trigger_aria_label='More actions', items=more_items) }}
+      {%- if menus %}
+      {{ dropdown_menu(id='composer-more-menu', trigger_icon='more-horizontal', trigger_icon_only=true, trigger_size='sm', transition='opacity', menu_width='w-64', trigger_testid='menu-more', trigger_aria_label='More actions', items=more_items) }}{% endif %}
     </div>
   </div>
 </nav>
