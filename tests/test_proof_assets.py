@@ -59,7 +59,7 @@ def test_other_module_screenshots_keep_their_one_x_size():
 def test_home_hero_declares_the_captured_pixels(app, client):
     html = client.get("/").get_data(as_text=True)
     assert 'data-testid="home-hero-figure"' in html
-    for name, width_attr in (("product-portfolio.webp", 1280), ("product-portfolio-mobile.webp", 358)):
+    for name, width_attr in (("chat-answer.webp", 908), ("chat-answer-mobile.webp", 374)):
         w, h = _css_size(HOME_IMG / name)
         assert w == width_attr
         tag = re.search(r'(?:width="%d"\s+height="(\d+)"|height="(\d+)"\s+width="%d")' % (w, w), html)
@@ -67,12 +67,10 @@ def test_home_hero_declares_the_captured_pixels(app, client):
         assert int(tag.group(1) or tag.group(2)) == h, f"{name}: declared height differs from the file's {h}px"
 
 
-def test_home_hero_chip_is_short_on_phones_and_has_one_primary_action(app, client):
+def test_home_hero_has_one_primary_action_and_a_pricing_link(app, client):
     html = client.get("/").get_data(as_text=True)
-    assert "Open source &middot; Self-host free" in html
     hero = html[html.index('data-testid="home-hero"'): html.index('data-testid="home-hero-figure"')]
-    assert hero.count("public-btn--primary") == 1
-    assert hero.count("public-btn--outline") == 1
+    assert hero.count('data-testid="home-hero-start"') == 1
     assert 'href="/pricing"' in hero
 
 

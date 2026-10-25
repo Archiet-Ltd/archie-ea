@@ -1,322 +1,162 @@
+{# design-block: board #}
 {% extends "layouts/admin_base.html" %}
 {% from 'macros/page_shell.html' import page_shell %}
-<!-- modal-a11y-ok -->
+{% from 'macros/kanban_board.html' import kanban_board, kanban_card %}
+{% from 'components/badge.html' import badge %}
+{% from 'components/card.html' import card, card_header, card_content %}
+{% from 'components/empty_state.html' import empty_state %}
 
 {% block title %}Product Roadmap{% endblock %}
 
 {% block content %}
-<div
-  class="p-6 max-w-7xl mx-auto"
-  x-data="productRoadmap()"
-  x-init="init()"
->
-  <!-- Header -->
+{% set horizon_states = ['now', 'next', 'later', 'unscheduled'] %}
+{% set horizon_labels = {'now': 'Now', 'next': 'Next', 'later': 'Later', 'unscheduled': 'Unscheduled'} %}
+<div class="p-6 max-w-7xl mx-auto space-y-6" x-data="productRoadmap()">
   {% macro _ps_actions() %}
-<div class="flex items-center gap-3">
-      <span class="text-xs text-muted-foreground">On Track (Now):</span>
-      <span
-        class="px-3 py-1 rounded-full text-sm font-semibold"
-        :class="onTrackPct == null ? 'bg-muted text-muted-foreground' : onTrackPct >= 70 ? 'bg-success/10 text-success-emphasis' : onTrackPct >= 40 ? 'bg-warning/10 text-warning-emphasis' : 'bg-destructive/10 text-destructive-emphasis'"
-        x-text="onTrackPct == null ? '—' : onTrackPct + '%'"
-      ></span>
-      <span class="text-xs text-muted-foreground/60" x-text="'Total epics: ' + totalEpics"></span>
+    <div class="flex items-center gap-3">
+      <span class="text-xs text-muted-foreground">On track (Now):</span>
+      {% call badge('neutral') %}<span data-testid="on-track" x-text="onTrackPct == null ? '—' : onTrackPct + '%'"></span>{% endcall %}
+      <span class="text-xs text-muted-foreground" x-text="'Total epics: ' + cards.length"></span>
     </div>
   {% endmacro %}
   {{ page_shell(title='Product Roadmap', breadcrumb=[('Home', '/'), ('Product Roadmap', none)], subtitle='Epics across Now · Next · Later horizons', actions_caller=_ps_actions) }}
 
-  <!-- Error banner -->
-  <div x-show="error" x-cloak class="mb-4 px-3 py-2 bg-destructive/10 border border-destructive/40 rounded text-destructive-emphasis text-sm" x-text="error"></div>
+  <p x-show="error" x-cloak class="text-sm text-destructive-emphasis" role="alert" x-text="error"></p>
 
-  <!-- 3-column kanban + unscheduled -->
-  <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+  <template x-if="loaded && !error && cards.length === 0">
+    {{ empty_state(
+        icon='map',
+        title='No epics on the roadmap yet',
+        description='The roadmap places epics on the Now, Next and Later horizons. Record an epic in the requirements backlog and it will appear here to schedule.',
+        cta_text='Open the requirements backlog',
+        cta_href='/enterprise/requirements-backlog'
+    ) }}
+  </template>
 
-    <!-- NOW -->
-    <div
-      class="bg-background border-2 border-primary/30 rounded-xl flex flex-col"
-      @dragover.prevent
-      @drop="dropEpic($event, 'now')"
-    >
-      <div class="border px-4 py-2 bg-primary/10 border-b border-primary/40 rounded-t-xl flex items-center gap-2">
-        <span class="w-2.5 h-2.5 rounded-full bg-primary"></span>
-        <h2 class="text-sm font-bold text-primary/90 uppercase tracking-wide">Now</h2>
-        <span class="ml-auto text-xs text-primary" x-text="horizons.now.epics.length + ' epics'"></span>
-      </div>
-      <!-- Sprint badges -->
-      <div class="px-4 py-2 flex flex-wrap gap-1 border-b border-primary/10">
-        <template x-for="sp in horizons.now.sprints" :key="sp.id">
-          <span class="text-xs bg-primary/10 text-info-emphasis px-2 py-0.5 rounded" x-text="sp.name"></span>
+  <div x-show="cards.length > 0" x-cloak class="space-y-6">
+    <p class="text-sm text-muted-foreground" data-testid="roadmap-help">
+      {% if can_write %}Drag an epic to a horizon, use its "Move to" menu, or focus it and press Space, then the left or right arrow keys, then Space again. Horizons are saved as you go.{% else %}You can view this roadmap. Ask an architect to schedule epics.{% endif %}
+    </p>
+
+    {% call(state) kanban_board(
+          states=horizon_states, labels=horizon_labels, can_write=can_write,
+          show_wip=False, unit='epic',
+          region_label='Product roadmap, scrolls horizontally',
+          empty_hints={
+            'now': {'why': 'No epics are in progress now.', 'next_write': 'Move an epic here when work starts.', 'next_read': ''},
+            'next': {'why': 'No epics are lined up next.', 'next_write': 'Move an epic here when it is the next to start.', 'next_read': ''},
+            'later': {'why': 'No epics are planned for later.', 'next_write': 'Move an epic here to park it for a later horizon.', 'next_read': ''},
+            'unscheduled': {'why': 'Every epic is scheduled.', 'next_write': 'Move an epic here to take it off the horizons.', 'next_read': ''}
+          }) %}
+      <div x-show="sprintsFor('{{ state }}').length > 0" class="flex flex-wrap gap-1">
+        <template x-for="sp in sprintsFor('{{ state }}')" :key="sp.id">
+          {% call badge('outline') %}<span x-text="sp.name"></span>{% endcall %}
         </template>
-        <span x-show="horizons.now.sprints.length === 0" x-cloak class="text-xs text-muted-foreground/60 italic">No sprints assigned</span>
       </div>
-      <!-- Epic cards -->
-      <div class="p-3 flex-1 space-y-2 min-h-24">
-        <template x-for="epic in horizons.now.epics" :key="epic.id">
-          <div
-            class="px-3 py-2 bg-primary/10 border border-primary/40 rounded-md cursor-grab active:cursor-grabbing"
-            draggable="true"
-            @dragstart="dragStart($event, epic)"
-          >
-            <p class="text-sm font-medium text-foreground mb-1" x-text="epic.title"></p>
-            <div class="flex items-center gap-2 mb-2">
-              <span class="text-xs text-muted-foreground" x-text="epic.stories_count + ' stories'"></span>
-              <span class="text-xs text-muted-foreground">&middot;</span>
-              <span class="text-xs text-muted-foreground" x-text="epic.completed_points + '/' + epic.total_points + ' pts'"></span>
-            </div>
-            <div class="w-full bg-muted rounded-full h-1.5">
-              <div
-                class="h-1.5 rounded-full transition-all"
-                :class="epic.pct_done >= 70 ? 'bg-success' : epic.pct_done >= 30 ? 'bg-warning' : 'bg-primary'"
-                :style="'width:' + epic.pct_done + '%'"
-              ></div>
-            </div>
-            <p class="text-xs text-right text-muted-foreground/60 mt-0.5" x-text="epic.pct_done + '% done'"></p>
+      <template x-for="card in columnCards('{{ state }}')" :key="card.id">
+        {% call kanban_card(horizon_states, horizon_labels, title='card.title', can_write=can_write) %}
+          <div class="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+            <span x-text="card.stories_count + ' stories'"></span>
+            <span aria-hidden="true">·</span>
+            <span x-text="card.completed_points + '/' + card.total_points + ' pts'"></span>
           </div>
-        </template>
-        <p x-show="horizons.now.epics.length === 0" x-cloak class="text-xs text-center text-muted-foreground/60 italic py-4">
-          No epics &mdash; drag one here
-        </p>
-      </div>
-    </div>
-
-    <!-- NEXT -->
-    <div
-      class="bg-background border-2 border-primary/20 rounded-xl flex flex-col"
-      @dragover.prevent
-      @drop="dropEpic($event, 'next')"
-    >
-      <div class="border px-4 py-2 bg-primary/10 border-b border-primary/10 rounded-t-xl flex items-center gap-2">
-        <span class="w-2.5 h-2.5 rounded-full bg-primary/70"></span>
-        <h2 class="text-sm font-bold text-foreground uppercase tracking-wide">Next</h2>
-        <span class="ml-auto text-xs text-muted-foreground" x-text="horizons.next.epics.length + ' epics'"></span>
-      </div>
-      <div class="px-4 py-2 flex flex-wrap gap-1 border-b border-border/50">
-        <template x-for="sp in horizons.next.sprints" :key="sp.id">
-          <span class="text-xs bg-muted text-muted-foreground px-2 py-0.5 rounded" x-text="sp.name"></span>
-        </template>
-        <span x-show="horizons.next.sprints.length === 0" x-cloak class="text-xs text-muted-foreground/60 italic">No sprints assigned</span>
-      </div>
-      <div class="p-3 flex-1 space-y-2 min-h-24">
-        <template x-for="epic in horizons.next.epics" :key="epic.id">
-          <div
-            class="p-3 bg-muted/30 border border-border rounded-lg cursor-grab active:cursor-grabbing"
-            draggable="true"
-            @dragstart="dragStart($event, epic)"
-          >
-            <p class="text-sm font-medium text-foreground mb-1" x-text="epic.title"></p>
-            <div class="flex items-center gap-2 mb-2">
-              <span class="text-xs text-muted-foreground" x-text="epic.stories_count + ' stories'"></span>
-              <span class="text-xs text-muted-foreground">&middot;</span>
-              <span class="text-xs text-muted-foreground" x-text="epic.completed_points + '/' + epic.total_points + ' pts'"></span>
-            </div>
-            <div class="w-full bg-muted rounded-full h-1.5">
-              <div
-                class="h-1.5 rounded-full transition-all"
-                :class="epic.pct_done >= 70 ? 'bg-success' : epic.pct_done >= 30 ? 'bg-warning' : 'bg-primary/70'"
-                :style="'width:' + epic.pct_done + '%'"
-              ></div>
-            </div>
-            <p class="text-xs text-right text-muted-foreground/60 mt-0.5" x-text="epic.pct_done + '% done'"></p>
+          <div class="mt-2">
+            {% call badge('neutral') %}<span x-text="card.pct_done + '% done'"></span>{% endcall %}
           </div>
-        </template>
-        <p x-show="horizons.next.epics.length === 0" x-cloak class="text-xs text-center text-muted-foreground/60 italic py-4">
-          No epics &mdash; drag one here
-        </p>
-      </div>
-    </div>
-
-    <!-- LATER -->
-    <div
-      class="bg-card border border-border rounded-lg flex flex-col"
-      @dragover.prevent
-      @drop="dropEpic($event, 'later')"
-    >
-      <div class="px-4 py-3 bg-muted/30 border-b border-border rounded-t-xl flex items-center gap-2">
-        <span class="w-2.5 h-2.5 rounded-full bg-muted-foreground"></span>
-        <h2 class="text-sm font-bold text-foreground uppercase tracking-wide">Later</h2>
-        <span class="ml-auto text-xs text-muted-foreground" x-text="horizons.later.epics.length + ' epics'"></span>
-      </div>
-      <div class="px-4 py-2 flex flex-wrap gap-1 border-b border-border/50">
-        <template x-for="sp in horizons.later.sprints" :key="sp.id">
-          <span class="text-xs bg-muted text-muted-foreground px-2 py-0.5 rounded" x-text="sp.name"></span>
-        </template>
-        <span x-show="horizons.later.sprints.length === 0" x-cloak class="text-xs text-muted-foreground/60 italic">No sprints assigned</span>
-      </div>
-      <div class="p-3 flex-1 space-y-2 min-h-24">
-        <template x-for="epic in horizons.later.epics" :key="epic.id">
-          <div
-            class="p-3 bg-muted/30 border border-border rounded-lg cursor-grab active:cursor-grabbing"
-            draggable="true"
-            @dragstart="dragStart($event, epic)"
-          >
-            <p class="text-sm font-medium text-foreground mb-1" x-text="epic.title"></p>
-            <div class="flex items-center gap-2 mb-2">
-              <span class="text-xs text-muted-foreground" x-text="epic.stories_count + ' stories'"></span>
-              <span class="text-xs text-muted-foreground">&middot;</span>
-              <span class="text-xs text-muted-foreground" x-text="epic.completed_points + '/' + epic.total_points + ' pts'"></span>
-            </div>
-            <div class="w-full bg-muted rounded-full h-1.5">
-              <div
-                class="h-1.5 rounded-full bg-muted-foreground transition-all"
-                :style="'width:' + epic.pct_done + '%'"
-              ></div>
-            </div>
-            <p class="text-xs text-right text-muted-foreground/60 mt-0.5" x-text="epic.pct_done + '% done'"></p>
-          </div>
-        </template>
-        <p x-show="horizons.later.epics.length === 0" x-cloak class="text-xs text-center text-muted-foreground/60 italic py-4">
-          No epics &mdash; drag one here
-        </p>
-      </div>
-    </div>
-  </div>
-
-  <!-- Unscheduled -->
-  <div
-    class="bg-background border border-dashed border-border rounded-xl mb-8"
-    @dragover.prevent
-    @drop="dropEpic($event, '')"
-  >
-    <div class="px-4 py-3 border-b border-border flex items-center gap-2">
-      <h2 class="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Unscheduled</h2>
-      <span class="ml-auto text-xs text-muted-foreground/60" x-text="unscheduled.length + ' epics'"></span>
-    </div>
-    <div class="p-3 flex flex-wrap gap-2">
-      <template x-for="epic in unscheduled" :key="epic.id">
-        <div
-          class="px-3 py-2 bg-muted/30 border border-border rounded-lg cursor-grab active:cursor-grabbing text-sm text-foreground"
-          draggable="true"
-          @dragstart="dragStart($event, epic)"
-          x-text="epic.title"
-        ></div>
+        {% endcall %}
       </template>
-      <p x-show="unscheduled.length === 0" x-cloak class="text-xs text-muted-foreground/60 italic py-2">All epics are scheduled</p>
-    </div>
-  </div>
+    {% endcall %}
 
-  <!-- Sprint timeline strip -->
-  <div class="bg-card border border-border rounded-lg p-4">
-    <h2 class="text-sm font-semibold text-foreground mb-3">Sprint Timeline</h2>
-    <div class="overflow-x-auto">
-      <div class="flex gap-2 min-w-max">
-        <template x-for="(group, label) in timelineGroups()" :key="label">
-          <div class="flex flex-col gap-1">
-            <span class="text-xs font-semibold uppercase tracking-wide px-2 text-muted-foreground" x-text="label"></span>
-            <div class="flex gap-1">
-              <template x-for="sp in group" :key="sp.id">
-                <div
-                  class="px-3 py-2 rounded-lg text-xs text-center min-w-28"
-                  :class="sp.status === 'active' ? 'bg-primary/10 border border-primary/30 text-primary/90 font-semibold' : 'bg-muted border border-border text-muted-foreground'"
-                >
-                  <p class="font-medium" x-text="sp.name"></p>
-                  <p class="text-muted-foreground/60 mt-0.5" x-text="sp.start_date ? sp.start_date + ' \u2192 ' + (sp.end_date || '?') : 'No dates'"></p>
+    {% call card() %}
+      {% call card_header(class='!p-4') %}
+        <h2 class="text-sm font-semibold text-foreground">Sprint timeline</h2>
+      {% endcall %}
+      {% call card_content(class='!p-4 !pt-0') %}
+        <div class="overflow-x-auto">
+          <div class="flex min-w-max gap-2">
+            <template x-for="h in ['now', 'next', 'later']" :key="h">
+              <div class="flex flex-col gap-1">
+                <span class="px-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground" x-text="h"></span>
+                <div class="flex gap-1">
+                  <template x-for="sp in sprintsFor(h)" :key="sp.id">
+                    {% call card(class='min-w-28 px-3 py-2 text-center text-xs') %}
+                      <p class="font-medium text-foreground" x-text="sp.name"></p>
+                      <p class="mt-0.5 text-muted-foreground" x-text="sp.start_date ? sp.start_date + ' → ' + (sp.end_date || 'no end date') : 'No dates set'"></p>
+                    {% endcall %}
+                  </template>
                 </div>
-              </template>
-            </div>
+              </div>
+            </template>
           </div>
-        </template>
-        <p x-show="allSprints().length === 0" x-cloak class="text-xs text-muted-foreground/60 italic">No sprints found</p>
-      </div>
-    </div>
+        </div>
+        <p x-show="allSprints().length === 0" x-cloak class="text-xs text-muted-foreground">No sprints are planned yet. Sprints appear here once they are assigned to a horizon.</p>
+      {% endcall %}
+    {% endcall %}
   </div>
 </div>
+{% endblock %}
 
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/components/kanban_board.js') }}"></script>
 <script>
 function productRoadmap() {
-  return {
-    horizons: { now: { epics: [], sprints: [] }, next: { epics: [], sprints: [] }, later: { epics: [], sprints: [] } },
-    unscheduled: [],
-    totalEpics: 0,
-    onTrackPct: null,  // M1: no epics loaded yet -- unmeasured, not "100% on track"
+  const board = kanbanBoard({
+    columns: [
+      { state: 'now', label: 'Now' },
+      { state: 'next', label: 'Next' },
+      { state: 'later', label: 'Later' },
+      { state: 'unscheduled', label: 'Unscheduled' },
+    ],
+    canWrite: {{ can_write | tojson }},
+    moveUrl: '/api/product-roadmap/epics/{id}/horizon',
+    moveBody: (card, toState) => ({ horizon: toState === 'unscheduled' ? '' : toState }),
+    sortBy: 'sort_order',
+  });
+  const page = {
+    sprints: { now: [], next: [], later: [] },
+    loaded: false,
+    onTrackPct: null,  // no epics loaded yet -- unmeasured, not "100% on track"
     error: '',
-    _dragging: null,
 
     async init() {
       try {
         const data = await Platform.fetch('/api/product-roadmap', { silent: true });
-        this.horizons = data.horizons || this.horizons;
-        this.unscheduled = data.unscheduled || [];
-        this.totalEpics = data.total_epics || 0;
+        const cards = [];
+        ['now', 'next', 'later'].forEach(h => {
+          const col = (data.horizons || {})[h] || { epics: [], sprints: [] };
+          this.sprints[h] = col.sprints || [];
+          (col.epics || []).forEach(e => cards.push(Object.assign(e, { state: h, name: e.title })));
+        });
+        (data.unscheduled || []).forEach(e => cards.push(Object.assign(e, { state: 'unscheduled', name: e.title })));
+        this.cards = cards;
         this.onTrackPct = typeof data.on_track_pct === 'number' ? data.on_track_pct : null;
       } catch (e) {
         this.error = 'Error loading roadmap: ' + e.message;
+      } finally {
+        this.loaded = true;
+        this.refreshIcons();
       }
     },
 
-    dragStart(event, epic) {
-      this._dragging = epic;
-      event.dataTransfer.effectAllowed = 'move';
-      event.dataTransfer.setData('text/plain', String(epic.id));
-    },
+    sprintsFor(state) { return this.sprints[state] || []; },
+    allSprints() { return [].concat(this.sprints.now, this.sprints.next, this.sprints.later); },
 
-    async dropEpic(event, targetHorizon) {
-      event.preventDefault();
-      const epic = this._dragging;
-      if (!epic) return;
-      this._dragging = null;
-
-      const prevHorizon = epic.horizon || '';
-
-      // Optimistic UI update
-      this._removeEpicFromAll(epic.id);
-      epic.horizon = targetHorizon || null;
-      if (targetHorizon && this.horizons[targetHorizon]) {
-        this.horizons[targetHorizon].epics.push(epic);
-      } else {
-        this.unscheduled.push(epic);
-      }
-
-      // Persist
-      try {
-        await Platform.fetch.patch(`/api/product-roadmap/epics/${epic.id}/horizon`, { horizon: targetHorizon || '' }, { silent: true });
-        this._recalcOnTrack();
-      } catch (e) {
-        if (e.type === 'NetworkError') {
-          this.error = 'Network error: ' + e.message;
-        } else {
-          this.error = 'Failed to save horizon assignment';
-        }
-        // Revert optimistic update
-        this._removeEpicFromAll(epic.id);
-        epic.horizon = prevHorizon || null;
-        if (prevHorizon && this.horizons[prevHorizon]) {
-          this.horizons[prevHorizon].epics.push(epic);
-        } else {
-          this.unscheduled.push(epic);
-        }
-      }
-    },
-
-    _removeEpicFromAll(epicId) {
-      ['now', 'next', 'later'].forEach(h => {
-        this.horizons[h].epics = this.horizons[h].epics.filter(e => e.id !== epicId);
-      });
-      this.unscheduled = this.unscheduled.filter(e => e.id !== epicId);
-    },
-
+    // "On track" is the share of Now epics that are more than half done; no
+    // epics in Now means nothing to measure, not 100%.
     _recalcOnTrack() {
-      const nowEpics = this.horizons.now.epics;
-      if (!nowEpics.length) { this.onTrackPct = null; return; }  // M1: 0 "Now" epics is unmeasured, not "100% on track"
-      const onTrack = nowEpics.filter(e => e.pct_done > 50).length;
-      this.onTrackPct = Math.round(onTrack / nowEpics.length * 100 * 10) / 10;
-    },
-
-    allSprints() {
-      return [
-        ...this.horizons.now.sprints,
-        ...this.horizons.next.sprints,
-        ...this.horizons.later.sprints,
-      ];
-    },
-
-    timelineGroups() {
-      return {
-        now: this.horizons.now.sprints,
-        next: this.horizons.next.sprints,
-        later: this.horizons.later.sprints,
-      };
+      const now = this.columnCards('now');
+      if (!now.length) { this.onTrackPct = null; return; }
+      this.onTrackPct = Math.round(now.filter(e => e.pct_done > 50).length / now.length * 1000) / 10;
     },
   };
+  const merged = Object.defineProperties(board, Object.getOwnPropertyDescriptors(page));
+  const persist = board._persistMove;
+  merged._persistMove = function (card, toState, selectEl) {
+    const done = persist.call(this, card, toState, selectEl);
+    if (done && done.then) done.then(() => this._recalcOnTrack());
+    return done;
+  };
+  return merged;
 }
 </script>
 {% endblock %}
-{# design-block: dashboard #}

@@ -1,8 +1,7 @@
 {# design-block: board #}
 {% extends "layouts/admin_base.html" %}
 {% from 'macros/page_shell.html' import page_shell %}
-{% from 'macros/kanban_board.html' import kanban_board %}
-{% from 'components/dropdown_menu.html' import dropdown_menu %}
+{% from 'macros/kanban_board.html' import kanban_board, kanban_card %}
 {% from 'components/badge.html' import badge %}
 {% from 'components/button.html' import button %}
 {% from 'components/input.html' import input %}
@@ -12,10 +11,6 @@
 {% block title %}SAFe Portfolio Kanban{% endblock %}
 
 {% block content %}
-{% set move_items = [] %}
-{% for state in kanban_states %}
-{% set _ = move_items.append({'text': state, 'onclick': "moveCardTo(card, '" ~ state ~ "')", 'aria_label': 'Move to ' ~ state}) %}
-{% endfor %}
 <div class="p-6 space-y-6">
     {% macro _page_actions() %}
         {% if can_write %}
@@ -86,6 +81,7 @@
 
         {% call(state) kanban_board(
                 plain_headers=true,
+                unit='epic',
                 states=kanban_states,
                 empty_hints=empty_hints,
                 can_write=can_write,
@@ -94,42 +90,13 @@
                 region_label='Portfolio Kanban board, scrolls horizontally') %}
             {% set group = stage_group.get(state) %}
             <template x-for="card in columnCards('{{ state }}')" :key="card.id">
-                <div :draggable="canWrite ? 'true' : 'false'"
-                     tabindex="0"
-                     role="group"
-                     :aria-label="`${card.name}, ${card.state}${canWrite ? '. Arrow left or right moves it to the next column.' : ''}`"
-                     class="kanban-card bg-card flex flex-col gap-2 rounded-lg border p-2.5 transition-colors"
-                     :data-card-id="card.id"
-                     x-data="{ expanded: false }"
-                     :class="{
-                         'opacity-40': draggingCard && draggingCard.id === card.id,
-                         'border-l-2 border-l-primary border-y-border border-r-border': isTopCard(card),
-                         'border-border': !isTopCard(card),
-                         'cursor-grab': canWrite,
-                         'cursor-grabbing': draggingCard && draggingCard.id === card.id
-                     }"
-                     @dragstart="onDragStart($event, card)"
-                     @dragend="onDragEnd()"
-                     @keydown="onCardKey($event, card)">
-
-                    <div class="flex items-start justify-between gap-2">
-                        {% if can_write %}<i data-lucide="grip-vertical" class="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" data-drag-handle aria-hidden="true"></i>{% endif %}
-                        <h3 class="min-w-0 flex-1 text-sm font-medium leading-snug text-foreground line-clamp-2" x-text="card.name"></h3>
-                        {% if can_write %}
-                        {{ dropdown_menu(trigger_icon='more-horizontal', trigger_icon_only=true, trigger_size='sm', trigger_variant='ghost',
-                                         trigger_class='shrink-0', trigger_aria_label='Move epic', trigger_testid='card-actions',
-                                         trigger_attrs_dict={':aria-label': '`Move ${card.name} to a different column`', ':disabled': 'moving === card.id'},
-                                         menu_width='w-48', class='shrink-0', subject_attr='data-card-id',
-                                         items=[{'header': 'Move to'}] + move_items) }}
-                        {% endif %}
-                    </div>
-
+                {% call kanban_card(kanban_states, class='transition-colors', title='card.name', top='isTopCard(card)', can_write=can_write) %}
+                  <div x-data="{ expanded: false }" class="mt-1.5 space-y-1.5">
                     <div class="flex flex-wrap items-center gap-1.5">
                         {% call badge(variant='info') %}<span x-text="`WSJF: ${card.wsjf_score}`" title="Weighted Shortest Job First priority score"></span>{% endcall %}
-                        {% set group = stage_group.get(state) %}
                         {% call badge(variant='info' if group == 'discovery' else 'success' if group == 'execution' else 'neutral') %}{{ 'Discovery' if group == 'discovery' else 'Execution' if group == 'execution' else 'Done' }}{% endcall %}
                         <template x-if="isTopCard(card)">
-                            {% call badge(variant='success') %}<i data-lucide="star" class="h-3 w-3 mr-1" aria-hidden="true"></i>Top WSJF{% endcall %}
+                            {% call badge(variant='success') %}<i data-lucide="star" class="mr-1 h-3 w-3" aria-hidden="true"></i>Top WSJF{% endcall %}
                         </template>
                         {% call button(variant='ghost', size='icon-xs', class='ml-auto shrink-0 text-primary', on_click="expanded = !expanded",
                                        attrs_dict={':aria-expanded': 'expanded', ':aria-label': "`${expanded ? 'Hide' : 'Show'} WSJF factors for ${card.name}`", ':title': "expanded ? 'Hide WSJF factors' : 'Show WSJF factors'"}) %}
@@ -152,26 +119,17 @@
                     </template>
 
                     <div x-show="expanded" x-collapse class="border-t border-border pt-2">
-                        <dl class="text-xs space-y-1">
+                        <dl class="space-y-1 text-xs">
+                            {% for label, field in [('Business Value', 'business_value'), ('Time Criticality', 'time_criticality'), ('Risk Reduction', 'risk_reduction'), ('Job Size', 'job_size')] %}
                             <div class="flex justify-between gap-2">
-                                <dt class="text-muted-foreground">Business Value</dt>
-                                <dd class="text-foreground font-medium" x-text="card.business_value"></dd>
+                                <dt class="text-muted-foreground">{{ label }}</dt>
+                                <dd class="font-medium text-foreground" x-text="card.{{ field }}"></dd>
                             </div>
-                            <div class="flex justify-between gap-2">
-                                <dt class="text-muted-foreground">Time Criticality</dt>
-                                <dd class="text-foreground font-medium" x-text="card.time_criticality"></dd>
-                            </div>
-                            <div class="flex justify-between gap-2">
-                                <dt class="text-muted-foreground">Risk Reduction</dt>
-                                <dd class="text-foreground font-medium" x-text="card.risk_reduction"></dd>
-                            </div>
-                            <div class="flex justify-between gap-2">
-                                <dt class="text-muted-foreground">Job Size</dt>
-                                <dd class="text-foreground font-medium" x-text="card.job_size"></dd>
-                            </div>
+                            {% endfor %}
                         </dl>
                     </div>
-                </div>
+                  </div>
+                {% endcall %}
             </template>
         {% endcall %}
     </div>
