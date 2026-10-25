@@ -201,9 +201,9 @@ Delivered today by: [Vendors](/modules/vendors), [Procurement](/modules/procurem
 
 <figure class="public-figure mt-10">
 <picture>
-<img src="/static/img/modules/vendors.webp" alt="Screenshot of the Vendors module's vendor catalogue." width="1200" height="750" loading="lazy" decoding="async" class="rounded-lg border border-border shadow-sm">
+<img src="/static/img/modules/vendors.webp" alt="Screenshot of the Vendors module's list of your vendors." width="1200" height="750" loading="lazy" decoding="async" class="rounded-lg border border-border shadow-sm">
 </picture>
-<figcaption class="mt-2 text-sm text-muted-foreground">The vendor catalogue, with each vendor's type, products and contract status.</figcaption>
+<figcaption class="mt-2 text-sm text-muted-foreground">Your vendors, with each vendor's type, products and contract status.</figcaption>
 </figure>
 
 <h3 id="ai-management">AI Management</h3>
