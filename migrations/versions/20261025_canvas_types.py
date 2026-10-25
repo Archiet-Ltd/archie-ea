@@ -16,7 +16,7 @@ from alembic import op
 from sqlalchemy import inspect
 
 revision = "20261025_canvas_types"
-down_revision = "20261025_price_plans_canvas"
+down_revision = "20261025_industry_frameworks"
 branch_labels = None
 depends_on = None
 

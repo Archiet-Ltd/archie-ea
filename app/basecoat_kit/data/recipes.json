@@ -1,0 +1,3444 @@
+{
+ "accordion": {
+  "base_classes": "cn-accordion flex w-full flex-col",
+  "component": "Accordion",
+  "component_name": "accordion",
+  "data_attrs": [],
+  "element": "AccordionPrimitive.Root"
+ },
+ "accordion-content": {
+  "base_classes": "cn-accordion-content overflow-hidden",
+  "component": "AccordionContent",
+  "component_name": "accordion",
+  "data_attrs": [],
+  "element": "AccordionPrimitive.Content"
+ },
+ "accordion-item": {
+  "base_classes": "cn-accordion-item",
+  "component": "AccordionItem",
+  "component_name": "accordion",
+  "data_attrs": [],
+  "element": "AccordionPrimitive.Item"
+ },
+ "accordion-trigger": {
+  "base_classes": "cn-accordion-trigger group/accordion-trigger relative flex flex-1 items-start justify-between border border-transparent transition-all outline-none disabled:pointer-events-none disabled:opacity-50",
+  "component": "AccordionTrigger",
+  "component_name": "accordion",
+  "data_attrs": [],
+  "element": "AccordionPrimitive.Trigger"
+ },
+ "accordion-trigger-icon": {
+  "base_classes": "cn-accordion-trigger-icon pointer-events-none shrink-0 group-aria-expanded/accordion-trigger:hidden",
+  "component": "AccordionTrigger",
+  "component_name": "accordion",
+  "data_attrs": [],
+  "element": "IconPlaceholder"
+ },
+ "alert": {
+  "base_classes": "",
+  "component": "Alert",
+  "component_name": "alert",
+  "cva": "alertVariants",
+  "data_attrs": [],
+  "element": "div",
+  "variants": {
+   "base": "cn-alert group/alert relative w-full",
+   "defaults": {
+    "variant": "default"
+   },
+   "variants": {
+    "variant": {
+     "default": "cn-alert-variant-default",
+     "destructive": "cn-alert-variant-destructive"
+    }
+   }
+  }
+ },
+ "alert-action": {
+  "base_classes": "cn-alert-action",
+  "component": "AlertAction",
+  "component_name": "alert",
+  "data_attrs": [],
+  "element": "div"
+ },
+ "alert-description": {
+  "base_classes": "cn-alert-description [&_a]:underline [&_a]:underline-offset-3 [&_a]:hover:text-foreground",
+  "component": "AlertDescription",
+  "component_name": "alert",
+  "data_attrs": [],
+  "element": "div"
+ },
+ "alert-dialog": {
+  "base_classes": "",
+  "component": "AlertDialog",
+  "component_name": "alert-dialog",
+  "data_attrs": [],
+  "element": "AlertDialogPrimitive.Root"
+ },
+ "alert-dialog-action": {
+  "base_classes": "cn-alert-dialog-action",
+  "component": "AlertDialogAction",
+  "component_name": "alert-dialog",
+  "data_attrs": [],
+  "element": "AlertDialogPrimitive.Action"
+ },
+ "alert-dialog-cancel": {
+  "base_classes": "cn-alert-dialog-cancel",
+  "component": "AlertDialogCancel",
+  "component_name": "alert-dialog",
+  "data_attrs": [],
+  "element": "AlertDialogPrimitive.Cancel"
+ },
+ "alert-dialog-content": {
+  "base_classes": "cn-alert-dialog-content group/alert-dialog-content fixed top-1/2 left-1/2 z-50 grid w-full -translate-x-1/2 -translate-y-1/2 outline-none",
+  "component": "AlertDialogContent",
+  "component_name": "alert-dialog",
+  "data_attrs": [
+   "data-size"
+  ],
+  "element": "AlertDialogPrimitive.Content"
+ },
+ "alert-dialog-description": {
+  "base_classes": "cn-alert-dialog-description",
+  "component": "AlertDialogDescription",
+  "component_name": "alert-dialog",
+  "data_attrs": [],
+  "element": "AlertDialogPrimitive.Description"
+ },
+ "alert-dialog-footer": {
+  "base_classes": "cn-alert-dialog-footer flex flex-col-reverse gap-2 group-data-[size=sm]/alert-dialog-content:grid group-data-[size=sm]/alert-dialog-content:grid-cols-2 sm:flex-row sm:justify-end",
+  "component": "AlertDialogFooter",
+  "component_name": "alert-dialog",
+  "data_attrs": [],
+  "element": "div"
+ },
+ "alert-dialog-header": {
+  "base_classes": "cn-alert-dialog-header",
+  "component": "AlertDialogHeader",
+  "component_name": "alert-dialog",
+  "data_attrs": [],
+  "element": "div"
+ },
+ "alert-dialog-media": {
+  "base_classes": "cn-alert-dialog-media",
+  "component": "AlertDialogMedia",
+  "component_name": "alert-dialog",
+  "data_attrs": [],
+  "element": "div"
+ },
+ "alert-dialog-overlay": {
+  "base_classes": "cn-alert-dialog-overlay fixed inset-0 z-50",
+  "component": "AlertDialogOverlay",
+  "component_name": "alert-dialog",
+  "data_attrs": [],
+  "element": "AlertDialogPrimitive.Overlay"
+ },
+ "alert-dialog-portal": {
+  "base_classes": "",
+  "component": "AlertDialogPortal",
+  "component_name": "alert-dialog",
+  "data_attrs": [],
+  "element": "AlertDialogPrimitive.Portal"
+ },
+ "alert-dialog-title": {
+  "base_classes": "cn-alert-dialog-title cn-font-heading",
+  "component": "AlertDialogTitle",
+  "component_name": "alert-dialog",
+  "data_attrs": [],
+  "element": "AlertDialogPrimitive.Title"
+ },
+ "alert-dialog-trigger": {
+  "base_classes": "",
+  "component": "AlertDialogTrigger",
+  "component_name": "alert-dialog",
+  "data_attrs": [],
+  "element": "AlertDialogPrimitive.Trigger"
+ },
+ "alert-title": {
+  "base_classes": "cn-alert-title [&_a]:underline [&_a]:underline-offset-3 [&_a]:hover:text-foreground",
+  "component": "AlertTitle",
+  "component_name": "alert",
+  "data_attrs": [],
+  "element": "div"
+ },
+ "aspect-ratio": {
+  "base_classes": "",
+  "component": "AspectRatio",
+  "component_name": "aspect-ratio",
+  "data_attrs": [],
+  "element": "AspectRatioPrimitive.Root"
+ },
+ "attachment": {
+  "base_classes": "",
+  "component": "Attachment",
+  "component_name": "attachment",
+  "cva": "attachmentVariants",
+  "data_attrs": [
+   "data-orientation",
+   "data-size",
+   "data-state"
+  ],
+  "element": "div",
+  "variants": {
+   "base": "cn-attachment group/attachment relative flex max-w-full min-w-0 shrink-0 flex-wrap border bg-card text-card-foreground transition-colors has-[>a,>button]:hover:bg-muted/50 data-[state=error]:border-destructive/30 data-[state=idle]:border-dashed",
+   "defaults": {},
+   "variants": {
+    "orientation": {
+     "horizontal": "cn-attachment-orientation-horizontal items-center",
+     "vertical": "cn-attachment-orientation-vertical flex-col"
+    },
+    "size": {
+     "default": "cn-attachment-size-default",
+     "sm": "cn-attachment-size-sm",
+     "xs": "cn-attachment-size-xs"
+    }
+   }
+  }
+ },
+ "attachment-action": {
+  "base_classes": "cn-attachment-action",
+  "component": "AttachmentAction",
+  "component_name": "attachment",
+  "data_attrs": [],
+  "element": "Button"
+ },
+ "attachment-actions": {
+  "base_classes": "cn-attachment-actions flex shrink-0 items-center",
+  "component": "AttachmentActions",
+  "component_name": "attachment",
+  "data_attrs": [],
+  "element": "div"
+ },
+ "attachment-content": {
+  "base_classes": "cn-attachment-content max-w-full min-w-0 flex-1",
+  "component": "AttachmentContent",
+  "component_name": "attachment",
+  "data_attrs": [],
+  "element": "div"
+ },
+ "attachment-description": {
+  "base_classes": "cn-attachment-description block min-w-0 truncate text-muted-foreground group-data-[state=error]/attachment:text-destructive/80 max-w-full",
+  "component": "AttachmentDescription",
+  "component_name": "attachment",
+  "data_attrs": [],
+  "element": "span"
+ },
+ "attachment-group": {
+  "base_classes": "cn-attachment-group flex min-w-0 scroll-fade-x snap-x snap-mandatory scrollbar-none overflow-x-auto overscroll-x-contain *:data-[slot=attachment]:flex-none *:data-[slot=attachment]:snap-start",
+  "component": "AttachmentGroup",
+  "component_name": "attachment",
+  "data_attrs": [],
+  "element": "div"
+ },
+ "attachment-media": {
+  "base_classes": "",
+  "component": "AttachmentMedia",
+  "component_name": "attachment",
+  "cva": "attachmentMediaVariants",
+  "data_attrs": [
+   "data-variant"
+  ],
+  "element": "div",
+  "variants": {
+   "base": "cn-attachment-media relative flex aspect-square shrink-0 items-center justify-center overflow-hidden group-data-[state=error]/attachment:bg-destructive/10 group-data-[state=error]/attachment:text-destructive [&_svg]:pointer-events-none",
+   "defaults": {
+    "variant": "icon"
+   },
+   "variants": {
+    "variant": {
+     "icon": "cn-attachment-media-variant-icon",
+     "image": "cn-attachment-media-variant-image *:[img]:aspect-square *:[img]:w-full *:[img]:object-cover"
+    }
+   }
+  }
+ },
+ "attachment-title": {
+  "base_classes": "cn-attachment-title block max-w-full min-w-0 truncate group-data-[state=processing]/attachment:shimmer group-data-[state=uploading]/attachment:shimmer",
+  "component": "AttachmentTitle",
+  "component_name": "attachment",
+  "data_attrs": [],
+  "element": "span"
+ },
+ "attachment-trigger": {
+  "base_classes": "cn-attachment-trigger absolute inset-0 z-10 outline-none",
+  "component": "AttachmentTrigger",
+  "component_name": "attachment",
+  "data_attrs": [],
+  "element": "Comp"
+ },
+ "avatar": {
+  "base_classes": "cn-avatar group/avatar relative flex shrink-0 select-none after:absolute after:inset-0 after:border after:border-border after:mix-blend-darken dark:after:mix-blend-lighten",
+  "component": "Avatar",
+  "component_name": "avatar",
+  "data_attrs": [
+   "data-size"
+  ],
+  "element": "AvatarPrimitive.Root"
+ },
+ "avatar-badge": {
+  "base_classes": "cn-avatar-badge absolute right-0 bottom-0 z-10 inline-flex items-center justify-center rounded-full bg-blend-color ring-2 select-none group-data-[size=sm]/avatar:size-2 group-data-[size=sm]/avatar:[&>svg]:hidden group-data-[size=default]/avatar:size-2.5 group-data-[size=default]/avatar:[&>svg]:size-2 group-data-[size=lg]/avatar:size-3 group-data-[size=lg]/avatar:[&>svg]:size-2",
+  "component": "AvatarBadge",
+  "component_name": "avatar",
+  "data_attrs": [],
+  "element": "span"
+ },
+ "avatar-fallback": {
+  "base_classes": "cn-avatar-fallback flex size-full items-center justify-center text-sm group-data-[size=sm]/avatar:text-xs",
+  "component": "AvatarFallback",
+  "component_name": "avatar",
+  "data_attrs": [],
+  "element": "AvatarPrimitive.Fallback"
+ },
+ "avatar-group": {
+  "base_classes": "cn-avatar-group group/avatar-group flex -space-x-2 *:data-[slot=avatar]:ring-2 *:data-[slot=avatar]:ring-background",
+  "component": "AvatarGroup",
+  "component_name": "avatar",
+  "data_attrs": [],
+  "element": "div"
+ },
+ "avatar-group-count": {
+  "base_classes": "cn-avatar-group-count relative flex shrink-0 items-center justify-center ring-2 ring-background",
+  "component": "AvatarGroupCount",
+  "component_name": "avatar",
+  "data_attrs": [],
+  "element": "div"
+ },
+ "avatar-image": {
+  "base_classes": "cn-avatar-image aspect-square size-full object-cover",
+  "component": "AvatarImage",
+  "component_name": "avatar",
+  "data_attrs": [],
+  "element": "AvatarPrimitive.Image"
+ },
+ "badge": {
+  "base_classes": "",
+  "component": "Badge",
+  "component_name": "badge",
+  "cva": "badgeVariants",
+  "data_attrs": [
+   "data-variant"
+  ],
+  "element": "Comp",
+  "variants": {
+   "base": "cn-badge group/badge inline-flex w-fit shrink-0 items-center justify-center overflow-hidden whitespace-nowrap focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 aria-invalid:border-destructive aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 [&>svg]:pointer-events-none",
+   "defaults": {
+    "variant": "default"
+   },
+   "variants": {
+    "variant": {
+     "default": "cn-badge-variant-default",
+     "destructive": "cn-badge-variant-destructive",
+     "ghost": "cn-badge-variant-ghost",
+     "link": "cn-badge-variant-link",
+     "outline": "cn-badge-variant-outline",
+     "secondary": "cn-badge-variant-secondary"
+    }
+   }
+  }
+ },
+ "breadcrumb": {
+  "base_classes": "cn-breadcrumb",
+  "component": "Breadcrumb",
+  "component_name": "breadcrumb",
+  "data_attrs": [],
+  "element": "nav"
+ },
+ "breadcrumb-ellipsis": {
+  "base_classes": "cn-breadcrumb-ellipsis flex items-center justify-center",
+  "component": "BreadcrumbEllipsis",
+  "component_name": "breadcrumb",
+  "data_attrs": [],
+  "element": "span"
+ },
+ "breadcrumb-item": {
+  "base_classes": "cn-breadcrumb-item inline-flex items-center",
+  "component": "BreadcrumbItem",
+  "component_name": "breadcrumb",
+  "data_attrs": [],
+  "element": "li"
+ },
+ "breadcrumb-link": {
+  "base_classes": "cn-breadcrumb-link",
+  "component": "BreadcrumbLink",
+  "component_name": "breadcrumb",
+  "data_attrs": [],
+  "element": "Comp"
+ },
+ "breadcrumb-list": {
+  "base_classes": "cn-breadcrumb-list flex flex-wrap items-center wrap-break-word",
+  "component": "BreadcrumbList",
+  "component_name": "breadcrumb",
+  "data_attrs": [],
+  "element": "ol"
+ },
+ "breadcrumb-page": {
+  "base_classes": "cn-breadcrumb-page",
+  "component": "BreadcrumbPage",
+  "component_name": "breadcrumb",
+  "data_attrs": [],
+  "element": "span"
+ },
+ "breadcrumb-separator": {
+  "base_classes": "cn-breadcrumb-separator",
+  "component": "BreadcrumbSeparator",
+  "component_name": "breadcrumb",
+  "data_attrs": [],
+  "element": "li"
+ },
+ "bubble": {
+  "base_classes": "",
+  "component": "Bubble",
+  "component_name": "bubble",
+  "cva": "bubbleVariants",
+  "data_attrs": [
+   "data-align",
+   "data-variant"
+  ],
+  "element": "div",
+  "variants": {
+   "base": "cn-bubble group/bubble relative flex w-fit min-w-0 flex-col",
+   "defaults": {
+    "variant": "default"
+   },
+   "variants": {
+    "variant": {
+     "default": "cn-bubble-variant-default",
+     "destructive": "cn-bubble-variant-destructive",
+     "ghost": "cn-bubble-variant-ghost",
+     "muted": "cn-bubble-variant-muted",
+     "outline": "cn-bubble-variant-outline",
+     "secondary": "cn-bubble-variant-secondary",
+     "tinted": "cn-bubble-variant-tinted"
+    }
+   }
+  }
+ },
+ "bubble-content": {
+  "base_classes": "cn-bubble-content w-fit max-w-full min-w-0 overflow-hidden wrap-break-word [button]:text-left [button,a]:transition-colors",
+  "component": "BubbleContent",
+  "component_name": "bubble",
+  "data_attrs": [],
+  "element": "Comp"
+ },
+ "bubble-group": {
+  "base_classes": "cn-bubble-group flex min-w-0 flex-col",
+  "component": "BubbleGroup",
+  "component_name": "bubble",
+  "data_attrs": [],
+  "element": "div"
+ },
+ "bubble-reactions": {
+  "base_classes": "",
+  "component": "BubbleReactions",
+  "component_name": "bubble",
+  "cva": "bubbleReactionsVariants",
+  "data_attrs": [
+   "data-align",
+   "data-side"
+  ],
+  "element": "div",
+  "variants": {
+   "base": "cn-bubble-reactions absolute z-10 flex w-fit items-center justify-center",
+   "defaults": {
+    "align": "end",
+    "side": "bottom"
+   },
+   "variants": {
+    "align": {
+     "end": "cn-bubble-reactions-align-end",
+     "start": "cn-bubble-reactions-align-start"
+    },
+    "side": {
+     "bottom": "cn-bubble-reactions-side-bottom",
+     "top": "cn-bubble-reactions-side-top"
+    }
+   }
+  }
+ },
+ "button": {
+  "base_classes": "",
+  "component": "Button",
+  "component_name": "button",
+  "cva": "buttonVariants",
+  "data_attrs": [
+   "data-size",
+   "data-variant"
+  ],
+  "element": "Comp",
+  "variants": {
+   "base": "cn-button group/button inline-flex shrink-0 items-center justify-center whitespace-nowrap transition-all outline-none select-none disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0",
+   "defaults": {
+    "size": "default",
+    "variant": "default"
+   },
+   "variants": {
+    "size": {
+     "default": "cn-button-size-default",
+     "icon": "cn-button-size-icon",
+     "icon-lg": "cn-button-size-icon-lg",
+     "icon-sm": "cn-button-size-icon-sm",
+     "icon-xs": "cn-button-size-icon-xs",
+     "lg": "cn-button-size-lg",
+     "sm": "cn-button-size-sm",
+     "xs": "cn-button-size-xs"
+    },
+    "variant": {
+     "default": "cn-button-variant-default",
+     "destructive": "cn-button-variant-destructive",
+     "ghost": "cn-button-variant-ghost",
+     "link": "cn-button-variant-link",
+     "outline": "cn-button-variant-outline",
+     "secondary": "cn-button-variant-secondary"
+    }
+   }
+  }
+ },
+ "button-group": {
+  "base_classes": "",
+  "component": "ButtonGroup",
+  "component_name": "button-group",
+  "cva": "buttonGroupVariants",
+  "data_attrs": [
+   "data-orientation"
+  ],
+  "element": "div",
+  "variants": {
+   "base": "cn-button-group group/button-group flex w-fit items-stretch *:focus-visible:relative *:focus-visible:z-10 [&>[data-slot=select-trigger]:not([class*='w-'])]:w-fit [&>input]:flex-1",
+   "defaults": {
+    "orientation": "horizontal"
+   },
+   "variants": {
+    "orientation": {
+     "horizontal": "cn-button-group-orientation-horizontal [&>*:not(:first-child)]:rounded-l-none [&>*:not(:first-child)]:border-l-0 [&>*:not(:last-child)]:rounded-r-none",
+     "vertical": "cn-button-group-orientation-vertical flex-col [&>*:not(:first-child)]:rounded-t-none [&>*:not(:first-child)]:border-t-0 [&>*:not(:last-child)]:rounded-b-none"
+    }
+   }
+  }
+ },
+ "button-group-separator": {
+  "base_classes": "cn-button-group-separator relative self-stretch data-horizontal:mx-px data-horizontal:w-auto data-vertical:my-px data-vertical:h-auto",
+  "component": "ButtonGroupSeparator",
+  "component_name": "button-group",
+  "data_attrs": [],
+  "element": "Separator"
+ },
+ "button-group-text": {
+  "base_classes": "cn-button-group-text flex items-center [&_svg]:pointer-events-none",
+  "component": "ButtonGroupText",
+  "component_name": "button-group",
+  "data_attrs": [],
+  "element": "Comp"
+ },
+ "calendar": {
+  "base_classes": "cn-calendar group/calendar bg-background in-data-[slot=card-content]:bg-transparent in-data-[slot=popover-content]:bg-transparent",
+  "component": "Calendar",
+  "component_name": "calendar",
+  "data_attrs": [],
+  "element": "DayPicker"
+ },
+ "calendar-day-button": {
+  "base_classes": "cn-calendar-day-button relative isolate z-10 flex aspect-square size-auto w-full min-w-(--cell-size) flex-col gap-1 border-0 leading-none font-normal group-data-[focused=true]/day:relative group-data-[focused=true]/day:z-10 group-data-[focused=true]/day:border-ring group-data-[focused=true]/day:ring-[3px] group-data-[focused=true]/day:ring-ring/50 data-[range-end=true]:rounded-(--cell-radius) data-[range-end=true]:rounded-r-(--cell-radius) data-[range-end=true]:bg-primary data-[range-end=true]:text-primary-foreground data-[range-middle=true]:rounded-none data-[range-middle=true]:bg-muted data-[range-middle=true]:text-foreground data-[range-start=true]:rounded-(--cell-radius) data-[range-start=true]:rounded-l-(--cell-radius) data-[range-start=true]:bg-primary data-[range-start=true]:text-primary-foreground data-[selected-single=true]:bg-primary data-[selected-single=true]:text-primary-foreground dark:hover:text-foreground [&>span]:text-xs [&>span]:opacity-70",
+  "component": "CalendarDayButton",
+  "component_name": "calendar",
+  "data_attrs": [
+   "data-day",
+   "data-range-end",
+   "data-range-middle",
+   "data-range-start",
+   "data-selected-single"
+  ],
+  "element": "Button"
+ },
+ "card": {
+  "base_classes": "cn-card group/card flex flex-col",
+  "component": "Card",
+  "component_name": "card",
+  "data_attrs": [
+   "data-size"
+  ],
+  "element": "div"
+ },
+ "card-action": {
+  "base_classes": "cn-card-action col-start-2 row-span-2 row-start-1 self-start justify-self-end",
+  "component": "CardAction",
+  "component_name": "card",
+  "data_attrs": [],
+  "element": "div"
+ },
+ "card-content": {
+  "base_classes": "cn-card-content",
+  "component": "CardContent",
+  "component_name": "card",
+  "data_attrs": [],
+  "element": "div"
+ },
+ "card-description": {
+  "base_classes": "cn-card-description",
+  "component": "CardDescription",
+  "component_name": "card",
+  "data_attrs": [],
+  "element": "div"
+ },
+ "card-footer": {
+  "base_classes": "cn-card-footer flex items-center",
+  "component": "CardFooter",
+  "component_name": "card",
+  "data_attrs": [],
+  "element": "div"
+ },
+ "card-header": {
+  "base_classes": "cn-card-header group/card-header @container/card-header grid auto-rows-min items-start has-data-[slot=card-action]:grid-cols-[1fr_auto] has-data-[slot=card-description]:grid-rows-[auto_auto]",
+  "component": "CardHeader",
+  "component_name": "card",
+  "data_attrs": [],
+  "element": "div"
+ },
+ "card-title": {
+  "base_classes": "cn-card-title cn-font-heading",
+  "component": "CardTitle",
+  "component_name": "card",
+  "data_attrs": [],
+  "element": "div"
+ },
+ "carousel": {
+  "base_classes": "relative",
+  "component": "Carousel",
+  "component_name": "carousel",
+  "data_attrs": [],
+  "element": "div"
+ },
+ "carousel-content": {
+  "base_classes": "overflow-hidden",
+  "component": "CarouselContent",
+  "component_name": "carousel",
+  "data_attrs": [],
+  "element": "div"
+ },
+ "carousel-item": {
+  "base_classes": "min-w-0 shrink-0 grow-0 basis-full",
+  "component": "CarouselItem",
+  "component_name": "carousel",
+  "data_attrs": [],
+  "element": "div"
+ },
+ "carousel-next": {
+  "base_classes": "cn-carousel-next absolute touch-manipulation",
+  "component": "CarouselNext",
+  "component_name": "carousel",
+  "data_attrs": [],
+  "element": "Button"
+ },
+ "carousel-previous": {
+  "base_classes": "cn-carousel-previous absolute touch-manipulation",
+  "component": "CarouselPrevious",
+  "component_name": "carousel",
+  "data_attrs": [],
+  "element": "Button"
+ },
+ "chart": {
+  "base_classes": "cn-chart flex aspect-video justify-center text-xs [&_.recharts-cartesian-axis-tick_text]:fill-muted-foreground [&_.recharts-cartesian-grid_line[stroke='#ccc']]:stroke-border/50 [&_.recharts-curve.recharts-tooltip-cursor]:stroke-border [&_.recharts-dot[stroke='#fff']]:stroke-transparent [&_.recharts-layer]:outline-hidden [&_.recharts-polar-grid_[stroke='#ccc']]:stroke-border [&_.recharts-radial-bar-background-sector]:fill-muted [&_.recharts-rectangle.recharts-tooltip-cursor]:fill-muted [&_.recharts-reference-line_[stroke='#ccc']]:stroke-border [&_.recharts-sector]:outline-hidden [&_.recharts-sector[stroke='#fff']]:stroke-transparent [&_.recharts-surface]:outline-hidden",
+  "component": "ChartContainer",
+  "component_name": "chart",
+  "data_attrs": [
+   "data-chart"
+  ],
+  "element": "div"
+ },
+ "checkbox": {
+  "base_classes": "cn-checkbox peer relative shrink-0 outline-none after:absolute after:-inset-x-3 after:-inset-y-2 disabled:cursor-not-allowed disabled:opacity-50",
+  "component": "Checkbox",
+  "component_name": "checkbox",
+  "data_attrs": [],
+  "element": "CheckboxPrimitive.Root"
+ },
+ "checkbox-group": {
+  "base_classes": "cn-field-group group/field-group @container/field-group flex w-full flex-col data-[slot=checkbox-group]:gap-3 [&>[data-slot=field-group]]:gap-4",
+  "component": "FieldGroup",
+  "component_name": "field",
+  "data_attrs": [],
+  "element": "div"
+ },
+ "checkbox-indicator": {
+  "base_classes": "cn-checkbox-indicator grid place-content-center text-current transition-none",
+  "component": "Checkbox",
+  "component_name": "checkbox",
+  "data_attrs": [],
+  "element": "CheckboxPrimitive.Indicator"
+ },
+ "code-block": {
+  "base_classes": "",
+  "component": "CodeBlock",
+  "component_name": "code-block",
+  "cva": "codeBlockVariants",
+  "data_attrs": [
+   "data-size",
+   "data-variant"
+  ],
+  "element": "div",
+  "variants": {
+   "base": "cn-code-block group/code-block relative flex w-full min-w-0 flex-col overflow-hidden",
+   "defaults": {
+    "variant": "default"
+   },
+   "variants": {
+    "variant": {
+     "default": "cn-code-block-variant-default",
+     "destructive": "cn-code-block-variant-destructive"
+    }
+   }
+  }
+ },
+ "code-block-actions": {
+  "base_classes": "cn-code-block-actions ms-auto flex shrink-0 items-center [[data-slot=code-block]>&]:absolute [[data-slot=code-block]>&]:z-10 [[data-slot=code-block]>&]:opacity-0 [[data-slot=code-block]>&]:transition-opacity [[data-slot=code-block]>&]:group-focus-within/code-block:opacity-100 [[data-slot=code-block]>&]:group-hover/code-block:opacity-100 [[data-slot=code-block]>&]:pointer-coarse:opacity-100",
+  "component": "CodeBlockActions",
+  "component_name": "code-block",
+  "data_attrs": [],
+  "element": "div"
+ },
+ "code-block-code": {
+  "base_classes": "cn-code-block-code grid min-h-lh min-w-max content-start in-data-numbered:grid-cols-[auto_1fr] in-data-wrap:min-w-0",
+  "component": "CodeBlockContent",
+  "component_name": "code-block",
+  "data_attrs": [],
+  "element": "code"
+ },
+ "code-block-content": {
+  "base_classes": "cn-code-block-content min-h-0 min-w-0 scroll-fade-x scrollbar-thin overflow-auto text-start font-mono outline-none data-wrap:scroll-fade-y data-wrap:wrap-break-word data-wrap:whitespace-pre-wrap",
+  "component": "CodeBlockContent",
+  "component_name": "code-block",
+  "data_attrs": [
+   "data-numbered",
+   "data-wrap"
+  ],
+  "element": "pre"
+ },
+ "code-block-copy-button": {
+  "base_classes": "cn-code-block-copy-button",
+  "component": "CodeBlockCopyButton",
+  "component_name": "code-block",
+  "data_attrs": [
+   "data-copied"
+  ],
+  "element": "Button"
+ },
+ "code-block-footer": {
+  "base_classes": "cn-code-block-footer flex min-w-0 shrink-0 items-center",
+  "component": "CodeBlockFooter",
+  "component_name": "code-block",
+  "data_attrs": [],
+  "element": "div"
+ },
+ "code-block-header": {
+  "base_classes": "cn-code-block-header flex min-w-0 shrink-0 items-center *:has-[>[data-slot=code-block-title]]:min-w-0",
+  "component": "CodeBlockHeader",
+  "component_name": "code-block",
+  "data_attrs": [],
+  "element": "div"
+ },
+ "code-block-line": {
+  "base_classes": "",
+  "component": "CodeBlockLine",
+  "component_name": "code-block",
+  "cva": "codeBlockLineVariants",
+  "data_attrs": [
+   "data-variant"
+  ],
+  "element": "span",
+  "variants": {
+   "base": "cn-code-block-line relative block min-h-lh after:absolute after:top-0 after:select-none in-data-numbered:col-span-2 in-data-numbered:grid in-data-numbered:grid-cols-subgrid in-data-numbered:[counter-increment:line] in-data-numbered:before:content-[counter(line)] in-data-numbered:before:select-none in-data-numbered:supports-[content:counter(line)_/_'']:before:content-[counter(line)_/_'']",
+   "defaults": {
+    "variant": "default"
+   },
+   "variants": {
+    "variant": {
+     "added": "cn-code-block-line-variant-added",
+     "default": "cn-code-block-line-variant-default",
+     "highlighted": "cn-code-block-line-variant-highlighted",
+     "removed": "cn-code-block-line-variant-removed"
+    }
+   }
+  }
+ },
+ "code-block-line-content": {
+  "base_classes": "min-w-0",
+  "component": "CodeBlockLine",
+  "component_name": "code-block",
+  "data_attrs": [],
+  "element": "span"
+ },
+ "code-block-title": {
+  "base_classes": "cn-code-block-title min-w-0 truncate [&_svg]:pointer-events-none [&_svg]:inline-block [&_svg]:align-middle",
+  "component": "CodeBlockTitle",
+  "component_name": "code-block",
+  "data_attrs": [],
+  "element": "div"
+ },
+ "collapsible": {
+  "base_classes": "",
+  "component": "Collapsible",
+  "component_name": "collapsible",
+  "data_attrs": [],
+  "element": "CollapsiblePrimitive.Root"
+ },
+ "collapsible-content": {
+  "base_classes": "",
+  "component": "CollapsibleContent",
+  "component_name": "collapsible",
+  "data_attrs": [],
+  "element": "CollapsiblePrimitive.CollapsibleContent"
+ },
+ "collapsible-trigger": {
+  "base_classes": "",
+  "component": "CollapsibleTrigger",
+  "component_name": "collapsible",
+  "data_attrs": [],
+  "element": "CollapsiblePrimitive.CollapsibleTrigger"
+ },
+ "combobox": {
+  "base_classes": "",
+  "component": "Combobox",
+  "component_name": "combobox",
+  "data_attrs": [],
+  "element": "ComboboxPrimitive.Root"
+ },
+ "combobox-chip": {
+  "base_classes": "cn-combobox-chip has-disabled:pointer-events-none has-disabled:cursor-not-allowed has-disabled:opacity-50",
+  "component": "ComboboxChip",
+  "component_name": "combobox",
+  "data_attrs": [],
+  "element": "ComboboxPrimitive.Chip"
+ },
+ "combobox-chip-input": {
+  "base_classes": "cn-combobox-chip-input min-w-16 flex-1 outline-none",
+  "component": "ComboboxChipsInput",
+  "component_name": "combobox",
+  "data_attrs": [],
+  "element": "ComboboxPrimitive.Input"
+ },
+ "combobox-chip-remove": {
+  "base_classes": "cn-combobox-chip-remove",
+  "component": "ComboboxChip",
+  "component_name": "combobox",
+  "data_attrs": [],
+  "element": "ComboboxPrimitive.ChipRemove"
+ },
+ "combobox-chips": {
+  "base_classes": "cn-combobox-chips",
+  "component": "ComboboxChips",
+  "component_name": "combobox",
+  "data_attrs": [],
+  "element": "ComboboxPrimitive.Chips"
+ },
+ "combobox-clear": {
+  "base_classes": "cn-combobox-clear",
+  "component": "ComboboxClear",
+  "component_name": "combobox",
+  "data_attrs": [],
+  "element": "ComboboxPrimitive.Clear"
+ },
+ "combobox-collection": {
+  "base_classes": "",
+  "component": "ComboboxCollection",
+  "component_name": "combobox",
+  "data_attrs": [],
+  "element": "ComboboxPrimitive.Collection"
+ },
+ "combobox-content": {
+  "base_classes": "cn-combobox-content cn-combobox-content-logical cn-menu-target cn-menu-translucent group/combobox-content relative max-h-(--available-height) w-(--anchor-width) max-w-(--available-width) min-w-[calc(var(--anchor-width)+--spacing(7))] origin-(--transform-origin) data-[chips=true]:min-w-(--anchor-width)",
+  "component": "ComboboxContent",
+  "component_name": "combobox",
+  "data_attrs": [
+   "data-chips"
+  ],
+  "element": "ComboboxPrimitive.Popup"
+ },
+ "combobox-empty": {
+  "base_classes": "cn-combobox-empty",
+  "component": "ComboboxEmpty",
+  "component_name": "combobox",
+  "data_attrs": [],
+  "element": "ComboboxPrimitive.Empty"
+ },
+ "combobox-group": {
+  "base_classes": "cn-combobox-group",
+  "component": "ComboboxGroup",
+  "component_name": "combobox",
+  "data_attrs": [],
+  "element": "ComboboxPrimitive.Group"
+ },
+ "combobox-item": {
+  "base_classes": "cn-combobox-item relative flex w-full cursor-default items-center outline-hidden select-none data-disabled:pointer-events-none data-disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0",
+  "component": "ComboboxItem",
+  "component_name": "combobox",
+  "data_attrs": [],
+  "element": "ComboboxPrimitive.Item"
+ },
+ "combobox-label": {
+  "base_classes": "cn-combobox-label",
+  "component": "ComboboxLabel",
+  "component_name": "combobox",
+  "data_attrs": [],
+  "element": "ComboboxPrimitive.GroupLabel"
+ },
+ "combobox-list": {
+  "base_classes": "cn-combobox-list overflow-y-auto overscroll-contain",
+  "component": "ComboboxList",
+  "component_name": "combobox",
+  "data_attrs": [],
+  "element": "ComboboxPrimitive.List"
+ },
+ "combobox-separator": {
+  "base_classes": "cn-combobox-separator",
+  "component": "ComboboxSeparator",
+  "component_name": "combobox",
+  "data_attrs": [],
+  "element": "ComboboxPrimitive.Separator"
+ },
+ "combobox-trigger": {
+  "base_classes": "cn-combobox-trigger",
+  "component": "ComboboxTrigger",
+  "component_name": "combobox",
+  "data_attrs": [],
+  "element": "ComboboxPrimitive.Trigger"
+ },
+ "combobox-value": {
+  "base_classes": "",
+  "component": "ComboboxValue",
+  "component_name": "combobox",
+  "data_attrs": [],
+  "element": "ComboboxPrimitive.Value"
+ },
+ "command": {
+  "base_classes": "cn-command flex size-full flex-col overflow-hidden",
+  "component": "Command",
+  "component_name": "command",
+  "data_attrs": [],
+  "element": "CommandPrimitive"
+ },
+ "command-dialog": {
+  "alts": [
+   {
+    "base_classes": "cn-command-dialog top-1/3 translate-y-0 overflow-hidden p-0",
+    "component": "CommandDialog",
+    "data_attrs": [],
+    "element": "DialogContent"
+   }
+  ],
+  "base_classes": "sr-only",
+  "component": "CommandDialog",
+  "component_name": "command",
+  "data_attrs": [],
+  "element": "DialogHeader"
+ },
+ "command-empty": {
+  "base_classes": "cn-command-empty",
+  "component": "CommandEmpty",
+  "component_name": "command",
+  "data_attrs": [],
+  "element": "CommandPrimitive.Empty"
+ },
+ "command-group": {
+  "base_classes": "cn-command-group",
+  "component": "CommandGroup",
+  "component_name": "command",
+  "data_attrs": [],
+  "element": "CommandPrimitive.Group"
+ },
+ "command-input": {
+  "base_classes": "cn-command-input outline-hidden disabled:cursor-not-allowed disabled:opacity-50",
+  "component": "CommandInput",
+  "component_name": "command",
+  "data_attrs": [],
+  "element": "CommandPrimitive.Input"
+ },
+ "command-input-wrapper": {
+  "base_classes": "cn-command-input-wrapper",
+  "component": "CommandInput",
+  "component_name": "command",
+  "data_attrs": [],
+  "element": "div"
+ },
+ "command-item": {
+  "base_classes": "cn-command-item group/command-item data-[disabled=true]:pointer-events-none data-[disabled=true]:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0",
+  "component": "CommandItem",
+  "component_name": "command",
+  "data_attrs": [],
+  "element": "CommandPrimitive.Item"
+ },
+ "command-list": {
+  "base_classes": "cn-command-list overflow-x-hidden overflow-y-auto",
+  "component": "CommandList",
+  "component_name": "command",
+  "data_attrs": [],
+  "element": "CommandPrimitive.List"
+ },
+ "command-separator": {
+  "base_classes": "cn-command-separator",
+  "component": "CommandSeparator",
+  "component_name": "command",
+  "data_attrs": [],
+  "element": "CommandPrimitive.Separator"
+ },
+ "command-shortcut": {
+  "base_classes": "cn-command-shortcut",
+  "component": "CommandShortcut",
+  "component_name": "command",
+  "data_attrs": [],
+  "element": "span"
+ },
+ "context-menu": {
+  "base_classes": "",
+  "component": "ContextMenu",
+  "component_name": "context-menu",
+  "data_attrs": [],
+  "element": "ContextMenuPrimitive.Root"
+ },
+ "context-menu-checkbox-item": {
+  "base_classes": "cn-context-menu-checkbox-item relative flex cursor-default items-center outline-hidden select-none data-disabled:pointer-events-none data-disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0",
+  "component": "ContextMenuCheckboxItem",
+  "component_name": "context-menu",
+  "data_attrs": [
+   "data-inset"
+  ],
+  "element": "ContextMenuPrimitive.CheckboxItem"
+ },
+ "context-menu-checkbox-item-indicator": {
+  "base_classes": "cn-context-menu-item-indicator pointer-events-none",
+  "component": "ContextMenuCheckboxItem",
+  "component_name": "context-menu",
+  "data_attrs": [],
+  "element": "span",
+  "no_slot": true
+ },
+ "context-menu-content": {
+  "base_classes": "cn-context-menu-content cn-menu-target cn-menu-translucent z-50 max-h-(--radix-context-menu-content-available-height) origin-(--radix-context-menu-content-transform-origin) overflow-x-hidden overflow-y-auto",
+  "component": "ContextMenuContent",
+  "component_name": "context-menu",
+  "data_attrs": [],
+  "element": "ContextMenuPrimitive.Content"
+ },
+ "context-menu-group": {
+  "base_classes": "",
+  "component": "ContextMenuGroup",
+  "component_name": "context-menu",
+  "data_attrs": [],
+  "element": "ContextMenuPrimitive.Group"
+ },
+ "context-menu-item": {
+  "base_classes": "cn-context-menu-item group/context-menu-item relative flex cursor-default items-center outline-hidden select-none data-disabled:pointer-events-none data-disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0",
+  "component": "ContextMenuItem",
+  "component_name": "context-menu",
+  "data_attrs": [
+   "data-inset",
+   "data-variant"
+  ],
+  "element": "ContextMenuPrimitive.Item"
+ },
+ "context-menu-label": {
+  "base_classes": "cn-context-menu-label",
+  "component": "ContextMenuLabel",
+  "component_name": "context-menu",
+  "data_attrs": [
+   "data-inset"
+  ],
+  "element": "ContextMenuPrimitive.Label"
+ },
+ "context-menu-portal": {
+  "base_classes": "",
+  "component": "ContextMenuPortal",
+  "component_name": "context-menu",
+  "data_attrs": [],
+  "element": "ContextMenuPrimitive.Portal"
+ },
+ "context-menu-radio-group": {
+  "base_classes": "",
+  "component": "ContextMenuRadioGroup",
+  "component_name": "context-menu",
+  "data_attrs": [],
+  "element": "ContextMenuPrimitive.RadioGroup"
+ },
+ "context-menu-radio-item": {
+  "base_classes": "cn-context-menu-radio-item relative flex cursor-default items-center outline-hidden select-none data-disabled:pointer-events-none data-disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0",
+  "component": "ContextMenuRadioItem",
+  "component_name": "context-menu",
+  "data_attrs": [
+   "data-inset"
+  ],
+  "element": "ContextMenuPrimitive.RadioItem"
+ },
+ "context-menu-radio-item-indicator": {
+  "base_classes": "cn-context-menu-item-indicator pointer-events-none",
+  "component": "ContextMenuRadioItem",
+  "component_name": "context-menu",
+  "data_attrs": [],
+  "element": "span",
+  "no_slot": true
+ },
+ "context-menu-separator": {
+  "base_classes": "cn-context-menu-separator",
+  "component": "ContextMenuSeparator",
+  "component_name": "context-menu",
+  "data_attrs": [],
+  "element": "ContextMenuPrimitive.Separator"
+ },
+ "context-menu-shortcut": {
+  "base_classes": "cn-context-menu-shortcut",
+  "component": "ContextMenuShortcut",
+  "component_name": "context-menu",
+  "data_attrs": [],
+  "element": "span"
+ },
+ "context-menu-sub": {
+  "base_classes": "",
+  "component": "ContextMenuSub",
+  "component_name": "context-menu",
+  "data_attrs": [],
+  "element": "ContextMenuPrimitive.Sub"
+ },
+ "context-menu-sub-content": {
+  "base_classes": "cn-context-menu-sub-content cn-menu-target cn-menu-translucent z-50 origin-(--radix-context-menu-content-transform-origin) overflow-hidden",
+  "component": "ContextMenuSubContent",
+  "component_name": "context-menu",
+  "data_attrs": [],
+  "element": "ContextMenuPrimitive.SubContent"
+ },
+ "context-menu-sub-trigger": {
+  "base_classes": "cn-context-menu-sub-trigger flex cursor-default items-center outline-hidden select-none [&_svg]:pointer-events-none [&_svg]:shrink-0",
+  "component": "ContextMenuSubTrigger",
+  "component_name": "context-menu",
+  "data_attrs": [
+   "data-inset"
+  ],
+  "element": "ContextMenuPrimitive.SubTrigger"
+ },
+ "context-menu-trigger": {
+  "base_classes": "cn-context-menu-trigger select-none",
+  "component": "ContextMenuTrigger",
+  "component_name": "context-menu",
+  "data_attrs": [],
+  "element": "ContextMenuPrimitive.Trigger"
+ },
+ "dialog": {
+  "base_classes": "",
+  "component": "Dialog",
+  "component_name": "dialog",
+  "data_attrs": [],
+  "element": "DialogPrimitive.Root"
+ },
+ "dialog-close": {
+  "base_classes": "",
+  "component": "DialogClose",
+  "component_name": "dialog",
+  "data_attrs": [],
+  "element": "DialogPrimitive.Close"
+ },
+ "dialog-content": {
+  "base_classes": "cn-dialog-content fixed top-1/2 left-1/2 z-50 w-full -translate-x-1/2 -translate-y-1/2 outline-none",
+  "component": "DialogContent",
+  "component_name": "dialog",
+  "data_attrs": [],
+  "element": "DialogPrimitive.Content"
+ },
+ "dialog-description": {
+  "base_classes": "cn-dialog-description",
+  "component": "DialogDescription",
+  "component_name": "dialog",
+  "data_attrs": [],
+  "element": "DialogPrimitive.Description"
+ },
+ "dialog-footer": {
+  "base_classes": "cn-dialog-footer flex flex-col-reverse gap-2 sm:flex-row sm:justify-end",
+  "component": "DialogFooter",
+  "component_name": "dialog",
+  "data_attrs": [],
+  "element": "div"
+ },
+ "dialog-header": {
+  "base_classes": "cn-dialog-header flex flex-col",
+  "component": "DialogHeader",
+  "component_name": "dialog",
+  "data_attrs": [],
+  "element": "div"
+ },
+ "dialog-overlay": {
+  "base_classes": "cn-dialog-overlay fixed inset-0 isolate z-50",
+  "component": "DialogOverlay",
+  "component_name": "dialog",
+  "data_attrs": [],
+  "element": "DialogPrimitive.Overlay"
+ },
+ "dialog-portal": {
+  "base_classes": "",
+  "component": "DialogPortal",
+  "component_name": "dialog",
+  "data_attrs": [],
+  "element": "DialogPrimitive.Portal"
+ },
+ "dialog-title": {
+  "base_classes": "cn-dialog-title cn-font-heading",
+  "component": "DialogTitle",
+  "component_name": "dialog",
+  "data_attrs": [],
+  "element": "DialogPrimitive.Title"
+ },
+ "dialog-trigger": {
+  "base_classes": "",
+  "component": "DialogTrigger",
+  "component_name": "dialog",
+  "data_attrs": [],
+  "element": "DialogPrimitive.Trigger"
+ },
+ "direction": {
+  "base_classes": "",
+  "component": "DirectionProvider",
+  "component_name": "direction",
+  "data_attrs": [],
+  "element": "div"
+ },
+ "drawer": {
+  "base_classes": "",
+  "component": "Drawer",
+  "component_name": "drawer",
+  "data_attrs": [],
+  "element": "DrawerPrimitive.Root"
+ },
+ "drawer-close": {
+  "base_classes": "",
+  "component": "DrawerClose",
+  "component_name": "drawer",
+  "data_attrs": [],
+  "element": "DrawerPrimitive.Close"
+ },
+ "drawer-content": {
+  "base_classes": "cn-drawer-content group/drawer-content fixed z-50 data-[vaul-drawer-direction=bottom]:inset-x-0 data-[vaul-drawer-direction=bottom]:bottom-0 data-[vaul-drawer-direction=bottom]:mt-24 data-[vaul-drawer-direction=bottom]:max-h-[80vh] data-[vaul-drawer-direction=left]:inset-y-0 data-[vaul-drawer-direction=left]:left-0 data-[vaul-drawer-direction=left]:w-3/4 data-[vaul-drawer-direction=right]:inset-y-0 data-[vaul-drawer-direction=right]:right-0 data-[vaul-drawer-direction=right]:w-3/4 data-[vaul-drawer-direction=top]:inset-x-0 data-[vaul-drawer-direction=top]:top-0 data-[vaul-drawer-direction=top]:mb-24 data-[vaul-drawer-direction=top]:max-h-[80vh] data-[vaul-drawer-direction=left]:sm:max-w-sm data-[vaul-drawer-direction=right]:sm:max-w-sm",
+  "component": "DrawerContent",
+  "component_name": "drawer",
+  "data_attrs": [],
+  "element": "DrawerPrimitive.Content"
+ },
+ "drawer-description": {
+  "base_classes": "cn-drawer-description",
+  "component": "DrawerDescription",
+  "component_name": "drawer",
+  "data_attrs": [],
+  "element": "DrawerPrimitive.Description"
+ },
+ "drawer-footer": {
+  "base_classes": "cn-drawer-footer mt-auto flex flex-col",
+  "component": "DrawerFooter",
+  "component_name": "drawer",
+  "data_attrs": [],
+  "element": "div"
+ },
+ "drawer-handle": {
+  "base_classes": "cn-drawer-handle",
+  "component": "DrawerContent",
+  "component_name": "drawer",
+  "data_attrs": [],
+  "element": "div",
+  "no_slot": true
+ },
+ "drawer-header": {
+  "base_classes": "cn-drawer-header flex flex-col group-data-[vaul-drawer-direction=bottom]/drawer-content:text-center group-data-[vaul-drawer-direction=top]/drawer-content:text-center",
+  "component": "DrawerHeader",
+  "component_name": "drawer",
+  "data_attrs": [],
+  "element": "div"
+ },
+ "drawer-overlay": {
+  "base_classes": "cn-drawer-overlay fixed inset-0 z-50 data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0",
+  "component": "DrawerOverlay",
+  "component_name": "drawer",
+  "data_attrs": [],
+  "element": "DrawerPrimitive.Overlay"
+ },
+ "drawer-portal": {
+  "base_classes": "",
+  "component": "DrawerPortal",
+  "component_name": "drawer",
+  "data_attrs": [],
+  "element": "DrawerPrimitive.Portal"
+ },
+ "drawer-title": {
+  "base_classes": "cn-drawer-title cn-font-heading",
+  "component": "DrawerTitle",
+  "component_name": "drawer",
+  "data_attrs": [],
+  "element": "DrawerPrimitive.Title"
+ },
+ "drawer-trigger": {
+  "base_classes": "",
+  "component": "DrawerTrigger",
+  "component_name": "drawer",
+  "data_attrs": [],
+  "element": "DrawerPrimitive.Trigger"
+ },
+ "dropdown-menu": {
+  "base_classes": "",
+  "component": "DropdownMenu",
+  "component_name": "dropdown-menu",
+  "data_attrs": [],
+  "element": "DropdownMenuPrimitive.Root"
+ },
+ "dropdown-menu-checkbox-item": {
+  "base_classes": "cn-dropdown-menu-checkbox-item relative flex cursor-default items-center outline-hidden select-none data-disabled:pointer-events-none data-disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0",
+  "component": "DropdownMenuCheckboxItem",
+  "component_name": "dropdown-menu",
+  "data_attrs": [
+   "data-inset"
+  ],
+  "element": "DropdownMenuPrimitive.CheckboxItem"
+ },
+ "dropdown-menu-checkbox-item-indicator": {
+  "base_classes": "cn-dropdown-menu-item-indicator pointer-events-none",
+  "component": "DropdownMenuCheckboxItem",
+  "component_name": "dropdown-menu",
+  "data_attrs": [],
+  "element": "span"
+ },
+ "dropdown-menu-content": {
+  "base_classes": "cn-dropdown-menu-content cn-menu-target cn-menu-translucent z-50 max-h-(--radix-dropdown-menu-content-available-height) w-(--radix-dropdown-menu-trigger-width) origin-(--radix-dropdown-menu-content-transform-origin) overflow-x-hidden overflow-y-auto data-[state=closed]:overflow-hidden",
+  "component": "DropdownMenuContent",
+  "component_name": "dropdown-menu",
+  "data_attrs": [],
+  "element": "DropdownMenuPrimitive.Content"
+ },
+ "dropdown-menu-group": {
+  "base_classes": "",
+  "component": "DropdownMenuGroup",
+  "component_name": "dropdown-menu",
+  "data_attrs": [],
+  "element": "DropdownMenuPrimitive.Group"
+ },
+ "dropdown-menu-item": {
+  "base_classes": "cn-dropdown-menu-item group/dropdown-menu-item relative flex cursor-default items-center outline-hidden select-none data-disabled:pointer-events-none data-disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0",
+  "component": "DropdownMenuItem",
+  "component_name": "dropdown-menu",
+  "data_attrs": [
+   "data-inset",
+   "data-variant"
+  ],
+  "element": "DropdownMenuPrimitive.Item"
+ },
+ "dropdown-menu-label": {
+  "base_classes": "cn-dropdown-menu-label",
+  "component": "DropdownMenuLabel",
+  "component_name": "dropdown-menu",
+  "data_attrs": [
+   "data-inset"
+  ],
+  "element": "DropdownMenuPrimitive.Label"
+ },
+ "dropdown-menu-portal": {
+  "base_classes": "",
+  "component": "DropdownMenuPortal",
+  "component_name": "dropdown-menu",
+  "data_attrs": [],
+  "element": "DropdownMenuPrimitive.Portal"
+ },
+ "dropdown-menu-radio-group": {
+  "base_classes": "",
+  "component": "DropdownMenuRadioGroup",
+  "component_name": "dropdown-menu",
+  "data_attrs": [],
+  "element": "DropdownMenuPrimitive.RadioGroup"
+ },
+ "dropdown-menu-radio-item": {
+  "base_classes": "cn-dropdown-menu-radio-item relative flex cursor-default items-center outline-hidden select-none data-disabled:pointer-events-none data-disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0",
+  "component": "DropdownMenuRadioItem",
+  "component_name": "dropdown-menu",
+  "data_attrs": [
+   "data-inset"
+  ],
+  "element": "DropdownMenuPrimitive.RadioItem"
+ },
+ "dropdown-menu-radio-item-indicator": {
+  "base_classes": "cn-dropdown-menu-item-indicator pointer-events-none",
+  "component": "DropdownMenuRadioItem",
+  "component_name": "dropdown-menu",
+  "data_attrs": [],
+  "element": "span"
+ },
+ "dropdown-menu-separator": {
+  "base_classes": "cn-dropdown-menu-separator",
+  "component": "DropdownMenuSeparator",
+  "component_name": "dropdown-menu",
+  "data_attrs": [],
+  "element": "DropdownMenuPrimitive.Separator"
+ },
+ "dropdown-menu-shortcut": {
+  "base_classes": "cn-dropdown-menu-shortcut",
+  "component": "DropdownMenuShortcut",
+  "component_name": "dropdown-menu",
+  "data_attrs": [],
+  "element": "span"
+ },
+ "dropdown-menu-sub": {
+  "base_classes": "",
+  "component": "DropdownMenuSub",
+  "component_name": "dropdown-menu",
+  "data_attrs": [],
+  "element": "DropdownMenuPrimitive.Sub"
+ },
+ "dropdown-menu-sub-content": {
+  "base_classes": "cn-dropdown-menu-sub-content cn-menu-target cn-menu-translucent z-50 origin-(--radix-dropdown-menu-content-transform-origin) overflow-hidden",
+  "component": "DropdownMenuSubContent",
+  "component_name": "dropdown-menu",
+  "data_attrs": [],
+  "element": "DropdownMenuPrimitive.SubContent"
+ },
+ "dropdown-menu-sub-trigger": {
+  "base_classes": "cn-dropdown-menu-sub-trigger flex cursor-default items-center outline-hidden select-none [&_svg]:pointer-events-none [&_svg]:shrink-0",
+  "component": "DropdownMenuSubTrigger",
+  "component_name": "dropdown-menu",
+  "data_attrs": [
+   "data-inset"
+  ],
+  "element": "DropdownMenuPrimitive.SubTrigger"
+ },
+ "dropdown-menu-trigger": {
+  "base_classes": "",
+  "component": "DropdownMenuTrigger",
+  "component_name": "dropdown-menu",
+  "data_attrs": [],
+  "element": "DropdownMenuPrimitive.Trigger"
+ },
+ "empty": {
+  "base_classes": "cn-empty flex w-full min-w-0 flex-1 flex-col items-center justify-center text-center text-balance",
+  "component": "Empty",
+  "component_name": "empty",
+  "data_attrs": [],
+  "element": "div"
+ },
+ "empty-content": {
+  "base_classes": "cn-empty-content flex w-full max-w-sm min-w-0 flex-col items-center text-balance",
+  "component": "EmptyContent",
+  "component_name": "empty",
+  "data_attrs": [],
+  "element": "div"
+ },
+ "empty-description": {
+  "base_classes": "cn-empty-description text-muted-foreground [&>a]:underline [&>a]:underline-offset-4 [&>a:hover]:text-primary",
+  "component": "EmptyDescription",
+  "component_name": "empty",
+  "data_attrs": [],
+  "element": "div"
+ },
+ "empty-header": {
+  "base_classes": "cn-empty-header flex max-w-sm flex-col items-center",
+  "component": "EmptyHeader",
+  "component_name": "empty",
+  "data_attrs": [],
+  "element": "div"
+ },
+ "empty-icon": {
+  "base_classes": "",
+  "component": "EmptyMedia",
+  "component_name": "empty",
+  "cva": "emptyMediaVariants",
+  "data_attrs": [
+   "data-variant"
+  ],
+  "element": "div",
+  "variants": {
+   "base": "cn-empty-media flex shrink-0 items-center justify-center [&_svg]:pointer-events-none [&_svg]:shrink-0",
+   "defaults": {
+    "variant": "default"
+   },
+   "variants": {
+    "variant": {
+     "default": "cn-empty-media-default",
+     "icon": "cn-empty-media-icon"
+    }
+   }
+  }
+ },
+ "empty-title": {
+  "base_classes": "cn-empty-title cn-font-heading",
+  "component": "EmptyTitle",
+  "component_name": "empty",
+  "data_attrs": [],
+  "element": "div"
+ },
+ "field": {
+  "base_classes": "",
+  "component": "Field",
+  "component_name": "field",
+  "cva": "fieldVariants",
+  "data_attrs": [
+   "data-orientation"
+  ],
+  "element": "div",
+  "variants": {
+   "base": "cn-field group/field flex w-full",
+   "defaults": {
+    "orientation": "vertical"
+   },
+   "variants": {
+    "orientation": {
+     "horizontal": "cn-field-orientation-horizontal flex-row items-center has-[>[data-slot=field-content]]:items-start *:data-[slot=field-label]:flex-auto has-[>[data-slot=field-content]]:[&>[role=checkbox],[role=radio]]:mt-px",
+     "responsive": "cn-field-orientation-responsive flex-col *:w-full @md/field-group:flex-row @md/field-group:items-center @md/field-group:*:w-auto @md/field-group:has-[>[data-slot=field-content]]:items-start @md/field-group:*:data-[slot=field-label]:flex-auto [&>.sr-only]:w-auto @md/field-group:has-[>[data-slot=field-content]]:[&>[role=checkbox],[role=radio]]:mt-px",
+     "vertical": "cn-field-orientation-vertical flex-col *:w-full [&>.sr-only]:w-auto"
+    }
+   }
+  }
+ },
+ "field-content": {
+  "base_classes": "cn-field-content group/field-content flex flex-1 flex-col leading-snug",
+  "component": "FieldContent",
+  "component_name": "field",
+  "data_attrs": [],
+  "element": "div"
+ },
+ "field-description": {
+  "base_classes": "cn-field-description leading-normal font-normal group-has-data-horizontal/field:text-balance last:mt-0 nth-last-2:-mt-1 [&>a]:underline [&>a]:underline-offset-4 [&>a:hover]:text-primary",
+  "component": "FieldDescription",
+  "component_name": "field",
+  "data_attrs": [],
+  "element": "p"
+ },
+ "field-error": {
+  "base_classes": "cn-field-error font-normal",
+  "component": "FieldError",
+  "component_name": "field",
+  "data_attrs": [],
+  "element": "div"
+ },
+ "field-group": {
+  "base_classes": "cn-field-group group/field-group @container/field-group flex w-full flex-col",
+  "component": "FieldGroup",
+  "component_name": "field",
+  "data_attrs": [],
+  "element": "div"
+ },
+ "field-label": {
+  "alts": [
+   {
+    "base_classes": "cn-field-title flex w-fit items-center",
+    "component": "FieldTitle",
+    "data_attrs": [],
+    "element": "div"
+   }
+  ],
+  "base_classes": "cn-field-label group/field-label peer/field-label flex w-fit has-[>[data-slot=field]]:w-full has-[>[data-slot=field]]:flex-col",
+  "component": "FieldLabel",
+  "component_name": "field",
+  "data_attrs": [],
+  "element": "Label"
+ },
+ "field-legend": {
+  "base_classes": "cn-field-legend",
+  "component": "FieldLegend",
+  "component_name": "field",
+  "data_attrs": [
+   "data-variant"
+  ],
+  "element": "legend"
+ },
+ "field-separator": {
+  "base_classes": "cn-field-separator relative",
+  "component": "FieldSeparator",
+  "component_name": "field",
+  "data_attrs": [
+   "data-content"
+  ],
+  "element": "div"
+ },
+ "field-separator-content": {
+  "base_classes": "cn-field-separator-content relative mx-auto block w-fit bg-background",
+  "component": "FieldSeparator",
+  "component_name": "field",
+  "data_attrs": [],
+  "element": "span"
+ },
+ "field-set": {
+  "base_classes": "cn-field-set flex flex-col",
+  "component": "FieldSet",
+  "component_name": "field",
+  "data_attrs": [],
+  "element": "fieldset"
+ },
+ "form": {
+  "base_classes": "",
+  "component": "Form",
+  "component_name": "form",
+  "data_attrs": [],
+  "element": "FormProvider"
+ },
+ "form-control": {
+  "base_classes": "",
+  "component": "FormControl",
+  "component_name": "form",
+  "data_attrs": [],
+  "element": "Slot.Root"
+ },
+ "form-description": {
+  "base_classes": "text-sm text-muted-foreground",
+  "component": "FormDescription",
+  "component_name": "form",
+  "data_attrs": [],
+  "element": "p"
+ },
+ "form-field": {
+  "base_classes": "",
+  "component": "FormField",
+  "component_name": "form",
+  "data_attrs": [],
+  "element": "Controller"
+ },
+ "form-item": {
+  "base_classes": "grid gap-2",
+  "component": "FormItem",
+  "component_name": "form",
+  "data_attrs": [],
+  "element": "div"
+ },
+ "form-label": {
+  "base_classes": "data-[error=true]:text-destructive",
+  "component": "FormLabel",
+  "component_name": "form",
+  "data_attrs": [
+   "data-error"
+  ],
+  "element": "Label"
+ },
+ "form-message": {
+  "base_classes": "text-sm text-destructive",
+  "component": "FormMessage",
+  "component_name": "form",
+  "data_attrs": [],
+  "element": "p"
+ },
+ "hover-card": {
+  "base_classes": "",
+  "component": "HoverCard",
+  "component_name": "hover-card",
+  "data_attrs": [],
+  "element": "HoverCardPrimitive.Root"
+ },
+ "hover-card-content": {
+  "base_classes": "cn-hover-card-content z-50 origin-(--radix-hover-card-content-transform-origin) outline-hidden",
+  "component": "HoverCardContent",
+  "component_name": "hover-card",
+  "data_attrs": [],
+  "element": "HoverCardPrimitive.Content"
+ },
+ "hover-card-portal": {
+  "base_classes": "",
+  "component": "HoverCardContent",
+  "component_name": "hover-card",
+  "data_attrs": [],
+  "element": "HoverCardPrimitive.Portal"
+ },
+ "hover-card-trigger": {
+  "base_classes": "",
+  "component": "HoverCardTrigger",
+  "component_name": "hover-card",
+  "data_attrs": [],
+  "element": "HoverCardPrimitive.Trigger"
+ },
+ "input": {
+  "base_classes": "cn-input w-full min-w-0 outline-none file:inline-flex file:border-0 file:bg-transparent file:text-foreground placeholder:text-muted-foreground disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50",
+  "component": "Input",
+  "component_name": "input",
+  "data_attrs": [],
+  "element": "input"
+ },
+ "input-group": {
+  "base_classes": "group/input-group cn-input-group relative flex w-full min-w-0 items-center outline-none has-[>textarea]:h-auto",
+  "component": "InputGroup",
+  "component_name": "input-group",
+  "data_attrs": [],
+  "element": "div"
+ },
+ "input-group-addon": {
+  "base_classes": "",
+  "component": "InputGroupAddon",
+  "component_name": "input-group",
+  "cva": "inputGroupAddonVariants",
+  "data_attrs": [
+   "data-align"
+  ],
+  "element": "div",
+  "variants": {
+   "base": "cn-input-group-addon flex cursor-text items-center justify-center select-none",
+   "defaults": {
+    "align": "inline-start"
+   },
+   "variants": {
+    "align": {
+     "block-end": "cn-input-group-addon-align-block-end order-last w-full justify-start",
+     "block-start": "cn-input-group-addon-align-block-start order-first w-full justify-start",
+     "inline-end": "cn-input-group-addon-align-inline-end order-last",
+     "inline-start": "cn-input-group-addon-align-inline-start order-first"
+    }
+   }
+  }
+ },
+ "input-group-button": {
+  "base_classes": "",
+  "component": "InputGroupButton",
+  "component_name": "input-group",
+  "cva": "inputGroupButtonVariants",
+  "data_attrs": [
+   "data-size"
+  ],
+  "element": "Button",
+  "variants": {
+   "base": "cn-input-group-button flex items-center shadow-none",
+   "defaults": {
+    "size": "xs"
+   },
+   "variants": {
+    "size": {
+     "icon-sm": "cn-input-group-button-size-icon-sm",
+     "icon-xs": "cn-input-group-button-size-icon-xs",
+     "sm": "cn-input-group-button-size-sm",
+     "xs": "cn-input-group-button-size-xs"
+    }
+   }
+  }
+ },
+ "input-group-control": {
+  "alts": [
+   {
+    "base_classes": "cn-input-group-textarea flex-1 resize-none",
+    "component": "InputGroupTextarea",
+    "data_attrs": [],
+    "element": "Textarea"
+   }
+  ],
+  "base_classes": "cn-input-group-input flex-1",
+  "component": "InputGroupInput",
+  "component_name": "input-group",
+  "data_attrs": [],
+  "element": "Input"
+ },
+ "input-otp": {
+  "base_classes": "cn-input-otp-input disabled:cursor-not-allowed",
+  "component": "InputOTP",
+  "component_name": "input-otp",
+  "data_attrs": [],
+  "element": "OTPInput"
+ },
+ "input-otp-group": {
+  "base_classes": "cn-input-otp-group flex items-center",
+  "component": "InputOTPGroup",
+  "component_name": "input-otp",
+  "data_attrs": [],
+  "element": "div"
+ },
+ "input-otp-separator": {
+  "base_classes": "cn-input-otp-separator flex items-center",
+  "component": "InputOTPSeparator",
+  "component_name": "input-otp",
+  "data_attrs": [],
+  "element": "div"
+ },
+ "input-otp-slot": {
+  "base_classes": "cn-input-otp-slot relative flex items-center justify-center data-[active=true]:z-10",
+  "component": "InputOTPSlot",
+  "component_name": "input-otp",
+  "data_attrs": [
+   "data-active"
+  ],
+  "element": "div"
+ },
+ "item": {
+  "base_classes": "",
+  "component": "Item",
+  "component_name": "item",
+  "cva": "itemVariants",
+  "data_attrs": [
+   "data-size",
+   "data-variant"
+  ],
+  "element": "Comp",
+  "variants": {
+   "base": "cn-item group/item flex w-full flex-wrap items-center transition-colors duration-100 outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 [a]:transition-colors",
+   "defaults": {
+    "size": "default",
+    "variant": "default"
+   },
+   "variants": {
+    "size": {
+     "default": "cn-item-size-default",
+     "sm": "cn-item-size-sm",
+     "xs": "cn-item-size-xs"
+    },
+    "variant": {
+     "default": "cn-item-variant-default",
+     "muted": "cn-item-variant-muted",
+     "outline": "cn-item-variant-outline"
+    }
+   }
+  }
+ },
+ "item-actions": {
+  "base_classes": "cn-item-actions flex items-center",
+  "component": "ItemActions",
+  "component_name": "item",
+  "data_attrs": [],
+  "element": "div"
+ },
+ "item-content": {
+  "base_classes": "cn-item-content flex flex-1 flex-col [&+[data-slot=item-content]]:flex-none",
+  "component": "ItemContent",
+  "component_name": "item",
+  "data_attrs": [],
+  "element": "div"
+ },
+ "item-description": {
+  "base_classes": "cn-item-description line-clamp-2 font-normal [&>a]:underline [&>a]:underline-offset-4 [&>a:hover]:text-primary",
+  "component": "ItemDescription",
+  "component_name": "item",
+  "data_attrs": [],
+  "element": "p"
+ },
+ "item-footer": {
+  "base_classes": "cn-item-footer flex basis-full items-center justify-between",
+  "component": "ItemFooter",
+  "component_name": "item",
+  "data_attrs": [],
+  "element": "div"
+ },
+ "item-group": {
+  "base_classes": "cn-item-group group/item-group flex w-full flex-col",
+  "component": "ItemGroup",
+  "component_name": "item",
+  "data_attrs": [],
+  "element": "div"
+ },
+ "item-header": {
+  "base_classes": "cn-item-header flex basis-full items-center justify-between",
+  "component": "ItemHeader",
+  "component_name": "item",
+  "data_attrs": [],
+  "element": "div"
+ },
+ "item-media": {
+  "base_classes": "",
+  "component": "ItemMedia",
+  "component_name": "item",
+  "cva": "itemMediaVariants",
+  "data_attrs": [
+   "data-variant"
+  ],
+  "element": "div",
+  "variants": {
+   "base": "cn-item-media flex shrink-0 items-center justify-center [&_svg]:pointer-events-none",
+   "defaults": {
+    "variant": "default"
+   },
+   "variants": {
+    "variant": {
+     "default": "cn-item-media-variant-default",
+     "icon": "cn-item-media-variant-icon",
+     "image": "cn-item-media-variant-image"
+    }
+   }
+  }
+ },
+ "item-separator": {
+  "base_classes": "cn-item-separator",
+  "component": "ItemSeparator",
+  "component_name": "item",
+  "data_attrs": [],
+  "element": "Separator"
+ },
+ "item-title": {
+  "base_classes": "cn-item-title line-clamp-1 flex w-fit items-center",
+  "component": "ItemTitle",
+  "component_name": "item",
+  "data_attrs": [],
+  "element": "div"
+ },
+ "kbd": {
+  "base_classes": "cn-kbd pointer-events-none inline-flex items-center justify-center select-none",
+  "component": "Kbd",
+  "component_name": "kbd",
+  "data_attrs": [],
+  "element": "kbd"
+ },
+ "kbd-group": {
+  "base_classes": "cn-kbd-group inline-flex items-center",
+  "component": "KbdGroup",
+  "component_name": "kbd",
+  "data_attrs": [],
+  "element": "kbd"
+ },
+ "label": {
+  "base_classes": "cn-label flex items-center select-none group-data-[disabled=true]:pointer-events-none peer-disabled:cursor-not-allowed",
+  "component": "Label",
+  "component_name": "label",
+  "data_attrs": [],
+  "element": "LabelPrimitive.Root"
+ },
+ "marker": {
+  "base_classes": "",
+  "component": "Marker",
+  "component_name": "marker",
+  "cva": "markerVariants",
+  "data_attrs": [
+   "data-variant"
+  ],
+  "element": "Comp",
+  "variants": {
+   "base": "cn-marker group/marker relative flex w-full items-center",
+   "defaults": {},
+   "variants": {
+    "variant": {
+     "border": "cn-marker-variant-border",
+     "default": "cn-marker-variant-default",
+     "separator": "cn-marker-variant-separator"
+    }
+   }
+  }
+ },
+ "marker-content": {
+  "base_classes": "cn-marker-content min-w-0 wrap-break-word",
+  "component": "MarkerContent",
+  "component_name": "marker",
+  "data_attrs": [],
+  "element": "span"
+ },
+ "marker-icon": {
+  "base_classes": "cn-marker-icon shrink-0",
+  "component": "MarkerIcon",
+  "component_name": "marker",
+  "data_attrs": [],
+  "element": "span"
+ },
+ "menubar": {
+  "base_classes": "cn-menubar flex items-center",
+  "component": "Menubar",
+  "component_name": "menubar",
+  "data_attrs": [],
+  "element": "MenubarPrimitive.Root"
+ },
+ "menubar-checkbox-item": {
+  "base_classes": "cn-menubar-checkbox-item relative flex cursor-default items-center outline-hidden select-none data-disabled:pointer-events-none [&_svg]:pointer-events-none [&_svg]:shrink-0",
+  "component": "MenubarCheckboxItem",
+  "component_name": "menubar",
+  "data_attrs": [
+   "data-inset"
+  ],
+  "element": "MenubarPrimitive.CheckboxItem"
+ },
+ "menubar-checkbox-item-indicator": {
+  "base_classes": "cn-menubar-checkbox-item-indicator pointer-events-none absolute flex items-center justify-center",
+  "component": "MenubarCheckboxItem",
+  "component_name": "menubar",
+  "data_attrs": [],
+  "element": "span",
+  "no_slot": true
+ },
+ "menubar-content": {
+  "base_classes": "cn-menubar-content cn-menu-target cn-menu-translucent z-50 origin-(--radix-menubar-content-transform-origin) overflow-hidden",
+  "component": "MenubarContent",
+  "component_name": "menubar",
+  "data_attrs": [],
+  "element": "MenubarPrimitive.Content"
+ },
+ "menubar-group": {
+  "base_classes": "",
+  "component": "MenubarGroup",
+  "component_name": "menubar",
+  "data_attrs": [],
+  "element": "MenubarPrimitive.Group"
+ },
+ "menubar-item": {
+  "base_classes": "cn-menubar-item group/menubar-item relative flex cursor-default items-center outline-hidden select-none data-disabled:pointer-events-none [&_svg]:pointer-events-none [&_svg]:shrink-0",
+  "component": "MenubarItem",
+  "component_name": "menubar",
+  "data_attrs": [
+   "data-inset",
+   "data-variant"
+  ],
+  "element": "MenubarPrimitive.Item"
+ },
+ "menubar-label": {
+  "base_classes": "cn-menubar-label",
+  "component": "MenubarLabel",
+  "component_name": "menubar",
+  "data_attrs": [
+   "data-inset"
+  ],
+  "element": "MenubarPrimitive.Label"
+ },
+ "menubar-menu": {
+  "base_classes": "",
+  "component": "MenubarMenu",
+  "component_name": "menubar",
+  "data_attrs": [],
+  "element": "MenubarPrimitive.Menu"
+ },
+ "menubar-portal": {
+  "base_classes": "",
+  "component": "MenubarPortal",
+  "component_name": "menubar",
+  "data_attrs": [],
+  "element": "MenubarPrimitive.Portal"
+ },
+ "menubar-radio-group": {
+  "base_classes": "",
+  "component": "MenubarRadioGroup",
+  "component_name": "menubar",
+  "data_attrs": [],
+  "element": "MenubarPrimitive.RadioGroup"
+ },
+ "menubar-radio-item": {
+  "base_classes": "cn-menubar-radio-item relative flex cursor-default items-center outline-hidden select-none data-disabled:pointer-events-none [&_svg]:pointer-events-none [&_svg]:shrink-0",
+  "component": "MenubarRadioItem",
+  "component_name": "menubar",
+  "data_attrs": [
+   "data-inset"
+  ],
+  "element": "MenubarPrimitive.RadioItem"
+ },
+ "menubar-radio-item-indicator": {
+  "base_classes": "cn-menubar-radio-item-indicator pointer-events-none absolute flex items-center justify-center",
+  "component": "MenubarRadioItem",
+  "component_name": "menubar",
+  "data_attrs": [],
+  "element": "span",
+  "no_slot": true
+ },
+ "menubar-separator": {
+  "base_classes": "cn-menubar-separator -mx-1 my-1 h-px",
+  "component": "MenubarSeparator",
+  "component_name": "menubar",
+  "data_attrs": [],
+  "element": "MenubarPrimitive.Separator"
+ },
+ "menubar-shortcut": {
+  "base_classes": "cn-menubar-shortcut ml-auto",
+  "component": "MenubarShortcut",
+  "component_name": "menubar",
+  "data_attrs": [],
+  "element": "span"
+ },
+ "menubar-sub": {
+  "base_classes": "",
+  "component": "MenubarSub",
+  "component_name": "menubar",
+  "data_attrs": [],
+  "element": "MenubarPrimitive.Sub"
+ },
+ "menubar-sub-content": {
+  "base_classes": "cn-menubar-sub-content cn-menu-target cn-menu-translucent z-50 origin-(--radix-menubar-content-transform-origin) overflow-hidden",
+  "component": "MenubarSubContent",
+  "component_name": "menubar",
+  "data_attrs": [],
+  "element": "MenubarPrimitive.SubContent"
+ },
+ "menubar-sub-trigger": {
+  "base_classes": "cn-menubar-sub-trigger flex cursor-default items-center outline-none select-none",
+  "component": "MenubarSubTrigger",
+  "component_name": "menubar",
+  "data_attrs": [
+   "data-inset"
+  ],
+  "element": "MenubarPrimitive.SubTrigger"
+ },
+ "menubar-trigger": {
+  "base_classes": "cn-menubar-trigger flex items-center outline-hidden select-none",
+  "component": "MenubarTrigger",
+  "component_name": "menubar",
+  "data_attrs": [],
+  "element": "MenubarPrimitive.Trigger"
+ },
+ "message": {
+  "base_classes": "cn-message group/message relative flex w-full min-w-0 data-[align=end]:flex-row-reverse",
+  "component": "Message",
+  "component_name": "message",
+  "data_attrs": [
+   "data-align"
+  ],
+  "element": "div"
+ },
+ "message-avatar": {
+  "base_classes": "cn-message-avatar flex w-fit shrink-0 items-center justify-center self-end overflow-hidden rounded-full bg-muted",
+  "component": "MessageAvatar",
+  "component_name": "message",
+  "data_attrs": [],
+  "element": "div"
+ },
+ "message-content": {
+  "base_classes": "cn-message-content flex w-full min-w-0 flex-col wrap-break-word",
+  "component": "MessageContent",
+  "component_name": "message",
+  "data_attrs": [],
+  "element": "div"
+ },
+ "message-footer": {
+  "base_classes": "cn-message-footer flex max-w-full min-w-0 items-center group-data-[align=end]/message:justify-end",
+  "component": "MessageFooter",
+  "component_name": "message",
+  "data_attrs": [],
+  "element": "div"
+ },
+ "message-group": {
+  "base_classes": "cn-message-group flex min-w-0 flex-col",
+  "component": "MessageGroup",
+  "component_name": "message",
+  "data_attrs": [],
+  "element": "div"
+ },
+ "message-header": {
+  "base_classes": "cn-message-header flex max-w-full min-w-0 items-center",
+  "component": "MessageHeader",
+  "component_name": "message",
+  "data_attrs": [],
+  "element": "div"
+ },
+ "message-scroller": {
+  "base_classes": "cn-message-scroller group/message-scroller relative flex size-full min-h-0 flex-col overflow-hidden",
+  "component": "MessageScroller",
+  "component_name": "message-scroller",
+  "data_attrs": [],
+  "element": "MessageScrollerPrimitive.Root"
+ },
+ "message-scroller-button": {
+  "base_classes": "cn-message-scroller-button absolute inset-s-1/2 -translate-x-1/2 border-border bg-background text-foreground transition-[translate,scale,opacity] duration-200 hover:bg-muted hover:text-foreground data-[active=false]:pointer-events-none data-[active=false]:scale-95 data-[active=false]:opacity-0 data-[active=false]:duration-400 data-[active=false]:ease-[cubic-bezier(0.7,0,0.84,0)] data-[active=true]:translate-y-0 data-[active=true]:scale-100 data-[active=true]:opacity-100 data-[active=true]:ease-[cubic-bezier(0.23,1,0.32,1)] data-[direction=end]:bottom-4 data-[direction=end]:data-[active=false]:translate-y-full data-[direction=start]:top-4 data-[direction=start]:data-[active=false]:-translate-y-full rtl:translate-x-1/2 data-[direction=start]:[&_svg]:rotate-180",
+  "component": "MessageScrollerButton",
+  "component_name": "message-scroller",
+  "data_attrs": [
+   "data-direction",
+   "data-size",
+   "data-variant"
+  ],
+  "element": "MessageScrollerPrimitive.Button"
+ },
+ "message-scroller-content": {
+  "base_classes": "cn-message-scroller-content flex h-max min-h-full flex-col",
+  "component": "MessageScrollerContent",
+  "component_name": "message-scroller",
+  "data_attrs": [],
+  "element": "MessageScrollerPrimitive.Content"
+ },
+ "message-scroller-item": {
+  "base_classes": "cn-message-scroller-item min-w-0 shrink-0 [contain-intrinsic-size:auto_10rem] [content-visibility:auto]",
+  "component": "MessageScrollerItem",
+  "component_name": "message-scroller",
+  "data_attrs": [],
+  "element": "MessageScrollerPrimitive.Item"
+ },
+ "message-scroller-viewport": {
+  "base_classes": "cn-message-scroller-viewport size-full min-h-0 min-w-0 scroll-fade-b scrollbar-thin scrollbar-gutter-stable overflow-y-auto overscroll-contain contain-content data-autoscrolling:scrollbar-thumb-transparent data-autoscrolling:scrollbar-track-transparent data-pending-scroll:invisible",
+  "component": "MessageScrollerViewport",
+  "component_name": "message-scroller",
+  "data_attrs": [],
+  "element": "MessageScrollerPrimitive.Viewport"
+ },
+ "native-select": {
+  "base_classes": "cn-native-select outline-none disabled:pointer-events-none disabled:cursor-not-allowed",
+  "component": "NativeSelect",
+  "component_name": "native-select",
+  "data_attrs": [
+   "data-size"
+  ],
+  "element": "select"
+ },
+ "native-select-icon": {
+  "base_classes": "cn-native-select-icon pointer-events-none absolute select-none",
+  "component": "NativeSelect",
+  "component_name": "native-select",
+  "data_attrs": [],
+  "element": "IconPlaceholder"
+ },
+ "native-select-optgroup": {
+  "base_classes": "bg-[Canvas] text-[CanvasText]",
+  "component": "NativeSelectOptGroup",
+  "component_name": "native-select",
+  "data_attrs": [],
+  "element": "optgroup"
+ },
+ "native-select-option": {
+  "base_classes": "bg-[Canvas] text-[CanvasText]",
+  "component": "NativeSelectOption",
+  "component_name": "native-select",
+  "data_attrs": [],
+  "element": "option"
+ },
+ "native-select-wrapper": {
+  "base_classes": "cn-native-select-wrapper group/native-select relative w-fit has-[select:disabled]:opacity-50",
+  "component": "NativeSelect",
+  "component_name": "native-select",
+  "data_attrs": [
+   "data-size"
+  ],
+  "element": "div"
+ },
+ "navigation-menu": {
+  "base_classes": "cn-navigation-menu group/navigation-menu relative flex max-w-max flex-1 items-center justify-center",
+  "component": "NavigationMenu",
+  "component_name": "navigation-menu",
+  "data_attrs": [
+   "data-viewport"
+  ],
+  "element": "NavigationMenuPrimitive.Root"
+ },
+ "navigation-menu-content": {
+  "base_classes": "cn-navigation-menu-content top-0 left-0 w-full group-data-[viewport=false]/navigation-menu:top-full group-data-[viewport=false]/navigation-menu:mt-1.5 group-data-[viewport=false]/navigation-menu:overflow-hidden **:data-[slot=navigation-menu-link]:focus:ring-0 **:data-[slot=navigation-menu-link]:focus:outline-none md:absolute md:w-auto",
+  "component": "NavigationMenuContent",
+  "component_name": "navigation-menu",
+  "data_attrs": [],
+  "element": "NavigationMenuPrimitive.Content"
+ },
+ "navigation-menu-indicator": {
+  "base_classes": "cn-navigation-menu-indicator top-full z-1 flex h-1.5 items-end justify-center overflow-hidden",
+  "component": "NavigationMenuIndicator",
+  "component_name": "navigation-menu",
+  "data_attrs": [],
+  "element": "NavigationMenuPrimitive.Indicator"
+ },
+ "navigation-menu-item": {
+  "base_classes": "cn-navigation-menu-item relative",
+  "component": "NavigationMenuItem",
+  "component_name": "navigation-menu",
+  "data_attrs": [],
+  "element": "NavigationMenuPrimitive.Item"
+ },
+ "navigation-menu-link": {
+  "base_classes": "cn-navigation-menu-link",
+  "component": "NavigationMenuLink",
+  "component_name": "navigation-menu",
+  "data_attrs": [],
+  "element": "NavigationMenuPrimitive.Link"
+ },
+ "navigation-menu-list": {
+  "base_classes": "cn-navigation-menu-list group flex flex-1 list-none items-center justify-center",
+  "component": "NavigationMenuList",
+  "component_name": "navigation-menu",
+  "data_attrs": [],
+  "element": "NavigationMenuPrimitive.List"
+ },
+ "navigation-menu-trigger": {
+  "base_classes": "group",
+  "component": "NavigationMenuTrigger",
+  "component_name": "navigation-menu",
+  "data_attrs": [],
+  "element": "NavigationMenuPrimitive.Trigger"
+ },
+ "navigation-menu-viewport": {
+  "base_classes": "cn-navigation-menu-viewport origin-top-center relative mt-1.5 h-(--radix-navigation-menu-viewport-height) w-full overflow-hidden md:w-(--radix-navigation-menu-viewport-width)",
+  "component": "NavigationMenuViewport",
+  "component_name": "navigation-menu",
+  "data_attrs": [],
+  "element": "NavigationMenuPrimitive.Viewport"
+ },
+ "pagination": {
+  "base_classes": "cn-pagination mx-auto flex w-full justify-center",
+  "component": "Pagination",
+  "component_name": "pagination",
+  "data_attrs": [],
+  "element": "nav"
+ },
+ "pagination-content": {
+  "base_classes": "cn-pagination-content flex items-center",
+  "component": "PaginationContent",
+  "component_name": "pagination",
+  "data_attrs": [],
+  "element": "ul"
+ },
+ "pagination-ellipsis": {
+  "base_classes": "cn-pagination-ellipsis flex items-center justify-center",
+  "component": "PaginationEllipsis",
+  "component_name": "pagination",
+  "data_attrs": [],
+  "element": "span"
+ },
+ "pagination-item": {
+  "base_classes": "",
+  "component": "PaginationItem",
+  "component_name": "pagination",
+  "data_attrs": [],
+  "element": "li"
+ },
+ "pagination-link": {
+  "base_classes": "",
+  "component": "PaginationLink",
+  "component_name": "pagination",
+  "data_attrs": [
+   "data-active"
+  ],
+  "element": "a"
+ },
+ "pagination-next": {
+  "alts": [
+   {
+    "base_classes": "cn-rtl-flip",
+    "component": "PaginationNext",
+    "data_attrs": [],
+    "element": "IconPlaceholder"
+   }
+  ],
+  "base_classes": "cn-pagination-next",
+  "component": "PaginationNext",
+  "component_name": "pagination",
+  "data_attrs": [],
+  "element": "PaginationLink"
+ },
+ "pagination-previous": {
+  "alts": [
+   {
+    "base_classes": "cn-rtl-flip",
+    "component": "PaginationPrevious",
+    "data_attrs": [],
+    "element": "IconPlaceholder"
+   }
+  ],
+  "base_classes": "cn-pagination-previous",
+  "component": "PaginationPrevious",
+  "component_name": "pagination",
+  "data_attrs": [],
+  "element": "PaginationLink"
+ },
+ "popover": {
+  "base_classes": "",
+  "component": "Popover",
+  "component_name": "popover",
+  "data_attrs": [],
+  "element": "PopoverPrimitive.Root"
+ },
+ "popover-anchor": {
+  "base_classes": "",
+  "component": "PopoverAnchor",
+  "component_name": "popover",
+  "data_attrs": [],
+  "element": "PopoverPrimitive.Anchor"
+ },
+ "popover-content": {
+  "base_classes": "cn-popover-content z-50 w-72 origin-(--radix-popover-content-transform-origin) outline-hidden",
+  "component": "PopoverContent",
+  "component_name": "popover",
+  "data_attrs": [],
+  "element": "PopoverPrimitive.Content"
+ },
+ "popover-description": {
+  "base_classes": "cn-popover-description",
+  "component": "PopoverDescription",
+  "component_name": "popover",
+  "data_attrs": [],
+  "element": "p"
+ },
+ "popover-header": {
+  "base_classes": "cn-popover-header",
+  "component": "PopoverHeader",
+  "component_name": "popover",
+  "data_attrs": [],
+  "element": "div"
+ },
+ "popover-title": {
+  "base_classes": "cn-popover-title",
+  "component": "PopoverTitle",
+  "component_name": "popover",
+  "data_attrs": [],
+  "element": "div"
+ },
+ "popover-trigger": {
+  "base_classes": "",
+  "component": "PopoverTrigger",
+  "component_name": "popover",
+  "data_attrs": [],
+  "element": "PopoverPrimitive.Trigger"
+ },
+ "progress": {
+  "base_classes": "cn-progress relative flex w-full items-center overflow-x-hidden",
+  "component": "Progress",
+  "component_name": "progress",
+  "data_attrs": [],
+  "element": "ProgressPrimitive.Root"
+ },
+ "progress-indicator": {
+  "base_classes": "cn-progress-indicator size-full flex-1 transition-all",
+  "component": "Progress",
+  "component_name": "progress",
+  "data_attrs": [],
+  "element": "ProgressPrimitive.Indicator"
+ },
+ "questionnaire": {
+  "base_classes": "cn-questionnaire flex w-full min-w-0 flex-col",
+  "component": "Questionnaire",
+  "component_name": "questionnaire",
+  "data_attrs": [],
+  "element": "QuestionnairePrimitive.Root"
+ },
+ "questionnaire-actions": {
+  "base_classes": "cn-questionnaire-actions grid min-h-11 w-full grid-cols-[minmax(0,1fr)_auto_auto] items-center",
+  "component": "QuestionnaireActions",
+  "component_name": "questionnaire",
+  "data_attrs": [],
+  "element": "div"
+ },
+ "questionnaire-choice": {
+  "base_classes": "cn-questionnaire-choice group/questionnaire-choice relative flex min-h-11 cursor-pointer items-start text-start transition-colors outline-none select-none data-disabled:pointer-events-none data-disabled:cursor-not-allowed data-disabled:opacity-50",
+  "component": "QuestionnaireChoice",
+  "component_name": "questionnaire",
+  "data_attrs": [],
+  "element": "QuestionnairePrimitive.Choice"
+ },
+ "questionnaire-choice-description": {
+  "base_classes": "cn-questionnaire-choice-description",
+  "component": "QuestionnaireChoiceDescription",
+  "component_name": "questionnaire",
+  "data_attrs": [],
+  "element": "span"
+ },
+ "questionnaire-choice-indicator": {
+  "base_classes": "cn-questionnaire-choice-indicator pointer-events-none relative flex shrink-0 items-center justify-center border group-data-[type=radio]/questionnaire-choice:rounded-full",
+  "component": "QuestionnaireChoice",
+  "component_name": "questionnaire",
+  "data_attrs": [],
+  "element": "span"
+ },
+ "questionnaire-choice-indicator-check": {
+  "base_classes": "cn-questionnaire-choice-indicator-check hidden group-data-[type=radio]/questionnaire-choice:hidden group-data-checked/questionnaire-choice:block",
+  "component": "QuestionnaireChoice",
+  "component_name": "questionnaire",
+  "data_attrs": [],
+  "element": "IconPlaceholder"
+ },
+ "questionnaire-choice-indicator-dot": {
+  "base_classes": "cn-questionnaire-choice-indicator-dot hidden rounded-full group-data-[type=checkbox]/questionnaire-choice:hidden group-data-checked/questionnaire-choice:block",
+  "component": "QuestionnaireChoice",
+  "component_name": "questionnaire",
+  "data_attrs": [],
+  "element": "span"
+ },
+ "questionnaire-choice-input": {
+  "base_classes": "cn-questionnaire-choice-input absolute inset-0 z-10 size-full cursor-pointer opacity-0",
+  "component": "QuestionnaireChoice",
+  "component_name": "questionnaire",
+  "data_attrs": [],
+  "element": "QuestionnairePrimitive.ChoiceInput"
+ },
+ "questionnaire-choice-label": {
+  "base_classes": "cn-questionnaire-choice-label cn-questionnaire-choice-content flex min-w-0 flex-1 flex-col leading-snug",
+  "component": "QuestionnaireChoice",
+  "component_name": "questionnaire",
+  "data_attrs": [],
+  "element": "QuestionnairePrimitive.ChoiceLabel"
+ },
+ "questionnaire-choice-shortcut": {
+  "base_classes": "cn-questionnaire-choice-shortcut cn-questionnaire-shortcut pointer-events-none ms-auto hidden shrink-0 group-data-[shortcut]/questionnaire-choice:inline-flex",
+  "component": "QuestionnaireChoice",
+  "component_name": "questionnaire",
+  "data_attrs": [],
+  "element": "QuestionnairePrimitive.ChoiceShortcut"
+ },
+ "questionnaire-choices": {
+  "base_classes": "cn-questionnaire-choices group/questionnaire-choices grid min-w-0",
+  "component": "QuestionnaireChoices",
+  "component_name": "questionnaire",
+  "data_attrs": [],
+  "element": "QuestionnairePrimitive.Choices"
+ },
+ "questionnaire-description": {
+  "base_classes": "cn-questionnaire-description text-pretty text-muted-foreground",
+  "component": "QuestionnaireDescription",
+  "component_name": "questionnaire",
+  "data_attrs": [],
+  "element": "QuestionnairePrimitive.Description"
+ },
+ "questionnaire-error": {
+  "base_classes": "cn-questionnaire-error text-destructive",
+  "component": "QuestionnaireError",
+  "component_name": "questionnaire",
+  "data_attrs": [],
+  "element": "QuestionnairePrimitive.Error"
+ },
+ "questionnaire-input": {
+  "base_classes": "cn-questionnaire-input min-h-11 w-full min-w-0 transition-[color,box-shadow,background-color] outline-none disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 sm:min-h-0 selection:bg-primary selection:text-primary-foreground placeholder:text-muted-foreground",
+  "component": "QuestionnaireInput",
+  "component_name": "questionnaire",
+  "data_attrs": [],
+  "element": "QuestionnairePrimitive.Input"
+ },
+ "questionnaire-input-wrapper": {
+  "base_classes": "cn-questionnaire-input-wrapper group/questionnaire-input relative min-w-0",
+  "component": "QuestionnaireInput",
+  "component_name": "questionnaire",
+  "data_attrs": [],
+  "element": "div"
+ },
+ "questionnaire-item": {
+  "base_classes": "cn-questionnaire-item min-w-0 border-0 p-0 outline-none",
+  "component": "QuestionnaireItem",
+  "component_name": "questionnaire",
+  "data_attrs": [],
+  "element": "QuestionnairePrimitive.Item"
+ },
+ "questionnaire-next": {
+  "base_classes": "cn-questionnaire-next col-start-3 row-start-1 min-h-11 justify-self-end sm:min-h-0",
+  "component": "QuestionnaireNext",
+  "component_name": "questionnaire",
+  "data_attrs": [
+   "data-size",
+   "data-variant"
+  ],
+  "element": "QuestionnairePrimitive.Next"
+ },
+ "questionnaire-previous": {
+  "base_classes": "cn-questionnaire-previous col-start-1 row-start-1 min-h-11 justify-self-start sm:min-h-0",
+  "component": "QuestionnairePrevious",
+  "component_name": "questionnaire",
+  "data_attrs": [
+   "data-size",
+   "data-variant"
+  ],
+  "element": "QuestionnairePrimitive.Previous"
+ },
+ "questionnaire-progress": {
+  "base_classes": "cn-questionnaire-progress min-h-[1lh] w-fit min-w-[14ch] font-medium text-muted-foreground tabular-nums",
+  "component": "QuestionnaireProgress",
+  "component_name": "questionnaire",
+  "data_attrs": [],
+  "element": "QuestionnairePrimitive.Progress"
+ },
+ "questionnaire-skip": {
+  "base_classes": "cn-questionnaire-skip col-start-2 row-start-1 min-h-11 justify-self-end sm:min-h-0",
+  "component": "QuestionnaireSkip",
+  "component_name": "questionnaire",
+  "data_attrs": [
+   "data-size",
+   "data-variant"
+  ],
+  "element": "QuestionnairePrimitive.Skip"
+ },
+ "questionnaire-submit": {
+  "base_classes": "cn-questionnaire-submit col-start-3 row-start-1 min-h-11 justify-self-end sm:min-h-0",
+  "component": "QuestionnaireSubmit",
+  "component_name": "questionnaire",
+  "data_attrs": [
+   "data-size",
+   "data-variant"
+  ],
+  "element": "QuestionnairePrimitive.Submit"
+ },
+ "questionnaire-title": {
+  "base_classes": "cn-questionnaire-title cn-font-heading text-pretty",
+  "component": "QuestionnaireTitle",
+  "component_name": "questionnaire",
+  "data_attrs": [],
+  "element": "QuestionnairePrimitive.Title"
+ },
+ "radio-group": {
+  "base_classes": "cn-radio-group w-full",
+  "component": "RadioGroup",
+  "component_name": "radio-group",
+  "data_attrs": [],
+  "element": "RadioGroupPrimitive.Root"
+ },
+ "radio-group-indicator": {
+  "base_classes": "cn-radio-group-indicator",
+  "component": "RadioGroupItem",
+  "component_name": "radio-group",
+  "data_attrs": [],
+  "element": "RadioGroupPrimitive.Indicator"
+ },
+ "radio-group-item": {
+  "base_classes": "cn-radio-group-item group/radio-group-item peer relative aspect-square shrink-0 border outline-none after:absolute after:-inset-x-3 after:-inset-y-2 disabled:cursor-not-allowed disabled:opacity-50",
+  "component": "RadioGroupItem",
+  "component_name": "radio-group",
+  "data_attrs": [],
+  "element": "RadioGroupPrimitive.Item"
+ },
+ "resizable-handle": {
+  "base_classes": "cn-resizable-handle relative flex w-px items-center justify-center bg-border ring-offset-background after:absolute after:inset-y-0 after:left-1/2 after:w-1 after:-translate-x-1/2 focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-hidden aria-[orientation=horizontal]:h-px aria-[orientation=horizontal]:w-full aria-[orientation=horizontal]:after:left-0 aria-[orientation=horizontal]:after:h-1 aria-[orientation=horizontal]:after:w-full aria-[orientation=horizontal]:after:translate-x-0 aria-[orientation=horizontal]:after:-translate-y-1/2 [&[aria-orientation=horizontal]>div]:rotate-90",
+  "component": "ResizableHandle",
+  "component_name": "resizable",
+  "data_attrs": [],
+  "element": "ResizablePrimitive.Separator"
+ },
+ "resizable-panel": {
+  "base_classes": "",
+  "component": "ResizablePanel",
+  "component_name": "resizable",
+  "data_attrs": [],
+  "element": "ResizablePrimitive.Panel"
+ },
+ "resizable-panel-group": {
+  "base_classes": "cn-resizable-panel-group flex h-full w-full aria-[orientation=vertical]:flex-col",
+  "component": "ResizablePanelGroup",
+  "component_name": "resizable",
+  "data_attrs": [],
+  "element": "ResizablePrimitive.Group"
+ },
+ "scroll-area": {
+  "base_classes": "cn-scroll-area relative",
+  "component": "ScrollArea",
+  "component_name": "scroll-area",
+  "data_attrs": [],
+  "element": "ScrollAreaPrimitive.Root"
+ },
+ "scroll-area-scrollbar": {
+  "base_classes": "cn-scroll-area-scrollbar flex touch-none p-px transition-colors select-none",
+  "component": "ScrollBar",
+  "component_name": "scroll-area",
+  "data_attrs": [
+   "data-orientation"
+  ],
+  "element": "ScrollAreaPrimitive.ScrollAreaScrollbar"
+ },
+ "scroll-area-thumb": {
+  "base_classes": "cn-scroll-area-thumb relative flex-1 bg-border",
+  "component": "ScrollBar",
+  "component_name": "scroll-area",
+  "data_attrs": [],
+  "element": "ScrollAreaPrimitive.ScrollAreaThumb"
+ },
+ "scroll-area-viewport": {
+  "base_classes": "cn-scroll-area-viewport size-full rounded-[inherit] transition-[color,box-shadow] outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-1",
+  "component": "ScrollArea",
+  "component_name": "scroll-area",
+  "data_attrs": [],
+  "element": "ScrollAreaPrimitive.Viewport"
+ },
+ "select": {
+  "base_classes": "",
+  "component": "Select",
+  "component_name": "select",
+  "data_attrs": [],
+  "element": "SelectPrimitive.Root"
+ },
+ "select-content": {
+  "base_classes": "cn-select-content cn-menu-target cn-menu-translucent relative z-50 max-h-(--radix-select-content-available-height) origin-(--radix-select-content-transform-origin) overflow-x-hidden overflow-y-auto data-[align-trigger=true]:animate-none",
+  "component": "SelectContent",
+  "component_name": "select",
+  "data_attrs": [
+   "data-align-trigger"
+  ],
+  "element": "SelectPrimitive.Content",
+  "silent_groups": [
+   "position"
+  ],
+  "variants": {
+   "base": "",
+   "defaults": {
+    "position": "item-aligned"
+   },
+   "variants": {
+    "position": {
+     "item-aligned": "",
+     "popper": "data-[side=bottom]:translate-y-1 data-[side=left]:-translate-x-1 data-[side=right]:translate-x-1 data-[side=top]:-translate-y-1"
+    }
+   }
+  }
+ },
+ "select-group": {
+  "base_classes": "cn-select-group",
+  "component": "SelectGroup",
+  "component_name": "select",
+  "data_attrs": [],
+  "element": "SelectPrimitive.Group"
+ },
+ "select-item": {
+  "base_classes": "cn-select-item relative flex w-full cursor-default items-center outline-hidden select-none data-disabled:pointer-events-none data-disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0",
+  "component": "SelectItem",
+  "component_name": "select",
+  "data_attrs": [],
+  "element": "SelectPrimitive.Item"
+ },
+ "select-item-indicator": {
+  "base_classes": "cn-select-item-indicator",
+  "component": "SelectItem",
+  "component_name": "select",
+  "data_attrs": [],
+  "element": "span",
+  "no_slot": true
+ },
+ "select-item-text": {
+  "base_classes": "",
+  "component": "SelectItem",
+  "component_name": "select",
+  "data_attrs": [],
+  "element": "span",
+  "no_slot": true
+ },
+ "select-label": {
+  "base_classes": "cn-select-label",
+  "component": "SelectLabel",
+  "component_name": "select",
+  "data_attrs": [],
+  "element": "SelectPrimitive.Label"
+ },
+ "select-scroll-down-button": {
+  "base_classes": "cn-select-scroll-down-button",
+  "component": "SelectScrollDownButton",
+  "component_name": "select",
+  "data_attrs": [],
+  "element": "SelectPrimitive.ScrollDownButton"
+ },
+ "select-scroll-up-button": {
+  "base_classes": "cn-select-scroll-up-button",
+  "component": "SelectScrollUpButton",
+  "component_name": "select",
+  "data_attrs": [],
+  "element": "SelectPrimitive.ScrollUpButton"
+ },
+ "select-separator": {
+  "base_classes": "cn-select-separator pointer-events-none",
+  "component": "SelectSeparator",
+  "component_name": "select",
+  "data_attrs": [],
+  "element": "SelectPrimitive.Separator"
+ },
+ "select-trigger": {
+  "base_classes": "cn-select-trigger flex w-fit items-center justify-between whitespace-nowrap outline-none disabled:cursor-not-allowed disabled:opacity-50 *:data-[slot=select-value]:line-clamp-1 *:data-[slot=select-value]:flex *:data-[slot=select-value]:items-center [&_svg]:pointer-events-none [&_svg]:shrink-0",
+  "component": "SelectTrigger",
+  "component_name": "select",
+  "data_attrs": [
+   "data-size"
+  ],
+  "element": "SelectPrimitive.Trigger"
+ },
+ "select-value": {
+  "base_classes": "",
+  "component": "SelectValue",
+  "component_name": "select",
+  "data_attrs": [],
+  "element": "SelectPrimitive.Value"
+ },
+ "select-viewport": {
+  "base_classes": "cn-select-viewport data-[position=popper]:h-(--radix-select-trigger-height) data-[position=popper]:w-full data-[position=popper]:min-w-(--radix-select-trigger-width)",
+  "component": "SelectContent",
+  "component_name": "select",
+  "data_attrs": [
+   "data-position"
+  ],
+  "element": "SelectPrimitive.Viewport",
+  "no_slot": true
+ },
+ "separator": {
+  "base_classes": "shrink-0 bg-border data-horizontal:h-px data-horizontal:w-full data-vertical:w-px data-vertical:self-stretch",
+  "component": "Separator",
+  "component_name": "separator",
+  "data_attrs": [],
+  "element": "SeparatorPrimitive.Root"
+ },
+ "sheet": {
+  "base_classes": "",
+  "component": "Sheet",
+  "component_name": "sheet",
+  "data_attrs": [],
+  "element": "SheetPrimitive.Root"
+ },
+ "sheet-close": {
+  "base_classes": "",
+  "component": "SheetClose",
+  "component_name": "sheet",
+  "data_attrs": [],
+  "element": "SheetPrimitive.Close"
+ },
+ "sheet-content": {
+  "base_classes": "cn-sheet-content data-open:animate-in data-open:fade-in-0 data-[side=bottom]:data-open:slide-in-from-bottom-10 data-[side=left]:data-open:slide-in-from-left-10 data-[side=right]:data-open:slide-in-from-right-10 data-[side=top]:data-open:slide-in-from-top-10 data-closed:animate-out data-closed:fade-out-0 data-[side=bottom]:data-closed:slide-out-to-bottom-10 data-[side=left]:data-closed:slide-out-to-left-10 data-[side=right]:data-closed:slide-out-to-right-10 data-[side=top]:data-closed:slide-out-to-top-10",
+  "component": "SheetContent",
+  "component_name": "sheet",
+  "data_attrs": [
+   "data-side"
+  ],
+  "element": "SheetPrimitive.Content"
+ },
+ "sheet-description": {
+  "base_classes": "cn-sheet-description",
+  "component": "SheetDescription",
+  "component_name": "sheet",
+  "data_attrs": [],
+  "element": "SheetPrimitive.Description"
+ },
+ "sheet-footer": {
+  "base_classes": "cn-sheet-footer mt-auto flex flex-col",
+  "component": "SheetFooter",
+  "component_name": "sheet",
+  "data_attrs": [],
+  "element": "div"
+ },
+ "sheet-header": {
+  "base_classes": "cn-sheet-header flex flex-col",
+  "component": "SheetHeader",
+  "component_name": "sheet",
+  "data_attrs": [],
+  "element": "div"
+ },
+ "sheet-overlay": {
+  "base_classes": "cn-sheet-overlay fixed inset-0 z-50 duration-100 data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0",
+  "component": "SheetOverlay",
+  "component_name": "sheet",
+  "data_attrs": [],
+  "element": "SheetPrimitive.Overlay"
+ },
+ "sheet-portal": {
+  "base_classes": "",
+  "component": "SheetPortal",
+  "component_name": "sheet",
+  "data_attrs": [],
+  "element": "SheetPrimitive.Portal"
+ },
+ "sheet-title": {
+  "base_classes": "cn-sheet-title cn-font-heading",
+  "component": "SheetTitle",
+  "component_name": "sheet",
+  "data_attrs": [],
+  "element": "SheetPrimitive.Title"
+ },
+ "sheet-trigger": {
+  "base_classes": "",
+  "component": "SheetTrigger",
+  "component_name": "sheet",
+  "data_attrs": [],
+  "element": "SheetPrimitive.Trigger"
+ },
+ "sidebar": {
+  "alts": [
+   {
+    "base_classes": "w-(--sidebar-width) bg-sidebar p-0 text-sidebar-foreground [&>button]:hidden",
+    "component": "Sidebar",
+    "data_attrs": [],
+    "element": "SheetContent"
+   }
+  ],
+  "base_classes": "",
+  "component": "Sidebar",
+  "component_name": "sidebar",
+  "data_attrs": [],
+  "element": "div",
+  "silent_groups": [
+   "collapsible"
+  ],
+  "variants": {
+   "base": "",
+   "defaults": {
+    "collapsible": "offcanvas"
+   },
+   "variants": {
+    "collapsible": {
+     "icon": "group peer hidden text-sidebar-foreground md:block",
+     "none": "flex h-full w-(--sidebar-width) flex-col bg-sidebar text-sidebar-foreground",
+     "offcanvas": "group peer hidden text-sidebar-foreground md:block"
+    }
+   }
+  }
+ },
+ "sidebar-container": {
+  "base_classes": "fixed inset-y-0 z-10 hidden h-svh w-(--sidebar-width) transition-[left,right,width] duration-200 ease-linear data-[side=left]:left-0 data-[side=left]:group-data-[collapsible=offcanvas]:left-[calc(var(--sidebar-width)*-1)] data-[side=right]:right-0 data-[side=right]:group-data-[collapsible=offcanvas]:right-[calc(var(--sidebar-width)*-1)] md:flex",
+  "component": "Sidebar",
+  "component_name": "sidebar",
+  "data_attrs": [
+   "data-side"
+  ],
+  "element": "div",
+  "silent_groups": [
+   "variant"
+  ],
+  "variants": {
+   "base": "",
+   "defaults": {
+    "variant": "sidebar"
+   },
+   "variants": {
+    "variant": {
+     "floating": "p-2 group-data-[collapsible=icon]:w-[calc(var(--sidebar-width-icon)+(--spacing(4))+2px)]",
+     "inset": "p-2 group-data-[collapsible=icon]:w-[calc(var(--sidebar-width-icon)+(--spacing(4))+2px)]",
+     "sidebar": "group-data-[collapsible=icon]:w-(--sidebar-width-icon) group-data-[side=left]:border-r group-data-[side=right]:border-l"
+    }
+   }
+  }
+ },
+ "sidebar-content": {
+  "base_classes": "cn-sidebar-content flex min-h-0 flex-1 flex-col overflow-auto group-data-[collapsible=icon]:overflow-hidden",
+  "component": "SidebarContent",
+  "component_name": "sidebar",
+  "data_attrs": [],
+  "element": "div"
+ },
+ "sidebar-footer": {
+  "base_classes": "cn-sidebar-footer flex flex-col",
+  "component": "SidebarFooter",
+  "component_name": "sidebar",
+  "data_attrs": [],
+  "element": "div"
+ },
+ "sidebar-gap": {
+  "base_classes": "cn-sidebar-gap relative w-(--sidebar-width) bg-transparent group-data-[collapsible=offcanvas]:w-0 group-data-[side=right]:rotate-180",
+  "component": "Sidebar",
+  "component_name": "sidebar",
+  "data_attrs": [],
+  "element": "div",
+  "silent_groups": [
+   "variant"
+  ],
+  "variants": {
+   "base": "",
+   "defaults": {
+    "variant": "sidebar"
+   },
+   "variants": {
+    "variant": {
+     "floating": "group-data-[collapsible=icon]:w-[calc(var(--sidebar-width-icon)+(--spacing(4)))]",
+     "inset": "group-data-[collapsible=icon]:w-[calc(var(--sidebar-width-icon)+(--spacing(4)))]",
+     "sidebar": "group-data-[collapsible=icon]:w-(--sidebar-width-icon)"
+    }
+   }
+  }
+ },
+ "sidebar-group": {
+  "base_classes": "cn-sidebar-group relative flex w-full min-w-0 flex-col",
+  "component": "SidebarGroup",
+  "component_name": "sidebar",
+  "data_attrs": [],
+  "element": "div"
+ },
+ "sidebar-group-action": {
+  "base_classes": "cn-sidebar-group-action flex aspect-square items-center justify-center outline-hidden transition-transform group-data-[collapsible=icon]:hidden after:absolute after:-inset-2 md:after:hidden [&>svg]:shrink-0",
+  "component": "SidebarGroupAction",
+  "component_name": "sidebar",
+  "data_attrs": [],
+  "element": "Comp"
+ },
+ "sidebar-group-content": {
+  "base_classes": "cn-sidebar-group-content w-full",
+  "component": "SidebarGroupContent",
+  "component_name": "sidebar",
+  "data_attrs": [],
+  "element": "div"
+ },
+ "sidebar-group-label": {
+  "base_classes": "cn-sidebar-group-label flex shrink-0 items-center outline-hidden [&>svg]:shrink-0",
+  "component": "SidebarGroupLabel",
+  "component_name": "sidebar",
+  "data_attrs": [],
+  "element": "Comp"
+ },
+ "sidebar-header": {
+  "base_classes": "cn-sidebar-header flex flex-col",
+  "component": "SidebarHeader",
+  "component_name": "sidebar",
+  "data_attrs": [],
+  "element": "div"
+ },
+ "sidebar-inner": {
+  "base_classes": "cn-sidebar-inner flex size-full flex-col",
+  "component": "Sidebar",
+  "component_name": "sidebar",
+  "data_attrs": [],
+  "element": "div"
+ },
+ "sidebar-input": {
+  "base_classes": "cn-sidebar-input",
+  "component": "SidebarInput",
+  "component_name": "sidebar",
+  "data_attrs": [],
+  "element": "Input"
+ },
+ "sidebar-inset": {
+  "base_classes": "cn-sidebar-inset relative flex w-full flex-1 flex-col",
+  "component": "SidebarInset",
+  "component_name": "sidebar",
+  "data_attrs": [],
+  "element": "main"
+ },
+ "sidebar-menu": {
+  "base_classes": "cn-sidebar-menu flex w-full min-w-0 flex-col",
+  "component": "SidebarMenu",
+  "component_name": "sidebar",
+  "data_attrs": [],
+  "element": "ul"
+ },
+ "sidebar-menu-action": {
+  "base_classes": "cn-sidebar-menu-action flex items-center justify-center outline-hidden transition-transform group-data-[collapsible=icon]:hidden after:absolute after:-inset-2 md:after:hidden [&>svg]:shrink-0",
+  "component": "SidebarMenuAction",
+  "component_name": "sidebar",
+  "data_attrs": [],
+  "element": "Comp"
+ },
+ "sidebar-menu-badge": {
+  "base_classes": "cn-sidebar-menu-badge flex items-center justify-center tabular-nums select-none group-data-[collapsible=icon]:hidden",
+  "component": "SidebarMenuBadge",
+  "component_name": "sidebar",
+  "data_attrs": [],
+  "element": "div"
+ },
+ "sidebar-menu-button": {
+  "base_classes": "",
+  "component": "SidebarMenuButton",
+  "component_name": "sidebar",
+  "cva": "sidebarMenuButtonVariants",
+  "data_attrs": [
+   "data-active",
+   "data-size"
+  ],
+  "element": "Comp",
+  "variants": {
+   "base": "cn-sidebar-menu-button peer/menu-button group/menu-button flex w-full items-center overflow-hidden outline-hidden disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50 [&_svg]:size-4 [&_svg]:shrink-0 [&>span:last-child]:truncate",
+   "defaults": {
+    "size": "default",
+    "variant": "default"
+   },
+   "variants": {
+    "size": {
+     "default": "cn-sidebar-menu-button-size-default",
+     "lg": "cn-sidebar-menu-button-size-lg",
+     "sm": "cn-sidebar-menu-button-size-sm"
+    },
+    "variant": {
+     "default": "cn-sidebar-menu-button-variant-default",
+     "outline": "cn-sidebar-menu-button-variant-outline"
+    }
+   }
+  }
+ },
+ "sidebar-menu-item": {
+  "base_classes": "group/menu-item relative",
+  "component": "SidebarMenuItem",
+  "component_name": "sidebar",
+  "data_attrs": [],
+  "element": "li"
+ },
+ "sidebar-menu-skeleton": {
+  "base_classes": "cn-sidebar-menu-skeleton flex items-center",
+  "component": "SidebarMenuSkeleton",
+  "component_name": "sidebar",
+  "data_attrs": [],
+  "element": "div"
+ },
+ "sidebar-menu-sub": {
+  "base_classes": "cn-sidebar-menu-sub flex min-w-0 flex-col",
+  "component": "SidebarMenuSub",
+  "component_name": "sidebar",
+  "data_attrs": [],
+  "element": "ul"
+ },
+ "sidebar-menu-sub-button": {
+  "base_classes": "cn-sidebar-menu-sub-button flex min-w-0 -translate-x-px items-center overflow-hidden outline-hidden group-data-[collapsible=icon]:hidden disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50 [&>span:last-child]:truncate [&>svg]:shrink-0",
+  "component": "SidebarMenuSubButton",
+  "component_name": "sidebar",
+  "data_attrs": [
+   "data-active",
+   "data-size"
+  ],
+  "element": "Comp"
+ },
+ "sidebar-menu-sub-item": {
+  "base_classes": "group/menu-sub-item relative",
+  "component": "SidebarMenuSubItem",
+  "component_name": "sidebar",
+  "data_attrs": [],
+  "element": "li"
+ },
+ "sidebar-rail": {
+  "base_classes": "cn-sidebar-rail absolute inset-y-0 z-20 hidden w-4 transition-all ease-linear group-data-[side=left]:-right-4 group-data-[side=right]:left-0 after:absolute after:inset-y-0 after:start-1/2 after:w-[2px] sm:flex ltr:-translate-x-1/2 rtl:-translate-x-1/2 in-data-[side=left]:cursor-w-resize in-data-[side=right]:cursor-e-resize [[data-side=left][data-state=collapsed]_&]:cursor-e-resize [[data-side=right][data-state=collapsed]_&]:cursor-w-resize group-data-[collapsible=offcanvas]:translate-x-0 group-data-[collapsible=offcanvas]:after:left-full hover:group-data-[collapsible=offcanvas]:bg-sidebar [[data-side=left][data-collapsible=offcanvas]_&]:-right-2 [[data-side=right][data-collapsible=offcanvas]_&]:-left-2",
+  "component": "SidebarRail",
+  "component_name": "sidebar",
+  "data_attrs": [],
+  "element": "button"
+ },
+ "sidebar-separator": {
+  "base_classes": "cn-sidebar-separator w-auto",
+  "component": "SidebarSeparator",
+  "component_name": "sidebar",
+  "data_attrs": [],
+  "element": "Separator"
+ },
+ "sidebar-trigger": {
+  "base_classes": "cn-sidebar-trigger",
+  "component": "SidebarTrigger",
+  "component_name": "sidebar",
+  "data_attrs": [],
+  "element": "Button"
+ },
+ "sidebar-wrapper": {
+  "base_classes": "group/sidebar-wrapper flex min-h-svh w-full has-data-[variant=inset]:bg-sidebar",
+  "component": "SidebarProvider",
+  "component_name": "sidebar",
+  "data_attrs": [],
+  "element": "div"
+ },
+ "skeleton": {
+  "base_classes": "cn-skeleton animate-pulse",
+  "component": "Skeleton",
+  "component_name": "skeleton",
+  "data_attrs": [],
+  "element": "div"
+ },
+ "slider": {
+  "base_classes": "cn-slider relative flex w-full touch-none items-center select-none data-disabled:opacity-50 data-vertical:h-full data-vertical:w-auto data-vertical:flex-col",
+  "component": "Slider",
+  "component_name": "slider",
+  "data_attrs": [],
+  "element": "SliderPrimitive.Root"
+ },
+ "slider-range": {
+  "base_classes": "cn-slider-range absolute select-none data-horizontal:h-full data-vertical:w-full",
+  "component": "Slider",
+  "component_name": "slider",
+  "data_attrs": [],
+  "element": "SliderPrimitive.Range"
+ },
+ "slider-thumb": {
+  "base_classes": "cn-slider-thumb block shrink-0 select-none disabled:pointer-events-none disabled:opacity-50",
+  "component": "Slider",
+  "component_name": "slider",
+  "data_attrs": [],
+  "element": "SliderPrimitive.Thumb"
+ },
+ "slider-track": {
+  "base_classes": "cn-slider-track relative grow overflow-hidden data-horizontal:w-full data-vertical:h-full",
+  "component": "Slider",
+  "component_name": "slider",
+  "data_attrs": [],
+  "element": "SliderPrimitive.Track"
+ },
+ "spinner": {
+  "base_classes": "size-4 animate-spin",
+  "component": "Spinner",
+  "component_name": "spinner",
+  "data_attrs": [],
+  "element": "IconPlaceholder"
+ },
+ "switch": {
+  "base_classes": "cn-switch peer group/switch relative inline-flex items-center transition-all outline-none after:absolute after:-inset-x-3 after:-inset-y-2 data-disabled:cursor-not-allowed data-disabled:opacity-50",
+  "component": "Switch",
+  "component_name": "switch",
+  "data_attrs": [
+   "data-size"
+  ],
+  "element": "SwitchPrimitive.Root"
+ },
+ "switch-thumb": {
+  "base_classes": "cn-switch-thumb pointer-events-none block ring-0 transition-transform",
+  "component": "Switch",
+  "component_name": "switch",
+  "data_attrs": [],
+  "element": "SwitchPrimitive.Thumb"
+ },
+ "table": {
+  "base_classes": "cn-table",
+  "component": "Table",
+  "component_name": "table",
+  "data_attrs": [],
+  "element": "table"
+ },
+ "table-body": {
+  "base_classes": "cn-table-body",
+  "component": "TableBody",
+  "component_name": "table",
+  "data_attrs": [],
+  "element": "tbody"
+ },
+ "table-caption": {
+  "base_classes": "cn-table-caption",
+  "component": "TableCaption",
+  "component_name": "table",
+  "data_attrs": [],
+  "element": "caption"
+ },
+ "table-cell": {
+  "base_classes": "cn-table-cell",
+  "component": "TableCell",
+  "component_name": "table",
+  "data_attrs": [],
+  "element": "td"
+ },
+ "table-container": {
+  "base_classes": "cn-table-container",
+  "component": "Table",
+  "component_name": "table",
+  "data_attrs": [],
+  "element": "div"
+ },
+ "table-footer": {
+  "base_classes": "cn-table-footer",
+  "component": "TableFooter",
+  "component_name": "table",
+  "data_attrs": [],
+  "element": "tfoot"
+ },
+ "table-head": {
+  "base_classes": "cn-table-head",
+  "component": "TableHead",
+  "component_name": "table",
+  "data_attrs": [],
+  "element": "th"
+ },
+ "table-header": {
+  "base_classes": "cn-table-header",
+  "component": "TableHeader",
+  "component_name": "table",
+  "data_attrs": [],
+  "element": "thead"
+ },
+ "table-row": {
+  "base_classes": "cn-table-row has-aria-expanded:bg-muted/50",
+  "component": "TableRow",
+  "component_name": "table",
+  "data_attrs": [],
+  "element": "tr"
+ },
+ "tabs": {
+  "base_classes": "cn-tabs group/tabs flex data-horizontal:flex-col",
+  "component": "Tabs",
+  "component_name": "tabs",
+  "data_attrs": [
+   "data-orientation"
+  ],
+  "element": "TabsPrimitive.Root"
+ },
+ "tabs-content": {
+  "base_classes": "cn-tabs-content flex-1 outline-none",
+  "component": "TabsContent",
+  "component_name": "tabs",
+  "data_attrs": [],
+  "element": "TabsPrimitive.Content"
+ },
+ "tabs-list": {
+  "base_classes": "",
+  "component": "TabsList",
+  "component_name": "tabs",
+  "cva": "tabsListVariants",
+  "data_attrs": [
+   "data-variant"
+  ],
+  "element": "TabsPrimitive.List",
+  "variants": {
+   "base": "cn-tabs-list group/tabs-list inline-flex w-fit items-center justify-center text-muted-foreground group-data-vertical/tabs:h-fit group-data-vertical/tabs:flex-col",
+   "defaults": {
+    "variant": "default"
+   },
+   "variants": {
+    "variant": {
+     "default": "cn-tabs-list-variant-default bg-muted",
+     "line": "cn-tabs-list-variant-line gap-1 bg-transparent"
+    }
+   }
+  }
+ },
+ "tabs-trigger": {
+  "base_classes": "cn-tabs-trigger relative inline-flex h-[calc(100%-1px)] flex-1 items-center justify-center whitespace-nowrap text-foreground/60 transition-all group-data-vertical/tabs:w-full group-data-vertical/tabs:justify-start hover:text-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-1 focus-visible:outline-ring disabled:pointer-events-none disabled:opacity-50 dark:text-muted-foreground dark:hover:text-foreground [&_svg]:pointer-events-none [&_svg]:shrink-0 group-data-[variant=line]/tabs-list:bg-transparent group-data-[variant=line]/tabs-list:data-active:bg-transparent dark:group-data-[variant=line]/tabs-list:data-active:border-transparent dark:group-data-[variant=line]/tabs-list:data-active:bg-transparent data-active:bg-background data-active:text-foreground dark:data-active:border-input dark:data-active:bg-input/30 dark:data-active:text-foreground after:absolute after:bg-foreground after:opacity-0 after:transition-opacity group-data-horizontal/tabs:after:inset-x-0 group-data-horizontal/tabs:after:bottom-[-5px] group-data-horizontal/tabs:after:h-0.5 group-data-vertical/tabs:after:inset-y-0 group-data-vertical/tabs:after:-right-1 group-data-vertical/tabs:after:w-0.5 group-data-[variant=line]/tabs-list:data-active:after:opacity-100",
+  "component": "TabsTrigger",
+  "component_name": "tabs",
+  "data_attrs": [],
+  "element": "TabsPrimitive.Trigger"
+ },
+ "textarea": {
+  "base_classes": "cn-textarea flex field-sizing-content min-h-16 w-full outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50",
+  "component": "Textarea",
+  "component_name": "textarea",
+  "data_attrs": [],
+  "element": "textarea"
+ },
+ "toast": {
+  "base_classes": "cn-toast group/toast pointer-events-auto absolute right-0 bottom-0 z-[calc(1000-var(--toast-index))] w-full origin-bottom border bg-popover text-popover-foreground shadow-lg will-change-transform outline-none select-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 [--gap:0.75rem] [--height:var(--toast-frontmost-height,var(--toast-height))] [--offset-y:calc(var(--toast-offset-y)*-1+calc(var(--toast-index)*var(--gap)*-1)+var(--toast-swipe-movement-y))] [--peek:0.75rem] [--scale:calc(max(0,1-(var(--toast-index)*0.1)))] [--shrink:calc(1-var(--scale))] h-(--height) [transform:translateX(var(--toast-swipe-movement-x))_translateY(calc(var(--toast-swipe-movement-y)-(var(--toast-index)*var(--peek))-(var(--shrink)*var(--height))))_scale(var(--scale))] [transition:transform_500ms_cubic-bezier(0.22,1,0.36,1),opacity_500ms,height_150ms] after:absolute after:top-full after:left-0 after:h-[calc(var(--gap)+1px)] after:w-full after:content-[''] data-expanded:h-(--toast-height) data-expanded:[transform:translateX(var(--toast-swipe-movement-x))_translateY(var(--offset-y))] data-limited:opacity-0 data-starting-style:[transform:translateY(150%)] [&[data-ending-style]:not([data-limited]):not([data-swipe-direction])]:[transform:translateY(150%)] data-ending-style:data-[swipe-direction=down]:[transform:translateY(calc(var(--toast-swipe-movement-y)+150%))] data-ending-style:data-[swipe-direction=left]:[transform:translateX(calc(var(--toast-swipe-movement-x)-150%))_translateY(var(--offset-y))] data-ending-style:data-[swipe-direction=right]:[transform:translateX(calc(var(--toast-swipe-movement-x)+150%))_translateY(var(--offset-y))] data-ending-style:data-[swipe-direction=up]:[transform:translateY(calc(var(--toast-swipe-movement-y)-150%))] data-expanded:data-ending-style:data-[swipe-direction=down]:[transform:translateY(calc(var(--toast-swipe-movement-y)+150%))] data-expanded:data-ending-style:data-[swipe-direction=left]:[transform:translateX(calc(var(--toast-swipe-movement-x)-150%))_translateY(var(--offset-y))] data-expanded:data-ending-style:data-[swipe-direction=right]:[transform:translateX(calc(var(--toast-swipe-movement-x)+150%))_translateY(var(--offset-y))] data-expanded:data-ending-style:data-[swipe-direction=up]:[transform:translateY(calc(var(--toast-swipe-movement-y)-150%))]",
+  "component": "Toast",
+  "component_name": "toast",
+  "data_attrs": [],
+  "element": "ToastPrimitive.Root"
+ },
+ "toast-action": {
+  "base_classes": "shrink-0",
+  "component": "ToastAction",
+  "component_name": "toast",
+  "data_attrs": [],
+  "element": "ToastPrimitive.Action"
+ },
+ "toast-close": {
+  "base_classes": "relative shrink-0 text-muted-foreground after:absolute after:-inset-2 after:content-[''] hover:text-foreground",
+  "component": "ToastClose",
+  "component_name": "toast",
+  "data_attrs": [],
+  "element": "ToastPrimitive.Close"
+ },
+ "toast-content": {
+  "base_classes": "flex h-full items-center gap-3 overflow-hidden p-4 transition-opacity duration-250 ease-[cubic-bezier(0.22,1,0.36,1)] data-behind:opacity-0 data-expanded:opacity-100",
+  "component": "ToastContent",
+  "component_name": "toast",
+  "data_attrs": [],
+  "element": "ToastPrimitive.Content"
+ },
+ "toast-description": {
+  "base_classes": "text-sm text-muted-foreground",
+  "component": "ToastDescription",
+  "component_name": "toast",
+  "data_attrs": [],
+  "element": "ToastPrimitive.Description"
+ },
+ "toast-icon": {
+  "base_classes": "shrink-0 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4",
+  "component": "ToastIcon",
+  "component_name": "toast",
+  "data_attrs": [],
+  "element": "span"
+ },
+ "toast-portal": {
+  "base_classes": "",
+  "component": "ToastPortal",
+  "component_name": "toast",
+  "data_attrs": [],
+  "element": "ToastPrimitive.Portal"
+ },
+ "toast-title": {
+  "base_classes": "text-sm font-medium",
+  "component": "ToastTitle",
+  "component_name": "toast",
+  "data_attrs": [],
+  "element": "ToastPrimitive.Title"
+ },
+ "toast-viewport": {
+  "base_classes": "pointer-events-none fixed inset-x-4 bottom-4 z-50 mx-auto w-auto max-w-sm outline-none sm:right-4 sm:left-auto sm:mx-0 sm:w-full",
+  "component": "ToastViewport",
+  "component_name": "toast",
+  "data_attrs": [],
+  "element": "ToastPrimitive.Viewport"
+ },
+ "toggle": {
+  "base_classes": "",
+  "component": "Toggle",
+  "component_name": "toggle",
+  "cva": "toggleVariants",
+  "data_attrs": [],
+  "element": "TogglePrimitive.Root",
+  "variants": {
+   "base": "cn-toggle group/toggle inline-flex items-center justify-center whitespace-nowrap outline-none hover:bg-muted focus-visible:ring-[3px] disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0",
+   "defaults": {
+    "size": "default",
+    "variant": "default"
+   },
+   "variants": {
+    "size": {
+     "default": "cn-toggle-size-default",
+     "lg": "cn-toggle-size-lg",
+     "sm": "cn-toggle-size-sm"
+    },
+    "variant": {
+     "default": "cn-toggle-variant-default",
+     "outline": "cn-toggle-variant-outline"
+    }
+   }
+  }
+ },
+ "toggle-group": {
+  "base_classes": "cn-toggle-group group/toggle-group flex w-fit flex-row items-center gap-[--spacing(var(--gap))] data-vertical:flex-col data-vertical:items-stretch",
+  "component": "ToggleGroup",
+  "component_name": "toggle-group",
+  "data_attrs": [
+   "data-orientation",
+   "data-size",
+   "data-spacing",
+   "data-variant"
+  ],
+  "element": "ToggleGroupPrimitive.Root"
+ },
+ "toggle-group-item": {
+  "base_classes": "cn-toggle-group-item shrink-0 focus:z-10 focus-visible:z-10 group-data-horizontal/toggle-group:data-[spacing=0]:data-[variant=outline]:border-l-0 group-data-vertical/toggle-group:data-[spacing=0]:data-[variant=outline]:border-t-0 group-data-horizontal/toggle-group:data-[spacing=0]:data-[variant=outline]:first:border-l group-data-vertical/toggle-group:data-[spacing=0]:data-[variant=outline]:first:border-t",
+  "component": "ToggleGroupItem",
+  "component_name": "toggle-group",
+  "data_attrs": [
+   "data-size",
+   "data-spacing",
+   "data-variant"
+  ],
+  "element": "ToggleGroupPrimitive.Item"
+ },
+ "tooltip": {
+  "base_classes": "",
+  "component": "Tooltip",
+  "component_name": "tooltip",
+  "data_attrs": [],
+  "element": "TooltipPrimitive.Root"
+ },
+ "tooltip-arrow": {
+  "base_classes": "cn-tooltip-arrow z-50 translate-y-[calc(-50%_-_2px)] bg-foreground fill-foreground",
+  "component": "TooltipContent",
+  "component_name": "tooltip",
+  "data_attrs": [],
+  "element": "svg",
+  "no_slot": true
+ },
+ "tooltip-content": {
+  "base_classes": "cn-tooltip-content z-50 w-fit max-w-xs origin-(--radix-tooltip-content-transform-origin) bg-foreground text-background",
+  "component": "TooltipContent",
+  "component_name": "tooltip",
+  "data_attrs": [],
+  "element": "TooltipPrimitive.Content"
+ },
+ "tooltip-provider": {
+  "base_classes": "",
+  "component": "TooltipProvider",
+  "component_name": "tooltip",
+  "data_attrs": [],
+  "element": "TooltipPrimitive.Provider"
+ },
+ "tooltip-trigger": {
+  "base_classes": "",
+  "component": "TooltipTrigger",
+  "component_name": "tooltip",
+  "data_attrs": [],
+  "element": "TooltipPrimitive.Trigger"
+ },
+ "trace": {
+  "base_classes": "cn-trace flex w-full min-w-0 flex-col *:has-[>[data-slot=trace-line]]:flex *:has-[>[data-slot=trace-line]]:w-fit *:has-[>[data-slot=trace-line]]:max-w-full *:has-[>[data-slot=trace-line]]:min-w-0 *:has-[>[data-slot=trace-line]]:text-left *:has-[>[data-slot=trace-line]]:outline-none",
+  "component": "Trace",
+  "component_name": "trace",
+  "data_attrs": [],
+  "element": "div"
+ },
+ "trace-collapsible": {
+  "base_classes": "cn-trace-collapsible flex w-full min-w-0 flex-col",
+  "component": "TraceCollapsible",
+  "component_name": "trace",
+  "data_attrs": [],
+  "element": "Collapsible"
+ },
+ "trace-collapsible-content": {
+  "base_classes": "cn-trace-collapsible-content min-w-0 overflow-hidden [--radix-accordion-content-height:var(--radix-collapsible-content-height)] data-open:animate-accordion-down data-closed:animate-accordion-up",
+  "component": "TraceCollapsibleContent",
+  "component_name": "trace",
+  "data_attrs": [],
+  "element": "CollapsibleContent"
+ },
+ "trace-collapsible-content-inner": {
+  "base_classes": "cn-trace-collapsible-content-inner min-w-0 wrap-break-word text-muted-foreground",
+  "component": "TraceCollapsibleContent",
+  "component_name": "trace",
+  "data_attrs": [],
+  "element": "div"
+ },
+ "trace-collapsible-trigger": {
+  "base_classes": "cn-trace-collapsible-trigger group/trace-collapsible-trigger flex w-fit max-w-full min-w-0 cursor-pointer items-center text-left text-muted-foreground transition-colors outline-none hover:text-foreground has-[[data-status=error]]:text-destructive",
+  "component": "TraceCollapsibleTrigger",
+  "component_name": "trace",
+  "data_attrs": [],
+  "element": "CollapsibleTrigger"
+ },
+ "trace-description": {
+  "base_classes": "cn-trace-description shrink-0 text-muted-foreground/70 tabular-nums",
+  "component": "TraceDescription",
+  "component_name": "trace",
+  "data_attrs": [],
+  "element": "span"
+ },
+ "trace-icon": {
+  "base_classes": "cn-trace-icon flex shrink-0 items-center justify-center [&_svg]:pointer-events-none",
+  "component": "TraceIcon",
+  "component_name": "trace",
+  "data_attrs": [],
+  "element": "span"
+ },
+ "trace-line": {
+  "base_classes": "cn-trace-line flex w-fit max-w-full min-w-0 items-center text-muted-foreground transition-colors in-[a,button]:cursor-pointer in-[a:hover,button:hover]:text-foreground data-[status=error]:text-destructive data-[status=error]:in-[a:hover,button:hover]:text-destructive data-[status=pending]:opacity-60 data-[status=running]:*:data-[slot=trace-title]:shimmer",
+  "component": "TraceLine",
+  "component_name": "trace",
+  "data_attrs": [
+   "data-status"
+  ],
+  "element": "span"
+ },
+ "trace-title": {
+  "base_classes": "cn-trace-title min-w-0 truncate motion-reduce:shimmer-none",
+  "component": "TraceTitle",
+  "component_name": "trace",
+  "data_attrs": [],
+  "element": "span"
+ }
+}

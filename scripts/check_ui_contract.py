@@ -25,6 +25,13 @@ definitions, so the canonical macros are never counted against themselves:
                 whose aria-labelledby names no element in the template;
   empty-state   a hand-written "No ... yet" block with its own icon, instead
                 of the empty_state macro;
+  legacy-macro  a call to an old macro (empty_state, page_header, modal,
+                dense_table, shadcn_*) outside the files that define it;
+  raw-button    a hand-written <button> outside a macro definition, instead
+                of the button component;
+  missing-value a bare dash, "N/A" or zero shown where a value is missing
+                ({{ x or '—' }}, |default('—'), {% else %}—), instead of
+                explained_value with its reason and next step;
   form-field    a form control inside a <form> that is not rendered by
                 form_field or placed inside a form_group call (label, control,
                 description and error together).
@@ -32,7 +39,7 @@ definitions, so the canonical macros are never counted against themselves:
 Usage:
     python scripts/check_ui_contract.py            # list violations by rule
     python scripts/check_ui_contract.py --count    # print only the total (gate)
-    python scripts/check_ui_contract.py --rule dialog-title|empty-state|form-field [--count|--list]
+    python scripts/check_ui_contract.py --rule dialog-title|empty-state|form-field|legacy-macro|raw-button|missing-value [--count|--list]
 """
 from __future__ import annotations
 
@@ -255,11 +262,58 @@ def _rule_form_field(rel: str, text: str, view: str):
                         f"<{c.group(1).lower()}> outside form_field/form_group"))
     return out
 
+# Old macros kept only as compatibility wrappers. A call elsewhere is the
+# second implementation the design system retires.
+_LEGACY_CALL = re.compile(
+    r"(?:{{-?|{%-?\s*call(?:\([^)]*\))?)\s*"
+    r"(empty_state|page_header|modal|dense_table|shadcn_\w+)\s*\(")
+_LEGACY_HOMES = (
+    "components/empty_state.html", "components/page_header.html",
+    "components/modal.html", "components/dense_table.html",
+    "macros/page_shell.html", "macros/shadcn_compat.html")
+_BUTTON_TAG = re.compile(r"<button\b", re.IGNORECASE)
+# A value expression whose last step substitutes a placeholder:
+# {{ x or '—' }}, {{ a if x else 'N/A' }}, {{ x|default('-') }}. A bare 0 is a
+# display only when the expression sits directly in element text, not in an
+# attribute, a script or a condition.
+_PLACEHOLDER = r"(?:—|&mdash;|-|N/A|n/a)"
+_MISSING_EXPR = re.compile(
+    r"{{-?\s*[^{}]*?(?:\bor\s+|\belse\s+)['\"]" + _PLACEHOLDER + r"['\"]\s*-?}}"
+    r"|{{-?\s*[^{}]*?\|\s*default\(\s*['\"]" + _PLACEHOLDER + r"['\"]\s*(?:,[^)]*)?\)\s*-?}}")
+_MISSING_ZERO = re.compile(
+    r">\s*{{-?\s*[^{}()]*?(?:\bor\s+|\belse\s+)['\"]?0['\"]?\s*-?}}\s*<")
+_MISSING_ELSE = re.compile(
+    r"{%-?\s*else\s*-?%}\s*(?:<(\w+)[^>]*>\s*)?" + _PLACEHOLDER + r"\s*(?:</\1>\s*)?{%-?\s*endif")
+
+
+def _rule_legacy_macro(rel: str, text: str, view: str):
+    if rel.replace("\\", "/").endswith(_LEGACY_HOMES):
+        return []
+    return [(_line_of(text, m.start()), f"{m.group(1)}() is an old macro; use the component")
+            for m in _LEGACY_CALL.finditer(view)]
+
+
+def _rule_raw_button(rel: str, text: str, view: str):
+    return [(_line_of(text, m.start()), "hand-written <button>; use the button component")
+            for m in _BUTTON_TAG.finditer(view)]
+
+
+def _rule_missing_value(rel: str, text: str, view: str):
+    out = []
+    for rx in (_MISSING_EXPR, _MISSING_ZERO, _MISSING_ELSE):
+        for m in rx.finditer(view):
+            out.append((_line_of(text, m.start()),
+                        "missing value shown as a bare dash or zero; use explained_value"))
+    return out
+
 
 COMPONENT_RULES = {
     "dialog-title": _rule_dialog_title,
     "empty-state": _rule_empty_state,
     "form-field": _rule_form_field,
+    "legacy-macro": _rule_legacy_macro,
+    "raw-button": _rule_raw_button,
+    "missing-value": _rule_missing_value,
 }
 
 

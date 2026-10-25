@@ -784,7 +784,7 @@ def test_arb_queue_has_real_reviews_with_cycle_times(app, db_session, make_org):
     from app.models.architecture_review_board import ARBReviewItem
 
     stats = _seed_once()
-    assert stats["arb_reviews_created"] == 9
+    assert stats["arb_reviews_created"] == 11
     items = ARBReviewItem.query.filter(ARBReviewItem.review_number.like("LQ-ARB-%")).all()
     decided = [i for i in items if i.decision_date and i.submitted_at]
     assert len(decided) >= 4
@@ -1035,3 +1035,37 @@ def test_demo_seed_twice_changes_nothing(app, db_session, make_org):
     assert len(work_package_service.addressed_gap_ids(org_id)) == links_before
     assert sum(len(g.plateaus) for g in Gap.query.filter_by(organization_id=org_id)) == plateau_links_before
     assert again["gaps_created"] == 0
+
+
+def test_demo_weekly_briefing_has_content_in_every_section(app, db_session, make_org, tenant_ctx):
+    """The demonstration organisation fills all four briefing sections."""
+    from sqlalchemy import text
+
+    from app.commands.apply_entity_history_trigger import FUNCTION_SQL, TABLES
+    from app.modules.solutions_strategic.v2.services import weekly_briefing
+
+    # Elements the seed adds are recorded as changes only once the history
+    # trigger is installed, as it is on every deployed database.
+    from app import db
+
+    with db.engine.connect() as conn:
+        conn.execute(text(FUNCTION_SQL))
+        for table in TABLES:
+            conn.execute(text(f'DROP TRIGGER IF EXISTS entity_history_trg ON "{table}"'))
+            conn.execute(text(
+                f'CREATE TRIGGER entity_history_trg BEFORE INSERT OR UPDATE OR DELETE '
+                f'ON "{table}" FOR EACH ROW EXECUTE FUNCTION entity_history_record_version()'
+            ))
+        conn.commit()
+
+    _seed_once()
+    org_id = _get_lantern_org_id()
+    with tenant_ctx(org_id):
+        briefing = weekly_briefing.build(org_id)
+
+    sections = {s["key"]: s for s in briefing["sections"]}
+    assert sections["changes"]["total"] >= 1
+    assert sections["decisions"]["total"] >= 2
+    assert sections["risks"]["total"] >= 2
+    assert sections["conformance"]["total"] >= 3
+    assert "3 reviews past the time limit" in briefing["headline"]

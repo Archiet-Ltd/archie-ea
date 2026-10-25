@@ -338,11 +338,15 @@ def is_admin(user) -> bool:
 # ONBOARDING answer and is NULL for every user who did not complete that flow --
 # so a business_architect, the persona that exists to own this model, saw a
 # read-only page and had no way to create a capability anywhere in the product.
+#
+# The CTO is included: in a small company the CTO is the person who decides which
+# capabilities differentiate the business, and must be able to classify them.
 CAPABILITY_EDITOR_ROLES: Set[str] = {
     ROLE_PLATFORM_ADMIN,
     ROLE_ENTERPRISE_ARCHITECT,
     ROLE_BUSINESS_ARCHITECT,
     ROLE_SOLUTION_ARCHITECT,
+    ROLE_CTO,
 }
 
 

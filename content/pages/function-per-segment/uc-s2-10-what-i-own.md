@@ -14,8 +14,8 @@ icon: briefcase
 **For engineering managers and staff engineers, not just the CTO signing the contract.**
 
 Open My Applications. It lists only the applications you are recorded as owner of, with the type of ownership you hold,
-the health status recorded on each one and any sunset dates coming up. To see what depends on one of them, ask "What
-breaks if ___ fails or is under-resourced?" on the Ask page. My Applications does not yet list dependants itself.
+the health status recorded on each one and any sunset dates coming up. To see what depends on one of them, ask the AI
+chat what breaks if it fails. My Applications does not yet list dependants itself.
 
 ## The question
 
@@ -62,8 +62,7 @@ role. The same question comes from a new joiner on day one, and from a manager t
 3. Open **My Portfolio** and use the ownership-type filters to separate what you run as Primary from what you back up.
 4. Open **Health Overview** and record a status for anything under Not assessed.
 5. Open **Roadmap Impact** to see what is due to be retired.
-6. For what depends on an application, open **Ask**, choose "What breaks if ___ fails or is under-resourced?", and
-   pick the application.
+6. For what depends on an application, open the **AI chat** and ask what breaks if that application fails.
 
 ## Doing this without Entelim
 
@@ -72,7 +71,7 @@ as soon as someone changes teams, and it says nothing about health or retirement
 
 ## Limits
 
-- The list of what depends on each owned application is not on these pages. The Ask page answers that question one
+- The list of what depends on each owned application is not on these pages. The AI chat answers that question one
   application at a time.
 - Only the application manager role, and platform administrators, can open My Applications. Other roles are refused.
 - It lists applications you are recorded against as an owner. An application with no owner recorded appears for nobody.
