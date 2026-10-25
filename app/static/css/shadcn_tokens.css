@@ -36,6 +36,8 @@
     --popover-foreground: 222.2 47.4% 11.2%;
     --primary: 213.2 81.3% 40.7%;  /* the logo's blue, oklch(0.497 0.163 257); white label 5.93:1 */
     --primary-foreground: 0 0% 100%;
+    --primary-surface: 213.2 81.3% 40.7%;  /* a large area of brand colour: the same blue as --primary in light */
+    --primary-surface-foreground: 0 0% 100%;
     --secondary: 210 40% 96.1%;
     --secondary-foreground: 215.3 25% 26.7%;
     --muted: 210 40% 96.1%;
@@ -66,12 +68,13 @@
     --border: 214.3 31.8% 91.4%;
     --input: 0 0% 56.1%;  /* oklch(0.65 0 0): control boundary 3.23:1 on white (R10) */
     --ring: 213.2 81.3% 40.7%;
-    /* Chart ramp, five steps of the brand blue; each at least 3.2:1 on the card. */
-    --chart-1: 213.2 100% 29.4%;
-    --chart-2: 213.7 75.1% 39.4%;
-    --chart-3: 214.5 61.1% 48.4%;
-    --chart-4: 214.7 66% 54.7%;
-    --chart-5: 214.8 77.6% 61%;
+    /* Chart ramp (foundations-v1 section 2): brand blue, orange, deep green, sky, plum; each at least 3.2:1 on the card. */
+    --chart-1: 213.2 81.3% 40.7%;
+    --chart-2: 29.6 88.4% 45.4%;
+    --chart-3: 157.5 90.6% 20.9%;
+    --chart-4: 198.3 49.3% 49.7%;
+    --chart-5: 289.2 50.7% 30.5%;
+    --chart-tint: 213.2 70% 56%;  /* the brand blue, muted: second series beside --chart-1; 3.7:1 on the card */
     /* The logo: --brand is --primary's value held apart so the public marketing palette (which re-points
        --primary to near-black) cannot recolour the mark. */
     --brand: 213.2 81.3% 40.7%;
@@ -105,6 +108,21 @@
     --layer-technology-emphasis: 142 71% 26%;
     --layer-implementation-emphasis: 199 89% 30%;
     --layer-risk-emphasis: 0 84% 42%;
+
+    /* ArchiMate 3.2 notation colours, as the standard teaches them: strategy tan, business yellow, application
+       blue, technology and physical green, motivation lilac, implementation pink, migration pale green,
+       location orange. Fill and hairline stroke per layer. The composer canvas, its palette and its legend
+       read these and nothing else. */
+    --notation-strategy: 39 78% 83%;        --notation-strategy-stroke: 38 55% 38%;
+    --notation-business: 60 100% 85%;       --notation-business-stroke: 55 70% 33%;
+    --notation-application: 180 100% 86%;   --notation-application-stroke: 190 80% 28%;
+    --notation-technology: 104 45% 80%;     --notation-technology-stroke: 120 45% 28%;
+    --notation-physical: 104 45% 80%;       --notation-physical-stroke: 120 45% 28%;
+    --notation-motivation: 240 100% 90%;    --notation-motivation-stroke: 250 40% 42%;
+    --notation-implementation: 0 100% 91%;  --notation-implementation-stroke: 0 50% 42%;
+    --notation-migration: 120 70% 90%;      --notation-migration-stroke: 130 45% 32%;
+    --notation-location: 30 90% 70%;        --notation-location-stroke: 25 65% 33%;
+    --notation-other: var(--background);    --notation-other-stroke: var(--muted-foreground);
   }
 
   .dark {
@@ -116,6 +134,8 @@
     --popover-foreground: 210 40% 98%;
     --primary: 215 86.8% 67.2%;  /* oklch(0.70 0.14 257); navy label 6.68:1 */
     --primary-foreground: 222.2 47.4% 11.2%;
+    --primary-surface: 215 60% 24%;  /* the brand blue held in the dark range, so a large area sits with the cards around it; white label 10:1 */
+    --primary-surface-foreground: 210 40% 98%;
     --secondary: 217.2 32.6% 17.5%;
     --secondary-foreground: 210 40% 98%;
     --muted: 217.2 32.6% 17.5%;
@@ -143,11 +163,12 @@
     --input: 0 0% 45.2%;  /* oklch(0.556 0 0): 3.79:1 on the dark card, 4.18:1 on the dark page */
     --ring: 215 86.8% 67.2%;
     --brand: 215 86.8% 67.2%;
-    --chart-1: 214.7 66% 54.7%;
-    --chart-2: 214.9 83.4% 63.6%;
-    --chart-3: 213.5 100% 70.8%;
-    --chart-4: 209.3 100% 74.4%;
-    --chart-5: 203.6 100% 78.1%;
+    --chart-1: 215 86.8% 67.2%;
+    --chart-2: 29 90.2% 60.6%;
+    --chart-3: 153.1 50.9% 40.5%;
+    --chart-4: 199.5 82.7% 73.7%;
+    --chart-tint: 215 55% 50%;  /* the brand blue, muted: second series beside --chart-1; 3.1:1 on this dark card */
+    --chart-5: 276.2 47.9% 55.5%;  /* oklch(0.58 0.17 310): 0.02 lighter than the spec so it holds 3:1 on this dark card */
     --overlay: 222.2 47.4% 11.2%;
 
     /* ArchiMate layer semantic colors (dark mode) */
@@ -165,6 +186,16 @@
     --layer-technology-emphasis: 142 71% 64%;
     --layer-implementation-emphasis: 199 89% 68%;
     --layer-risk-emphasis: 0 84% 74%;
+
+    --notation-strategy: 38 40% 24%;        --notation-strategy-stroke: 38 55% 65%;
+    --notation-business: 58 45% 22%;        --notation-business-stroke: 56 65% 62%;
+    --notation-application: 190 50% 22%;    --notation-application-stroke: 190 60% 65%;
+    --notation-technology: 125 35% 22%;     --notation-technology-stroke: 125 40% 62%;
+    --notation-physical: 125 35% 22%;       --notation-physical-stroke: 125 40% 62%;
+    --notation-motivation: 250 35% 26%;     --notation-motivation-stroke: 250 60% 74%;
+    --notation-implementation: 0 35% 25%;   --notation-implementation-stroke: 0 60% 72%;
+    --notation-migration: 130 35% 22%;      --notation-migration-stroke: 130 45% 62%;
+    --notation-location: 30 50% 30%;        --notation-location-stroke: 28 70% 68%;
   }
 
   /* Public marketing theme. Opt-in: layouts/public_base.html puts this class on <body> for the marketing
@@ -213,6 +244,11 @@
     --ring: 0 0% 45.2%;
   }
 }
+
+/* Chart axis labels: the chart script gives each tick label its own fill, which no card colour overrides,
+   so on the dark card the labels fell to 2.55:1. */
+.cn-chart .recharts-cartesian-axis-tick-value,
+.cn-chart .recharts-cartesian-axis-tick-value tspan { fill: hsl(var(--muted-foreground)); }
 
 /* ArchiMate layer border-left utilities (missing from Tailwind JIT scan) */
 .border-l-violet-500 { border-left-color: #8b5cf6 !important; }

@@ -44,7 +44,9 @@
     [x-cloak] { display: none !important; }
 
     @media print {
-      .admin-sidebar, .admin-header, [x-data], button, .no-print { display: none !important; }
+      .admin-sidebar, .admin-header, #admin-sidebar, #admin-header, button, .no-print { display: none !important; }
+      /* The shell pins itself to one screen and scrolls inside; on paper it must flow. */
+      .app-shell, .app-shell > div { display: block !important; height: auto !important; overflow: visible !important; }
       main { margin: 0 !important; padding: 0 !important; width: 100% !important; }
       body { background: white !important; color: black !important; font-size: 12pt; }
       table { border-collapse: collapse; width: 100%; }

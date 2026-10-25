@@ -15,8 +15,8 @@ icon: alert-triangle
 
 Open Value Streams at Risk and choose a maturity threshold from 1 to 5. Entelim lists every value stream that depends
 on a capability whose current maturity is below that level, with the capability, its current and target maturity, the gap and
-the stages it supports. For the initiatives and success metrics attached to an element, ask the strategy question on
-the Ask page.
+the stages it supports. For the initiatives and success metrics attached to an element, ask the AI chat what you are
+trying to achieve there and how it is tracking.
 
 ## The question
 
@@ -45,8 +45,8 @@ one or more capabilities below the threshold carries an "At risk" tag. Click a r
 A capability with no maturity recorded is Not assessed. It is not treated as safe and it is not treated as failing.
 When no value stream falls below the threshold, the page says "No value streams are below the maturity threshold."
 
-The strategy side lives on **Ask**. "What are we trying to achieve at ___, and how is it tracking?" lists the
-initiatives recorded against the element you pick. Each card shows its status, percentage complete and health, the
+The strategy side lives in the **AI chat**. Ask "what are we trying to achieve at the checkout, and how is it tracking?"
+and it lists the initiatives recorded against the element you name. Each card shows its status, percentage complete and health, the
 executive sponsor, budget variance (or "Not costed"), and its success metrics as name, actual against target, and
 status.
 
@@ -61,8 +61,8 @@ The question comes up before a planning round or after an incident that traced b
 2. In the stage grid, link capabilities to the stages they support. This link is what the page reads.
 3. Record each capability's current and target maturity (see the capability maturity view).
 4. Open **Value Streams at Risk** from the business architect's sidebar and pick your threshold.
-5. Open a flagged value stream to see the capabilities behind it. For the initiatives and metrics, open **Ask** and
-   pick the capability or value stream they are recorded against.
+5. Open a flagged value stream to see the capabilities behind it. For the initiatives and metrics, ask the **AI chat**
+   about the capability or value stream they are recorded against.
 
 ## Doing this without Entelim
 
@@ -74,7 +74,7 @@ round. The match goes stale quickly and it hides capabilities nobody has assesse
 - With no capabilities linked to value stream stages, the page shows "No capabilities are linked to a value stream
   yet" and offers a link to Value Streams. It does not guess the links.
 - It reads the links you recorded. It does not infer dependencies that nobody entered.
-- Initiatives and success metrics are not shown on this page. They are on the Ask strategy card, one element at a
+- Initiatives and success metrics are not shown on this page. They are in the chat's strategy answer, one element at a
   time.
 - Threshold is one number from 1 to 5, applied to every capability. There are no per-capability thresholds.
 

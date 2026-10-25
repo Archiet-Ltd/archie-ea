@@ -368,7 +368,7 @@ def test_plateau_roadmap_page_shows_critical_path_panel(two_orgs, db_session, cl
     _wp(db_session, b, "B work", plateau_b)
 
     login_as(client, two_orgs["user_a"])
-    resp = client.get("/adm-kanban/plateau-roadmap")
+    resp = client.get("/adm-kanban/plateau-roadmap", follow_redirects=True)
     assert resp.status_code == 200
     html = resp.get_data(as_text=True)
     assert 'data-testid="critical-path-panel"' in html
@@ -473,37 +473,24 @@ def test_roadmap_query_count_is_flat_in_the_number_of_plateaus(two_orgs, db_sess
 
 def test_panel_failure_keeps_the_plateau_cards(two_orgs, db_session, client, login_as,
                                                monkeypatch):
-    from app.models.adm_kanban import ADMPhase, KanbanBoard, KanbanCard
     from app.services import work_package_service as svc
 
     a = two_orgs["a"]
     user = two_orgs["user_a"]
-    suffix = uuid.uuid4().hex[:8]
-    phase = ADMPhase(name=f"Phase {suffix}", code=suffix[:10], order=1)
-    db_session.add(phase)
-    db_session.flush()
-    board = KanbanBoard(name="Board", board_type="architecture_development",
-                        created_by_id=user.id, organization_id=a.id)
-    db_session.add(board)
-    db_session.flush()
-    card = KanbanCard(
-        title="Kept plateau card", adm_phase_id=phase.id, board_id=board.id,
-        card_type="task", status="todo", arch_element_type="Plateau",
-        created_by_id=user.id, organization_id=a.id,
-    )
-    db_session.add(card)
-    db_session.flush()
+    plateau = _plateau(db_session, a, "Kept plateau card")
+    _wp(db_session, a, "Kept work package", plateau,
+        start=datetime(2026, 1, 1), end=datetime(2026, 1, 5))
 
     def _boom(organization_id):
         raise RuntimeError("critical path exploded")
 
     monkeypatch.setattr(svc, "critical_paths_for_roadmap", _boom)
     login_as(client, user)
-    resp = client.get("/adm-kanban/plateau-roadmap")
+    resp = client.get("/adm-kanban/plateau-roadmap", follow_redirects=True)
 
     assert resp.status_code == 200
     html = resp.get_data(as_text=True)
-    assert "Kept plateau card" in html
+    assert "Kept plateau card" in html and "Kept work package" in html
     assert 'data-testid="critical-path-panel"' not in html
 
 
@@ -524,7 +511,7 @@ def test_nameless_blocking_owner_shows_no_email(two_orgs, db_session, client, lo
     assert nameless.email not in json.dumps(cp)
 
     login_as(client, two_orgs["user_a"])
-    html = client.get("/adm-kanban/plateau-roadmap").get_data(as_text=True)
+    html = client.get("/adm-kanban/plateau-roadmap", follow_redirects=True).get_data(as_text=True)
     assert "Owned by nobody named" in html
     assert nameless.email not in html
 

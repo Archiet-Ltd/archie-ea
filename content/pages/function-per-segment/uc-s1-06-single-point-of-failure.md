@@ -25,7 +25,7 @@ makes you realize you don't actually know.
 
 ## What Entelim answers
 
-Ask the question in plain words, and Entelim traces every relationship your model has — the ones
+Connect GitHub, or import a file, and Entelim proposes the services and dependencies it finds for you to approve. Then ask the AI chat in plain words what happens if one of them goes down, and Entelim traces every relationship your model has — the ones
 you entered and the ones it worked out on its own — to show exactly what sits downstream. Every
 connection in the answer carries its own reasoning, open to check in a proof drawer, never a number
 you have to take on faith.
@@ -38,11 +38,11 @@ whose head has been the system of record until now.
 
 ## Before you ask "isn't this overkill for a company our size?"
 
-Start from what you already use — a Lean Canvas, a Business Model Canvas, or nothing written down
+Start from what you already use — a Business Model Canvas, or nothing written down
 at all. The underlying model notation is never shown unless you choose to open it. If your canvas
 already lives in Miro or Notion, keep it there: Entelim's own version is the Business Model Canvas,
-where every block gets an AI-drafted suggestion pulled from your own model data, so you start from
-something real instead of a blank box.
+where each block can get an AI-drafted suggestion built from the other blocks you have filled in, so you
+start from something real instead of a blank box.
 
 ## Related
 

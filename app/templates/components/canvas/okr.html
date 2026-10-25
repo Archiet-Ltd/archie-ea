@@ -1,0 +1,15 @@
+{# Vendored from flask-basecoat, branch feat/canvases-capability-map, commit 2b02744, flask_basecoat/templates/basecoat/canvas/ okr.html, reduced to its objective, key results and initiatives. #}
+{# OKR, C2. After Andy Grove (High Output Management, 1983) and John Doerr (Measure What Matters, 2018): one qualitative Objective with measurable Key Results, and the initiatives that move them. Entelim holds no measured value for a key result yet, so no score or progress bar is drawn. #}
+{% import 'components/canvas/_frame.html' as f with context %}
+{% set SPEC = {
+  'form': 'C2', 'name': 'OKR', 'grid': 'grid-cols-12', 'width': 'min-w-200',
+  'hint': 'Scroll sideways on a narrow screen to see the key results beside the initiatives.',
+  'credit': 'OKR after Andy Grove, High Output Management (1983), and John Doerr, Measure What Matters (2018).',
+  'boxes': [
+    {'key': 'objective', 'title': 'Objective', 'icon': 'target', 'question': 'What do we want to achieve? One qualitative goal.', 'empty': 'No objective yet. Add the goal this quarter is for.', 'area': 'col-span-12 row-start-1'},
+    {'key': 'key-results', 'title': 'Key Results', 'icon': 'gauge', 'question': 'How will we know it is met? Three to five measurable results.', 'empty': 'No key results yet. Add the outcomes, each with a baseline and a target.', 'area': 'col-span-7 row-start-2'},
+    {'key': 'initiatives', 'title': 'Initiatives', 'icon': 'rocket', 'question': 'What will we do to move the key results?', 'empty': 'No initiatives yet. Add the work packages that move the key results.', 'area': 'col-span-5 row-start-2'},
+  ]} %}
+{% macro okr(data, id='okr') -%}
+{{ f.grid_canvas(SPEC, data, id) }}
+{%- endmacro %}

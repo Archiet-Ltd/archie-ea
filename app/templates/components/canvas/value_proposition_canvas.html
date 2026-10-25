@@ -1,0 +1,77 @@
+{# Vendored from flask-basecoat, branch feat/canvases-capability-map, commit 24590ba,
+   flask_basecoat/templates/basecoat/canvas/value-proposition-canvas.html. Adapted only to Entelim macro names (components/canvas/_ui.html maps the library
+   names onto components/*.html); the edit Sheet and its client-side script are left out because Entelim saves on the server. #}
+{# Value Proposition Canvas, C4. Osterwalder, Pigneur, Bernarda and Smith, Value Proposition Design (Strategyzer, 2014):
+   the Value Map as a square on the left (Products and Services in the left part, Gain Creators over Pain Relievers on the
+   right) and the Customer Profile as a circle on the right (Gains over Pains on the left, Customer Jobs on the right), the two
+   joined by the fit arrows between Gain Creators and Gains and between Pain Relievers and Pains.
+   The square and the circle are SVG outlines in tokens behind the Cards, which sit on a 20 by 20 grid laid over each shape
+   (SVG with aria-hidden: the shapes carry no information a reader needs). The circle's segments are cut by one horizontal and one
+   vertical line rather than by three rays, so that the Cards (rectangles) stay inside their segment.
+   Usage: {{ canvas.value_proposition_canvas(data) }}, data = {'title', 'subtitle', 'boxes': {'products-services': [notes], ...}}.
+   Box keys: products-services gain-creators pain-relievers gains pains customer-jobs. #}
+{% import 'components/canvas/_ui.html' as ui with context %}
+{% import 'components/canvas/_frame.html' as f with context %}
+
+{% set MAP = [
+  {'key': 'products-services', 'empty': 'No products or services yet. Add them on the business model canvas under Value Propositions.', 'title': 'Products and Services', 'icon': 'package', 'question': 'What do you offer that helps the customer?', 'area': 'col-start-2 col-span-7 row-start-2 row-span-18'},
+  {'key': 'gain-creators', 'empty': 'No value recorded yet. Add it on the business model canvas under Value Propositions.', 'title': 'Gain Creators', 'icon': 'trending-up', 'question': 'How do you create customer gains?', 'area': 'col-start-11 col-span-9 row-start-2 row-span-8'},
+  {'key': 'pain-relievers', 'empty': 'No pain relievers recorded yet.', 'title': 'Pain Relievers', 'icon': 'life-buoy', 'question': 'How do you relieve customer pains?', 'area': 'col-start-11 col-span-9 row-start-12 row-span-8'},
+] %}
+{% set PROFILE = [
+  {'key': 'gains', 'empty': 'No customer gains recorded yet.', 'title': 'Gains', 'icon': 'smile', 'question': 'What outcomes do customers want?', 'area': 'col-start-5 col-span-8 row-start-3 row-span-7'},
+  {'key': 'pains', 'empty': 'No customer pains recorded yet.', 'title': 'Pains', 'icon': 'triangle-alert', 'question': 'What annoys customers before, during and after?', 'area': 'col-start-5 col-span-8 row-start-12 row-span-7'},
+  {'key': 'customer-jobs', 'empty': 'No customer jobs recorded yet.', 'title': 'Customer Jobs', 'icon': 'briefcase', 'question': 'What jobs are customers trying to get done?', 'area': 'col-start-14 col-span-5 row-start-6 row-span-10'},
+] %}
+
+
+{% macro value_proposition_canvas(data, id='value-proposition-canvas') -%}
+{%- set boxes = data.boxes or {} -%}
+{%- set rows = [] -%}
+{%- for part, group in [('Value Map', MAP), ('Customer Profile', PROFILE)] -%}
+  {%- for b in group -%}{%- for n in boxes.get(b.key) or [f.empty_text(b)] %}{% set _ = rows.append([b.key, b.title, part, n.text if n is mapping else n, n.href if n is mapping else '']) %}{% endfor -%}{%- endfor -%}
+{%- endfor -%}
+{% call f.frame(id, 'C4', 'Value proposition canvas', data, rows, 'Scroll sideways on a narrow screen to see the value map, the fit arrows and the customer profile.',
+     credit='Value Proposition Canvas by Strategyzer AG (strategyzer.com), Alexander Osterwalder, Yves Pigneur, Greg Bernarda and Alan Smith.',
+     width='min-w-240', columns=['Box', 'Part', 'Note']) %}
+  <div class="grid grid-cols-11 items-stretch gap-2 rounded-lg border bg-muted/30 p-2">
+    <div class="col-span-5 flex flex-col gap-2">
+      <h3 class="text-sm font-medium">Value Map</h3>
+      <div class="relative aspect-square">
+        <svg viewBox="0 0 100 100" class="absolute inset-0 size-full fill-none" aria-hidden="true" focusable="false">
+          <rect x="1" y="1" width="98" height="98" rx="2" class="fill-muted/40 stroke-border" stroke-width="1.5" vector-effect="non-scaling-stroke"/>
+          <path d="M45 1 V99 M45 50 H99" class="stroke-border" stroke-width="1.5" vector-effect="non-scaling-stroke"/>
+        </svg>
+        <div class="absolute inset-0 grid grid-cols-20 grid-rows-20 gap-1">
+          {% for b in MAP %}{{ f.box(id, b, boxes, scroll=true) }}{% endfor %}
+        </div>
+      </div>
+    </div>
+    <div class="col-span-1 flex flex-col gap-2">
+      <h3 class="text-sm font-medium">Fit</h3>
+      <div class="grid flex-1 grid-rows-2 place-items-center gap-2 text-center">
+        <div class="flex flex-col items-center gap-1.5">
+          {{ ui.lucide('arrow-left-right', 'size-5 text-muted-foreground') }}
+          <span class="text-xs text-muted-foreground">Gain creators meet gains</span>
+        </div>
+        <div class="flex flex-col items-center gap-1.5">
+          {{ ui.lucide('arrow-left-right', 'size-5 text-muted-foreground') }}
+          <span class="text-xs text-muted-foreground">Pain relievers meet pains</span>
+        </div>
+      </div>
+    </div>
+    <div class="col-span-5 flex flex-col gap-2">
+      <h3 class="text-sm font-medium">Customer Profile</h3>
+      <div class="relative aspect-square">
+        <svg viewBox="0 0 100 100" class="absolute inset-0 size-full fill-none" aria-hidden="true" focusable="false">
+          <circle cx="50" cy="50" r="49" class="fill-muted/40 stroke-border" stroke-width="1.5" vector-effect="non-scaling-stroke"/>
+          <path d="M1 50 H62 M62 2.5 V97.5" class="stroke-border" stroke-width="1.5" vector-effect="non-scaling-stroke"/>
+        </svg>
+        <div class="absolute inset-0 grid grid-cols-20 grid-rows-20 gap-1">
+          {% for b in PROFILE %}{{ f.box(id, b, boxes, scroll=true) }}{% endfor %}
+        </div>
+      </div>
+    </div>
+  </div>
+{% endcall %}
+{%- endmacro %}

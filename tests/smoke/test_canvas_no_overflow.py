@@ -31,7 +31,7 @@ def _login(page, base, email):
 @pytest.mark.smoke
 @pytest.mark.parametrize("width,height", [(1440, 900), (1280, 800)])
 def test_canvas_detail_titles_wrap_only_between_words(browser, live_server, seeded, width, height):
-    """At 1280 and 1440 px the nine-box grid must fit the content width with
+    """At 1280 and 1440 px the nine-box canvas must fit the content width with
     no horizontal overflow, and every box title must wrap only at spaces --
     never inside a word."""
     context = browser.new_context(ignore_https_errors=True, viewport={"width": width, "height": height})
@@ -66,10 +66,10 @@ def test_canvas_detail_titles_wrap_only_between_words(browser, live_server, seed
         # dismissing it first). The dialog has no test id of its own; its
         # step-1 heading text is the stable anchor (app/templates/layouts/
         # admin_base.html).
-        expect(page.get_by_test_id("bmc-grid")).to_be_visible(timeout=PAGE_TIMEOUT)
+        expect(page.locator('[data-entelim-form="C4"]')).to_be_visible(timeout=PAGE_TIMEOUT)
         welcome_heading = page.get_by_text(re.compile("^Welcome to "))
         assert welcome_heading.count() == 0 or not welcome_heading.first.is_visible(), (
-            "the onboarding dialog is covering the canvas grid"
+            "the onboarding dialog is covering the canvas"
         )
 
         # Assert no horizontal overflow on the document.
@@ -79,7 +79,7 @@ def test_canvas_detail_titles_wrap_only_between_words(browser, live_server, seed
             f"Horizontal overflow detected: scrollWidth={scroll_width} > innerWidth={inner_width}"
         )
 
-        titles = page.locator(".bmc-box-title")
+        titles = page.locator('[data-entelim-form="C4"] [data-slot=card-title] > span')
         count = titles.count()
         assert count == 9, f"Expected 9 box titles, found {count}"
 

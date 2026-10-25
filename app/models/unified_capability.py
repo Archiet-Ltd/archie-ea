@@ -672,6 +672,19 @@ def _scope_unified_capability_queries(orm_execute_state):
     )
 
 
+@db.event.listens_for(UnifiedCapability, "before_insert")
+def _give_new_capability_a_type(mapper, connection, target):
+    """A new capability is never untyped: fall back to the starting rule."""
+    from app.services.capability_type import (
+        default_capability_type,
+        normalise_capability_type,
+    )
+
+    target.capability_type = normalise_capability_type(
+        target.capability_type
+    ) or default_capability_type(target.category, target.level)
+
+
 @db.event.listens_for(db.session, "before_flush")
 def _protect_reference_capability_writes(session, flush_context, instances):
     """Stamp tenant-created capabilities and reject reference/cross-org edits."""

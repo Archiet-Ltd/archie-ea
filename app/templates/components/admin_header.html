@@ -5,6 +5,8 @@
 {% from 'components/button.html' import button %}
 {% from 'components/ui_sidebar.html' import sidebar_trigger %}
 {% from 'components/empty_state.html' import empty_state %}
+{% from 'components/badge.html' import badge %}
+{% from 'components/popover.html' import popover %}
 <header id="admin-header"
         class="sticky top-0 z-30 flex h-12 shrink-0 items-center justify-between px-4 bg-background border-b border-border">
     <div class="flex items-center gap-4">
@@ -65,30 +67,23 @@
 
         <!-- ── Notifications ─────────────────────────────────────────── -->
         <div class="relative" id="notif-wrapper" data-dropdown-wrapper>
-            <button type="button" id="notif-btn"
-                    class="relative text-muted-foreground hover:text-foreground transition-colors p-1.5 rounded-md hover:bg-accent"
-                    aria-label="Notifications"
-                    aria-expanded="false"
-                    aria-haspopup="dialog"
-                    aria-controls="notif-dropdown">
-                <i data-lucide="bell" class="h-5 w-5"></i>
-                <span id="notif-badge"
-                      class="absolute -top-1 -right-1 min-w-[1rem] h-4 rounded-full bg-destructive text-xs font-medium text-destructive-foreground flex items-center justify-center px-0.5 hidden">0</span>
-            </button>
+            {% call button(variant='ghost', size='icon', class='relative', aria_label='Notifications', attrs_dict={'id': 'notif-btn', 'aria-expanded': 'false', 'aria-haspopup': 'dialog', 'aria-controls': 'notif-dropdown'}) %}
+                <i data-lucide="bell" class="h-5 w-5" aria-hidden="true"></i>
+                <span id="notif-badge" class="absolute -top-1 -right-1 hidden">
+                    {% call badge(variant='destructive', class='h-4 min-w-4 justify-center px-1 py-0') %}<span id="notif-badge-count">0</span>{% endcall %}
+                </span>
+            {% endcall %}
 
-            <div id="notif-dropdown"
-                 class="absolute right-0 mt-2 w-80 rounded-md border border-border bg-popover z-50 hidden"
-                 role="dialog" aria-labelledby="notif-title">
-                <div class="p-3 border-b border-border flex items-center justify-between">
-                    <span id="notif-title" class="text-sm font-semibold">Notifications</span>
-                    <span id="notif-mark-read-btn-wrapper" class="hidden">
-                        {{ button(text='Mark all read', variant='ghost', size='sm', class='text-xs', aria_label='Mark all notifications as read', attrs_dict={'id': 'notif-mark-read-btn'}) }}
-                    </span>
-                </div>
+            {% set mark_read_action %}
+                <span id="notif-mark-read-btn-wrapper" class="hidden">
+                    {{ button(text='Mark all read', variant='ghost', size='xs', aria_label='Mark all notifications as read', attrs_dict={'id': 'notif-mark-read-btn'}) }}
+                </span>
+            {% endset %}
+            {% call popover(id='notif-dropdown', title='Notifications', title_id='notif-title', header_action=mark_read_action) %}
                 <div id="notif-list" class="max-h-72 overflow-y-auto">
                     {{ empty_state(icon='bell-off', title='No notifications', description='Updates about your work will appear here.', padding='py-6') }}
                 </div>
-            </div>
+            {% endcall %}
         </div>
 
         <template id="notif-empty-template">{{ empty_state(icon='bell-off', title='No notifications', description='Updates about your work will appear here.', padding='py-6') }}</template>
@@ -289,7 +284,7 @@
         if (!notifBadge) return;
         if (count > 0) {
             notifBadge.style.display = 'flex';
-            notifBadge.textContent = count > 99 ? '99+' : String(count);
+            document.getElementById('notif-badge-count').textContent = count > 99 ? '99+' : String(count);
         } else {
             notifBadge.style.display = 'none';
         }

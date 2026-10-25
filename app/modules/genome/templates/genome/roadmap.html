@@ -1,47 +1,109 @@
+{# design-block: dashboard #}
 {% extends 'layouts/admin_base.html' %}
 {% from 'macros/page_shell.html' import page_shell %}
-{% block title %}Transformation Roadmap{% endblock %}
+{% from 'components/roadmap/board.html' import roadmap_board %}
+{% from 'components/empty_state.html' import empty_state %}
+{% from 'components/card.html' import card, card_header, card_title, card_description, card_content %}
+{% from 'components/badge.html' import badge %}
+{% from 'components/button.html' import button %}
+{% block title %}Roadmap{% endblock %}
 
 {% block content %}
 <div class="p-6 space-y-6 mx-auto">
     {% macro _ps_actions() %}
-    <form method="post" action="{{ url_for('genome_roadmap.generate') }}">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <button type="submit"
-                class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
-            <i data-lucide="calendar-range" class="w-4 h-4"></i>
-            Generate roadmap
-        </button>
-    </form>
+    {{ button(text='Add work package', icon='plus', href=url_for('implementation_planning.create_work_package')) }}
     {% endmacro %}
     {{ page_shell(
-        title='Transformation Roadmap', breadcrumb=[('Home', '/'), ('Transformation Roadmap', none)],
-        subtitle='Deterministic Plateau → Work Package transformation roadmap, built from the implementation-and-migration stores with element-level provenance (zero LLM).',
+        title='Roadmap',
+        breadcrumb=[('Home', '/')] + crumbs,
+        subtitle='Every plateau and work package your organisation has planned, from one store. Each card is a plateau; the work packages on it open their own page.',
+        tabs=tabs,
         actions_caller=_ps_actions) }}
 
     {% if error %}
-    <div class="px-3 py-2 border border-destructive/50 bg-destructive/10 rounded-md text-sm text-destructive">
-        {{ error }}
-    </div>
+    <div role="alert" class="px-3 py-2 border border-destructive/50 bg-destructive/10 rounded-md text-sm text-destructive">{{ error }}</div>
     {% endif %}
 
-    {% if roadmap_html %}
-    <div class="bg-card border border-border rounded-lg p-4">
-        {{ roadmap_html }}
-    </div>
-    <p class="text-xs text-muted-foreground">
-        Each lane is a plateau and each bar a real work package, positioned by its
-        start and target dates and shaded by status. Hover a bar to see its status,
-        completion, the gaps it closes, and its ArchiMate element id — provenance is
-        structural where an element is anchored and honestly marked synthetic where
-        one is legitimately absent.
+    {% if board %}
+    <p class="text-sm text-muted-foreground" data-testid="roadmap-lens-help">
+        <span class="font-medium text-foreground">{{ board.lens_label }} view.</span> {{ board.lens_help }}
+        {% if board.filtered and clear_url %}<a href="{{ clear_url }}" class="text-primary hover:underline" data-testid="roadmap-clear-filter">Show the whole enterprise</a>{% endif %}
     </p>
+
+    {% if board.card_count %}
+    <p class="text-sm text-muted-foreground" data-testid="roadmap-totals">
+        {{ board.card_count }} plateau{{ '' if board.card_count == 1 else 's' }} and {{ board.work_package_count }} work package{{ '' if board.work_package_count == 1 else 's' }} shown.
+    </p>
+    {{ roadmap_board(board.columns) }}
+    {% elif board.plateau_total or board.work_package_total %}
+    {{ empty_state(
+        icon='filter',
+        title='Nothing in this view matches',
+        description='Your organisation has ' ~ board.plateau_total ~ ' plateau' ~ ('' if board.plateau_total == 1 else 's') ~ ' and ' ~ board.work_package_total ~ ' work package' ~ ('' if board.work_package_total == 1 else 's') ~ ', but none is linked to this ' ~ ('filter' if board.filtered else 'view') ~ '. Link a work package to see it here.',
+        cta_text='Show the whole enterprise' if clear_url else 'Open the Strategic view',
+        cta_href=clear_url or url_for('genome_roadmap.index'),
+        cta_icon='map') }}
     {% else %}
-    {% if not error %}
-    <div class="p-8 text-center text-muted-foreground border border-dashed border-border rounded-lg">
-        <i data-lucide="calendar-range" class="w-8 h-8 mx-auto mb-3 opacity-60"></i>
-        <p>Click <span class="font-medium text-foreground">Generate roadmap</span>
-        to build the deterministic transformation roadmap for your organization.</p>
+    {{ empty_state(
+        icon='calendar-range',
+        title='No plateaus or work packages yet',
+        description='The roadmap is drawn from your plateaus and work packages. Add the first work package and it appears here.',
+        cta_text='Add a work package',
+        cta_href=url_for('implementation_planning.create_work_package'),
+        cta_icon='plus') }}
+    {% endif %}
+
+    {% if critical_paths %}
+    <div data-testid="critical-path-panel">
+    {% call card() %}
+        {% call card_header() %}
+            {% call card_title(class='text-base') %}Critical path to the next plateau{% endcall %}
+            {% call card_description() %}The longest dependency chain of scheduled work packages, read from the one work package store.{% endcall %}
+        {% endcall %}
+        {% call card_content(class='divide-y divide-border') %}
+            {% for cp in critical_paths %}
+            <div data-testid="critical-path-plateau" class="py-3 space-y-2">
+                <div class="flex items-center justify-between gap-2">
+                    <span class="text-sm font-medium text-foreground">{{ cp.plateau_name or 'Plateau' }}</span>
+                    {% if cp.has_critical_path %}
+                    {% call badge(variant='info') %}{{ cp.duration_days }} day critical path{% endcall %}
+                    {% else %}
+                    {% call badge(variant='neutral') %}not scheduled{% endcall %}
+                    {% endif %}
+                </div>
+                {% if cp.has_critical_path %}
+                <div data-testid="critical-path-chain" class="flex items-center gap-1.5 flex-wrap text-xs">
+                    {% for node in cp.path %}
+                    {% call badge(variant='outline') %}{{ node.name }}{% endcall %}
+                    {% if not loop.last %}<span class="text-muted-foreground" aria-hidden="true">→</span>{% endif %}
+                    {% endfor %}
+                </div>
+                <div data-testid="critical-path-blocking" class="flex items-center gap-1.5 flex-wrap text-xs text-muted-foreground">
+                    <span class="font-medium text-foreground">Blocking:</span>
+                    <span>{{ cp.blocking.name }}</span>
+                    <span aria-hidden="true">·</span>
+                    <span>Owner: {{ cp.blocking.owner_name or '—' }}</span>
+                    <span aria-hidden="true">·</span>
+                    <span>Ends {{ cp.blocking.end_date or '—' }}</span>
+                </div>
+                {% if cp.cycles %}
+                <div data-testid="critical-path-cycle" class="text-xs text-warning-emphasis">
+                    A dependency cycle was found and is not followed: work package ids {{ cp.cycles|tojson }}.
+                </div>
+                {% endif %}
+                {% if cp.ignored_dependencies %}
+                <div class="text-xs text-warning-emphasis">
+                    Dependency on another organisation's work package ignored: id{{ 's' if cp.ignored_dependencies|length != 1 else '' }}
+                    {{ cp.ignored_dependencies|map(attribute='dependency_id')|join(', ') }}.
+                </div>
+                {% endif %}
+                {% else %}
+                <div class="text-xs text-muted-foreground">No work package on this plateau has dates yet. Give one a start and a target date to see its path.</div>
+                {% endif %}
+            </div>
+            {% endfor %}
+        {% endcall %}
+    {% endcall %}
     </div>
     {% endif %}
     {% endif %}

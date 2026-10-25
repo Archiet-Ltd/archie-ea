@@ -212,6 +212,7 @@ class InvestmentPrioritizationService:
             "capability_name": capability.name,
             "capability_domain": getattr(capability, 'industry_domain', None) or getattr(capability, 'business_domain', None) or "Unknown",
             "strategic_importance": capability.strategic_importance,
+            "capability_type": capability.capability_type,
             "coverage_count": coverage_count,
             "strategic_score": strategic_score,
             "coverage_score": coverage_score,

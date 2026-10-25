@@ -123,7 +123,7 @@
 
     {% elif lens == 'data' %}
         {% if not data.data_objects and not data.flows %}
-            {{ empty_state(icon='database', title='No data objects or data flows are recorded for this element yet', description='Nothing is missing from this answer: none is linked to ' ~ name ~ ' yet.', padding='py-6') }}
+            {{ empty_state(icon='database', title='This element has no linked data objects or flows yet', description='Link a data object or a flow to ' ~ name ~ ' in the model and it will be listed here.', padding='py-6') }}
         {% else %}
             {% for item in data.data_objects %}
             {% call card(class='p-4') %}
@@ -139,13 +139,13 @@
                 </div>
             {% endcall %}
             {% else %}
-                <p class="text-sm text-muted-foreground">No data objects are recorded for this element.</p>
+                <p class="text-sm text-muted-foreground">This element has no linked data objects yet. Link one in the model to list it here.</p>
             {% endfor %}
             <h3 class="text-sm font-semibold text-foreground">Where it flows</h3>
             {% for flow in data.flows %}
                 <p class="text-sm text-foreground" data-lens-flow><span class="font-medium">{{ 'Flows to ' if flow.direction == 'out' else 'Comes from ' }}</span>{{ flow.other_element_name or '—' }}{% set detail = [flow.lineage_type, flow.frequency] | select | join(', ') %}{% if detail %} <span class="text-muted-foreground">({{ detail }})</span>{% endif %}</p>
             {% else %}
-                <p class="text-sm text-muted-foreground">No data flows are recorded for this element.</p>
+                <p class="text-sm text-muted-foreground">This element has no linked data flows yet. Link one in the model to list it here.</p>
             {% endfor %}
         {% endif %}
 
