@@ -34,6 +34,29 @@
 {% call f.frame(id, 'C4', 'Value proposition canvas', data, rows, 'Scroll sideways on a narrow screen to see the value map, the fit arrows and the customer profile.',
      credit='Value Proposition Canvas by Strategyzer AG (strategyzer.com), Alexander Osterwalder, Yves Pigneur, Greg Bernarda and Alan Smith.',
      width='min-w-240', columns=['Box', 'Part', 'Note']) %}
+  {%- set ed = data.editable and data.editable_boxes or [] %}
+  {%- if data.roomy %}
+  {#- roomy (optional, default off): the boxes flow at their natural size inside the Value Map panel and the rounded Customer
+      Profile panel instead of being laid over a 20 by 20 grid, so a box is as tall and wide as its entries need. -#}
+  <div class="grid grid-cols-1 gap-4 rounded-lg border bg-muted/30 p-3 lg:grid-cols-2" data-vpc-roomy>
+    <div class="flex flex-col gap-2">
+      <h3 class="text-sm font-medium">Value Map</h3>
+      <div class="grid grid-cols-1 gap-2 rounded-lg border bg-muted/40 p-2 sm:grid-cols-2">
+        {{ f.box(id, dict(MAP[0], area='sm:row-span-2'), boxes, MAP[0].key in ed, scroll=false) }}
+        {{ f.box(id, dict(MAP[1], area=''), boxes, MAP[1].key in ed, scroll=false) }}
+        {{ f.box(id, dict(MAP[2], area=''), boxes, MAP[2].key in ed, scroll=false) }}
+      </div>
+    </div>
+    <div class="flex flex-col gap-2">
+      <h3 class="text-sm font-medium">Customer Profile</h3>
+      <div class="grid grid-cols-1 gap-2 rounded-3xl border bg-muted/40 p-4 sm:grid-cols-2">
+        {{ f.box(id, dict(PROFILE[0], area=''), boxes, PROFILE[0].key in ed, scroll=false) }}
+        {{ f.box(id, dict(PROFILE[2], area='sm:row-span-2'), boxes, PROFILE[2].key in ed, scroll=false) }}
+        {{ f.box(id, dict(PROFILE[1], area=''), boxes, PROFILE[1].key in ed, scroll=false) }}
+      </div>
+    </div>
+  </div>
+  {%- else %}
   <div class="grid grid-cols-11 items-stretch gap-2 rounded-lg border bg-muted/30 p-2">
     <div class="col-span-5 flex flex-col gap-2">
       <h3 class="text-sm font-medium">Value Map</h3>
@@ -73,5 +96,6 @@
       </div>
     </div>
   </div>
+  {%- endif %}
 {% endcall %}
 {%- endmacro %}
