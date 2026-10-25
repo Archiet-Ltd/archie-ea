@@ -21786,6 +21786,117 @@
    "tier": "B",
    "type_changed": false
   },
+  "app/templates/data_architecture/entity_diagram.html": {
+    "allowed_macros": [
+      "components/accessibility_helpers.html",
+      "components/alert.html",
+      "components/badge.html",
+      "components/breadcrumb.html",
+      "components/breadcrumb_nav.html",
+      "components/button.html",
+      "components/card.html",
+      "components/checkbox.html",
+      "components/confirmation_dialog.html",
+      "components/data_card.html",
+      "components/dense_table.html",
+      "components/dialog.html",
+      "components/dropdown_menu.html",
+      "components/empty_state.html",
+      "components/error_boundary.html",
+      "components/filter_bar.html",
+      "components/form_field.html",
+      "components/inline_hint.html",
+      "components/input.html",
+      "components/loading_state.html",
+      "components/modal.html",
+      "components/page_header.html",
+      "components/provenance.html",
+      "components/search_bar.html",
+      "components/select.html",
+      "components/skeleton.html",
+      "components/status_badge.html",
+      "components/tabs.html",
+      "macros/page_shell.html"
+    ],
+    "basis": "rule",
+    "block": "board",
+    "charts": [],
+    "components": [
+      "alert",
+      "badge",
+      "breadcrumb",
+      "button",
+      "card",
+      "checkbox",
+      "dialog",
+      "empty",
+      "input",
+      "page-header",
+      "select",
+      "table",
+      "button-group",
+      "toggle-group",
+      "tooltip",
+      "sidebar",
+      "sheet",
+      "field",
+      "resizable"
+    ],
+    "confidence": "high",
+    "controls": {
+      "button": 80,
+      "link": 1,
+      "modal": 6,
+      "table": 2,
+      "testid": 3
+    },
+    "extends": [
+      "layouts/admin_base.html"
+    ],
+    "extra_macros": [
+      "components/checkbox.html",
+      "components/diagram/finder.html",
+      "components/diagram/legend.html",
+      "components/diagram/status_line.html",
+      "components/diagram/toolbar.html",
+      "components/table.html"
+    ],
+    "frame": "dashboard-01",
+    "inhouse_components": [
+      "breadcrumb_nav:Replace",
+      "dense_table:Replace",
+      "empty_state:Replace",
+      "modal:Replace"
+    ],
+    "macros": [
+      "components/breadcrumb_nav.html",
+      "components/button.html",
+      "components/checkbox.html",
+      "components/dense_table.html",
+      "components/empty_state.html",
+      "components/input.html",
+      "components/modal.html",
+      "components/select.html"
+    ],
+    "original": "gap:G-4",
+    "page_type": "diagram-canvas",
+    "persona": "enterprise_architect",
+    "reason": "ArchiMate composer with minimap and toolbar; notation canvas with shadcn palette, toolbar and properties sheet.",
+    "reference": {
+      "shadcn": {
+        "name": "shadcn examples: cards",
+        "url": "https://ui.shadcn.com/examples/cards"
+      },
+      "basecoat": {
+        "name": "flask-basecoat examples: Kanban",
+        "image": "docs/design/reference/basecoat-kanban.webp"
+      }
+    },
+    "spec": null,
+    "status": "mapped",
+    "tier": "C1",
+    "type_changed": true
+  },
   "app/templates/data_architecture/entity_form.html": {
    "allowed_macros": [
     "components/accessibility_helpers.html",
