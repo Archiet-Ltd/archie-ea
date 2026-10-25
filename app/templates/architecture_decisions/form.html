@@ -4,6 +4,8 @@
 {% from "components/page_header.html" import page_header %}
 {% from "components/form_field.html" import form_field, form_group, form_footer %}
 {% from "components/button.html" import button %}
+{% from "components/select.html" import native_select %}
+{% from "components/input.html" import input %}
 
 {% block title %}{% if decision %}Edit {{ decision.decision_id }}{% else %}New Architecture Decision{% endif %}{% endblock %}
 
@@ -44,18 +46,16 @@
                     <div class="grid grid-cols-1 gap-4">
                         <!-- Status -->
                         {% call form_group(id='status', label='Status') %}
-                        <select id="status" name="status"
-                                class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                        {% call native_select(id='status', name='status', aria_label='Status', selected=decision.status if decision else 'proposed') %}
                             {% for val, label in [('proposed','Proposed'),('accepted','Accepted'),('deprecated','Deprecated'),('superseded','Superseded')] %}
                             <option value="{{ val }}" {% if decision and decision.status == val %}selected{% elif not decision and val == 'proposed' %}selected{% endif %}>{{ label }}</option>
                             {% endfor %}
-                        </select>
+                        {% endcall %}
                         {% endcall %}
 
                         <!-- ADM Phase -->
                         {% call form_group(id='adm_phase', label='TOGAF ADM Phase') %}
-                        <select id="adm_phase" name="adm_phase"
-                                class="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                        {% call native_select(id='adm_phase', name='adm_phase', aria_label='TOGAF ADM Phase') %}
                             <option value="">None</option>
                             {% for ph, label in [
                                 ('A','Phase A: Architecture Vision'),
@@ -69,7 +69,7 @@
                             ] %}
                             <option value="{{ ph }}" {% if decision and decision.adm_phase == ph %}selected{% endif %}>{{ label }}</option>
                             {% endfor %}
-                        </select>
+                        {% endcall %}
                         {% endcall %}
                     </div>
                 </div>
@@ -172,16 +172,14 @@
                     </h3>
 
                     <!-- Hidden field with selected IDs -->
-                    <input type="hidden" name="archimate_element_ids" :value="JSON.stringify(selectedIds)">
+                    {{ input(type='hidden', name='archimate_element_ids', attrs_dict={':value': 'JSON.stringify(selectedIds)'}) }}
 
                     <!-- Selected elements -->
                     <div class="flex flex-wrap gap-2 mb-3 min-h-[2rem]" x-show="selectedElements.length > 0" x-cloak>
                         <template x-for="el in selectedElements" :key="el.id">
                             <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-primary/10 text-info-emphasis border border-primary/20">
                                 <span x-text="el.name"></span>
-                                <button aria-label="Remove" type="button" @click="removeElement(el.id)" class="hover:text-destructive-emphasis ml-0.5">
-                                    <i data-lucide="x" class="h-3 w-3"></i>
-                                </button>
+                                {% call button(size='icon-xs', variant='bare', aria_label='Remove', attrs_dict={'@click': 'removeElement(el.id)'}) %}<i data-lucide="x" class="h-3 w-3"></i>{% endcall %}
                             </span>
                         </template>
                     </div>
@@ -189,23 +187,20 @@
                     <!-- Search input -->
                     <div class="relative">
                         <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none"></i>
-                        <input type="text" x-model="searchQuery" @input.debounce.300ms="searchElements()"
-                               placeholder="Search ArchiMate elements..."
-                               class="flex h-9 w-full rounded-md border border-input bg-background pl-9 pr-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Search ArchiMate elements">
+                        {{ input(name='q', placeholder='Search ArchiMate elements...', aria_label='Search ArchiMate elements', attrs_dict={'x-model': 'searchQuery', '@input.debounce.300ms': 'searchElements()'}, class='pl-9') }}
                     </div>
 
                     <!-- Search results dropdown -->
                     <div x-show="searchError" x-cloak class="mt-1 border border-border rounded-md bg-popover px-3 py-2 text-sm text-destructive-emphasis" x-text="searchError"></div>
                     <div x-show="!searchError && searchResults.length > 0" x-cloak class="mt-1 border border-border rounded-md bg-popover divide-y divide-border max-h-48 overflow-y-auto">
                         <template x-for="el in searchResults" :key="el.id">
-                            <button type="button" @click="addElement(el)"
-                                    class="w-full text-left flex items-center justify-between px-3 py-2 text-sm hover:bg-accent transition-colors">
+                            {% call button(variant='ghost', size='md', attrs_dict={'@click': 'addElement(el)'}, class='w-full text-left flex items-center justify-between') %}
                                 <span x-text="el.name" class="font-medium text-foreground"></span>
                                 <div class="flex gap-1.5">
                                     <span x-show="el.layer" x-cloak x-text="el.layer" class="text-xs px-1.5 py-0.5 rounded bg-secondary text-secondary-foreground"></span>
                                     <span x-show="el.element_type" x-cloak x-text="el.element_type" class="text-xs px-1.5 py-0.5 rounded bg-muted text-muted-foreground"></span>
                                 </div>
-                            </button>
+                            {% endcall %}
                         </template>
                     </div>
                 </div>

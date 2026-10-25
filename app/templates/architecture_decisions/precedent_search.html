@@ -28,9 +28,9 @@
         </div>
 
         <div class="px-4 lg:px-6">
-            <form method="GET" action="{{ url_for('arch_decisions.precedent_search') }}"
-                  class="bg-card border border-border rounded-lg p-4 flex gap-3">
-                {% if element_id %}<input type="hidden" name="element_id" value="{{ element_id }}">{% endif %}
+<form method="GET" action="{{ url_for('arch_decisions.precedent_search') }}"
+      class="bg-card border border-border rounded-lg p-4 flex gap-3">
+                {% if element_id %}{{ input(type='hidden', name='element_id', value=element_id) }}{% endif %}
                 <div class="flex-1">
                     {{ input(
                         name='q',
