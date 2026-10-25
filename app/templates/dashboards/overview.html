@@ -205,7 +205,7 @@
       {{ d.card_head('Applications by area', 'The business area each application serves') }}
       {% call ui.card_content(class='flex flex-col gap-4') %}
         {% if o.areas %}
-        {{ d.chart('bar', o.areas, [{'key': 'applications', 'label': 'Applications', 'color': chart_1}], x='area', class='aspect-auto h-[280px] w-full', label='Applications by business area', testid='areas-chart') }}
+        {{ d.bar_rows(o.areas, 'area', 'applications', 'Applications', chart_1, label='Applications by business area', testid='areas-chart') }}
         {% else %}
         <p class="text-sm text-muted-foreground" data-testid="areas-empty">Appears once applications are in the model.</p>
         {% endif %}
@@ -239,15 +239,14 @@
           {% if o.table.rows %}
           {% call ui.table_container() %}{% call ui.table() %}
             {% call ui.table_header() %}{% call ui.table_row() %}
-              {{ ui.table_head(text='Application', class='pl-6') }}{{ ui.table_head(text='Type') }}{{ ui.table_head(text='Status') }}{{ ui.table_head(text='Owner') }}{{ ui.table_head(text='Annual cost', class='pr-6 text-right') }}
+              {{ ui.table_head(text='Application', class='pl-6') }}{{ ui.table_head(text='Status') }}{{ ui.table_head(text='Owner') }}{{ ui.table_head(text='Annual cost', class='pr-6 text-right') }}
             {% endcall %}{% endcall %}
             {% call ui.table_body() %}
             {% for row in o.table.rows %}
               {% call ui.table_row(attrs={'data-testid': 'applications-row'}) %}
-                {% call ui.table_cell(class='pl-6') %}<a href="{{ url_for('unified_applications.application_detail', id=row.id) }}" class="font-medium hover:underline">{{ row.name }}</a>{% endcall %}
-                {{ ui.table_cell(text=row.type or 'Not recorded') }}
+                {% call ui.table_cell(class='pl-6') %}<a href="{{ url_for('unified_applications.application_detail', id=row.id) }}" class="font-medium hover:underline">{{ row.name }}</a><span class="block text-sm text-muted-foreground" data-testid="applications-row-type">{{ row.type or 'Type not recorded' }}</span>{% endcall %}
                 {% call ui.table_cell() %}{{ ui.badge(text=row.status or 'Not recorded', variant='outline') }}{% endcall %}
-                {% call ui.table_cell() %}{% if row.owner %}{{ row.owner }}{% else %}<span class="text-muted-foreground">No owner</span>{% endif %}{% endcall %}
+                {% call ui.table_cell(class='max-w-36 truncate', attrs={'title': row.owner} if row.owner else {}) %}{% if row.owner %}{{ row.owner }}{% else %}<span class="text-muted-foreground">No owner</span>{% endif %}{% endcall %}
                 {% call ui.table_cell(class='pr-6 text-right tabular-nums') %}{% if row.cost is not none %}{{ row.cost_label }}{% else %}<span class="text-muted-foreground">Not recorded</span>{% endif %}{% endcall %}
               {% endcall %}
             {% endfor %}
