@@ -50,7 +50,7 @@
             <tr class="h-12" data-testid="fact-{{ fact.kind }}">
               <td class="px-2 font-medium text-foreground">{{ fact.name }}</td>
               <td class="px-2">{% call badge(variant='outline') %}{{ fact.archimate_type }}{% endcall %}</td>
-              <td class="px-2 text-muted-foreground min-w-56">{{ fact.detail or '' }}</td>
+              <td class="px-2 text-muted-foreground min-w-72">{{ fact.detail or '' }}</td>
               <td class="px-2 text-muted-foreground">{{ (fact.attributes or {}).get('protocol', '') }}</td>
               {{ source_cell(fact) }}
             </tr>
@@ -107,7 +107,7 @@
                   {%- elif kind == 'integration' %}{% if a.get('related_slug') in related %}<a class="text-primary hover:underline underline-offset-4" href="{{ url_for('unified_applications.vendor_catalogue_product', slug=a.get('related_slug')) }}">{{ related[a.get('related_slug')] }}</a>{% else %}Not in the catalogue yet{% endif %}
                   {%- else %}{{ a.get('scope', '') }}{% endif -%}
                 </td>
-                <td class="px-2 text-muted-foreground min-w-56">{{ fact.detail or '' }}</td>
+                <td class="px-2 text-muted-foreground min-w-72">{{ fact.detail or '' }}</td>
                 {{ source_cell(fact) }}
               </tr>
               {% endfor %}
