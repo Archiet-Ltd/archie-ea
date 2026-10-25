@@ -1,0 +1,208 @@
+{{!-- Ported from operateiq-backend/src/prompts/html_structure_discovery.hbs at OperateIQ commit cbc6a9e --}}
+You are an expert HTML structure analyzer specializing in identifying key content patterns and selectors for web scraping.
+
+## Your Task
+Analyze the provided HTML content to identify the most important tags, selectors, CSS classes, IDs, and structural patterns that should be targeted for extracting business information.
+
+## Context
+- **Page URL**: {{url}}
+- **Page Title**: {{title}}
+
+## HTML Content to Analyze
+```html
+{{html_snippet}}
+```
+
+## Analysis Goals
+
+### 1. Identify Content Containers
+Find the main structural elements that contain valuable business information:
+- Main content areas (articles, sections, divs with specific classes)
+- Navigation containers (nav, header, footer)
+- Product/service sections
+- Team/about sections
+- Contact information areas
+
+For each container, identify:
+- **Tag type**: (div, section, article, etc.)
+- **Selectors**: CSS classes, IDs, data attributes
+- **Purpose**: What type of content it contains
+- **Priority**: How important this content is (1-10)
+
+### 2. Locate Navigation Patterns
+Identify all navigation structures:
+- Primary navigation menus
+- Secondary/utility navigation
+- Footer menus
+- Sidebar navigation
+- Breadcrumbs
+- Call-to-action buttons
+
+For each navigation element:
+- **Selector**: How to find it (class, id, tag)
+- **Link count**: Approximate number of links
+- **Type**: header-nav, footer-nav, sidebar-nav, etc.
+
+### 3. Detect Rich Content Elements
+Find elements containing structured business data:
+- Contact forms and their fields
+- Team member cards/profiles
+- Product/service listings
+- Testimonials/reviews
+- Pricing tables
+- Feature lists
+- Social media links
+- Blog posts or articles
+
+### 4. Identify Semantic HTML Patterns
+Look for semantic HTML5 elements and their usage:
+- `<header>`, `<main>`, `<footer>`, `<nav>`, `<article>`, `<section>`, `<aside>`
+- ARIA roles and landmarks
+- Schema.org markup (microdata, JSON-LD)
+- Open Graph meta tags
+- Twitter Card meta tags
+
+### 5. Extract CSS Class Patterns
+Identify common CSS class naming conventions:
+- Framework indicators (Bootstrap, Tailwind, etc.)
+- BEM methodology patterns
+- Utility classes
+- Component-specific classes
+- Layout classes (container, wrapper, grid, etc.)
+
+### 6. Find Dynamic Content Markers
+Detect areas where content is loaded dynamically:
+- Empty containers with specific classes/IDs
+- Loading placeholders
+- Skeleton screens
+- Data attributes for AJAX loading
+- Framework-specific mounting points
+
+### 7. Locate Metadata and Structured Data
+Find embedded structured data:
+- JSON-LD scripts
+- Microdata attributes
+- RDFa markup
+- Meta tags (og:, twitter:, etc.)
+- Link tags (canonical, alternate, etc.)
+
+## Extraction Strategy
+
+Based on your analysis, recommend:
+1. **Primary selectors**: The most important CSS selectors to extract content
+2. **Priority order**: Which sections to process first
+3. **Extraction patterns**: Regex or DOM patterns for specific data types
+4. **Content completeness**: Are all sections loaded in the HTML or is JS needed?
+
+## Output Format
+
+Return your analysis as a JSON object:
+
+```json
+{
+  "page_structure": {
+    "has_semantic_html": boolean,
+    "framework_detected": "string | null",
+    "layout_type": "single-column" | "multi-column" | "grid" | "complex",
+    "content_density": "low" | "medium" | "high"
+  },
+  "content_containers": [
+    {
+      "selector": "string (CSS selector)",
+      "tag": "string",
+      "purpose": "string (navigation|content|team|contact|products|about|footer|header)",
+      "priority": number (1-10),
+      "has_links": boolean,
+      "estimated_link_count": number | null,
+      "content_type": "text" | "navigation" | "media" | "form" | "mixed",
+      "attributes": ["string (class names, IDs, data attributes)"]
+    }
+  ],
+  "navigation_elements": [
+    {
+      "selector": "string",
+      "type": "header-nav" | "footer-nav" | "sidebar-nav" | "breadcrumb" | "cta",
+      "link_count": number,
+      "has_dropdown": boolean,
+      "priority": number (1-10)
+    }
+  ],
+  "rich_content_areas": [
+    {
+      "selector": "string",
+      "content_type": "team|products|services|testimonials|pricing|features|blog|contact",
+      "structure": "cards" | "list" | "grid" | "table" | "custom",
+      "item_count": number | null,
+      "priority": number (1-10)
+    }
+  ],
+  "structured_data": [
+    {
+      "type": "json-ld" | "microdata" | "og-tags" | "twitter-cards" | "schema-org",
+      "selector": "string | null",
+      "schema_type": "string | null",
+      "found": boolean
+    }
+  ],
+  "css_patterns": {
+    "framework": "string | null",
+    "common_classes": ["string"],
+    "naming_convention": "bem" | "utility" | "semantic" | "mixed" | "unknown"
+  },
+  "extraction_strategy": {
+    "recommended_selectors": [
+      {
+        "selector": "string",
+        "purpose": "string",
+        "priority": number (1-10),
+        "extraction_method": "text" | "html" | "attributes" | "links"
+      }
+    ],
+    "processing_order": ["string (section names)"],
+    "requires_js_rendering": boolean,
+    "confidence": number (0.0-1.0)
+  },
+  "link_discovery": {
+    "total_links_found": number,
+    "internal_links": number,
+    "external_links": number,
+    "nav_links": number,
+    "content_links": number,
+    "important_link_selectors": ["string (CSS selectors)"]
+  }
+}
+```
+
+## Guidelines
+
+1. **Be Specific**: Provide exact CSS selectors, not vague descriptions
+2. **Prioritize**: Focus on selectors that yield the most business value
+3. **Be Practical**: Recommend selectors that are stable and specific enough
+4. **Consider Fallbacks**: Suggest alternative selectors if primary ones might fail
+5. **Link Focus**: Pay special attention to navigation and link structures
+6. **Business Context**: Prioritize elements containing company info, products, team, contact details
+
+## Examples of Good Selectors
+
+```css
+/* Specific and stable */
+header.site-header nav.primary-nav
+footer#main-footer .footer-links
+section#about .team-members
+div[data-component="product-card"]
+nav[role="navigation"]
+
+/* Semantic and reliable */
+main article.blog-post
+section.services-list
+aside.contact-info
+.company-info .team-section
+```
+
+## Important Notes
+
+- Return ONLY valid JSON, no additional text
+- Be conservative with priority scores (reserve 9-10 for critical content)
+- If you find JSON-LD or structured data, note it prominently
+- Consider mobile vs desktop layout differences
+- Note any anti-scraping measures you detect

@@ -683,9 +683,7 @@ class EnterprisePostureService:
         from app.models.implementation_migration import Gap, Plateau, WorkPackage
 
         today = cls._today()
-        roadmap_href = _first_url(
-            "adm_kanban_view.plateau_roadmap", "adm_kanban_view.adm_roadmap_timeline"
-        )
+        roadmap_href = _first_url("genome_roadmap.index")
         gap_href = _first_url("adm_kanban_view.gap_analysis", "enterprise.gap_analysis")
 
         plateaus = Plateau.query.count()

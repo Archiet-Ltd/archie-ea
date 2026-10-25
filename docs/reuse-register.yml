@@ -747,7 +747,7 @@ entries:
     status: active
     canonical:
       path: app/templates/macros/kanban_board.html
-      symbols: ["kanban_board", "kanban_move_select"]
+      symbols: ["kanban_board", "kanban_card", "kanban_move_menu"]
     reuse: >
       Render every Kanban board through the kanban_board macro in
       app/templates/macros/kanban_board.html, and move cards with the shared kanbanBoard() Alpine
@@ -755,7 +755,10 @@ entries:
       moveCard for the keyboard "Move to" select, wipAtLimit / wipNearLimit for the WIP treatment).
       A board whose columns come from the server as data renders them with the macro's
       columns='client' mode and supplies its own card body; it does not hand-roll a second
-      board. Do not write a new class="kanban-board" wrapper, a new "kanban-column" grid, or a
+      board. An item is kanban_card (a Card with a grip, Space/Enter pick-up and arrow keys) and
+      the pointer-free route is its kanban_move_menu (a DropdownMenu); a column's move is saved
+      on the server, never in localStorage. The composer, the capability network and the codegen
+      workflow designer are diagram canvases, not boards, and are the only other files that drag. Do not write a new class="kanban-board" wrapper, a new "kanban-column" grid, or a
       second board macro anywhere else: one board shell means the SAFe board and the ADM board
       stay the same shape and move cards the same way.
     must_not_create:
@@ -767,10 +770,22 @@ entries:
         regex: '{%-?\s*macro\s+(\w*kanban\w*board\w*|\w*board\w*kanban\w*)\s*\('
         scope: [app/templates]
         suffixes: [.html]
+      - id: kanban-column-markup
+        regex: 'class="[^"]*\bkanban-column\b'
+        scope: [app/templates]
+        suffixes: [.html]
+      - id: board-drag-hooks
+        regex: '@dragstart|:draggable|draggable="true"'
+        scope: [app/templates]
+        suffixes: [.html]
     known_exceptions:
       - path: app/static/js/adm_kanban/board.js
         reason: ADM board v1 renderer, superseded by board_v2 and the shared component; carries its
           own removal brief and is not wired into any template
+      - path: app/templates/archimate/composer.html
+        reason: a diagram canvas whose palette items are dragged onto a drawing, not a board of columns
+      - path: app/templates/codegen/workflow_designer.html
+        reason: a diagram canvas whose nodes are dragged onto a flow, not a board of columns
 
   - id: public-site-registry
     concept: The public navbar, its menus, the footer and the roles hub link lists (one registry file, one reader)
