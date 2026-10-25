@@ -20,6 +20,7 @@ from app.modules.architecture.services.data_model_validation_service import (
     DATA_STANDARDS,
     DataModelValidationService,
 )
+from app.utils.plain_errors import render_plain_error
 from app.utils.role_access import can_access_section
 
 logger = logging.getLogger(__name__)
@@ -29,7 +30,7 @@ data_governance_bp = Blueprint("data_governance", __name__, url_prefix="/data-go
 
 def _guard():
     if not can_access_section(current_user, "data_integration"):
-        return render_template("errors/403.html"), 403
+        return render_plain_error(403, "errors/403.html")
     return None
 
 

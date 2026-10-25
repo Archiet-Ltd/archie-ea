@@ -115,7 +115,12 @@ def test_a_startup_cto_sees_exactly_the_ten_entries(ctx):
     entries = nav["main"] + nav["architecture"] + nav["secondary"]
     assert _labels(entries) == MAIN + SECONDARY
     assert len(entries) == 10
-    assert all(not item.children for item in entries)
+    # The one thing nested for them is the page an organisation administrator may open
+    # and the route admits: their organisation's data-subject requests, under Compliance.
+    # No procurement pages are offered as sub-items (those follow the persona).
+    assert {item.label: _labels(item.children) for item in entries if item.children} == {
+        "Compliance": ["Data Subject Requests"]
+    }
     # Connecting a source is theirs to do: Integrations opens the connectors page.
     integrations = nav["secondary"][0]
     assert integrations.href == "/admin/connectors"
@@ -151,7 +156,12 @@ def test_procurement_pages_are_sub_items_of_spend_for_the_roles_they_admit(ctx, 
 @pytest.mark.parametrize("role", [r for r in VALID_ROLES if r not in (ROLE_PROCUREMENT, ROLE_FINANCE, ROLE_PORTFOLIO_MANAGER)])
 def test_no_other_role_gets_procurement_sub_items(ctx, role):
     nav = _nav(_Person(role, admin=True))
-    assert all(not item.children for item in nav["main"])
+    spend = next(item for item in nav["main"] if item.key == "spend")
+    assert not spend.children
+    # An administrator is also offered the data-subject requests page, under Compliance.
+    assert {item.label: _labels(item.children) for item in nav["main"] if item.children} == {
+        "Compliance": ["Data Subject Requests"]
+    }
 
 
 def test_platform_admin_is_one_user_menu_entry_for_the_platform_flag_only(ctx):

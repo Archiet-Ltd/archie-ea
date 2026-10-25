@@ -10,13 +10,13 @@ ADR Reference: docs/adr/0010-procurement-persona.md
 from datetime import date, timedelta
 
 from flask import render_template, request
-from flask_login import current_user, login_required
+from flask_login import login_required
 
 from app.decorators import requires_procurement, requires_procurement_or_finance
 from app.models.application_portfolio import VendorContract
 from app.models.license_entitlement import LicenseEntitlement
 
-from . import procurement_bp
+from . import acting_org_id, procurement_bp
 
 # As in my_applications, services.py held the summary shapes these templates
 # read and was never imported, so every dashboard raised jinja2.UndefinedError.
@@ -63,7 +63,7 @@ def _compliance_summary(licenses):
 @requires_procurement
 def contracts_list():
     """List all vendor contracts for current organization."""
-    org_id = current_user.organization_id
+    org_id = acting_org_id()
 
     contracts = VendorContract.query.filter_by(organization_id=org_id).all()
 
@@ -122,7 +122,7 @@ def contracts_list():
 @requires_procurement
 def contract_detail(contract_id):
     """View contract details (scoped to org)."""
-    org_id = current_user.organization_id
+    org_id = acting_org_id()
 
     contract = VendorContract.query.filter_by(
         id=contract_id,
@@ -147,7 +147,7 @@ def contract_detail(contract_id):
 @requires_procurement
 def renewals_dashboard():
     """Dashboard showing upcoming contract renewals."""
-    org_id = current_user.organization_id
+    org_id = acting_org_id()
     today = date.today()
 
     # The template renders `contracts` as [{contract, urgency, days_until_renewal}]
@@ -190,7 +190,7 @@ def renewals_dashboard():
 @requires_procurement_or_finance
 def licenses_list():
     """List all license entitlements for current organization."""
-    org_id = current_user.organization_id
+    org_id = acting_org_id()
 
     licenses = LicenseEntitlement.query.filter_by(organization_id=org_id).all()
 
@@ -221,7 +221,7 @@ def licenses_list():
 @requires_procurement
 def license_detail(license_id):
     """View license details (scoped to org)."""
-    org_id = current_user.organization_id
+    org_id = acting_org_id()
 
     license = LicenseEntitlement.query.filter_by(
         id=license_id,
@@ -239,7 +239,7 @@ def license_detail(license_id):
 @requires_procurement
 def compliance_dashboard():
     """License compliance dashboard."""
-    org_id = current_user.organization_id
+    org_id = acting_org_id()
 
     licenses = LicenseEntitlement.query.filter_by(organization_id=org_id).all()
 
@@ -280,7 +280,7 @@ def compliance_dashboard():
 @requires_procurement_or_finance
 def spend_analytics():
     """Spend analytics dashboard."""
-    org_id = current_user.organization_id
+    org_id = acting_org_id()
 
     # Spend by category - shared with the AI recommendations endpoint
     # (procurement_ai_service.py) via get_spend_by_category() rather than a

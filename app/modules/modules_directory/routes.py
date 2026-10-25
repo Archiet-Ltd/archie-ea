@@ -23,11 +23,11 @@ destination was requested with a logged-in client:
 from flask import current_app, render_template, url_for
 from flask_login import current_user, login_required
 
+from app.decorators.requires_role import may_open_procurement, may_open_spend
 from app.utils.role_access import (
     _ZONE_TITLES,
     SIDEBAR_ZONES,
     can_access_section,
-    get_user_role,
     is_hidden_not_ready,
     link_requires_satisfied,
 )
@@ -71,9 +71,9 @@ _SECTION_BY_ENDPOINT_PREFIX = {
 
 # Procurement pages are guarded by role, not by section: the procurement section
 # is also granted to personas (compliance, finance) whose pages are a different
-# set, so the section alone offered them pages that answer 403. Mirrors
+# set, so the section alone offered them pages that answer 403. Decided by
+# may_open_procurement / may_open_spend, the predicates behind
 # requires_procurement / requires_procurement_or_finance (decorators/requires_role.py).
-_PROCUREMENT_ROLES = {"procurement", "portfolio_manager"}
 _PROCUREMENT_OR_FINANCE_ENDPOINTS = {"procurement.licenses_list", "procurement.spend_analytics"}
 
 
@@ -95,11 +95,9 @@ def _link_visible(endpoint: str, requires: str | None = None) -> bool:
     """
     if endpoint in _NOT_RENDERED or is_hidden_not_ready(endpoint):
         return False
-    if endpoint.startswith("procurement.") and not getattr(current_user, "is_platform_admin", False):
-        roles = set(_PROCUREMENT_ROLES)
-        if endpoint in _PROCUREMENT_OR_FINANCE_ENDPOINTS:
-            roles.add("finance")
-        if get_user_role(current_user) not in roles:
+    if endpoint.startswith("procurement."):
+        may_open = may_open_spend if endpoint in _PROCUREMENT_OR_FINANCE_ENDPOINTS else may_open_procurement
+        if not may_open(current_user):
             return False
     if not link_requires_satisfied(current_user, requires):
         return False

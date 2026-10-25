@@ -11,6 +11,7 @@ from app.modules.ai_chat.services.agent_registry_service import (
     CrossOrganisationOwner,
     InvalidDelegatedLimit,
 )
+from app.utils.plain_errors import render_plain_error
 from app.utils.role_access import can_access_section
 
 agent_registry_bp = Blueprint("agent_registry", __name__, url_prefix="/admin/agent-registry")
@@ -18,7 +19,7 @@ agent_registry_bp = Blueprint("agent_registry", __name__, url_prefix="/admin/age
 
 def _guard():
     if not can_access_section(current_user, "administration"):
-        return render_template("errors/403.html"), 403
+        return render_plain_error(403, "errors/403.html")
     return None
 
 

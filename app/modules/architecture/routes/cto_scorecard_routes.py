@@ -9,6 +9,7 @@ from flask import Blueprint, flash, g, redirect, render_template, url_for
 from flask_login import current_user, login_required
 
 from app.modules.architecture.services import cto_scorecard_service as svc
+from app.utils.plain_errors import render_plain_error
 from app.utils.role_access import can_access_section
 
 cto_scorecard_bp = Blueprint("cto_scorecard", __name__, url_prefix="/architecture/cto-scorecard")
@@ -16,7 +17,7 @@ cto_scorecard_bp = Blueprint("cto_scorecard", __name__, url_prefix="/architectur
 
 def _guard():
     if not can_access_section(current_user, "governance"):
-        return render_template("errors/403.html"), 403
+        return render_plain_error(403, "errors/403.html")
     return None
 
 

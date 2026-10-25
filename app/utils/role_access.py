@@ -1273,14 +1273,14 @@ def link_requires_satisfied(user, requires):
         return can_access_section(user, requires.split(":", 1)[1])
     if requires in ("procurement", "procurement_or_finance"):
         # The guards on the procurement pages (requires_procurement and
-        # requires_procurement_or_finance), through the one predicate the
+        # requires_procurement_or_finance), through the one predicate each the
         # templates already use for them.
         try:
-            from app.decorators.requires_role import may_open_procurement
+            from app.decorators.requires_role import may_open_procurement, may_open_spend
 
-            if may_open_procurement(user):
-                return True
-            return requires == "procurement_or_finance" and get_user_role(user) == ROLE_FINANCE
+            if requires == "procurement_or_finance":
+                return may_open_spend(user)
+            return may_open_procurement(user)
         except Exception:  # anonymous / unexpected user object
             return False
     if requires == "org_or_platform_admin":

@@ -25,8 +25,9 @@ DATA_SUBJECT_REQUEST_ROLES = ["security_architect"]
 
 def may_handle_data_subject_requests(user):
     """True when ``user`` may open the data-subject request pages: the roles in
-    DATA_SUBJECT_REQUEST_ROLES, and platform_admin as ``requires_role`` always
-    admits it.
+    DATA_SUBJECT_REQUEST_ROLES, the administrator of the active organisation
+    (it is their organisation's data and the first buyer holds no other role),
+    and platform_admin as ``requires_role`` always admits it.
 
     R3-5 (PR 428 round 4): kept consistent with the fix in ``requires_role``
     below -- genuine platform authority is judged by ``is_platform_admin``,
@@ -36,9 +37,9 @@ def may_handle_data_subject_requests(user):
     showing the data-subject-request pages to a default-persona user that
     ``requires_role`` now correctly refuses.
     """
-    from app.middleware.tenant_decorators import is_platform_admin
+    from app.middleware.tenant_decorators import is_active_org_admin
 
-    if is_platform_admin(user):
+    if is_active_org_admin(user):
         return True
     return get_user_role(user) in DATA_SUBJECT_REQUEST_ROLES
 
@@ -149,12 +150,13 @@ def requires_admin(f):
 
 def may_open_procurement(user):
     """True when ``user`` may open the procurement pages: the roles
-    ``requires_procurement`` admits, and platform authority."""
-    from app.middleware.tenant_decorators import is_platform_admin
+    ``requires_procurement`` admits, the administrator of the active
+    organisation, and platform authority."""
+    from app.middleware.tenant_decorators import is_active_org_admin
 
     if not getattr(user, "is_authenticated", False):
         return False
-    return bool(is_platform_admin(user)) or get_user_role(user) in (
+    return bool(is_active_org_admin(user)) or get_user_role(user) in (
         "procurement",
         "portfolio_manager",
     )
@@ -162,24 +164,59 @@ def may_open_procurement(user):
 
 def may_open_spend(user):
     """True when ``user`` may open the spend page: the people
-    ``requires_procurement_or_finance`` admits, and platform authority."""
-    from app.middleware.tenant_decorators import is_platform_admin
+    ``requires_procurement_or_finance`` admits, the administrator of the
+    active organisation, and platform authority."""
+    from app.middleware.tenant_decorators import is_active_org_admin
 
     if not getattr(user, "is_authenticated", False):
         return False
-    return bool(is_platform_admin(user)) or get_user_role(user) in (
+    return bool(is_active_org_admin(user)) or get_user_role(user) in (
         "procurement",
         "portfolio_manager",
         "finance",
     )
 
 
+def _or_active_org_admin(f, role_gated):
+    """Admit the administrator of the ACTIVE organisation to ``f``, and judge
+    everyone else exactly as ``role_gated`` (``f`` already wrapped by
+    ``requires_role``) does.
+
+    Admission is ``is_active_org_admin`` -- the one predicate for that question.
+    It refuses when no active organisation is set, and for a person switched into
+    an organisation as a viewer, rather than falling back to their home
+    organisation. The decorated routes read and write the active organisation's
+    records only, so admitting its administrator never reaches another
+    organisation's data.
+    """
+
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        from app.middleware.tenant_decorators import is_active_org_admin
+
+        if current_user.is_authenticated and is_active_org_admin():
+            return f(*args, **kwargs)
+        return role_gated(*args, **kwargs)
+
+    return decorated_function
+
+
+def requires_data_subject_requests(f):
+    """
+    The data-subject request and personal-data trace routes: the roles in
+    DATA_SUBJECT_REQUEST_ROLES, and the administrator of the active
+    organisation. The routes act on that organisation's records only.
+    """
+    return _or_active_org_admin(f, requires_role(DATA_SUBJECT_REQUEST_ROLES)(f))
+
+
 def requires_procurement(f):
     """
     Shorthand decorator for procurement routes.
-    Allows procurement role and portfolio_manager (read-only context).
+    Allows procurement role and portfolio_manager (read-only context), and the
+    administrator of the active organisation.
     """
-    return requires_role(["procurement", "portfolio_manager"])(f)
+    return _or_active_org_admin(f, requires_role(["procurement", "portfolio_manager"])(f))
 
 
 def requires_procurement_or_finance(f):
@@ -190,8 +227,12 @@ def requires_procurement_or_finance(f):
     the shared requires_procurement would have opened every procurement
     page to it, which the authorisation matrix caught as a real mismatch
     (POLICY only names the two pages finance's own sidebar links to).
+    The administrator of the active organisation is admitted here as on every
+    other procurement page.
     """
-    return requires_role(["procurement", "portfolio_manager", "finance"])(f)
+    return _or_active_org_admin(
+        f, requires_role(["procurement", "portfolio_manager", "finance"])(f)
+    )
 
 
 def requires_application_owner(f):
@@ -229,17 +270,7 @@ def requires_application_owner_or_org_admin(f):
     the *signed-in user* owns, so an administrator who owns none sees an empty
     state, and one who owns some sees only those.
     """
-    owner_gated = requires_application_owner(f)
-
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        from app.middleware.tenant_decorators import is_active_org_admin
-
-        if current_user.is_authenticated and is_active_org_admin():
-            return f(*args, **kwargs)
-        return owner_gated(*args, **kwargs)
-
-    return decorated_function
+    return _or_active_org_admin(f, requires_application_owner(f))
 
 
 def requires_any_architect(f):

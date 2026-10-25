@@ -18,14 +18,14 @@ from __future__ import annotations
 import logging
 
 from flask import jsonify
-from flask_login import current_user, login_required
+from flask_login import login_required
 
 from app.decorators import requires_procurement
 from app.models.application_portfolio import VendorContract
 from app.models.license_entitlement import LicenseEntitlement
 from app.services.feature_flag_service import FeatureFlagService
 
-from . import procurement_bp
+from . import acting_org_id, procurement_bp
 from .procurement_ai_service import (
     ProcurementAIError,
     generate_licenses_position,
@@ -45,13 +45,13 @@ def _owned_contract_or_404(contract_id):
     crud_routes._owned_contract_or_404).
     """
     return VendorContract.query.filter_by(
-        id=contract_id, organization_id=current_user.organization_id
+        id=contract_id, organization_id=acting_org_id()
     ).first_or_404()
 
 
 def _owned_license_or_404(license_id):
     return LicenseEntitlement.query.filter_by(
-        id=license_id, organization_id=current_user.organization_id
+        id=license_id, organization_id=acting_org_id()
     ).first_or_404()
 
 
@@ -140,12 +140,12 @@ def licenses_ai_position():
         return feature_guard
 
     try:
-        position = generate_licenses_position(current_user.organization_id)
+        position = generate_licenses_position(acting_org_id())
     except ProcurementAIError as e:
-        logger.warning("Licence position unparseable for org %s: %s", current_user.organization_id, e)
+        logger.warning("Licence position unparseable for org %s: %s", acting_org_id(), e)
         return jsonify({"error": f"AI licence position failed: {e}"}), 502
     except Exception as e:
-        logger.exception("Licence position generation failed for org %s", current_user.organization_id)
+        logger.exception("Licence position generation failed for org %s", acting_org_id())
         return jsonify({"error": f"AI licence position failed: {e}"}), 502
 
     return jsonify({"position": position})
@@ -168,12 +168,12 @@ def spend_ai_recommendations():
         return feature_guard
 
     try:
-        result = generate_spend_recommendations(current_user.organization_id)
+        result = generate_spend_recommendations(acting_org_id())
     except ProcurementAIError as e:
-        logger.warning("Spend recommendations unparseable for org %s: %s", current_user.organization_id, e)
+        logger.warning("Spend recommendations unparseable for org %s: %s", acting_org_id(), e)
         return jsonify({"error": f"AI spend recommendations failed: {e}"}), 502
     except Exception as e:
-        logger.exception("Spend recommendations generation failed for org %s", current_user.organization_id)
+        logger.exception("Spend recommendations generation failed for org %s", acting_org_id())
         return jsonify({"error": f"AI spend recommendations failed: {e}"}), 502
 
     return jsonify({"recommendations": result["recommendations"], "summary": result["summary"]})

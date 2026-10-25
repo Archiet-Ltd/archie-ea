@@ -4,8 +4,7 @@ from datetime import datetime
 from flask import Blueprint, Response, abort, flash, jsonify, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
 
-from app.decorators import requires_role
-from app.decorators.requires_role import DATA_SUBJECT_REQUEST_ROLES
+from app.decorators.requires_role import requires_data_subject_requests
 from app.extensions import db
 from app.middleware.tenant_decorators import platform_admin_required
 from app.models.gdpr_request import REQUEST_TYPES, GDPRRequest
@@ -98,14 +97,17 @@ def gdpr_status(user_id):
 # Every route below acts only inside the caller's own organisation: requests,
 # subjects and assignees from another organisation read as not found.
 # The Data Protection Officer works as the security architect persona, which
-# owns the compliance section; platform administrators also pass.
+# owns the compliance section; the administrator of the active organisation
+# and platform administrators also pass.
 # ---------------------------------------------------------------------------
-
-_DPO_ROLES = DATA_SUBJECT_REQUEST_ROLES
 
 
 def _org_id():
-    return current_user.organization_id
+    """The organisation the person is acting in: the active one, which is the
+    organisation the guard judged them against."""
+    from app.middleware.tenant_context import current_org_id
+
+    return current_org_id() or current_user.organization_id
 
 
 def _org_people():
@@ -125,7 +127,7 @@ def _request_or_404(request_id):
 
 @gdpr_bp.route("/compliance/data-subject-requests", methods=["GET"])
 @login_required
-@requires_role(_DPO_ROLES)
+@requires_data_subject_requests
 def dsr_index():
     return render_template(
         "compliance/data_subject_requests.html",
@@ -138,7 +140,7 @@ def dsr_index():
 
 @gdpr_bp.route("/compliance/data-subject-requests", methods=["POST"])
 @login_required
-@requires_role(_DPO_ROLES)
+@requires_data_subject_requests
 def dsr_create():
     subject_user_id = request.form.get("subject_user_id", type=int)
     category_ids = [int(v) for v in request.form.getlist("category_ids") if v.isdigit()]
@@ -160,7 +162,7 @@ def dsr_create():
 
 @gdpr_bp.route("/compliance/data-subject-requests/<int:request_id>", methods=["GET"])
 @login_required
-@requires_role(_DPO_ROLES)
+@requires_data_subject_requests
 def dsr_detail(request_id):
     req = _request_or_404(request_id)
     people = _org_people()
@@ -193,7 +195,7 @@ def _act(request_id, action):
 
 @gdpr_bp.route("/compliance/data-subject-requests/<int:request_id>/assign", methods=["POST"])
 @login_required
-@requires_role(_DPO_ROLES)
+@requires_data_subject_requests
 def dsr_assign(request_id):
     def _do(req):
         item = GDPRService.assign_search(
@@ -207,7 +209,7 @@ def dsr_assign(request_id):
 
 @gdpr_bp.route("/compliance/data-subject-requests/<int:request_id>/complete", methods=["POST"])
 @login_required
-@requires_role(_DPO_ROLES)
+@requires_data_subject_requests
 def dsr_complete(request_id):
     def _do(req):
         item = GDPRService.complete_search(_org_id(), req, request.form.get("key", ""), current_user)
@@ -218,7 +220,7 @@ def dsr_complete(request_id):
 
 @gdpr_bp.route("/compliance/data-subject-requests/<int:request_id>/access", methods=["POST"])
 @login_required
-@requires_role(_DPO_ROLES)
+@requires_data_subject_requests
 def dsr_access(request_id):
     req = _request_or_404(request_id)
     try:
@@ -236,7 +238,7 @@ def dsr_access(request_id):
 
 @gdpr_bp.route("/compliance/data-subject-requests/<int:request_id>/erasure/review", methods=["POST"])
 @login_required
-@requires_role(_DPO_ROLES)
+@requires_data_subject_requests
 def dsr_erasure_review(request_id):
     def _do(req):
         GDPRService.review_erasure(_org_id(), req, current_user)
@@ -247,7 +249,7 @@ def dsr_erasure_review(request_id):
 
 @gdpr_bp.route("/compliance/data-subject-requests/<int:request_id>/erasure/run", methods=["POST"])
 @login_required
-@requires_role(_DPO_ROLES)
+@requires_data_subject_requests
 def dsr_erasure_run(request_id):
     def _do(req):
         if request.form.get("confirm") != "erase":
@@ -260,7 +262,7 @@ def dsr_erasure_run(request_id):
 
 @gdpr_bp.route("/compliance/personal-data-trace", methods=["GET"])
 @login_required
-@requires_role(_DPO_ROLES)
+@requires_data_subject_requests
 def dsr_trace():
     categories = GDPRService.personal_data_categories(_org_id())
     category_id = request.args.get("category_id", type=int)

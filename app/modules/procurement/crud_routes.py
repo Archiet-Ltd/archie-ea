@@ -19,7 +19,7 @@ is what makes each handler safe on its own terms rather than by inheritance.
 from datetime import date, datetime
 
 from flask import flash, jsonify, redirect, render_template, request, url_for
-from flask_login import current_user, login_required
+from flask_login import login_required
 from sqlalchemy.exc import IntegrityError
 
 from app.decorators import requires_procurement
@@ -29,7 +29,7 @@ from app.models.license_entitlement import LicenseEntitlement
 from app.models.vendor.vendor_organization import VendorOrganization
 from app.services.feature_flag_service import FeatureFlagService
 
-from . import procurement_bp
+from . import acting_org_id, procurement_bp
 from .contract_extraction_service import (
     MAX_CONTRACT_TEXT_CHARS,
     ContractExtractionError,
@@ -61,13 +61,13 @@ def _owned_contract_or_404(contract_id):
     to another tenant is itself a disclosure.
     """
     return VendorContract.query.filter_by(
-        id=contract_id, organization_id=current_user.organization_id
+        id=contract_id, organization_id=acting_org_id()
     ).first_or_404()
 
 
 def _owned_license_or_404(license_id):
     return LicenseEntitlement.query.filter_by(
-        id=license_id, organization_id=current_user.organization_id
+        id=license_id, organization_id=acting_org_id()
     ).first_or_404()
 
 
@@ -154,7 +154,7 @@ def _apply_contract_form(contract, form):
 def contract_create():
     """Create a vendor contract."""
     if request.method == "POST":
-        contract = VendorContract(organization_id=current_user.organization_id)
+        contract = VendorContract(organization_id=acting_org_id())
         try:
             _apply_contract_form(contract, request.form)
             db.session.add(contract)
@@ -239,7 +239,7 @@ def contract_delete(contract_id):
     # bulk delete bypasses the tenant filter entirely, which is documented
     # behaviour and exactly the kind of thing that is easy to forget.
     LicenseEntitlement.query.filter_by(
-        contract_id=contract.id, organization_id=current_user.organization_id
+        contract_id=contract.id, organization_id=acting_org_id()
     ).delete(synchronize_session=False)
 
     db.session.delete(contract)
@@ -291,7 +291,7 @@ def _license_form_context(entitlement, form):
         "license": entitlement,
         "form": form,
         "contracts": VendorContract.query.filter_by(
-            organization_id=current_user.organization_id
+            organization_id=acting_org_id()
         ).order_by(VendorContract.contract_name).all(),
         "license_types": LicenseEntitlement.LICENSE_TYPES,
     }
@@ -353,7 +353,7 @@ def license_create():
         _owned_contract_or_404(int(contract_id))
 
         entitlement = LicenseEntitlement(
-            organization_id=current_user.organization_id,
+            organization_id=acting_org_id(),
             contract_id=int(contract_id),
         )
         try:

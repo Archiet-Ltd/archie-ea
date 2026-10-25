@@ -20,6 +20,7 @@ from flask_login import login_required
 
 from app.models.application_portfolio import ApplicationComponent
 from app.modules.interface_register.services import interface_register_service as service
+from app.utils.plain_errors import render_plain_error
 from app.utils.role_access import can_access_section
 
 logger = logging.getLogger(__name__)
@@ -39,7 +40,7 @@ def _guard():
     from flask_login import current_user
 
     if not can_access_section(current_user, "data_integration"):
-        return render_template("errors/403.html"), 403
+        return render_plain_error(403, "errors/403.html")
     return None
 
 
