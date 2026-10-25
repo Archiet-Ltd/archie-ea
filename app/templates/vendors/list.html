@@ -6,6 +6,7 @@
 {% from "components/status_badge.html" import status_badge %}
 {% from "components/workbench_table.html" import workbench_table with context %}
 {% from "components/modal.html" import modal %}
+{% from "vendors/_catalogue_tabs.html" import vendor_tabs with context %}
 
 {% block title %}Vendor Catalogue{% endblock %}
 
@@ -34,6 +35,8 @@
           {'text': 'Vendor Options Analysis', 'icon': 'sparkles', 'href': url_for('application_mgmt.vendor_analysis_list'), 'variant': 'outline'}
       ]
   ) }}
+
+  {{ vendor_tabs('vendors') }}
 
   {# Metrics Cards #}
   <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 sm:gap-6 mb-8">

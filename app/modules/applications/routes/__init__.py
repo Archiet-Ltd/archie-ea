@@ -110,5 +110,6 @@ from . import (  # noqa: F401, E402
     rationalization_api_routes,
     update_routes,
     vendor_api_routes,
+    vendor_catalogue_routes,
     vendor_display_routes,
 )

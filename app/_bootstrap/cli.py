@@ -588,6 +588,12 @@ def init_cli(app):
         app.logger.warning(f"⚠️  Failed to register clear foreign assignees CLI: {e}")
 
     try:
+        from app.commands.vendor_catalogue import init_app as init_vendor_catalogue
+        init_vendor_catalogue(app)
+    except Exception as e:
+        app.logger.warning(f"Failed to register vendor catalogue CLI: {e}")
+
+    try:
         from app.commands.scan_eol_alerts import init_app as init_scan_eol_alerts
         init_scan_eol_alerts(app)
         app.logger.info("✅ End-of-support alert scan CLI command registered")

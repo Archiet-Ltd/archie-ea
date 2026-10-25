@@ -435,6 +435,7 @@ users
 validation_gates
 validation_violations
 vendor_archimate_templates
+vendor_catalogue_facts
 vendor_comparison_criteria
 vendor_concentration_analysis
 vendor_data_sources

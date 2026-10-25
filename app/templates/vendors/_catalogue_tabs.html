@@ -1,0 +1,8 @@
+{# The Vendors page's two tabs: the organisation's vendors and the public catalogue. #}
+{% from 'components/tabs.html' import tab_links %}
+{% macro vendor_tabs(active) %}
+{{ tab_links([
+    {'label': 'Vendors', 'href': url_for('unified_applications.vendors'), 'active': active == 'vendors', 'testid': 'vendors-tab-vendors'},
+    {'label': 'Catalogue', 'href': url_for('unified_applications.vendor_catalogue'), 'active': active == 'catalogue', 'testid': 'vendors-tab-catalogue'},
+], label='Vendors sections', class='mb-6') }}
+{% endmacro %}
