@@ -86,4 +86,4 @@ You see a count on the Ask card. Open the system on the twin map for the connect
 - [Portfolio](/modules/portfolio)
 - [Projects](/modules/projects)
 - [Show the path from today's estate to the target state](/use-cases/target-state-roadmap)
-- [Take a change through the review board with the impact evidence attached](/use-cases/architecture-review-board)
+- [Take a change through the review board with its evidence pinned to the decision](/use-cases/architecture-review-board)

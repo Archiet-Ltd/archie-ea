@@ -9,7 +9,6 @@ from flask_login import current_user
 
 from app import db
 from app.models.business_model import (
-    CANVAS_BLOCKS,
     OPERATING_MODEL_TYPES,
     BusinessModelCanvas,
 )
@@ -55,14 +54,6 @@ def update_canvas_meta(canvas, name=None, description=None, operating_model_type
         if operating_model_type and operating_model_type not in OPERATING_MODEL_TYPES:
             raise ValueError(f"Invalid operating_model_type: {operating_model_type}")
         canvas.operating_model_type = operating_model_type or None
-    db.session.commit()
-    return canvas
-
-
-def save_block(canvas, block_key, content):
-    if block_key not in CANVAS_BLOCKS:
-        raise ValueError(f"Unknown canvas block: {block_key}")
-    canvas.set_block(block_key, content)
     db.session.commit()
     return canvas
 

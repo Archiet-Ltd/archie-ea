@@ -4801,9 +4801,9 @@
       "controls": {
         "button": 54,
         "form": 1,
-        "link": 1,
-        "modal": 4,
-        "testid": 6
+        "link": 4,
+        "modal": 3,
+        "testid": 2
       },
       "extends": [
         "layouts/admin_base.html"
@@ -8052,7 +8052,7 @@
       "confidence": "high",
       "controls": {
         "link": 1,
-        "testid": 1
+        "testid": 2
       },
       "extends": [
         "layouts/admin_base.html"
@@ -9897,7 +9897,7 @@
         "form": 2,
         "link": 3,
         "modal": 2,
-        "testid": 10
+        "testid": 9
       },
       "extends": [
         "layouts/admin_base.html"
@@ -17345,7 +17345,6 @@
       ],
       "basis": "rule",
       "block": "record-detail",
-      "charts": [],
       "components": [
         "alert",
         "badge",
@@ -17358,32 +17357,27 @@
         "page-header",
         "tabs"
       ],
-      "confidence": "high",
       "controls": {
-        "button": 4,
-        "form": 1,
-        "link": 2,
-        "modal": 1,
+        "button": 6,
+        "form": 4,
+        "link": 3,
+        "modal": 9,
         "testid": 8
       },
       "extends": [
         "layouts/admin_base.html"
       ],
-      "frame": "dashboard-01",
-      "inhouse_components": [
-        "canvas-box:Compose",
-        "modal:Replace",
-        "page-header:Replace"
-      ],
       "macros": [
+        "components/button.html",
+        "components/canvas/index.html",
         "components/canvas_box.html",
+        "components/empty_state.html",
+        "components/input.html",
         "components/modal.html",
-        "components/page_header.html"
+        "components/page_header.html",
+        "components/select.html"
       ],
-      "original": "gap:G-4",
-      "page_type": "board-canvas",
       "persona": "business_architect",
-      "reason": "Business model canvas; nine boxes in the canonical grid.",
       "reference": {
         "shadcn": {
           "name": "shadcn examples: mail (reading pane)",
@@ -17396,8 +17390,22 @@
       },
       "spec": null,
       "status": "mapped",
+      "charts": [],
+      "confidence": "high",
+      "frame": "dashboard-01",
+      "inhouse_components": [
+        "canvas-box:Compose",
+        "modal:Replace",
+        "page-header:Replace"
+      ],
+      "original": "gap:G-4",
+      "page_type": "board-canvas",
+      "reason": "Business model canvas; nine boxes in the canonical grid.",
       "tier": "C4",
-      "type_changed": true
+      "type_changed": true,
+      "extra_macros": [
+        "components/canvas/index.html"
+      ]
     },
     "app/templates/business_model/index.html": {
       "allowed_macros": [
@@ -17436,7 +17444,6 @@
       ],
       "basis": "rule",
       "block": "data-table",
-      "charts": [],
       "components": [
         "alert",
         "badge",
@@ -17451,7 +17458,6 @@
         "select",
         "table"
       ],
-      "confidence": "high",
       "controls": {
         "button": 2,
         "form": 1,
@@ -17462,22 +17468,13 @@
       "extends": [
         "layouts/admin_base.html"
       ],
-      "frame": "dashboard-01",
-      "inhouse_components": [
-        "empty_state:Replace",
-        "modal:Replace",
-        "page-header:Replace"
-      ],
       "macros": [
         "components/card.html",
         "components/empty_state.html",
         "components/modal.html",
         "components/page_header.html"
       ],
-      "original": "example:tasks",
-      "page_type": "data-table",
       "persona": "business_architect",
-      "reason": "Business models list.",
       "reference": {
         "shadcn": {
           "name": "shadcn examples: tasks",
@@ -17490,8 +17487,22 @@
       },
       "spec": null,
       "status": "mapped",
+      "charts": [],
+      "confidence": "high",
+      "frame": "dashboard-01",
+      "inhouse_components": [
+        "empty_state:Replace",
+        "modal:Replace",
+        "page-header:Replace"
+      ],
+      "original": "example:tasks",
+      "page_type": "data-table",
+      "reason": "Business models list.",
       "tier": "B",
-      "type_changed": false
+      "type_changed": false,
+      "extra_macros": [
+        "components/card.html"
+      ]
     },
     "app/templates/business_model/not_found.html": {
       "allowed_macros": [
@@ -30774,7 +30785,8 @@
         "components/modal.html",
         "macros/kanban_board.html",
         "macros/page_shell.html",
-        "components/dropdown_menu.html"
+        "components/dropdown_menu.html",
+        "components/select.html"
       ],
       "original": "gap:G-4",
       "page_type": "board",
@@ -32748,7 +32760,7 @@
       "controls": {
         "button": 4,
         "link": 1,
-        "modal": 2,
+        "modal": 1,
         "table": 1,
         "testid": 5
       },
