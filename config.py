@@ -877,17 +877,15 @@ class CurrencyConfig:
     def get_org_currency_code(cls, organization=None):
         """H-04: single source of truth for "which currency does this org use".
 
-        Reads `organization.settings['currency_code']` (a plain JSON field
-        already on Organization — no schema change) and falls back to
-        DEFAULT_CURRENCY. Every server-rendered money figure AND the client
-        currencyManager default should both come from this, not from a
-        hardcoded '$' or '£' baked into a template.
+        Reads ``organization.reporting_currency`` (the one stored currency
+        column) and falls back to DEFAULT_CURRENCY. Every server-rendered
+        money figure AND the client currencyManager default both come from
+        this, not from a hardcoded '$' or '£' baked into a template.
         """
         code = None
         try:
             if organization is not None:
-                settings = getattr(organization, "settings", None) or {}
-                code = settings.get("currency_code")
+                code = getattr(organization, "reporting_currency", None)
         except Exception:
             code = None
         if not code or not cls.is_supported(code):
