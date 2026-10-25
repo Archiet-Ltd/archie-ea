@@ -122,6 +122,35 @@ _SERVICE_PATTERNS = [
     re.compile(r"\bbreaks? for .*? if (?:the |our )?(.+?) (?:is down|fails|goes down)\b", re.I),
 ]
 
+# Superlative/descriptive phrases that name no specific system. When the
+# captured service phrase matches one of these, we treat it as "no service
+# named" so the answer falls through to single points of failure without a
+# "nothing recorded matches" reason line.
+_SUPERLATIVE_PHRASES = [
+    re.compile(r"^most connected\b", re.I),
+    re.compile(r"^most depended[- ]?on\b", re.I),
+    re.compile(r"^most critical\b", re.I),
+    re.compile(r"^biggest\b", re.I),
+    re.compile(r"^our main\b", re.I),
+    re.compile(r"^the core\b", re.I),
+    # Also catch "main" and "core" when they appear as the first word of the
+    # captured phrase (e.g. "main application", "core database") since the
+    # regex patterns strip leading "the/our" before capturing.
+    re.compile(r"^main\b", re.I),
+    re.compile(r"^core\b", re.I),
+]
+
+
+def _is_superlative_phrase(service: str) -> bool:
+    """True if the captured phrase is a superlative/descriptive term that
+    names no specific system (e.g. "most connected", "our main", "the core").
+    """
+    s = service.strip().lower()
+    for pattern in _SUPERLATIVE_PHRASES:
+        if pattern.match(s):
+            return True
+    return False
+
 
 def _extract_service(question: str) -> Optional[str]:
     """The service a 'what breaks' question names, or None.
@@ -130,14 +159,21 @@ def _extract_service(question: str) -> Optional[str]:
     one); the catalogue entry resolves that phrase to an element through the
     one entity matcher, and an unmatched phrase is answered honestly rather
     than with an invented blast radius.
+
+    Superlative/descriptive phrases ("most connected", "most depended-on",
+    "most critical", "biggest", "our main", "the core") are treated as no
+    service named, so the answer falls through to single points of failure
+    without a "nothing recorded matches" reason line.
     """
     text = (question or "").strip()
     for pattern in _SERVICE_PATTERNS:
         found = pattern.search(text)
         if found:
             service = found.group(1).strip().rstrip("?.! ")
-            if service:
+            if service and not _is_superlative_phrase(service):
                 return service
+            # Superlative phrase matched — treat as no service named.
+            return None
     return None
 
 

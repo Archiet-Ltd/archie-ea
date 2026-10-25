@@ -177,6 +177,63 @@ class TestNLInterpreterEvaluationSet:
         assert result["method"] == "none"
 
 
+class TestNLInterpreterSuperlativePhrases:
+    """Superlative/descriptive phrases name no specific system; the
+    interpreter must treat them as "no service named" so the answer falls
+    through to single points of failure without a "nothing recorded matches"
+    reason line.
+    """
+
+    def test_most_connected_phrase_returns_no_service_param(self):
+        from app.modules.intelligence.services.nl_query_interpreter import interpret
+
+        result = interpret("What breaks if our most connected application fails?")
+        assert result["entry_id"] == "what_breaks_if_fails"
+        assert "service" not in result["params"]
+
+    def test_most_depended_on_phrase_returns_no_service_param(self):
+        from app.modules.intelligence.services.nl_query_interpreter import interpret
+
+        result = interpret("What breaks if our most depended-on system fails?")
+        assert result["entry_id"] == "what_breaks_if_fails"
+        assert "service" not in result["params"]
+
+    def test_most_critical_phrase_returns_no_service_param(self):
+        from app.modules.intelligence.services.nl_query_interpreter import interpret
+
+        result = interpret("What breaks if our most critical service fails?")
+        assert result["entry_id"] == "what_breaks_if_fails"
+        assert "service" not in result["params"]
+
+    def test_biggest_single_point_of_failure_phrase_returns_no_service_param(self):
+        from app.modules.intelligence.services.nl_query_interpreter import interpret
+
+        result = interpret("What breaks if our biggest single point of failure fails?")
+        assert result["entry_id"] == "what_breaks_if_fails"
+        assert "service" not in result["params"]
+
+
+class TestNLInterpreterRealSystemNames:
+    """A genuinely named system that does not match keeps the fallback, with
+    a plain line that names it. The interpreter must extract the service
+    name so the catalogue entry can attempt to resolve it.
+    """
+
+    def test_payments_api_extracted_as_service(self):
+        from app.modules.intelligence.services.nl_query_interpreter import interpret
+
+        result = interpret("What breaks if Payments API fails?")
+        assert result["entry_id"] == "what_breaks_if_fails"
+        assert result["params"].get("service") == "Payments API"
+
+    def test_billing_platform_extracted_as_service(self):
+        from app.modules.intelligence.services.nl_query_interpreter import interpret
+
+        result = interpret("What breaks if the billing platform fails?")
+        assert result["entry_id"] == "what_breaks_if_fails"
+        assert result["params"].get("service") == "billing platform"
+
+
 class TestAskRouteTwoOrgIsolation:
     def test_ask_route_requires_login(self, client):
         resp = client.post("/api/v1/intelligence/ask", json={"question": "which applications have no owner?"})
