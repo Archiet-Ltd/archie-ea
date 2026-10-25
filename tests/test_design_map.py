@@ -153,7 +153,7 @@ def test_the_gate_holds_the_count_of_pages_outside_their_components():
 
 # ---- the designers' port map is folded into every row
 
-TIER_TOTALS = {"A": 17, "B": 334, "C1": 8, "C2": 14, "C3": 16, "C4": 4, "C5": 13}
+TIER_TOTALS = {"A": 17, "B": 333, "C1": 8, "C2": 14, "C3": 16, "C4": 5, "C5": 13}
 PORT_FIELDS = ("tier", "page_type", "type_changed", "original", "frame", "charts", "inhouse_components",
                "confidence", "reason")
 

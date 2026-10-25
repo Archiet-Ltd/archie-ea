@@ -11,7 +11,7 @@
 {% from 'components/checkbox.html' import checkbox %}
 {% from 'components/alert.html' import alert %}
 {% set step = step | default(1) %}
-{% set sign_up_steps = [{'num': 1, 'label': 'Your account'}, {'num': 2, 'label': 'Your company'}, {'num': 3, 'label': 'Your AI provider'}] %}
+{% set sign_up_steps = [{'num': 1, 'label': 'Your account'}, {'num': 2, 'label': 'Your sources'}, {'num': 3, 'label': 'Your company'}, {'num': 4, 'label': 'Your AI provider'}] %}
 
 {% block content %}
 {# layouts/public_base.html already renders the sole <main id="main-content">
@@ -71,6 +71,8 @@
     </div>
     {{ check.password_check('password', 0) }}
     {% elif step == 2 %}
+    {% include 'account/_signup_sources.html' %}
+    {% elif step == 3 %}
     {% include 'account/_signup_company.html' %}
     {% else %}
     {% include 'account/_signup_ai.html' %}
