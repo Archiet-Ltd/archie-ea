@@ -1273,7 +1273,6 @@ def _seed_canvas_model(org_id, canvas):
     to the seeded capabilities, price plans, and the vision as a Goal.
     Idempotent: every element is found by name and type before one is made."""
     from app.models import ArchiMateElement, ArchiMateRelationship
-    from app.models.archimate_core import SavedDiagramElement
     from app.models.price_plan import PricePlan
     from app.modules.business_model_canvas import model_service
     from app.services.archimate_backbone import create_backbone_element
@@ -1300,16 +1299,12 @@ def _seed_canvas_model(org_id, canvas):
             created += 1
         return el
 
-    diagram = model_service.ensure_view(canvas)
+    model_service.ensure_view(canvas)
     zones = model_service.zones()
     for box, entries in _CANVAS_ENTRIES.items():
         for name, type_, layer in entries:
             el = element(name, type_, layer)
-            model_service.set_profile(el, zones[box]["profile"])
-            if not db.session.query(SavedDiagramElement.id).filter_by(
-                diagram_id=diagram.id, element_id=el.id
-            ).first():
-                db.session.add(SavedDiagramElement(diagram_id=diagram.id, element_id=el.id))
+            model_service.place(canvas, box, el)
     vision = element(*_CANVAS_VISION)
     canvas.vision_element_id = vision.id
     db.session.flush()
@@ -2892,6 +2887,9 @@ def seed_demo_company() -> dict:
             ).first()
         stats["canvas_entries_created"] = _seed_canvas_model(org_id, canvas)
         stats["business_model_canvases_created"] = 0 if canvas_exists else 1
+        from app.commands import seed_framework_canvases
+
+        stats["framework_canvases_created"], stats["framework_canvas_rows_created"] = seed_framework_canvases.seed(org_id)
 
         # ── 11. plateaus ────────────────────────────────────────────────
         existing_plateaus = {

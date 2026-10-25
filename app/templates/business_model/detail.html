@@ -8,31 +8,32 @@
 {% from 'components/empty_state.html' import empty_state %}
 {% import 'components/canvas/index.html' as canvas_lib with context %}
 
-{% block title %}{{ canvas.name or 'Business Model Canvas' }}{% endblock %}
+{% block title %}{{ canvas.name or canvas_type_name }}{% endblock %}
 
 {% block content %}
 {% set vpc = framework == 'value_proposition' %}
+{% set has_prices = 'revenue_streams' in (zones or {}) %}
 {% set actions = [] %}
 {% if vpc %}
 {% set actions = [{'text': 'Business Model Canvas', 'icon': 'layout-grid', 'href': url_for('business_model.detail', canvas_id=canvas.id), 'variant': 'outline'}] %}
 {% else %}
-{% set actions = [{'text': 'Value Proposition Canvas', 'icon': 'layout-grid', 'href': url_for('business_model.value_proposition', canvas_id=canvas.id), 'variant': 'outline'}] %}
+{% set actions = [{'text': 'Value Proposition Canvas', 'icon': 'layout-grid', 'href': url_for('business_model.value_proposition', canvas_id=canvas.id), 'variant': 'outline'}] if is_bmc else [] %}
 {% if can_edit %}{% set actions = actions + [{'text': 'Delete Canvas', 'icon': 'trash-2', 'onclick': "Platform.modal.open('bmc-delete-modal')", 'variant': 'outline'}] %}{% endif %}
 {% endif %}
 
 <div class="flex-1 overflow-auto">
   {{ page_header(
-      title='Value Proposition Canvas' if vpc else (canvas.name or 'Untitled Canvas'),
+      title='Value Proposition Canvas' if vpc else (canvas.name or canvas_type_name),
       description=('What ' ~ (canvas.name or 'this canvas') ~ ' offers each customer segment. It reads the same elements as the business model canvas.') if vpc else canvas.description,
       breadcrumbs=([
           {'label': 'Home', 'href': url_for('main.index')},
-          {'label': 'Business Model Canvas', 'href': url_for('business_model.index')},
+          {'label': 'Canvases', 'href': url_for('business_model.index')},
           {'label': canvas.name or 'Canvas', 'href': url_for('business_model.detail', canvas_id=canvas.id)},
           {'label': 'Value Proposition Canvas'}
       ] if vpc else [
           {'label': 'Home', 'href': url_for('main.index')},
-          {'label': 'Business Model Canvas', 'href': url_for('business_model.index')},
-          {'label': canvas.name or 'Canvas'}
+          {'label': 'Canvases', 'href': url_for('business_model.index')},
+          {'label': canvas.name or canvas_type_name}
       ]),
       actions=actions
   ) }}
@@ -64,6 +65,7 @@
       <p class="flex h-9 min-w-0 items-center gap-1 text-sm text-muted-foreground" data-testid="bmc-vision">Vision: <a class="text-primary hover:underline" href="{{ vision_href }}">{{ vision.name }}</a></p>
       {% endif %}
       <div class="ml-auto flex flex-wrap items-end gap-4">
+      {% if canvas_key in ('business_model_canvas', 'lean_canvas') %}
       <form method="post" action="{{ url_for('business_model.update_canvas', canvas_id=canvas.id) }}" class="flex items-end gap-2" data-testid="bmc-operating-model-panel">
         {{ input(type='hidden', name='csrf_token', value=csrf_token()) }}
         <div class="flex flex-col gap-1.5">
@@ -74,6 +76,7 @@
           {% endcall %}
         </div>
       </form>
+      {% endif %}
       <form method="get" action="{{ url_for('business_model.export_canvas', canvas_id=canvas.id) }}" class="flex items-end gap-2" data-testid="bmc-export-panel">
         <div class="flex flex-col gap-1.5">
           {% call label(for='bmc-export-format') %}Download as{% endcall %}
@@ -88,7 +91,7 @@
       </div>
     </div>
 
-    {{ canvas_lib.business_model_canvas({
+    {{ canvas_lib[canvas_key]({
          'title': '',
          'subtitle': 'Every entry is an element of your model. Select one to open it.',
          'boxes': boxes,
@@ -124,12 +127,13 @@
 {% endcall %}
 {% endfor %}
 
+{% if has_prices %}
 {% call modal(id='add-revenue-streams', title='Add to Revenue Streams', description='A price belongs to one of your value propositions.', size='sm') %}
 {% if priceable %}
 <form method="post" action="{{ url_for('business_model.add_price', canvas_id=canvas.id) }}" class="flex flex-col gap-4" data-testid="bmc-add-form-revenue_streams">
   {{ input(type='hidden', name='csrf_token', value=csrf_token()) }}
   <div class="flex flex-col gap-1.5">
-    {% call label(for='price-element') %}Priced value proposition{% endcall %}
+    {% call label(for='price-element') %}{{ 'Priced value proposition' if is_bmc else 'Priced solution' }}{% endcall %}
     {% call native_select(id='price-element', name='element_id') %}
       {% for p in priceable %}<option value="{{ p.id }}">{{ p.text }}</option>{% endfor %}
     {% endcall %}
@@ -160,9 +164,10 @@
   </div>
 </form>
 {% else %}
-{{ empty_state(icon='gem', title='No value propositions yet', description='Add a value proposition first, then give it a price.') }}
+{{ empty_state(icon='gem', title='No ' ~ (zones[priceable_box_key].label | lower) ~ ' yet', description='Add one first, then give it a price.') }}
 {% endif %}
 {% endcall %}
+{% endif %}
 
 {% call modal(id='bmc-delete-modal', title='Delete this canvas?', description='The elements it shows stay in your model.', size='sm') %}
 <form method="POST" action="{{ url_for('business_model.delete_canvas', canvas_id=canvas.id) }}" data-testid="bmc-delete-form">
