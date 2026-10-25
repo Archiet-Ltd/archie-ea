@@ -598,3 +598,189 @@ def test_a_website_is_read_shown_with_its_pages_and_written_only_when_confirmed(
         shoot(page, "website-settings-%d" % width)
     finally:
         context.close()
+
+
+# ----------------------------------------------------------------------------- the public signals follow the company the person confirmed
+
+def _no_hits():
+    return {
+        "https://newsapi.org/": {"status": "ok", "articles": []}, "https://api.search.brave.com/": {"web": {"results": []}},
+        "https://efts.sec.gov/": {"hits": {"hits": []}}, "https://developer.uspto.gov/": {"results": []},
+        "https://api.openalex.org/": {"results": []}, "https://www.reddit.com/": {"data": {"children": []}},
+        "https://hn.algolia.com/": {"hits": []}, "https://public.api.bsky.app/": {"posts": []},
+        "https://mastodon.social/": {"statuses": []}, "https://query1.finance.yahoo.com/": {"quotes": []},
+    }
+
+
+def _keep_signals_in_process(app, org_id, answers):
+    """Read the public sources for one organisation from recorded answers; returns the addresses asked."""
+    from tests.test_public_signals import FakeHttp, load
+
+    from app.modules.organization import public_signals
+
+    http = FakeHttp(answers)
+    with app.app_context():
+        try:
+            public_signals.refresh_organization(org_id, http=http, llm=lambda prompt: json.dumps(load("sentiment")), force=True)
+        finally:
+            from app import db
+
+            db.session.remove()
+    return http.calls
+
+
+def _signal_titles(app, org_id):
+    with app.app_context():
+        from app import db
+        from app.models.organization_signal import OrganizationSignal
+
+        held = sorted((r.subject, r.title) for r in OrganizationSignal.query.filter_by(organization_id=org_id).all())
+        db.session.remove()
+    return held
+
+
+@pytest.mark.parametrize("width", [1440, 390], ids=["1440", "390"])
+def test_the_public_signals_are_about_the_company_the_person_confirmed_and_sit_under_its_name(
+        browser, server, people, app, company_site, width, monkeypatch):
+    from app.models.organization import Organization
+    from app.models.organization_signal import OrganizationSignal
+    from tests.smoke.fresh_org import create_fresh_org, sign_in
+
+    from app import db
+
+    for name in ("NEWSAPI_KEY", "BRAVE_SEARCH_API_KEY"):
+        monkeypatch.setenv(name, "journey-key")
+    monkeypatch.delenv("ALPHAVANTAGE_API_KEY", raising=False)
+    site = company_site
+    about, products = site.url + "/about", site.url + "/products"
+
+    acme = _no_hits()
+    acme["https://newsapi.org/"] = {"status": "ok", "articles": [
+        {"source": {"name": "Robotics Weekly"}, "title": "Acme Robotics Group opens a pick-and-pack line", "description": "Warehouse robots.",
+         "url": about, "publishedAt": "2026-10-20T09:30:00Z"},
+        {"source": {"name": "Daily Wire"}, "title": "Warehouse automation trends for 2026", "description": "An industry overview.",
+         "url": products, "publishedAt": "2026-10-19T09:30:00Z"}]}
+    acme["https://api.search.brave.com/"] = {"web": {"results": [
+        {"title": "Acme Robotics Group - company profile", "url": products, "description": "Makers of PickBot."}]}}
+    acme["https://hn.algolia.com/"] = {"hits": [
+        {"title": "Show HN: robots that pick and pack", "story_text": "Built by the team at %s" % site.url, "objectID": "11", "created_at": "2026-10-12T00:00:00Z"},
+        {"title": "Entrepreneurial passion and the 2008 start-up", "objectID": "12", "created_at": "2008-03-01T00:00:00Z"}]}
+    acme["https://api.openalex.org/"] = {"results": [
+        {"id": "https://openalex.org/W9", "display_name": "Neuroprotective Effect of Lithium Chloride in Rat Model of Cardiac Arrest",
+         "publication_date": "2020-01-01", "abstract_inverted_index": {"Rats": [0], "recover": [1]}}]}
+    birch = _no_hits()
+    birch["https://hn.algolia.com/"] = {"hits": [{"title": "Birch Robotics ships a gripper", "objectID": "21", "created_at": "2026-10-14T00:00:00Z"}]}
+
+    # A second company, already confirmed under its own name, reads its own public sources.
+    other = create_fresh_org("enterprise_architect")
+    with app.app_context():
+        row = db.session.get(Organization, other["org_id"])
+        row.name = "Birch Robotics"
+        row.settings = {"onboarding": {"website": {"url": "https://birch.example", "consent_at": "2026-10-01T00:00:00"}},
+                        "company_profile": {"company_name": {"value": "Birch Robotics"}}}
+        db.session.commit()
+        db.session.remove()
+
+    context, page = new_page(browser, width)
+    page.set_viewport_size({"width": width, "height": 900 if width > 500 else 844})
+    try:
+        email, _started = sign_up(page, str(server), people)
+        with app.app_context():
+            from app.models.user import User
+
+            org_id = User.query.filter_by(email=email).one().organization_id
+            assert db.session.get(Organization, org_id).name == "Casey Founder's Workspace"  # the stand-in, until the company is confirmed
+            db.session.remove()
+
+        page.get_by_label("Website address").fill(site.url)
+        page.get_by_label("You may read this website").check()
+        page.get_by_role("button", name="Save website").click()
+        expect(page.get_by_test_id("signup-status-website")).to_contain_text(re.compile("Company website|Reading|Read "))
+        page.get_by_test_id("signup-continue").click()
+        page.wait_for_url("**/account/welcome?step=3")
+        expect(page.get_by_test_id("signup-facts")).to_be_visible(timeout=120000)
+
+        # Before the company is confirmed nothing is searched: the daily read finds no name to search for.
+        with app.app_context():
+            db.session.add(OrganizationSignal(organization_id=org_id, checksum="old-1", subject="Casey Founder's Workspace", source="hackernews",
+                                              kind="mention", title="Entrepreneurial passion and the 2008 start-up", summary="", fetched_at=_now()))
+            db.session.commit()
+            db.session.remove()
+        from app.modules.organization.public_signals import SignalsRefused
+
+        with pytest.raises(SignalsRefused, match="not been confirmed"):
+            _keep_signals_in_process(app, org_id, acme)
+        assert _signal_titles(app, org_id) == [], "nothing is kept under the stand-in name"
+
+        # The person confirms the company under its own name.
+        name = _fact(page, "Company name")
+        name.locator("[data-fact-value]").fill("Acme Robotics Group")
+        page.get_by_label("Company size").select_option(label="11 to 50 people")
+        page.get_by_label("Your role").fill("CTO")
+        page.get_by_label("What do you want first?").select_option(label="Prepare for an audit")
+        page.get_by_role("button", name="Continue").click()
+        page.wait_for_url("**/account/welcome?step=4")
+        with app.app_context():
+            assert db.session.get(Organization, org_id).name == "Acme Robotics Group"
+            db.session.remove()
+
+        asked = _keep_signals_in_process(app, org_id, acme)
+        assert not any("Casey" in str(kw.get("params")) for _url, kw in asked), "the stand-in name is never searched"
+        _keep_signals_in_process(app, other["org_id"], birch)
+        page.get_by_role("button", name="Finish").click()
+        page.wait_for_url("**/dashboard/**")
+
+        # Settings: the card is under the confirmed name and every item names the company or its address.
+        page.goto(str(server) + "/account/manage", wait_until="domcontentloaded")
+        card = page.get_by_test_id("company-signals-card")
+        card.scroll_into_view_if_needed()
+        expect(card).to_contain_text("What the public sources say about Acme Robotics Group")
+        assert "Casey" not in card.inner_text()
+        table = card.get_by_test_id("company-signals-table")
+        rows = table.locator("tbody tr")
+        shown = [r.locator("a, span.font-medium").first.inner_text() for r in rows.all()]
+        assert sorted(t for t in shown if not t.startswith("Public sentiment")) == sorted([
+            "Acme Robotics Group opens a pick-and-pack line", "Acme Robotics Group - company profile", "Show HN: robots that pick and pack"]), shown
+        host = site.url.split("//")[1].split(":")[0]
+        for row in rows.all():
+            cite = row.get_by_test_id("signal-cite")
+            assert re.search(r" · (\d{2} \w{3} \d{4}|read \d{2} \w{3} \d{4})$", cite.inner_text()), cite.inner_text()
+        from app.modules.organization.public_signals import sources as sources_module
+
+        with app.app_context():
+            kept = [r for r in OrganizationSignal.query.filter_by(organization_id=org_id).all() if r.kind != "sentiment"]
+            assert kept and all(sources_module.is_about(r.title, r.summary, "Acme Robotics Group", host) for r in kept), [r.title for r in kept]
+            assert {r.subject for r in OrganizationSignal.query.filter_by(organization_id=org_id).all()} == {"Acme Robotics Group"}
+            db.session.remove()
+        for gone in ("Entrepreneurial", "Lithium", "Warehouse automation trends", "Casey"):
+            assert gone not in card.inner_text(), gone
+        expect(page.get_by_test_id("company-profile-card")).to_contain_text("Acme Robotics Group")
+        # each link lands on a page with content
+        for title, expected in (("Acme Robotics Group opens a pick-and-pack line", "Dana Whitfield"), ("Acme Robotics Group - company profile", "PickBot")):
+            with context.expect_page() as opened:
+                table.get_by_role("link", name=title).click()
+            landing = opened.value
+            landing.wait_for_load_state("domcontentloaded")
+            expect(landing.locator("body")).to_contain_text(expected)
+            landing.close()
+        shoot(page, "signals-card-%d" % width)
+
+        # The other company's card holds its own items and none of ours.
+        other_context, other_page = new_page(browser, width)
+        try:
+            sign_in(other_page, str(server), other["emails"]["enterprise_architect"])
+            other_page.goto(str(server) + "/account/manage", wait_until="domcontentloaded")
+            theirs = other_page.get_by_test_id("company-signals-card")
+            expect(theirs).to_contain_text("What the public sources say about Birch Robotics")
+            expect(theirs).to_contain_text("Birch Robotics ships a gripper")
+            assert "Acme" not in theirs.inner_text() and "Show HN" not in theirs.inner_text()
+        finally:
+            other_context.close()
+    finally:
+        context.close()
+
+
+def _now():
+    from datetime import datetime
+
+    return datetime.utcnow()
