@@ -56,8 +56,7 @@ def _document(app, client, persona):
             name="Layout Vendor " + uuid.uuid4().hex[:6], vendor_type="saas_provider", status="active",
             contract_status="contracted", enterprise_readiness_score=72,
         )
-        if hasattr(vendor, "organization_id"):
-            vendor.organization_id = org
+        vendor.named_by_organization_id = org  # the organisation's own vendor, so its Vendors list shows it
         db.session.add(vendor)
         db.session.commit()
     login(client, user)
@@ -94,7 +93,7 @@ def _open(browser, client, document, width=1440, height=900, empty_api=False):
             return route.fulfill(path=str(f)) if f.is_file() else route.fulfill(status=404, body="")
         if url.path == "/applications/vendors":
             return route.fulfill(status=200, content_type="text/html", body=document)
-        if empty_api and url.path == "/api/vendors/list":
+        if empty_api and url.path == "/api/vendors/register":
             return route.fulfill(status=200, content_type="application/json", body=json.dumps(EMPTY_LIST))
         if url.path.startswith(("/api/", "/applications/", "/vendors")):
             r = client.get(url.path, query_string=dict(parse_qsl(url.query)))
@@ -140,8 +139,8 @@ def test_no_column_sits_underneath_the_actions_column(browser, client, page_and_
             if t is actions:
                 continue
             assert t["right"] <= actions["left"] + 1, "%r runs underneath the Actions column" % t["text"]
-        readiness = next(t for t in ths if t["text"].lower() == "readiness")
-        assert readiness["right"] - readiness["left"] >= 90, "the Readiness header has no room for its text"
+        renewal = next(t for t in ths if t["text"].lower() == "next renewal")
+        assert renewal["right"] - renewal["left"] >= 90, "the Next renewal header has no room for its text"
     finally:
         pg.close()
 
@@ -205,13 +204,13 @@ def test_the_filter_card_spans_the_full_content_width_at_1440(browser, client, p
         pg.close()
 
 
-def test_readiness_is_readable_at_1280_without_scrolling(browser, client, page_and_document):
+def test_next_renewal_is_readable_at_1280_without_scrolling(browser, client, page_and_document):
     pg = _open(browser, client, page_and_document, width=1280, height=800)
     try:
         ths = pg.evaluate(MEASURE)["ths"]
         actions = next(t for t in ths if t["text"].lower() == "actions")
-        readiness = next(t for t in ths if t["text"].lower() == "readiness")
-        assert readiness["right"] <= actions["left"] + 1, "READINESS runs underneath the Actions column at 1280px"
+        renewal = next(t for t in ths if t["text"].lower() == "next renewal")
+        assert renewal["right"] <= actions["left"] + 1, "NEXT RENEWAL runs underneath the Actions column at 1280px"
     finally:
         pg.close()
 
