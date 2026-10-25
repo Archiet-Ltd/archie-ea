@@ -111,11 +111,6 @@ _SPEND_CHILDREN = (
        roles=PROCUREMENT_ROLES, requires="procurement_or_finance", aliases=("Spend",)),
 )
 
-_CHANGES_CHILDREN = (
-    _l("business_cases", "Business cases", "business_case.index", job="4",
-       aliases=("Business case", "Case for change", "Options", "Payback", "Investment case")),
-)
-
 MAIN: tuple = (
     _l("home", "Home", "dashboard.overview", "home", job="home",
        aliases=("Overview", "Dashboard", "Dashboard overview", "Start", "Getting started"),
@@ -138,7 +133,6 @@ MAIN: tuple = (
     _l("changes", "Changes", "enterprise.gap_analysis", "route", job="4",
        aliases=("Gaps", "Gap", "Gap analysis", "Work packages", "Roadmap", "Roadmaps", "Plateaus", "Programmes",
                 "Transformation", "Change"),
-       children=_CHANGES_CHILDREN,
        owns=("enterprise.work_packages", "enterprise.plateaus", "genome_roadmap.", "main.capability_roadmap",
              "business_case.",
              "solution_design.programmes_list", "implementation_planning.", "adm_kanban_view.",
