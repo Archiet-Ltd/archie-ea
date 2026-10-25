@@ -321,6 +321,25 @@ entries:
       - id: second-applications-list-endpoint
         regex: 'def\s+_?(applications|apps)_(list|all|index|reader)\s*\('
 
+  - id: your-systems
+    concept: Which applications an organisation counts as its own systems (not deleted, not a flagged duplicate,
+      not decommissioned), the set behind the Overview's Applications figure and the Vendors page's "of your N systems"
+    status: active
+    canonical:
+      path: app/services/your_systems.py
+      symbols: [conditions, select_for, count]
+    reuse: >
+      Count or list the organisation's systems through your_systems.count, select_for or conditions. Do not write
+      the duplicate and decommissioned filters again beside them: a second copy is how one page said 21 systems and
+      the other 20. A test (tests/test_your_systems.py) fails when the Overview and the Vendors page differ.
+    must_not_create:
+      - id: second-systems-definition
+        regex: 'func\.lower\(\w+\.lifecycle_status\)\s*!=|def\s+_?(active|live|current|own)_(applications|systems)\w*\s*\('
+    known_exceptions:
+      - path: app/modules/applications/routes/list_views.py
+        reason: the Systems list adds its search-box and include-decommissioned switches to the same filter; it moves
+          onto your_systems.conditions when that query is next changed
+
   - id: empty-state
     concept: Empty state shown when a list or page has no data
     status: active

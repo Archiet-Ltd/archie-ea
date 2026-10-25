@@ -10,7 +10,13 @@ Stores used (none added here):
     what its own applications and contracts attach to it.
   * ``ApplicationComponent.vendor_organization_id`` – the link from a system to
     its vendor (falling back to the vendor of its primary vendor product).
-  * ``VendorContract.vendor_id`` – the link from a contract to its vendor.
+  * ``VendorContract.vendor_id`` – the link from a contract to its vendor. A
+    contract that names both a vendor and a system also says who supplies that
+    system, so a system with no direct link and no vendor product is supplied by
+    the vendor its most recent active contract names. It is read, not copied: no
+    second link is stored, so it cannot drift from the contract.
+  * Which applications are "your systems" is ``your_systems``, the definition
+    the Overview reads as well.
   * Annual cost comes from ``application_cost_accessor``; renewals from the
     organisation's active contracts.
 """
@@ -27,6 +33,7 @@ from sqlalchemy.orm import Session
 from app import db
 from app.models.application_portfolio import ApplicationComponent, VendorContract
 from app.models.vendor.vendor_organization import VendorOrganization, VendorProduct
+from app.services import your_systems
 
 RENEWAL_WINDOW_DAYS = 90
 
@@ -78,25 +85,48 @@ def set_application_vendor(application: ApplicationComponent, vendor: Optional[V
     application.vendor_name = vendor.name[:100] if vendor is not None else None
 
 
+def _contract_vendor_expr():
+    """SQL for "the vendor on the contract that names this application": active first, then the latest."""
+    return (
+        db.select(VendorContract.vendor_id)
+        .where(
+            VendorContract.application_id == ApplicationComponent.id,
+            VendorContract.organization_id == ApplicationComponent.organization_id,
+            VendorContract.vendor_id.isnot(None),
+        )
+        .order_by(
+            (func.coalesce(VendorContract.status, "active") == "active").desc(),
+            VendorContract.end_date.desc().nullslast(),
+            VendorContract.id.desc(),
+        )
+        .limit(1)
+        .scalar_subquery()
+    )
+
+
 def _app_vendor_expr():
-    """SQL for "the vendor of this application": the direct link, else its product's vendor."""
+    """SQL for "the vendor of this application": the direct link, else its product's vendor, else its contract's."""
     product_vendor = (
         db.select(VendorProduct.vendor_organization_id)
         .where(VendorProduct.id == ApplicationComponent.vendor_product_id)
         .scalar_subquery()
     )
-    return func.coalesce(ApplicationComponent.vendor_organization_id, product_vendor)
+    return func.coalesce(ApplicationComponent.vendor_organization_id, product_vendor, _contract_vendor_expr())
 
 
 def _live_apps(org_id: int):
-    return [ApplicationComponent.organization_id == org_id, ApplicationComponent.deleted_at.is_(None)]
+    return [ApplicationComponent.organization_id == org_id, *your_systems.conditions()]
 
 
 def vendor_of(application: ApplicationComponent) -> Optional[int]:
     if application.vendor_organization_id:
         return application.vendor_organization_id
     product = application.primary_vendor_product
-    return product.vendor_organization_id if product is not None else None
+    if product is not None and product.vendor_organization_id:
+        return product.vendor_organization_id
+    return db.session.execute(
+        db.select(_contract_vendor_expr()).where(ApplicationComponent.id == application.id)
+    ).scalar_one_or_none()
 
 
 def systems_without_vendor(org_id: Optional[int] = None) -> List[ApplicationComponent]:
@@ -304,8 +334,7 @@ def page_summary() -> Optional[Dict]:
     try:
         rows = register(org_id)
         unmapped = systems_without_vendor(org_id)
-        total_systems = db.session.execute(
-            db.select(func.count(ApplicationComponent.id)).where(*_live_apps(org_id))).scalar_one()
+        total_systems = your_systems.count(org_id)
     except Exception:  # noqa: BLE001 - the page reports it, rather than showing zeros
         db.session.rollback()
         current_app.logger.exception("Vendor register could not be read")
