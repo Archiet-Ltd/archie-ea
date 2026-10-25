@@ -411,8 +411,10 @@ def canvas_export_reasons(template_key: str, saved_diagram_id=None) -> List[Dict
     A tenant-scoped read (``ArchiMateElement`` and ``SavedDiagram`` are both
     tenant-scoped models; a query against either carries the organisation
     predicate automatically) — the same explicit membership check the design
-    uses for a plain ``type_profile`` zone: an entry counts once an element on
-    the diagram carries the zone's ``profile`` in ``acm_properties``.
+    uses for a plain ``type_profile`` zone: an entry counts once the diagram
+    lists an element in the zone's box (``canvas_box``), or, for a canvas
+    drawn before boxes were kept on the view, an element carrying the zone's
+    ``profile`` in ``acm_properties``.
     """
     from app.config.archimate_viewpoints import CANVAS_TEMPLATES
 
@@ -421,12 +423,15 @@ def canvas_export_reasons(template_key: str, saved_diagram_id=None) -> List[Dict
         return []
 
     profiles_present = set()
+    boxes_present = set()
     if saved_diagram_id:
         from app.models.archimate_core import ArchiMateElement, SavedDiagram
 
         diagram = SavedDiagram.query.filter(SavedDiagram.id == saved_diagram_id).first()
         if diagram is not None:
-            element_ids = [p.element_id for p in diagram.positions.all()]
+            positions = diagram.positions.all()
+            boxes_present = {p.canvas_box for p in positions if p.canvas_box}
+            element_ids = [p.element_id for p in positions if not p.canvas_box]
             if element_ids:
                 els = ArchiMateElement.query.filter(ArchiMateElement.id.in_(element_ids)).all()
                 for el in els:
@@ -438,7 +443,9 @@ def canvas_export_reasons(template_key: str, saved_diagram_id=None) -> List[Dict
 
     reasons = []
     for zone in tpl.get("zones", []):
-        if zone.get("membership") == "type_profile" and zone.get("profile") in profiles_present:
+        if zone.get("membership") == "type_profile" and (
+            zone.get("box_key") in boxes_present or zone.get("profile") in profiles_present
+        ):
             continue
         reasons.append({
             "box_key": zone["box_key"],

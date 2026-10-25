@@ -297,33 +297,51 @@ def _simple_view_context():
             UnifiedCapability.level, UnifiedCapability.name
         ).all()
 
-        children_by_parent = {}
-        for c in capabilities:
-            if c.parent_capability_id:
-                children_by_parent.setdefault(c.parent_capability_id, []).append(c)
+        from app.services.capability_type import (
+            CAPABILITY_TYPE_HELP,
+            CAPABILITY_TYPE_LABELS,
+            CAPABILITY_TYPES,
+            normalise_capability_type,
+        )
 
-        def child_to_dict(cap):
+        def capability_row(cap):
+            fact_sheet_id = None
+            if cap.source_table == "business_capability" and str(cap.source_id).isdigit():
+                fact_sheet_id = int(cap.source_id)
             return {
                 "name": cap.name,
                 "description": cap.description or "",
                 "level": cap.level,
                 "domain": cap.domain.name if cap.domain else "",
+                "fact_sheet_id": fact_sheet_id,
             }
 
-        roots = [c for c in capabilities if c.level == 1]
+        by_type = {key: [] for key in CAPABILITY_TYPES}
+        unclassified = []
+        for cap in capabilities:
+            key = normalise_capability_type(cap.capability_type)
+            (by_type[key] if key else unclassified).append(capability_row(cap))
+
         capability_groups = [
             {
-                "name": root.name,
-                "description": root.description or "",
-                "level": root.level,
-                "domain": root.domain.name if root.domain else "",
-                "children": [
-                    child_to_dict(child) for child in children_by_parent.get(root.id, [])
-                ],
+                "key": key,
+                "name": CAPABILITY_TYPE_LABELS[key],
+                "description": CAPABILITY_TYPE_HELP[key],
+                "capabilities": by_type[key],
             }
-            for root in roots
+            for key in CAPABILITY_TYPES
         ]
+        if unclassified:
+            capability_groups.append(
+                {
+                    "key": "unclassified",
+                    "name": "Not yet classified",
+                    "description": "No one has said whether these are strategic, operational or supporting.",
+                    "capabilities": unclassified,
+                }
+            )
 
+        roots = [c for c in capabilities if c.level == 1]
         levels = [c.level for c in capabilities if c.level is not None]
         domains = {c.domain.name for c in capabilities if c.domain}
 

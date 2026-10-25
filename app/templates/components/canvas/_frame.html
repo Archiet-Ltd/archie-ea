@@ -174,17 +174,22 @@
     <div class="flex flex-col gap-2">
       <div class="flex items-center justify-between gap-2">
         <span class="text-xs font-medium text-foreground/70">{{ s.title }}</span>
-        {{ ui.badge(text=(boxes.get(s.key) or [])|length, variant='secondary') }}
+        <span class="flex shrink-0 items-center gap-1">
+          {{ ui.badge(text=(boxes.get(s.key) or [])|length, variant='secondary') }}
+          {% if add %}{{ add_button(s.key, s.title) }}{% endif %}
+        </span>
       </div>
-      {{ notes(canvas_id, s.key, boxes.get(s.key) or [], s.title, sm.element, canvas_name, s.empty or s.question) }}
+      {{ notes(canvas_id, s.key, boxes.get(s.key) or [], s.title, sm.element, canvas_name, s.empty or s.question, add) }}
     </div>
     {% endfor %}
   {% endcall %}
 {% endcall %}
 {%- endmacro %}
 
-{#- A canvas that is a grid of boxes. spec = {'id', 'form', 'name', 'grid' (grid classes), 'boxes': [...], 'hint', 'credit', 'width'}. -#}
+{#- A canvas that is a grid of boxes. spec = {'id', 'form', 'name', 'grid' (grid classes), 'boxes': [...], 'hint', 'credit', 'width'}.
+    A layout that draws more than boxes (axis headings, arrows, the 7S lines) passes them as the call body: they are placed inside the grid, before the boxes. -#}
 {% macro grid_canvas(spec, data, id) -%}
+{%- set decoration = caller() if caller else '' -%}
 {%- set boxes = data.boxes or {} -%}
 {%- set rows = [] -%}
 {%- for b in spec.boxes -%}
@@ -193,6 +198,7 @@
 {%- endfor -%}
 {% call frame(id, spec.form, spec.name, data, rows, spec.hint, credit=spec.credit, width=spec.width or 'min-w-240') %}
   <div class="grid gap-2 rounded-lg border bg-muted/30 p-2 {{ spec.grid }}">
+    {{ decoration }}
     {% for b in spec.boxes %}{{ box(id, b, boxes, data.editable) }}{% endfor %}
   </div>
 {% endcall %}

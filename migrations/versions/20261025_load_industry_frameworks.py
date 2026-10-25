@@ -14,7 +14,7 @@ from __future__ import annotations
 
 from alembic import op
 
-revision = "20261025_load_industry_frameworks"
+revision = "20261025_industry_frameworks"
 down_revision = "20261025_price_plans_canvas"
 branch_labels = None
 depends_on = None
