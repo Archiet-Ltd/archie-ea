@@ -40,14 +40,29 @@ def _currency():
     except Exception:
         organization = None
     cfg = CurrencyConfig.get_org_currency_config(organization)
-    return cfg["symbol"], cfg["position"] == "prefix"
+    return cfg["symbol"], cfg["position"] == "prefix", cfg["code"]
+
+
+def _currency_code():
+    """The organisation's currency code (e.g., 'GBP', 'USD')."""
+    from flask import has_request_context
+
+    from app.middleware.tenant_context import current_org
+    from config import CurrencyConfig
+
+    try:
+        organization = current_org() if has_request_context() else None
+    except Exception:
+        organization = None
+    cfg = CurrencyConfig.get_org_currency_config(organization)
+    return cfg["code"]
 
 
 def _money(amount, compact=False):
     """An amount in whole pounds, or short ("£250k", "£20.8k") for a card; the table keeps the whole figure."""
     if amount is None:
         return None
-    symbol, prefix = _currency()
+    symbol, prefix, _code = _currency()
     amount = float(amount)
     if compact and abs(amount) >= 1000:
         for size, suffix in ((1_000_000, "m"), (1_000, "k")):
@@ -550,6 +565,7 @@ def build_overview(org_id, user, now=None):
         "areas": _areas(org_id),
         "table": table,
         "ranges": RANGES,
+        "currency_code": _currency_code(),
         # the chart ramp tokens as colours a chart can draw with
         "chart_colours": ["hsl(var(--chart-1))", "hsl(var(--chart-tint))"],
     }
