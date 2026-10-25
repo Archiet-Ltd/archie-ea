@@ -826,3 +826,91 @@ def _now():
     from datetime import datetime
 
     return datetime.utcnow()
+
+
+# ----------------------------------------------------------------------------- a branded title gives the name, and the signals are about the company
+
+@pytest.fixture(scope="module")
+def brand_site():
+    """A company whose home page has no declared name: only a title, "Brand | tagline"."""
+    from tests.test_website_crawl import _Site
+
+    text = "<p>We help small teams plan their work together and keep every decision in one place. </p>" * 6
+    site = _Site({
+        "/": (200, "text/html", "<!doctype html><html><head><title>Brand | Plans that run themselves</title></head>"
+                                "<body><main><h1>Plans that run themselves</h1>%s</main></body></html>" % text),
+        "/robots.txt": (200, "text/plain", ""),
+    })
+    yield site
+    site.stop()
+
+
+@pytest.mark.parametrize("width", [1440, 390], ids=["1440", "390"])
+def test_a_founder_who_presses_continue_gets_the_brand_as_their_company_and_a_signals_card_that_holds_only_news_about_it(
+        browser, server, people, app, brand_site, width, monkeypatch):
+    from app.models.organization import Organization
+    from app import db
+
+    for name in ("NEWSAPI_KEY", "BRAVE_SEARCH_API_KEY"):
+        monkeypatch.setenv(name, "journey-key")
+    monkeypatch.delenv("ALPHAVANTAGE_API_KEY", raising=False)
+
+    brand = _no_hits()
+    brand["https://hn.algolia.com/"] = {"hits": [
+        {"title": "Launch HN: Brand (YC W20)", "story_text": "Open source planning. Privacy, GDPR, lawsuits, funding.", "objectID": "1",
+         "created_at": "2026-10-01T00:00:00Z"},
+        {"title": "Brand's New Website", "objectID": "2", "created_at": "2026-10-11T10:00:00Z"},
+        {"title": "New Brand Website", "objectID": "3", "created_at": "2026-10-10T10:00:00Z"},
+        {"title": "Show HN: Laminar – Open-Source DataDog + Brand for LLM Apps", "objectID": "4", "created_at": "2026-10-05T00:00:00Z"},
+        {"title": "Show HN: Phospho – Text analytics for LLM apps (Brand for Prompts)", "objectID": "5", "created_at": "2026-10-06T00:00:00Z"},
+    ]}
+
+    context, page = new_page(browser, width)
+    page.set_viewport_size({"width": width, "height": 900 if width > 500 else 844})
+    try:
+        email, _started = sign_up(page, str(server), people)
+        page.get_by_label("Website address").fill(brand_site.url)
+        page.get_by_label("You may read this website").check()
+        page.get_by_role("button", name="Save website").click()
+        page.get_by_test_id("signup-continue").click()
+        page.wait_for_url("**/account/welcome?step=3")
+        expect(page.get_by_test_id("signup-facts")).to_be_visible(timeout=120000)
+
+        # The name proposed is the brand, not the whole title, and it is ticked: the founder only presses Continue.
+        name = _fact(page, "Company name")
+        expect(name.locator("[data-fact-value]")).to_have_value("Brand")
+        expect(name.get_by_role("checkbox")).to_be_checked()
+        assert "Plans that run themselves" not in name.inner_text(), name.inner_text()
+        shoot(page, "brand-name-%d" % width)
+        page.get_by_label("Company size").select_option(label="11 to 50 people")
+        page.get_by_label("Your role").fill("CTO")
+        page.get_by_label("What do you want first?").select_option(label="Prepare for an audit")
+        page.get_by_role("button", name="Continue").click()
+        page.wait_for_url("**/account/welcome?step=4")
+        with app.app_context():
+            from app.models.user import User
+
+            org_id = User.query.filter_by(email=email).one().organization_id
+            assert db.session.get(Organization, org_id).name == "Brand"  # the workspace is no longer the stand-in
+            db.session.remove()
+
+        _keep_signals_in_process(app, org_id, brand)
+        page.get_by_role("button", name="Finish").click()
+        page.wait_for_url("**/dashboard/**")
+
+        page.goto(str(server) + "/account/manage", wait_until="domcontentloaded")
+        card = page.get_by_test_id("company-signals-card")
+        card.scroll_into_view_if_needed()
+        expect(card).to_contain_text("What the public sources say about Brand")
+        assert "Confirm your company name first" not in page.locator("body").inner_text()
+        table = card.get_by_test_id("company-signals-table")
+        shown = [r.locator("a, span.font-medium").first.inner_text() for r in table.locator("tbody tr").all()]
+        assert sorted(t for t in shown if not t.startswith("Public sentiment")) == sorted([
+            "Launch HN: Brand (YC W20)", "Brand's New Website"]), shown  # the other products and the repeat are not here
+        launch = table.locator("tbody tr").filter(has_text="Launch HN: Brand (YC W20)")
+        expect(launch.get_by_test_id("signal-informs-none")).to_have_text("Not matched to PESTLE or SWOT")
+        assert "Legal" not in launch.inner_text()
+        if SHOTS:
+            card.screenshot(path=os.path.join(SHOTS, "signals-brand-%d.png" % width))
+    finally:
+        context.close()

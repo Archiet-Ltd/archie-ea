@@ -428,6 +428,50 @@ def _store(org_id: int, facts: List[Dict[str, Any]], crawl_id: str) -> int:
 _HOME_NAME_BREAK = re.compile(r"[|•·–—\-\u2013\u2014\u00b7\u2022]\s*(?:Home|Welcome|Official|Website|Site|\w+\.\w+).*$")
 
 
+_TITLE_SPLIT = re.compile(r"\s+[|\u2013\u2014-]\s+")  # " | ", " - ", " \u2013 ", " \u2014 "
+TITLE_MATCHED_CONFIDENCE = 0.9  # a title part that is the site's own address or declared site name
+TITLE_FIRST_PART_CONFIDENCE = 0.7  # a short first part before a separator, with nothing to match it against
+
+
+def _alnum(text: str) -> str:
+    return re.sub(r"[^a-z0-9]", "", (text or "").lower())
+
+
+def _domain_names(url: str) -> set:
+    """What a company's own web address spells: ``cal.com`` is "calcom" and "cal"; ``acme-robotics.test`` is "acmerobotics"."""
+    from urllib.parse import urlparse
+
+    host = (urlparse(url if "://" in url else "https://" + url).hostname or "").lower() if url else ""
+    host = host[4:] if host.startswith("www.") else host
+    labels = host.split(".")
+    names = {_alnum(host)}
+    if len(labels) >= 2:
+        label = labels[-3] if len(labels) >= 3 and labels[-2] in ("co", "com", "org", "gov", "ac") else labels[-2]
+        names.add(_alnum(label))
+    return {n for n in names if n and not n.isdigit()}
+
+
+def _name_from_title(title: str, url: str, site_name: Optional[str] = None) -> Optional[Tuple[str, Optional[float]]]:
+    """The brand in a home-page title such as "Cal.com | Scheduling Software for Online Meetings".
+
+    The title is split on " | ", " \u2013 ", " - " and " \u2014 ". The part that is the site's address or its declared
+    site name is the name (high confidence). With no such part, the first part of a title that has a separator
+    and is short enough to be a name is offered (lower confidence, still ticked at sign-up). None otherwise."""
+    parts = [p.strip() for p in _TITLE_SPLIT.split(title.strip()) if p.strip()]
+    if len(parts) < 2:
+        only = parts[0] if parts else ""
+        if only and _alnum(only) in (_domain_names(url) | ({_alnum(site_name)} if site_name else set())):
+            return only, TITLE_MATCHED_CONFIDENCE
+        return None
+    known = _domain_names(url) | ({_alnum(site_name)} if site_name else set())
+    for part in parts:
+        if _alnum(part) in known:
+            return part, TITLE_MATCHED_CONFIDENCE
+    if len(parts[0].split()) <= 4:
+        return parts[0], TITLE_FIRST_PART_CONFIDENCE
+    return None
+
+
 def _home_page_company_name(first_page: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     """The company name from the home page: ``og:site_name``, organisation name in JSON-LD,
     or the page title, with the suffix after a separator (|, -, —, etc.) dropped.
@@ -445,6 +489,9 @@ def _home_page_company_name(first_page: Dict[str, Any]) -> Optional[Dict[str, An
     # title as fallback
     title = static.get("title") or ""
     if title.strip():
+        brand = _name_from_title(title, first_page.get("url") or "", (static.get("company_name") or {}).get("value"))
+        if brand:
+            return {"value": brand[0], "confidence": brand[1], "basis": "page"}
         value = _HOME_NAME_BREAK.sub("", title.strip()).strip()
         if value and static.get("text_length", 0) > 200:
             return {"value": value, "confidence": None, "basis": "page"}

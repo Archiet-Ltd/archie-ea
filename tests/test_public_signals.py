@@ -479,3 +479,71 @@ def test_signals_already_kept_under_the_stand_in_or_off_topic_are_removed_for_th
     with tenant_ctx(theirs.id):
         assert service.signals_for_profile(theirs.id) == []  # shown under their own name, which has none
         assert service.signals_for_profile(mine.id) == []  # and never another organisation's
+
+
+# ----------------------------------------------------------------------------- crawl03: near-duplicates, comparisons, reasoned tags
+
+def test_a_title_that_uses_the_company_as_a_comparison_is_not_about_it():
+    domain = "posthog.com"
+    for title in ("Show HN: Laminar – Open-Source DataDog + PostHog for LLM Apps",
+                  "Show HN: Phospho – Text analytics for LLM apps (Posthog for Prompts)",
+                  "Show HN: A session replay tool, an open-source alternative to PostHog",
+                  "Show HN: Mixpanel for PostHog users"):
+        assert not src.is_about(title, "PostHog", domain), title
+    for title in ("Launch HN: PostHog (YC W20) – open-source product analytics", "PostHog opens its roadmap",
+                  "Show HN: PostHog – product analytics you host yourself"):
+        assert src.is_about(title, "PostHog", domain), title
+    # on the company's own address it is still theirs
+    assert src.is_about("Show HN: PostHog for Prompts", "PostHog", domain, "https://posthog.com/prompts")
+
+
+def test_the_same_story_with_its_words_moved_within_a_few_days_is_stored_and_shown_once(db_session, make_org, tenant_ctx, keys):
+    org = _confirmed(db_session, make_org, "PostHog", "https://posthog.com")
+    answers = _posthog_answers()
+    answers["https://hn.algolia.com/"] = {"hits": [
+        {"title": "Posthog's New Website", "objectID": "1", "created_at": "2025-09-11T10:00:00Z"},
+        {"title": "New Posthog Website", "objectID": "2", "created_at": "2025-09-10T10:00:00Z"},
+        {"title": "New Posthog Website", "objectID": "3", "created_at": "2026-03-01T10:00:00Z"},  # months later: another story
+    ]}
+    service.refresh_organization(org.id, http=FakeHttp(answers), llm=_no_model)
+    stored = sorted(r.published_at.date().isoformat() for r in _rows(org.id) if r.kind != "sentiment")
+    assert stored == ["2025-09-11", "2026-03-01"], stored
+    shown = [r["published_at"].date().isoformat() for r in service.signals_for_profile(org.id) if r["kind"] != "sentiment"]
+    assert shown == ["2026-03-01", "2025-09-11"], shown
+
+
+def test_rows_kept_twice_before_are_shown_once_and_tidied_away(db_session, make_org, tenant_ctx, keys):
+    org = _confirmed(db_session, make_org, "PostHog", "https://posthog.com")
+    for title, day in (("Posthog's New Website", datetime(2025, 9, 11)), ("New Posthog Website", datetime(2025, 9, 10))):
+        _stored(org.id, subject="PostHog", source="hackernews", source_label="Hacker News", kind="mention", title=title, summary="",
+                url="https://news.ycombinator.com/item?id=" + title[:3], published_at=day)
+    assert len(service.signals_for_profile(org.id)) == 1
+    service.refresh_organization(org.id, http=FakeHttp(_posthog_answers()), llm=_no_model, force=True)
+    assert len([r for r in _rows(org.id) if "Website" in r.title]) == 1
+
+
+def test_every_tag_has_a_reason_and_a_signal_with_no_clear_category_has_no_tag():
+    # the headline says it: a lawsuit is legal, whatever else the post says
+    factor, reason = service.pestle_reason("news", "Firm sued over privacy breach", "")
+    assert factor == "legal" and "sued" in reason
+    # a launch post is not a legal matter, and a word in the body text does not decide the tag
+    assert service.pestle_factor("mention", "Launch HN: PostHog (YC W20)", "We are open source and care about privacy, GDPR and the court of public opinion") is None
+    assert service.pestle_factor("mention", "Show HN: Phospho – analytics for LLM apps", "We raised funding at a valuation") is None
+    assert service.pestle_factor("mention", "Show HN: a platform for cloud software", "") is None  # a product word is not a factor
+    # a record type is its own reason
+    assert service.pestle_reason("filing", "x", "") == ("legal", "a regulatory filing")
+    assert service.pestle_reason("news", "A quiet day", "") == (None, None)
+
+
+def test_the_launch_post_is_kept_for_posthog_and_carries_no_tag(db_session, make_org, tenant_ctx, keys):
+    org = _confirmed(db_session, make_org, "PostHog", "https://posthog.com")
+    answers = _posthog_answers()
+    answers["https://hn.algolia.com/"] = {"hits": [
+        {"title": "Launch HN: PostHog (YC W20)", "story_text": "Open source analytics. Privacy, GDPR, lawsuits, funding.", "objectID": "1", "created_at": "2020-03-01T00:00:00Z"},
+        {"title": "Show HN: Laminar – Open-Source DataDog + PostHog for LLM Apps", "objectID": "2", "created_at": "2025-03-01T00:00:00Z"},
+        {"title": "Show HN: Phospho – Text analytics for LLM apps (Posthog for Prompts)", "objectID": "3", "created_at": "2025-03-02T00:00:00Z"},
+    ]}
+    service.refresh_organization(org.id, http=FakeHttp(answers), llm=_no_model)
+    mentions = [r for r in service.signals_for_profile(org.id) if r["kind"] == "mention"]
+    assert [r["title"] for r in mentions] == ["Launch HN: PostHog (YC W20)"]
+    assert mentions[0]["pestle_factor"] is None

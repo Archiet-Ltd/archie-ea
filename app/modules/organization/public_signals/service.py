@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import hashlib
 import logging
+import re
 from datetime import datetime, timedelta
 from typing import Any, Callable, Dict, List, Optional
 
@@ -35,17 +36,23 @@ COMPANY_ONLY = ("sec_edgar", "uspto", "yahoo_finance", "alpha_vantage")  # the c
 PESTLE = ("political", "economic", "social", "technological", "legal", "environmental")
 SWOT = ("strength", "weakness", "opportunity", "threat")
 
-# Which PESTLE factor a signal informs. A filing is a legal and regulatory record, a market figure is an
-# economic one, a patent or a paper is technological. News and public mentions are read for the words
-# they use; where none of these words appears the signal carries no factor, and is not forced into one.
-_KIND_FACTOR = {"filing": "legal", "financial": "economic", "patent": "technological", "research": "technological"}
+# Which PESTLE factor a signal informs, and why. A filing is a legal and regulatory record, a market figure is an
+# economic one, a patent or a paper is technological: the record type is the reason. News and public mentions are
+# read by their headline alone, for whole words that name the matter (a lawsuit, a tariff, an emissions target).
+# Words that only describe a product (launch, platform, software, cloud, AI) and words in the body text decide
+# nothing: where the headline names no matter the signal carries no factor, and is never forced into one.
+_KIND_FACTOR = {"filing": ("legal", "a regulatory filing"), "financial": ("economic", "a market figure"),
+                "patent": ("technological", "a patent"), "research": ("technological", "a research paper")}
 _WORDS = (
-    ("legal", ("lawsuit", "court", "regulat", "compliance", "fine ", "fined", "antitrust", "privacy", "gdpr", "sued", "settlement")),
-    ("political", ("government", "election", "tariff", "sanction", "policy", "minister", "congress", "parliament", "treaty")),
-    ("environmental", ("climate", "emission", "carbon", "sustainab", "net zero", "renewable")),
-    ("economic", ("revenue", "profit", "earnings", "inflation", "funding", "investment", "acquisition", "acquires", "layoff", "stock", "ipo", "valuation")),
-    ("technological", ("launch", "ai ", "artificial intelligence", "cloud", "platform", "software", "patent", "breach", "outage", "cyber")),
-    ("social", ("customers", "workforce", "hiring", "culture", "community", "diversity", "protest", "boycott")),
+    ("legal", ("lawsuit", "lawsuits", "sued", "sues", "court", "fined", "antitrust", "gdpr", "regulator", "regulators",
+               "regulation", "settlement")),
+    ("political", ("government", "election", "tariff", "tariffs", "sanction", "sanctions", "minister", "congress",
+                   "parliament", "treaty")),
+    ("environmental", ("climate", "emission", "emissions", "carbon", "sustainability", "net zero", "renewable", "renewables")),
+    ("economic", ("revenue", "profit", "earnings", "inflation", "funding", "investment", "acquisition", "acquires",
+                  "acquired", "layoffs", "ipo", "valuation")),
+    ("technological", ("outage", "breach", "cyberattack", "ransomware", "vulnerability")),
+    ("social", ("hiring", "workforce", "boycott", "protest", "diversity")),
 )
 
 
@@ -99,14 +106,21 @@ def _context(org) -> Dict[str, Any]:
     }
 
 
-def pestle_factor(kind: str, title: str, summary: str) -> Optional[str]:
+def pestle_reason(kind: str, title: str, summary: str = "") -> tuple:
+    """(factor, the reason in words) for a signal, or (None, None) when no category clearly applies.
+    Only the record type and the headline decide it; the summary is not read."""
     if kind in _KIND_FACTOR:
         return _KIND_FACTOR[kind]
-    text = (" %s %s " % (title or "", summary or "")).lower()
+    text = " ".join(re.findall(r"[a-z0-9]+", (title or "").lower()))
     for factor, words in _WORDS:
-        if any(w in text for w in words):
-            return factor
-    return None
+        for word in words:
+            if (" %s " % word) in (" %s " % text):
+                return factor, 'the headline says "%s"' % word
+    return None, None
+
+
+def pestle_factor(kind: str, title: str, summary: str = "") -> Optional[str]:
+    return pestle_reason(kind, title, summary)[0]
 
 
 def swot_quadrant(subject_is_company: bool, score: Optional[float]) -> Optional[str]:
@@ -146,6 +160,38 @@ def _same_item_key(row: OrganizationSignal) -> tuple:
     return (row.source, row.subject, row.title, _day(row.published_at))
 
 
+NEAR_DAYS = 3  # one story re-posted with its words moved, within this many days, is one signal
+
+
+def title_words(title: str) -> tuple:
+    """The words of a title, lower case, without possessive endings and articles, in order of spelling:
+    "Posthog's New Website" and "New Posthog Website" are the same words."""
+    text = re.sub(r"['\u2019]s\b", "", (title or "").lower())
+    return tuple(sorted(w for w in re.findall(r"[a-z0-9]+", text) if w not in ("a", "an", "the")))
+
+
+def _near(a: Optional[datetime], b: Optional[datetime]) -> bool:
+    if a is None or b is None:
+        return a is None and b is None
+    return abs(a - b) <= timedelta(days=NEAR_DAYS)
+
+
+def near_repeats(rows) -> List[Any]:
+    """Of rows in the order given, those that repeat an earlier one: same source and subject, the same words
+    in the title, published within a few days. A sentiment summary is its own thing and is never a repeat."""
+    kept: Dict[tuple, List[Optional[datetime]]] = {}
+    repeats = []
+    for row in rows:
+        if row.kind == "sentiment":
+            continue
+        key = (row.source, row.subject, title_words(row.title))
+        if any(_near(row.published_at, day) for day in kept.get(key, [])):
+            repeats.append(row)
+        else:
+            kept.setdefault(key, []).append(row.published_at)
+    return repeats
+
+
 # ----------------------------------------------------------------------------- tidying
 
 def tidy(org_id: int, org=None) -> int:
@@ -175,6 +221,13 @@ def tidy(org_id: int, org=None) -> int:
             db.session.delete(row)
             removed += 1
         seen.add(key)
+    live = [r for r in sorted(rows, key=lambda r: r.id) if r not in db.session.deleted]
+    for row in near_repeats(live):  # the same words in another order, a day or two apart
+        db.session.delete(row)
+        removed += 1
+    for row in live:  # a tag kept from an earlier, looser rule is read again by the current one
+        if row.kind != "sentiment" and row not in db.session.deleted and row.pestle_factor != pestle_factor(row.kind, row.title):
+            row.pestle_factor = pestle_factor(row.kind, row.title)
     return removed
 
 
@@ -187,6 +240,15 @@ def _relevant(source: src.Source, subject: str, domain: str, items: List[src.Ite
     if not source.searched or not is_company:
         return items
     return [i for i in items if src.is_about(i.title, subject, domain, src.own_link(i.url, i.details))]
+
+
+class _Candidate:
+    """A hit not stored yet, shaped like a stored row so the same repeat test reads both."""
+
+    kind = "news"
+
+    def __init__(self, source: str, subject: str, title: str, published_at: Optional[datetime]):
+        self.source, self.subject, self.title, self.published_at = source, subject, title, published_at
 
 
 def _store(org_id: int, source: src.Source, subject: str, items: List[src.Item], is_company: bool, now: datetime) -> int:
@@ -203,6 +265,10 @@ def _store(org_id: int, source: src.Source, subject: str, items: List[src.Item],
             row = next((r for r in OrganizationSignal.query.filter_by(
                 organization_id=org_id, source=source.key, subject=subject, title=title).all()
                 if _day(r.published_at) == _day(published)), None)
+        if row is None and any(near_repeats([r, _Candidate(source.key, subject, title, published)])
+                               for r in OrganizationSignal.query.filter_by(
+                                   organization_id=org_id, source=source.key, subject=subject).all()):
+            continue  # the same story as one already kept, with its words moved
         if row is None:
             row = OrganizationSignal(organization_id=org_id, checksum=digest, source=source.key, created_at=now)
             db.session.add(row)
@@ -415,6 +481,7 @@ def _row(sig: OrganizationSignal) -> Dict[str, Any]:
         "id": sig.id, "kind": sig.kind, "source": sig.source_label, "source_key": sig.source, "subject": sig.subject,
         "title": sig.title, "summary": sig.summary, "url": sig.url, "published_at": sig.published_at,
         "fetched_at": sig.fetched_at, "pestle_factor": sig.pestle_factor, "swot_quadrant": sig.swot_quadrant,
+        "pestle_reason": pestle_reason(sig.kind, sig.title)[1] if sig.pestle_factor else None,
         "sentiment_score": sig.sentiment_score,
     }
 
@@ -434,8 +501,9 @@ def signals_for_profile(org_id: int, limit: int = 50) -> List[Dict[str, Any]]:
         key = _same_item_key(r)
         if key not in seen:
             seen.add(key)
-            shown.append(_row(r))
-    return shown[:limit]
+            shown.append(r)
+    again = {id(r) for r in near_repeats(shown)}  # and so is the same story with its words moved
+    return [_row(r) for r in shown if id(r) not in again][:limit]
 
 
 def framework_view(org_id: int, framework: str) -> Dict[str, List[Dict[str, Any]]]:
