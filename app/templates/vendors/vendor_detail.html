@@ -1,3 +1,4 @@
+{# design-block: record-detail #}
 {# smoke-coverage-ok: label-only change — plain-language rename, no functional change #}
 {% extends 'layouts/admin_base.html' %}
 {% block title %}{{ vendor.name }}{% endblock %}
@@ -105,6 +106,56 @@
         {{ data_card(icon='shield-check', icon_color='green', value=capability_count, label='Capability Mappings', subtitle='Mapped business capabilities') }}
         {{ data_card(icon='network', icon_color='purple', value=deployed_count, label='Deployed Applications', subtitle='Linked application components') }}
         {{ data_card(icon='blocks', icon_color='amber', value=archimate_count, label='Architecture Elements', subtitle='Architecture elements linked') }}
+    </div>
+
+    {# Systems this organisation buys from the vendor, with what they cost and when the contract renews #}
+    <div id="vendor-systems" class="mb-6">
+        {% call card() %}
+            {% call card_header() %}
+                <h2 class="text-lg font-semibold leading-none tracking-tight">Systems supplied</h2>
+                {% call card_description() %}
+                    {% if supplied_systems %}
+                        {{ supplied_systems|length }} of your systems
+                        {%- if supplied_cost is not none %}, {{ supplied_cost|currency }} a year{% endif %}
+                        {%- if next_renewal %}, next renewal {{ next_renewal.strftime('%d %b %Y') }}{% endif %}
+                    {% else %}
+                        None of your systems name {{ vendor.name }} as their vendor.
+                    {% endif %}
+                {% endcall %}
+            {% endcall %}
+            {% call card_content() %}
+                {% if supplied_systems %}
+                <ul class="space-y-2">
+                    {% for system in supplied_systems %}
+                    <li class="flex items-center justify-between rounded-md border border-border px-3 py-2">
+                        <a href="{{ url_for('unified_applications.application_detail', id=system.id) }}"
+                           class="font-medium text-sm text-primary hover:underline">{{ system.name }}</a>
+                        <span class="text-xs text-muted-foreground">{{ system.lifecycle_status|replace('_', ' ')|title if system.lifecycle_status else 'Lifecycle not recorded' }}</span>
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% else %}
+                <p class="text-sm text-muted-foreground">
+                    Name this vendor on a system from the
+                    <a href="{{ url_for('unified_applications.vendors') }}?tab=mapping" class="text-primary hover:underline">Mapping tab</a>.
+                </p>
+                {% endif %}
+                {% if vendor_contracts %}
+                <h3 class="mt-4 mb-2 text-sm font-semibold">Contracts</h3>
+                <ul class="space-y-2">
+                    {% for contract in vendor_contracts %}
+                    <li class="flex items-center justify-between rounded-md border border-border px-3 py-2 text-sm">
+                        <span>{{ contract.contract_name }}</span>
+                        <span class="text-xs text-muted-foreground">
+                            {{ contract.end_date.strftime('%d %b %Y') if contract.end_date else 'No end date recorded' }}
+                            {%- if contract.annual_cost is not none %} · {{ contract.annual_cost|currency }} a year{% endif %}
+                        </span>
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% endif %}
+            {% endcall %}
+        {% endcall %}
     </div>
 
     {# FRAG-036: Vendor Score Card (lazy-loaded) #}

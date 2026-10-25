@@ -151,8 +151,8 @@ def lifecycle(product: VendorProductDetail) -> dict:
 
 
 def organisation_vendor_products():
-    """Vendor products the signed-in organisation uses: named on its applications or
-    on its contracts. Tenant scoping comes from the ORM filter on the
+    """Vendor products the signed-in organisation uses: mapped to its applications,
+    of a vendor named on its systems, or on its contracts. Tenant scoping comes from the ORM filter on the
     organisation-owned rows (applications, contracts)."""
     from app.models.application_portfolio import ApplicationComponent, VendorContract
     from app.models.capability_to_vendor_mapping import ApplicationVendorProductMapping
@@ -172,6 +172,16 @@ def organisation_vendor_products():
     )
     ids = {r[0] for r in via_apps.all()}
     contract_vendors = [r[0] for r in vendor_ids.all()]
+    # Vendors named on the organisation's systems (one vendor record per vendor).
+    if hasattr(ApplicationComponent, "vendor_organization_id"):
+        contract_vendors += [
+            r[0]
+            for r in db.session.query(ApplicationComponent.vendor_organization_id)
+            .filter(ApplicationComponent.organization_id == current_org_id())
+            .filter(ApplicationComponent.vendor_organization_id.isnot(None))
+            .distinct()
+            .all()
+        ]
     if contract_vendors:
         ids |= {
             r[0]
