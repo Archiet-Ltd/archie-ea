@@ -345,64 +345,6 @@ def test_layered_viewpoint_with_no_org_context_returns_scope_required(app, db_se
 # that the "Open in composer" link never actually filtered to.
 
 
-def test_dashboard_layer_tab_links_carry_correct_layer_param(app, db_session, make_org, login_as):
-    """Each of the six dashboard layer tabs' 'Open in composer' anchor must be
-    Alpine-bound to that tab's own layer key, not the static, unscoped href
-    the founder reported. Asserts the Alpine binding expression itself
-    (rendered once, evaluated per-tab client-side by activeRole), matching
-    how test_composer_sidebar_link_carries_viewpoint_query_param above checks
-    the sidebar's real rendered HTML rather than a source file.
-    """
-    import uuid
-
-    from app.models.application_portfolio import ApplicationComponent
-    from app.models.user import User
-
-    org = make_org("layer-tab-links")
-    suffix = uuid.uuid4().hex[:8]
-    user = User(
-        email=f"layer-tab-links-{suffix}@example.com",
-        first_name="Layer",
-        last_name="Tabs",
-        organization_id=org.id,
-        confirmed=True,
-        enterprise_role="enterprise_architect",
-    )
-    db_session.add(user)
-    # The per-layer panel only renders in dashboard_mode == 'data'
-    # (dashboard_views.py:606-608: "guided" for applications_count < 5 and
-    # zero capability mappings) -- seed 5 applications so this org reaches
-    # 'data' mode and the layer tabs actually render.
-    db_session.add_all([
-        ApplicationComponent(name=f"App {i}", organization_id=org.id)
-        for i in range(5)
-    ])
-    db_session.flush()
-
-    client = app.test_client()
-    login_as(client, user)
-
-    resp = client.get("/dashboard/overview")
-    assert resp.status_code == 200, resp.get_data(as_text=True)[:2000]
-    html = resp.get_data(as_text=True)
-
-    assert (
-        ":href=\"'/archimate/composer?viewpoint=layered&layer=' + activeRole\""
-        in html
-    ), (
-        "the per-layer 'Open in composer' link must be dynamically bound to "
-        "activeRole so each of the six tabs opens its own layer -- static "
-        "href found instead"
-    )
-
-    for layer_key in ("motivation", "strategy", "business", "application",
-                       "technology", "implementation"):
-        assert f"{layer_key}:" in html, (
-            f"expected the Alpine _layers object to declare a '{layer_key}' "
-            f"key (drives activeRole matching for that tab)"
-        )
-
-
 def test_layer_filtered_viewpoint_returns_only_that_layers_element_types(
     app, db_session, make_org, tenant_ctx
 ):

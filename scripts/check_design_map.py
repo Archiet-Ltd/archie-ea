@@ -69,11 +69,14 @@ SHARED_PREFIXES = ("components/", "macros/")
 STATUSES = ("mapped", "specified", "implemented", "verified")
 DESIGNED_FIELDS = ("block", "basis", "spec", "status", "extra_macros", "note", "persona", "also_serves", "components",
                    "tier", "page_type", "type_changed", "original", "frame", "charts", "inhouse_components",
-                   "confidence", "reason")
+                   "confidence", "reason", "patterns", "states", "departures", "grid", "pattern_gap")
 # The designers' port map: how close each page is to a shadcn original. A is the original verbatim,
 # B is composed inside the nearest original's frame, C1 to C5 are the five forms shadcn has no original for.
 TIERS = ("A", "B", "C1", "C2", "C3", "C4", "C5")
 CONFIDENCE = ("high", "low")
+# Final port map: the rules a page may depart from (criteria v4) and the content grids of rule R13.
+DEPARTURE_RULES = ("R9", "R10", "brand", "C-form")
+GRIDS = ("G1", "G2", "G3", "G4")
 
 # Shared macro file stem -> the shadcn component it is an instance of. A macro with no
 # shadcn counterpart is an app component named after its file (source "app").
@@ -204,6 +207,10 @@ TIER_CHECKS = {
     "colour_literals": "pages whose own template holds a colour literal instead of a token (X1)",
     "inline_style": "pages whose own template sets an inline style beyond the geometry properties (X2)",
     "arbitrary_values": "pages whose own template uses an arbitrary-value class such as h-[250px] (X4)",
+    "pattern_outside_named": "pages whose own template does a job (table, tabs, pagination) that no pattern named in "
+                             "the row covers (B3)",
+    "grid_outside_named": "pages whose region wrappers use a gap, padding or column class outside the content grid "
+                          "the row names, a grey placeholder box, or a bento span (R13)",
 }
 GEOMETRY_PROPERTIES = {"--x", "--y", "--w", "--h", "--col", "--row"}
 COLOUR_LITERAL_RE = re.compile(
@@ -213,6 +220,25 @@ STYLE_ATTR_RE = re.compile(r"""\bstyle\s*=\s*(?:"([^"]*)"|'([^']*)')""")
 CLASS_ATTR_RE = re.compile(r"""\bclass\s*=\s*(?:"([^"]*)"|'([^']*)')""")
 ARBITRARY_RE = re.compile(r"(?<![\w-])[a-z0-9:!-]*-\[[^\]\s]+\]")
 CHART_CALL_RE = re.compile(r"new\s+Chart\s*\(")
+
+# A job a template can be seen doing, and the patterns (by number) whose markup may do it.
+JOB_SIGNATURES = {
+    "table": (re.compile(r"<table\b|components/(?:data_table|dense_table|workbench_table|table)\.html"),
+              {"P03", "P06", "P14", "P18", "P25", "P36"}),
+    "tabs": (re.compile(r"role\s*=\s*[\"']tablist[\"']|components/tabs\.html"), {"P02", "P03"}),
+    "pagination": (re.compile(r"components/pagination_controls\.html"), {"P05"}),
+}
+# Content grids of R13: the gap, padding and column classes a region wrapper may carry, per grid.
+GRID_BASE = {"gap-2", "gap-4", "md:gap-6", "py-4", "md:py-6", "px-4", "lg:px-6"}
+GRID_CLASSES = {
+    "G1": GRID_BASE | {"grid-cols-1", "@xl/main:grid-cols-2", "@5xl/main:grid-cols-4"},
+    "G2": {"gap-4", "p-4", "auto-rows-min", "md:grid-cols-3"},
+    "G3": GRID_BASE,
+    "G4": GRID_BASE,
+}
+FORM_FIELD_GRID = {"grid-cols-2", "grid-cols-3", "col-span-2"}
+SPAN_RE = re.compile(r"^(?:[\w@/-]+:)?(?:col|row)-span-")
+WRAPPER_TOKEN_RE = re.compile(r"^(?:[\w@/-]+:)?(?:gap(?:-[xy])?|p[xy]?|space-[xy]|grid-cols|col-span|row-span|auto-rows)-")
 
 
 def style_properties(source):
@@ -228,6 +254,38 @@ def style_properties(source):
 
 def charts_drawn(source):
     return max(len(re.findall(r"<canvas\b", source)), len(CHART_CALL_RE.findall(source)))
+
+
+def class_lists(source):
+    """Every class attribute value that holds no template expression, as a list of class tokens."""
+    for match in CLASS_ATTR_RE.finditer(source):
+        value = match.group(1) if match.group(1) is not None else match.group(2)
+        if "{{" in value or "{%" in value:
+            value = re.sub(r"{{.*?}}|{%.*?%}", " ", value)
+        yield value.split()
+
+
+def outside_grid(source, grid, patterns):
+    """True when a region wrapper (a class list with grid or flex-col) steps outside the named grid."""
+    allowed = set(GRID_CLASSES[grid])
+    if any(p.split("-")[0] == "P10" for p in patterns):
+        allowed |= FORM_FIELD_GRID
+    for tokens in class_lists(source):
+        if "aspect-video" in tokens and "bg-muted/50" in tokens:
+            return True
+        wrapper = "grid" in tokens or "flex-col" in tokens
+        for token in tokens:
+            span = SPAN_RE.match(token)
+            if (span or (wrapper and WRAPPER_TOKEN_RE.match(token))) and token not in allowed:
+                return True
+    return False
+
+
+def outside_patterns(source, patterns):
+    """The jobs the template does that none of the row's patterns covers."""
+    named = {p.split("-")[0] for p in patterns}
+    return sorted(job for job, (regex, covered) in JOB_SIGNATURES.items()
+                  if regex.search(source) and not named & covered)
 
 
 def tier_checks(design_map, pages, read=None):
@@ -263,6 +321,10 @@ def tier_checks(design_map, pages, read=None):
         if any(ARBITRARY_RE.search(m.group(1) if m.group(1) is not None else m.group(2))
                for m in CLASS_ATTR_RE.finditer(source)):
             found["arbitrary_values"].append((rel, tier))
+        if entry.get("patterns") and outside_patterns(source, entry["patterns"]):
+            found["pattern_outside_named"].append((rel, tier))
+        if entry.get("grid") in GRID_CLASSES and outside_grid(source, entry["grid"], entry.get("patterns") or []):
+            found["grid_outside_named"].append((rel, tier))
     out = {}
     for name, hits in found.items():
         by_tier = Counter(tier for _rel, tier in hits)
@@ -317,6 +379,35 @@ def check_block(rel, source, design_map):
 
 # ------------------------------------------------------------------ whole tree
 
+def port_map_problems(rel, entry, design_map):
+    """The final port map's fields on one row: patterns, states, departures and the content grid."""
+    register = design_map.get("pattern_register", {})
+    problems = []
+    patterns = entry.get("patterns")
+    if patterns is None:
+        problems.append(f"{rel}: no patterns list from the port map")
+    elif not patterns:
+        if not (entry.get("pattern_gap") or "").strip():
+            problems.append(f"{rel}: names no pattern and does not say which gap leaves it without one")
+    for pattern in patterns or []:
+        if pattern.split(":")[0] not in register:
+            problems.append(f"{rel}: pattern {pattern!r} is not in the pattern register of docs/design-map.json")
+    if not entry.get("states"):
+        problems.append(f"{rel}: no states from the port map")
+    departures = entry.get("departures")
+    if departures is None:
+        problems.append(f"{rel}: no departures list from the port map")
+    for departure in departures or []:
+        if departure.get("rule") not in DEPARTURE_RULES or not (departure.get("what") or "").strip():
+            problems.append(f"{rel}: departure {departure!r} needs a rule of {', '.join(DEPARTURE_RULES)} and a reason")
+    grid = entry.get("grid")
+    if grid is not None and grid not in GRIDS:
+        problems.append(f"{rel}: grid {grid!r} is not one of {', '.join(GRIDS)}")
+    if "grid" not in entry:
+        problems.append(f"{rel}: no content grid (one of {', '.join(GRIDS)}, or null for a public page)")
+    return problems
+
+
 def measure(design_map=None, pages=None):
     design_map = design_map if design_map is not None else load_map()
     pages = pages if pages is not None else tree_pages()
@@ -364,6 +455,7 @@ def measure(design_map=None, pages=None):
                 errors.append(f"{rel}: no {field.replace('_', ' ')} from the port map")
         if not (entry.get("reason") or "").strip():
             errors.append(f"{rel}: no reason from the port map")
+        errors.extend(port_map_problems(rel, entry, design_map))
         listed = entry.get("components") or []
         if not listed:
             errors.append(f"{rel}: lists no components")
@@ -538,7 +630,10 @@ def render_tracker(design_map, result):
         f'<td>{_esc(design_map["personas"][e["persona"]])}</td>'
         f'<td>{_esc(", ".join(e["components"]))}</td><td>{_esc(e["tier"])}</td>'
         f'<td>{_esc(e["page_type"])}{" (corrected)" if e["type_changed"] else ""}<br>'
-        f'<span class="muted">{_esc(e["reason"])}</span></td><td>{_esc(e["confidence"])}</td><td>{_esc(e["status"])}</td>'
+        f'<span class="muted">{_esc(e["reason"])}</span></td><td>{_esc(e["confidence"])}</td>'
+        f'<td>{_esc(", ".join(e.get("patterns") or []) or e.get("pattern_gap") or "None")}</td>'
+        f'<td>{_esc(", ".join(d["rule"] for d in e.get("departures") or []) or "None")}</td>'
+        f'<td>{_esc(e["status"])}</td>'
         f'<td>{_esc(", ".join(outside[rel])) if rel in outside else "None: follows its block"}</td>'
         f'<td>{(chr(60) + "a href=" + chr(34) + _esc(e["spec"].replace("docs/design/", "")) + chr(34) + ">Spec</a>") if e.get("spec") else "Not written yet"}</td></tr>'
         for rel, e in design_map["pages"].items()
@@ -653,7 +748,7 @@ select, input {{ font:inherit; padding:6px 8px; border:1px solid hsl(var(--borde
 <span class="muted" id="page-count" aria-live="polite"></span>
 </div>
 <div class="scroll"><table id="pages-table">
-<thead><tr><th scope="col">Template</th><th scope="col">Block</th><th scope="col">Persona</th><th scope="col">Components</th><th scope="col">Tier</th><th scope="col">Page type and why</th><th scope="col">Confidence</th><th scope="col">Status</th><th scope="col">Macros outside its block</th><th scope="col">Spec</th></tr></thead>
+<thead><tr><th scope="col">Template</th><th scope="col">Block</th><th scope="col">Persona</th><th scope="col">Components</th><th scope="col">Tier</th><th scope="col">Page type and why</th><th scope="col">Confidence</th><th scope="col">Patterns</th><th scope="col">Departures</th><th scope="col">Status</th><th scope="col">Macros outside its block</th><th scope="col">Spec</th></tr></thead>
 <tbody>
 {page_rows}
 </tbody></table></div>

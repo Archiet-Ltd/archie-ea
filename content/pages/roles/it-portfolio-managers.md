@@ -36,7 +36,7 @@ spreadsheet nobody fully trusts.
 
 ## The screens you will use
 
-- **Ask**, first, for a quick question about one application before you open its full record.
+- **The AI chat**, first, for a quick question about one application before you open its full record.
 - **Applications**, the one inventory of owner, cost, lifecycle and risk for everything you run — see
   [Applications](/modules/applications).
 - **Rationalisation**, which scores every application against the TIME model and runs duplicate
@@ -128,5 +128,5 @@ once more than three people need to edit.
 
 [Start free](/register) on the Community plan for one organisation of up to three people, with
 Applications, Rationalisation and Vendors all included from day one. A growing portfolio team moves to
-Team, priced per editor, where people who only ask questions on Ask stay free. [See full
+Team, priced per editor, where people who only ask questions in the AI chat stay free. [See full
 pricing](/pricing).
