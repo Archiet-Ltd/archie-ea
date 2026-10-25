@@ -18,7 +18,7 @@ Routes:
 
 import logging
 
-from flask import Blueprint, flash, jsonify, redirect, render_template, request, url_for
+from flask import Blueprint, flash, g, jsonify, redirect, render_template, request, url_for
 from flask_login import login_required
 
 from app.extensions import csrf
@@ -79,6 +79,9 @@ def billing_index():
                 refresh_error = str(exc)
     else:
         config = billing_plans.configuration_status()
+
+    # The buy form on this page is answered with a redirect to the provider's hosted checkout.
+    g.csp_form_action_extra = " ".join(BillingService.checkout_origins())
 
     sub = billing_plans.current_subscription(org)
     selected = request.args.get("plan")

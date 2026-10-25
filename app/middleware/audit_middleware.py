@@ -115,7 +115,8 @@ def _label_of(connection, target):
     return None
 
 
-def _write_audit(connection, action, table_label, record_id, old_value=None, new_value=None, target=None):
+def _write_audit(connection, action, table_label, record_id, old_value=None, new_value=None, target=None,
+                 recorded_at=None):
     """Insert one audit row using the flush's own connection.
 
     Mapper events (after_insert/update/delete) fire mid-flush, so we must NOT use
@@ -138,8 +139,11 @@ def _write_audit(connection, action, table_label, record_id, old_value=None, new
         org_id = owner_org
     label = _label_of(connection, target)
     # Sealed into the organisation's integrity chain like every other entry.
+    # A date is given only by a demonstration or sample load, as the record's first version is written.
+    dated = {"created_at": recorded_at} if recorded_at is not None else {}
     chain_insert(
         connection,
+        **dated,
         action=str(action)[:20],
         table_name=table_label,
         record_id=record_id,
@@ -182,12 +186,22 @@ def _listeners_for(table_label: str):
 
 
 def _make_after_insert(table_label: str):
+    from app.services.change_source import current_change_context
+
     def _after_insert(mapper, connection, target):
         try:
             record_id = getattr(target, "id", None)
+            recorded_at = None
+            dating = current_change_context()["dating"]
+            if dating is not None:
+                try:
+                    recorded_at = dating.date_new_record(connection, table_label, target)
+                except Exception:
+                    # The record is still audited, with today's date, rather than not at all.
+                    logger.warning("audit dating failed for %s", table_label, exc_info=True)
             _write_audit(
                 connection, "create", table_label, record_id,
-                new_value=_column_snapshot(target), target=target,
+                new_value=_column_snapshot(target), target=target, recorded_at=recorded_at,
             )
         except Exception:
             logger.debug("audit after_insert failed for %s", table_label, exc_info=True)
