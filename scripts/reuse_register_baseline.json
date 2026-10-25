@@ -215,6 +215,9 @@
    "app/services/rationalization_scoring_service.py": 1,
    "app/services/strategic_recommendation_engine.py": 1
   },
+  "kanban-board/kanban-column-markup": {
+   "app/templates/adm_kanban/board_v2.html": 1
+  },
   "name-matching/duplicate-lookup": {
    "app/application_mgmt/consolidation_routes.py": 1,
    "app/modules/ai_chat/services/ai_chat_approval_service.py": 1,
@@ -262,12 +265,10 @@
    "app/static/css/data-table.css": 12,
    "app/templates/adm_kanban/board_v2.html": 1,
    "app/templates/ai_chat/entity_matching_chat_interface.html": 3,
-   "app/templates/ai_chat/index.html": 3,
    "app/templates/application_mgmt/portfolio_gap_analysis.html": 5,
    "app/templates/architecture_assistant/arb_package_print.html": 3,
    "app/templates/architecture_assistant/archimate_model_viewer.html": 1,
    "app/templates/architecture_assistant/index.html": 3,
-   "app/templates/backlog/prioritisation.html": 2,
    "app/templates/capability_map/capabilities.html": 1,
    "app/templates/market_intelligence/index.html": 4,
    "app/templates/solutions/export_executive.html": 1

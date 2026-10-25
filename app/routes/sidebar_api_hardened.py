@@ -11,7 +11,7 @@ Sidebar API Routes - HARDENED SECURE VERSION
 """
 
 import logging
-from flask import Blueprint, current_app, jsonify, request, url_for
+from flask import Blueprint, jsonify, request
 from flask_login import login_required, current_user
 from functools import wraps
 
@@ -569,51 +569,29 @@ def api_global_search():
 
         # EA Workflow definitions — removed from search (feature hidden, Journey Wizard is canonical)
 
-        # Modules — S-11/P-10: search covered data records only, never the
-        # module estate itself, so a user could not find "duplicate
-        # detection" or "procurement" by typing it. Indexed from the same
-        # source the sidebar and the /modules directory already use, so a
-        # module only has to be added once to become searchable everywhere.
+        # Pages — navigation v3: one index, the navigation registry
+        # (app/navigation/registry.py), which the sidebar and the breadcrumbs read too.
+        # Every page the signed-in person may open, matched on its name and every old
+        # name it went by (aliases), spelling-blind (en-GB/en-US variants fold both
+        # ways, app/utils/search_text.py), each labelled with the sidebar entry it sits
+        # under. A page the person cannot open is not in their index, so a hit never
+        # 403s on click. Pages come first: they are what the box is for.
         try:
-            # visible_module_links(), not all_module_links(): the directory
-            # unions every role's zones, so the unfiltered list includes the
-            # admin / procurement / my-applications surfaces that hard-403 for
-            # most personas. A search hit that 403s on click is a dead result.
-            #
-            # Matching is spelling-blind (normalise_search_text folds en-GB/en-US variant pairs both
-            # ways, app/utils/search_text.py), and every hit is labelled with a zone — the caller's own
-            # SIDEBAR_ZONES if the page lives there, "All modules" otherwise (a page the persona keeps only
-            # via the directory, not a sidebar zone). One map, built once per request.
-            from app.modules.modules_directory.routes import visible_module_links
-            from app.utils.role_access import get_sidebar_zones
-            from app.utils.search_text import normalise_search_text
+            from app.navigation.registry import search_pages
 
-            endpoint_zone = {}
-            for zone in get_sidebar_zones(current_user):
-                for link in zone["links"]:
-                    endpoint_zone.setdefault(link["endpoint"], zone["title"])
-
-            q_norm = normalise_search_text(q)
-            for link in visible_module_links():
-                if q_norm not in normalise_search_text(link["label"]):
-                    continue
-                if link["endpoint"] not in current_app.view_functions:
-                    continue
-                try:
-                    module_url = url_for(link["endpoint"], **(link.get("query_params") or {}))
-                except Exception:
-                    continue
-                results.append(
-                    {
-                        "type": "module",
-                        "id": link["endpoint"],
-                        "name": link["label"],
-                        "url": module_url,
-                        "zone": endpoint_zone.get(link["endpoint"], "All modules"),
-                    }
-                )
+            pages = [
+                {
+                    "type": "module",
+                    "id": row["endpoint"],
+                    "name": row["label"],
+                    "url": row["url"],
+                    "zone": row["section"],
+                }
+                for row in search_pages(current_user, q)
+            ]
+            results = pages + results
         except Exception as e:
-            logger.debug(f"Search skip modules: {e}")
+            logger.debug(f"Search skip pages: {e}")
 
         return jsonify({"results": results, "total_count": len(results)})
 

@@ -195,6 +195,10 @@ def test_an_architect_records_a_decision_finds_it_from_the_element_and_asks_why(
     expect(derived).to_have_count(1)
 
     why = derived.locator("[data-why]")
+    expect(why.locator("[data-why-sentence]")).to_have_text(
+        "%s reaches %s through %s." % (names["mainframe"], names["portal"], names["gateway"])
+    )
+    why.get_by_text("How this was worked out").click()
     expect(why.locator("[data-why-rule]")).to_have_text(
         "A serving link followed by a serving link gives a serving link, by the ArchiMate derivation table."
     )

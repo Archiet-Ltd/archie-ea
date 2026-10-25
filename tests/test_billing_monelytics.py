@@ -421,7 +421,7 @@ def test_without_the_other_three_settings_the_org_admin_sees_the_generic_banner(
         page = client.get("/admin/billing/")
     html = page.get_data(as_text=True)
     assert page.status_code == 200
-    assert "Online payment is not set up on this installation" in html
+    assert "Online payment is not open yet" in html
     assert "MONELYTICS_CLIENT_SECRET" not in html
     assert "Settings the operator has not provided" not in html
 

@@ -43,6 +43,7 @@ from flask.cli import with_appcontext
 from sqlalchemy import text
 
 from app import db
+from app.services.capability_type import default_type_sql
 from app.commands.cutover_capability_tenancy import (
     ADVISORY_LOCK_ID as CUTOVER_ADVISORY_LOCK_ID,
     _foreign_keys,
@@ -388,7 +389,7 @@ WITH {_SOURCE_CTE}
 INSERT INTO unified_capabilities (
     name, description, code, level, scope, organization_id,
     source_table, source_id, source_org_id, source_checksum,
-    specialization_type, category, current_maturity_level, target_maturity_level,
+    specialization_type, category, capability_type, current_maturity_level, target_maturity_level,
     maturity_gap, maturity_assessment_date, maturity_assessment_notes,
     strategic_importance, business_value, business_owner, it_owner,
     performance_score, kpis, archimate_id, archimate_element_id,
@@ -412,6 +413,8 @@ SELECT
     {_CHECKSUM_SQL},
     'BUSINESS',
     bc.category,
+    -- Untyped until someone decides: the one starting rule, shared with the backfill.
+    {default_type_sql('bc.category', 'LEAST(GREATEST(bc.level, 1), 3)')},
     -- Explicit values, including NULL: the target column defaults are 1 and 3
     -- (`unified_capability.py:193-194`), and an unassessed capability must stay
     -- NULL -> "—" rather than acquire a plausible maturity nobody measured.

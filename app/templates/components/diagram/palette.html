@@ -1,0 +1,65 @@
+{# Element palette: all 60 ArchiMate 3.2 element types in eight collapsible groups with counts, each row
+   showing its notation icon. Search narrows the rows; drag a row onto the canvas, or focus it and press
+   Enter or Space, to add one. Reads composerApp (shellGroups, shellOpenGroups, paletteFilter).
+
+   Usage: {% from 'components/diagram/palette.html' import diagram_palette with context %}
+          {{ diagram_palette() }} #}
+{% from 'components/input.html' import input %}
+{% from 'components/button.html' import button %}
+{% from 'components/badge.html' import badge %}
+
+{# The swatch spells every layer's classes out in full, so the stylesheet build can see them. #}
+{% macro notation_swatch(type_expr, layer_expr) %}
+<span class="relative flex h-6 w-8 shrink-0 items-center justify-center rounded-sm border" x-data="{ KNOWN: ['strategy', 'business', 'application', 'technology', 'physical', 'motivation', 'implementation', 'migration', 'location'] }" :class="(L => ({
+  'bg-notation-strategy border-notation-strategy-stroke text-notation-strategy-stroke': L === 'strategy',
+  'bg-notation-business border-notation-business-stroke text-notation-business-stroke': L === 'business',
+  'bg-notation-application border-notation-application-stroke text-notation-application-stroke': L === 'application',
+  'bg-notation-technology border-notation-technology-stroke text-notation-technology-stroke': L === 'technology',
+  'bg-notation-physical border-notation-physical-stroke text-notation-physical-stroke': L === 'physical',
+  'bg-notation-motivation border-notation-motivation-stroke text-notation-motivation-stroke': L === 'motivation',
+  'bg-notation-implementation border-notation-implementation-stroke text-notation-implementation-stroke': L === 'implementation',
+  'bg-notation-migration border-notation-migration-stroke text-notation-migration-stroke': L === 'migration',
+  'bg-notation-location border-notation-location-stroke text-notation-location-stroke': L === 'location',
+  'bg-notation-other border-notation-other-stroke text-notation-other-stroke': !KNOWN.includes(L)
+}))({{ layer_expr }})">
+  <svg class="h-3.5 w-5" viewBox="0 0 20 14" aria-hidden="true"><use :href="'/static/img/archimate-notation.svg#am-' + {{ type_expr }}"></use></svg>
+</span>
+{% endmacro %}
+
+{% macro diagram_palette() %}
+<section class="flex min-h-0 flex-1 flex-col" aria-label="Element palette" data-testid="diagram-palette">
+  <div class="flex flex-col gap-2 border-b border-border p-3">
+    <p class="text-xs text-muted-foreground">Drag an element onto the diagram, or select one and press Enter. <span x-text="shellTypeTotal"></span> ArchiMate 3.2 element types.</p>
+    {{ input(type='search', placeholder='Search element types', aria_label='Search element types', class='h-8', attrs_dict={'x-model': 'paletteFilter', 'data-testid': 'palette-search'}) }}
+  </div>
+  <div class="min-h-0 flex-1 overflow-y-auto p-2">
+    <template x-for="group in shellGroups" :key="group.key">
+      <div class="mb-1" :data-testid="'palette-group-' + group.key">
+        {% call button(variant='ghost', size='sm', class='w-full justify-between px-2 text-xs font-medium text-muted-foreground', attrs_dict={'@click': 'shellToggleGroup(group.key)', ':aria-expanded': 'shellGroupIsOpen(group.key) ? \'true\' : \'false\'', ':aria-controls': '\'palette-list-\' + group.key'}) %}
+          <span class="flex items-center gap-2">
+            <span x-text="group.label"></span>
+            <span class="inline-flex items-center rounded-full bg-secondary px-2 py-0.5 text-xs font-semibold tabular-nums text-secondary-foreground" :data-testid="'palette-count-' + group.key" x-text="group.count"></span>
+          </span>
+          <i data-lucide="chevron-down" class="h-4 w-4" aria-hidden="true"></i>
+        {% endcall %}
+        <ul class="flex flex-col gap-0.5 pb-2" :id="'palette-list-' + group.key" x-show="shellGroupIsOpen(group.key)" x-cloak>
+          <template x-for="item in group.items" :key="item.type">
+            <li class="flex cursor-grab items-center gap-2 rounded-md px-2 py-1 text-sm hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                role="button" tabindex="0" draggable="true" {# reuse-ok: drags an element type from the palette onto a diagram; no board column or card is involved #}
+                :aria-label="'Add ' + item.label" :data-testid="'palette-item-' + item.type" :data-element-type="item.type"
+                @dragstart="onPaletteDragStart($event, item)" @dragend="onPaletteDragEnd($event)" {# reuse-ok: drags an element type from the palette onto a diagram; no board column or card is involved #}
+                @keydown.enter.prevent="shellAddType(item)" @keydown.space.prevent="shellAddType(item)" @dblclick="shellAddType(item)">
+              {{ notation_swatch('item.type', 'item.layer') }}
+              <span class="truncate" x-text="item.label"></span>
+            </li>
+          </template>
+        </ul>
+      </div>
+    </template>
+    <div x-show="shellGroups.length === 0" x-cloak class="px-2 py-6 text-center text-sm text-muted-foreground" data-testid="palette-empty">
+      <p>No element type matches that search.</p>
+      {% call button(variant='outline', size='sm', class='mt-2', attrs_dict={'@click': 'paletteFilter = \'\''}) %}Show all element types{% endcall %}
+    </div>
+  </div>
+</section>
+{% endmacro %}

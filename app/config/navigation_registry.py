@@ -267,8 +267,8 @@ NAVIGATION_REGISTRY = {
             {
                 "label": "Roadmap Builder",
                 "icon": "route",
-                "endpoint": "architect_ui.roadmap_builder",
-                "url_fallback": "/roadmap-builder/",
+                "endpoint": "genome_roadmap.index",
+                "url_fallback": "/genome/roadmap/",
             },
         ],
     },

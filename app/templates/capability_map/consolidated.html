@@ -1,0 +1,938 @@
+{% extends "layouts/admin_base.html" %}
+{% from 'components/card.html' import card, card_header, card_title, card_description, card_content, card_footer %}
+{% from 'components/tabs.html' import tabs, tabs_list, tabs_trigger, tabs_content %}
+{% from 'components/input.html' import input %}
+{% from 'components/drawer.html' import drawer with context %}
+{% from 'components/badge.html' import badge %}
+{% from 'components/empty_state.html' import empty_state %}
+{% from 'components/skeleton.html' import skeleton_card %}
+{% from 'macros/page_shell.html' import page_shell %}
+{% from 'components/button.html' import button %}
+
+{% block title %}Capability Map{% endblock %}
+
+{% block content %}
+<div x-data="capabilityMap()" x-init="init()" class="flex-1 overflow-auto">
+    <!-- Page Header -->
+    {{ page_shell(
+        title='Capability Map',
+        subtitle='Business capability hierarchy with six lenses: Maturity, Importance, Investment, Health, Control coverage and Application coverage.',
+        breadcrumb=[('Home', url_for('main.index')), ('Capability Framework', None), ('Capability Map', None)],
+        icon='map'
+    ) }}
+
+    <!-- Controls: Lens ToggleGroup, View ToggleGroup, Search -->
+    <div class="p-6 space-y-4">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <!-- Lens ToggleGroup (six lenses) -->
+            <div class="flex items-center gap-2 flex-wrap">
+                <span class="text-sm font-medium text-muted-foreground whitespace-nowrap">Lens:</span>
+                <div role="group" class="inline-flex rounded-md bg-muted p-1 flex-wrap" aria-label="Lens">
+                    <button type="button"
+                            @click="lens = 'maturity'; applyFilters()"
+                            :class="lens === 'maturity' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'"
+                            class="px-3 py-1.5 rounded-sm text-sm font-medium transition-colors"
+                            :aria-pressed="lens === 'maturity'">Maturity</button>
+                    <button type="button"
+                            @click="lens = 'importance'; applyFilters()"
+                            :class="lens === 'importance' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'"
+                            class="px-3 py-1.5 rounded-sm text-sm font-medium transition-colors"
+                            :aria-pressed="lens === 'importance'">Importance</button>
+                    <button type="button"
+                            @click="lens = 'investment'; applyFilters()"
+                            :class="lens === 'investment' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'"
+                            class="px-3 py-1.5 rounded-sm text-sm font-medium transition-colors"
+                            :aria-pressed="lens === 'investment'">Investment</button>
+                    <button type="button"
+                            @click="lens = 'health'; applyFilters()"
+                            :class="lens === 'health' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'"
+                            class="px-3 py-1.5 rounded-sm text-sm font-medium transition-colors"
+                            :aria-pressed="lens === 'health'">Health</button>
+                    <button type="button"
+                            @click="lens = 'control'; applyFilters()"
+                            :class="lens === 'control' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'"
+                            class="px-3 py-1.5 rounded-sm text-sm font-medium transition-colors"
+                            :aria-pressed="lens === 'control'">Control</button>
+                    <button type="button"
+                            @click="lens = 'application'; applyFilters()"
+                            :class="lens === 'application' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'"
+                            class="px-3 py-1.5 rounded-sm text-sm font-medium transition-colors"
+                            :aria-pressed="lens === 'application'">Applications</button>
+                </div>
+            </div>
+
+            <!-- View ToggleGroup -->
+            <div class="flex items-center gap-2">
+                <span class="text-sm font-medium text-muted-foreground whitespace-nowrap">View:</span>
+                <div role="group" class="inline-flex rounded-md bg-muted p-1" aria-label="View mode">
+                    <button type="button"
+                            @click="view = 'map'"
+                            :class="view === 'map' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'"
+                            class="px-3 py-1.5 rounded-sm text-sm font-medium transition-colors"
+                            :aria-pressed="view === 'map'">
+                        <i data-lucide="layout-grid" class="w-4 h-4"></i>
+                        <span class="hidden sm:inline ml-1">Map</span>
+                    </button>
+                    <button type="button"
+                            @click="view = 'list'"
+                            :class="view === 'list' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'"
+                            class="px-3 py-1.5 rounded-sm text-sm font-medium transition-colors"
+                            :aria-pressed="view === 'list'">
+                        <i data-lucide="list" class="w-4 h-4"></i>
+                        <span class="hidden sm:inline ml-1">List</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Search -->
+            <div class="flex-1 sm:w-64">
+                <div class="relative">
+                    <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" aria-hidden="true"></i>
+                    <input type="text"
+                           x-model="searchQuery"
+                           @input.debounce.300ms="applyFilters()"
+                           placeholder="Search capabilities..."
+                           class="w-full pl-10 pr-4 py-2 border border-input rounded-md text-sm bg-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                           aria-label="Search capabilities">
+                </div>
+            </div>
+        </div>
+
+        <!-- Legend (one line that changes with the lens) -->
+        <div class="flex flex-wrap items-center gap-4 text-sm" role="status" aria-live="polite">
+            <span class="font-medium text-muted-foreground">Legend:</span>
+            <template x-if="lens === 'maturity'">
+                <span class="flex flex-wrap items-center gap-x-3 gap-y-1">
+                    <span class="inline-flex items-center gap-1"><span class="inline-flex items-center justify-center w-5 h-5 rounded text-xs font-bold bg-destructive/10 text-destructive-emphasis border border-destructive/30">1</span> Initial</span>
+                    <span class="inline-flex items-center gap-1"><span class="inline-flex items-center justify-center w-5 h-5 rounded text-xs font-bold bg-warning/15 text-warning-emphasis border border-warning/30">2</span> Developing</span>
+                    <span class="inline-flex items-center gap-1"><span class="inline-flex items-center justify-center w-5 h-5 rounded text-xs font-bold bg-info/10 text-info-emphasis border border-info/30">3</span> Defined</span>
+                    <span class="inline-flex items-center gap-1"><span class="inline-flex items-center justify-center w-5 h-5 rounded text-xs font-bold bg-success/15 text-success-emphasis border border-success/30">4</span> Managed</span>
+                    <span class="inline-flex items-center gap-1"><span class="inline-flex items-center justify-center w-5 h-5 rounded text-xs font-bold bg-success/40 text-success-emphasis border border-success/50">5</span> Optimising</span>
+                    <span class="inline-flex items-center gap-1"><span class="inline-flex items-center justify-center w-5 h-5 rounded text-xs font-bold bg-muted text-muted-foreground border border-dashed border-muted-foreground/30">—</span> Not assessed</span>
+                </span>
+            </template>
+            <template x-if="lens === 'importance'">
+                <span class="flex flex-wrap items-center gap-x-3 gap-y-1">
+                    <span class="inline-flex items-center gap-1"><span class="w-3 h-3 rounded bg-destructive"></span> Critical</span>
+                    <span class="inline-flex items-center gap-1"><span class="w-3 h-3 rounded bg-warning"></span> High</span>
+                    <span class="inline-flex items-center gap-1"><span class="w-3 h-3 rounded bg-info"></span> Medium</span>
+                    <span class="inline-flex items-center gap-1"><span class="w-3 h-3 rounded bg-muted"></span> Low</span>
+                    <span class="inline-flex items-center gap-1"><span class="w-3 h-3 rounded bg-muted border border-dashed border-muted-foreground/30"></span> Not assessed</span>
+                </span>
+            </template>
+            <template x-if="lens === 'investment'">
+                <span class="flex flex-wrap items-center gap-x-3 gap-y-1">
+                    <span class="inline-flex items-center gap-1"><span class="w-3 h-3 rounded bg-success"></span> Funded</span>
+                    <span class="inline-flex items-center gap-1"><span class="w-3 h-3 rounded bg-warning"></span> Under review</span>
+                    <span class="inline-flex items-center gap-1"><span class="w-3 h-3 rounded bg-destructive"></span> Unfunded</span>
+                    <span class="inline-flex items-center gap-1"><span class="w-3 h-3 rounded bg-muted border border-dashed border-muted-foreground/30"></span> Not recorded</span>
+                </span>
+            </template>
+            <template x-if="lens === 'health'">
+                <span class="flex flex-wrap items-center gap-x-3 gap-y-1">
+                    <span class="inline-flex items-center gap-1"><span class="w-3 h-3 rounded bg-success"></span> Healthy (&ge;80%)</span>
+                    <span class="inline-flex items-center gap-1"><span class="w-3 h-3 rounded bg-warning"></span> Warning (60&ndash;79%)</span>
+                    <span class="inline-flex items-center gap-1"><span class="w-3 h-3 rounded bg-destructive"></span> Critical (&lt;60%)</span>
+                    <span class="inline-flex items-center gap-1"><span class="w-3 h-3 rounded bg-muted border border-dashed border-muted-foreground/30"></span> Not assessed</span>
+                </span>
+            </template>
+            <template x-if="lens === 'control'">
+                <span class="flex flex-wrap items-center gap-x-3 gap-y-1">
+                    <span class="inline-flex items-center gap-1"><span class="w-3 h-3 rounded bg-success"></span> Strong (&ge;80%)</span>
+                    <span class="inline-flex items-center gap-1"><span class="w-3 h-3 rounded bg-warning"></span> Adequate (60&ndash;79%)</span>
+                    <span class="inline-flex items-center gap-1"><span class="w-3 h-3 rounded bg-destructive"></span> Weak (&lt;60%)</span>
+                    <span class="inline-flex items-center gap-1"><span class="w-3 h-3 rounded bg-muted border border-dashed border-muted-foreground/30"></span> Not assessed</span>
+                </span>
+            </template>
+            <template x-if="lens === 'application'">
+                <span class="flex flex-wrap items-center gap-x-3 gap-y-1">
+                    <span class="inline-flex items-center gap-1"><span class="w-3 h-3 rounded bg-success"></span> Covered</span>
+                    <span class="inline-flex items-center gap-1"><span class="w-3 h-3 rounded bg-destructive"></span> Gap</span>
+                    <span class="inline-flex items-center gap-1"><span class="w-3 h-3 rounded bg-muted border border-dashed border-muted-foreground/30"></span> Not assessed</span>
+                </span>
+            </template>
+        </div>
+    </div>
+
+    <!-- Map View: Three bands (strategic, operational, supporting) with nested cards -->
+    <div x-show="view === 'map'" x-cloak x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" class="p-6 space-y-6" role="tabpanel" aria-label="Map view">
+        <template x-if="filteredDomains.length === 0">
+            {{ empty_state(
+                icon='layout-grid',
+                title='No capabilities found',
+                description='No capabilities match your current filters. Try adjusting your search or lens.',
+                cta_text='Clear filters',
+                cta_href='#',
+                cta_icon='x'
+            ) }}
+        </template>
+
+        <!-- Three bands: strategic, operational, supporting -->
+        <template x-for="band in bands" :key="band.key">
+            <div x-show="band.capabilities.length > 0">
+                <div class="flex items-center gap-2 mb-3">
+                    <h2 class="text-lg font-semibold text-foreground" x-text="band.label"></h2>
+                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-muted text-muted-foreground" x-text="band.capabilities.length + ' capabilities'"></span>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+                    <template x-for="cap in band.capabilities" :key="cap.id">
+                        <div class="group relative rounded-lg border bg-card p-4 hover:border-primary/50 hover:shadow-md transition-all cursor-pointer"
+                             @click="openCapabilityDetail(cap)"
+                             :class="{
+                                 'border-dashed border-muted-foreground/30': lens === 'application' && cap.applicationCoverage === 0,
+                                 'border-border': !(lens === 'application' && cap.applicationCoverage === 0),
+                                 'ring-2 ring-success': lens === 'health' && cap.healthScore !== null && cap.healthScore >= 80,
+                                 'ring-2 ring-warning': lens === 'health' && cap.healthScore !== null && cap.healthScore >= 60 && cap.healthScore < 80,
+                                 'ring-2 ring-destructive': lens === 'health' && cap.healthScore !== null && cap.healthScore < 60,
+                                 'ring-2 ring-success': lens === 'control' && cap.controlCoverage !== null && cap.controlCoverage >= 80,
+                                 'ring-2 ring-warning': lens === 'control' && cap.controlCoverage !== null && cap.controlCoverage >= 60 && cap.controlCoverage < 80,
+                                 'ring-2 ring-destructive': lens === 'control' && cap.controlCoverage !== null && cap.controlCoverage < 60,
+                             }"
+                             role="button"
+                             tabindex="0"
+                             @keydown.enter="openCapabilityDetail(cap)"
+                             @keydown.space.prevent="openCapabilityDetail(cap)"
+                             :aria-label="cap.name + ' ' + lensLabel(cap)">
+                            <!-- Lens indicator bar at top -->
+                            <div class="absolute top-0 left-0 right-0 h-1 rounded-t-lg"
+                                 :class="lensBarClass(cap)"
+                                 :style="'width: ' + lensBarWidth(cap) + '%'"></div>
+
+                            <div class="flex items-start justify-between mb-2">
+                                <h4 class="font-medium text-foreground leading-snug pr-2" x-text="cap.name"></h4>
+                                <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-primary border border-primary/30 shrink-0" x-text="'L' + cap.level"></span>
+                            </div>
+
+                            <template x-if="cap.description">
+                                <p class="text-sm text-muted-foreground mb-3 line-clamp-2" x-text="cap.description"></p>
+                            </template>
+
+                            <div class="flex items-center gap-2 text-xs text-muted-foreground mb-2">
+                                <span x-text="cap.domainName"></span>
+                                <span class="text-muted-foreground">·</span>
+                                <span x-text="cap.type || '—'"></span>
+                            </div>
+
+                            <!-- Lens-specific tile content -->
+                            <template x-if="lens === 'maturity'">
+                                <div class="border-t pt-2 space-y-1">
+                                    <div class="flex items-center justify-between text-xs">
+                                        <span class="text-muted-foreground">Current</span>
+                                        <template x-if="cap.currentMaturity !== null">
+                                            <span class="font-medium" x-text="'L' + cap.currentMaturity"></span>
+                                        </template>
+                                        <template x-if="cap.currentMaturity === null">
+                                            <span class="text-muted-foreground italic">Not assessed</span>
+                                        </template>
+                                    </div>
+                                    <div class="flex items-center justify-between text-xs">
+                                        <span class="text-muted-foreground">Target</span>
+                                        <template x-if="cap.targetMaturity !== null">
+                                            <span class="font-medium" x-text="'L' + cap.targetMaturity"></span>
+                                        </template>
+                                        <template x-if="cap.targetMaturity === null">
+                                            <span class="text-muted-foreground italic">Not assessed</span>
+                                        </template>
+                                    </div>
+                                    <template x-if="cap.currentMaturity !== null && cap.targetMaturity !== null && (cap.targetMaturity - cap.currentMaturity) >= 2">
+                                        <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-destructive/10 text-destructive-emphasis border border-destructive/30" x-text="'Gap ' + (cap.targetMaturity - cap.currentMaturity)"></span>
+                                    </template>
+                                </div>
+                            </template>
+
+                            <template x-if="lens === 'importance'">
+                                <div class="border-t pt-2">
+                                    <div class="flex items-center justify-between text-xs">
+                                        <span class="text-muted-foreground">Importance</span>
+                                        <template x-if="cap.importance">
+                                            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium"
+                                                  :class="[
+                                                      cap.importance === 'critical' ? 'bg-destructive/10 text-destructive-emphasis border-destructive/30',
+                                                      cap.importance === 'high' ? 'bg-warning/10 text-warning-emphasis border-warning/30',
+                                                      cap.importance === 'medium' ? 'bg-info/10 text-info-emphasis border-info/30',
+                                                      'bg-muted text-muted-foreground'
+                                                  ]"
+                                                  x-text="cap.importance"></span>
+                                        </template>
+                                        <template x-if="!cap.importance">
+                                            <span class="text-muted-foreground italic">Not assessed</span>
+                                        </template>
+                                    </div>
+                                </div>
+                            </template>
+
+                            <template x-if="lens === 'investment'">
+                                <div class="border-t pt-2 space-y-1">
+                                    <div class="flex items-center justify-between text-xs">
+                                        <span class="text-muted-foreground">Now</span>
+                                        <template x-if="cap.investmentNow !== null">
+                                            <span class="font-medium" x-text="formatCurrency(cap.investmentNow)"></span>
+                                        </template>
+                                        <template x-if="cap.investmentNow === null">
+                                            <span class="text-muted-foreground italic">Not recorded</span>
+                                        </template>
+                                    </div>
+                                    <div class="flex items-center justify-between text-xs">
+                                        <span class="text-muted-foreground">Planned</span>
+                                        <template x-if="cap.investmentPlanned !== null">
+                                            <span class="font-medium" x-text="formatCurrency(cap.investmentPlanned)"></span>
+                                        </template>
+                                        <template x-if="cap.investmentPlanned === null">
+                                            <span class="text-muted-foreground italic">Not recorded</span>
+                                        </template>
+                                    </div>
+                                </div>
+                            </template>
+
+                            <template x-if="lens === 'health'">
+                                <div class="border-t pt-2">
+                                    <div class="flex items-center justify-between text-xs">
+                                        <span class="text-muted-foreground">Health</span>
+                                        <template x-if="cap.healthScore !== null">
+                                            <span :class="cap.healthScore >= 80 ? 'text-success-emphasis font-medium' : (cap.healthScore >= 60 ? 'text-warning-emphasis font-medium' : 'text-destructive-emphasis font-medium')" x-text="cap.healthScore + '%'"></span>
+                                        </template>
+                                        <template x-if="cap.healthScore === null">
+                                            <span class="text-muted-foreground italic">Not assessed</span>
+                                        </template>
+                                    </div>
+                                </div>
+                            </template>
+
+                            <template x-if="lens === 'control'">
+                                <div class="border-t pt-2">
+                                    <div class="flex items-center justify-between text-xs">
+                                        <span class="text-muted-foreground">Control</span>
+                                        <template x-if="cap.controlCoverage !== null">
+                                            <span :class="cap.controlCoverage >= 80 ? 'text-success-emphasis font-medium' : (cap.controlCoverage >= 60 ? 'text-warning-emphasis font-medium' : 'text-destructive-emphasis font-medium')" x-text="cap.controlCoverage + '%'"></span>
+                                        </template>
+                                        <template x-if="cap.controlCoverage === null">
+                                            <span class="text-muted-foreground italic">Not assessed</span>
+                                        </template>
+                                    </div>
+                                </div>
+                            </template>
+
+                            <template x-if="lens === 'application'">
+                                <div class="border-t pt-2">
+                                    <div class="flex items-center justify-between text-xs">
+                                        <span class="text-muted-foreground">Applications</span>
+                                        <template x-if="cap.applicationCoverage > 0">
+                                            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-success/10 text-success border-success/30" x-text="cap.applicationCoverage + ' apps'"></span>
+                                        </template>
+                                        <template x-if="cap.applicationCoverage === 0">
+                                            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-destructive/10 text-destructive border-destructive/30">Gap</span>
+                                        </template>
+                                    </div>
+                                </div>
+                            </template>
+                        </div>
+                    </template>
+                </div>
+            </div>
+        </template>
+    </div>
+
+    <!-- List View: Table with all six measures -->
+    <div x-show="view === 'list'" x-cloak x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" class="p-6 space-y-4" role="tabpanel" aria-label="List view">
+        <div class="bg-card rounded-lg overflow-hidden">
+            <table class="w-full text-sm">
+                <thead class="bg-muted/50">
+                    <tr>
+                        <th class="px-4 py-3 text-left font-medium text-muted-foreground uppercase tracking-wider">Capability</th>
+                        <th class="px-4 py-3 text-left font-medium text-muted-foreground uppercase tracking-wider">Domain</th>
+                        <th class="px-4 py-3 text-left font-medium text-muted-foreground uppercase tracking-wider">Level</th>
+                        <th class="px-4 py-3 text-left font-medium text-muted-foreground uppercase tracking-wider">Maturity</th>
+                        <th class="px-4 py-3 text-left font-medium text-muted-foreground uppercase tracking-wider">Importance</th>
+                        <th class="px-4 py-3 text-left font-medium text-muted-foreground uppercase tracking-wider">Investment</th>
+                        <th class="px-4 py-3 text-left font-medium text-muted-foreground uppercase tracking-wider">Health</th>
+                        <th class="px-4 py-3 text-left font-medium text-muted-foreground uppercase tracking-wider">Control</th>
+                        <th class="px-4 py-3 text-left font-medium text-muted-foreground uppercase tracking-wider">Apps</th>
+                        <th class="px-4 py-3 text-left font-medium text-muted-foreground uppercase tracking-wider">Owner</th>
+                        <th class="px-4 py-3 text-right font-medium text-muted-foreground uppercase tracking-wider">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-border">
+                    <template x-for="cap in allFilteredCapabilities" :key="cap.id">
+                        <tr class="hover:bg-muted/50 transition-colors cursor-pointer" @click="openCapabilityDetail(cap)" tabindex="0" @keydown.enter="openCapabilityDetail(cap)">
+                            <td class="px-4 py-3 font-medium text-foreground" x-text="cap.name"></td>
+                            <td class="px-4 py-3 text-muted-foreground" x-text="cap.domainName"></td>
+                            <td class="px-4 py-3">
+                                <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-primary border border-primary/30" x-text="'L' + cap.level"></span>
+                            </td>
+                            <!-- Maturity -->
+                            <td class="px-4 py-3">
+                                <template x-if="cap.currentMaturity !== null">
+                                    <span x-text="'L' + cap.currentMaturity + (cap.targetMaturity !== null ? ' → L' + cap.targetMaturity : '')"></span>
+                                    <template x-if="cap.currentMaturity !== null && cap.targetMaturity !== null && (cap.targetMaturity - cap.currentMaturity) >= 2">
+                                        <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-destructive/10 text-destructive-emphasis border-destructive/30 ml-1" x-text="'Gap ' + (cap.targetMaturity - cap.currentMaturity)"></span>
+                                    </template>
+                                </template>
+                                <template x-if="cap.currentMaturity === null">
+                                    <span class="text-muted-foreground italic">Not assessed</span>
+                                </template>
+                            </td>
+                            <!-- Importance -->
+                            <td class="px-4 py-3">
+                                <template x-if="cap.importance">
+                                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium"
+                                          :class="[
+                                              cap.importance === 'critical' ? 'bg-destructive/10 text-destructive-emphasis border-destructive/30',
+                                              cap.importance === 'high' ? 'bg-warning/10 text-warning-emphasis border-warning/30',
+                                              cap.importance === 'medium' ? 'bg-info/10 text-info-emphasis border-info/30',
+                                              'bg-muted text-muted-foreground'
+                                          ]"
+                                          x-text="cap.importance"></span>
+                                </template>
+                                <template x-if="!cap.importance">
+                                    <span class="text-muted-foreground">—</span>
+                                </template>
+                            </td>
+                            <!-- Investment -->
+                            <td class="px-4 py-3">
+                                <template x-if="cap.investmentNow !== null || cap.investmentPlanned !== null">
+                                    <span>
+                                        <template x-if="cap.investmentNow !== null">
+                                            <span x-text="formatCurrency(cap.investmentNow)"></span>
+                                        </template>
+                                        <template x-if="cap.investmentNow === null">
+                                            <span class="text-muted-foreground">—</span>
+                                        </template>
+                                        <template x-if="cap.investmentPlanned !== null">
+                                            <span class="text-muted-foreground" x-text="' / ' + formatCurrency(cap.investmentPlanned) + ' planned'"></span>
+                                        </template>
+                                    </span>
+                                </template>
+                                <template x-if="cap.investmentNow === null && cap.investmentPlanned === null">
+                                    <span class="text-muted-foreground italic">Not recorded</span>
+                                </template>
+                            </td>
+                            <!-- Health -->
+                            <td class="px-4 py-3">
+                                <template x-if="cap.healthScore !== null">
+                                    <span :class="cap.healthScore >= 80 ? 'text-success-emphasis font-medium' : (cap.healthScore >= 60 ? 'text-warning-emphasis font-medium' : 'text-destructive-emphasis font-medium')" x-text="cap.healthScore + '%'"></span>
+                                </template>
+                                <template x-if="cap.healthScore === null">
+                                    <span class="text-muted-foreground italic">Not assessed</span>
+                                </template>
+                            </td>
+                            <!-- Control -->
+                            <td class="px-4 py-3">
+                                <template x-if="cap.controlCoverage !== null">
+                                    <span :class="cap.controlCoverage >= 80 ? 'text-success-emphasis font-medium' : (cap.controlCoverage >= 60 ? 'text-warning-emphasis font-medium' : 'text-destructive-emphasis font-medium')" x-text="cap.controlCoverage + '%'"></span>
+                                </template>
+                                <template x-if="cap.controlCoverage === null">
+                                    <span class="text-muted-foreground italic">Not assessed</span>
+                                </template>
+                            </td>
+                            <!-- Apps -->
+                            <td class="px-4 py-3">
+                                <template x-if="cap.applicationCoverage > 0">
+                                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-success/10 text-success border-success/30" x-text="cap.applicationCoverage"></span>
+                                </template>
+                                <template x-if="cap.applicationCoverage === 0">
+                                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-destructive/10 text-destructive border-destructive/30">Gap</span>
+                                </template>
+                            </td>
+                            <!-- Owner -->
+                            <td class="px-4 py-3 text-sm text-muted-foreground" x-text="cap.businessOwner || cap.capabilityOwner || '—'"></td>
+                            <td class="px-4 py-3 text-right">
+                                <button type="button"
+                                        @click.stop="openCapabilityDetail(cap)"
+                                        class="text-primary hover:text-primary/80 text-sm font-medium">
+                                    View detail
+                                </button>
+                            </td>
+                        </tr>
+                    </template>
+                    <template x-if="allFilteredCapabilities.length === 0">
+                        <tr>
+                            <td colspan="11" class="px-4 py-8 text-center text-muted-foreground">
+                                {{ empty_state(
+                                    icon='search-x',
+                                    title='No capabilities found',
+                                    description='No capabilities match your current filters.',
+                                    cta_text='Clear filters',
+                                    cta_href='#',
+                                    cta_icon='x'
+                                ) }}
+                            </td>
+                        </tr>
+                    </template>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Capability Detail Drawer (side panel with all six measures) -->
+{% call drawer(id='capability-detail', title='', description='', size='lg') %}
+<div x-data="capabilityDetail()" x-init="init()">
+    <template x-if="loading">
+        <div class="space-y-4">
+            {{ skeleton_card() }}
+            {{ skeleton_card() }}
+            {{ skeleton_card() }}
+        </div>
+    </template>
+    <template x-if="!loading && capability">
+        <div class="space-y-6">
+            <!-- Header with name, level, domain -->
+            <div class="flex items-start justify-between">
+                <div>
+                    <h3 class="text-xl font-semibold text-foreground" x-text="capability.name"></h3>
+                    <div class="flex items-center gap-2 mt-1">
+                        <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-primary border border-primary/30" x-text="'L' + capability.level"></span>
+                        <span class="text-sm text-muted-foreground" x-text="capability.domainName"></span>
+                        <span class="text-sm text-muted-foreground">·</span>
+                        <span class="text-sm text-muted-foreground" x-text="capability.type || '—'"></span>
+                    </div>
+                </div>
+                <span class="text-sm text-muted-foreground" x-text="capability.code"></span>
+            </div>
+
+            <!-- Description -->
+            <template x-if="capability.description">
+                <div class="border-t border-border pt-4">
+                    <h4 class="text-sm font-medium text-muted-foreground uppercase tracking-wide mb-2">Description</h4>
+                    <p class="text-sm text-foreground" x-text="capability.description"></p>
+                </div>
+            </template>
+
+            <!-- All six measures in a grid -->
+            <div class="border-t border-border pt-4">
+                <h4 class="text-sm font-medium text-muted-foreground uppercase tracking-wide mb-3">Measures</h4>
+                <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                    <!-- Maturity -->
+                    <div class="rounded-lg border border-border bg-card p-3">
+                        <p class="text-xs text-muted-foreground mb-1">Maturity</p>
+                        <template x-if="capability.currentMaturity !== null">
+                            <div>
+                                <span class="text-lg font-semibold" x-text="'L' + capability.currentMaturity"></span>
+                                <template x-if="capability.targetMaturity !== null">
+                                    <span class="text-sm text-muted-foreground" x-text="' → L' + capability.targetMaturity"></span>
+                                </template>
+                                <template x-if="capability.currentMaturity !== null && capability.targetMaturity !== null && (capability.targetMaturity - capability.currentMaturity) >= 2">
+                                    <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-destructive/10 text-destructive-emphasis border-destructive/30 ml-1" x-text="'Gap ' + (capability.targetMaturity - capability.currentMaturity)"></span>
+                                </template>
+                            </div>
+                        </template>
+                        <template x-if="capability.currentMaturity === null">
+                            <p class="text-sm text-muted-foreground italic">Not assessed</p>
+                        </template>
+                    </div>
+                    <!-- Importance -->
+                    <div class="rounded-lg border border-border bg-card p-3">
+                        <p class="text-xs text-muted-foreground mb-1">Importance</p>
+                        <template x-if="capability.importance">
+                            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium"
+                                  :class="[
+                                      capability.importance === 'critical' ? 'bg-destructive/10 text-destructive-emphasis border-destructive/30',
+                                      capability.importance === 'high' ? 'bg-warning/10 text-warning-emphasis border-warning/30',
+                                      capability.importance === 'medium' ? 'bg-info/10 text-info-emphasis border-info/30',
+                                      'bg-muted text-muted-foreground'
+                                  ]"
+                                  x-text="capability.importance"></span>
+                        </template>
+                        <template x-if="!capability.importance">
+                            <p class="text-sm text-muted-foreground italic">Not assessed</p>
+                        </template>
+                    </div>
+                    <!-- Investment -->
+                    <div class="rounded-lg border border-border bg-card p-3">
+                        <p class="text-xs text-muted-foreground mb-1">Investment</p>
+                        <template x-if="capability.investmentNow !== null || capability.investmentPlanned !== null">
+                            <div class="space-y-0.5">
+                                <template x-if="capability.investmentNow !== null">
+                                    <p class="text-sm"><span class="text-muted-foreground">Now:</span> <span class="font-medium" x-text="formatCurrency(capability.investmentNow)"></span></p>
+                                </template>
+                                <template x-if="capability.investmentPlanned !== null">
+                                    <p class="text-sm"><span class="text-muted-foreground">Planned:</span> <span class="font-medium" x-text="formatCurrency(capability.investmentPlanned)"></span></p>
+                                </template>
+                            </div>
+                        </template>
+                        <template x-if="capability.investmentNow === null && capability.investmentPlanned === null">
+                            <p class="text-sm text-muted-foreground italic">Not recorded</p>
+                        </template>
+                    </div>
+                    <!-- Health -->
+                    <div class="rounded-lg border border-border bg-card p-3">
+                        <p class="text-xs text-muted-foreground mb-1">Health</p>
+                        <template x-if="capability.healthScore !== null">
+                            <span class="text-lg font-semibold" :class="capability.healthScore >= 80 ? 'text-success-emphasis' : (capability.healthScore >= 60 ? 'text-warning-emphasis' : 'text-destructive-emphasis')" x-text="capability.healthScore + '%'"></span>
+                        </template>
+                        <template x-if="capability.healthScore === null">
+                            <p class="text-sm text-muted-foreground italic">Not assessed</p>
+                        </template>
+                    </div>
+                    <!-- Control coverage -->
+                    <div class="rounded-lg border border-border bg-card p-3">
+                        <p class="text-xs text-muted-foreground mb-1">Control coverage</p>
+                        <template x-if="capability.controlCoverage !== null">
+                            <span class="text-lg font-semibold" :class="capability.controlCoverage >= 80 ? 'text-success-emphasis' : (capability.controlCoverage >= 60 ? 'text-warning-emphasis' : 'text-destructive-emphasis')" x-text="capability.controlCoverage + '%'"></span>
+                        </template>
+                        <template x-if="capability.controlCoverage === null">
+                            <p class="text-sm text-muted-foreground italic">Not assessed</p>
+                        </template>
+                    </div>
+                    <!-- Application coverage -->
+                    <div class="rounded-lg border border-border bg-card p-3">
+                        <p class="text-xs text-muted-foreground mb-1">Application coverage</p>
+                        <template x-if="capability.applicationCoverage > 0">
+                            <span class="text-lg font-semibold text-success-emphasis" x-text="capability.applicationCoverage"></span>
+                        </template>
+                        <template x-if="capability.applicationCoverage === 0">
+                            <span class="text-lg font-semibold text-destructive-emphasis">Gap</span>
+                        </template>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Ownership -->
+            <div class="border-t border-border pt-4">
+                <h4 class="text-sm font-medium text-muted-foreground uppercase tracking-wide mb-2">Ownership</h4>
+                <dl class="space-y-2 text-sm">
+                    <template x-if="capability.businessOwner">
+                        <div class="flex justify-between">
+                            <dt class="text-muted-foreground">Business Owner</dt>
+                            <dd class="font-medium" x-text="capability.businessOwner"></dd>
+                        </div>
+                    </template>
+                    <template x-if="capability.itOwner">
+                        <div class="flex justify-between">
+                            <dt class="text-muted-foreground">IT Owner</dt>
+                            <dd class="font-medium" x-text="capability.itOwner"></dd>
+                        </div>
+                    </template>
+                    <template x-if="capability.capabilityOwner">
+                        <div class="flex justify-between">
+                            <dt class="text-muted-foreground">Capability Owner</dt>
+                            <dd class="font-medium" x-text="capability.capabilityOwner"></dd>
+                        </div>
+                    </template>
+                    <template x-if="capability.productManager">
+                        <div class="flex justify-between">
+                            <dt class="text-muted-foreground">Product Manager</dt>
+                            <dd class="font-medium" x-text="capability.productManager"></dd>
+                        </div>
+                    </template>
+                    <template x-if="!capability.businessOwner && !capability.itOwner && !capability.capabilityOwner && !capability.productManager">
+                        <p class="text-sm text-muted-foreground">No owners assigned</p>
+                    </template>
+                </dl>
+            </div>
+
+            <!-- Applications that realise this capability -->
+            <template x-if="capability.applications && capability.applications.length > 0">
+                <div class="border-t border-border pt-4">
+                    <h4 class="text-sm font-medium text-muted-foreground uppercase tracking-wide mb-3 flex items-center gap-2">
+                        <i data-lucide="layers" class="w-4 h-4"></i>
+                        Supporting applications (<span x-text="capability.applications.length"></span>)
+                    </h4>
+                    <div class="space-y-2">
+                        <template x-for="app in capability.applications" :key="app.id">
+                            <a :href="app.url" class="flex items-center justify-between p-3 rounded-lg border border-border bg-card hover:bg-muted/50 transition-colors">
+                                <div class="flex items-center gap-3">
+                                    <i data-lucide="server" class="w-5 h-5 text-muted-foreground"></i>
+                                    <div>
+                                        <p class="font-medium text-foreground" x-text="app.name"></p>
+                                        <p class="text-xs text-muted-foreground" x-text="app.lifecycleStatus || '—'"></p>
+                                    </div>
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    <template x-if="app.supportLevel">
+                                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium"
+                                              :class="[
+                                                  app.supportLevel === 'full' ? 'bg-success/10 text-success border-success/30',
+                                                  app.supportLevel === 'partial' ? 'bg-warning/10 text-warning border-warning/30',
+                                                  'bg-muted text-muted-foreground'
+                                              ]"
+                                              x-text="app.supportLevel"></span>
+                                    </template>
+                                    <template x-if="app.coveragePercentage !== null">
+                                        <span class="text-xs text-muted-foreground" x-text="app.coveragePercentage + '% coverage'"></span>
+                                    </template>
+                                    <i data-lucide="chevron-right" class="w-4 h-4 text-muted-foreground"></i>
+                                </div>
+                            </a>
+                        </template>
+                    </div>
+                </div>
+            </template>
+
+            <!-- Child capabilities -->
+            <template x-if="capability.children && capability.children.length > 0">
+                <div class="border-t border-border pt-4">
+                    <h4 class="text-sm font-medium text-muted-foreground uppercase tracking-wide mb-3 flex items-center gap-2">
+                        <i data-lucide="git-branch" class="w-4 h-4"></i>
+                        Sub-capabilities (<span x-text="capability.children.length"></span>)
+                    </h4>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        <template x-for="child in capability.children" :key="child.id">
+                            <button type="button"
+                                    @click="openCapabilityDetail(child)"
+                                    class="text-left p-3 rounded-lg border border-border bg-card hover:bg-muted/50 hover:border-primary/50 transition-colors">
+                                <div class="flex items-center justify-between">
+                                    <span class="font-medium text-foreground text-sm" x-text="child.name"></span>
+                                    <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-primary border border-primary/30" x-text="'L' + child.level"></span>
+                                </div>
+                            </button>
+                        </template>
+                    </div>
+                </div>
+            </template>
+
+            <!-- Actions -->
+            <div class="border-t border-border pt-4 flex items-center gap-3">
+                <button type="button"
+                        @click="openRecord(capability)"
+                        class="inline-flex items-center justify-center rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 h-9 px-4 py-2">
+                    Open the record
+                </button>
+                <template x-if="lens === 'maturity' && capability.currentMaturity === null">
+                    <button type="button"
+                            class="inline-flex items-center justify-center rounded-md text-sm font-medium border border-input bg-background hover:bg-accent hover:text-accent-foreground h-9 px-4 py-2">
+                        Assess
+                    </button>
+                </template>
+            </div>
+        </div>
+    </template>
+    <template x-if="!loading && !capability">
+        <div class="text-center py-8 text-muted-foreground">
+            <i data-lucide="alert-circle" class="w-8 h-8 mx-auto mb-2"></i>
+            <p>Capability not found</p>
+        </div>
+    </template>
+</div>
+{% endcall %}
+
+<script>
+function capabilityMap() {
+    return {
+        lens: 'maturity',
+        view: 'map',
+        searchQuery: '',
+        domains: [],
+        loading: true,
+        error: null,
+
+        async init() {
+            const params = new URLSearchParams(window.location.search);
+            this.lens = params.get('lens') || 'maturity';
+            this.view = params.get('view') || 'map';
+            this.searchQuery = params.get('search') || '';
+            this.updateUrl();
+            await this.loadCapabilities();
+            this.applyFilters();
+            lucide.createIcons();
+        },
+
+        async loadCapabilities() {
+            this.loading = true;
+            this.error = null;
+            try {
+                const data = await Platform.fetch('/capability-map/api/capabilities/hierarchy', {
+                    headers: { 'Accept': 'application/json' },
+                    silent: true, // the page shows the error inline
+                });
+                this.domains = data.domains || [];
+            } catch (e) {
+                this.error = e.status ? `Failed to load capabilities (HTTP ${e.status})` : 'Failed to load capabilities';
+            } finally {
+                this.loading = false;
+                this.$nextTick(() => lucide.createIcons());
+            }
+        },
+
+        applyFilters() {
+            this.updateUrl();
+            this.$nextTick(() => lucide.createIcons());
+        },
+
+        updateUrl() {
+            const params = new URLSearchParams();
+            if (this.lens !== 'maturity') params.set('lens', this.lens);
+            if (this.view !== 'map') params.set('view', this.view);
+            if (this.searchQuery) params.set('search', this.searchQuery);
+            const newUrl = '/capability-map/' + (params.toString() ? '?' + params.toString() : '');
+            window.history.replaceState({}, '', newUrl);
+        },
+
+        get bands() {
+            const allCaps = this.domains.flatMap(d =>
+                d.capabilities.filter(c => this.matchesFilter(c))
+            );
+            const strategic = allCaps.filter(c => c.type === 'strategic');
+            const operational = allCaps.filter(c => c.type === 'operational');
+            const supporting = allCaps.filter(c => c.type === 'supporting' || (!c.type || c.type === 'business'));
+
+            return [
+                { key: 'strategic', label: 'Strategic', capabilities: strategic },
+                { key: 'operational', label: 'Operational', capabilities: operational },
+                { key: 'supporting', label: 'Supporting', capabilities: supporting }
+            ];
+        },
+
+        get filteredDomains() {
+            return this.domains.map(domain => ({
+                ...domain,
+                filteredCapabilities: domain.capabilities.filter(cap => this.matchesFilter(cap))
+            })).filter(domain => domain.filteredCapabilities.length > 0);
+        },
+
+        get allFilteredCapabilities() {
+            return this.domains.flatMap(domain =>
+                domain.capabilities.filter(cap => this.matchesFilter(cap))
+            );
+        },
+
+        matchesFilter(cap) {
+            if (!this.searchQuery) return true;
+            const query = this.searchQuery.toLowerCase();
+            return (
+                (cap.name || '').toLowerCase().includes(query) ||
+                (cap.description || '').toLowerCase().includes(query) ||
+                (cap.domainName || '').toLowerCase().includes(query) ||
+                (cap.businessOwner || '').toLowerCase().includes(query) ||
+                (cap.code || '').toLowerCase().includes(query)
+            );
+        },
+
+        lensLabel(cap) {
+            switch (this.lens) {
+                case 'maturity':
+                    if (cap.currentMaturity !== null) return 'maturity L' + cap.currentMaturity;
+                    return 'not assessed';
+                case 'health':
+                    if (cap.healthScore !== null) return 'health ' + cap.healthScore + '%';
+                    return 'not assessed';
+                case 'control':
+                    if (cap.controlCoverage !== null) return 'control ' + cap.controlCoverage + '%';
+                    return 'not assessed';
+                case 'importance':
+                    return cap.importance || 'not assessed';
+                case 'investment':
+                    return cap.investmentNow !== null ? 'funded' : 'not recorded';
+                case 'application':
+                    return cap.applicationCoverage > 0 ? cap.applicationCoverage + ' apps' : 'gap';
+                default:
+                    return '';
+            }
+        },
+
+        lensBarClass(cap) {
+            switch (this.lens) {
+                case 'health':
+                    if (cap.healthScore === null) return 'bg-muted';
+                    return cap.healthScore >= 80 ? 'bg-success' : (cap.healthScore >= 60 ? 'bg-warning' : 'bg-destructive');
+                case 'control':
+                    if (cap.controlCoverage === null) return 'bg-muted';
+                    return cap.controlCoverage >= 80 ? 'bg-success' : (cap.controlCoverage >= 60 ? 'bg-warning' : 'bg-destructive');
+                case 'maturity':
+                    if (cap.currentMaturity === null) return 'bg-muted';
+                    return 'bg-primary';
+                case 'importance':
+                    if (!cap.importance) return 'bg-muted';
+                    if (cap.importance === 'critical') return 'bg-destructive';
+                    if (cap.importance === 'high') return 'bg-warning';
+                    return 'bg-info';
+                case 'investment':
+                    if (cap.investmentNow === null && cap.investmentPlanned === null) return 'bg-muted';
+                    return cap.investmentNow !== null ? 'bg-success' : 'bg-warning';
+                case 'application':
+                    if (cap.applicationCoverage === 0) return 'bg-destructive';
+                    return 'bg-success';
+                default:
+                    return 'bg-muted';
+            }
+        },
+
+        lensBarWidth(cap) {
+            switch (this.lens) {
+                case 'health':
+                    return cap.healthScore !== null ? cap.healthScore : 0;
+                case 'control':
+                    return cap.controlCoverage !== null ? cap.controlCoverage : 0;
+                case 'maturity':
+                    return cap.currentMaturity !== null ? cap.currentMaturity * 20 : 0;
+                case 'importance':
+                    if (!cap.importance) return 0;
+                    if (cap.importance === 'critical') return 100;
+                    if (cap.importance === 'high') return 75;
+                    if (cap.importance === 'medium') return 50;
+                    return 25;
+                case 'investment':
+                    if (cap.investmentNow === null && cap.investmentPlanned === null) return 0;
+                    return cap.investmentNow !== null ? 100 : 50;
+                case 'application':
+                    return cap.applicationCoverage > 0 ? 100 : 0;
+                default:
+                    return 0;
+            }
+        },
+
+        formatCurrency(value) {
+            if (value === null || value === undefined) return '—';
+            const num = Number(value);
+            if (num >= 1000000) return '£' + (num / 1000000).toFixed(1) + 'M';
+            if (num >= 1000) return '£' + (num / 1000).toFixed(0) + 'K';
+            return '£' + num.toFixed(0);
+        },
+
+        openCapabilityDetail(cap) {
+            window.dispatchEvent(new CustomEvent('open-drawer-capability-detail', {
+                detail: { capability: cap, lens: this.lens }
+            }));
+        }
+    };
+}
+
+function capabilityDetail() {
+    return {
+        capability: null,
+        lens: 'maturity',
+        loading: true,
+
+        init() {
+            window.addEventListener('open-drawer-capability-detail', (e) => {
+                this.capability = e.detail.capability;
+                this.lens = e.detail.lens || 'maturity';
+                this.loading = false;
+                this.$nextTick(() => lucide.createIcons());
+            });
+        },
+
+        maturityLabel(level) {
+            const labels = { 1: 'Initial', 2: 'Developing', 3: 'Defined', 4: 'Managed', 5: 'Optimising' };
+            return labels[level] || '';
+        },
+
+        formatDate(dateStr) {
+            if (!dateStr) return '';
+            const date = new Date(dateStr);
+            return date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+        },
+
+        formatCurrency(value) {
+            if (value === null || value === undefined) return '—';
+            const num = Number(value);
+            if (num >= 1000000) return '£' + (num / 1000000).toFixed(1) + 'M';
+            if (num >= 1000) return '£' + (num / 1000).toFixed(0) + 'K';
+            return '£' + num.toFixed(0);
+        },
+
+        openCapabilityDetail(cap) {
+            this.capability = cap;
+            this.loading = false;
+            this.$nextTick(() => lucide.createIcons());
+        },
+
+        openRecord(cap) {
+            // Navigate to the capability detail page
+            window.location.href = '/capability-map/hierarchy?capability_id=' + cap.id;
+        }
+    };
+}
+</script>
+{% endblock %}
+{# design-block: board #}

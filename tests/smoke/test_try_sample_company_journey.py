@@ -126,7 +126,7 @@ def test_try_sample_company_loads_and_removes_cleanly(browser, live_server, seed
         page.goto(live_server + "/dashboard/overview", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
 
         # Remove it: one plain confirmation, then back on the setup screen
-        page.get_by_role("button", name="Remove the sample company").first.click()
+        page.get_by_role("button", name="Remove it", exact=True).first.click()
         confirm = page.locator('[data-testid="sample-company-remove-confirm"]')
         expect(confirm).to_be_visible(timeout=PAGE_TIMEOUT)
         confirm.click()

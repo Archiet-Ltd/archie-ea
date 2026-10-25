@@ -1,3 +1,4 @@
+{# design-block: dashboard #}
 {% extends "layouts/admin_base.html" %}
 {% from 'components/modal.html' import modal %}
 {% from 'components/page_header.html' import page_header %}
@@ -214,7 +215,7 @@
                                 <div class="font-medium text-foreground">{{ config.configuration_name }}</div>
                                 <div class="text-sm text-muted-foreground">{{ config.configuration_code }}</div>
                             </td>
-                            <td class="px-4 py-3 text-sm text-foreground">{{ config.organization_name or 'N/A' }}</td>
+                            <td class="px-4 py-3 text-sm text-foreground">{{ config.organization_name or 'No organisation set' }}</td>
                             <td class="px-4 py-3 text-sm text-foreground">{{ config.industry_focus }}</td>
                             <td class="px-4 py-3">
                                 <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium 

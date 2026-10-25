@@ -1,10 +1,11 @@
-{# Admin Header with breadcrumbs, search, notifications, user menu
+{# Admin Header: sidebar trigger, breadcrumbs, page guide, business unit scope, notifications
    smoke-coverage-ok: a11y fix (aria-hidden on icon); covered by tests/test_capability_map_a11y_csp.py #}
 
 {% set resolved_page_guide_context = page_guide_context | default({'enabled': false, 'supported': false}, true) %}
-{% from 'components/switch.html' import switch %}
 {% from 'components/button.html' import button %}
 {% from 'components/empty_state.html' import empty_state %}
+{% from 'components/badge.html' import badge %}
+{% from 'components/popover.html' import popover %}
 <header id="admin-header"
         class="sticky top-0 z-30 flex h-12 shrink-0 items-center justify-between pl-14 lg:pl-4 pr-4 bg-background border-b border-border">
     <div class="flex items-center gap-4">
@@ -31,33 +32,9 @@
 
     <div class="flex items-center gap-2">
 
-        {% if current_user.is_authenticated and active_organization_name %}
-        <div class="hidden md:flex h-8 items-center gap-2 rounded-md border border-input bg-background px-2.5 text-13"
-             data-testid="active-organization-chip"
-             aria-label="Active organization {{ active_organization_name }}">
-            <i data-lucide="building-2" class="h-4 w-4 text-muted-foreground" aria-hidden="true"></i>
-            <span class="font-medium text-foreground">{{ active_organization_name }}</span>
-        </div>
-        {% endif %}
-
-        <!-- Search (desktop) -->
-        <div class="relative hidden md:block">
-            <button type="button" id="search-modal-trigger"
-                    class="flex h-8 w-64 items-center gap-2 rounded-md border border-input bg-background px-2.5 text-13 text-muted-foreground hover:bg-accent transition-colors"
-                    aria-label="Open search">
-                <i data-lucide="search" class="h-4 w-4"></i>
-                <span class="flex-1 text-left">Search...</span>
-                <!-- Platform-aware shortcut hint, filled by JS -->
-                <kbd id="search-kbd-hint" class="pointer-events-none ml-auto inline-flex h-5 select-none items-center gap-1 rounded border border-border bg-muted px-1.5 font-mono text-2xs font-medium text-foreground"></kbd>
-            </button>
-        </div>
-
-        <!-- Search (mobile icon only) -->
-        <button type="button" id="header-search-btn-mobile"
-                class="md:hidden text-muted-foreground hover:text-foreground transition-colors p-1.5 rounded-md hover:bg-accent"
-                aria-label="Open search">
-            <i data-lucide="search" class="h-5 w-5"></i>
-        </button>
+        {# Navigation v3: the organisation switcher, the one search box ("Search or ask...",
+           Ctrl/Cmd+K) and the user menu live in the sidebar (components/admin_sidebar.html);
+           the header keeps the trigger, the breadcrumb and the page-level controls. #}
 
         {# LLM/model choice lives in AI Chat's own Settings (app/templates/ai_chat/index.html
            #model-selector), not in the global header — every page showed a provider
@@ -104,173 +81,29 @@
 
         <!-- ── Notifications ─────────────────────────────────────────── -->
         <div class="relative" id="notif-wrapper" data-dropdown-wrapper>
-            <button type="button" id="notif-btn"
-                    class="relative text-muted-foreground hover:text-foreground transition-colors p-1.5 rounded-md hover:bg-accent"
-                    aria-label="Notifications"
-                    aria-expanded="false"
-                    aria-haspopup="dialog"
-                    aria-controls="notif-dropdown">
-                <i data-lucide="bell" class="h-5 w-5"></i>
-                <span id="notif-badge"
-                      class="absolute -top-1 -right-1 min-w-[1rem] h-4 rounded-full bg-destructive text-xs font-medium text-destructive-foreground flex items-center justify-center px-0.5 hidden">0</span>
-            </button>
+            {% call button(variant='ghost', size='icon', class='relative', aria_label='Notifications', attrs_dict={'id': 'notif-btn', 'aria-expanded': 'false', 'aria-haspopup': 'dialog', 'aria-controls': 'notif-dropdown'}) %}
+                <i data-lucide="bell" class="h-5 w-5" aria-hidden="true"></i>
+                <span id="notif-badge" class="absolute -top-1 -right-1 hidden">
+                    {% call badge(variant='destructive', class='h-4 min-w-4 justify-center px-1 py-0') %}<span id="notif-badge-count">0</span>{% endcall %}
+                </span>
+            {% endcall %}
 
-            <div id="notif-dropdown"
-                 class="absolute right-0 mt-2 w-80 rounded-md border border-border bg-popover z-50 hidden"
-                 role="dialog" aria-labelledby="notif-title">
-                <div class="p-3 border-b border-border flex items-center justify-between">
-                    <span id="notif-title" class="text-sm font-semibold">Notifications</span>
-                    <span id="notif-mark-read-btn-wrapper" class="hidden">
-                        {{ button(text='Mark all read', variant='ghost', size='sm', class='text-xs', aria_label='Mark all notifications as read', attrs_dict={'id': 'notif-mark-read-btn'}) }}
-                    </span>
-                </div>
+            {% set mark_read_action %}
+                <span id="notif-mark-read-btn-wrapper" class="hidden">
+                    {{ button(text='Mark all read', variant='ghost', size='xs', aria_label='Mark all notifications as read', attrs_dict={'id': 'notif-mark-read-btn'}) }}
+                </span>
+            {% endset %}
+            {% call popover(id='notif-dropdown', title='Notifications', title_id='notif-title', header_action=mark_read_action) %}
                 <div id="notif-list" class="max-h-72 overflow-y-auto">
                     {{ empty_state(icon='bell-off', title='No notifications', description='Updates about your work will appear here.', padding='py-6') }}
                 </div>
-            </div>
+            {% endcall %}
         </div>
 
         <template id="notif-empty-template">{{ empty_state(icon='bell-off', title='No notifications', description='Updates about your work will appear here.', padding='py-6') }}</template>
 
-        <!-- ── User Menu ─────────────────────────────────────────────── -->
-        <div class="relative" id="user-menu-wrapper" data-dropdown-wrapper>
-            <button type="button" id="user-menu-btn"
-                    class="flex h-8 items-center gap-2 rounded-md hover:bg-accent px-1.5 transition-colors"
-                    aria-expanded="false"
-                    aria-haspopup="menu"
-                    aria-label="User menu">
-                <!-- Avatar: coloured circle derived from display name -->
-                <div id="user-avatar"
-                     class="w-8 h-8 rounded-full flex items-center justify-center shrink-0 font-semibold text-sm select-none"
-                     aria-hidden="true">
-                    {% if current_user.is_authenticated %}
-                        {% set _display = (current_user.first_name or current_user.full_name() or current_user.email or 'A') %}
-                        {{ _display[0] | upper }}
-                    {% else %}?{% endif %}
-                </div>
-                {% if current_user.is_authenticated %}
-                    <span class="hidden md:inline max-w-[160px] truncate text-13 font-medium text-foreground">{{ current_user.full_name() or current_user.email }}</span>
-                {% endif %}
-                <!-- Role badge for ALL roles, not just admin -->
-                {% if current_user.is_authenticated %}
-                    <span id="user-role-badge"
-                          class="hidden sm:inline-flex items-center px-1.5 py-0 rounded text-2xs font-medium border bg-muted/50 text-muted-foreground border-border">
-                        {{ get_role_display_name(current_user.enterprise_role) if current_user.enterprise_role else ('Admin' if current_user.is_admin() else 'User') }}
-                    </span>
-                {% endif %}
-                <i id="user-chevron"
-                   data-lucide="chevron-down"
-                   class="h-4 w-4 text-muted-foreground hidden sm:block transition-transform duration-150 ease-out"></i>
-            </button>
-
-            <div id="user-dropdown"
-                 class="absolute right-0 mt-2 w-64 rounded-md border border-border bg-popover text-popover-foreground z-50 hidden"
-                 role="menu" aria-labelledby="user-menu-btn">
-                <div class="p-2">
-                    {% if current_user.is_authenticated %}
-                    <div class="px-2 py-1.5">
-                        <p class="text-sm font-semibold truncate">{{ current_user.full_name() or current_user.email }}</p>
-                        <p class="text-xs text-muted-foreground truncate">{{ current_user.email }}</p>
-                    </div>
-                    {% else %}
-                    <div class="px-2 py-1.5 text-sm font-semibold">My Account</div>
-                    {% endif %}
-                    {% if current_user.is_authenticated %}
-                        {% set header_login_time = current_user.last_login_at|default(none, true) %}
-                        {% if header_login_time %}
-                        <div class="px-2 py-1 text-xs text-muted-foreground">
-                            <i data-lucide="clock" class="inline h-3 w-3 align-text-bottom mr-0.5"></i>
-                            Last login: {{ header_login_time.strftime('%d %b %Y %H:%M') }}
-                        </div>
-                        {% endif %}
-                    {% endif %}
-                    <div class="h-px bg-border my-1" role="separator"></div>
-                    <a href="{{ url_for('account.manage') }}"
-                       role="menuitem"
-                       class="flex items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent transition-colors">
-                        <i data-lucide="user" class="h-4 w-4"></i>
-                        Profile
-                    </a>
-                    <a href="{{ url_for('account.manage') }}"
-                       role="menuitem"
-                       class="flex items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent transition-colors">
-                        <i data-lucide="settings" class="h-4 w-4"></i>
-                        Settings
-                    </a>
-                    {% if (current_user.is_org_admin or current_user.is_platform_admin) and 'team.team' in flask.current_app.view_functions %}
-                    <a href="{{ url_for('team.team') }}"
-                       role="menuitem"
-                       class="flex items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent transition-colors">
-                        <i data-lucide="user-plus" class="h-4 w-4"></i>
-                        Invite your team
-                    </a>
-                    {% endif %}
-
-                    <div class="h-px bg-border my-1" role="separator"></div>
-                    <button type="button"
-                            role="menuitemcheckbox"
-                            :aria-checked="$store.theme.dark"
-                            @click="$store.theme.toggle()"
-                            class="flex items-center justify-between w-full rounded-sm px-2 py-1.5 text-sm hover:bg-accent transition-colors">
-                        <span class="flex items-center gap-2">
-                            <i data-lucide="moon" class="h-4 w-4"></i>
-                            Dark theme
-                        </span>
-                        {{ switch(bind_checked="$store.theme.dark", span_only=true) }}
-                    </button>
-
-                    <div class="h-px bg-border my-1" role="separator"></div>
-                    <a href="{{ url_for('account.logout') }}"
-                       role="menuitem"
-                       class="flex items-center gap-2 rounded-sm px-2 py-1.5 text-sm text-destructive-emphasis hover:bg-destructive/10 transition-colors">
-                        <i data-lucide="log-out" class="h-4 w-4"></i>
-                        Log out
-                    </a>
-                </div>
-            </div>
-        </div>
-
     </div>
 </header>
-
-<!-- Search modal -->
-<div id="search-modal"
-     class="fixed inset-0 z-[100] flex items-start justify-center pt-[15vh] hidden"
-     role="dialog"
-     aria-modal="true"
-     aria-label="Search">
-    <div id="search-modal-backdrop"
-         class="absolute inset-0 bg-overlay/50"></div>
-    <div class="cmd-palette relative w-full max-w-2xl mx-4 overflow-hidden">
-        <div class="cmd-palette-input-wrap flex items-center gap-3 px-4 py-3.5">
-            <i data-lucide="search" class="h-4 w-4 text-muted-foreground shrink-0"></i>
-            <input id="search-modal-input"
-                   type="text"
-                   placeholder="Search pages, applications, solutions, capabilities..."
-                   class="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
-                   autocomplete="off"
-                   spellcheck="false" aria-label="Search pages, applications, solutions, capabilities...">
-            <kbd class="pointer-events-none hidden sm:inline-flex h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-xs font-medium text-muted-foreground">ESC</kbd>
-        </div>
-        <div id="search-results" class="cmd-palette-results max-h-[28rem] overflow-y-auto p-1.5" role="listbox">
-            <p class="px-2 py-8 text-center text-sm text-muted-foreground">Type to search pages and entities...</p>
-        </div>
-        <div class="cmd-palette-footer flex items-center justify-between px-4 py-2 text-xs text-muted-foreground">
-            <div class="flex items-center gap-3">
-                <span class="flex items-center gap-1">
-                    <kbd class="px-1.5 py-0.5 bg-background border border-border rounded font-mono text-xs">↑</kbd>
-                    <kbd class="px-1.5 py-0.5 bg-background border border-border rounded font-mono text-xs">↓</kbd>
-                    Navigate
-                </span>
-                <span class="flex items-center gap-1">
-                    <kbd class="px-1.5 py-0.5 bg-background border border-border rounded font-mono text-xs">↵</kbd>
-                    Open
-                </span>
-            </div>
-            <span class="text-muted-foreground/60">Pages · Apps · Solutions · Capabilities</span>
-        </div>
-    </div>
-</div>
 
 <script>
 (function () {
@@ -289,56 +122,6 @@
 
     /* ── Lucide ── */
     if (typeof lucide !== 'undefined') lucide.createIcons();
-
-    /* ── Avatar colour from display name ────────────────────────────────── */
-    (function () {
-        const avatar = document.getElementById('user-avatar');
-        if (!avatar) return;
-        const text = avatar.textContent.trim();
-        // A tint of each ArchiMate layer hue with that layer's readable-text
-        // token, so the initial keeps its contrast in light and dark. The class
-        // names are written out whole so the stylesheet build keeps them.
-        const CLASSES = [
-            'bg-layer-motivation/10 text-layer-motivation-emphasis',
-            'bg-layer-strategy/10 text-layer-strategy-emphasis',
-            'bg-layer-business/10 text-layer-business-emphasis',
-            'bg-layer-application/10 text-layer-application-emphasis',
-            'bg-layer-technology/10 text-layer-technology-emphasis',
-            'bg-layer-implementation/10 text-layer-implementation-emphasis',
-            'bg-layer-risk/10 text-layer-risk-emphasis',
-        ];
-        let hash = 0;
-        const name = avatar.dataset.name || text;
-        for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
-        avatar.classList.add(...CLASSES[Math.abs(hash) % CLASSES.length].split(' '));
-    })();
-
-    /* ── Role badge colour ───────────────────────────────────────────────── */
-    (function () {
-        const badge = document.getElementById('user-role-badge');
-        if (!badge) return;
-        const text = badge.textContent.trim().toLowerCase();
-        const map = {
-              admin:    'bg-warning/10 text-warning-emphasis border-warning/30',
-              user:     'bg-info/10 text-primary border-info/30',
-              analyst:  'bg-purple-500/10 text-primary border-purple-500/30', // design-tokens-ok: 5-role legend, info already used by 'user'
-              architect:'bg-success/10 text-success-emphasis border-success/30',
-              viewer:   'bg-muted-foreground/10 text-muted-foreground border-muted-foreground/30',
-        };
-        const cls = Object.entries(map).find(([k]) => text.includes(k));
-        if (cls) cls[1].split(' ').forEach(function(c) { badge.classList.add(c); });
-        else 'bg-info/10 text-primary border-info/30'.split(' ').forEach(function(c) { badge.classList.add(c); });
-    })();
-
-    /* ── Platform-aware keyboard shortcut hint ───────────────────────────── */
-    (function () {
-        const hint = document.getElementById('search-kbd-hint');
-        if (!hint) return;
-        const isMac = /Mac|iPhone|iPad|iPod/.test(navigator.platform || navigator.userAgent);
-        hint.innerHTML = isMac
-            ? '<span class="text-xs">⌘</span>K'
-            : '<span class="text-xs">Ctrl</span>K';
-    })();
 
     /* ── Generic dropdown helper ─────────────────────────────────────────── */
     let _openDropdown = null;
@@ -515,7 +298,7 @@
         if (!notifBadge) return;
         if (count > 0) {
             notifBadge.style.display = 'flex';
-            notifBadge.textContent = count > 99 ? '99+' : String(count);
+            document.getElementById('notif-badge-count').textContent = count > 99 ? '99+' : String(count);
         } else {
             notifBadge.style.display = 'none';
         }
@@ -651,252 +434,6 @@
     {% if current_user.is_authenticated %}
     loadBuScope();
     {% endif %}
-
-    /* ── User menu ─────────────────────────────────────────────────────── */
-    const userBtn      = document.getElementById('user-menu-btn');
-    const userDropdown = document.getElementById('user-dropdown');
-    const userChevron  = document.getElementById('user-chevron');
-
-    if (userBtn && userDropdown) {
-        userBtn.addEventListener('click', function (e) {
-            e.stopPropagation();
-            openDropdown(userBtn, userDropdown);
-            if (userChevron) {
-                userChevron.style.transform =
-                    userDropdown.style.display !== 'none' ? 'rotate(180deg)' : 'rotate(0deg)';
-            }
-        });
-    }
-
-    /* ── Search modal ──────────────────────────────────────────────────── */
-    const searchModal    = document.getElementById('search-modal');
-    const searchInput    = document.getElementById('search-modal-input');
-    const searchResults  = document.getElementById('search-results');
-    const searchBackdrop = document.getElementById('search-modal-backdrop');
-
-    function openSearchModal(prefillQuery) {
-        searchModal.style.display = 'flex';
-        if (typeof prefillQuery === 'string' && prefillQuery && searchInput) {
-            searchInput.value = prefillQuery;
-            handleSearchInput(prefillQuery);
-        }
-        setTimeout(function () { if (searchInput) searchInput.focus(); }, 50);
-    }
-
-    // The sidebar's "Search everywhere (Ctrl+K)" no-match action opens this modal pre-filled.
-    window.openSearchModal = openSearchModal;
-
-    function closeSearchModal() {
-        searchModal.style.display = 'none';
-        if (searchInput) searchInput.value = '';
-        if (searchResults) searchResults.innerHTML =
-            '<p class="px-2 py-8 text-center text-sm text-muted-foreground">Type to search pages and entities...</p>';
-    }
-
-    window.closeSearchModal = closeSearchModal;
-
-    const btnDesktop = document.getElementById('search-modal-trigger');
-    const btnMobile  = document.getElementById('header-search-btn-mobile');
-    if (btnDesktop) btnDesktop.addEventListener('click', function () { openSearchModal(); });
-    if (btnMobile)  btnMobile.addEventListener('click', function () { openSearchModal(); });
-    if (searchBackdrop) searchBackdrop.addEventListener('click', closeSearchModal);
-
-    if (searchInput) {
-        searchInput.addEventListener('keydown', function (e) {
-            if (e.key === 'Escape') { closeSearchModal(); return; }
-            if (e.key === 'ArrowDown') {
-                e.preventDefault();
-                const first = searchResults && searchResults.querySelector('[role="option"]');
-                if (first) first.focus();
-                return;
-            }
-            if (e.key === 'Enter') {
-                const first = searchResults && searchResults.querySelector('a[href]');
-                if (first) first.click();
-            }
-        });
-        searchInput.addEventListener('input', function () {
-            handleSearchInput(this.value);
-        });
-    }
-
-    // Keyboard nav within search results
-    if (searchResults) {
-        searchResults.addEventListener('keydown', function(e) {
-            const items = Array.from(searchResults.querySelectorAll('[role="option"]'));
-            if (!items.length) return;
-            const idx = items.indexOf(document.activeElement);
-            if (e.key === 'ArrowDown') { e.preventDefault(); items[(idx + 1) % items.length].focus(); }
-            else if (e.key === 'ArrowUp') {
-                e.preventDefault();
-                if (idx <= 0) { searchInput.focus(); return; }
-                items[idx - 1].focus();
-            }
-            else if (e.key === 'Escape') { closeSearchModal(); }
-            else if (e.key === 'Enter' && document.activeElement.tagName === 'A') { document.activeElement.click(); }
-        });
-    }
-
-    document.addEventListener('keydown', function (e) {
-        // Pages with their own Ctrl+K surface (the ArchiMate Composer's quick-add
-        // palette) opt out via this body attribute. Without it, this handler and
-        // the page's own keydown listener both fire on the same keypress -- both
-        // registered on `document`, so stopPropagation in the later (page-level)
-        // listener cannot undo work this earlier one already did. Found 10 Sep
-        // 2026: the Composer's Ctrl+K opened its quick-add palette AND this global
-        // search modal at once, the modal's `hidden` class overridden by this
-        // handler's own `style.display = 'flex'`, leaving an invisible-looking
-        // but fully interactive full-screen overlay stealing every click on the
-        // page until Escape was pressed.
-        if (document.body.hasAttribute('data-suppress-global-search-shortcut')) return;
-        if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
-            e.preventDefault();
-            if (searchModal.style.display === 'flex') closeSearchModal();
-            else openSearchModal();
-        }
-        if (e.key === 'Escape' && searchModal.style.display === 'flex') closeSearchModal();
-    });
-
-    /* ── Search index — covers all major platform sections ──────────────── */
-    const SEARCH_INDEX = [
-        // Core nav
-        { label: 'Dashboard',                    href: '{{ url_for("admin.index") }}',                          icon: 'layout-dashboard',  section: 'Navigation' },
-        { label: 'Profile',                      href: '{{ url_for("account.manage") }}',                       icon: 'user',              section: 'Account' },
-        { label: 'Settings / Change Password',   href: '{{ url_for("account.change_password") }}',             icon: 'settings',          section: 'Account' },
-        { label: 'Manage Users',                 href: '{{ url_for("admin.registered_users") }}',               icon: 'users',             section: 'Admin' },
-        {# Both routes are guarded (platform-admin / org-admin). A command-palette hit
-           that 403s is the same defect as a link that 403s, so they are indexed only
-           for the users whose guard will pass. #}
-        {% if current_user.is_platform_admin %}
-        { label: 'Feature Flags',                href: '{{ url_for("admin.feature_flags") }}',                  icon: 'flag',              section: 'Admin' },
-        {% endif %}
-        {% if current_user.is_org_admin %}
-        { label: 'API Settings',                 href: '{{ url_for("admin.api_settings") }}',                   icon: 'key',               section: 'Admin' },
-        {% endif %}
-        // Applications
-        { label: 'Application Portfolio',        href: '/applications',                                          icon: 'layers',            section: 'Applications' },
-        { label: 'All Applications',             href: '/applications',                                          icon: 'app-window',        section: 'Applications' },
-        { label: 'Duplicate Detection',          href: '/applications/duplicates',                               icon: 'copy',              section: 'Applications' },
-        { label: 'Application Dashboard',        href: '/applications/dashboard',                                icon: 'bar-chart-2',       section: 'Applications' },
-        // Vendors
-        { label: 'Vendor Management',            href: '/applications/vendors',                                  icon: 'briefcase',         section: 'Vendors' },
-        { label: 'Vendor Dashboard',             href: '/applications/vendors',                                  icon: 'building-2',        section: 'Vendors' },
-        { label: 'Vendor Capability Matrix',     href: '/dashboards/vendor-capability-matrix',                  icon: 'table-2',           section: 'Vendors' },
-        // Architecture
-        { label: 'Architecture Models',          href: '/architecture',                                          icon: 'git-branch',        section: 'Architecture' },
-        { label: 'ArchiMate Elements',           href: '/architecture/elements',                                 icon: 'boxes',             section: 'Architecture' },
-        { label: 'Solution Composer',            href: '/solutions',                                             icon: 'pencil-ruler',      section: 'Architecture' },
-        { label: 'Enterprise Architecture',      href: '/architecture/enterprise',                               icon: 'network',           section: 'Architecture' },
-        // Capabilities
-        { label: 'Business Capabilities',        href: '/capability-map/',                                       icon: 'target',            section: 'Capabilities' },
-        { label: 'Capability Map',               href: '/capability-map/',                                       icon: 'map',               section: 'Capabilities' },
-        { label: 'Capability Maturity',          href: '/capabilities/maturity',                                 icon: 'trending-up',       section: 'Capabilities' },
-        // AI
-        { label: 'AI Assistant',                 href: '/ai-chat',                                               icon: 'bot',               section: 'AI & Analysis' },
-        { label: 'Architecture Assistant',       href: '/architecture-assistant',                                icon: 'sparkles',          section: 'AI & Analysis' },
-        { label: 'Gap Discovery',                href: '{{ url_for("enterprise.gap_analysis") }}',                icon: 'search',            section: 'AI & Analysis' },
-        { label: 'Market Intelligence',          href: '/market-intelligence',                                   icon: 'trending-up',       section: 'AI & Analysis' },
-        // Governance
-        { label: 'Governance',                   href: '/governance',                                            icon: 'shield',            section: 'Governance' },
-        { label: 'ARB Submissions',              href: '/governance/arb',                                        icon: 'check-square',      section: 'Governance' },
-        { label: 'Roadmap',                      href: '/roadmap',                                               icon: 'calendar',          section: 'Governance' },
-    ];
-
-    let _searchSelected = -1;
-    let _searchDebounce = null;
-
-    const ENTITY_ICONS = {
-        application: 'app-window', capability: 'target', solution: 'pencil-ruler',
-        archimate_element: 'boxes', workflow: 'git-branch', vendor: 'building-2'
-    };
-
-    function _renderSection(sec, items) {
-        let h = '<div class="px-2 pt-2 pb-0.5 text-xs font-semibold uppercase tracking-widest text-muted-foreground">' + esc(sec) + '</div>';
-        items.forEach(function(item) {
-            const icon = item.icon || ENTITY_ICONS[item.type] || 'circle';
-            const badge = item.type ? ' <span class="ml-auto text-xs text-muted-foreground">' + esc(item.type) + '</span>' : '';
-            h += '<a href="' + esc(item.href || item.url || '#') + '" role="option" tabindex="-1"' +
-                ' class="flex items-center gap-3 rounded-sm px-3 py-2 text-sm hover:bg-accent focus:bg-accent focus:outline-none transition-colors">' +
-                '<i data-lucide="' + esc(icon) + '" class="h-4 w-4 text-muted-foreground shrink-0"></i>' +
-                '<span class="truncate">' + esc(item.label || item.name) + '</span>' + badge + '</a>';
-        });
-        return h;
-    }
-
-    function handleSearchInput(query) {
-        _searchSelected = -1;
-        if (!query || !query.trim()) {
-            searchResults.innerHTML =
-                '<p class="px-2 py-4 text-center text-sm text-muted-foreground">Type to search pages and entities...</p>';
-            return;
-        }
-        const q = query.toLowerCase();
-
-        // 1. Instant: filter static page index
-        const pageMatches = SEARCH_INDEX.filter(function(item) {
-            return item.label.toLowerCase().indexOf(q) !== -1 ||
-                   (item.section && item.section.toLowerCase().indexOf(q) !== -1);
-        });
-        const sections = {};
-        pageMatches.forEach(function(item) {
-            const sec = item.section || 'Pages';
-            if (!sections[sec]) sections[sec] = [];
-            sections[sec].push(item);
-        });
-        let html = '';
-        Object.entries(sections).forEach(function([sec, items]) {
-            html += _renderSection(sec, items);
-        });
-
-        // Show pages immediately + loading indicator for entities
-        if (q.length >= 2) {
-            html += '<div id="entity-search-loading" class="px-3 py-2 text-xs text-muted-foreground flex items-center gap-2">' +
-                '<svg class="animate-spin h-3 w-3" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none" opacity="0.25"/>' +
-                '<path fill="currentColor" d="M4 12a8 8 0 018-8V0C5.4 0 0 5.4 0 12h4z"/></svg> Searching entities...</div>';
-        }
-        if (!html) {
-            html = '<p class="px-2 py-4 text-center text-sm text-muted-foreground">No results for <strong>' + esc(query) + '</strong></p>';
-        }
-        searchResults.innerHTML = html;
-        if (typeof lucide !== 'undefined') lucide.createIcons();
-
-        // 2. Async: fetch entities from API (debounced)
-        if (q.length < 2) return;
-        clearTimeout(_searchDebounce);
-        _searchDebounce = setTimeout(function() {
-            if (!window.Platform || !window.Platform.fetch) return;
-            Platform.fetch.get('/api/sidebar/search', { q: q }, { silent: true })
-                .then(function(data) {
-                    if (searchInput.value.toLowerCase() !== q) return; // stale
-                    const results = data.results || data || [];
-                    if (!results.length) {
-                        let el = document.getElementById('entity-search-loading');
-                        if (el) el.remove();
-                        return;
-                    }
-                    // Group by type
-                    const entitySections = {};
-                    results.forEach(function(r) {
-                        const sec = (r.type || 'entity').replace(/_/g, ' ');
-                        const label = sec.charAt(0).toUpperCase() + sec.slice(1) + 's';
-                        if (!entitySections[label]) entitySections[label] = [];
-                        entitySections[label].push(r);
-                    });
-                    let entityHtml = '';
-                    Object.entries(entitySections).forEach(function([sec, items]) {
-                        entityHtml += _renderSection(sec, items.slice(0, 5));
-                    });
-                    let el = document.getElementById('entity-search-loading');
-                    if (el) el.outerHTML = entityHtml;
-                    else searchResults.insertAdjacentHTML('beforeend', entityHtml);
-                    if (typeof lucide !== 'undefined') lucide.createIcons();
-                })
-                .catch(function() {
-                    let el = document.getElementById('entity-search-loading');
-                    if (el) el.remove();
-                });
-        }, 300);
-    }
 
 })();
 </script>

@@ -218,39 +218,9 @@ def mfa_challenge():
         flash("Your sign-in attempt expired. Please sign in again.", "error")
         return redirect(url_for("account.login"))
 
-    from app.services import mfa_service
+    from app.modules.account.mfa_flow import run_mfa_challenge
 
-    if not user.mfa_enabled:
-        secret = session.get("_mfa_enroll_secret")
-        if not secret:
-            secret = mfa_service.generate_secret()
-            session["_mfa_enroll_secret"] = secret
-        if request.method == "POST":
-            code = request.form.get("code", "")
-            try:
-                mfa_service.enroll(user, secret, code)
-            except mfa_service.MFAError as exc:
-                flash(str(exc), "form-error")
-                return render_template(
-                    "account/mfa_enroll.html",
-                    secret=secret,
-                    provisioning_uri=mfa_service.provisioning_uri(user, secret),
-                )
-            session.pop("_mfa_enroll_secret", None)
-            return _complete_login_after_mfa(user)
-        return render_template(
-            "account/mfa_enroll.html",
-            secret=secret,
-            provisioning_uri=mfa_service.provisioning_uri(user, secret),
-        )
-
-    if request.method == "POST":
-        code = request.form.get("code", "")
-        if mfa_service.verify_login_code(user, code):
-            return _complete_login_after_mfa(user)
-        flash("That code was not accepted. Try again.", "form-error")
-
-    return render_template("account/mfa_challenge.html")
+    return run_mfa_challenge(user, _complete_login_after_mfa)
 
 
 @account_bp_v2.route("/register", methods=["GET", "POST"])
@@ -259,6 +229,20 @@ def mfa_challenge():
 def register():
     """Register a new user, and send them a confirmation email."""
     return mail_views.register_view()
+
+
+def _company_card():
+    from app.modules.account.services import onboarding_service
+
+    org = getattr(current_user, "organization", None)
+    return onboarding_service.settings_card(org) if org is not None else None
+
+
+# Sign-up after the account: bring the company in, then choose the AI provider.
+from app.modules.admin.connector_routes import connections_access as _connections_access  # noqa: E402
+from app.modules.account.routes import onboarding_views  # noqa: E402
+
+onboarding_views.add_routes(account_bp_v2, _connections_access)
 
 
 @account_bp_v2.route("/logout")
@@ -299,6 +283,7 @@ def manage():
         "account/manage.html",
         user=current_user,
         form=None,
+        company=_company_card(),
         last_login_entry=last_login_entry,
         recent_auth_events=auth_audit.recent_auth_events(current_user.id),
     )

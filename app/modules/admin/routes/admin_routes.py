@@ -10,6 +10,7 @@ Complex routes (API settings, feature flags, abacus, seed) retain inline logic
 for Phase 0.5 parity; service extraction planned for Phase 2.
 """
 
+from app.modules.ai_chat.services.model_defaults import DEFAULT_MODELS
 from app.models.models import ExternalSystem
 import hashlib
 import hmac
@@ -610,7 +611,7 @@ def preview_env_keys():
         "openai": "gpt-4o",
         "anthropic": "claude-opus-5",
         "gemini": "gemini-2.0-flash-exp",
-        "nvidia": "nvidia/nemotron-3-super-120b-a12b",
+        "nvidia": DEFAULT_MODELS["nvidia"],
         "huggingface": "meta-llama/Llama-3.1-8B-Instruct",
         "azure": "gpt-4",
         "openrouter": "google/gemma-4-31b-it:free",
@@ -702,7 +703,7 @@ def load_env_keys():
         "openai": "gpt-4o",
         "anthropic": "claude-opus-5",
         "gemini": "gemini-2.0-flash-exp",
-        "nvidia": "nvidia/nemotron-3-super-120b-a12b",
+        "nvidia": DEFAULT_MODELS["nvidia"],
         "huggingface": "meta-llama/Llama-3.1-8B-Instruct",
         "azure": "gpt-4",
         "openrouter": "google/gemma-4-31b-it:free",

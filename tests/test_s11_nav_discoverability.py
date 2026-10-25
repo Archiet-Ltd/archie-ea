@@ -188,7 +188,11 @@ def test_enterprise_architect_sidebar_links_the_capability(
     app, db_session, make_org, login_as, endpoint
 ):
     """Fail-first: none of these three endpoints appeared anywhere in any
-    role's sidebar before this change."""
+    role's sidebar before this change.
+
+    Navigation v3: the gap register is the Changes entry itself; work packages and
+    decisions sit under Changes and Compliance and are found by name from the one
+    search box (the sidebar no longer lists every page)."""
     user, _ = _user(db_session, make_org, "nav")
     client = app.test_client()
     login_as(client, user)
@@ -196,6 +200,13 @@ def test_enterprise_architect_sidebar_links_the_capability(
     assert resp.status_code == 200
     with app.test_request_context():
         href = url_for(endpoint)
-    assert f'href="{href}"' in resp.get_data(as_text=True), (
-        f"{endpoint} is not linked from the enterprise_architect sidebar"
+    if endpoint == "enterprise.gap_analysis":
+        assert f'href="{href}"' in resp.get_data(as_text=True), (
+            f"{endpoint} is not linked from the enterprise_architect sidebar"
+        )
+        return
+    query = {"enterprise.work_packages": "work packages", "arch_decisions.list_decisions": "decisions"}[endpoint]
+    hits = client.get("/api/sidebar/search", query_string={"q": query}).get_json()["results"]
+    assert href in [h["url"] for h in hits if h["type"] == "module"], (
+        f"{endpoint} cannot be found from the enterprise_architect's search box"
     )

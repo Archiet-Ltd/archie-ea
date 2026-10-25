@@ -1,3 +1,4 @@
+{# design-block: dashboard #}
 {% extends "layouts/admin_base.html" %}
 {% from 'components/page_header.html' import page_header %}
 {% from 'components/metrics_card.html' import metrics_card %}
@@ -73,7 +74,7 @@
                 </div>
             </a>
             
-            <a href="{{ url_for('enterprise.technology_roadmap') }}" class="block bg-card rounded-lg border border-border p-6 hover:bg-accent transition-colors">
+            <a href="{{ url_for('genome_roadmap.index', lens='technology') }}" class="block bg-card rounded-lg border border-border p-6 hover:bg-accent transition-colors">
                 <div class="flex items-center gap-4">
                     <div class="w-12 h-12 bg-accent rounded-lg flex items-center justify-center">
                         <i data-lucide="route" class="w-6 h-6 text-primary" aria-hidden="true"></i>

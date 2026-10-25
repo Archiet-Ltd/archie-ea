@@ -135,6 +135,7 @@ else:
     from .regulatory_framework import *  # noqa - FrameworkAdoption (tenant-hybrid framework catalogue)
     from .regulatory_change import *  # noqa - RegulatoryChange, RegulatoryChangeImpact (regulatory change tracker)
     from .cost_fact import *  # noqa - CostFact, ExchangeRate (one cost fact store)
+    from .price_plan import *  # noqa - PricePlan (one price store)
     from .change_feed_offset import *  # noqa - ChangeFeedOffset (change feed consumer position)
     from .graph_projection_snapshot import *  # noqa - GraphProjectionSnapshot (per-organisation graph projection copy)
     from .cost_intelligence import *  # noqa - CapabilityCostAllocation, VendorContract, SLA (Cost intelligence)
@@ -389,7 +390,7 @@ else:
     from .rate_card import RateCard  # noqa: F401
 
     # SA-009: TOGAF ADM deliverable checklists per phase
-    from .adm_deliverable import ADMDeliverable, ADMDeliverableCheck  # noqa: F401
+    from .adm_deliverable import ADMDeliverable  # noqa: F401
 
     # RRT-001: Requirement templates with 16 seeded architecture-layer templates
     from .requirement_template import RequirementTemplate  # noqa: F401

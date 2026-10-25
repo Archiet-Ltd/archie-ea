@@ -14,11 +14,11 @@ Seeds a small org with 2 plateaus, 3 work packages, and their ArchiMate elements
 """
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime
 
 import pytest
 
-from app.modules.genome.emit.roadmap_gantt import emit_roadmap_gantt_html
+from app.modules.genome.services.roadmap_board import build_roadmap_board
 from app.modules.genome.services.roadmap_slice import (
     SliceProvenanceError,
     build_roadmap_slice,
@@ -31,14 +31,13 @@ def _seed(db_session, org_id):
     Returns the names and element ids for assertions.
     """
     from app.models.archimate_core import ArchiMateElement
-    from app.models.implementation_migration import Plateau, WorkPackage
+    from app.models.implementation_migration import Plateau
+    from app.services import work_package_service
 
     # ArchiMate elements (the provenance anchors).
     p_elem_1 = ArchiMateElement(name="Current State", type="Plateau", layer="implementation", organization_id=org_id)
     p_elem_2 = ArchiMateElement(name="Target State", type="Plateau", layer="implementation", organization_id=org_id)
-    wp_elem_1 = ArchiMateElement(name="Migrate CRM", type="WorkPackage", layer="implementation", organization_id=org_id)
-    wp_elem_2 = ArchiMateElement(name="Decommission Legacy ERP", type="WorkPackage", layer="implementation", organization_id=org_id)
-    db_session.add_all([p_elem_1, p_elem_2, wp_elem_1, wp_elem_2])
+    db_session.add_all([p_elem_1, p_elem_2])
     db_session.flush()
 
     p1 = Plateau(
@@ -52,33 +51,26 @@ def _seed(db_session, org_id):
     db_session.add_all([p1, p2])
     db_session.flush()
 
-    wp1 = WorkPackage(
-        name="Migrate CRM", organization_id=org_id, plateau_id=p2.id,
-        status="in_progress", priority="high", percent_complete=40,
-        start_date=date(2026, 2, 1), target_date=date(2026, 8, 1),
-        sequence_order=1, archimate_element_id=wp_elem_1.id,
+    # The one writer creates the work package, its ArchiMate element and its plateau link.
+    wp1 = work_package_service.create_work_package(
+        organization_id=org_id, name="Migrate CRM", plateau_id=p2.id,
+        status="in_progress", priority="high", progress_percentage=40,
+        start_date=datetime(2026, 2, 1), end_date=datetime(2026, 8, 1),
     )
-    wp2 = WorkPackage(
-        name="Decommission Legacy ERP", organization_id=org_id, plateau_id=p2.id,
-        status="planned", priority="medium", percent_complete=0,
-        start_date=date(2026, 6, 1), target_date=date(2027, 1, 1),
-        sequence_order=2, archimate_element_id=wp_elem_2.id,
+    wp2 = work_package_service.create_work_package(
+        organization_id=org_id, name="Decommission Legacy ERP", plateau_id=p2.id,
+        status="planned", priority="medium", progress_percentage=0,
+        start_date=datetime(2026, 6, 1), end_date=datetime(2027, 1, 1),
     )
-    # Third work package is created without an explicit archimate_element_id;
-    # the backbone's before_flush listener creates one automatically.  It is
-    # unassigned to a plateau — exercises the Unassigned path.
-    wp3 = WorkPackage(
-        name="Backlog Grooming", organization_id=org_id,
-        status="planned", priority="low", percent_complete=0,
-        sequence_order=3,
+    # Third work package is unassigned to a plateau: exercises the Unassigned path.
+    wp3 = work_package_service.create_work_package(
+        organization_id=org_id, name="Backlog Grooming",
+        status="planned", priority="low",
     )
-    db_session.add_all([wp1, wp2, wp3])
     db_session.flush()
 
-    # Collect all element ids including the auto-created one for wp3.
-    all_element_ids = {p_elem_1.id, p_elem_2.id, wp_elem_1.id, wp_elem_2.id}
-    if wp3.archimate_element_id:
-        all_element_ids.add(wp3.archimate_element_id)
+    all_element_ids = {p_elem_1.id, p_elem_2.id}
+    all_element_ids.update(w.archimate_element_id for w in (wp1, wp2, wp3) if w.archimate_element_id)
 
     return {
         "plateau_names": {"Current State", "Target State"},
@@ -87,27 +79,24 @@ def _seed(db_session, org_id):
     }
 
 
-def _legacy_work_package(db_session, *, name, organization_id, plateau_id=None,
-                         status="planned", priority="medium", sequence_order=0):
-    """Insert a WorkPackage row with a Core INSERT, bypassing the ORM flush
+def _legacy_work_package(db_session, *, name, organization_id, status="planned", priority="medium"):
+    """Insert a work package row with a Core INSERT, bypassing the ORM flush
     listener.  Use this to simulate a legacy row that has no ArchiMate element
     and should be reported as synthetic."""
     from datetime import datetime
 
     from app.datetime_helpers import utcnow
-    from app.models.implementation_migration import WorkPackage
+    from app.models.unified_work_package import UnifiedWorkPackage
 
     now = utcnow()
     result = db_session.execute(
-        WorkPackage.__table__.insert().values(
+        UnifiedWorkPackage.__table__.insert().values(
             name=name,
             organization_id=organization_id,
-            plateau_id=plateau_id,
             status=status,
             priority=priority,
-            sequence_order=sequence_order,
             context="application",
-            percent_complete=0,
+            scope="enterprise",
             created_at=now,
             updated_at=now,
         )
@@ -161,32 +150,11 @@ def test_roadmap_slice_determinism(db_session, make_org, tenant_ctx):
         s1 = build_roadmap_slice(org.id)
         s2 = build_roadmap_slice(org.id)
 
-    # (c) determinism: identical spec_hash and byte-identical emitted HTML.
+    # (c) determinism: identical spec_hash and an identical board.
     assert s1["spec_hash"] == s2["spec_hash"]
     assert s1["spec_hash"].startswith("sha256:")
-    html1 = emit_roadmap_gantt_html(s1)
-    html2 = emit_roadmap_gantt_html(s2)
-    assert html1 == html2
-
-
-def test_emitted_html_renders_real_names_and_provenance(db_session, make_org, tenant_ctx):
-    org = make_org("genome-roadmap")
-    _seed(db_session, org.id)
-
     with tenant_ctx(org.id):
-        s = build_roadmap_slice(org.id)
-    html = emit_roadmap_gantt_html(s)
-
-    # Real names appear in the rendered gantt.
-    assert "Current State" in html
-    assert "Migrate CRM" in html
-
-    # Every anchored row carries its provenance element id as a data-* attribute.
-    for p in s["plateaus"]:
-        assert f'data-element-id="{p["provenance"]["archimate_element_id"]}"' in html
-    # All work packages now have auto-created elements, so all are structural.
-    assert 'data-provenance-origin="structural"' in html
-    assert 'data-domain="implementation"' in html
+        assert build_roadmap_board(org.id) == build_roadmap_board(org.id)
 
 
 def test_roadmap_page_renders_for_tenant(db_session, make_org, client, login_as):
@@ -207,12 +175,13 @@ def test_roadmap_page_renders_for_tenant(db_session, make_org, client, login_as)
     db_session.flush()
 
     login_as(client, user)
-    resp = client.post("/genome/roadmap/generate")
+    resp = client.get("/genome/roadmap/")
     assert resp.status_code == 200
     body = resp.get_data(as_text=True)
     assert "Migrate CRM" in body
     assert "Current State" in body
-    assert 'data-domain="implementation"' in body
+    # Every anchored row carries its ArchiMate element id; all are structural here.
+    assert 'data-provenance-origin="structural"' in body
     assert "data-element-id=" in body
 
 
@@ -273,7 +242,6 @@ def test_legacy_work_package_reported_as_synthetic(db_session, make_org, tenant_
     # Legacy work package — no element, inserted via Core.
     _legacy_work_package(
         db_session, name="Orphaned WP", organization_id=org.id,
-        plateau_id=p.id, sequence_order=1,
     )
     db_session.flush()
 
@@ -287,9 +255,13 @@ def test_legacy_work_package_reported_as_synthetic(db_session, make_org, tenant_
     assert prov["archimate_element_id"] is None
 
 
-def test_legacy_work_package_html_renders_synthetic(db_session, make_org, tenant_ctx):
-    """The emitted HTML for a legacy work package must carry
+def test_legacy_work_package_html_renders_synthetic(db_session, make_org, client, login_as):
+    """The page for a legacy work package must carry
     data-provenance-origin='synthetic'."""
+    import uuid
+
+    from app.models.user import User
+
     from app.models.archimate_core import ArchiMateElement
     from app.models.implementation_migration import Plateau
 
@@ -310,12 +282,16 @@ def test_legacy_work_package_html_renders_synthetic(db_session, make_org, tenant
 
     _legacy_work_package(
         db_session, name="Orphaned WP", organization_id=org.id,
-        plateau_id=p.id, sequence_order=1,
     )
     db_session.flush()
 
-    with tenant_ctx(org.id):
-        s = build_roadmap_slice(org.id)
-    html = emit_roadmap_gantt_html(s)
+    user = User(
+        email=f"genome-syn-{uuid.uuid4().hex[:10]}@example.test",
+        organization_id=org.id, confirmed=True, enterprise_role="enterprise_architect",
+    )
+    db_session.add(user)
+    db_session.flush()
+    login_as(client, user)
+    html = client.get("/genome/roadmap/").get_data(as_text=True)
 
     assert 'data-provenance-origin="synthetic"' in html

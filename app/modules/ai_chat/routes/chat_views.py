@@ -151,12 +151,32 @@ def index():
     # The lens the person chose (or sign-up set) is read first, then the assigned role,
     # the same order the dashboard uses; display only, never a permission.
     default_chat_persona = get_default_chat_persona(
-        getattr(current_user, "persona_lens", None)
-        or getattr(current_user, "enterprise_role", None)
+        getattr(current_user, "enterprise_role", None),
+        getattr(current_user, "persona_lens", None),
     )
     from app.services.feature_flag_service import FeatureFlagService
 
     llm_provider_info = FeatureFlagService.get_configured_provider_info()
+
+    # A startup with nothing recorded is shown what to do next (the same two steps as its
+    # dashboard), to the people those steps open for. A larger company keeps the portfolio
+    # prompt, and the company kind defaults to startup until it is set.
+    from flask import g
+
+    from app.models.organization import Organization
+    from app.utils.role_access import may_connect_github, may_load_sample_company
+
+    company_kind = None
+    try:
+        org = Organization.query.get(g.current_org_id)
+        company_kind = ((org.settings or {}).get("company_context") or {}).get("kind") if org else None
+    except Exception:  # noqa: BLE001 - the kind only chooses which empty state shows
+        company_kind = None
+    startup_first_steps = {
+        "show": (company_kind or "startup") == "startup",
+        "connect": may_connect_github(current_user, g.current_org_id),
+        "sample": may_load_sample_company(current_user),
+    }
 
     chat_service = get_chat_service()
     if chat_service is None:
@@ -187,6 +207,7 @@ def index():
         default_chat_persona=default_chat_persona,
         llm_configured=llm_provider_info["configured"],
         llm_provider=llm_provider_info.get("provider"),
+        startup_first_steps=startup_first_steps,
         chat_persona_preference_key=f"archie_chat_persona_v2:{current_user.id}",
     )
 

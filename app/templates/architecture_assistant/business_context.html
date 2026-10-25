@@ -1,5 +1,8 @@
 {% extends "layouts/admin_base.html" %}
-{% from 'macros/page_shell.html' import page_shell %}
+{% from 'components/page_header.html' import page_header %}
+{% from 'components/form_field.html' import form_field %}
+{% from 'components/button.html' import button %}
+{% import 'components/card.html' as card %}
 {% block title %}Business Context — Phase A{% endblock %}
 
 {% block breadcrumb %}
@@ -14,66 +17,38 @@
 
 {% block content %}
 <div class="max-w-2xl mx-auto py-8" x-data="businessContextApp()">
-  {{ page_shell(title='Phase A — Business Context', subtitle='Capture the business context for your TOGAF architecture engagement.') }}
+  {{ page_header(
+      title='Phase A — Business Context',
+      description='Capture the business context for your TOGAF architecture engagement.'
+  ) }}
 
-  <div class="bg-card border border-border rounded-lg p-6 space-y-5">
+  {% call card.card() %}
+  {% call card.card_content(class='space-y-5') %}
 
-    <div class="space-y-1">
-      <label class="text-sm font-medium text-foreground" for="project_name">Project Name</label>
-      <input id="project_name" type="text" x-model="form.project_name"
-             class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-             placeholder="e.g. Customer Portal Modernisation" required>
-    </div>
+    {{ form_field(id='project_name', label='Project Name', required=true, placeholder='e.g. Customer Portal Modernisation', attrs_dict={'x-model': 'form.project_name'}) }}
 
-    <div class="space-y-1">
-      <label class="text-sm font-medium text-foreground" for="organization">Organisation</label>
-      <input id="organization" type="text" x-model="form.organization"
-             class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-             placeholder="e.g. Enterprise IT" required>
-    </div>
+    {{ form_field(id='organization', label='Organisation', required=true, placeholder='e.g. Enterprise IT', attrs_dict={'x-model': 'form.organization'}) }}
 
-    <div class="space-y-1">
-      <label class="text-sm font-medium text-foreground" for="industry">Industry</label>
-      <input id="industry" type="text" x-model="form.industry"
-             class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-             placeholder="e.g. Financial Services" required>
-    </div>
+    {{ form_field(id='industry', label='Industry', required=true, placeholder='e.g. Financial Services', attrs_dict={'x-model': 'form.industry'}) }}
 
-    <div class="space-y-1">
-      <label class="text-sm font-medium text-foreground" for="business_problem">Business Problem</label>
-      <textarea id="business_problem" x-model="form.business_problem" rows="4"
-                class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring resize-none"
-                placeholder="Describe the core business problem..."></textarea>
-    </div>
+    {{ form_field(id='business_problem', label='Business Problem', input_type='textarea', rows=4, placeholder='Describe the core business problem...', attrs_dict={'x-model': 'form.business_problem'}) }}
 
-    <div class="space-y-1">
-      <label class="text-sm font-medium text-foreground" for="strategic_objectives">Strategic Objectives (one per line)</label>
-      <textarea id="strategic_objectives" x-model="form.strategic_objectives" rows="3"
-                class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring resize-none"
-                placeholder="• Reduce time-to-market by 30%..."></textarea>
-    </div>
+    {{ form_field(id='strategic_objectives', label='Strategic Objectives (one per line)', input_type='textarea', rows=3, placeholder='• Reduce time-to-market by 30%...', attrs_dict={'x-model': 'form.strategic_objectives'}) }}
 
-    <div class="space-y-1">
-      <label class="text-sm font-medium text-foreground" for="stakeholders">Key Stakeholders (one per line)</label>
-      <textarea id="stakeholders" x-model="form.stakeholders" rows="3"
-                class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring resize-none"
-                placeholder="• CTO — Technology direction..."></textarea>
-    </div>
+    {{ form_field(id='stakeholders', label='Key Stakeholders (one per line)', input_type='textarea', rows=3, placeholder='• CTO — Technology direction...', attrs_dict={'x-model': 'form.stakeholders'}) }}
 
-    <div class="space-y-1">
-      <label class="text-sm font-medium text-foreground" for="constraints">Constraints (one per line)</label>
-      <textarea id="constraints" x-model="form.constraints" rows="3"
-                class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring resize-none"
-                placeholder="• Budget cap: £500k..."></textarea>
-    </div>
+    {{ form_field(id='constraints', label='Constraints (one per line)', input_type='textarea', rows=3, placeholder='• Budget cap: £500k...', attrs_dict={'x-model': 'form.constraints'}) }}
 
     <div class="flex items-center gap-4 pt-2">
-      <button type="button" @click.prevent="submitPhaseA()"
-              :disabled="submitting"
-              class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
-        <span x-show="!submitting" x-cloak>Save &amp; Continue to Gap Analysis →</span>
-        <span x-show="submitting" x-cloak>Saving...</span>
-      </button>
+      {{ button(
+          text='Save &amp; Continue to Gap Analysis →',
+          attrs_dict={'@click.prevent': 'submitPhaseA()', ':disabled': 'submitting', 'x-show': '!submitting', 'x-cloak': ''}
+      ) }}
+      {{ button(
+          text='Saving...',
+          disabled=true,
+          attrs_dict={'x-show': 'submitting', 'x-cloak': ''}
+      ) }}
     </div>
 
     <div x-show="statusMsg" x-text="statusMsg" x-cloak
@@ -81,7 +56,8 @@
     <div x-show="errorMsg" x-text="errorMsg" x-cloak
          class="text-destructive-emphasis text-sm mt-2"></div>
 
-  </div>
+  {% endcall %}
+  {% endcall %}
 </div>
 {% endblock %}
 

@@ -13,7 +13,7 @@ Usage::
             secret = mfa_service.generate_secret()
             uri = mfa_service.provisioning_uri(user, secret)
             # show secret/QR, ask for one code, then:
-            mfa_service.enroll(user, secret, code)
+            recovery_codes = mfa_service.enroll(user, secret, code)
         else:
             mfa_service.verify_code(user, code)  # raises MFAError on failure
 """
@@ -129,10 +129,21 @@ def verify_code(secret: str, code: str) -> bool:
     return pyotp.TOTP(secret).verify(code.strip(), valid_window=1)
 
 
-def enroll(user, secret: str, code: str) -> None:
+def generate_recovery_codes(count: int = 8) -> list[str]:
+    """Generate ``count`` recovery codes, each 10 alphanumeric characters."""
+    import secrets
+    import string
+
+    alphabet = string.ascii_uppercase + string.digits
+    return ["".join(secrets.choice(alphabet) for _ in range(10)) for _ in range(count)]
+
+
+def enroll(user, secret: str, code: str) -> list[str]:
     """Attach ``secret`` to ``user`` and turn MFA on, after proving the
     administrator can already produce a valid code from it (so a typo'd or
     never-scanned secret can never lock the account's own enrolment in).
+
+    Returns a list of recovery codes that the user must save.
 
     Raises:
         :class:`MFAError` if ``code`` does not verify against ``secret``.
@@ -144,7 +155,44 @@ def enroll(user, secret: str, code: str) -> None:
 
     user.mfa_secret = secret
     user.mfa_enabled = True
+    recovery_codes = generate_recovery_codes()
+    import json
+
+    from werkzeug.security import generate_password_hash
+
+    # Only salted hashes are stored; the plain codes exist for this one return.
+    user.mfa_recovery_codes = json.dumps([generate_password_hash(c) for c in recovery_codes])
     db.session.commit()
+    return recovery_codes
+
+
+def _normalise_recovery_code(code: str) -> str:
+    return (code or "").replace("-", "").replace(" ", "").strip().upper()
+
+
+def use_recovery_code(user, code: str) -> bool:
+    """True if ``code`` is an unused recovery code of ``user``; the matching
+    code is removed so it works exactly once."""
+    import json
+
+    from werkzeug.security import check_password_hash
+
+    code = _normalise_recovery_code(code)
+    if not code or not getattr(user, "mfa_enabled", False) or not user.mfa_recovery_codes:
+        return False
+    try:
+        hashes = json.loads(user.mfa_recovery_codes)
+    except ValueError:
+        return False
+    for stored in hashes:
+        if check_password_hash(stored, code):
+            from app import db
+
+            hashes.remove(stored)
+            user.mfa_recovery_codes = json.dumps(hashes)
+            db.session.commit()
+            return True
+    return False
 
 
 def verify_login_code(user, code: str) -> bool:
