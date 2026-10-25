@@ -341,27 +341,6 @@ _ERROR_PATH_CONTEXTS = [
         ),
     ),
     (
-        "vendor_analysis/archimate_mapping.html",
-        dict(
-            vendor_orgs=None,
-            vendor_products=None,
-            archimate_elements=None,
-            with_archimate=None,
-            without_archimate=None,
-            vendor_coverage=None,
-            with_source_product=None,
-            without_source_product=None,
-            archimate_coverage=None,
-            orphaned_elements=None,
-            orphaned_details=[],
-            app_vendor_products=None,
-            product_types=[],
-            element_types=[],
-            unmapped_products=[],
-            load_error="x",
-        ),
-    ),
-    (
         "business_capability/overview.html",
         dict(
             classified_capabilities=None,

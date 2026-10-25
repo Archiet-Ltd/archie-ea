@@ -100,7 +100,7 @@ def test_the_page_offers_the_next_step_in_an_empty_profile_box(db_session, make_
 
 
 def test_costs_in_the_demo_differ_and_are_in_the_organisations_currency():
-    totals = [demo._app_total_cost(*cost) for cost in demo._APP_COSTS.values()]
+    totals = [licence + 12 * infra for licence, infra, _area in demo._APP_COSTS.values()]
     assert len(set(totals)) == len(totals), "two systems share a cost"
     assert demo._ORG_CURRENCY == "GBP"
     assert {price[3] for price in demo._CANVAS_PRICES} == {demo._ORG_CURRENCY}
@@ -111,11 +111,11 @@ def test_the_cost_box_equals_the_cost_store_for_every_system(db_session, make_or
     canvas = _canvas(db_session, org)
     org.reporting_currency = "GBP"
     apps = []
-    for name, (licence, infrastructure) in list(demo._APP_COSTS.items())[:5]:
+    for name, (licence, infrastructure, _area) in list(demo._APP_COSTS.items())[:5]:
         row = ApplicationComponent(
             name=name, organization_id=org.id, license_cost_annual=licence,
             infrastructure_cost_monthly=infrastructure,
-            total_cost_of_ownership=demo._app_total_cost(licence, infrastructure),
+            total_cost_of_ownership=licence + 12 * infrastructure,
         )
         db_session.add(row)
         apps.append(row)

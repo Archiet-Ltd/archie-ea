@@ -20,7 +20,7 @@ def _seed(org_id):
     """A canvas filled from the model with its customer profiles, systems with different recorded costs in the
     organisation's currency, and an empty canvas in the same organisation."""
     from app import create_app, db
-    from app.commands.seed_demo_company import _app_total_cost, _seed_canvas_model
+    from app.commands.seed_demo_company import _seed_canvas_model
     from app.models.application_portfolio import ApplicationComponent
     from app.models.business_model import BusinessModelCanvas
     from app.models.organization import Organization
@@ -38,7 +38,7 @@ def _seed(org_id):
             row = ApplicationComponent(
                 name=name, organization_id=org_id, license_cost_annual=licence,
                 infrastructure_cost_monthly=infrastructure,
-                total_cost_of_ownership=_app_total_cost(licence, infrastructure),
+                total_cost_of_ownership=licence + 12 * infrastructure,
             )
             db.session.add(row)
             db.session.flush()
@@ -58,7 +58,6 @@ def test_business_architect_reads_both_canvases_complete_and_true(browser, live_
     email = seeded["emails"]["business_architect"]
     _assert_persona(email)
     filled_id, empty_id = _seed(seeded["ids"]["org"])
-    from app.commands.seed_demo_company import _app_total_cost
 
     context = browser.new_context(ignore_https_errors=True, viewport={"width": 1440, "height": 900})
     page = context.new_page()
@@ -80,7 +79,7 @@ def test_business_architect_reads_both_canvases_complete_and_true(browser, live_
         costs = {}
         for name, licence, infrastructure in SYSTEMS:
             line = page.locator('[data-canvas-notes="cost-structure"] > li', has_text=name)
-            amount = _app_total_cost(licence, infrastructure)
+            amount = licence + 12 * infrastructure
             expect(line).to_contain_text(f"{name}: {amount:,.0f} GBP a year")
             costs[name] = (amount, line.locator("a[data-note-text]").get_attribute("href"))
         assert len({amount for amount, _ in costs.values()}) == len(SYSTEMS), "two systems show one cost"

@@ -363,6 +363,17 @@ class VendorOrganization(db.Model):
         db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
     )
     created_by_id = db.Column(db.Integer, db.ForeignKey("users.id"))
+    # The organisation that first named this vendor. NULL for a catalogue entry
+    # shipped with the platform. Not TenantMixin: the name stays unique across
+    # the platform (see the class docstring), so two organisations that name
+    # "Okta" share one row; what each sees of it is decided by its own
+    # applications and contracts (app/services/vendor_register.py).
+    named_by_organization_id = db.Column(
+        db.Integer,
+        db.ForeignKey("organizations.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
 
     # Seed data tracking (for UnifiedVendorSeeder)
     # NOTE: Migration backfills existing vendors with generated code/seed_source_id

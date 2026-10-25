@@ -855,23 +855,40 @@ _APP_OWNERS = [
 
 # The organisation's own currency: costs, prices and the canvases all read in it.
 _ORG_CURRENCY = "GBP"
-# What each application costs: (licence a year, infrastructure a month). The total is the one place the annual
-# figure is computed. The figures differ because the systems do: a licensed package costs more than an in-house tool.
-_APP_COSTS = {
-    "Event Relay": (38000, 3100), "Calibration Ledger": (0, 1450), "Dispatch Planner": (64000, 2200),
-    "Inventory Manager": (86000, 3400), "Field Service Scheduler": (52000, 1800), "Compliance Reporter": (21000, 950),
-    "Supplier Portal": (17500, 1200), "Workforce Planner": (29000, 700), "Quality Monitor": (12500, 1050),
-    "Sensor Data Hub": (24000, 4600), "Firmware Distribution Service": (0, 1900), "Customer Portal": (31000, 2750),
-    "Finance System": (118000, 3900), "Document Management": (26500, 850), "Identity Provider": (19800, 600),
-    "Monitoring Dashboard": (9400, 1300), "Alert Manager": (7200, 450), "Reporting Engine": (33000, 1500),
-    "Integration Bus": (72000, 3800), "Data Warehouse": (58000, 6200),
-}
 _APP_LICENSE_ANNUAL = 12000  # the one flat figure an earlier seed wrote on every application
 _APP_INFRASTRUCTURE_MONTHLY = 2500
 
+# Each application's own annual licence (0 where Lantern Quay builds it) and monthly infrastructure
+# cost, so the estate's costs differ from one application to the next, and the business area it serves.
+# (application) -> (licence per year, infrastructure per month, business area)
+_APP_COSTS = {
+    "Event Relay": (38000, 3100, "IT Operations"),
+    "Calibration Ledger": (0, 1450, "Quality and Compliance"),
+    "Dispatch Planner": (64000, 2200, "Operations"),
+    "Inventory Manager": (86000, 3400, "Operations"),
+    "Field Service Scheduler": (52000, 1800, "Field Services"),
+    "Compliance Reporter": (21000, 950, "Quality and Compliance"),
+    "Supplier Portal": (17500, 1200, "Shared Services"),
+    "Workforce Planner": (29000, 700, "Shared Services"),
+    "Quality Monitor": (12500, 1050, "Quality and Compliance"),
+    "Sensor Data Hub": (24000, 4600, "Field Services"),
+    "Firmware Distribution Service": (0, 1900, "Field Services"),
+    "Customer Portal": (31000, 2750, "Operations"),
+    "Finance System": (118000, 3900, "Shared Services"),
+    "Document Management": (26500, 850, "Shared Services"),
+    "Identity Provider": (19800, 600, "IT Operations"),
+    "Monitoring Dashboard": (9400, 1300, "IT Operations"),
+    "Alert Manager": (7200, 450, "IT Operations"),
+    "Reporting Engine": (33000, 1500, "Shared Services"),
+    "Integration Bus": (72000, 3800, "IT Operations"),
+    "Data Warehouse": (58000, 6200, "IT Operations"),
+}
 
-def _app_total_cost(license_annual, infrastructure_monthly):
-    return license_annual + 12 * infrastructure_monthly
+
+def _app_figures(app_name):
+    """(licence, infrastructure per month, total per year, area) for an application."""
+    licence, infra, area = _APP_COSTS.get(app_name, (_APP_LICENSE_ANNUAL, _APP_INFRASTRUCTURE_MONTHLY, None))
+    return licence, infra, (licence or 0) + 12 * infra, area
 
 
 # Organisation units that own the applications (one per owner role).
@@ -1633,6 +1650,100 @@ _BACKLOG_REQUIREMENTS = [
 ]
 
 
+# Three data domains with the entities, attributes and relationships a data
+# architect would draw for a fabrication and fulfilment business. Each entity is
+# a DataEntity (and so its ArchiMate data object); nothing here is a second store.
+_DATA_MODEL = {
+    "Customer": {
+        "entities": {
+            "Customer": ["customer_id:uuid:pk", "legal_name:varchar", "segment:varchar?", "created_on:date"],
+            "Contact": ["contact_id:uuid:pk", "customer_id:uuid:fk", "full_name:varchar", "email:varchar?"],
+            "Delivery Address": ["address_id:uuid:pk", "customer_id:uuid:fk", "street:varchar", "postcode:varchar", "country:varchar"],
+            "Consent": ["consent_id:uuid:pk", "contact_id:uuid:fk", "purpose:varchar", "given_on:timestamp", "withdrawn_on:timestamp?"],
+        },
+        "relationships": [
+            ("Customer", "Contact", "one-to-many", "has"),
+            ("Customer", "Delivery Address", "one-to-many", "ships to"),
+            ("Contact", "Consent", "one-to-many", "gives"),
+        ],
+    },
+    "Orders and Fulfilment": {
+        "entities": {
+            "Sales Order": ["order_id:uuid:pk", "customer_id:uuid:fk", "placed_on:timestamp", "status:varchar"],
+            "Order Line": ["line_id:uuid:pk", "order_id:uuid:fk", "product_id:uuid:fk", "quantity:integer", "unit_price:decimal"],
+            "Product": ["product_id:uuid:pk", "sku:varchar", "name:varchar", "weight_kg:decimal?"],
+            "Shipment": ["shipment_id:uuid:pk", "order_id:uuid:fk", "carrier:varchar", "shipped_on:date?"],
+            "Return": ["return_id:uuid:pk", "line_id:uuid:fk", "reason:text", "received_on:date?"],
+        },
+        "relationships": [
+            ("Sales Order", "Order Line", "one-to-many", "contains"),
+            ("Product", "Order Line", "one-to-many", "is sold on"),
+            ("Sales Order", "Shipment", "one-to-many", "is sent in"),
+            ("Order Line", "Return", "one-to-many", "may be returned as"),
+        ],
+    },
+    "Finance": {
+        "entities": {
+            "Invoice": ["invoice_id:uuid:pk", "order_id:uuid:fk", "issued_on:date", "total:decimal"],
+            "Payment": ["payment_id:uuid:pk", "invoice_id:uuid:fk", "paid_on:date", "amount:decimal"],
+            "Cost Centre": ["cost_centre_id:varchar:pk", "name:varchar", "owner:varchar?"],
+            "Ledger Entry": ["entry_id:bigint:pk", "cost_centre_id:varchar:fk", "invoice_id:uuid:fk?", "posted_on:date", "amount:decimal"],
+        },
+        "relationships": [
+            ("Invoice", "Payment", "one-to-many", "is settled by"),
+            ("Cost Centre", "Ledger Entry", "one-to-many", "is charged by"),
+            ("Invoice", "Ledger Entry", "one-to-many", "is posted as"),
+        ],
+    },
+}
+
+
+def _seed_data_model(org_id) -> dict:
+    """Fill the demonstration organisation's data domains so each opens with a
+    drawn entity relationship diagram. Idempotent: a domain or entity that
+    exists by name is left as it is."""
+    from app.models.process_data import DataDomain, DataEntity, DataEntityRelationship
+    from app.modules.architecture.services import data_erd_service as erd
+
+    stats = {"data_domains_created": 0, "data_entities_created": 0, "data_relationships_created": 0}
+    for domain_name, spec in _DATA_MODEL.items():
+        domain = DataDomain.query.filter_by(organization_id=org_id, name=domain_name).first()
+        if domain is None:
+            domain = DataDomain(name=domain_name, organization_id=org_id,
+                                description=f"The {domain_name.lower()} data of Lantern Quay Systems")
+            db.session.add(domain)
+            db.session.flush()
+            stats["data_domains_created"] += 1
+        by_name = {}
+        for entity_name, columns in spec["entities"].items():
+            entity = DataEntity.query.filter_by(
+                organization_id=org_id, domain_id=domain.id, name=entity_name).first()
+            if entity is None:
+                attributes = []
+                for column in columns:
+                    parts = column.split(":")
+                    nullable = parts[-1].endswith("?")
+                    parts[-1] = parts[-1].rstrip("?")
+                    flags = parts[2:]
+                    attributes.append({
+                        "name": parts[0], "data_type": parts[1],
+                        "is_primary_key": "pk" in flags, "is_foreign_key": "fk" in flags,
+                        "is_nullable": nullable,
+                    })
+                entity = erd.create_entity(domain, entity_name, attributes)
+                stats["data_entities_created"] += 1
+            by_name[entity_name] = entity
+        for source, target, preset, label in spec["relationships"]:
+            exists = DataEntityRelationship.query.filter_by(
+                organization_id=org_id, source_entity_id=by_name[source].id,
+                target_entity_id=by_name[target].id).first()
+            if exists is None:
+                erd.relate(by_name[source], by_name[target], preset=preset, label=label)
+                stats["data_relationships_created"] += 1
+    db.session.flush()
+    return stats
+
+
 def _seed_boards(org_id, demo_user_id) -> dict:
     """SAFe kinds, ADM-board solutions, a value stream and a requirements
     backlog for the demonstration organisation.
@@ -2353,56 +2464,6 @@ def _seed_solution_blueprints(org_id, solutions) -> dict:
     return stats
 
 
-# Days before today on which the demonstration model's records were added, repeated down the list of
-# records. Every third record names a connected source, the rest were added by hand, so the Overview's
-# chart of records added has a shape across the last 90 days instead of a single day.
-_HISTORY_DAYS_AGO = (0, 1, 2, 4, 5, 8, 11, 12, 15, 19, 23, 27, 31, 36, 40, 47, 53, 58, 66, 74, 83)
-
-
-def spread_history(org_id, days_ago=_HISTORY_DAYS_AGO, now=None):
-    """Date an organisation's model records across the last 90 days in the change history.
-
-    Only the first version of each record moves (when it was added), and every third record names a connected
-    source, in its first version and on the record itself. Records, relationships and the dates they carry are
-    otherwise untouched. Returns how many records were dated; 0 when the history holds none.
-    """
-    from sqlalchemy.orm.attributes import flag_modified
-
-    from app.models.entity_history import EntityHistory
-
-    now = now or _dt.datetime.utcnow()
-    rows = (
-        db.session.query(EntityHistory)
-        .filter(
-            EntityHistory.organization_id == org_id,
-            EntityHistory.table_name.in_(["archimate_elements", "archimate_relationships"]),
-        )
-        .order_by(EntityHistory.table_name, EntityHistory.record_id, EntityHistory.valid_from, EntityHistory.id)
-        .all()
-    )
-    from app.models import ArchiMateElement
-
-    first = {}
-    for row in rows:
-        first.setdefault((row.table_name, row.record_id), row)
-    for index, row in enumerate(first.values()):
-        moved = now - _dt.timedelta(days=days_ago[index % len(days_ago)], hours=index % 5)
-        row.valid_from = min(row.valid_from, moved)
-        snapshot = dict(row.snapshot or {})
-        if index % 3 == 0:
-            snapshot["source_kind"] = "connector"
-            snapshot["source_label"] = "GitHub"
-            if row.table_name == "archimate_elements":
-                element = db.session.get(ArchiMateElement, row.record_id)
-                if element is not None and element.organization_id == org_id and element.source_kind is None:
-                    element.source_kind = "connector"
-                    element.source_label = "GitHub"
-        row.snapshot = snapshot
-        flag_modified(row, "snapshot")
-    db.session.flush()
-    return len(first)
-
-
 def seed_demo_company() -> dict:
     """Create the Lantern Quay Systems demonstration organisation.
 
@@ -2529,7 +2590,7 @@ def seed_demo_company() -> dict:
                 continue
             el = elements.get(el_name)
             profile = _APP_PROFILE.get(app_name)
-            license_annual, infrastructure_monthly = _APP_COSTS.get(app_name, (_APP_LICENSE_ANNUAL, _APP_INFRASTRUCTURE_MONTHLY))
+            licence, infra, total, area = _app_figures(app_name)
             app = ApplicationComponent(
                 name=app_name,
                 organization_id=org_id,
@@ -2541,9 +2602,10 @@ def seed_demo_company() -> dict:
                 application_code=f"LQ-{app_name.upper().replace(' ', '-')[:20]}",
                 implementation_date=_dt.date(2022, 3, 15),
                 go_live_date=_dt.date(2022, 6, 1),
-                total_cost_of_ownership=_app_total_cost(license_annual, infrastructure_monthly),
-                license_cost_annual=license_annual,
-                infrastructure_cost_monthly=infrastructure_monthly,
+                total_cost_of_ownership=total,
+                license_cost_annual=licence,
+                infrastructure_cost_monthly=infra,
+                business_domain=area,
                 business_criticality="high",
                 strategic_importance="high",
             )
@@ -2661,7 +2723,7 @@ def seed_demo_company() -> dict:
         from app.models.enterprise_intelligence import (
             ApplicationOwnership, OrganizationUnit,
         )
-        from app.services.application_cost_accessor import sync_cost_fact
+        from app.services.application_cost_accessor import state_contract, sync_cost_fact
 
         units = {
             u.code: u
@@ -2712,22 +2774,25 @@ def seed_demo_company() -> dict:
                 ))
                 held.add((app.id, unit.id, "Business Owner"))
                 changed = True
-            # An earlier seed wrote one flat figure on every application: give each its own. The total is the
-            # sum of its components, whatever an earlier seed wrote.
-            own = _APP_COSTS.get(app_name)
-            if own and (app.license_cost_annual, app.infrastructure_cost_monthly) == (
-                    _APP_LICENSE_ANNUAL, _APP_INFRASTRUCTURE_MONTHLY):
-                app.license_cost_annual, app.infrastructure_cost_monthly = own
-                changed = True
-            if own and app.total_cost_of_ownership != _app_total_cost(app.license_cost_annual, app.infrastructure_cost_monthly):
-                app.total_cost_of_ownership = _app_total_cost(app.license_cost_annual, app.infrastructure_cost_monthly)
+# The figures are the application's own, whatever an earlier seed wrote.
+            licence, infra, total, area = _app_figures(app_name)
+            if (app.license_cost_annual, app.infrastructure_cost_monthly, app.total_cost_of_ownership,
+                    app.business_domain) != (licence, infra, total, area):
+                app.license_cost_annual, app.infrastructure_cost_monthly = licence, infra
+                app.total_cost_of_ownership, app.business_domain = total, area
                 changed = True
             agreed += changed
         db.session.flush()
         for app in _resolve_apps(org_id).values():
             for column in ("total_cost_of_ownership", "license_cost_annual",
                            "infrastructure_cost_monthly"):
-                sync_cost_fact(app, column, _ORG_CURRENCY)
+                sync_cost_fact(app, column)
+            # The Spend page reads contracts, so a vendor-supplied application states its cost there
+            # too: the run cost on the Overview, the Spend page and the canvas's cost box then agree.
+            profile = _APP_PROFILE.get(app.name)
+            if (profile and "in-house" not in profile[2].lower() and not profile[0].startswith("5.")
+                    and app.total_cost_of_ownership):
+                state_contract(app, profile[2], app.total_cost_of_ownership, months_ago=3 + app.id % 8)
         db.session.flush()
         stats["application_figures_agreed"] = agreed
 
@@ -3217,9 +3282,12 @@ def seed_demo_company() -> dict:
         demo_user = User.query.filter_by(
             email=_DEMO_USER_EMAIL, organization_id=org_id).first()
         stats.update(_seed_boards(org_id, demo_user.id if demo_user else None))
+        stats.update(_seed_data_model(org_id))
 
         db.session.commit()
-        stats["history_dated"] = spread_history(org_id)
+        from app.services.history_spread import HAND_LABEL, spread_history
+
+        stats["history_dated"] = spread_history(org_id, rest=("manual", HAND_LABEL))
         db.session.commit()
 
     return stats
