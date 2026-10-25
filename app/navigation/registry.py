@@ -737,26 +737,30 @@ def search_index(user) -> list:
 
 
 def search_pages(user, query: str, limit: int = 12) -> list:
-    """Pages whose name or an alias contains the query, spelling-blind, best match first."""
-    from app.utils.search_text import normalise_search_text
+    """Pages whose name or an alias contains the query, spelling-blind and typo-tolerant, best match first."""
+    from app.utils.search_text import normalise_search_text, fuzzy_match_score
 
     q = normalise_search_text(query or "")
     if not q:
         return []
     scored = []
     for order, row in enumerate(search_index(user)):
-        best = None
+        best_exact = -1
+        best_fuzzy = -1
         for rank, term in enumerate(row["terms"]):
             t = normalise_search_text(term)
-            if q not in t:
+            exact, fuzzy = fuzzy_match_score(q, t)
+            if exact == 0 and fuzzy == 0:
                 continue
-            score = (0 if t == q else 1 if t.startswith(q) else 2, 0 if rank == 0 else 1)
-            if best is None or score < best:
-                best = score
-        if best is not None:
-            scored.append((best, order, row))
-    scored.sort(key=lambda s: (s[0], s[1]))
-    return [row for _, _, row in scored[:limit]]
+            # Exact matches rank first (higher exact = better), then fuzzy matches
+            # Within same match type, prefer earlier terms (lower rank)
+            score = (-exact, -fuzzy, rank)
+            if best_exact == -1 or score < ( -best_exact, -best_fuzzy, 999):
+                best_exact, best_fuzzy = exact, fuzzy
+        if best_exact != -1:
+            scored.append((-best_exact, -best_fuzzy, order, row))
+    scored.sort()
+    return [row for _, _, _, row in scored[:limit]]
 
 
 # ── Breadcrumbs ──────────────────────────────────────────────────────────────────────────

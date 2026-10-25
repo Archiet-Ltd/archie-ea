@@ -95,7 +95,7 @@ Budget: scripts/check_sidebar_links.py renders this per role and counts its link
                 id='sidebar-search',
                 name='sidebar-search',
                 type='text',
-                placeholder='Search pages and records',
+                placeholder='Search',
                 aria_label='Search pages and records',
                 size='sm',
                 class='pl-8 pr-16',
@@ -151,7 +151,7 @@ Budget: scripts/check_sidebar_links.py renders this per role and counts its link
                            class="flex items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent"
                            data-testid="sidebar-search-record">
                             <span class="min-w-0 flex-1 truncate" x-text="hit.name"></span>
-                            <span class="shrink-0 text-xs capitalize text-muted-foreground" x-text="hit.type"></span>
+                            <span class="shrink-0 text-xs text-muted-foreground" x-text="hit.type"></span>
                         </a>
                     </template>
                 </div>
