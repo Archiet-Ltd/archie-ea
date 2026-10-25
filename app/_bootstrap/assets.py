@@ -92,7 +92,7 @@ def init_assets(app):
     # setup fails (e.g. missing source files in development).
     _load_manifest(app)
 
-    if app.debug:
+    if app.config.get("ASSET_MANIFEST_RELOAD", False):
         @app.before_request
         def _reload_asset_manifest():
             _maybe_reload_manifest(app)

@@ -503,6 +503,13 @@ class Config:
     }
     UPLOAD_FOLDER = os.path.join(basedir, "uploads", "documents")
 
+    # Asset manifest reload (QA-015): the shared preview runs the production
+    # configuration (TestingConfig sets DEBUG=False), so we need a separate flag
+    # to control whether the manifest is reloaded when its mtime changes without
+    # a restart. True in every non-production config; False in production and
+    # its subclasses.
+    ASSET_MANIFEST_RELOAD = True
+
     @staticmethod
     def init_app(app):
         """Base class hook — subclasses override to customize app initialization."""
@@ -702,6 +709,7 @@ class SmokeTestingConfig(TestingConfig):
 class ProductionConfig(Config):
     DEBUG = False
     USE_RELOADER = False
+    ASSET_MANIFEST_RELOAD = False
 
     # Session cookie security.
     #
