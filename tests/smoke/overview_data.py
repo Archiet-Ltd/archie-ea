@@ -2,8 +2,7 @@
 
 Each organisation has applications (owned by a record, owned by text, owned by nobody, plus a
 decommissioned one and a duplicate the lists leave out), model relationships between them, an
-element that names its source, and a contract with an annual cost. The change history trigger is
-applied first so every record is dated by the change history, as it is in production.
+element that names its source, and a contract with an annual cost. The records are dated across the last 90 days in the change history.
 """
 import datetime as dt
 import uuid
@@ -12,14 +11,6 @@ from sqlalchemy import text
 
 from .conftest import PASSWORD
 from .fresh_org import create_fresh_org
-
-
-def _apply_history_trigger():
-    from app import create_app
-
-    app = create_app("testing")
-    result = app.test_cli_runner().invoke(args=["apply-entity-history-trigger"])
-    assert result.exit_code == 0, result.output
 
 
 def seed_overview_org(label, apps, contracts, with_owner_user=True, spread=True, last_year=False):
@@ -35,7 +26,6 @@ def seed_overview_org(label, apps, contracts, with_owner_user=True, spread=True,
     from app.models.user import Role, User
     from app.models.vendor.vendor_organization import VendorOrganization
 
-    _apply_history_trigger()
     info = create_fresh_org("enterprise_architect", extra_roles=("portfolio_manager",))
     app = create_app("testing")
     with app.app_context():
@@ -92,18 +82,11 @@ def seed_overview_org(label, apps, contracts, with_owner_user=True, spread=True,
             ))
         db.session.commit()
         if spread:
-            from app.commands.seed_demo_company import spread_history
+            from app.services.history_spread import HISTORY_DAYS_AGO, spread_history
 
-            spread_history(org_id)
+            # a first record added last year gives the year card two years to set side by side
+            spread_history(org_id, days_ago=((400,) + HISTORY_DAYS_AGO) if last_year else HISTORY_DAYS_AGO)
             db.session.commit()
-            if last_year:
-                # one record was added last year, so the year card has two years to set side by side
-                from app.models.entity_history import EntityHistory
-
-                row = (EntityHistory.query.filter_by(organization_id=org_id, table_name="archimate_relationships")
-                       .order_by(EntityHistory.id).first())
-                row.valid_from = dt.datetime(dt.date.today().year - 1, 6, 1)
-                db.session.commit()
         info["app_ids"] = {r.name: r.id for r in made}
         info["relationships"] = ArchiMateRelationship.query.filter_by(organization_id=org_id).count()
         db.session.remove()

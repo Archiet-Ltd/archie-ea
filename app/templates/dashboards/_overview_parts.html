@@ -7,7 +7,7 @@
 
 {#- A change as a small badge. good is true when the change is welcome, false when it is not, none when neither. -#}
 {% macro delta(value, good=none) -%}
-{%- call ui.badge(variant='destructive' if good == false else ('secondary' if good else 'outline'), class='tabular-nums') -%}{{ lucide('trending-down' if value.startswith('-') else 'trending-up') }}{{ value }}{%- endcall -%}
+{%- call ui.badge(variant='secondary' if good else 'outline', class='tabular-nums text-foreground') -%}{{ lucide('trending-down' if value.startswith('-') else 'trending-up', 'text-destructive' if good == false else '') }}{{ value }}{%- endcall -%}
 {%- endmacro %}
 
 {#- Square icon tile used at the top right of stat cards and in lists. -#}
