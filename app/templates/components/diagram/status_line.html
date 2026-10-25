@@ -5,10 +5,15 @@
           {{ diagram_status_line() }} #}
 {% from 'components/button.html' import button %}
 
-{% macro diagram_status_line() %}
+{# element_noun / relation_noun: the words for the two counts when the diagram is not ArchiMate ("step", "flow"). Defaults render as before. #}
+{% macro diagram_status_line(element_noun='element', relation_noun='relationship') %}
 <footer class="flex h-9 shrink-0 select-none flex-wrap items-center gap-x-4 gap-y-1 border-t border-border bg-card px-4 text-xs text-muted-foreground" data-testid="diagram-status-line">
   <span class="font-medium text-foreground tabular-nums" data-testid="status-counts"
+        {% if element_noun == 'element' and relation_noun == 'relationship' -%}
         x-text="shellElementTotal + (shellElementTotal === 1 ? ' element, ' : ' elements, ') + shellRelTotal + (shellRelTotal === 1 ? ' relationship' : ' relationships')"></span>
+  {%- else -%}
+        x-text="shellElementTotal + (shellElementTotal === 1 ? ' {{ element_noun }}, ' : ' {{ element_noun }}s, ') + shellRelTotal + (shellRelTotal === 1 ? ' {{ relation_noun }}' : ' {{ relation_noun }}s')"></span>
+  {%- endif %}
   <span x-show="selectedNode" x-cloak data-testid="status-selection" x-text="selectedNode ? ('Selected: ' + selectedNode.label) : ''"></span>
   <span class="hidden md:inline" x-show="statusText && statusText !== 'Ready'" x-cloak role="status" aria-live="polite" x-text="statusText"></span>
   <span class="ml-auto hidden items-center gap-3 lg:flex">
