@@ -76,7 +76,13 @@ Also add these keys to the JSON object, using only what this page states and emp
 
 
 class CrawlRefused(ValueError):
-    """The website was not read; the message says why in words a person can act on."""
+    """The website was not read. ``reason`` is why, as a code the sign-up page turns into a sentence:
+    no_site, no_consent, blocked, robots, no_answer, script_only or nothing_found."""
+
+    def __init__(self, message: str, reason: str = "no_answer", status: Optional[int] = None):
+        super().__init__(message)
+        self.reason = reason
+        self.status = status
 
 
 # ----------------------------------------------------------------------------- model
@@ -110,17 +116,17 @@ def _consented_site(org_id: int) -> Tuple[Any, str]:
 
     org = db.session.get(Organization, org_id)
     if org is None:
-        raise CrawlRefused("That organisation does not exist.")
+        raise CrawlRefused("That organisation does not exist.", "no_site")
     site = ((org.settings or {}).get("onboarding") or {}).get("website") or {}
     url, consented = site.get("url"), site.get("consent_at")
     if not url:
-        raise CrawlRefused("No company website is recorded, so there is nothing to read.")
+        raise CrawlRefused("No company website is recorded, so there is nothing to read.", "no_site")
     if not consented:
-        raise CrawlRefused("The website has not been agreed to be read. Record consent first.")
+        raise CrawlRefused("The website has not been agreed to be read. Record consent first.", "no_consent")
     try:
         validate_user_supplied_url(url)
     except BlockedOutboundURL:
-        raise CrawlRefused("That website address cannot be read from here.")
+        raise CrawlRefused("That website address cannot be read from here.", "blocked")
     return org, url
 
 
@@ -147,11 +153,22 @@ def _discover(page_url: str, html: str, title: str, model) -> str:
     return "\n\n## Where the business facts sit on this site (from structure discovery)\n" + "\n".join(lines)
 
 
-def _read_site(site: str, model, max_pages: int, time_limit: float, delay: float) -> Dict[str, Any]:
+def _tell(progress: Optional[Callable[[Dict[str, Any]], None]], **state: Any) -> None:
+    """Report how far the reading has got. A reporter that fails never stops the reading."""
+    if progress is None:
+        return
+    try:
+        progress(state)
+    except Exception:
+        logger.info("crawl progress could not be reported", exc_info=True)
+
+
+def _read_site(site: str, model, max_pages: int, time_limit: float, delay: float,
+               progress: Optional[Callable[[Dict[str, Any]], None]] = None) -> Dict[str, Any]:
     started = time.monotonic()
     fetcher = Fetcher(site)
     browser = Browser(site)
-    result: Dict[str, Any] = {"pages": [], "rendered": [], "skipped_by_robots": [], "failed": [],
+    result: Dict[str, Any] = {"pages": [], "rendered": [], "unrendered": [], "skipped_by_robots": [], "failed": [],
                               "stopped": None, "model_errors": 0}
     queue: List[str] = [site]
     queued = {site}
@@ -170,6 +187,7 @@ def _read_site(site: str, model, max_pages: int, time_limit: float, delay: float
             if attempts and (delay or fetcher.crawl_delay):
                 time.sleep(max(delay, fetcher.crawl_delay))
             attempts += 1
+            _tell(progress, stage="reading", pages_read=len(result["pages"]), limit=max_pages, current=url)
             try:
                 page = fetcher.get(url, timeout=remaining)
             except (FetchRefused, requests.RequestException) as exc:
@@ -186,6 +204,7 @@ def _read_site(site: str, model, max_pages: int, time_limit: float, delay: float
                     result["rendered"].append(final_url)
                 except Exception as exc:  # the static page is still read
                     logger.warning("browser render failed for %s: %s", final_url, exc)
+                    result["unrendered"].append(final_url)
             fetched_at = datetime.utcnow().isoformat(timespec="seconds")
             static = extract_static(final_url, html, site)
             if not result["pages"]:
@@ -198,6 +217,7 @@ def _read_site(site: str, model, max_pages: int, time_limit: float, delay: float
                 result["model_errors"] += 1
             result["pages"].append({"url": final_url, "fetched_at": fetched_at, "static": static,
                                     "analysis": analysis, "html": html if not result["pages"] else None})
+            _tell(progress, stage="reading", pages_read=len(result["pages"]), limit=max_pages, current=final_url)
             for link in list(static["links"]) + [item for item in (analysis.get("links") or []) if isinstance(item, str)]:
                 link = urldefrag(urljoin(final_url, link))[0]
                 if link not in queued and same_site(link, site):
@@ -207,6 +227,7 @@ def _read_site(site: str, model, max_pages: int, time_limit: float, delay: float
             result["stopped"] = "page_limit"
     finally:
         browser.close()
+    result["robots_unanswered"] = fetcher.robots_unanswered
     return result
 
 
@@ -430,20 +451,28 @@ def crawl_organization_website(
     max_pages: int = MAX_PAGES,
     time_limit_seconds: float = TIME_LIMIT_SECONDS,
     delay_seconds: float = 0.0,
+    progress: Optional[Callable[[Dict[str, Any]], None]] = None,
 ) -> Dict[str, Any]:
     """Read the organisation's consented website and store what was found as pending proposals.
 
-    Raises CrawlRefused when there is no consented site. Returns what was read, not the pages.
+    ``progress`` is told how far the reading has got (pages read, the limit, the page being read).
+    Raises CrawlRefused, with a reason code, when there is no consented site or nothing could be
+    read or found. Returns what was read, not the pages.
     """
     org, site = _consented_site(org_id)
     model = _scoped(llm or default_model(), org_id)
     max_pages = max(1, min(int(max_pages), MAX_PAGES))
-    read = _read_site(site, model, max_pages, float(time_limit_seconds), float(delay_seconds))
+    _tell(progress, stage="reading", pages_read=0, limit=max_pages, current=site)
+    read = _read_site(site, model, max_pages, float(time_limit_seconds), float(delay_seconds), progress)
     if not read["pages"]:
         reason = "; ".join("%s (%s)" % (f["url"], f["reason"]) for f in read["failed"][:3])
-        if read["skipped_by_robots"]:
-            reason = "the site's robots.txt excludes it"
-        raise CrawlRefused("Nothing could be read from %s: %s." % (site, reason or "it did not answer"))
+        if read["skipped_by_robots"] and not read["failed"] and not read["robots_unanswered"]:
+            raise CrawlRefused("Nothing could be read from %s: the site's robots.txt excludes it." % site, "robots")
+        status = next((int(f["reason"].split()[1]) for f in read["failed"]
+                       if f["reason"].startswith("status ") and f["reason"].split()[1].isdigit()), None)
+        raise CrawlRefused("Nothing could be read from %s: %s." % (site, reason or "it did not answer"),
+                           "no_answer", status)
+    _tell(progress, stage="working_out", pages_read=len(read["pages"]), limit=max_pages, current=None)
 
     facts = _Facts()
     for page in read["pages"]:
@@ -457,6 +486,10 @@ def crawl_organization_website(
         logger.info("website inference failed for organisation %s", org_id, exc_info=True)
         read["model_errors"] += 1
     _from_inference(facts, first["url"], first["fetched_at"], inferred)
+    if not facts.rows:
+        raise CrawlRefused(
+            "%d page(s) of %s were read and no fact could be taken from them." % (len(read["pages"]), site),
+            "script_only" if read["unrendered"] else "nothing_found")
 
     crawl_id = uuid.uuid4().hex
     from app.jobs.tenant_safe_job import tenant_scope
@@ -479,14 +512,75 @@ def queue_website_crawl(org_id: int):
         "Read the company website", WEBSITE_TASK, {}, organization_id=org_id)
 
 
+def _job_progress(job_id: Optional[int]) -> Optional[Callable[[Dict[str, Any]], None]]:
+    """A reporter that keeps how far the reading has got on the job's own record, which the sign-up
+    page polls. It holds counts and the address of the page being read, never what the page says."""
+    if job_id is None:
+        return None
+
+    def write(state: Dict[str, Any]) -> None:
+        from app.models.job import Job
+
+        job = db.session.get(Job, job_id)
+        if job is None:
+            return
+        job.result = {"progress": {key: state.get(key) for key in ("stage", "pages_read", "limit", "current")}}
+        db.session.commit()
+
+    return write
+
+
+def _tell_the_bell(org_id: int) -> None:
+    """Post to the notifications bell of the person who gave the website that its facts are ready to
+    confirm, with a link to the screen where they do. Failing to post never fails the reading."""
+    from flask import current_app
+
+    from app.jobs.tenant_safe_job import tenant_scope
+    from app.models.organization import Organization
+    from app.services.notification_service import NotificationService
+
+    from .confirm import proposals
+
+    try:
+        with tenant_scope(org_id):
+            org = db.session.get(Organization, org_id)
+            site = (((org.settings or {}).get("onboarding") or {}).get("website") or {}) if org else {}
+            user_id = site.get("consent_by")
+            facts, _completeness = proposals(org_id)
+            if not user_id or not facts:
+                return
+            url = current_app.url_map.bind("localhost").build("account.welcome", {"step": 3})
+            NotificationService.create(
+                user_id,
+                "We read your website and %d %s ready for you to confirm." % (len(facts), "fact is" if len(facts) == 1 else "facts are"),
+                url,
+                organization_id=org_id,
+                event_type="website_read",
+                entity_type="organization",
+                entity_id=org_id,
+            )
+            db.session.commit()
+    except Exception:
+        logger.warning("could not post the website reading to the bell for organisation %s", org_id, exc_info=True)
+
+
 def run_website_crawl_job(payload: Dict[str, Any]) -> Dict[str, Any]:
-    """The job body: read one organisation's site. Returns counts only, never page content."""
+    """The job body: read one organisation's site. Returns counts only, never page content.
+
+    A site that cannot be read is an answer, not a crash: the job finishes with ``success: False``
+    and the reason, which the sign-up page turns into a sentence and a next step."""
     from app.modules.organization import website_crawl
 
     org_id = payload.get("organization_id")
     if org_id is None:
         raise ValueError("%s job requires organization_id in payload" % WEBSITE_TASK)
-    summary = website_crawl.crawl_organization_website(org_id, llm=website_crawl.default_model())
+    try:
+        summary = website_crawl.crawl_organization_website(
+            org_id, llm=website_crawl.default_model(), progress=_job_progress(payload.get("job_id")))
+    except CrawlRefused as refused:
+        logger.info("website not read for organisation %s: %s", org_id, refused.reason)
+        return {"success": False, "reason": refused.reason, "status": refused.status}
+    _tell_the_bell(org_id)
     return {
         "pages_read": summary["pages_read"], "pages_rendered": len(summary["rendered"]),
         "pages_skipped_by_robots": len(summary["skipped_by_robots"]), "pages_failed": len(summary["failed"]),

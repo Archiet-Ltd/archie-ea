@@ -319,18 +319,98 @@ def sources(org) -> List[Dict[str, Any]]:
     rows.append({"key": "github", "label": "GitHub", **github})
     jira = _source_state(org.id, JIRA_TASK, "Jira", lambda r: "Read %s issues." % r.get("issues", 0))
     rows.append({"key": "jira", "label": "Jira", **jira})
-    site = _onboarding(org).get("website")
-    if site:
-        state = _source_state(
-            org.id, WEBSITE_TASK, "Company website",
-            lambda r: "Read %s pages; %s facts wait for you to confirm in the next step." % (r.get("pages_read", 0), r.get("proposals", 0)),
-        )
-        if state["state"] == "not_given":
-            state = {"state": "waiting", "text": "%s will be read in a moment. Nothing from it is in your model until you confirm it." % site["url"]}
-    else:
-        state = {"state": "not_given", "text": "Not given."}
-    rows.append({"key": "website", "label": "Company website", **state})
+    rows.append({"key": "website", "label": "Company website", **website_state(org)})
     return rows
+
+
+# Why a site could not be read, in words a person can act on, by the reason the reading gives.
+_WEBSITE_REASONS = {
+    "robots": "%s asks readers like ours to stay out, in its robots.txt, so we have not read it.",
+    "no_answer": "%s did not answer when we tried to read it.",
+    "blocked": "%s is an address we cannot read from here.",
+    "script_only": "%s builds its pages with scripts, and the browser we use could not show them, so nothing could be read.",
+    "nothing_found": "We read %s but found no facts we could state with confidence.",
+    "no_consent": "%s has not been agreed to be read yet.",
+    "no_site": "No website is recorded yet.",
+}
+_INSTEAD = " You can connect GitHub or Jira instead, or look around the sample company."
+
+
+def _host(url: str) -> str:
+    parts = urlparse(url)
+    return parts.netloc + (parts.path if parts.path not in ("", "/") else "")
+
+
+def _address(url: Optional[str]) -> str:
+    """A page address as a person reads it: no scheme."""
+    return (url or "").replace("https://", "").replace("http://", "").rstrip("/")
+
+
+def website_instead() -> List[Dict[str, str]]:
+    """What a person can do when their website cannot be read: each opens a page with content."""
+    from flask import url_for
+
+    return [
+        {"label": "Connect GitHub", "url": url_for("account.welcome") + "#signup-github"},
+        {"label": "Connect Jira", "url": url_for("account.welcome") + "#signup-jira"},
+        {"label": "See the sample company", "url": url_for("unified_ai_chat.index")},
+    ]
+
+
+def website_state(org) -> Dict[str, Any]:
+    """How far the reading of the company website has got, in a sentence a person can read, with the
+    counts behind it and what to do next: confirm what was read, or, when the site could not be read,
+    what to do instead."""
+    from flask import url_for
+
+    from app.models.job import JobStatus
+    from app.modules.organization.website_crawl import confirm
+    from app.services.job_queue_service import get_job_queue_service
+
+    site = _onboarding(org).get("website")
+    if not site:
+        return {"state": "not_given", "text": "Not given."}
+    host = _host(site["url"])
+    jobs = get_job_queue_service().list_jobs(org.id, limit=1, task=WEBSITE_TASK)
+    if not jobs:
+        return {"state": "waiting", "text": "%s will be read in a moment. Nothing from it is in your model until you confirm it." % site["url"]}
+    job = jobs[0]
+    result = job.result or {}
+    if job.status == JobStatus.COMPLETED.value and result.get("success") is not False:
+        facts, _completeness = confirm.proposals(org.id)
+        read = result.get("pages_read", 0)
+        pages = "%s %s" % (read, "page" if read == 1 else "pages")
+        if facts:
+            return {
+                "state": "done",
+                "text": "Read %s; %s %s for you to confirm in the next step." % (
+                    pages, len(facts), "fact waits" if len(facts) == 1 else "facts wait"),
+                "next": {"label": "Confirm what we read", "url": url_for("account.welcome", step=3)},
+                "progress": {"read": read, "limit": read, "percent": 100},
+            }
+        return {"state": "done", "text": "Read %s. What was found is confirmed and in your profile." % pages}
+    if job.status in (JobStatus.FAILED.value, JobStatus.CANCELLED.value) or result.get("success") is False:
+        reason = result.get("reason")
+        if reason in _WEBSITE_REASONS:
+            sentence = _WEBSITE_REASONS[reason] % host if "%s" in _WEBSITE_REASONS[reason] else _WEBSITE_REASONS[reason]
+            if reason == "no_answer" and result.get("status"):
+                sentence = "%s answered with an error (status %s) when we tried to read it." % (host, result["status"])
+        else:
+            sentence = "Something went wrong while reading %s, and nothing was added to your model." % host
+        return {"state": "failed", "text": sentence + _INSTEAD, "instead": website_instead()}
+    if job.status == JobStatus.IN_PROGRESS.value:
+        progress = result.get("progress") or {}
+        limit = int(progress.get("limit") or 30)
+        read = int(progress.get("pages_read") or 0)
+        percent = min(100, int(round(100.0 * read / limit))) if limit else 0
+        if progress.get("stage") == "working_out":
+            text = "Read %d of up to %d pages. Working out what they say; this takes a minute." % (read, limit)
+        elif read == 0:
+            text = "Opening %s. Up to %d pages will be read." % (_address(progress.get("current")) or host, limit)
+        else:
+            text = "Read %d of up to %d pages. Reading now: %s." % (read, limit, _address(progress.get("current")))
+        return {"state": "reading", "text": text, "progress": {"read": read, "limit": limit, "percent": percent}}
+    return {"state": "waiting", "text": "Company website is connected. Reading starts in a moment; carry on."}
 
 
 def any_source_given(org) -> bool:

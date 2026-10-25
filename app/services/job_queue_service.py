@@ -241,7 +241,7 @@ class JobQueueService:
         elif task == "website_profile_crawl":
             from app.modules.organization.website_crawl import run_website_crawl_job
 
-            return run_website_crawl_job(payload)
+            return run_website_crawl_job({**payload, "job_id": job_id})
         elif task == "company_signals_refresh":
             from app.modules.organization.public_signals import run_signals_job
 
