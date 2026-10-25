@@ -37,7 +37,9 @@
         {'label': 'Applications', 'href': url_for('unified_applications.application_list')},
         {'label': app.name, 'href': url_for('unified_applications.application_detail', id=app.id)},
         {'label': 'Fact sheet'}
-      ]
+      ],
+      actions=[{'text': 'Trace', 'icon': 'route', 'variant': 'outline',
+                'href': url_for('architect_ui.traceability_matrix', element=app.archimate_element_id)}] if app.archimate_element_id else []
   ) }}
 
   {# ── Top band: completeness + headline signals ──────────────────────── #}

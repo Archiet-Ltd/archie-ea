@@ -188,7 +188,7 @@ def test_api_answers_for_own_organisation_and_404s_for_another(app, db_session, 
     assert data["up"]["complete"] is False
 
     login_as(client, user_a)
-    page = client.get("/intelligence/traceability?element=%d" % component.id)
+    page = client.get("/intelligence/traceability?element=%d" % component.id, follow_redirects=True)
     assert page.status_code == 200
     html = page.get_data(as_text=True)
     assert "Stops at Take orders api" in html
@@ -199,8 +199,113 @@ def test_api_answers_for_own_organisation_and_404s_for_another(app, db_session, 
     denied = client.get("/api/v1/intelligence/traceability/%d" % component.id)
     assert denied.status_code == 404
     login_as(client, user_b)
-    page_b = client.get("/intelligence/traceability?element=%d" % component.id)
+    page_b = client.get("/intelligence/traceability?element=%d" % component.id, follow_redirects=True)
     assert page_b.status_code == 200
     html_b = page_b.get_data(as_text=True)
     assert "Take orders api" not in html_b
     assert "That element was not found" in html_b
+
+
+def _user(db_session, org, label, role="enterprise_architect"):
+    from app.models.user import User
+
+    user = User(email="trace-%s-%s@example.com" % (label, org.id), organization_id=org.id,
+                enterprise_role=role, confirmed=True)
+    db_session.add(user)
+    db_session.commit()
+    return user
+
+
+def test_old_address_redirects_to_the_matrix_and_keeps_the_element(app, db_session, make_org, login_as):
+    org = make_org("trace-redirect")
+    user = _user(db_session, org, "redirect")
+    client = app.test_client()
+    login_as(client, user)
+
+    bare = client.get("/intelligence/traceability")
+    assert bare.status_code == 302
+    assert bare.headers["Location"].endswith("/architecture/traceability")
+
+    scoped = client.get("/intelligence/traceability?element=42")
+    assert scoped.status_code == 302
+    assert scoped.headers["Location"].endswith("/architecture/traceability?element=42")
+
+
+def test_broken_chains_are_counted_listed_and_never_cross_organisations(
+    app, db_session, make_org, tenant_ctx, login_as
+):
+    from app.modules.intelligence.services.traceability_check_service import broken_chains
+
+    org_a = make_org("trace-broken-a")
+    org_b = make_org("trace-broken-b")
+    with tenant_ctx(org_a.id):
+        component, process, node, other = _broken_estate(db_session, org_a, "A")
+        capability = _element(db_session, org_a, "Pay suppliers A", "Capability", "strategy")
+        db_session.commit()
+    with tenant_ctx(org_b.id):
+        b_app = _element(db_session, org_b, "Only B app", "ApplicationComponent", "application")
+        db_session.commit()
+    user_a = _user(db_session, org_a, "a")
+    user_b = _user(db_session, org_b, "b")
+
+    with tenant_ctx(org_a.id):
+        answer = broken_chains(org_a.id)
+    names = {r["name"]: r["break"] for r in answer["rows"]}
+    # Hub stops at the process, the ledger has nothing above it, the capability has nothing below it.
+    assert names == {
+        "Order hub A": "no_capability",
+        "Ledger A": "no_capability",
+        "Pay suppliers A": "no_technology",
+    }
+    assert answer["checked"] == 3
+
+    client = app.test_client()
+    login_as(client, user_a)
+    html = client.get("/architecture/traceability").get_data(as_text=True)
+    assert 'data-testid="broken-count">3<' in html
+    assert html.count("data-broken-id=") == 3
+    assert "element=%d" % component.id in html
+    assert "Only B app" not in html
+
+    login_as(client, user_b)
+    html_b = client.get("/architecture/traceability").get_data(as_text=True)
+    assert "Only B app" in html_b
+    assert 'data-testid="broken-count">1<' in html_b
+    assert "Order hub A" not in html_b and "Pay suppliers A" not in html_b
+
+
+def test_an_organisation_with_complete_chains_is_told_how_many_were_checked(
+    app, db_session, make_org, tenant_ctx, login_as
+):
+    org = make_org("trace-complete")
+    with tenant_ctx(org.id):
+        component = _element(db_session, org, "Whole app", "ApplicationComponent", "application")
+        capability = _element(db_session, org, "Whole cap", "Capability", "strategy")
+        node = _element(db_session, org, "Whole node", "Node", "technology")
+        _relate(db_session, component, capability, "realization")
+        _relate(db_session, node, component, "serving")
+        _relate(db_session, node, capability, "serving")
+        db_session.commit()
+    user = _user(db_session, org, "complete")
+    client = app.test_client()
+    login_as(client, user)
+    html = client.get("/architecture/traceability").get_data(as_text=True)
+    assert 'data-testid="broken-count">0<' in html
+    assert "Every chain is complete: all 2 components and capabilities checked" in html
+
+
+def test_record_pages_carry_a_trace_action_to_the_filtered_page(app, db_session, make_org, tenant_ctx, login_as):
+    org = make_org("trace-action")
+    with tenant_ctx(org.id):
+        component = _element(db_session, org, "Action app", "ApplicationComponent", "application")
+        db_session.commit()
+    user = _user(db_session, org, "action")
+    client = app.test_client()
+    login_as(client, user)
+    from app.models.application_portfolio import ApplicationComponent
+
+    row = ApplicationComponent(name="Action app row", organization_id=org.id, archimate_element_id=component.id)
+    db_session.add(row)
+    db_session.commit()
+    html = client.get("/applications/%d/fact-sheet" % row.id).get_data(as_text=True)
+    assert "/architecture/traceability?element=%d" % component.id in html

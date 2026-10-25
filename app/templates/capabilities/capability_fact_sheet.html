@@ -34,7 +34,9 @@
         {'label': 'Capabilities', 'href': '/capability-map/'},
         {'label': cap.name},
         {'label': 'Fact sheet'}
-      ]
+      ],
+      actions=[{'text': 'Trace', 'icon': 'route', 'variant': 'outline',
+                'href': url_for('architect_ui.traceability_matrix', element=archimate_element_id)}] if archimate_element_id else []
   ) }}
 
   {# ── Top band ────────────────────────────────────────────────────────── #}
