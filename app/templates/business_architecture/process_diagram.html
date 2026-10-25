@@ -244,7 +244,7 @@
     <span class="inline-flex items-center gap-2"><svg width="44" height="10" aria-hidden="true"><circle cx="4" cy="5" r="3" class="bpmn-key-open"/><line x1="8" y1="5" x2="34" y2="5" class="bpmn-key-line bpmn-key-dash"/><polygon points="34,1 42,5 34,9" class="bpmn-key-open"/></svg>Message flow, between pools</span>
   </div>
 
-  {{ diagram_status_line(element_noun='step', relation_noun='flow') }}
+  {{ diagram_status_line(noun='step', noun_plural='steps', relation_noun='flow', relation_noun_plural='flows') }}
 
   {% call dialog(open_expr='importOpen', close_expr='importOpen = false', title='Import a BPMN 2.0 file',
                  description='The diagram on this page is replaced by the file. Lanes that match a business role in your model are linked to it.', start_hidden=false) %}
