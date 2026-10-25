@@ -507,7 +507,7 @@ counts only the families in `BANNED_FAMILIES` (`scripts/check_design_tokens.py`)
 `orange` or `cyan` class is right per DESIGN.md but moves this number by zero, and a
 line carrying a `token-migration-ok` marker is already excluded from the count.
 
-**All 84 gates, in registry order (`scripts/verify.py`, `build_gates`) — this table
+**All 87 gates, in registry order (`scripts/verify.py`, `build_gates`) — this table
 is a snapshot, not generated. Run `grep -oE '^\s*Gate\("[a-z-]+"' scripts/verify.py`
 to reconfirm the count before trusting it:**
 
@@ -533,6 +533,9 @@ to reconfirm the count before trusting it:**
 | `dialog-title` | a dialog, sheet or drawer with no title | ratchet @ 65 |
 | `empty-state-macro` | a hand-written "No ... yet" block instead of the `empty_state` macro | ratchet @ 166 |
 | `form-field-macro` | a form control inside a form that is not in `form_field`/`form_group` | ratchet @ 583 |
+| `legacy-macro-calls` | a call to an old macro (`empty_state`, `page_header`, `modal`, `dense_table`, `shadcn_*`) outside the file that defines it | ratchet @ 429 |
+| `raw-button` | a hand-written button tag instead of the button component | ratchet @ 2254 |
+| `missing-value-placeholder` | a bare dash, N/A or zero standing in for a missing value instead of `explained_value` | ratchet @ 563 |
 | `nav-coverage` | business-architecture output missing from every sidebar | ratchet @ 0 |
 | `air-gap` | a UI asset loaded from a public CDN | ratchet @ 0 |
 | `raw-sql-tenancy` | raw SQL on a tenant table with no `organization_id` predicate | ratchet @ 0 |
