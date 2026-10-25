@@ -189,24 +189,24 @@ def test_format_currency_filter_uses_org_currency_and_no_invented_zero(app):
         assert default_cfg["code"] in with_code
 
 
-def test_org_currency_code_resolution_prefers_org_setting():
-    """H-04: Organization.settings['currency_code'] is the single source of
+def test_org_currency_code_resolution_reads_reporting_currency():
+    """H-04: Organization.reporting_currency is the single source of
     truth for which currency an org sees — not a hardcoded default."""
     from config import CurrencyConfig
 
     class FakeOrg:
-        settings = {"currency_code": "USD"}
+        reporting_currency = "USD"
 
     assert CurrencyConfig.get_org_currency_code(FakeOrg()) == "USD"
 
     class FakeOrgNoSetting:
-        settings = {}
+        reporting_currency = None
 
     assert CurrencyConfig.get_org_currency_code(FakeOrgNoSetting()) == CurrencyConfig.DEFAULT_CURRENCY
     assert CurrencyConfig.get_org_currency_code(None) == CurrencyConfig.DEFAULT_CURRENCY
 
     class FakeOrgUnsupported:
-        settings = {"currency_code": "NOTREAL"}
+        reporting_currency = "NOTREAL"
 
     # An invalid stored code must not be trusted verbatim — falls back safely.
     assert CurrencyConfig.get_org_currency_code(FakeOrgUnsupported()) == CurrencyConfig.DEFAULT_CURRENCY

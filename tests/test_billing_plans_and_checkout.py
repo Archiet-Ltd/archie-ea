@@ -716,8 +716,8 @@ def test_currency_context_and_filter_follow_the_switched_organisation(app, db_se
 
     home_org = make_org("currency-home")
     switched_org = make_org("currency-second")
-    home_org.settings = {"currency_code": "USD"}
-    switched_org.settings = {"currency_code": "EUR"}
+    home_org.reporting_currency = "USD"
+    switched_org.reporting_currency = "EUR"
     user = _user(db_session, home_org, admin=True)
     OrgRole.set_role(switched_org.id, user.id, "architect", granted_by_id=user.id)
     db_session.commit()
