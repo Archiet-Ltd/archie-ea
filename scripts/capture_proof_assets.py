@@ -426,60 +426,46 @@ def capture_role_screen(browser, base, password, slug: str, archetype: str, path
 
 
 def capture_role(browser, base, password, slug: str, archetype: str, wide: bool = True) -> tuple[bool, str]:
-    """The role's workspace: Ask open on the impact question with one answer shown.
+    """The role's workspace: /ai-chat/ with the impact answer showing, or the top of the primary screen.
 
     Returns (captured, reason). An empty state or a 403 is reported and nothing is written, so the
-    page stays held rather than shipping a bad image.
-    """
-    # 1408px leaves a 1104px crop, the public figure column, so the desktop crop is shown 1:1 (as capture_applications).
+    page stays held rather than shipping a bad image."""
     path = _role_screen_path(slug)
-    if path != "/intelligence/ask":
+    if path != "/ai-chat/":
         return capture_role_screen(browser, base, password, slug, archetype, path, wide)
+
+    # Capture the AI chat impact answer for the role persona, similar to capture_home_chat
     vw, vh = (1408, 1600) if wide else (390, 1400)
+    cards_shown = 2 if wide else 1
     ctx = browser.new_context(viewport={"width": vw, "height": vh}, device_scale_factor=DPR)
     page = ctx.new_page()
     try:
         _login(page, base, role_email(archetype), password)
-        response = page.goto(base + "/intelligence/ask", wait_until="networkidle")
-        page.wait_for_timeout(1500)
+        page.goto(base + "/ai-chat", wait_until="networkidle")
         _dismiss_onboarding(page)
-        if response is None or response.status != 200:
-            return False, "Ask answered HTTP %s for %s" % (response.status if response else "none", archetype)
-        page.click("#ask-question-impact")
-        page.fill("#ask-picker-input", SUBJECT)
-        page.wait_for_selector("#ask-picker-listbox [role=option]", timeout=20000)
-        page.locator("#ask-picker-listbox [role=option]").first.click()
+        page.wait_for_timeout(1000)
+        page.locator("#user-input").fill("What breaks if %s fails" % CHAT_SUBJECT)
+        page.locator("#user-input").press("Enter")
         try:
-            page.wait_for_selector("[data-ask-row]", timeout=30000)
+            page.wait_for_selector('[data-testid="estate-answer"] [data-answer-row]', timeout=30000)
         except Exception:
-            return False, "no answer rows appeared for %s (empty state)" % archetype
-        button = page.get_by_role("button", name="Work them out now")
-        if button.count():
-            # A 409 (busy) or 500 leaves the earlier rows on screen, so the row selector alone
-            # cannot tell a refreshed answer from a failed recalculation: require the request to succeed.
-            try:
-                with page.expect_response(lambda r: "/derivation/recompute" in r.url, timeout=60000) as sent:
-                    button.click()
-            except Exception:
-                return False, "recalculation did not complete for %s" % archetype
-            if not sent.value.ok:
-                return False, "recalculation answered HTTP %s for %s" % (sent.value.status, archetype)
-            page.wait_for_load_state("networkidle")
-            if page.locator("[data-recompute-button]").count() and page.locator("[data-recompute-button]").first.is_visible():
-                return False, "recalculation notice still shown for %s" % archetype
-        page.wait_for_selector("[data-ask-row]", timeout=30000)
+            return False, "the chat gave no cited answer for %s (run seed-demo-company first)" % archetype
         page.wait_for_timeout(1000)
         _tidy(page)
-        # Ask scrolls to its results; measure from the top, the same position _shoot() clips from.
-        page.evaluate("window.scrollTo(0, 0)")
-        h1 = _box(page, "h1")
-        main = _box(page, "main")
-        row = _box(page, "[data-ask-row]", 0)
-        pad = 24 if wide else 16
-        clip = {
-            "x": main["x"] + pad, "y": h1["y"] - 16, "width": main["width"] - 2 * pad,
-            "height": row["y"] + row["height"] + 12 - (h1["y"] - 16),
-        }
+        rows = page.locator('[data-testid="estate-answer"] [data-answer-row]')        
+        if rows.count() < cards_shown:
+            return False, "the chat answer has too few cards for %s" % archetype
+        for i in range(cards_shown):
+            source = rows.nth(i).locator("xpath=ancestor::*[@data-slot='card'][1]").locator("[data-citation]").inner_text()
+            if not source.strip() or "not recorded" in source:
+                return False, "a card has no recorded source for %s" % archetype
+        page.evaluate("document.getElementById('messages-container').scrollTop = 0")
+        page.wait_for_timeout(300)
+        pane = _box(page, "#messages-container")
+        last = rows.nth(cards_shown - 1).locator("xpath=ancestor::*[@data-slot='card'][1]").bounding_box()
+        clip = {"x": pane["x"], "y": pane["y"], "width": pane["width"], "height": last["y"] + last["height"] + 12 - pane["y"]}
+        if clip["height"] <= 0 or clip["y"] + clip["height"] > vh:
+            return False, "the role chat crop does not fit the viewport for %s" % archetype
         name = "%s.webp" % slug if wide else "%s-mobile.webp" % slug
         _webp(_shoot(page, clip), IMG / "roles" / name)
         return True, "captured"
