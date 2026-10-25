@@ -6,11 +6,14 @@ least 280px and never shrinks to fit, the board scrolls sideways inside itself,
 a long title wraps at word boundaries to at most two lines, the chips share one
 row, and no card is taller than 120px.
 """
+import os
+import pathlib
 import uuid
 
 import pytest
 
 from .conftest import PAGE_TIMEOUT, _seed_standard_org
+from .test_archetype_journeys import _login
 from .test_one_board_journey import (
     BACKLOG, ROADMAP, _assert_persona, _open, _seed_epics, _seed_requirements, _wait_cards,
 )
@@ -20,6 +23,7 @@ from .test_seeded_boards_journey import demo_org  # noqa: F401  (fixture)
 
 pytestmark = [pytest.mark.smoke, pytest.mark.journey]
 
+WALK = pathlib.Path(os.environ.get("KANBAN_WALK_DIR", "/tmp/kanban-walk"))
 MIN_LANE = 280
 MAX_CARD = 120
 LONG_TITLE = "Consolidate the regional settlement reconciliation and exception handling workflow %s"
@@ -90,5 +94,26 @@ def test_roadmap_lanes_and_cards_keep_their_form(browser, live_server, own_org):
     try:
         _wait_cards(page)
         _assert_form(page)
+    finally:
+        context.close()
+
+
+@pytest.mark.parametrize("width,scheme", [(1440, "light"), (1440, "dark"), (390, "light"), (390, "dark")])
+@pytest.mark.parametrize("path,heading,name", [(BACKLOG, "Backlog Prioritisation", "backlog"),
+                                               (ROADMAP, "Product Roadmap", "roadmap")])
+def test_boards_walk_screenshots(browser, live_server, own_org, path, heading, name, width, scheme):
+    tag = uuid.uuid4().hex[:6]
+    _seed_requirements(own_org, [LONG_TITLE % tag, "Archive ledgers %s" % tag])
+    _seed_epics(own_org, [(LONG_TITLE % tag, "now"), ("Epic B %s" % tag, "next")])
+    email = _make_enterprise_architect(own_org)
+    context = browser.new_context(viewport={"width": width, "height": 900}, color_scheme=scheme)
+    page = context.new_page()
+    try:
+        _login(page, live_server, email)
+        page.goto(live_server + path, timeout=PAGE_TIMEOUT)
+        _wait_cards(page)
+        page.wait_for_load_state("networkidle")
+        WALK.mkdir(parents=True, exist_ok=True)
+        page.screenshot(path=str(WALK / ("%s-%d-%s.png" % (name, width, scheme))), full_page=True)
     finally:
         context.close()
