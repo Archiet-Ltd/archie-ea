@@ -113,8 +113,7 @@
 
   <div class="grid grid-cols-1 gap-4 md:gap-6 xl:grid-cols-3">
     {# Records added #}
-    {% call ui.card(class='xl:col-span-2') %}
-      <div x-data="{ range: '90d' }" data-testid="activity-chart">
+    {% call ui.card(class='xl:col-span-2', attrs={'x-data': "{ range: '90d' }", 'data-testid': 'activity-chart'}) %}
         {% call ui.card_header() %}
           {{ ui.card_title(text='Model records added') }}
           {{ ui.card_description(text='Added each day, from connected sources and by hand') }}
@@ -145,7 +144,6 @@
           <p class="py-8 text-sm text-muted-foreground lg:col-span-2" data-testid="activity-empty">{% if act is none %}The change history could not be read, so the daily records cannot be drawn. Reload the page to try again.{% else %}Nothing was added in the last 3 months. Records appear here, day by day, as a connected source or a person adds them.{% endif %}</p>
           {% endif %}
         {% endcall %}
-      </div>
     {% endcall %}
 
     <div class="flex flex-col gap-4 md:gap-6">
