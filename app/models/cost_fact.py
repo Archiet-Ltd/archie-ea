@@ -20,7 +20,10 @@ __all__ = ["CostFact", "ExchangeRate"]
 # at a call site.
 ELEMENT_APPLICATION = "application"
 ELEMENT_CAPABILITY = "capability"
-ELEMENT_TYPES = frozenset({ELEMENT_APPLICATION, ELEMENT_CAPABILITY})
+# An option compared in a business case: its one-off cost, annual running cost
+# and annual benefit are facts about the option, not columns on it.
+ELEMENT_BUSINESS_CASE_OPTION = "business_case_option"
+ELEMENT_TYPES = frozenset({ELEMENT_APPLICATION, ELEMENT_CAPABILITY, ELEMENT_BUSINESS_CASE_OPTION})
 
 KIND_ACTUAL = "actual"
 KIND_BUDGET = "budget"

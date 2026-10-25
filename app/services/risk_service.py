@@ -125,6 +125,9 @@ def _load_linkable_entity(entity_type, entity_id):
     if entity_type == "programme":
         from app.models.strategic import StrategicInitiative
         return StrategicInitiative.query.filter_by(id=entity_id).first()
+    if entity_type == "work_package":
+        from app.models.unified_work_package import UnifiedWorkPackage
+        return UnifiedWorkPackage.query.filter_by(id=entity_id).first()
     if entity_type == "constraint":
         from app.models.solution_architect_models import SolutionConstraint
         return SolutionConstraint.query.filter_by(id=entity_id).first()

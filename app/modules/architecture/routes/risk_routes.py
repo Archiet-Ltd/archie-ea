@@ -375,6 +375,9 @@ def _entity_label(entity_type, entity_id):
         elif entity_type == "programme":
             from app.models.strategic import StrategicInitiative
             row = StrategicInitiative.query.get(entity_id)
+        elif entity_type == "work_package":
+            from app.models.unified_work_package import UnifiedWorkPackage
+            row = UnifiedWorkPackage.query.get(entity_id)
         else:
             return None
         return getattr(row, "name", None) if row else None

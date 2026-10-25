@@ -2,6 +2,7 @@
 {% from 'components/page_header.html' import page_header %}
 {% from 'components/empty_state.html' import empty_state %}
 {% from 'components/modal.html' import modal %}
+{% from 'components/form_field.html' import form_group %}
 {% import 'components/card.html' as card %}
 
 {% block title %}Business Cases{% endblock %}
@@ -16,15 +17,13 @@
 {% block content %}
 <div class="flex-1 overflow-auto">
   {{ page_header(
-      title='Business Cases',
-      description='Consolidated business-case documents — problem, options, recommendation, costs, benefits and risk in one place.',
+      title='Business cases',
+      description='Each case argues for one work package: the recommendation, the options compared, what it costs and pays back, the risks and the decision.',
       breadcrumbs=[
           {'label': 'Home', 'href': url_for('main.index')},
-          {'label': 'Business Cases'}
+          {'label': 'Business cases'}
       ],
-      actions=[
-          {'text': 'New Business Case', 'icon': 'plus', 'onclick': "Platform.modal.open('bc-create-modal')", 'variant': 'default'}
-      ]
+      actions=([{'text': 'New business case', 'icon': 'plus', 'onclick': "Platform.modal.open('bc-create-modal')", 'variant': 'default'}] if can_edit else [])
   ) }}
 
   <div class="p-6 space-y-6">
@@ -35,12 +34,12 @@
           <table class="dense-table w-full text-sm" data-testid="bc-table">
             <thead>
               <tr class="border-b border-border text-left">
-                <th class="px-4 py-3 font-medium text-muted-foreground">Title</th>
-                <th class="px-4 py-3 font-medium text-muted-foreground">Status</th>
-                <th class="px-4 py-3 font-medium text-muted-foreground text-right">3yr TCO</th>
-                <th class="px-4 py-3 font-medium text-muted-foreground text-right">ROI</th>
-                <th class="px-4 py-3 font-medium text-muted-foreground">Updated</th>
-              </tr>
+                <th class="px-4 py-3 font-medium text-muted-foreground">Business case</th>
+                <th class="px-4 py-3 font-medium text-muted-foreground">Work package</th>
+                <th class="px-4 py-3 font-medium text-muted-foreground text-right">Three-year cost</th>
+                <th class="px-4 py-3 font-medium text-muted-foreground text-right">Payback</th>
+                <th class="px-4 py-3 font-medium text-muted-foreground">Decision</th>
+                </tr>
             </thead>
             <tbody>
               {% for bc in business_cases %}
@@ -51,17 +50,21 @@
                   </a>
                 </td>
                 <td class="px-4 py-3">
-                  <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium border {{ _status_badge.get(bc.status, _status_badge['draft']) }}">
-                    {{ (bc.status or 'draft') | capitalize }}
-                  </span>
+                  {% if bc.work_package %}
+                  <a href="{{ url_for('implementation_planning.work_package_detail', work_package_id=bc.work_package.id) }}" class="text-primary hover:underline">{{ bc.work_package.name }}</a>
+                  {% else %}<span class="text-muted-foreground">Not linked</span>{% endif %}
                 </td>
-                <td class="px-4 py-3 text-right tabular-nums">
-                  {{ bc.tco_3yr|format_currency if bc.tco_3yr is not none else '—' }}
+                {% set d = documents[bc.id] %}{% set rec = d.recommended %}
+                <td class="px-4 py-3 text-right tabular-nums" data-cell="cost">
+                  {% if rec and rec.three_year_cost is not none %}{{ rec.three_year_cost|format_currency(currency=d.currency) }}{% else %}<span class="text-muted-foreground">No recommended option costed</span>{% endif %}
                 </td>
-                <td class="px-4 py-3 text-right tabular-nums">
-                  {% if bc.roi_percentage is not none %}{{ bc.roi_percentage }}%{% else %}—{% endif %}
+                <td class="px-4 py-3 text-right tabular-nums" data-cell="payback">
+                  {% if rec and rec.payback_months is not none %}{{ rec.payback_months }} month{{ '' if rec.payback_months == 1 else 's' }}{% else %}<span class="text-muted-foreground">Not worked out</span>{% endif %}
                 </td>
-                <td class="px-4 py-3 text-muted-foreground">{{ bc.updated_at.strftime('%Y-%m-%d') if bc.updated_at else '—' }}</td>
+                <td class="px-4 py-3" data-cell="decision">
+                  <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium border {{ _status_badge.get(bc.status, _status_badge['draft']) }}">{{ (bc.status or 'draft') | capitalize }}</span>
+                  {% if bc.decided_at %}<span class="block text-xs text-muted-foreground mt-1">{{ bc.decided_by.full_name() if bc.decided_by else 'Unknown' }}, {{ bc.decided_at.strftime('%-d %b %Y') }}</span>{% endif %}
+                </td>
               </tr>
               {% endfor %}
             </tbody>
@@ -72,10 +75,10 @@
     {% else %}
     {{ empty_state(
         icon='file-text',
-        title='No Business Cases yet',
-        description='Create your first business case to document a problem, the options considered, the recommendation, and its financial justification.',
-        cta_text='New Business Case',
-        cta_onclick="Platform.modal.open('bc-create-modal')",
+        title='No business cases yet',
+        description='A business case argues for one work package. Create the first one to set out the problem, compare options and record the decision.',
+        cta_text='New business case' if can_edit else none,
+        cta_onclick="Platform.modal.open('bc-create-modal')" if can_edit else none,
         cta_icon='plus'
     ) }}
     {% endif %}
@@ -107,6 +110,12 @@
     <input id="bc-title" x-ref="bcTitle" name="title" type="text" required maxlength="256" placeholder="e.g. Consolidate Regional CRM Instances"
       class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
   </div>
+  {% call form_group(id='bc-work-package', label='Work package', help_text='The change this case argues for. You can link it later.') %}
+  <select id="bc-work-package" name="work_package_id" class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm">
+    <option value="">Not linked</option>
+    {% for wp in work_packages %}<option value="{{ wp.id }}">{{ wp.name }}</option>{% endfor %}
+  </select>
+  {% endcall %}
   <div>
     <label for="bc-description" class="block text-sm font-medium text-muted-foreground mb-1">Description</label>
     <textarea id="bc-description" x-ref="bcDescription" name="description" rows="2" maxlength="2000" placeholder="Optional context for this business case"

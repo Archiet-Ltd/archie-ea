@@ -62,6 +62,9 @@ def test_business_case_create_document_and_delete(browser, live_server, seeded):
             page.get_by_test_id("bc-create-submit").click()
         assert created.value.status < 400, f"create POST failed: {created.value.status}"
         page.wait_for_url(re.compile(r"/business-case/\d+$"), timeout=PAGE_TIMEOUT)
+        # The case opens as a document; its canvas boards are one click on.
+        page.get_by_role("link", name="Canvas boards").click()
+        page.wait_for_url(re.compile(r"/business-case/\d+/canvas$"), timeout=PAGE_TIMEOUT)
         detail_url = page.url
 
         # ---- DOCUMENT FIELD SAVE (POST/PUT .../api/field, inline @blur) ----

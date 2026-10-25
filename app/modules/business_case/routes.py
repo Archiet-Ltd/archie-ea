@@ -7,6 +7,7 @@ Index endpoint (linked from the sidebar by the orchestrator post-merge):
 
 import logging
 
+from werkzeug.exceptions import HTTPException
 from flask import Blueprint, Response, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
 
@@ -14,19 +15,26 @@ from flask_login import current_user, login_required
 # authenticated user could delete another user's records. Matches the gating
 # already used by app/modules/capabilities/routes/enterprise_crud_routes.py.
 from app.decorators import require_roles
+from app import db
 
 from app.config.archimate_viewpoints import CANVAS_TEMPLATES
 from app.models.business_case import BUSINESS_CASE_STATUSES
 from app.models.business_capabilities import BusinessCapability
 from app.models.solution_models import Solution
+from app.models.risk import Risk
 from app.models.strategic import StrategicInitiative
+from app.models.unified_work_package import UnifiedWorkPackage
+from app.services import work_package_service
 from app.utils.api_response import error_response, not_found_response, success_response
 
-from . import service
+from . import document, service
 
 logger = logging.getLogger(__name__)
 
 business_case_bp = Blueprint("business_case", __name__, url_prefix="/business-case")
+
+# Who writes a case. The portfolio manager owns the cost and change story.
+WRITE_ROLES = ("admin", "architect", "business_architect", "portfolio_manager")
 
 
 def _link_options():
@@ -37,21 +45,29 @@ def _link_options():
     return capabilities, initiatives, solutions
 
 
+def _work_packages():
+    return work_package_service.query_for(current_user.organization_id).order_by(
+        UnifiedWorkPackage.name).all()
+
+
 @business_case_bp.route("/")
 @login_required
 def index():
-    """List all Business Cases for the current tenant."""
+    """List all Business Cases for the current tenant, with work package, cost, payback and decision."""
     business_cases = service.list_business_cases()
     return render_template(
         "business_case/index.html",
         business_cases=business_cases,
+        documents={bc.id: document.build_document(bc) for bc in business_cases},
+        work_packages=_work_packages(),
+        can_edit=_can_edit(),
         statuses=BUSINESS_CASE_STATUSES,
     )
 
 
 @business_case_bp.route("/create", methods=["POST"])
 @login_required
-@require_roles("admin", "architect", "business_architect")
+@require_roles(*WRITE_ROLES)
 def create():
     """Create a new business case and redirect to its document view."""
     title = (request.form.get("title") or "").strip()
@@ -62,6 +78,7 @@ def create():
             title=title or "Untitled Business Case",
             description=description,
             created_by_id=getattr(current_user, "id", None),
+            work_package_id=request.form.get("work_package_id") or None,
         )
     except ValueError as exc:
         logger.warning("Invalid business case create payload: %s", exc)
@@ -70,10 +87,86 @@ def create():
     return redirect(url_for("business_case.detail", business_case_id=business_case.id))
 
 
+def _can_edit():
+    """Whether the signed-in user may write a case: the one role helper, not a second rule."""
+    try:
+        require_roles(*WRITE_ROLES)(lambda: True)()
+    except HTTPException:
+        return False
+    return True
+
+
 @business_case_bp.route("/<int:business_case_id>")
 @login_required
 def detail(business_case_id):
-    """The structured business-case document view."""
+    """The business case as a document: recommendation, problem, options, costs, risks, decision."""
+    business_case = service.get_business_case_or_none(business_case_id)
+    if business_case is None:
+        return render_template("business_case/not_found.html", business_case_id=business_case_id), 404
+    return render_template(
+        "business_case/document.html",
+        doc=document.build_document(business_case),
+        business_case=business_case,
+        can_edit=_can_edit(),
+    )
+
+
+@business_case_bp.route("/<int:business_case_id>/edit", methods=["GET", "POST"])
+@login_required
+@require_roles(*WRITE_ROLES)
+def edit(business_case_id):
+    """Edit the document: work package, problem, options and their figures, risks, decision."""
+    business_case = service.get_business_case_or_none(business_case_id)
+    if business_case is None:
+        return render_template("business_case/not_found.html", business_case_id=business_case_id), 404
+    error = None
+    if request.method == "POST":
+        form = request.form
+        try:
+            rows = []
+            for i in range(document.MAX_OPTIONS):
+                rows.append({
+                    "name": form.get(f"option_{i}_name"),
+                    "summary": form.get(f"option_{i}_summary"),
+                    "advantages": form.get(f"option_{i}_advantages"),
+                    "drawbacks": form.get(f"option_{i}_drawbacks"),
+                    document.ONE_OFF: form.get(f"option_{i}_{document.ONE_OFF}"),
+                    document.RUN_ANNUAL: form.get(f"option_{i}_{document.RUN_ANNUAL}"),
+                    document.BENEFIT_ANNUAL: form.get(f"option_{i}_{document.BENEFIT_ANNUAL}"),
+                    "recommended": form.get("recommended") == str(i),
+                })
+            service.update_business_case(
+                business_case,
+                title=(form.get("title") or "").strip() or business_case.title,
+                work_package_id=form.get("work_package_id") or None,
+                problem_statement=form.get("problem_statement"),
+                status=form.get("status") or business_case.status,
+                decision_note=form.get("decision_note"),
+            )
+            service.save_options(business_case, rows)
+            service.save_risks(business_case, form.getlist("risk_ids"))
+            return redirect(url_for("business_case.detail", business_case_id=business_case.id))
+        except ValueError as exc:
+            db.session.rollback()
+            error = str(exc)
+    doc = document.build_document(business_case)
+    return render_template(
+        "business_case/edit.html",
+        doc=doc,
+        business_case=business_case,
+        work_packages=_work_packages(),
+        risks=Risk.query.filter_by(organization_id=business_case.organization_id).order_by(Risk.title).all(),
+        linked_risk_ids={r.id for r in doc.risks},
+        statuses=BUSINESS_CASE_STATUSES,
+        max_options=document.MAX_OPTIONS,
+        error=error,
+    ), (400 if error else 200)
+
+
+@business_case_bp.route("/<int:business_case_id>/canvas")
+@login_required
+def canvas(business_case_id):
+    """The canvas boards for this case (the sections the document reads from)."""
     business_case = service.get_business_case_or_none(business_case_id)
     if business_case is None:
         return render_template("business_case/not_found.html", business_case_id=business_case_id), 404
@@ -135,7 +228,7 @@ def export_canvas(business_case_id):
 
 @business_case_bp.route("/<int:business_case_id>/update", methods=["POST"])
 @login_required
-@require_roles("admin", "architect", "business_architect")
+@require_roles(*WRITE_ROLES)
 def update(business_case_id):
     """Update business case meta fields (title/description/status/links) — JSON API."""
     business_case = service.get_business_case_or_none(business_case_id)
@@ -171,7 +264,7 @@ def update(business_case_id):
 # error, not an inline one, since this route redirects rather than
 # returning JSON) trying to delete their own record. Same roles as
 # create/update.
-@require_roles("admin", "architect", "business_architect")
+@require_roles(*WRITE_ROLES)
 def delete(business_case_id):
     """Delete a business case."""
     business_case = service.get_business_case_or_none(business_case_id)
@@ -184,7 +277,7 @@ def delete(business_case_id):
 
 @business_case_bp.route("/<int:business_case_id>/api/field", methods=["POST", "PUT"])
 @login_required
-@require_roles("admin", "architect", "business_architect")
+@require_roles(*WRITE_ROLES)
 def save_field(business_case_id):
     """Save a single business-case document section (inline save).
 
@@ -211,7 +304,7 @@ def save_field(business_case_id):
 
 @business_case_bp.route("/<int:business_case_id>/pull-financials", methods=["POST"])
 @login_required
-@require_roles("admin", "architect", "business_architect")
+@require_roles(*WRITE_ROLES)
 def pull_financials(business_case_id):
     """Re-run aggregate_financials() against the linked capability / initiative
     / solution and pre-populate any blank financial fields (JSON API)."""

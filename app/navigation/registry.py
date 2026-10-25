@@ -111,6 +111,14 @@ _SPEND_CHILDREN = (
        roles=PROCUREMENT_ROLES, requires="procurement_or_finance", aliases=("Spend",)),
 )
 
+_CHANGES_CHILDREN = (
+    _l("gaps", "Gaps", "enterprise.gap_analysis", job="4", aliases=("Gap", "Gap analysis")),
+    _l("change_work_packages", "Work packages", "enterprise.work_packages", job="4",
+       aliases=("Work package", "WorkPackage", "Projects")),
+    _l("business_cases", "Business cases", "business_case.index", job="4",
+       aliases=("Business case", "Case for change", "Options", "Payback", "Investment case")),
+)
+
 MAIN: tuple = (
     _l("home", "Home", "dashboard.overview", "home", job="home",
        aliases=("Overview", "Dashboard", "Dashboard overview", "Start", "Getting started"),
@@ -133,7 +141,9 @@ MAIN: tuple = (
     _l("changes", "Changes", "enterprise.gap_analysis", "route", job="4",
        aliases=("Gaps", "Gap", "Gap analysis", "Work packages", "Roadmap", "Roadmaps", "Plateaus", "Programmes",
                 "Transformation", "Change"),
+       children=_CHANGES_CHILDREN,
        owns=("enterprise.work_packages", "enterprise.plateaus", "genome_roadmap.", "main.capability_roadmap",
+             "business_case.",
              "solution_design.programmes_list", "implementation_planning.", "adm_kanban_view.",
              "architecture_journey.", "portfolio.", "solution_design.list_solutions"),
        note="Lands on the gap register, the first step of gaps, work packages and the one roadmap "
@@ -164,7 +174,7 @@ ARCHITECTURE: tuple = (
        # Frameworks are views over this one model (ADR-0017): their pages sit here, with
        # no sidebar entry of their own, and keep their addresses.
        owns=("archimate_crud.", "archimate_layers.", "maturity_management.frameworks_overview",
-             "business_model.", "business_case.")),
+             "business_model.")),
     # Opens on the layered viewpoint, not a blank canvas.
     _l("composer", "Composer", "archimate.composer_page", "pen-tool", job="1", roles=ARCHITECTURE_ROLES,
        url_values={"viewpoint": "layered"},

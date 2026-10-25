@@ -19,6 +19,7 @@ from decimal import Decimal, InvalidOperation
 from flask_login import current_user
 
 from app import db
+from app.datetime_helpers import utcnow
 from app.models.business_case import BUSINESS_CASE_STATUSES, BusinessCase
 from app.models.cost_intelligence import CapabilityCostAllocation
 from app.models.solution_models import Solution
@@ -35,6 +36,8 @@ EDITABLE_FIELDS = (
     "capability_id",
     "strategic_initiative_id",
     "solution_id",
+    "work_package_id",
+    "decision_note",
     "problem_statement",
     "options_considered",
     "recommended_option",
@@ -55,7 +58,8 @@ _MONEY_FIELDS = {
     "tco_3yr",
     "roi_percentage",
 }
-_INT_FIELDS = {"capability_id", "strategic_initiative_id", "solution_id", "payback_months"}
+_INT_FIELDS = {"capability_id", "strategic_initiative_id", "solution_id", "work_package_id",
+               "payback_months"}
 
 
 def _to_decimal(value):
@@ -92,6 +96,7 @@ def create_business_case(title, description=None, status=None, created_by_id=Non
     if status and status not in BUSINESS_CASE_STATUSES:
         raise ValueError(f"Invalid status: {status}")
 
+    _check_work_package(fields.get("work_package_id"))
     business_case = BusinessCase(
         title=title or "Untitled Business Case",
         description=description,
@@ -99,6 +104,7 @@ def create_business_case(title, description=None, status=None, created_by_id=Non
         created_by_id=created_by_id,
     )
     _apply_fields(business_case, fields)
+    _stamp_decision(business_case)
     db.session.add(business_case)
     db.session.commit()
     return business_case
@@ -108,7 +114,9 @@ def update_business_case(business_case, **fields):
     status = fields.get("status")
     if status is not None and status not in BUSINESS_CASE_STATUSES and status != "":
         raise ValueError(f"Invalid status: {status}")
+    _check_work_package(fields.get("work_package_id"))
     _apply_fields(business_case, fields)
+    _stamp_decision(business_case)
     db.session.commit()
     return business_case
 
@@ -124,9 +132,115 @@ def save_field(business_case, field_name, value):
         raise ValueError(f"Unknown or non-editable field: {field_name}")
     if field_name == "status" and value and value not in BUSINESS_CASE_STATUSES:
         raise ValueError(f"Invalid status: {value}")
+    if field_name == "work_package_id":
+        _check_work_package(value)
     _apply_fields(business_case, {field_name: value})
+    _stamp_decision(business_case)
     db.session.commit()
     return business_case
+
+
+DECIDED_STATUSES = ("approved", "rejected")
+
+
+def _check_work_package(work_package_id):
+    """A case links only to a work package of the signed-in organisation."""
+    if work_package_id in (None, ""):
+        return
+    from app.services import work_package_service
+
+    try:
+        found = work_package_service.get_work_package(int(work_package_id), current_user.organization_id)
+    except (TypeError, ValueError):
+        found = None
+    if found is None:
+        raise ValueError("That work package was not found in this organisation")
+
+
+def _stamp_decision(business_case):
+    """Record who decided and when as the status becomes approved or rejected.
+
+    A case moved back to draft or submitted has no decision, so the stamp is
+    cleared; saving an unchanged decided case keeps its original stamp.
+    """
+    if business_case.status in DECIDED_STATUSES:
+        if business_case.decided_at is None or business_case.decided_by_id is None:
+            business_case.decided_at = utcnow()
+            business_case.decided_by_id = getattr(current_user, "id", None)
+    else:
+        business_case.decided_at = None
+        business_case.decided_by_id = None
+
+
+def save_options(business_case, rows):
+    """Replace the case's options with *rows* (at most MAX_OPTIONS), writing each
+    option's figures as cost facts. A row with no name and no figures is dropped.
+
+    Each row: name, summary, advantages, drawbacks, one_off, run_annual,
+    benefit_annual, recommended (bool).
+    """
+    from app.modules.business_case import document
+    from app.models.business_case import BusinessCaseOption
+
+    kept = [r for r in rows if (r.get("name") or "").strip() or any(
+        r.get(c) not in (None, "") for c, _ in document.FIGURES)]
+    if len(kept) > document.MAX_OPTIONS:
+        raise ValueError(f"A business case compares at most {document.MAX_OPTIONS} options")
+    for row in kept:
+        for category, label in document.FIGURES:
+            raw = row.get(category)
+            if raw not in (None, ""):
+                amount = _to_decimal(raw)
+                if amount is None or amount < 0:
+                    raise ValueError(f"{label} must be a number, zero or more")
+                row[category] = amount
+    existing = list(business_case.options)
+    org_id = business_case.organization_id
+    for index, row in enumerate(kept):
+        option = existing[index] if index < len(existing) else None
+        if option is None:
+            option = BusinessCaseOption(organization_id=org_id)
+            business_case.options.append(option)
+        option.name = (row.get("name") or "").strip() or None
+        for key in ("summary", "advantages", "drawbacks"):
+            setattr(option, key, (row.get(key) or "").strip() or None)
+        option.is_recommended = bool(row.get("recommended"))
+        option.position = index
+        db.session.flush()
+        document.set_option_figures(
+            org_id, option, **{c: row.get(c) for c, _ in document.FIGURES})
+    for option in existing[len(kept):]:
+        document.set_option_figures(org_id, option)
+        business_case.options.remove(option)
+    db.session.commit()
+    return business_case
+
+
+def save_risks(business_case, risk_ids):
+    """Link the chosen register risks to the case's work package; unlink the rest."""
+    from app.models.risk import Risk
+    from app.models.risk_entity_link import RiskEntityLink
+
+    if not business_case.work_package_id:
+        if risk_ids:
+            raise ValueError("Link a work package before choosing risks")
+        return
+    org_id = business_case.organization_id
+    wanted = {
+        r.id for r in Risk.query.filter(Risk.organization_id == org_id,
+                                        Risk.id.in_([int(i) for i in risk_ids])).all()
+    } if risk_ids else set()
+    links = RiskEntityLink.query.filter_by(
+        organization_id=org_id, entity_type="work_package", entity_id=business_case.work_package_id
+    ).all()
+    have = {link.risk_id: link for link in links}
+    for risk_id in wanted - set(have):
+        db.session.add(RiskEntityLink(organization_id=org_id, risk_id=risk_id,
+                                      entity_type="work_package",
+                                      entity_id=business_case.work_package_id))
+    for risk_id in set(have) - wanted:
+        db.session.delete(have[risk_id])
+    db.session.commit()
 
 
 def _apply_fields(business_case, fields):

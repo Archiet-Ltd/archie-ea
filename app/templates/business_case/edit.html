@@ -1,0 +1,100 @@
+{% extends 'layouts/admin_base.html' %}
+{% from 'components/page_header.html' import page_header %}
+{% from 'components/form_field.html' import form_field, form_group, form_footer %}
+{% import 'components/card.html' as card %}
+
+{% block title %}Edit {{ business_case.title or 'business case' }}{% endblock %}
+
+{% macro amount(value) %}{{ ('%.2f' % value) if value is not none else '' }}{% endmacro %}
+{% set _select_class = 'h-9 w-full rounded-md border border-input bg-background px-3 text-sm' %}
+
+{% block content %}
+<div class="flex-1 overflow-auto">
+  {{ page_header(
+      title='Edit business case',
+      description='Write the case in the order it is read: problem, options with their figures, risks, decision.',
+      breadcrumbs=[
+          {'label': 'Home', 'href': url_for('main.index')},
+          {'label': 'Business cases', 'href': url_for('business_case.index')},
+          {'label': business_case.title or 'Business case', 'href': url_for('business_case.detail', business_case_id=business_case.id)},
+          {'label': 'Edit'}
+      ]
+  ) }}
+
+  <form method="POST" action="{{ url_for('business_case.edit', business_case_id=business_case.id) }}" class="p-6 space-y-6 max-w-5xl" data-testid="bc-edit-form">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    {% if error %}<div class="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive-emphasis" role="alert" data-testid="bc-edit-error">{{ error }}</div>{% endif %}
+
+    {% call card.card() %}
+      {% call card.card_header() %}{% call card.card_title(class='text-base') %}The case{% endcall %}{% endcall %}
+      {% call card.card_content(class='space-y-4') %}
+        {{ form_field(id='bc-title', name='title', label='Title', value=business_case.title or '', required=true) }}
+        {% call form_group(id='bc-work-package', label='Work package', help_text='The change this case argues for. Its risks in the register appear in the case.') %}
+        <select id="bc-work-package" name="work_package_id" class="{{ _select_class }}">
+          <option value="">Not linked</option>
+          {% for wp in work_packages %}<option value="{{ wp.id }}" {{ 'selected' if wp.id == business_case.work_package_id }}>{{ wp.name }}</option>{% endfor %}
+        </select>
+        {% endcall %}
+        {{ form_field(id='bc-problem', name='problem_statement', label='The problem', input_type='textarea', rows=4, value=business_case.problem_statement or '', help_text='What is wrong today, and who feels it.') }}
+      {% endcall %}
+    {% endcall %}
+
+    {% for i in range(max_options) %}
+    {% set o = doc.options[i] if i < doc.options|length else none %}
+    {% call card.card() %}
+      {% call card.card_header() %}{% call card.card_title(class='text-base') %}Option {{ i + 1 }}{% endcall %}{% endcall %}
+      {% call card.card_content(class='space-y-4') %}
+        {{ form_field(id='bc-option-%d-name' % i, name='option_%d_name' % i, label='Name', value=(o.option.name if o else '') or '', placeholder='e.g. Do nothing') }}
+        {{ form_field(id='bc-option-%d-summary' % i, name='option_%d_summary' % i, label='What it is', input_type='textarea', rows=2, value=(o.option.summary if o else '') or '') }}
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {{ form_field(id='bc-option-%d-advantages' % i, name='option_%d_advantages' % i, label='Advantages', input_type='textarea', rows=2, value=(o.option.advantages if o else '') or '') }}
+          {{ form_field(id='bc-option-%d-drawbacks' % i, name='option_%d_drawbacks' % i, label='Drawbacks', input_type='textarea', rows=2, value=(o.option.drawbacks if o else '') or '') }}
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          {{ form_field(id='bc-option-%d-one-off' % i, name='option_%d_one_off' % i, label='One-off cost (' ~ doc.currency ~ ')', type='number', value=amount(o.one_off) if o else '') }}
+          {{ form_field(id='bc-option-%d-run' % i, name='option_%d_run_annual' % i, label='Annual running cost (' ~ doc.currency ~ ')', type='number', value=amount(o.run_annual) if o else '') }}
+          {{ form_field(id='bc-option-%d-benefit' % i, name='option_%d_benefit_annual' % i, label='Annual benefit (' ~ doc.currency ~ ')', type='number', value=amount(o.benefit_annual) if o else '') }}
+        </div>
+        <label class="inline-flex items-center gap-2 text-sm font-medium">
+          <input type="radio" name="recommended" value="{{ i }}" {{ 'checked' if o and o.recommended }}> Recommend this option
+        </label>
+      {% endcall %}
+    {% endcall %}
+    {% endfor %}
+
+    {% call card.card() %}
+      {% call card.card_header() %}{% call card.card_title(class='text-base') %}Risks{% endcall %}
+      {% call card.card_description() %}Choose the risks from the register that this case answers for. They are linked to the work package.{% endcall %}{% endcall %}
+      {% call card.card_content() %}
+        {% if risks %}
+        <ul class="space-y-2">
+          {% for r in risks %}
+          <li><label class="inline-flex items-center gap-2 text-sm"><input type="checkbox" name="risk_ids" value="{{ r.id }}" {{ 'checked' if r.id in linked_risk_ids }}> {{ r.title }}</label></li>
+          {% endfor %}
+        </ul>
+        {% else %}
+        <p class="text-sm text-muted-foreground">The risk register is empty. <a href="{{ url_for('risk.risk_register') }}" class="text-primary hover:underline">Open the register</a> to record one.</p>
+        {% endif %}
+      {% endcall %}
+    {% endcall %}
+
+    {% call card.card() %}
+      {% call card.card_header() %}{% call card.card_title(class='text-base') %}Decision{% endcall %}
+      {% call card.card_description() %}Approving or rejecting records you and the time as the decision.{% endcall %}{% endcall %}
+      {% call card.card_content(class='space-y-4') %}
+        {% call form_group(id='bc-status', label='Status') %}
+        <select id="bc-status" name="status" class="{{ _select_class }}">
+          {% for s in statuses %}<option value="{{ s }}" {{ 'selected' if s == (business_case.status or 'draft') }}>{{ s | capitalize }}</option>{% endfor %}
+        </select>
+        {% endcall %}
+        {{ form_field(id='bc-decision-note', name='decision_note', label='Reason for the decision', input_type='textarea', rows=3, value=business_case.decision_note or '') }}
+      {% endcall %}
+    {% endcall %}
+
+    <div class="flex items-center justify-end gap-2">
+      <a href="{{ url_for('business_case.detail', business_case_id=business_case.id) }}" class="inline-flex h-9 items-center rounded-md px-4 text-sm font-medium text-muted-foreground hover:bg-accent hover:text-foreground">Cancel</a>
+      {{ form_footer(submit_text='Save business case', cancel_text='', class='pt-0') }}
+    </div>
+  </form>
+</div>
+{% endblock %}

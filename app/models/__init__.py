@@ -479,7 +479,7 @@ else:
     from .organization_model import EnterpriseRaciAssignment  # noqa: F401
 
     # BC-001: consolidated Business Case artifact (Business-Architect)
-    from .business_case import BusinessCase  # noqa: F401
+    from .business_case import BusinessCase, BusinessCaseOption  # noqa: F401
 
     # ARCH-124: Tech Radar — adopt/trial/assess/hold classification over the
     # existing Technology-layer ArchiMateElement catalogue.

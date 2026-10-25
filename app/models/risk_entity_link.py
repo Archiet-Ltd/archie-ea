@@ -24,7 +24,7 @@ from app.models.mixins import TenantMixin
 # "Programme" in the product vocabulary is StrategicInitiative in the schema
 # (see app/models/transformation_programme.py: ProgrammeWorkstream.programme_id
 # -> strategic_initiatives.id).
-ENTITY_TYPES = ("application", "solution", "programme", "constraint")
+ENTITY_TYPES = ("application", "solution", "programme", "constraint", "work_package")
 
 
 class RiskEntityLink(TenantMixin, db.Model):

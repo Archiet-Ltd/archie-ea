@@ -1,0 +1,232 @@
+{% extends 'layouts/admin_base.html' %}
+{% from 'components/page_header.html' import page_header %}
+{% from 'components/modal.html' import modal %}
+{% import 'components/card.html' as card %}
+{% import 'components/table.html' as tbl %}
+
+{% block title %}{{ business_case.title or 'Business case' }}{% endblock %}
+
+{% set _status_badge = {
+    'draft':     'bg-muted text-muted-foreground border-border',
+    'submitted': 'bg-info/10 text-info border-info/30',
+    'approved':  'bg-success/10 text-success border-success/30',
+    'rejected':  'bg-destructive/10 text-destructive border-destructive/30'
+} %}
+{% set _status = business_case.status or 'draft' %}
+{% set _wp = business_case.work_package %}
+{% set _rec = doc.recommended %}
+
+{% macro money(value) %}{{ value|format_currency(currency=doc.currency) if value is not none else '—' }}{% endmacro %}
+{% macro months(opt) %}{% if opt.payback_months is not none %}{{ opt.payback_months }} month{{ '' if opt.payback_months == 1 else 's' }}{% else %}—{% endif %}{% endmacro %}
+{% macro empty_note(text, href=None, link_text=None) %}
+<p class="text-sm text-muted-foreground" data-empty-section>{{ text }}
+  {% if href %}<a href="{{ href }}" class="font-medium text-primary hover:underline">{{ link_text }}</a>{% endif %}</p>
+{% endmacro %}
+
+{% block content %}
+<div class="flex-1 overflow-auto" data-testid="bc-document">
+  {{ page_header(
+      title=business_case.title or 'Untitled business case',
+      description=business_case.description,
+      breadcrumbs=[
+          {'label': 'Home', 'href': url_for('main.index')},
+          {'label': 'Business cases', 'href': url_for('business_case.index')},
+          {'label': business_case.title or 'Business case'}
+      ],
+      actions=([{'text': 'Edit', 'icon': 'pencil', 'href': url_for('business_case.edit', business_case_id=business_case.id), 'variant': 'default'}] if can_edit else [])
+        + [{'text': 'Canvas boards', 'icon': 'layout-grid', 'href': url_for('business_case.canvas', business_case_id=business_case.id), 'variant': 'outline'}]
+  ) }}
+
+  <div class="p-6 space-y-6 max-w-5xl">
+
+    <div class="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm" data-testid="bc-doc-meta">
+      <span>
+        <span class="text-muted-foreground">Work package</span>
+        {% if _wp %}
+        <a href="{{ url_for('implementation_planning.work_package_detail', work_package_id=_wp.id) }}"
+           class="font-medium text-primary hover:underline" data-testid="bc-work-package-link">{{ _wp.name }}</a>
+        {% else %}
+        <span class="font-medium">None linked yet</span>
+        {% if can_edit %}<a href="{{ url_for('business_case.edit', business_case_id=business_case.id) }}" class="text-primary hover:underline">Link one</a>{% endif %}
+        {% endif %}
+      </span>
+      <span>
+        <span class="text-muted-foreground">Status</span>
+        <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium border {{ _status_badge.get(_status, _status_badge['draft']) }}">{{ _status | capitalize }}</span>
+      </span>
+    </div>
+
+    {# 1. Recommendation — the answer comes first. #}
+    {% call card.card(class='border-primary/30') %}
+      {% call card.card_header() %}
+        {% call card.card_title(class='text-base') %}1. Recommendation{% endcall %}
+      {% endcall %}
+      {% call card.card_content() %}
+        <div data-testid="bc-section-recommendation">
+        {% if _rec %}
+          <p class="text-lg font-semibold">{{ _rec.option.name or 'Unnamed option' }}</p>
+          {% if _rec.option.summary %}<p class="mt-1 text-sm">{{ _rec.option.summary }}</p>{% endif %}
+          {% if business_case.recommended_option %}<p class="mt-2 text-sm text-muted-foreground">{{ business_case.recommended_option }}</p>{% endif %}
+          <dl class="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
+            <div><dt class="text-muted-foreground">Three-year cost</dt><dd class="font-semibold tabular-nums" data-figure="recommended-three-year-cost">{{ money(_rec.three_year_cost) }}</dd></div>
+            <div><dt class="text-muted-foreground">Annual benefit</dt><dd class="font-semibold tabular-nums">{{ money(_rec.benefit_annual) }}</dd></div>
+            <div><dt class="text-muted-foreground">Payback</dt><dd class="font-semibold tabular-nums" data-figure="recommended-payback">{{ months(_rec) }}</dd></div>
+          </dl>
+          {% if _rec.payback_note %}<p class="mt-2 text-xs text-muted-foreground">{{ _rec.payback_note }}</p>{% endif %}
+        {% elif business_case.recommended_option %}
+          <p class="text-sm">{{ business_case.recommended_option }}</p>
+        {% else %}
+          {{ empty_note('No option is recommended yet. Compare the options, then mark one as the recommendation.', url_for('business_case.edit', business_case_id=business_case.id) if can_edit, 'Add options') }}
+        {% endif %}
+        </div>
+      {% endcall %}
+    {% endcall %}
+
+    {# 2. Problem #}
+    {% call card.card() %}
+      {% call card.card_header() %}{% call card.card_title(class='text-base') %}2. The problem{% endcall %}{% endcall %}
+      {% call card.card_content() %}
+        <div data-testid="bc-section-problem">
+        {% if business_case.problem_statement %}
+          <p class="text-sm whitespace-pre-line">{{ business_case.problem_statement }}</p>
+        {% else %}
+          {{ empty_note('The problem is not written yet. Say what is wrong today and who feels it.', url_for('business_case.edit', business_case_id=business_case.id) if can_edit, 'Write the problem') }}
+        {% endif %}
+        </div>
+      {% endcall %}
+    {% endcall %}
+
+    {# 3. Options side by side #}
+    {% call card.card() %}
+      {% call card.card_header() %}{% call card.card_title(class='text-base') %}3. Options compared{% endcall %}{% endcall %}
+      {% call card.card_content() %}
+        <div data-testid="bc-section-options">
+        {% if doc.options %}
+          {% call tbl.table(attrs_dict={'data-testid': 'bc-options-table'}) %}
+            {% call tbl.table_header() %}
+              {% call tbl.table_row() %}
+                {% call tbl.table_head() %}<span class="sr-only">Attribute</span>{% endcall %}
+                {% for o in doc.options %}
+                {% call tbl.table_head() %}{{ o.option.name or 'Unnamed option' }}{% if o.recommended %} <span class="ml-1 text-xs font-medium text-primary">Recommended</span>{% endif %}{% endcall %}
+                {% endfor %}
+              {% endcall %}
+            {% endcall %}
+            {% call tbl.table_body() %}
+              {% for label, key in [('What it is', 'summary'), ('Advantages', 'advantages'), ('Drawbacks', 'drawbacks')] %}
+              {% call tbl.table_row() %}
+                {% call tbl.table_cell(class='font-medium text-muted-foreground') %}{{ label }}{% endcall %}
+                {% for o in doc.options %}
+                {% call tbl.table_cell(class='whitespace-pre-line align-top') %}{{ o.option[key] or 'Not described yet' }}{% endcall %}
+                {% endfor %}
+              {% endcall %}
+              {% endfor %}
+            {% endcall %}
+          {% endcall %}
+        {% else %}
+          {{ empty_note('No options are compared yet. A business case sets at least two options side by side, including doing nothing.', url_for('business_case.edit', business_case_id=business_case.id) if can_edit, 'Add options') }}
+        {% endif %}
+        </div>
+      {% endcall %}
+    {% endcall %}
+
+    {# 4. Costs and benefits, from the cost fact store #}
+    {% call card.card() %}
+      {% call card.card_header() %}
+        {% call card.card_title(class='text-base') %}4. Costs and benefits{% endcall %}
+        {% call card.card_description() %}Figures in {{ doc.currency }}, read from the recorded cost facts. Payback is worked out from them, never typed.{% endcall %}
+      {% endcall %}
+      {% call card.card_content() %}
+        <div data-testid="bc-section-costs">
+        {% if doc.options %}
+          {% call tbl.table(attrs_dict={'data-testid': 'bc-costs-table'}) %}
+            {% call tbl.table_header() %}
+              {% call tbl.table_row() %}
+                {% call tbl.table_head() %}<span class="sr-only">Figure</span>{% endcall %}
+                {% for o in doc.options %}{% call tbl.table_head(class='text-right') %}{{ o.option.name or 'Unnamed option' }}{% endcall %}{% endfor %}
+              {% endcall %}
+            {% endcall %}
+            {% call tbl.table_body() %}
+              {% for label, key in [('One-off cost', 'one_off'), ('Annual running cost', 'run_annual'), ('Annual benefit', 'benefit_annual'), ('Three-year cost', 'three_year_cost')] %}
+              {% call tbl.table_row() %}
+                {% call tbl.table_cell(class='font-medium text-muted-foreground') %}{{ label }}{% endcall %}
+                {% for o in doc.options %}{% call tbl.table_cell(class='text-right tabular-nums') %}<span data-figure="{{ key }}-{{ o.option.id }}">{{ money(o[key]) }}</span>{% endcall %}{% endfor %}
+              {% endcall %}
+              {% endfor %}
+              {% call tbl.table_row(class='font-semibold') %}
+                {% call tbl.table_cell(class='text-muted-foreground') %}Payback{% endcall %}
+                {% for o in doc.options %}{% call tbl.table_cell(class='text-right tabular-nums') %}<span data-figure="payback-{{ o.option.id }}">{{ months(o) }}</span>{% endcall %}{% endfor %}
+              {% endcall %}
+            {% endcall %}
+          {% endcall %}
+          {% for o in doc.options if o.payback_note %}
+          <p class="mt-2 text-xs text-muted-foreground">{{ o.option.name or 'Unnamed option' }}: {{ o.payback_note }}</p>
+          {% endfor %}
+        {% else %}
+          {{ empty_note('No costs or benefits are recorded because no option exists yet. Add an option, then enter its one-off cost, annual running cost and annual benefit.', url_for('business_case.edit', business_case_id=business_case.id) if can_edit, 'Add options') }}
+        {% endif %}
+        </div>
+      {% endcall %}
+    {% endcall %}
+
+    {# 5. Risks, from the risk register #}
+    {% call card.card() %}
+      {% call card.card_header() %}
+        {% call card.card_title(class='text-base') %}5. Risks{% endcall %}
+        {% call card.card_description() %}From the risk register, linked to the work package.{% endcall %}
+      {% endcall %}
+      {% call card.card_content() %}
+        <div data-testid="bc-section-risks">
+        {% if doc.risks %}
+          {% call tbl.table(attrs_dict={'data-testid': 'bc-risks-table'}) %}
+            {% call tbl.table_header() %}
+              {% call tbl.table_row() %}
+                {% call tbl.table_head() %}Risk{% endcall %}
+                {% call tbl.table_head() %}Level{% endcall %}
+                {% call tbl.table_head() %}Owner{% endcall %}
+                {% call tbl.table_head() %}Mitigation{% endcall %}
+              {% endcall %}
+            {% endcall %}
+            {% call tbl.table_body() %}
+              {% for r in doc.risks %}
+              {% call tbl.table_row(attrs_dict={'data-risk-row': r.id}) %}
+                {% call tbl.table_cell(class='font-medium') %}<a href="{{ url_for('risk.risk_page', risk_id=r.id) }}" class="text-primary hover:underline">{{ r.title }}</a>{% endcall %}
+                {% call tbl.table_cell() %}{{ r.risk_level | capitalize }}{% endcall %}
+                {% call tbl.table_cell() %}{{ r.owner or 'No owner yet' }}{% endcall %}
+                {% call tbl.table_cell(class='whitespace-pre-line') %}{{ r.mitigation_plan or 'No mitigation written yet' }}{% endcall %}
+              {% endcall %}
+              {% endfor %}
+            {% endcall %}
+          {% endcall %}
+        {% elif not _wp %}
+          {{ empty_note('Risks come from the work package. Link a work package to bring in the risks recorded against it.', url_for('business_case.edit', business_case_id=business_case.id) if can_edit, 'Link a work package') }}
+        {% else %}
+          {{ empty_note('No risks are linked to this work package in the risk register. Choose the ones this case must answer for.', url_for('business_case.edit', business_case_id=business_case.id) if can_edit, 'Choose risks') }}
+        {% endif %}
+        </div>
+      {% endcall %}
+    {% endcall %}
+
+    {# 6. Decision #}
+    {% call card.card() %}
+      {% call card.card_header() %}{% call card.card_title(class='text-base') %}6. Decision{% endcall %}{% endcall %}
+      {% call card.card_content() %}
+        <div data-testid="bc-section-decision" class="text-sm">
+        {% if business_case.decided_at %}
+          <p class="font-semibold">{{ _status | capitalize }} by {{ business_case.decided_by.full_name() if business_case.decided_by else 'a user who has since left' }} on {{ business_case.decided_at.strftime('%-d %B %Y') }}</p>
+          {% if business_case.decision_note %}<p class="mt-2 whitespace-pre-line">{{ business_case.decision_note }}</p>{% endif %}
+        {% else %}
+          {{ empty_note('Not decided yet. The case is ' ~ _status ~ '. Record who approves or rejects it, and why.', url_for('business_case.edit', business_case_id=business_case.id) if can_edit, 'Record the decision') }}
+        {% endif %}
+        </div>
+      {% endcall %}
+    {% endcall %}
+
+    <div class="no-print">
+      <button type="button" x-data @click="window.print()" data-testid="bc-print"
+        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring h-9 px-4">
+        <i data-lucide="printer" class="h-4 w-4" aria-hidden="true"></i> Print this case
+      </button>
+    </div>
+  </div>
+</div>
+{% endblock %}

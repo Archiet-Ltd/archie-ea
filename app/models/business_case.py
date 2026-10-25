@@ -71,6 +71,19 @@ class BusinessCase(TenantMixin, db.Model):
         db.Integer, db.ForeignKey("solutions.id"), nullable=True, index=True
     )
 
+    # The work package this case is the "why" of. Nullable: a case may
+    # exist before the change it justifies is planned.
+    work_package_id = db.Column(
+        db.BigInteger, db.ForeignKey("unified_work_packages.id", ondelete="SET NULL"),
+        nullable=True, index=True,
+    )
+
+    # ── The decision: who decided, when, and why. Written when the status
+    # moves to approved or rejected, never typed separately.
+    decided_by_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
+    decided_at = db.Column(db.DateTime, nullable=True)
+    decision_note = db.Column(db.Text, nullable=True)
+
     # ── The business-case document sections ─────────────────────────
     problem_statement = db.Column(db.Text, nullable=True)
     options_considered = db.Column(db.Text, nullable=True)
@@ -106,6 +119,14 @@ class BusinessCase(TenantMixin, db.Model):
         "User", backref=db.backref("business_cases_created", lazy="dynamic"),
         foreign_keys=[created_by_id],
     )
+    decided_by = db.relationship("User", foreign_keys=[decided_by_id])
+    work_package = db.relationship(
+        "UnifiedWorkPackage", backref=db.backref("business_cases", lazy="dynamic")
+    )
+    options = db.relationship(
+        "BusinessCaseOption", backref="business_case", cascade="all, delete-orphan",
+        order_by="BusinessCaseOption.position",
+    )
 
     def __repr__(self):
         return f"<BusinessCase {self.id} {self.title!r} status={self.status}>"
@@ -135,6 +156,9 @@ class BusinessCase(TenantMixin, db.Model):
             "strategic_initiative_name": (
                 self.strategic_initiative.name if self.strategic_initiative else None
             ),
+            "work_package_id": self.work_package_id,
+            "decided_by_id": self.decided_by_id,
+            "decided_at": self.decided_at.isoformat() if self.decided_at else None,
             "solution_id": self.solution_id,
             "solution_name": self.solution.name if self.solution else None,
             "problem_statement": self.problem_statement,
@@ -160,3 +184,27 @@ class BusinessCase(TenantMixin, db.Model):
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
         }
+
+
+class BusinessCaseOption(TenantMixin, db.Model):
+    """One option compared in a business case.
+
+    The option's costs and benefit are not columns here: they are cost facts
+    (element type ``business_case_option``), read through
+    ``app.modules.business_case.document``.
+    """
+
+    __tablename__ = "business_case_options"
+
+    id = db.Column(db.Integer, primary_key=True)
+    business_case_id = db.Column(
+        db.Integer, db.ForeignKey("business_cases.id", ondelete="CASCADE"),
+        nullable=False, index=True,
+    )
+    name = db.Column(db.String(256), nullable=True)
+    summary = db.Column(db.Text, nullable=True)
+    advantages = db.Column(db.Text, nullable=True)
+    drawbacks = db.Column(db.Text, nullable=True)
+    is_recommended = db.Column(db.Boolean, nullable=True, default=False)
+    position = db.Column(db.Integer, nullable=True, default=0)
+    created_at = db.Column(db.DateTime, default=utcnow, nullable=True)

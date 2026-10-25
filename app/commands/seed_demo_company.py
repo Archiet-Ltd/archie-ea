@@ -1375,6 +1375,75 @@ _BACKLOG_REQUIREMENTS = [
 ]
 
 
+_BUSINESS_CASE_TITLE = "Move the event backbone to a managed broker"
+_BUSINESS_CASE_WORK_PACKAGE = "Migrate event backbone to cloud"
+_BUSINESS_CASE_RISKS = ("Event Relay single point of failure", "Sensor Gateway capacity exceeded")
+# (name, what it is, advantages, drawbacks, one-off, annual running, annual benefit, recommended)
+_BUSINESS_CASE_OPTIONS = (
+    ("Do nothing", "Keep the self-hosted event relay and add engineers when it fails.",
+     "No project cost and no change for the plant teams.",
+     "The relay stays a single point of failure; every outage stops calibration data reaching the ledger.",
+     0, 310000, 0, False),
+    ("Harden the current relay", "Add a second relay in another region and keep operating it ourselves.",
+     "Smaller change; the team already knows the relay.",
+     "We still run and patch the broker, and capacity work stays manual.",
+     180000, 260000, 90000, False),
+    ("Managed broker", "Move events to a managed message broker and retire the self-hosted relay.",
+     "Removes the single point of failure and the patching burden; capacity scales on demand.",
+     "A migration project and a new supplier to manage.",
+     420000, 150000, 240000, True),
+)
+
+
+def _seed_business_case(org_id, user_id) -> dict:
+    """One complete business case: three options with costed figures, linked to a work package
+    and two register risks, approved by the demonstration user."""
+    from app.models.business_case import BusinessCase, BusinessCaseOption
+    from app.models.risk import Risk
+    from app.models.unified_work_package import UnifiedWorkPackage
+    from app.modules.business_case import document
+
+    exists = db.session.query(BusinessCase).filter_by(
+        organization_id=org_id, title=_BUSINESS_CASE_TITLE).first()
+    if exists is not None:
+        return {"business_cases_created": 0}
+    wp = db.session.query(UnifiedWorkPackage).filter_by(
+        organization_id=org_id, name=_BUSINESS_CASE_WORK_PACKAGE).first()
+    if wp is None:
+        return {"business_cases_created": 0}
+    case = BusinessCase(
+        organization_id=org_id, title=_BUSINESS_CASE_TITLE, status="approved",
+        description="Why the event backbone moves off the self-hosted relay.",
+        work_package_id=wp.id, created_by_id=user_id, decided_by_id=user_id,
+        decided_at=_dt.datetime.utcnow(),
+        decision_note="Approved: the managed broker pays back inside two years and removes the "
+                      "outage that stops calibration data reaching the ledger.",
+        problem_statement="The self-hosted event relay is a single point of failure. Each outage "
+                          "stops calibration and sensor events reaching the ledger, and the "
+                          "platform team spends its time patching a broker instead of improving it.",
+        recommended_option="Move to the managed broker: the lowest running cost and the only "
+                           "option that removes the single point of failure.",
+    )
+    db.session.add(case)
+    db.session.flush()
+    for index, (name, summary, advantages, drawbacks, one_off, run, benefit, recommended) in enumerate(
+            _BUSINESS_CASE_OPTIONS):
+        option = BusinessCaseOption(
+            organization_id=org_id, business_case_id=case.id, name=name, summary=summary,
+            advantages=advantages, drawbacks=drawbacks, is_recommended=recommended, position=index)
+        db.session.add(option)
+        db.session.flush()
+        document.set_option_figures(org_id, option, one_off=one_off, run_annual=run,
+                                    benefit_annual=benefit)
+    from app.models.risk_entity_link import RiskEntityLink
+    for risk in db.session.query(Risk).filter(
+            Risk.organization_id == org_id, Risk.title.in_(_BUSINESS_CASE_RISKS)):
+        db.session.add(RiskEntityLink(organization_id=org_id, risk_id=risk.id,
+                                      entity_type="work_package", entity_id=wp.id))
+    db.session.flush()
+    return {"business_cases_created": 1}
+
+
 def _seed_boards(org_id, demo_user_id) -> dict:
     """SAFe kinds, ADM-board solutions, a value stream and a requirements
     backlog for the demonstration organisation.
@@ -2853,6 +2922,7 @@ def seed_demo_company() -> dict:
         demo_user = User.query.filter_by(
             email=_DEMO_USER_EMAIL, organization_id=org_id).first()
         stats.update(_seed_boards(org_id, demo_user.id if demo_user else None))
+        stats.update(_seed_business_case(org_id, demo_user.id if demo_user else None))
 
         db.session.commit()
 

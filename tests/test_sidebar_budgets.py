@@ -115,7 +115,7 @@ def test_a_startup_cto_sees_exactly_the_ten_entries(ctx):
     entries = nav["main"] + nav["architecture"] + nav["secondary"]
     assert _labels(entries) == MAIN + SECONDARY
     assert len(entries) == 10
-    assert all(not item.children for item in entries)
+    assert all(not item.children for item in entries if item.key != "changes")
     # Connecting a source is theirs to do: Integrations opens the connectors page.
     integrations = nav["secondary"][0]
     assert integrations.href == "/admin/connectors"
@@ -144,14 +144,14 @@ def test_procurement_pages_are_sub_items_of_spend_for_the_roles_they_admit(ctx, 
     spend = next(item for item in nav["main"] if item.key == "spend")
     assert spend.label == "Spend"
     assert _labels(spend.children) == expected
-    others = [item for item in nav["main"] if item.key != "spend"]
+    others = [item for item in nav["main"] if item.key not in ("spend", "changes")]
     assert all(not item.children for item in others)
 
 
 @pytest.mark.parametrize("role", [r for r in VALID_ROLES if r not in (ROLE_PROCUREMENT, ROLE_FINANCE, ROLE_PORTFOLIO_MANAGER)])
 def test_no_other_role_gets_procurement_sub_items(ctx, role):
     nav = _nav(_Person(role, admin=True))
-    assert all(not item.children for item in nav["main"])
+    assert all(not item.children for item in nav["main"] if item.key != "changes")
 
 
 def test_platform_admin_is_one_user_menu_entry_for_the_platform_flag_only(ctx):
@@ -286,3 +286,11 @@ def test_gaps_point_at_the_one_gap_register():
     by_type = {element_type: endpoint for _, _, element_type, endpoint, _, _ in registry.element_type_pages()}
     assert by_type.get("Gap", "enterprise.gap_analysis") == "enterprise.gap_analysis"
     assert not [e for e in by_type.values() if e.startswith("adm_kanban")]
+
+
+@pytest.mark.parametrize("role", VALID_ROLES)
+def test_changes_holds_the_gaps_work_packages_and_business_cases(ctx, role):
+    nav = _nav(_Person(role))
+    changes = next(item for item in nav["main"] if item.key == "changes")
+    assert _labels(changes.children) == ["Gaps", "Work packages", "Business cases"]
+    assert changes.children[-1].href == "/business-case/"

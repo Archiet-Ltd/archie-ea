@@ -310,7 +310,7 @@ class TestBothPagesRenderEmpty:
         case_id = case.id
 
         login_as(client, user)
-        resp = client.get(f"/business-case/{case_id}")
+        resp = client.get(f"/business-case/{case_id}/canvas")
         assert resp.status_code == 200
         soup = BeautifulSoup(resp.get_data(as_text=True), "html.parser")
 
@@ -348,7 +348,7 @@ class TestBothPagesRenderEmpty:
         case_id = case.id
 
         login_as(client, user)
-        resp = client.get(f"/business-case/{case_id}")
+        resp = client.get(f"/business-case/{case_id}/canvas")
         html = resp.get_data(as_text=True)
 
         zones = sorted(CANVAS_TEMPLATES["business_case"]["zones"], key=lambda z: z["order"])
