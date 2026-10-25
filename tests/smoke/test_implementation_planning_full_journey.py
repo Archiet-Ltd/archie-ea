@@ -55,8 +55,8 @@ def test_portfolio_manager_creates_views_and_finds_blocked_work_packages(browser
         sign_in(page, live_server, org["emails"]["portfolio_manager"])
 
         # The signed-in user's role is the persona.
-        heading = page.locator("h1").filter(has_text="Dashboard")
-        expect(heading).to_have_count(1)
+        # After the shadcn rebuild the dashboard landing page shows "Overview"
+        expect(page.get_by_role("heading", name="Overview").first).to_be_visible(timeout=15000)
 
         # Create the first work package (the blocker) through the form.
         page.goto(live_server + CREATE, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
