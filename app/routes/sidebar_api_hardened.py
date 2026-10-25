@@ -489,31 +489,79 @@ def get_quick_access_items():
         return jsonify({"error": "Internal server error"}), 500
 
 
-def _chunked_ilike_filter(query, column):
+def _search_filter(query, model_class, column, org_id, limit=100):
     """
-    Build an OR-of-ilike filter from 3-letter chunks of each normalised word in the query.
-    Each word of 3+ chars is broken into consecutive 3-letter chunks; any chunk matching
-    as a substring of the column catches candidates for fuzzy ranking in Python while
-    keeping the DB-side filter tight enough that a limit of 100 finds the right rows.
+    Two-pass candidate search so an exact name is never lost to a limit:
+    1. Exact-substring match on the normalised name (ilike %query%) — up to `limit`.
+    2. Fill the remainder from a 3-letter-chunk OR query ordered by the number of
+       chunks matched (CASE sum DESC, then name ASC), excluding ids already found.
+    Returns at most `limit` rows from the model, with exact matches first.
     """
-    from sqlalchemy import or_
-
+    from sqlalchemy import case, or_
     from app.utils.search_text import normalise_search_text
 
     q_norm = normalise_search_text(query)
+
+    # Pass 1: exact-substring match — catches exact names and close spellings
+    exact_matches = (
+        model_class.query
+        .filter(model_class.organization_id == org_id)
+        .filter(column.ilike(f"%{q_norm}%"))
+        .limit(limit)
+        .all()
+    )
+
+    remaining = limit - len(exact_matches)
+    if remaining <= 0:
+        return list(exact_matches)
+
+    exact_ids = {row.id for row in exact_matches}
+
+    # Pass 2: 3-letter chunks, ordered by how many chunks hit, then by name
     words = [w for w in q_norm.split() if len(w) >= 3]
     if not words:
-        return column.ilike(f"%{q_norm}%")
+        return list(exact_matches)
 
-    chunks = set()
+    chunks = []
     for w in words:
         for i in range(len(w) - 2):
-            chunks.add(w[i : i + 3])
+            chunks.append(w[i : i + 3])
 
     if not chunks:
-        return column.ilike(f"%{q_norm}%")
+        return list(exact_matches)
 
-    return or_(*[column.ilike(f"%{c}%") for c in chunks])
+    # Unique chunks while preserving the list order for the CASE sum
+    seen = set()
+    unique_chunks = []
+    for c in chunks:
+        if c not in seen:
+            seen.add(c)
+            unique_chunks.append(c)
+
+    # Build CASE sum: +1 for each chunk that ilike-matches the column
+    chunk_sum = case((column.ilike(f"%{unique_chunks[0]}%"), 1), else_=0)
+    for c in unique_chunks[1:]:
+        chunk_sum = chunk_sum + case((column.ilike(f"%{c}%"), 1), else_=0)
+
+    chunk_or = or_(*[column.ilike(f"%{c}%") for c in unique_chunks])
+
+    # Exclude ids already found in pass 1
+    base = (
+        model_class.query
+        .filter(model_class.organization_id == org_id)
+        .filter(chunk_or)
+    )
+    if exact_ids:
+        base = base.filter(~model_class.id.in_(exact_ids))
+
+    chunk_matches = (
+        base
+        .order_by(chunk_sum.desc(), column)
+        .limit(remaining)
+        .all()
+    )
+
+    return list(exact_matches) + chunk_matches
 
 
 def _type_label(element_type):
@@ -528,32 +576,6 @@ def _type_label(element_type):
         return element_type
     return " ".join([words[0]] + [w.lower() for w in words[1:]])
 
-
-def _chunked_ilike_filter(query, column):
-    """
-    Build an OR-of-ilike filter from 3-letter chunks of each normalised word in the query.
-    Each word of 3+ chars is broken into consecutive 3-letter chunks; any chunk matching
-    as a substring of the column catches candidates for fuzzy ranking in Python while
-    keeping the DB-side filter tight enough that a limit of 100 finds the right rows.
-    """
-    from sqlalchemy import or_
-
-    from app.utils.search_text import normalise_search_text
-
-    q_norm = normalise_search_text(query)
-    words = [w for w in q_norm.split() if len(w) >= 3]
-    if not words:
-        return column.ilike(f"%{q_norm}%")
-
-    chunks = set()
-    for w in words:
-        for i in range(len(w) - 2):
-            chunks.add(w[i : i + 3])
-
-    if not chunks:
-        return column.ilike(f"%{q_norm}%")
-
-    return or_(*[column.ilike(f"%{c}%") for c in chunks])
 
 
 @sidebar_api_bp.route("/search", methods=["GET"])
@@ -573,19 +595,14 @@ def api_global_search():
         if not org_id:
             return jsonify({"results": [], "total_count": 0})
 
-        # DB-side candidate filter via 3-letter chunks so a limit of 100 per type
-        # finds the right rows even in a large organisation.
+        # Two-pass DB-side candidate filter: exact-substring match first,
+        # then chunk query ordered by CASE sum, so an exact name in a large
+        # organisation is never lost to the limit.
         fetch_limit = 100
 
         # Applications
         try:
-            apps = (
-                ApplicationComponent.query
-                .filter(ApplicationComponent.organization_id == org_id)
-                .filter(_chunked_ilike_filter(q, ApplicationComponent.name))
-                .limit(fetch_limit)
-                .all()
-            )
+            apps = _search_filter(q, ApplicationComponent, ApplicationComponent.name, org_id, fetch_limit)
             for a in apps:
                 results.append({"type": "Application", "id": a.id, "name": a.name, "url": f"/applications/{a.id}"})
         except Exception as e:
@@ -594,13 +611,7 @@ def api_global_search():
         # Capabilities
         try:
             from app.models.unified_capability import UnifiedCapability
-            caps = (
-                UnifiedCapability.query
-                .filter(UnifiedCapability.organization_id == org_id)
-                .filter(_chunked_ilike_filter(q, UnifiedCapability.name))
-                .limit(fetch_limit)
-                .all()
-            )
+            caps = _search_filter(q, UnifiedCapability, UnifiedCapability.name, org_id, fetch_limit)
             for c in caps:
                 results.append({"type": "Capability", "id": c.id, "name": c.name, "url": "/capability-map"})
         except Exception as e:
@@ -609,13 +620,7 @@ def api_global_search():
         # Solutions
         try:
             from app.models.truly_missing_models import Solution
-            sols = (
-                Solution.query
-                .filter(Solution.organization_id == org_id)
-                .filter(_chunked_ilike_filter(q, Solution.name))
-                .limit(fetch_limit)
-                .all()
-            )
+            sols = _search_filter(q, Solution, Solution.name, org_id, fetch_limit)
             for s in sols:
                 results.append({"type": "Solution", "id": s.id, "name": s.name, "url": f"/solutions/{s.id}"})
         except Exception as e:
@@ -624,13 +629,7 @@ def api_global_search():
         # ArchiMate elements — labelled with their actual type in plain words
         try:
             from app.models.models import ArchiMateElement
-            elems = (
-                ArchiMateElement.query
-                .filter(ArchiMateElement.organization_id == org_id)
-                .filter(_chunked_ilike_filter(q, ArchiMateElement.name))
-                .limit(fetch_limit)
-                .all()
-            )
+            elems = _search_filter(q, ArchiMateElement, ArchiMateElement.name, org_id, fetch_limit)
             for e in elems:
                 layer = (e.layer or "").lower()
                 if layer not in _VALID_ARCHIMATE_LAYERS:
