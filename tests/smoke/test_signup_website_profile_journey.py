@@ -89,7 +89,7 @@ def server(request, app, company_site):
 
 
 def _row(page, label):
-    return page.locator("[data-fact]").filter(has=page.get_by_role("cell", name=label, exact=True))
+    return page.locator("[data-fact]").filter(has=page.get_by_test_id("fact-label").get_by_text(label, exact=True))
 
 
 def test_a_cto_confirms_and_corrects_the_company_profile_read_from_their_website(browser, server, people, app, company_site):
@@ -141,6 +141,7 @@ def test_a_cto_confirms_and_corrects_the_company_profile_read_from_their_website
         page.get_by_label("What do you want first?").select_option(label="Prepare for an audit")
         expect(page.get_by_label("ISO 27001")).to_be_visible()
         expect(page.get_by_label("ITIL 4")).to_be_hidden()
+        shoot(page, "company-filled")
         page.get_by_role("button", name="Continue").click()
         page.wait_for_url("**/account/welcome?step=4")
         page.get_by_role("button", name="Finish").click()
@@ -149,6 +150,8 @@ def test_a_cto_confirms_and_corrects_the_company_profile_read_from_their_website
         # Settings shows what was confirmed: the corrected fact names the person, the others their page.
         page.goto(str(server) + "/account/manage", wait_until="domcontentloaded")
         profile = page.get_by_test_id("company-profile-card")
+        profile.scroll_into_view_if_needed()
+        shoot(page, "settings-profile")
         expect(profile).to_contain_text("Acme Robotics Group")
         expect(profile).to_contain_text("Corrected by Casey Founder")
         expect(profile).to_contain_text("Dana Whitfield, Chief Executive Officer")

@@ -224,6 +224,7 @@ def test_a_startup_cto_signs_up_gives_github_and_asks_about_their_own_systems(br
         expect(page.locator("[data-framework]:checked")).to_have_count(0)
         assert page.get_by_label("Your industry").input_value() == ""
         page.get_by_label("Your industry").select_option(label="Banking and payments")
+        page.get_by_role("button", name="Show all frameworks").click()
         page.get_by_label("ISO 27001").check()
         shoot(page, "step2-filled")
         page.get_by_role("button", name="Continue").click()
@@ -393,7 +394,8 @@ def test_every_step_keeps_its_actions_in_view_and_every_later_step_has_previous(
             expect(nav).to_contain_text("Your company")
             # Step 2, sources.
             expect(page.get_by_role("heading", name="Bring in your company")).to_be_visible()
-            _footer_in_first_view(page, ["signup-previous", "signup-continue"])
+            _footer_in_first_view(page, ["signup-continue"])
+            expect(page.get_by_test_id("signup-previous")).to_have_count(0)  # nothing before the first step to go back to
             page.get_by_test_id("signup-continue").click()
             # Step 3, the company.
             page.wait_for_url("**/account/welcome?step=3")

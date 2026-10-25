@@ -25,4 +25,5 @@
         {{ checkbox(id='welcome-framework-' ~ key, value=key, label=name, checked=(key in chosen.frameworks), class=('hidden' if suggested is defined and key not in suggested and key not in chosen.frameworks else ''), attrs_dict={'data-framework': '', 'title': note}) }}
         {% endfor %}
     </div>
+    {% if suggested is defined %}{{ button(text='Show all frameworks', variant='link', size='sm', testid='signup-frameworks-all', attrs_dict={'data-action': 'show-frameworks'}) }}{% endif %}
 </fieldset>

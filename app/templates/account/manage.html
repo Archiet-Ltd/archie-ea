@@ -1,7 +1,7 @@
 {# smoke-coverage-ok: account settings page — display preferences toggle is a non-visual preference, tested by tests/test_plain_language.py unit tests #}
 {% extends 'layouts/admin_base.html' %}
 {% block title %}Account Settings{% endblock %}
-{% from 'components/table.html' import table, table_header, table_body, table_row, table_head, table_cell %}
+{% from 'components/dense_table.html' import dense_table %}
 {% from 'components/page_header.html' import page_header %}
 {% from 'components/company_kind.html' import company_kind_picker %}
 {% block extra_head_js %}<script src="{{ url_for('static', filename='js/dashboard/company_kind.js') }}"></script>{% endblock %}
@@ -147,26 +147,15 @@
                 {% call card_description() %}What you confirmed from your website, and the page each fact came from.{% endcall %}
             {% endcall %}
             {% call card_content() %}
-                <div class="max-h-96 overflow-auto rounded-md border border-border">
-                {% call table() %}
-                    {% call table_header() %}
-                        {% call table_row() %}
-                            {% call table_head() %}Fact{% endcall %}
-                            {% call table_head() %}Value{% endcall %}
-                            {% call table_head() %}Source{% endcall %}
-                        {% endcall %}
-                    {% endcall %}
-                    {% call table_body() %}
-                        {% for entry in company.profile %}
-                        {% call table_row() %}
-                            {% call table_cell(class='whitespace-nowrap font-medium') %}{{ entry.label }}{% endcall %}
-                            {% call table_cell() %}{{ entry.text }}{% endcall %}
-                            {% call table_cell(class='max-w-64 truncate') %}{% if entry.source == 'person' %}Corrected by {{ entry.confirmed_by_name }}{% else %}<a href="{{ entry.source_url }}" class="text-primary hover:underline" target="_blank" rel="noopener noreferrer">{{ entry.source_url | replace('https://', '') | replace('http://', '') }}</a>{% endif %}{% endcall %}
-                        {% endcall %}
-                        {% endfor %}
-                    {% endcall %}
+                {% call dense_table(columns=[('Fact', ''), ('Value', ''), ('Source', '')], caption='Company profile', testid='company-profile-table', rows=company.profile|length, max_height='24rem', flush=true) %}
+                    {% for entry in company.profile %}
+                    <tr class="h-12">
+                        <td class="px-2 align-middle font-medium whitespace-nowrap">{{ entry.label }}</td>
+                        <td class="px-2 align-middle">{{ entry.text }}</td>
+                        <td class="px-2 align-middle max-w-64 truncate">{% if entry.source == 'person' %}Corrected by {{ entry.confirmed_by_name }}{% else %}<a href="{{ entry.source_url }}" class="text-primary hover:underline" target="_blank" rel="noopener noreferrer">{{ entry.source_url | replace('https://', '') | replace('http://', '') }}</a>{% endif %}</td>
+                    </tr>
+                    {% endfor %}
                 {% endcall %}
-                </div>
             {% endcall %}
         {% endcall %}
     </div>

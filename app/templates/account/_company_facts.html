@@ -2,31 +2,20 @@
 <section class="space-y-2" data-testid="signup-facts">
     <div class="flex items-baseline justify-between gap-3">
         <h2 class="text-sm font-semibold">What we read on {{ website.url }}</h2>
-        {% if completeness %}<span class="text-xs text-muted-foreground" data-testid="signup-completeness">{{ completeness.value | round | int }}% of the profile found</span>{% endif %}
+        {% if completeness %}<span class="text-xs text-muted-foreground" data-testid="signup-completeness">{{ ((completeness.value * 100) if completeness.value <= 1 else completeness.value) | round | int }}% of the profile found</span>{% endif %}
     </div>
     <p class="text-xs text-muted-foreground">Tick what is right and change what is not. Each fact names the page it came from, and nothing is added to your model until you continue.</p>
-    <div class="max-h-56 overflow-auto rounded-md border border-border" data-testid="signup-facts-list">
-        {% call table() %}
-            {% call table_header() %}
-                {% call table_row() %}
-                    {% call table_head(class='w-10') %}<span class="sr-only">Keep</span>{% endcall %}
-                    {% call table_head() %}Fact{% endcall %}
-                    {% call table_head() %}Value{% endcall %}
-                    {% call table_head() %}Read from{% endcall %}
-                    {% call table_head(class='text-right') %}Sure{% endcall %}
-                {% endcall %}
-            {% endcall %}
-            {% call table_body() %}
-                {% for fact in facts %}
-                {% call table_row(attrs_dict={'data-fact': fact.id, 'data-original': fact.text}) %}
-                    {% call table_cell() %}{{ checkbox(id='fact-keep-' ~ fact.id, checked=(fact.percent >= 50), attrs_dict={'data-fact-keep': '', 'aria-label': 'Keep ' ~ fact.label}) }}{% endcall %}
-                    {% call table_cell(class='whitespace-nowrap font-medium') %}{{ fact.label }}{% endcall %}
-                    {% call table_cell(class='min-w-48') %}{{ input(id='fact-value-' ~ fact.id, value=fact.text, size='sm', aria_label=fact.label ~ ' value', attrs_dict={'data-fact-value': ''}) }}{% endcall %}
-                    {% call table_cell(class='max-w-56 truncate') %}<a href="{{ fact.source_url }}" class="text-primary hover:underline" target="_blank" rel="noopener noreferrer" data-testid="fact-source">{{ fact.source_url | replace('https://', '') | replace('http://', '') }}</a>{% endcall %}
-                    {% call table_cell(class='text-right') %}{% call badge('success' if fact.percent >= 70 else 'warning' if fact.percent >= 50 else 'neutral') %}{{ fact.percent }}%{% endcall %}{% endcall %}
-                {% endcall %}
-                {% endfor %}
-            {% endcall %}
-        {% endcall %}
-    </div>
+    <ul class="max-h-56 divide-y divide-border overflow-auto rounded-md border border-border" data-testid="signup-facts-list">
+        {% for fact in facts %}
+        <li class="flex flex-wrap items-center gap-x-3 gap-y-1 p-2" data-fact="{{ fact.id }}" data-original="{{ fact.text }}">
+            {{ checkbox(id='fact-keep-' ~ fact.id, checked=(fact.percent >= 50), attrs_dict={'data-fact-keep': '', 'aria-label': 'Keep ' ~ fact.label}) }}
+            <span class="w-36 shrink-0 text-sm font-medium" data-testid="fact-label">{{ fact.label }}</span>
+            <div class="min-w-48 flex-1">{{ input(id='fact-value-' ~ fact.id, value=fact.text, size='sm', aria_label=fact.label ~ ' value', attrs_dict={'data-fact-value': ''}) }}</div>
+            <p class="w-full truncate pl-7 text-xs text-muted-foreground sm:w-56 sm:pl-0">
+                <a href="{{ fact.source_url }}" class="text-primary hover:underline" target="_blank" rel="noopener noreferrer" data-testid="fact-source">{{ fact.source_url | replace('https://', '') | replace('http://', '') }}</a>
+                · {{ fact.percent }}% sure
+            </p>
+        </li>
+        {% endfor %}
+    </ul>
 </section>

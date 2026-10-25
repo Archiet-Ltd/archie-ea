@@ -147,6 +147,10 @@
             }).catch(function (error) {
                 say('choices', error.message || 'Your choices were not saved.', true);
             }).then(function () { busy(button, false); });
+        } else if (action === 'show-frameworks') {
+            root.querySelectorAll('[data-framework]').forEach(function (box) { box.closest('div').classList.remove('hidden'); });
+            root.querySelector('[data-suggest]').removeAttribute('data-suggest');
+            button.classList.add('hidden');
         } else if (action === 'test-key') {
             busy(button, true);
             say('key', 'Testing the key…', false);
