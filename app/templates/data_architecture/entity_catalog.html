@@ -35,7 +35,7 @@
     {{ page_shell(title='Data objects', subtitle=(total_count|string) ~ (' data entity' if total_count == 1 else ' data entities') ~ ' across the enterprise', tabs=page_tabs, actions_caller=_actions) }}
 
     <div class="grid grid-cols-2 gap-4 md:grid-cols-4">
-        {% for label, value in [('Total entities', total_count), ('Domains', domains|length), ('PII entities', entities|selectattr('contains_pii')|list|length), ('Classifications', classification_dist|length)] %}
+        {% for label, value in [('Total entities', total_count), ('Domains', domains|length), ('PII entities', entities|selectattr('contains_pii')|list|length), ('Classifications', classification_dist.keys()|select|list|length)] %}
         <div class="rounded-lg border border-border bg-card p-4">
             <div class="text-xs font-medium uppercase tracking-wide text-muted-foreground">{{ label }}</div>
             <div class="mt-1 text-2xl font-bold text-foreground">{{ value }}</div>
