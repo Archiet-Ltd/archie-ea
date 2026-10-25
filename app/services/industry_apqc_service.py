@@ -700,7 +700,7 @@ class IndustryAPQCService:
             return None, False
         capability, created = ensure_capability_record(
             name=process.industry_process_name,
-            level=2,
+            level=1,
             description=(
                 "Adopted from the %s process framework (%s)."
                 % (process.framework.industry_name, process.industry_process_code)
@@ -709,6 +709,12 @@ class IndustryAPQCService:
             scope="tenant",
         )
         db.session.commit()
+        if created:
+            # The capability map caches its hierarchy per organisation for five
+            # minutes; drop it so the adopted process is on the page now.
+            from app.extensions.cache import invalidate_cache
+
+            invalidate_cache("capability_map:*:%s" % organization_id)
         return capability, created
 
     # =========================================================================
