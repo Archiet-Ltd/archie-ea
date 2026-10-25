@@ -1,860 +1,126 @@
-    {# TOOLBAR — Secondary bar with grouped dropdowns
-       ══════════════════════════════════════════════════════════ #}
-    <nav aria-label="Composer toolbar">
-    <div class="composer-toolbar">
+{# The Composer's header and toolbar, built from the diagram shell components. Every action calls a
+   composerApp method; the menus carry what the old hand-built toolbar offered, grouped by job. #}
+{% from 'components/diagram/header.html' import diagram_header with context %}
+{% from 'components/diagram/toolbar.html' import diagram_toolbar with context %}
+{% from 'components/dropdown_menu.html' import dropdown_menu %}
+{% from 'components/button.html' import button %}
+{% from 'components/badge.html' import badge %}
 
-        {# ── CMP-067: Navigation drawer hamburger menu ─────── #}
-        <button type="button" class="toolbar-btn toolbar-btn-sm" @click="$store.sidebar.open = true" title="Navigation menu">
-            <i data-lucide="menu" class="w-4 h-4"></i>
-        </button>
+{% set purposes = {} %}
+{% for vp in viewpoints %}{% if vp.get('description') %}{% set _ = purposes.update({vp.id: vp.description}) %}{% endif %}{% endfor %}
 
-        <div class="toolbar-sep"></div>
+{% set viewpoint_items = [{'text': 'Free canvas, no viewpoint', 'icon': 'layers', 'onclick': 'clearViewpoint()'}] %}
+{% for cat_key, cat_viewpoints in viewpoint_categories.items() %}
+  {% set _ = viewpoint_items.append({'divider': true}) %}
+  {% set _ = viewpoint_items.append({'header': cat_key | replace('_', ' ') | title}) %}
+  {% for vp in cat_viewpoints %}
+    {% set _ = viewpoint_items.append({'text': vp.name ~ ((' (' ~ viewpoint_counts[vp.id] ~ ')') if viewpoint_counts is defined and vp.id in viewpoint_counts else ''), 'onclick': 'selectViewpoint(' ~ (vp.id | tojson) ~ ', ' ~ (vp.name | tojson) ~ ')'}) %}
+  {% endfor %}
+{% endfor %}
 
-        {# ── LEFT: Branding + Mode + Undo/Redo + Zoom ───────── #}
-        {# Branding only shown on wide screens (saves ~130px at 1280px) #}
-        <span class="toolbar-overflow-secondary inline-flex items-center gap-1.5 text-sm font-semibold px-2.5 py-1 rounded-md mr-1 bg-primary/10 text-info-emphasis border border-primary/20">
-            <i data-lucide="pen-tool" class="w-3.5 h-3.5"></i>
-            Composer
-        </span>
-        <span class="toolbar-overflow-secondary inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-info-emphasis border border-primary/20" x-text="solutionLabel"></span>
+{% set save_items = [
+  {'text': 'Save this view', 'icon': 'save', 'onclick': 'saveViewpoint()'},
+  {'text': 'Save a snapshot to compare against later', 'icon': 'bookmark', 'onclick': 'saveSnapshot()'},
+  {'text': 'Save as a template', 'icon': 'layout-template', 'onclick': 'saveAsTemplate()'},
+  {'divider': true},
+  {'text': 'Open a saved view', 'icon': 'folder-open', 'onclick': 'loadSavedViewpoints()'},
+  {'text': 'Open a snapshot', 'icon': 'history', 'onclick': 'loadSnapshots()'},
+  {'text': 'Start from a template', 'icon': 'layout-template', 'onclick': 'loadTemplates()'},
+  {'text': 'Clear the canvas and start a new view', 'icon': 'file-plus', 'onclick': 'newDiagram()'},
+] %}
 
-        <div class="toolbar-sep toolbar-overflow-secondary"></div>
+{% set import_items = [
+  {'text': 'Import elements in bulk', 'icon': 'files', 'onclick': 'openBulkImport()'},
+  {'text': 'Import from CSV', 'icon': 'file-spreadsheet', 'onclick': 'importCsv()'},
+  {'text': 'Import ArchiMate exchange file', 'icon': 'file-code', 'onclick': 'importOef()'},
+  {'text': 'Import from Lucidchart', 'icon': 'workflow', 'onclick': 'openLucidchartImportModal()'},
+] %}
 
-        {# Mode toggle #}
-        <button type="button" class="toolbar-btn" :class="{ 'active': mode === 'view' }"
-                @click="toggleMode()" :title="mode === 'view' ? 'Switch to Edit mode (E)' : 'Switch to View mode (E)'">
-            <i :data-lucide="mode === 'view' ? 'eye' : 'pencil'" class="w-3.5 h-3.5"></i>
-            <span class="toolbar-overflow-secondary" x-text="mode === 'view' ? 'View' : 'Edit'"></span>
-        </button>
+{% set export_items = [
+  {'header': 'Picture or document'},
+  {'text': 'PNG image', 'icon': 'image', 'onclick': 'exportPng()'},
+  {'text': 'SVG image', 'icon': 'image', 'onclick': 'exportSvg()'},
+  {'text': 'PDF', 'icon': 'file-text', 'onclick': 'exportPdf()'},
+  {'text': 'PowerPoint slide', 'icon': 'presentation', 'onclick': 'exportToPptx()'},
+  {'text': 'Written report', 'icon': 'file-text', 'onclick': 'exportReport()'},
+  {'divider': true},
+  {'header': 'Model file'},
+  {'text': 'ArchiMate exchange file (XML)', 'icon': 'file-code', 'onclick': "exportFormat('archimate_exchange','xml','ArchiMate XML (OEF)')"},
+  {'text': 'Archi model', 'icon': 'file-code', 'onclick': "exportFormat('archi','archimate','ArchiMate model')"},
+  {'text': 'Lucidchart', 'icon': 'file-code', 'onclick': "exportFormat('lucid','lucid','Lucidchart')"},
+  {'text': 'Mermaid', 'icon': 'file-code', 'onclick': "exportFormat('mermaid','mmd','Mermaid')"},
+] %}
 
-        {# CMP2-007: Diagram / Matrix toggle #}
-        <div class="flex items-center bg-muted rounded-md p-0.5 gap-0.5">
-            <button type="button" class="toolbar-btn toolbar-btn-sm" :class="{ 'active': !relMatrixOpen }"
-                    @click="if (relMatrixOpen) toggleRelMatrix()" title="Diagram view">
-                <i data-lucide="git-branch" class="w-3.5 h-3.5"></i>
-                <span class="hidden sm:inline">Diagram</span>
-            </button>
-            <button type="button" class="toolbar-btn toolbar-btn-sm" :class="{ 'active': relMatrixOpen }"
-                    @click="if (!relMatrixOpen) toggleRelMatrix()" title="Relationship matrix view">
-                <i data-lucide="grid" class="w-3.5 h-3.5"></i>
-                <span class="hidden sm:inline">Matrix</span>
-            </button>
-        </div>
+{% set more_items = [
+  {'header': 'View'},
+  {'text': 'Switch between editing and viewing', 'icon': 'eye', 'onclick': 'toggleMode()'},
+  {'text': 'Show the relationship matrix or the diagram', 'icon': 'grid', 'onclick': 'toggleRelMatrix()'},
+  {'text': 'Find an element on the canvas', 'icon': 'search', 'onclick': 'openCanvasSearch()'},
+  {'text': 'Filter elements by property', 'icon': 'sliders-horizontal', 'onclick': 'toggleFilterBar()'},
+  {'text': 'Show or hide layer swimlanes', 'icon': 'rows-3', 'onclick': 'toggleLayerZones()'},
+  {'text': 'Show or hide connection notes', 'icon': 'file-text', 'onclick': 'toggleAnnotations()'},
+  {'text': 'Add a sticky note', 'icon': 'sticky-note', 'onclick': 'addAnnotation()'},
+  {'text': 'Quick add an element', 'icon': 'plus', 'onclick': 'openQuickAdd()'},
+  {'text': 'Present full screen', 'icon': 'presentation', 'onclick': 'enterPresentationMode()'},
+  {'text': 'Submit for architecture review', 'icon': 'send', 'onclick': 'submitForReview()'},
+  {'divider': true},
+  {'header': 'Layers'},
+  {'text': 'Show all layers', 'icon': 'layers', 'onclick': "applyLayerPreset('all')"},
+  {'text': 'Applications in use', 'icon': 'layers', 'onclick': "applyLayerPreset('application_usage')"},
+  {'text': 'Technology only', 'icon': 'layers', 'onclick': "applyLayerPreset('technology')"},
+  {'text': 'Motivation only', 'icon': 'layers', 'onclick': "applyLayerPreset('motivation')"},
+  {'text': 'Business only', 'icon': 'layers', 'onclick': "applyLayerPreset('business_only')"},
+  {'text': 'Migration only', 'icon': 'layers', 'onclick': "applyLayerPreset('migration')"},
+  {'divider': true},
+  {'header': 'Arrange'},
+  {'text': 'Arrange automatically', 'icon': 'layout', 'onclick': 'reLayout()'},
+  {'text': 'Arrange top to bottom', 'icon': 'layout', 'onclick': "layoutDagre('TB')"},
+  {'text': 'Arrange left to right', 'icon': 'layout', 'onclick': "layoutDagre('LR')"},
+  {'text': 'Arrange as a sequence', 'icon': 'layout', 'onclick': 'layoutSequence()'},
+  {'text': 'Clear the canvas', 'icon': 'trash-2', 'onclick': 'clearCanvas()', 'variant': 'destructive'},
+  {'divider': true},
+  {'header': 'Style'},
+  {'text': 'Corporate style', 'icon': 'palette', 'onclick': "applyStyleTemplate('Corporate')"},
+  {'text': 'High contrast style', 'icon': 'palette', 'onclick': "applyStyleTemplate('High Contrast')"},
+  {'text': 'Print friendly style', 'icon': 'palette', 'onclick': "applyStyleTemplate('Print Friendly')"},
+  {'text': 'Reset element styles', 'icon': 'rotate-ccw', 'onclick': 'resetElementStyles()'},
+  {'divider': true},
+  {'header': 'Check and explain'},
+  {'text': 'Validate against the architecture rules', 'icon': 'shield-check', 'onclick': 'runValidation()'},
+  {'text': 'Explain this diagram', 'icon': 'message-square', 'onclick': 'explainDiagram()'},
+  {'text': 'Detect missing relationships', 'icon': 'git-pull-request', 'onclick': 'autoDetectRelationships()'},
+  {'text': 'Show intelligence overlay', 'icon': 'brain', 'onclick': 'toggleIntelligence()'},
+  {'text': 'Open the relationship matrix', 'icon': 'grid', 'onclick': 'openMatrixView()'},
+  {'text': 'Open the landscape view', 'icon': 'map', 'onclick': 'openLandscapeView()'},
+  {'text': 'Open the audit log', 'icon': 'scroll-text', 'onclick': 'openAuditLog()'},
+  {'text': 'Compare current and target', 'icon': 'git-compare', 'onclick': 'deltaMode ? exitDeltaMode() : openDeltaCompare()'},
+  {'text': 'Colour by maturity', 'icon': 'bar-chart-3', 'onclick': "toggleMetricsOverlay('maturity')"},
+  {'text': 'Colour by lifecycle', 'icon': 'bar-chart-3', 'onclick': "toggleMetricsOverlay('lifecycle')"},
+  {'text': 'Colour by risk', 'icon': 'bar-chart-3', 'onclick': "toggleMetricsOverlay('risk')"},
+  {'text': 'Colour by cost', 'icon': 'bar-chart-3', 'onclick': "toggleMetricsOverlay('cost')"},
+  {'text': 'Remove the colouring', 'icon': 'x', 'onclick': "toggleMetricsOverlay('off')"},
+  {'divider': true},
+  {'header': 'Draft with AI'},
+  {'text': 'Generate a diagram from a description', 'icon': 'sparkles', 'onclick': 'openGenerateModal()'},
+  {'text': 'Extract elements from a document', 'icon': 'file-search', 'onclick': 'openExtractModal()'},
+  {'text': 'Start from an architecture pattern', 'icon': 'blocks', 'onclick': 'openPatternModal()'},
+  {'text': 'Suggest what is missing', 'icon': 'lightbulb', 'onclick': 'toggleSuggestions()'},
+] %}
 
-        <div class="toolbar-sep"></div>
+<div class="shrink-0 flex flex-wrap items-center justify-between gap-x-3 border-b border-border bg-background">
+{{ diagram_header(purposes=purposes) }}
 
-        {# Undo / Redo (edit mode) #}
-        <template x-if="mode === 'edit'">
-            <div class="flex items-center gap-0.5">
-                <button type="button" class="toolbar-btn toolbar-btn-sm" @click="undo()" title="Undo (Ctrl+Z)">
-                    <i data-lucide="undo-2" class="w-3.5 h-3.5"></i>
-                </button>
-                <button type="button" class="toolbar-btn toolbar-btn-sm" @click="redo()" title="Redo (Ctrl+Shift+Z)">
-                    <i data-lucide="redo-2" class="w-3.5 h-3.5"></i>
-                </button>
-            </div>
-        </template>
+<div class="flex flex-wrap items-center gap-2 px-3 py-1" data-testid="composer-view-actions">
+  {{ dropdown_menu(id='composer-viewpoint-menu', trigger_text='Viewpoint', trigger_icon='layers', trigger_size='sm', transition='opacity', menu_width='w-72', position='left', trigger_testid='menu-viewpoint', trigger_aria_label='Choose a viewpoint', items=viewpoint_items) }}
+  {{ dropdown_menu(id='composer-save-menu', trigger_text='Save', trigger_icon='save', trigger_size='sm', transition='opacity', menu_width='w-72', position='left', trigger_testid='menu-save', trigger_aria_label='Save options', items=save_items) }}
+  {{ button(text='Submit for review', variant='outline', size='sm', icon='send', class='hidden md:inline-flex', attrs_dict={'@click': 'submitForReview()', 'x-show': 'currentSavedVpId && elementCount > 0 && relCount > 0 && !viewpointReviewStatus', 'x-cloak': ''}) }}
+  <span class="hidden md:inline" x-show="viewpointReviewStatus" x-cloak>{% call badge(variant='secondary') %}<span x-text="viewpointReviewStatus === 'submitted' ? 'Under review' : viewpointReviewStatus === 'approved' ? 'Approved' : 'Changes requested'"></span>{% endcall %}</span>
+  {% call button(variant='outline', size='sm', class='hidden gap-1 md:inline-flex', attrs_dict={'@click': 'compliancePanelOpen = !compliancePanelOpen', 'x-show': 'elementCount >= 2', 'x-cloak': '', 'aria-label': 'Diagram quality score, open details'}) %}
+    <i data-lucide="shield-check" class="h-3.5 w-3.5" aria-hidden="true"></i><span class="tabular-nums" x-text="'Quality ' + complianceScore + '%'"></span>
+  {% endcall %}
+  <span x-show="validationErrors > 0" x-cloak class="hidden md:inline text-xs font-medium text-destructive" x-text="validationErrors + (validationErrors > 1 ? ' errors' : ' error')"></span>
+  <span x-show="validationWarnings > 0" x-cloak class="hidden md:inline text-xs font-medium text-warning" x-text="validationWarnings + (validationWarnings > 1 ? ' warnings' : ' warning')"></span>
+</div>
+</div>
 
-        <div class="toolbar-sep"></div>
-
-        {# Zoom controls #}
-        <button type="button" class="toolbar-btn toolbar-btn-sm" @click="zoomOut()" title="Zoom out (Ctrl+-)">
-            <i data-lucide="zoom-out" class="w-3.5 h-3.5"></i>
-        </button>
-        <div class="relative" @click.outside="zoomDropdownOpen = false">
-            <button type="button" class="zoom-badge cursor-pointer hover:bg-muted/60 transition-colors select-none"
-                    @click="zoomDropdownOpen = !zoomDropdownOpen"
-                    x-text="zoomPercent + '%'" title="Click for zoom presets"></button>
-            <!-- modal-a11y-ok -->
-            <div x-show="zoomDropdownOpen" x-cloak x-transition.opacity.duration.120ms
-                 class="toolbar-dropdown-menu" style="min-width:120px; left:50%; transform:translateX(-50%);">
-                <div class="toolbar-dropdown-label">Zoom Presets</div>
-                <button type="button" class="toolbar-dropdown-item" :class="{'text-primary': zoomPercent === 50}"  @click="setZoom(50);  zoomDropdownOpen = false">50%</button>
-                <button type="button" class="toolbar-dropdown-item" :class="{'text-primary': zoomPercent === 75}"  @click="setZoom(75);  zoomDropdownOpen = false">75%</button>
-                <button type="button" class="toolbar-dropdown-item" :class="{'text-primary': zoomPercent === 100}" @click="setZoom(100); zoomDropdownOpen = false">100% — Actual</button>
-                <button type="button" class="toolbar-dropdown-item" :class="{'text-primary': zoomPercent === 150}" @click="setZoom(150); zoomDropdownOpen = false">150%</button>
-                <button type="button" class="toolbar-dropdown-item" :class="{'text-primary': zoomPercent === 200}" @click="setZoom(200); zoomDropdownOpen = false">200%</button>
-                <div class="toolbar-dropdown-sep"></div>
-                <button type="button" class="toolbar-dropdown-item" @click="fitCanvas(); zoomDropdownOpen = false">
-                    <i data-lucide="maximize-2" class="w-3.5 h-3.5"></i> Fit to Content
-                </button>
-            </div>
-        </div>
-        <button type="button" class="toolbar-btn toolbar-btn-sm" @click="zoomIn()" title="Zoom in (Ctrl++)">
-            <i data-lucide="zoom-in" class="w-3.5 h-3.5"></i>
-        </button>
-        <button type="button" class="toolbar-btn" @click="fitCanvas()" title="Fit to content (Ctrl+0)">
-            <i data-lucide="maximize-2" class="w-3.5 h-3.5"></i>
-        </button>
-
-        <div class="toolbar-sep"></div>
-
-        {# Layer visibility dots — only show when canvas has content #}
-        <div class="flex items-center gap-1.5" title="Toggle layer visibility" x-show="elementCount > 0" x-cloak>
-            <button type="button" @click="toggleLayerVisibility('business')"
-                    :class="layerVisibility.business ? 'opacity-100' : 'opacity-25'"
-                    class="layer-dot" style="background:#c8a200; border-color:#a08200;" title="Business"></button>
-            <button type="button" @click="toggleLayerVisibility('application')"
-                    :class="layerVisibility.application ? 'opacity-100' : 'opacity-25'"
-                    class="layer-dot" style="background:#0097a7; border-color:#00798a;" title="Application"></button>
-            <button type="button" @click="toggleLayerVisibility('technology')"
-                    :class="layerVisibility.technology ? 'opacity-100' : 'opacity-25'"
-                    class="layer-dot" style="background:#2e7d32; border-color:#1b5e20;" title="Technology"></button>
-            <button type="button" @click="toggleLayerVisibility('motivation')"
-                    :class="layerVisibility.motivation ? 'opacity-100' : 'opacity-25'"
-                    class="layer-dot" style="background:#5c5c9e; border-color:#454580;" title="Motivation"></button>
-            <button type="button" @click="toggleLayerVisibility('strategy')"
-                    :class="layerVisibility.strategy ? 'opacity-100' : 'opacity-25'"
-                    class="layer-dot" style="background:#a07000; border-color:#805900;" title="Strategy"></button>
-            <button type="button" @click="toggleLayerVisibility('implementation')"
-                    :class="layerVisibility.implementation ? 'opacity-100' : 'opacity-25'"
-                    class="layer-dot" style="background:#c0392b; border-color:#962d22;" title="Implementation"></button>
-        </div>
-
-        {# Layer preset filter #}
-        <div class="relative" @click.outside="layerPresetOpen = false">
-            <button type="button" class="toolbar-btn toolbar-btn-sm" @click="layerPresetOpen = !layerPresetOpen"
-                    title="Apply layer filter preset">
-                <i data-lucide="filter" class="w-3.5 h-3.5"></i>
-            </button>
-            <div x-show="layerPresetOpen" x-cloak x-transition.opacity.duration.120ms class="toolbar-dropdown-menu" style="min-width:210px;"> <!-- modal-a11y-ok --> <!-- inline-style-ok -->
-                <div class="toolbar-dropdown-label">ArchiMate Viewpoints</div>
-                <button type="button" class="toolbar-dropdown-item" @click="applyLayerPreset('all'); layerPresetOpen = false">
-                    <i data-lucide="layers" class="w-3.5 h-3.5"></i> All Layers (reset)
-                </button>
-                <button type="button" class="toolbar-dropdown-item" @click="applyLayerPreset('application_usage'); layerPresetOpen = false">
-                    <i data-lucide="layout" class="w-3.5 h-3.5"></i> Application Usage
-                </button>
-                <button type="button" class="toolbar-dropdown-item" @click="applyLayerPreset('technology'); layerPresetOpen = false">
-                    <i data-lucide="server" class="w-3.5 h-3.5"></i> Technology View
-                </button>
-                <button type="button" class="toolbar-dropdown-item" @click="applyLayerPreset('motivation'); layerPresetOpen = false">
-                    <i data-lucide="target" class="w-3.5 h-3.5"></i> Motivation & Strategy
-                </button>
-                <button type="button" class="toolbar-dropdown-item" @click="applyLayerPreset('business_only'); layerPresetOpen = false">
-                    <i data-lucide="briefcase" class="w-3.5 h-3.5"></i> Business Process
-                </button>
-                <button type="button" class="toolbar-dropdown-item" @click="applyLayerPreset('migration'); layerPresetOpen = false">
-                    <i data-lucide="git-fork" class="w-3.5 h-3.5"></i> Migration & Implementation
-                </button>
-            </div>
-        </div>
-
-        {# Canvas search button (Ctrl+F) #}
-        <button type="button" class="toolbar-btn toolbar-btn-sm" @click="openCanvasSearch()" title="Search elements on canvas (Ctrl+F)">
-            <i data-lucide="search" class="w-3.5 h-3.5"></i>
-        </button>
-
-        {# CMP-049: Property filter toggle #}
-        <button type="button" class="toolbar-btn toolbar-btn-sm" @click="toggleFilterBar()" title="Filter elements (property filter)"
-                :class="{ 'active': filterBarVisible }">
-            <i data-lucide="sliders-horizontal" class="w-3.5 h-3.5"></i>
-        </button>
-
-        {# ── Lanes / Note / Viewpoints — segmented pill control ── #}
-        <div class="flex items-center bg-muted p-0.5 rounded-lg border border-border gap-0"
-             style="background: hsl(var(--muted)); border-color: hsl(var(--border));">
-            <template x-if="mode === 'edit'">
-                <button type="button" class="px-2.5 py-1 text-xs font-medium rounded-md transition-colors flex items-center gap-1.5"
-                        :class="layerZonesActive
- ? 'bg-background border border-border text-foreground'
- : 'text-muted-foreground hover:text-foreground'"
-                        style="background: layerZonesActive ? hsl(var(--card)) : ''; border-color: layerZonesActive ? hsl(var(--border)) : '';"
-                        @click="toggleLayerZones()"
-                        title="Toggle layer swimlanes">
-                    <i data-lucide="rows-3" class="w-3.5 h-3.5"></i>
-                    <span class="toolbar-overflow-secondary">Lanes</span>
-                </button>
-            </template>
-            <template x-if="mode === 'edit'">
-                <button type="button" class="px-2.5 py-1 text-xs font-medium rounded-md transition-colors text-muted-foreground hover:text-foreground flex items-center gap-1.5"
-                        @click="addAnnotation()"
-                        title="Add sticky note (double-click to edit)">
-                    <i data-lucide="sticky-note" class="w-3.5 h-3.5"></i>
-                    <span class="toolbar-overflow-secondary">Note</span>
-                </button>
-            </template>
-            {# GAP-INT-003: Annotation card toggle #}
-            <button type="button" class="px-2.5 py-1 text-xs font-medium rounded-md transition-colors flex items-center gap-1.5"
-                    :class="showAnnotations
- ? 'bg-background border border-border text-foreground'
- : 'text-muted-foreground hover:text-foreground'"
-                    @click="toggleAnnotations()"
-                    title="Show/Hide connection annotations">
-                <i data-lucide="file-text" class="w-3.5 h-3.5"></i>
-                <span class="toolbar-overflow-secondary">Annotations</span>
-            </button>
-            {# Viewpoint selector — always visible #}
-            <div class="vp-dropdown" @click.outside="vpDropdownOpen = false">
-                <button type="button" class="px-3 py-1 text-xs font-medium rounded-md transition-colors flex items-center gap-1"
-                        :class="activeViewpoint
- ? 'bg-background border border-border text-foreground'
- : 'text-muted-foreground hover:text-foreground'"
-                        @click="vpDropdownOpen = !vpDropdownOpen">
-                    <i data-lucide="layers" class="w-3 h-3"></i>
-                    <span x-text="activeViewpointName || 'Viewpoints'"></span>
-                    <i data-lucide="chevron-down" class="w-3 h-3"></i>
-                </button>
-            <div x-show="vpDropdownOpen" x-cloak x-transition.opacity.duration.120ms class="vp-dropdown-menu"> <!-- modal-a11y-ok -->
-                <button type="button" class="vp-dropdown-item" :class="{ 'active-vp': !activeViewpoint }"
-                        @click="clearViewpoint()">
-                    <span class="text-muted-foreground">No viewpoint (free canvas)</span>
-                </button>
-                {% for cat_key, cat_viewpoints in viewpoint_categories.items() %}
-                <div class="vp-dropdown-cat">{{ cat_key | replace('_', ' ') | title }}</div>
-                {% for vp in cat_viewpoints %}
-                <button type="button" class="vp-dropdown-item"
-                        :class="{ 'active-vp': activeViewpoint === '{{ vp.id }}' }"
-                        @click="selectViewpoint('{{ vp.id }}', '{{ vp.name }}')"
-                        {% if viewpoint_counts is defined and viewpoint_counts.get(vp.id, -1) == 0 %}style="opacity: 0.4"{% endif %}>
-                    {{ vp.name }}
-                    {% if viewpoint_counts is defined and vp.id in viewpoint_counts %}
-                    <span class="ml-auto text-2xs text-muted-foreground">({{ viewpoint_counts[vp.id] }})</span>
-                    {% endif %}
-                </button>
-                {% endfor %}
-                {% endfor %}
-            </div>
-        </div>
-        </div>{# end pill group #}
-
-        {# ── Save + Diagrams ─────────────────────────────────── #}
-        <div class="toolbar-sep"></div>
-
-        {# Save dropdown — save-related actions only (CMP-060) #}
-        <div class="toolbar-dropdown" @click.outside="saveDropdownOpen = false">
-            <button type="button" class="toolbar-btn relative" @click="saveDropdownOpen = !saveDropdownOpen"
-                    :class="{ 'border-primary text-primary': viewpointDirty }">
-                <i data-lucide="save" class="w-3.5 h-3.5"></i>
-                <span class="toolbar-overflow-secondary" x-text="viewpointDirty ? 'Save*' : 'Save'"></span>
-                {# ENT-111: Staleness badge #}
-                <span x-show="staleRelationships && staleRelationships.length > 0" x-cloak
-                      @click.stop="showStalenessReview = true; saveDropdownOpen = false"
-                      class="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-warning border border-background"
-                      title="Stale relationships detected — click to review"></span>
-                <i data-lucide="chevron-down" class="w-3 h-3"></i>
-            </button>
-            <div x-show="saveDropdownOpen" x-cloak x-transition.opacity.duration.120ms class="toolbar-dropdown-menu min-w-[220px]"> <!-- modal-a11y-ok -->
-                <button type="button" class="toolbar-dropdown-item" @click="saveViewpoint(); saveDropdownOpen = false"
-                        x-show="elementCount > 0">
-                    <i data-lucide="save" class="w-3.5 h-3.5"></i> Save Viewpoint
-                </button>
-                <button type="button" class="toolbar-dropdown-item" @click="saveSnapshot(); saveDropdownOpen = false"
-                        x-show="currentSavedVpId" x-cloak>
-                    <i data-lucide="bookmark" class="w-3.5 h-3.5"></i> Save Snapshot
-                </button>
-                <button type="button" class="toolbar-dropdown-item" @click="saveAsTemplate(); saveDropdownOpen = false"
-                        x-show="elementCount > 0" x-cloak>
-                    <i data-lucide="layout-template" class="w-3.5 h-3.5"></i> Save as Template
-                </button>
-            </div>
-        </div>
-
-        {# REQ-CMP-003: Always-visible save status indicator #}
-        <div class="flex items-center gap-1 text-2xs min-w-[90px]" x-cloak>
-            <template x-if="_saveState === 'saving'">
-                <span class="flex items-center gap-1 text-primary">
-                    <svg class="w-3 h-3 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
-                    Saving...
-                </span>
-            </template>
-            <template x-if="_saveState === 'saved'">
-                <span class="flex items-center gap-1 text-success-emphasis">
-                    <i data-lucide="check-circle" class="w-3 h-3"></i>
-                    <span x-text="_autosaveLabel || 'Saved'"></span>
-                </span>
-            </template>
-            <template x-if="_saveState === 'dirty'">
-                <span class="flex items-center gap-1 text-warning-emphasis">
-                    <span class="w-1.5 h-1.5 rounded-full bg-warning"></span>
-                    Unsaved
-                </span>
-            </template>
-            <template x-if="_saveState === 'failed'">
-                <button type="button" @click="_autoSave()" class="flex items-center gap-1 text-destructive-emphasis hover:underline">
-                    <i data-lucide="alert-circle" class="w-3 h-3"></i>
-                    Retry
-                </button>
-            </template>
-        </div>
-
-        {# GAP-CMP-007: Submit for ARB Review button + status badge #}
-        <button type="button" class="toolbar-btn"
-                x-show="currentSavedVpId && elementCount > 0 && relCount > 0 && !viewpointReviewStatus" x-cloak
-                @click="submitForReview()"
-                title="Submit diagram to Architecture Review Board"
-                style="border: 1px solid hsl(var(--border));">
-            <i data-lucide="send" class="w-3.5 h-3.5"></i>
-            <span class="toolbar-overflow-secondary">Submit for Review</span>
-        </button>
-        <span x-show="viewpointReviewStatus" x-cloak
-              class="inline-flex items-center px-2 py-0.5 rounded-md text-2xs font-medium"
-              :class="{
-                  'bg-warning/10 text-warning-emphasis border border-warning/30': viewpointReviewStatus === 'submitted',
-                  'bg-success/10 text-success-emphasis border border-success/30': viewpointReviewStatus === 'approved',
-                  'bg-destructive/10 text-destructive-emphasis border border-destructive/30': viewpointReviewStatus === 'changes_requested',
-              }"
-              x-text="viewpointReviewStatus === 'submitted' ? 'Under Review' : viewpointReviewStatus === 'approved' ? 'Approved' : 'Changes Requested'">
-        </span>
-
-        {# CMP2-009: Real-time compliance score badge #}
-        <button type="button" class="toolbar-btn toolbar-btn-sm gap-1" x-show="elementCount >= 2" x-cloak
-                @click="compliancePanelOpen = !compliancePanelOpen"
-                :class="compliancePanelOpen ? 'active' : ''"
-                title="Diagram quality score — click for details">
-            <i data-lucide="shield-check" class="w-3.5 h-3.5"></i>
-            <span class="inline-flex items-center px-1.5 py-0.5 rounded-md text-xs font-semibold tabular-nums border"
-                  :class="complianceScore >= 80 ? 'bg-success/10 text-success-emphasis border-success/30' : (complianceScore >= 50 ? 'bg-warning/10 text-warning-emphasis border-warning/30' : 'bg-destructive/10 text-destructive-emphasis border-destructive/30')"
-                  x-text="complianceScore + '%'"></span>
-        </button>
-
-        {# GAP-CMP-002: Validation badge — persistent error/warning counts #}
-        <div x-show="validationErrors > 0 || validationWarnings > 0" x-cloak
-             class="flex items-center gap-1 text-xs">
-            <span x-show="validationErrors > 0" x-cloak
-                  class="inline-flex items-center px-1.5 py-0.5 rounded-full text-2xs font-bold bg-destructive/10 text-destructive-emphasis"
-                  x-text="validationErrors + ' error' + (validationErrors > 1 ? 's' : '')"></span>
-            <span x-show="validationWarnings > 0" x-cloak
-                  class="inline-flex items-center px-1.5 py-0.5 rounded-full text-2xs font-bold bg-warning/10 text-warning-emphasis"
-                  x-text="validationWarnings + ' warning' + (validationWarnings > 1 ? 's' : '')"></span>
-        </div>
-
-        {# Diagrams dropdown — load/browse diagram actions (CMP-060) #}
-        <div class="toolbar-dropdown" @click.outside="diagramsDropdownOpen = false">
-            <button type="button" class="toolbar-btn" @click="diagramsDropdownOpen = !diagramsDropdownOpen">
-                <i data-lucide="folder-open" class="w-3.5 h-3.5"></i>
-                <span>Diagrams</span>
-                <i data-lucide="chevron-down" class="w-3 h-3"></i>
-            </button>
-            <div x-show="diagramsDropdownOpen" x-cloak x-transition.opacity.duration.120ms class="toolbar-dropdown-menu min-w-[220px]"> <!-- modal-a11y-ok -->
-                <button type="button" class="toolbar-dropdown-item" @click="newDiagram(); diagramsDropdownOpen = false">
-                    <i data-lucide="file-plus" class="w-3.5 h-3.5"></i> New Diagram
-                </button>
-                <button type="button" class="toolbar-dropdown-item" @click="openBulkImport(); diagramsDropdownOpen = false">
-                    <i data-lucide="database" class="w-3.5 h-3.5"></i> Import from Portfolio
-                </button>
-                <div class="toolbar-dropdown-sep"></div>
-                <button type="button" class="toolbar-dropdown-item" @click="loadSavedViewpoints(); diagramsDropdownOpen = false">
-                    <i data-lucide="folder-open" class="w-3.5 h-3.5"></i> Load Viewpoint
-                </button>
-                <button type="button" class="toolbar-dropdown-item" @click="loadSnapshots(); diagramsDropdownOpen = false"
-                        x-show="currentSavedVpId" x-cloak>
-                    <i data-lucide="history" class="w-3.5 h-3.5"></i> Version History
-                </button>
-                <div class="toolbar-dropdown-sep"></div>
-                <button type="button" class="toolbar-dropdown-item" @click="loadTemplates(); diagramsDropdownOpen = false">
-                    <i data-lucide="copy" class="w-3.5 h-3.5"></i> Use Template
-                </button>
-                <div class="toolbar-dropdown-sep"></div>
-                <button type="button" class="toolbar-dropdown-item" @click="importCsv(); diagramsDropdownOpen = false"
-                        x-show="mode === 'edit'" x-cloak>
-                    <i data-lucide="upload" class="w-3.5 h-3.5"></i> Import CSV
-                </button>
-                <button type="button" class="toolbar-dropdown-item" @click="importOef(); diagramsDropdownOpen = false"
-                        x-show="mode === 'edit'" x-cloak>
-                    <i data-lucide="file-code-2" class="w-3.5 h-3.5"></i> Import ArchiMate XML
-                </button>
-                <button type="button" class="toolbar-dropdown-item" @click="openLucidchartImportModal(); diagramsDropdownOpen = false"
-                        x-show="mode === 'edit'" x-cloak>
-                    <i data-lucide="workflow" class="w-3.5 h-3.5"></i> Import Lucidchart
-                </button>
-            </div>
-        </div>
-
-        {# CMP-056: Diagram metadata toggle #}
-        <button type="button" class="toolbar-btn toolbar-btn-sm" @click="toggleMetadataPanel()" title="Diagram metadata"
-                :class="{ 'active': metadataPanelOpen }">
-            <i data-lucide="file-text" class="w-3.5 h-3.5"></i>
-        </button>
-
-        {# ── SPACER ─────────────────────────────────────────── #}
-        <div class="flex-1 min-w-0"></div>
-
-        {# ── RIGHT: AI dropdown + Layout + Export + Analyze ── #}
-        {# CMP-063: Secondary actions (Layout, Style, Analyze, Present, Export) are marked
-           toolbar-overflow-secondary and hidden below 1600px viewport width.
-           A "More" overflow dropdown (toolbar-overflow-more) appears instead. #}
-
-        {# Quick add (edit mode) — always visible (primary action) #}
-        <template x-if="mode === 'edit'">
-            <button type="button" class="toolbar-btn" @click="openQuickAdd()" title="Quick add (Ctrl+K)">
-                <i data-lucide="search" class="w-3.5 h-3.5"></i>
-                <span class="text-2xs px-1.5 py-0.5 rounded bg-muted border border-border">Ctrl+K</span>
-            </button>
-        </template>
-
-        {# AI dropdown (edit mode) #}
-        <template x-if="mode === 'edit'">
-            <div class="toolbar-dropdown" @click.outside="aiDropdownOpen = false">
-                <button type="button" class="toolbar-btn" @click="aiDropdownOpen = !aiDropdownOpen"
-                        :class="suggestionsEnabled ? 'active' : ''">
-                    <i data-lucide="sparkles" class="w-3.5 h-3.5"></i> AI
-                    <i data-lucide="chevron-down" class="w-3 h-3"></i>
-                </button>
-                <div x-show="aiDropdownOpen" x-cloak x-transition.opacity.duration.120ms class="toolbar-dropdown-menu right-align"> <!-- modal-a11y-ok -->
-                    <button type="button" class="toolbar-dropdown-item" @click="openGenerateModal(); aiDropdownOpen = false">
-                        <i data-lucide="sparkles" class="w-3.5 h-3.5"></i> Generate from Description
-                    </button>
-                    <button type="button" class="toolbar-dropdown-item" @click="openExtractModal(); aiDropdownOpen = false">
-                        <i data-lucide="file-text" class="w-3.5 h-3.5"></i> Extract from Text
-                    </button>
-                    <button type="button" class="toolbar-dropdown-item" @click="openPatternModal(); aiDropdownOpen = false">
-                        <i data-lucide="layout-template" class="w-3.5 h-3.5"></i> Apply Pattern
-                    </button>
-                    <div class="toolbar-dropdown-sep"></div>
-                    <button type="button" class="toolbar-dropdown-item" @click="toggleSuggestions(); aiDropdownOpen = false">
-                        <i data-lucide="lightbulb" class="w-3.5 h-3.5"></i>
-                        <span x-text="suggestionsEnabled ? 'Disable Suggestions' : 'Enable Suggestions'"></span>
-                    </button>
-                </div>
-            </div>
-        </template>
-
-        {# Layout dropdown (edit mode) — collapsible into More #}
-        <template x-if="mode === 'edit'">
-            <div class="toolbar-dropdown toolbar-overflow-secondary" @click.outside="layoutDropdownOpen = false">
-                <button type="button" class="toolbar-btn" @click="layoutDropdownOpen = !layoutDropdownOpen">
-                    <i data-lucide="layout-grid" class="w-3.5 h-3.5"></i> Layout
-                    <i data-lucide="chevron-down" class="w-3 h-3"></i>
-                </button>
-                <div x-show="layoutDropdownOpen" x-cloak x-transition.opacity.duration.120ms class="toolbar-dropdown-menu right-align"> <!-- modal-a11y-ok -->
-                    <div class="toolbar-dropdown-label">Auto-Layout</div>
-                    <button type="button" class="toolbar-dropdown-item" @click="reLayout(); layoutDropdownOpen = false">
-                        <i data-lucide="layout-grid" class="w-3.5 h-3.5"></i> Layer Banding
-                    </button>
-                    <button type="button" class="toolbar-dropdown-item" @click="layoutDagre('TB'); layoutDropdownOpen = false">
-                        <i data-lucide="arrow-down" class="w-3.5 h-3.5"></i> Hierarchical (Top→Bottom)
-                    </button>
-                    <button type="button" class="toolbar-dropdown-item" @click="layoutDagre('LR'); layoutDropdownOpen = false">
-                        <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i> Hierarchical (Left→Right)
-                    </button>
-                    <button type="button" class="toolbar-dropdown-item" @click="layoutSequence(); layoutDropdownOpen = false">
-                        <i data-lucide="arrow-left-right" class="w-3.5 h-3.5"></i> Sequence View
-                    </button>
-                    <div class="toolbar-dropdown-sep"></div>
-                    <div class="toolbar-dropdown-label">Align Selected</div>
-                    <div class="flex gap-0.5 px-2 py-1">
-                        <button type="button" class="toolbar-btn toolbar-btn-sm" @click="alignSelected('left')" title="Left"><i data-lucide="align-start-vertical" class="w-3.5 h-3.5"></i></button>
-                        <button type="button" class="toolbar-btn toolbar-btn-sm" @click="alignSelected('center-h')" title="Center H"><i data-lucide="align-center-vertical" class="w-3.5 h-3.5"></i></button>
-                        <button type="button" class="toolbar-btn toolbar-btn-sm" @click="alignSelected('right')" title="Right"><i data-lucide="align-end-vertical" class="w-3.5 h-3.5"></i></button>
-                        <button type="button" class="toolbar-btn toolbar-btn-sm" @click="alignSelected('top')" title="Top"><i data-lucide="align-start-horizontal" class="w-3.5 h-3.5"></i></button>
-                        <button type="button" class="toolbar-btn toolbar-btn-sm" @click="alignSelected('bottom')" title="Bottom"><i data-lucide="align-end-horizontal" class="w-3.5 h-3.5"></i></button>
-                    </div>
-                    <div class="toolbar-dropdown-label">Distribute</div>
-                    <div class="flex gap-0.5 px-2 py-1">
-                        <button type="button" class="toolbar-btn toolbar-btn-sm" @click="distributeSelected('horizontal')" title="Horizontal"><i data-lucide="columns-3" class="w-3.5 h-3.5"></i></button>
-                        <button type="button" class="toolbar-btn toolbar-btn-sm" @click="distributeSelected('vertical')" title="Vertical"><i data-lucide="rows-3" class="w-3.5 h-3.5"></i></button>
-                    </div>
-                    <div class="toolbar-dropdown-sep"></div>
-                    <div class="toolbar-dropdown-label">Routing</div>
-                    <button type="button" class="toolbar-dropdown-item" @click="setDefaultRouting('manhattan'); layoutDropdownOpen = false"
-                            :class="defaultRouting === 'manhattan' ? 'text-primary' : ''">
-                        <i data-lucide="git-commit-horizontal" class="w-3.5 h-3.5"></i> Manhattan
-                    </button>
-                    <button type="button" class="toolbar-dropdown-item" @click="setDefaultRouting('smooth'); layoutDropdownOpen = false"
-                            :class="defaultRouting === 'smooth' ? 'text-primary' : ''">
-                        <i data-lucide="spline" class="w-3.5 h-3.5"></i> Smooth
-                    </button>
-                    <div class="toolbar-dropdown-sep"></div>
-                    <button type="button" class="toolbar-dropdown-item" @click="clearCanvas(); layoutDropdownOpen = false" style="color: hsl(var(--destructive));">
-                        <i data-lucide="trash-2" class="w-3.5 h-3.5"></i> Clear Canvas
-                    </button>
-                </div>
-            </div>
-        </template>
-
-        {# CMP-055: Style templates dropdown — collapsible into More #}
-        <template x-if="mode === 'edit'">
-            <div class="toolbar-dropdown toolbar-overflow-secondary" @click.outside="styleDropdownOpen = false">
-                <button type="button" class="toolbar-btn" @click="styleDropdownOpen = !styleDropdownOpen; loadStyleTemplates()">
-                    <i data-lucide="palette" class="w-3.5 h-3.5"></i> Style
-                    <i data-lucide="chevron-down" class="w-3 h-3"></i>
-                </button>
-                <div x-show="styleDropdownOpen" x-cloak x-transition.opacity.duration.120ms class="toolbar-dropdown-menu right-align" style="min-width: 220px;"> <!-- modal-a11y-ok --> <!-- inline-style-ok -->
-                    <div class="toolbar-dropdown-label">Built-in Presets</div>
-                    <button type="button" class="toolbar-dropdown-item" @click="applyStyleTemplate('Corporate'); styleDropdownOpen = false">
-                        <span class="w-3 h-3 rounded-sm border" style="background:#f0f4f8; border-color:#334155;"></span> Corporate
-                    </button>
-                    <button type="button" class="toolbar-dropdown-item" @click="applyStyleTemplate('High Contrast'); styleDropdownOpen = false">
-                        <span class="w-3 h-3 rounded-sm border" style="background:#ffffff; border-color:#000000;"></span> High Contrast
-                    </button>
-                    <button type="button" class="toolbar-dropdown-item" @click="applyStyleTemplate('Print Friendly'); styleDropdownOpen = false">
-                        <span class="w-3 h-3 rounded-sm border" style="background:#fafafa; border-color:#555555;"></span> Print Friendly
-                    </button>
-                    <div class="toolbar-dropdown-sep"></div>
-                    <div class="toolbar-dropdown-label">Custom Templates</div>
-                    <template x-for="tmpl in (customStyleTemplates || [])" :key="tmpl.name">
-                        <div class="toolbar-dropdown-item flex items-center justify-between">
-                            <button type="button" class="flex items-center gap-1.5 flex-1 text-left" @click="applyStyleTemplate(tmpl.name); styleDropdownOpen = false">
-                                <span class="w-3 h-3 rounded-sm border" :style="'background:' + tmpl.fill + '; border-color:' + tmpl.stroke"></span>
-                                <span x-text="tmpl.name"></span>
-                            </button>
-                            <button aria-label="Remove" type="button" @click.stop="deleteCustomStyleTemplate(tmpl.name)" class="text-destructive-emphasis hover:text-destructive-emphasis/80 p-0.5 ml-1">
-                                <i data-lucide="x" class="w-3 h-3"></i>
-                            </button>
-                        </div>
-                    </template>
-                    <template x-if="!customStyleTemplates || customStyleTemplates.length === 0">
-                        <div class="px-3 py-1 text-2xs text-muted-foreground italic">No custom templates yet</div>
-                    </template>
-                    <div class="toolbar-dropdown-sep"></div>
-                    <button type="button" class="toolbar-dropdown-item" @click="styleTemplateSaveOpen = true; styleDropdownOpen = false"
-                            x-show="_selectedCells && _selectedCells.length > 0" x-cloak>
-                        <i data-lucide="plus" class="w-3.5 h-3.5"></i> Save from Selection
-                    </button>
-                    <button type="button" class="toolbar-dropdown-item" @click="resetElementStyles(); styleDropdownOpen = false">
-                        <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i> Reset to Layer Colors
-                    </button>
-                </div>
-            </div>
-        </template>
-
-        {# Delete selected (edit mode, shown only when selection active) #}
-        <template x-if="mode === 'edit'">
-            <button type="button" class="toolbar-btn" @click="deleteSelected()" title="Delete selected"
-                    x-show="_selectedCells.length > 0" x-cloak
-                    style="color: hsl(var(--destructive));">
-                <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
-            </button>
-        </template>
-
-        <div class="toolbar-sep toolbar-overflow-secondary"></div>
-
-        {# Analyze dropdown — collapsible into More #}
-        <div class="toolbar-dropdown toolbar-overflow-secondary" @click.outside="analyzeDropdownOpen = false">
-            <button type="button" class="toolbar-btn" @click="analyzeDropdownOpen = !analyzeDropdownOpen"
-                    :class="{ 'active': intelligenceEnabled || validationPanelOpen || deltaMode }">
-                <i data-lucide="scan-search" class="w-3.5 h-3.5"></i> Analyze
-                <i data-lucide="chevron-down" class="w-3 h-3"></i>
-            </button>
-            <div x-show="analyzeDropdownOpen" x-cloak x-transition.opacity.duration.120ms class="toolbar-dropdown-menu right-align"> <!-- modal-a11y-ok -->
-                <button type="button" class="toolbar-dropdown-item" @click="clearDependencyPropagation(); analyzeDropdownOpen = false"
-                        x-show="depPropagationActive" x-cloak>
-                    <i data-lucide="eye-off" class="w-3.5 h-3.5"></i> Clear Dependency Highlight
-                </button>
-                <div class="toolbar-dropdown-sep" x-show="depPropagationActive" x-cloak></div>
-                <button type="button" class="toolbar-dropdown-item" @click="autoDetectRelationships(); analyzeDropdownOpen = false"
-                        x-show="elementCount >= 2">
-                    <i data-lucide="git-branch" class="w-3.5 h-3.5"></i> Auto-Detect Relationships
-                </button>
-                <button type="button" class="toolbar-dropdown-item" @click="runValidation(); analyzeDropdownOpen = false" :disabled="validationLoading">
-                    <i data-lucide="check-circle" class="w-3.5 h-3.5"></i>
-                    <span x-text="validationLoading ? 'Validating...' : 'Validate Diagram'"></span>
-                </button>
-                <button type="button" class="toolbar-dropdown-item" @click="explainDiagram(); analyzeDropdownOpen = false" :disabled="explanationLoading">
-                    <i data-lucide="book-open" class="w-3.5 h-3.5"></i>
-                    <span x-text="explanationLoading ? 'Explaining...' : 'Explain Diagram'"></span>
-                </button>
-                <div class="toolbar-dropdown-sep"></div>
-                <button type="button" class="toolbar-dropdown-item" @click="toggleIntelligence(); analyzeDropdownOpen = false" :disabled="intelligenceLoading">
-                    <i data-lucide="shield" class="w-3.5 h-3.5"></i>
-                    <span x-text="intelligenceEnabled ? 'Disable Intelligence' : 'Enterprise Intelligence'"></span>
-                </button>
-                <button type="button" class="toolbar-dropdown-item" @click="openMatrixView(); analyzeDropdownOpen = false">
-                    <i data-lucide="table-2" class="w-3.5 h-3.5"></i> Matrix View
-                </button>
-                <button type="button" class="toolbar-dropdown-item" @click="openLandscapeView(); analyzeDropdownOpen = false">
-                    <i data-lucide="grid" class="w-3.5 h-3.5"></i> Landscape Map
-                </button>
-                <button type="button" class="toolbar-dropdown-item" @click="openAuditLog(); analyzeDropdownOpen = false">
-                    <i data-lucide="clock" class="w-3.5 h-3.5"></i> Change History
-                </button>
-                <div class="toolbar-dropdown-sep"></div>
-                <button type="button" class="toolbar-dropdown-item" @click="deltaMode ? exitDeltaMode() : openDeltaCompare(); analyzeDropdownOpen = false"
-                        x-show="currentSavedVpId" x-cloak>
-                    <i data-lucide="git-compare" class="w-3.5 h-3.5"></i>
-                    <span x-text="deltaMode ? 'Exit Delta Mode' : 'Compare Baseline'"></span>
-                </button>
-                <div class="toolbar-dropdown-sep"></div>
-                <button type="button" class="toolbar-dropdown-item" @click="toggleLifecycleViz(); analyzeDropdownOpen = false">
-                    <i data-lucide="activity" class="w-3.5 h-3.5"></i>
-                    <span x-text="lifecycleVizEnabled ? 'Disable Lifecycle View' : 'Enable Lifecycle View'"></span>
-                </button>
-                <div class="toolbar-dropdown-sep"></div>
-                {# CMP2-001: Current / Target / Gap state toggle #}
-                <div class="toolbar-dropdown-label" style="padding: 4px 12px; font-size: 10px; color: hsl(var(--muted-foreground)); text-transform: uppercase; letter-spacing: 0.5px;">State View</div> <!-- inline-style-ok --> <!-- ratchet-ok -->
-                <button type="button" class="toolbar-dropdown-item" @click="setStateViewMode('all'); analyzeDropdownOpen = false"
-                        :class="stateViewMode === 'all' ? 'text-primary font-semibold' : ''">
-                    <i data-lucide="layers" class="w-3.5 h-3.5"></i>
-                    <span x-text="stateViewMode === 'all' ? 'All States ✓' : 'All States'"></span>
-                </button>
-                <button type="button" class="toolbar-dropdown-item" @click="setStateViewMode('current'); analyzeDropdownOpen = false"
-                        :class="stateViewMode === 'current' ? 'text-primary font-semibold' : ''">
-                    <i data-lucide="clock" class="w-3.5 h-3.5"></i>
-                    <span x-text="stateViewMode === 'current' ? 'Current State ✓' : 'Current State'"></span>
-                </button>
-                <button type="button" class="toolbar-dropdown-item" @click="setStateViewMode('target'); analyzeDropdownOpen = false"
-                        :class="stateViewMode === 'target' ? 'text-primary font-semibold' : ''">
-                    <i data-lucide="target" class="w-3.5 h-3.5"></i>
-                    <span x-text="stateViewMode === 'target' ? 'Target State ✓' : 'Target State'"></span>
-                </button>
-                <button type="button" class="toolbar-dropdown-item" @click="setStateViewMode('gap'); analyzeDropdownOpen = false"
-                        :class="stateViewMode === 'gap' ? 'text-primary font-semibold' : ''">
-                    <i data-lucide="git-compare" class="w-3.5 h-3.5"></i>
-                    <span x-text="stateViewMode === 'gap' ? 'Gap Analysis ✓' : 'Gap Analysis'"></span>
-                </button>
-                <div class="toolbar-dropdown-sep"></div>
-                <div class="toolbar-dropdown-label" style="padding: 4px 12px; font-size: 10px; color: hsl(var(--muted-foreground)); text-transform: uppercase; letter-spacing: 0.5px;">Heatmap</div>
-                <button type="button" class="toolbar-dropdown-item" @click="toggleHeatmap('maturity'); analyzeDropdownOpen = false" :disabled="heatmapLoading">
-                    <i data-lucide="thermometer" class="w-3.5 h-3.5"></i>
-                    <span x-text="heatmapEnabled && heatmapMetric === 'maturity' ? 'Clear Maturity Heatmap' : 'Maturity Heatmap'"></span>
-                </button>
-                <button type="button" class="toolbar-dropdown-item" @click="toggleHeatmap('risk'); analyzeDropdownOpen = false" :disabled="heatmapLoading">
-                    <i data-lucide="shield-alert" class="w-3.5 h-3.5"></i>
-                    <span x-text="heatmapEnabled && heatmapMetric === 'risk' ? 'Clear Risk Heatmap' : 'Risk Heatmap'"></span>
-                </button>
-                <button type="button" class="toolbar-dropdown-item" @click="toggleHeatmap('adoption'); analyzeDropdownOpen = false" :disabled="heatmapLoading">
-                    <i data-lucide="users" class="w-3.5 h-3.5"></i>
-                    <span x-text="heatmapEnabled && heatmapMetric === 'adoption' ? 'Clear Adoption Heatmap' : 'Adoption Heatmap'"></span>
-                </button>
-                <div class="toolbar-dropdown-sep"></div>
-                <button type="button" class="toolbar-dropdown-item" @click="toggleDerived(); analyzeDropdownOpen = false" :disabled="derivedLoading">
-                    <i data-lucide="git-branch" class="w-3.5 h-3.5"></i>
-                    <span x-text="derivedEnabled ? 'Hide Derived Rels' : 'Show Derived Rels'"></span>
-                </button>
-                <div class="toolbar-dropdown-sep"></div>
-                {# CMP2-004: Live metrics overlay #}
-                <div class="toolbar-dropdown-label" style="padding: 4px 12px; font-size: 10px; color: hsl(var(--muted-foreground)); text-transform: uppercase; letter-spacing: 0.5px;">Metrics Overlay</div> <!-- inline-style-ok --> <!-- ratchet-ok -->
-                <button type="button" class="toolbar-dropdown-item" @click="toggleMetricsOverlay('off'); analyzeDropdownOpen = false"
-                        :class="metricsOverlayType === 'off' ? 'text-primary font-semibold' : ''">
-                    <i data-lucide="eye-off" class="w-3.5 h-3.5"></i> Off
-                </button>
-                <button type="button" class="toolbar-dropdown-item" @click="toggleMetricsOverlay('maturity'); analyzeDropdownOpen = false"
-                        :disabled="metricsLoading"
-                        :class="metricsOverlayType === 'maturity' ? 'text-primary font-semibold' : ''">
-                    <i data-lucide="gauge" class="w-3.5 h-3.5"></i>
-                    <span x-text="metricsOverlayType === 'maturity' ? 'Maturity ✓' : 'Maturity'"></span>
-                </button>
-                <button type="button" class="toolbar-dropdown-item" @click="toggleMetricsOverlay('lifecycle'); analyzeDropdownOpen = false"
-                        :disabled="metricsLoading"
-                        :class="metricsOverlayType === 'lifecycle' ? 'text-primary font-semibold' : ''">
-                    <i data-lucide="activity" class="w-3.5 h-3.5"></i>
-                    <span x-text="metricsOverlayType === 'lifecycle' ? 'Lifecycle ✓' : 'Lifecycle'"></span>
-                </button>
-                <button type="button" class="toolbar-dropdown-item" @click="toggleMetricsOverlay('risk'); analyzeDropdownOpen = false"
-                        :disabled="metricsLoading"
-                        :class="metricsOverlayType === 'risk' ? 'text-primary font-semibold' : ''">
-                    <i data-lucide="shield-alert" class="w-3.5 h-3.5"></i>
-                    <span x-text="metricsOverlayType === 'risk' ? 'Risk ✓' : 'Risk'"></span>
-                </button>
-                <button type="button" class="toolbar-dropdown-item" @click="toggleMetricsOverlay('cost'); analyzeDropdownOpen = false"
-                        :disabled="metricsLoading"
-                        :class="metricsOverlayType === 'cost' ? 'text-primary font-semibold' : ''">
-                    <i data-lucide="dollar-sign" class="w-3.5 h-3.5"></i>
-                    <span x-text="metricsOverlayType === 'cost' ? 'Cost ✓' : 'Cost'"></span>
-                </button>
-            </div>
-        </div>
-
-        {# CMP-054: Presentation mode — collapsible into More #}
-        <button type="button" class="toolbar-btn toolbar-overflow-secondary" @click="enterPresentationMode()" title="Enter presentation mode">
-            <i data-lucide="presentation" class="w-3.5 h-3.5"></i>
-            <span>Present</span>
-        </button>
-
-        {# Export dropdown — collapsible into More #}
-        <div class="toolbar-dropdown toolbar-overflow-secondary" @click.outside="exportDropdownOpen = false">
-            <button type="button" class="toolbar-btn" @click="exportDropdownOpen = !exportDropdownOpen"
-                    style="border: 1px solid hsl(var(--border));">
-                <i data-lucide="download" class="w-3.5 h-3.5"></i> Export
-                <i data-lucide="chevron-down" class="w-3 h-3"></i>
-            </button>
-            <div x-show="exportDropdownOpen" x-cloak x-transition.opacity.duration.120ms class="toolbar-dropdown-menu right-align" style="min-width: 180px;"> <!-- modal-a11y-ok --> <!-- inline-style-ok -->
-                <button type="button" class="toolbar-dropdown-item" @click="exportPng(); exportDropdownOpen = false">
-                    <i data-lucide="image" class="w-3.5 h-3.5"></i> Export PNG (2x)
-                </button>
-                <button type="button" class="toolbar-dropdown-item" @click="exportSvg(); exportDropdownOpen = false">
-                    <i data-lucide="file-code" class="w-3.5 h-3.5"></i> Export SVG
-                </button>
-                <button type="button" class="toolbar-dropdown-item" @click="exportPdf(); exportDropdownOpen = false">
-                    <i data-lucide="file-text" class="w-3.5 h-3.5"></i> Export PDF
-                </button>
-                <button type="button" class="toolbar-dropdown-item" @click="exportToPptx(); exportDropdownOpen = false"
-                        x-show="elementCount > 0" x-cloak>
-                    <i data-lucide="presentation" class="w-3.5 h-3.5"></i> Export PowerPoint
-                </button>
-                <div class="toolbar-dropdown-sep"></div>
-                <button type="button" class="toolbar-dropdown-item" @click="exportFormat('archimate_exchange','xml','ArchiMate XML (OEF)'); exportDropdownOpen = false"
-                        x-show="elementCount > 0" x-cloak title="ArchiMate Exchange Format (.xml) — re-importable into other ArchiMate tools">
-                    <i data-lucide="file-json" class="w-3.5 h-3.5"></i> Export ArchiMate XML
-                </button>
-                <button type="button" class="toolbar-dropdown-item" @click="exportReport(); exportDropdownOpen = false"
-                        x-show="elementCount > 0" x-cloak>
-                    <i data-lucide="file-bar-chart" class="w-3.5 h-3.5"></i> Export Report (PDF)
-                </button>
-                <button type="button" class="toolbar-dropdown-item" @click="exportFormat('archimate_exchange','xml','ArchiMate XML (OEF)'); exportDropdownOpen = false"
-                        x-show="elementCount > 0" x-cloak>
-                    <i data-lucide="file-text" class="w-3.5 h-3.5"></i> ArchiMate XML (OEF)
-                </button>
-                <button type="button" class="toolbar-dropdown-item" @click="exportFormat('archi','archimate','ArchiMate model'); exportDropdownOpen = false"
-                        x-show="elementCount > 0" x-cloak>
-                    <i data-lucide="boxes" class="w-3.5 h-3.5"></i> ArchiMate (.archimate)
-                </button>
-                <button type="button" class="toolbar-dropdown-item" @click="exportFormat('lucid','lucid','Lucidchart'); exportDropdownOpen = false"
-                        x-show="elementCount > 0" x-cloak>
-                    <i data-lucide="workflow" class="w-3.5 h-3.5"></i> Lucidchart (.lucid)
-                </button>
-                <button type="button" class="toolbar-dropdown-item" @click="exportFormat('mermaid','mmd','Mermaid'); exportDropdownOpen = false"
-                        x-show="elementCount > 0" x-cloak>
-                    <i data-lucide="git-branch" class="w-3.5 h-3.5"></i> Mermaid
-                </button>
-            </div>
-        </div>
-
-        {# ── CMP-063: "More" overflow dropdown — visible only below 1600px ── #}
-        <div class="toolbar-dropdown toolbar-overflow-more" @click.outside="moreDropdownOpen = false">
-            <button type="button" class="toolbar-btn" @click="moreDropdownOpen = !moreDropdownOpen"
-                    title="More actions (Layout, Style, Analyze, Present, Export)">
-                <i data-lucide="more-horizontal" class="w-3.5 h-3.5"></i>
-                <span>More</span>
-                <i data-lucide="chevron-down" class="w-3 h-3"></i>
-            </button>
-            <div x-show="moreDropdownOpen" x-cloak x-transition.opacity.duration.120ms class="toolbar-dropdown-menu right-align" style="min-width: 220px; max-height: 70vh;"> <!-- modal-a11y-ok --> <!-- inline-style-ok -->
-                {# Layout section (edit mode only) #}
-                <template x-if="mode === 'edit'">
-                    <div>
-                        <div class="toolbar-dropdown-label">Layout</div>
-                        <button type="button" class="toolbar-dropdown-item" @click="reLayout(); moreDropdownOpen = false">
-                            <i data-lucide="layout-grid" class="w-3.5 h-3.5"></i> Layer Banding
-                        </button>
-                        <button type="button" class="toolbar-dropdown-item" @click="layoutDagre('TB'); moreDropdownOpen = false">
-                            <i data-lucide="arrow-down" class="w-3.5 h-3.5"></i> Hierarchical (Top-Bottom)
-                        </button>
-                        <button type="button" class="toolbar-dropdown-item" @click="layoutDagre('LR'); moreDropdownOpen = false">
-                            <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i> Hierarchical (Left-Right)
-                        </button>
-                        <button type="button" class="toolbar-dropdown-item" @click="layoutSequence(); moreDropdownOpen = false">
-                            <i data-lucide="arrow-left-right" class="w-3.5 h-3.5"></i> Sequence View
-                        </button>
-                        <button type="button" class="toolbar-dropdown-item" @click="clearCanvas(); moreDropdownOpen = false" style="color: hsl(var(--destructive));">
-                            <i data-lucide="trash-2" class="w-3.5 h-3.5"></i> Clear Canvas
-                        </button>
-                        <div class="toolbar-dropdown-sep"></div>
-                        <div class="toolbar-dropdown-label">Style</div>
-                        <button type="button" class="toolbar-dropdown-item" @click="applyStyleTemplate('Corporate'); moreDropdownOpen = false">
-                            <span class="w-3 h-3 rounded-sm border" style="background:#f0f4f8; border-color:#334155;"></span> Corporate
-                        </button>
-                        <button type="button" class="toolbar-dropdown-item" @click="applyStyleTemplate('High Contrast'); moreDropdownOpen = false">
-                            <span class="w-3 h-3 rounded-sm border" style="background:#ffffff; border-color:#000000;"></span> High Contrast
-                        </button>
-                        <button type="button" class="toolbar-dropdown-item" @click="applyStyleTemplate('Print Friendly'); moreDropdownOpen = false">
-                            <span class="w-3 h-3 rounded-sm border" style="background:#fafafa; border-color:#555555;"></span> Print Friendly
-                        </button>
-                        <button type="button" class="toolbar-dropdown-item" @click="resetElementStyles(); moreDropdownOpen = false">
-                            <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i> Reset to Layer Colors
-                        </button>
-                        <div class="toolbar-dropdown-sep"></div>
-                    </div>
-                </template>
-                {# Analyze section #}
-                <div class="toolbar-dropdown-label">Analyze</div>
-                <button type="button" class="toolbar-dropdown-item" @click="runValidation(); moreDropdownOpen = false" :disabled="validationLoading">
-                    <i data-lucide="check-circle" class="w-3.5 h-3.5"></i>
-                    <span x-text="validationLoading ? 'Validating...' : 'Validate Diagram'"></span>
-                </button>
-                <button type="button" class="toolbar-dropdown-item" @click="explainDiagram(); moreDropdownOpen = false" :disabled="explanationLoading">
-                    <i data-lucide="book-open" class="w-3.5 h-3.5"></i>
-                    <span x-text="explanationLoading ? 'Explaining...' : 'Explain Diagram'"></span>
-                </button>
-                <button type="button" class="toolbar-dropdown-item" @click="toggleIntelligence(); moreDropdownOpen = false" :disabled="intelligenceLoading">
-                    <i data-lucide="shield" class="w-3.5 h-3.5"></i>
-                    <span x-text="intelligenceEnabled ? 'Disable Intelligence' : 'Enterprise Intelligence'"></span>
-                </button>
-                <button type="button" class="toolbar-dropdown-item" @click="openMatrixView(); moreDropdownOpen = false">
-                    <i data-lucide="table-2" class="w-3.5 h-3.5"></i> Matrix View
-                </button>
-                <button type="button" class="toolbar-dropdown-item" @click="openLandscapeView(); moreDropdownOpen = false">
-                    <i data-lucide="grid" class="w-3.5 h-3.5"></i> Landscape Map
-                </button>
-                <button type="button" class="toolbar-dropdown-item" @click="openAuditLog(); moreDropdownOpen = false">
-                    <i data-lucide="clock" class="w-3.5 h-3.5"></i> Change History
-                </button>
-                <div class="toolbar-dropdown-sep"></div>
-                {# CMP2-004: Metrics overlay in More dropdown #}
-                <div class="toolbar-dropdown-label">Metrics Overlay</div>
-                <button type="button" class="toolbar-dropdown-item" @click="toggleMetricsOverlay('maturity'); moreDropdownOpen = false"
-                        :disabled="metricsLoading"
-                        :class="metricsOverlayType === 'maturity' ? 'text-primary font-semibold' : ''">
-                    <i data-lucide="gauge" class="w-3.5 h-3.5"></i> Maturity
-                </button>
-                <button type="button" class="toolbar-dropdown-item" @click="toggleMetricsOverlay('lifecycle'); moreDropdownOpen = false"
-                        :disabled="metricsLoading"
-                        :class="metricsOverlayType === 'lifecycle' ? 'text-primary font-semibold' : ''">
-                    <i data-lucide="activity" class="w-3.5 h-3.5"></i> Lifecycle
-                </button>
-                <button type="button" class="toolbar-dropdown-item" @click="toggleMetricsOverlay('risk'); moreDropdownOpen = false"
-                        :disabled="metricsLoading"
-                        :class="metricsOverlayType === 'risk' ? 'text-primary font-semibold' : ''">
-                    <i data-lucide="shield-alert" class="w-3.5 h-3.5"></i> Risk
-                </button>
-                <button type="button" class="toolbar-dropdown-item" @click="toggleMetricsOverlay('cost'); moreDropdownOpen = false"
-                        :disabled="metricsLoading"
-                        :class="metricsOverlayType === 'cost' ? 'text-primary font-semibold' : ''">
-                    <i data-lucide="dollar-sign" class="w-3.5 h-3.5"></i> Cost
-                </button>
-                <div class="toolbar-dropdown-sep"></div>
-                {# Present #}
-                <button type="button" class="toolbar-dropdown-item" @click="enterPresentationMode(); moreDropdownOpen = false">
-                    <i data-lucide="presentation" class="w-3.5 h-3.5"></i> Presentation Mode
-                </button>
-                <div class="toolbar-dropdown-sep"></div>
-                {# Export #}
-                <div class="toolbar-dropdown-label">Export</div>
-                <button type="button" class="toolbar-dropdown-item" @click="exportPng(); moreDropdownOpen = false">
-                    <i data-lucide="image" class="w-3.5 h-3.5"></i> Export PNG (2x)
-                </button>
-                <button type="button" class="toolbar-dropdown-item" @click="exportSvg(); moreDropdownOpen = false">
-                    <i data-lucide="file-code" class="w-3.5 h-3.5"></i> Export SVG
-                </button>
-                <button type="button" class="toolbar-dropdown-item" @click="exportPdf(); moreDropdownOpen = false">
-                    <i data-lucide="file-text" class="w-3.5 h-3.5"></i> Export PDF
-                </button>
-                <button type="button" class="toolbar-dropdown-item" @click="exportToPptx(); moreDropdownOpen = false"
-                        x-show="elementCount > 0" x-cloak>
-                    <i data-lucide="presentation" class="w-3.5 h-3.5"></i> Export PowerPoint
-                </button>
-                <button type="button" class="toolbar-dropdown-item" @click="exportReport(); moreDropdownOpen = false"
-                        x-show="elementCount > 0" x-cloak>
-                    <i data-lucide="file-bar-chart" class="w-3.5 h-3.5"></i> Export Report (PDF)
-                </button>
-                <div class="toolbar-dropdown-sep"></div>
-                <button type="button" class="toolbar-dropdown-item" @click="exportFormat('archimate_exchange','xml','ArchiMate XML (OEF)'); moreDropdownOpen = false"
-                        x-show="elementCount > 0" x-cloak>
-                    <i data-lucide="file-text" class="w-3.5 h-3.5"></i> ArchiMate XML (OEF)
-                </button>
-                <button type="button" class="toolbar-dropdown-item" @click="exportFormat('archi','archimate','ArchiMate model'); moreDropdownOpen = false"
-                        x-show="elementCount > 0" x-cloak>
-                    <i data-lucide="boxes" class="w-3.5 h-3.5"></i> ArchiMate (.archimate)
-                </button>
-                <button type="button" class="toolbar-dropdown-item" @click="exportFormat('lucid','lucid','Lucidchart'); moreDropdownOpen = false"
-                        x-show="elementCount > 0" x-cloak>
-                    <i data-lucide="workflow" class="w-3.5 h-3.5"></i> Lucidchart (.lucid)
-                </button>
-                <button type="button" class="toolbar-dropdown-item" @click="exportFormat('mermaid','mmd','Mermaid'); moreDropdownOpen = false"
-                        x-show="elementCount > 0" x-cloak>
-                    <i data-lucide="git-branch" class="w-3.5 h-3.5"></i> Mermaid
-                </button>
-            </div>
-        </div>
-
-        {# Wave 10: Quality score badge #}
-        <template x-if="qualityScore">
-            <div class="flex items-center gap-1 ml-auto mr-2">
-                <div class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-2xs font-medium border"
-                     :class="qualityScore.overall >= 80 ? 'bg-success/10 text-success-emphasis border-success/30' : qualityScore.overall >= 50 ? 'bg-warning/10 text-warning-emphasis border-warning/30' : 'bg-destructive/10 text-destructive-emphasis border-destructive/30'">
-                    <span x-text="'Quality: ' + qualityScore.overall + '%'"></span>
-                </div>
-                <div class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-2xs text-muted-foreground border border-border">
-                    <span x-text="'V:' + qualityScore.validity + '%'"></span>
-                </div>
-                <template x-if="staleCount > 0">
-                    <div class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-2xs font-medium bg-warning/10 text-warning-emphasis border border-warning/30 animate-pulse"
-                         x-text="staleCount + ' stale'"></div>
-                </template>
-            </div>
-        </template>
-
-        {# Status info shown in bottom status bar — not in toolbar #}
-    </div>
-    </nav>
-
+{{ diagram_toolbar(import_items=import_items, export_items=export_items, more_items=more_items) }}

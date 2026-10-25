@@ -222,6 +222,7 @@ let ComposerSearch = (function() {
                     let el = { id: elem.id, name: elem.name || name, type: elem.type || type, layer: elem.layer || layer };
                     let node = createNode(el.id, el.name, el.type, el.layer, self.dropX, self.dropY);
                     self.graph.addCell(node);
+                    self.shellRecordPlacement(node);
                     self.canvasElements[el.id] = el;
                     self.elementCount++;
                     if (self.solutionId) self.linkElementToSolution(elem.id);

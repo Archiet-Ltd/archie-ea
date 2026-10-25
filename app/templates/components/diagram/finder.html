@@ -1,0 +1,41 @@
+{# Finder: the elements in this view, searchable, with a count. Choosing one selects it and brings it to the
+   middle of the canvas. Reads composerApp (finderRows, finderItems, finderFilter).
+
+   Usage: {% from 'components/diagram/finder.html' import diagram_finder with context %}
+          {{ diagram_finder() }} #}
+{% from 'components/input.html' import input %}
+{% from 'components/button.html' import button %}
+{% from 'components/diagram/palette.html' import notation_swatch with context %}
+
+{% macro diagram_finder() %}
+<section class="flex min-h-0 flex-1 flex-col" aria-label="Elements in this view" data-testid="diagram-finder">
+  <div class="flex flex-col gap-2 border-b border-border p-3">
+    <p class="text-xs text-muted-foreground">
+      <span class="font-medium text-foreground tabular-nums" data-testid="finder-count" x-text="finderRows.length"></span>
+      <span x-text="finderFilter ? ('of ' + finderItems.length + ' elements match') : (finderItems.length === 1 ? 'element in this view' : 'elements in this view')"></span>
+    </p>
+    {{ input(type='search', placeholder='Find an element in this view', aria_label='Find an element in this view', class='h-8', attrs_dict={'x-model': 'finderFilter', 'data-testid': 'finder-search'}) }}
+  </div>
+  <ul class="min-h-0 flex-1 overflow-y-auto p-2" data-testid="finder-list">
+    <template x-for="row in finderRows" :key="row.id">
+      <li>
+        {% call button(variant='ghost', size='sm', class='h-auto w-full justify-start gap-2 px-2 py-1 text-left font-normal', attrs_dict={'@click': 'shellFocus(row.id)', ':data-testid': '\'finder-row-\' + row.id', ':aria-label': '\'Show \' + row.name + \' on the diagram\''}) %}
+          {{ notation_swatch('row.elType', 'row.layer') }}
+          <span class="flex min-w-0 flex-col">
+            <span class="truncate text-sm" x-text="row.name"></span>
+            <span class="truncate text-xs text-muted-foreground" x-text="row.type"></span>
+          </span>
+        {% endcall %}
+      </li>
+    </template>
+  </ul>
+  <div x-show="finderItems.length === 0" x-cloak class="px-4 py-6 text-center text-sm text-muted-foreground" data-testid="finder-empty">
+    <p>This view has no elements yet. Add one from the Add tab, and it is listed here so you can find it again.</p>
+    {% call button(variant='outline', size='sm', class='mt-2', attrs_dict={'@click': 'shellRailTab = \'add\''}) %}Open the element palette{% endcall %}
+  </div>
+  <div x-show="finderItems.length > 0 && finderRows.length === 0" x-cloak class="px-4 py-6 text-center text-sm text-muted-foreground" data-testid="finder-no-match">
+    <p>No element in this view matches that search.</p>
+    {% call button(variant='outline', size='sm', class='mt-2', attrs_dict={'@click': 'finderFilter = \'\''}) %}Clear the search{% endcall %}
+  </div>
+</section>
+{% endmacro %}
