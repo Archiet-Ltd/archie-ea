@@ -67,17 +67,18 @@
 {% set ZONES = {
   1: 'bg-chart-1/10 border-chart-1/30', 2: 'bg-chart-2/10 border-chart-2/30', 3: 'bg-chart-3/10 border-chart-3/30',
   4: 'bg-chart-4/10 border-chart-4/30', 5: 'bg-chart-5/10 border-chart-5/30'} %}
-{% set EMPTY_ROW = 'Empty. Add the first entry from the canvas view.' %}
+{#- What an empty box or sub-area says in the list view and the canvas view: its own text, or "No <title> yet." with its question. -#}
+{% macro empty_text(b) -%}{{ b.empty or ('No ' ~ b.title|lower ~ ' yet. ' ~ (b.question or 'Add the first entry from the canvas view.')) }}{%- endmacro %}
 
 {#- One note card: the note as the trigger of a hover card that previews the model element (help-and-overlays-v1 3). A note is a string,
     or a dict {'text', 'href', 'remove_url', 'box'}: with an href the text links to the element it names; with a remove_url a small
     form takes the entry off this canvas. -#}
 {% macro note_card(canvas_id, box_title, element, n, canvas_name='') -%}
 {%- set text = n.text if n is mapping else n -%}
-<li data-canvas-note class="flex items-start justify-between gap-1">
+<li data-canvas-note class="flex w-full flex-wrap items-start gap-x-1 rounded-md border bg-card">
   {% call ui.hover_card() %}
-    {% if n is mapping and n.href %}<a href="{{ n.href }}" class="block min-w-0 break-words rounded-md border bg-card px-2 py-1.5 text-sm text-primary hover:underline focus-visible:ring-2 focus-visible:ring-ring" data-note-text>{{ text }}</a>
-    {% else %}<span class="block min-w-0 break-words rounded-md border bg-card px-2 py-1.5 text-sm" data-note-text>{{ text }}</span>{% endif %}
+    {% if n is mapping and n.href %}<a href="{{ n.href }}" class="block min-w-0 break-words px-2 py-1.5 text-sm text-primary hover:underline focus-visible:ring-2 focus-visible:ring-ring" data-note-text>{{ text }}</a>
+    {% else %}<span class="block min-w-0 break-words px-2 py-1.5 text-sm" data-note-text>{{ text }}</span>{% endif %}
     {% call ui.hover_card_content() %}
       <div class="flex flex-col gap-2 text-sm">
         <p class="font-medium">{{ text }}</p>
@@ -86,16 +87,22 @@
           <dt class="text-muted-foreground">Box</dt><dd>{{ box_title }}</dd>
           <dt class="text-muted-foreground">Used in</dt><dd class="min-w-0 break-words">{{ canvas_name }}</dd>
         </dl>
-        {% if n is mapping and n.href %}<p class="text-xs text-muted-foreground">Select the name to open it.</p>{% endif %}
+        {% if n is mapping and n.href %}{{ ui.button(text='Open in the model', variant='link', size='xs', href=n.href, class='justify-start px-0', attrs={'data-note-open': ''}) }}
+        <p class="text-xs text-muted-foreground">Delete the element there. Here it only leaves this canvas.</p>{% endif %}
       </div>
     {% endcall %}
   {% endcall %}
-  {% if n is mapping and n.remove_url %}
-  <form method="post" action="{{ n.remove_url }}" class="shrink-0">
-    {{ ui.hidden('csrf_token', csrf_token()) }}
-    {{ ui.hidden('box', n.box) }}
-    {% call ui.tooltip('Remove from this canvas') %}{% call ui.button(variant='ghost', size='icon-xs', type='submit', class='text-muted-foreground', attrs={'aria-label': 'Remove ' ~ text ~ ' from this canvas'}) %}{{ ui.lucide('x', 'size-3') }}{% endcall %}{% endcall %}
-  </form>
+  {% if n is mapping and (n.rename_url or n.remove_url) %}
+  <span class="ml-auto flex shrink-0 items-center gap-0.5 py-1.5 pr-1.5">
+    {% if n.rename_url %}{{ ui.edit_popover('Edit this entry', 'Edit ' ~ text, n.rename_url, n.box, text, n.box ~ '-' ~ n.id) }}{% endif %}
+    {% if n.remove_url %}
+    <form method="post" action="{{ n.remove_url }}" class="inline-flex">
+      {{ ui.hidden('csrf_token', csrf_token()) }}
+      {{ ui.hidden('box', n.box) }}
+      {% call ui.tooltip('Remove from this canvas (stays in your model)', true) %}{% call ui.button(variant='ghost', size='icon-xs', type='submit', class='text-muted-foreground', attrs={'aria-label': 'Remove from this canvas (stays in your model)', 'data-note-remove': ''}) %}{{ ui.lucide('x', 'size-3') }}{% endcall %}{% endcall %}
+    </form>
+    {% endif %}
+  </span>
   {% endif %}
 </li>
 {%- endmacro %}
@@ -140,9 +147,9 @@
         {% if add %}{{ add_button(b.key, b.title) }}{% endif %}
       </span>
     </div>
-    {% call ui.card_title(class='flex items-center gap-2') %}
+    {% call ui.card_title(class='flex items-center gap-2 text-foreground') %}
       {% if b.number %}{{ ui.badge(text=b.number, variant='outline', class='size-5 rounded-full px-0') }}{% endif %}
-      {% if b.icon %}{{ ui.lucide(b.icon, 'size-4 shrink-0') }}{% endif %}
+      {% if b.icon %}{{ ui.lucide(b.icon, 'size-4 shrink-0 text-foreground') }}{% endif %}
       <span>{{ b.title }}</span>
     {% endcall %}
     {{ ui.card_description(text=b.question, class='text-xs text-foreground/70') }}
@@ -160,7 +167,7 @@
 {% call ui.card(size='sm', class=b.area ~ ' ' ~ (b.class or '') ~ ' relative gap-0 py-0') %}
   {{ band(canvas_id, b, m, boxes.get(b.key) or [], add=add) }}
   {% call ui.card_content(class='flex min-h-0 flex-1 flex-col gap-3 py-3' ~ (' overflow-y-auto' if scroll else '')) %}
-    {{ notes(canvas_id, b.key, boxes.get(b.key) or [], b.title, m.element, canvas_name, b.empty or b.question, add) }}
+    {{ notes(canvas_id, b.key, boxes.get(b.key) or [], b.title, m.element, canvas_name, empty_text(b), add) }}
     {% for s in (b.subs or []) %}
     {%- set sm = canvas_box_meta(canvas_id, s.key) -%}
     {{ ui.separator() }}
@@ -181,8 +188,8 @@
 {%- set boxes = data.boxes or {} -%}
 {%- set rows = [] -%}
 {%- for b in spec.boxes -%}
-  {%- for n in boxes.get(b.key) or [b.empty or EMPTY_ROW] %}{% set _ = rows.append([b.key, b.title, n.text if n is mapping else n, n.href if n is mapping else '']) %}{% endfor -%}
-  {%- for s in b.subs or [] -%}{%- for n in boxes.get(s.key) or [s.empty or EMPTY_ROW] %}{% set _ = rows.append([s.key, s.title, n.text if n is mapping else n, n.href if n is mapping else '']) %}{% endfor -%}{%- endfor -%}
+  {%- for n in boxes.get(b.key) or [empty_text(b)] %}{% set _ = rows.append([b.key, b.title, n.text if n is mapping else n, n.href if n is mapping else '']) %}{% endfor -%}
+  {%- for s in b.subs or [] -%}{%- for n in boxes.get(s.key) or [empty_text(s)] %}{% set _ = rows.append([s.key, s.title, n.text if n is mapping else n, n.href if n is mapping else '']) %}{% endfor -%}{%- endfor -%}
 {%- endfor -%}
 {% call frame(id, spec.form, spec.name, data, rows, spec.hint, credit=spec.credit, width=spec.width or 'min-w-240') %}
   <div class="grid gap-2 rounded-lg border bg-muted/30 p-2 {{ spec.grid }}">

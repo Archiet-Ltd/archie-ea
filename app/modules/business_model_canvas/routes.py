@@ -84,6 +84,7 @@ def _note_entry(canvas, box_key, el, editable):
     }
     if editable:
         note["remove_url"] = url_for("business_model.remove_entry", canvas_id=canvas.id, element_id=el.id)
+        note["rename_url"] = url_for("business_model.rename_entry", canvas_id=canvas.id, element_id=el.id)
     return note
 
 

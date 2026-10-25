@@ -29,7 +29,7 @@
 {%- set boxes = data.boxes or {} -%}
 {%- set rows = [] -%}
 {%- for part, group in [('Value Map', MAP), ('Customer Profile', PROFILE)] -%}
-  {%- for b in group -%}{%- for n in boxes.get(b.key) or [b.empty or f.EMPTY_ROW] %}{% set _ = rows.append([b.key, b.title, part, n.text if n is mapping else n, n.href if n is mapping else '']) %}{% endfor -%}{%- endfor -%}
+  {%- for b in group -%}{%- for n in boxes.get(b.key) or [f.empty_text(b)] %}{% set _ = rows.append([b.key, b.title, part, n.text if n is mapping else n, n.href if n is mapping else '']) %}{% endfor -%}{%- endfor -%}
 {%- endfor -%}
 {% call f.frame(id, 'C4', 'Value proposition canvas', data, rows, 'Scroll sideways on a narrow screen to see the value map, the fit arrows and the customer profile.',
      credit='Value Proposition Canvas by Strategyzer AG (strategyzer.com), Alexander Osterwalder, Yves Pigneur, Greg Bernarda and Alan Smith.',

@@ -102,7 +102,7 @@ def test_business_architect_fills_and_follows_the_canvas(browser, live_server, s
             notes = page.locator(f'[data-canvas-notes="{box}"] > li')
             assert notes.count() >= 1, f"{box} is empty on a seeded company"
             for i in range(notes.count()):
-                link = notes.nth(i).locator("a")
+                link = notes.nth(i).locator("a[data-note-text]")
                 assert link.count() == 1, f"{box} entry {i} does not open anything"
                 hrefs[link.get_attribute("href")] = link.inner_text()
         assert len(hrefs) >= 20
@@ -163,7 +163,8 @@ def test_business_architect_fills_and_follows_the_canvas(browser, live_server, s
         # Removing an entry takes it off the canvas and keeps the element.
         page.goto(canvas_url, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
         with page.expect_navigation(timeout=PAGE_TIMEOUT):
-            page.get_by_role("button", name="Remove Grocery chains from this canvas").click()
+            page.locator("[data-canvas-note]", has_text="Grocery chains").get_by_role(
+                "button", name="Remove from this canvas (stays in your model)").click()
         expect(page.locator('[data-canvas-notes="customer-segments"]')).not_to_contain_text("Grocery chains")
         assert context.request.get(live_server + [h for h, t in hrefs.items()][0]).status == 200
 
@@ -280,7 +281,7 @@ def test_architect_reads_what_each_box_wants_from_its_band_and_empty_state(brows
             '[data-slot=card]:has([data-canvas-notes="key-partners"])',
         )
         assert inside, "the entry preview is cut off by its box"
-        href = first.locator("a").get_attribute("href")
+        href = first.locator("a[data-note-text]").get_attribute("href")
         assert context.request.get(live_server + href).status == 200
 
         # An empty canvas: the empty box says what is missing and its button opens the add dialog.
@@ -300,5 +301,107 @@ def test_architect_reads_what_each_box_wants_from_its_band_and_empty_state(brows
         page.locator(f'main a[href$="/business-model/{empty_id}"]').first.click()
         page.wait_for_url(re.compile(rf"/business-model/{empty_id}$"), timeout=PAGE_TIMEOUT)
         expect(page.locator('[data-canvas-empty="customer-segments"]')).to_be_visible()
+    finally:
+        context.close()
+
+
+def _renamed_names(page, live_server, canvas_id):
+    """The segment names the Value Proposition Canvas shows for this canvas."""
+    page.goto(f"{live_server}/business-model/{canvas_id}/value-proposition", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+    return page.get_by_test_id("vpc-segments").inner_text()
+
+
+@pytest.mark.smoke
+@pytest.mark.journey
+def test_architect_edits_a_note_in_place_and_every_canvas_shows_the_new_name(browser, live_server, seeded):
+    """Goal: a business architect corrects the name of a customer segment from its note card, without leaving the canvas.
+    The edit popover opens prefilled, Cancel changes nothing, Save renames that one element, the Value Proposition Canvas
+    shows the new name and not the old one, and the icon-only controls name themselves in a tooltip."""
+    email = seeded["emails"]["business_architect"]
+    _assert_persona(email)
+    filled_id, _ = _seed_canvases(seeded["ids"]["org"])
+    context = browser.new_context(ignore_https_errors=True, viewport={"width": 1440, "height": 900})
+    page = context.new_page()
+    try:
+        _login(page, live_server, email)
+        page.goto(f"{live_server}/business-model/{filled_id}", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        old = "Municipal water utilities"
+        new = "Regional water boards"
+        assert old in _renamed_names(page, live_server, filled_id)
+        page.goto(f"{live_server}/business-model/{filled_id}", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+        segments = page.locator('[data-canvas-notes="customer-segments"]')
+        card = segments.locator("[data-canvas-note]", has_text=old)
+
+        # Every icon-only control carries a tooltip with the words of its accessible name.
+        for name in ("Edit this entry", "Remove from this canvas (stays in your model)"):
+            button = card.get_by_role("button", name=name)
+            button.hover()
+            expect(card.locator("[role=tooltip]", has_text=name)).to_be_visible()
+        add = page.locator('[data-slot=card]:has([data-canvas-notes="customer-segments"])').get_by_role("button", name="Add to Customer Segments")
+        add.hover()
+        expect(page.locator("[role=tooltip]", has_text="Add to Customer Segments").first).to_be_visible()
+        card.get_by_role("link", name=old).hover()
+        expect(card.get_by_role("link", name="Open in the model")).to_be_visible()
+
+        # The popover is prefilled; Cancel changes nothing.
+        card.get_by_role("button", name="Edit this entry").click()
+        dialog = card.get_by_role("dialog", name=f"Edit {old}")
+        field = dialog.get_by_label("Name")
+        expect(field).to_have_value(old)
+        field.fill("Discarded name")
+        dialog.get_by_role("button", name="Cancel").click()
+        expect(dialog).to_be_hidden()
+        assert "Discarded name" not in page.locator("body").inner_text()
+
+        # Save renames that one element and nothing else.
+        others = segments.locator("[data-canvas-note] [data-note-text]").all_inner_texts()
+        card.get_by_role("button", name="Edit this entry").click()
+        field = card.get_by_role("dialog", name=f"Edit {old}").get_by_label("Name")
+        field.fill(new)
+        with page.expect_navigation(timeout=PAGE_TIMEOUT):
+            card.get_by_role("dialog", name=f"Edit {old}").get_by_role("button", name="Save").click()
+        after = segments.locator("[data-canvas-note] [data-note-text]").all_inner_texts()
+        assert sorted(after) == sorted([new if t == old else t for t in others]), (others, after)
+        page.reload()
+        expect(page.locator('[data-canvas-notes="customer-segments"]')).to_contain_text(new)
+        assert _count_elements(old, seeded["ids"]["org"]) == 0
+        assert _count_elements(new, seeded["ids"]["org"]) == 1
+
+        # The Value Proposition Canvas shows the new name and the old one is gone.
+        text = _renamed_names(page, live_server, filled_id)
+        assert new in text and old not in text, text
+        page.get_by_test_id("vpc-segments").get_by_role("link", name=new).click()
+        page.wait_for_load_state("domcontentloaded")
+        expect(page.locator("body")).to_contain_text(new)
+    finally:
+        context.close()
+
+
+@pytest.mark.smoke
+@pytest.mark.journey
+def test_no_canvas_page_says_nothing_here_yet(browser, live_server, seeded):
+    """An empty box says what is missing and what to add, in the canvas view and in the list view, on both canvases,
+    filled and empty: never a bare "Nothing here yet", "No data" or "N/A"."""
+    email = seeded["emails"]["business_architect"]
+    _assert_persona(email)
+    filled_id, empty_id = _seed_canvases(seeded["ids"]["org"])
+    context = browser.new_context(ignore_https_errors=True, viewport={"width": 1440, "height": 900})
+    page = context.new_page()
+    banned = ("Nothing here yet", "No data", "N/A")
+    try:
+        _login(page, live_server, email)
+        for canvas_id in (filled_id, empty_id):
+            for suffix in ("", "/value-proposition"):
+                page.goto(f"{live_server}/business-model/{canvas_id}{suffix}", wait_until="domcontentloaded", timeout=PAGE_TIMEOUT)
+                for view in ("Canvas", "List"):
+                    page.get_by_role("button", name=view, exact=True).click()
+                    for phrase in banned:
+                        assert phrase not in page.locator("main").inner_text(), (canvas_id, suffix, view, phrase)
+                # The list view's rows for an empty box carry that box's own empty text.
+                page.get_by_role("button", name="List", exact=True).click()
+                rows = page.locator("[data-canvas-rows] tr").all_inner_texts()
+                assert rows and all(len(r.split()) >= 4 for r in rows), rows
+                if canvas_id == empty_id:
+                    assert any("No " in r and " yet" in r for r in rows), rows
     finally:
         context.close()

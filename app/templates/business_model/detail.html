@@ -37,7 +37,7 @@
       actions=actions
   ) }}
 
-  <div class="p-6 space-y-6">
+  <div class="space-y-6">
     {% for category, message in get_flashed_messages(with_categories=true) %}
     <div role="alert" class="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive-emphasis" data-testid="bmc-error">{{ message }}</div>
     {% endfor %}
@@ -59,10 +59,11 @@
          'boxes': boxes,
        }) }}
     {% else %}
-    <div class="flex flex-wrap items-end gap-4">
+    <div class="flex flex-wrap items-end justify-between gap-x-6 gap-y-3" role="group" aria-label="Canvas options" data-testid="bmc-toolbar">
       {% if vision %}
-      <p class="text-sm text-muted-foreground" data-testid="bmc-vision">Vision: <a class="text-primary hover:underline" href="{{ vision_href }}">{{ vision.name }}</a></p>
+      <p class="flex h-9 min-w-0 items-center gap-1 text-sm text-muted-foreground" data-testid="bmc-vision">Vision: <a class="text-primary hover:underline" href="{{ vision_href }}">{{ vision.name }}</a></p>
       {% endif %}
+      <div class="ml-auto flex flex-wrap items-end gap-4">
       <form method="post" action="{{ url_for('business_model.update_canvas', canvas_id=canvas.id) }}" class="flex items-end gap-2" data-testid="bmc-operating-model-panel">
         {{ input(type='hidden', name='csrf_token', value=csrf_token()) }}
         <div class="flex flex-col gap-1.5">
@@ -82,8 +83,9 @@
             <option value="archi">Archi</option>
           {% endcall %}
         </div>
-        {{ button(text='Download', variant='outline', size='sm', type='submit', testid='bmc-export-file') }}
+        {{ button(text='Download', variant='outline', type='submit', testid='bmc-export-file') }}
       </form>
+      </div>
     </div>
 
     {{ canvas_lib.business_model_canvas({

@@ -96,3 +96,18 @@ def test_every_box_zone_is_a_chart_token_the_frame_tints():
     for canvas in ("business-model-canvas", "value-proposition-canvas"):
         for key, meta in boxes[canvas].items():
             assert meta["zone"] in range(1, 6), f"{canvas}/{key}"
+
+
+def test_box_titles_and_icons_are_full_foreground_and_hold_4_5_to_1_in_dark_and_light():
+    """The title and its icon are drawn in the foreground token itself (not muted, not an inherited dark colour), and
+    that token reads at 4.5:1 or better on every band tint in dark mode as well as light."""
+    frame = (CANVAS / "_frame.html").read_text(encoding="utf8")
+    band = frame[frame.index("{% macro band("):frame.index("{%- endmacro %}", frame.index("{% macro band("))]
+    assert "ui.card_title(class='flex items-center gap-2 text-foreground')" in band
+    assert "ui.lucide(b.icon, 'size-4 shrink-0 text-foreground')" in band
+    for selector in (":root", ".dark"):
+        tokens = _tokens(selector)
+        card, fg = _rgb(tokens["card"]), _rgb(tokens["foreground"])
+        for zone in range(1, 6):
+            tint = _mix(_rgb(tokens[f"chart-{zone}"]), card, 0.10)
+            assert _contrast(fg, tint) >= 4.5, f"{selector} zone {zone} title"

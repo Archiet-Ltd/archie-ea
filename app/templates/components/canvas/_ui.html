@@ -17,7 +17,7 @@
 {% macro card_content(class='') %}{% set inner = caller() %}{% call c.card_content(class='p-3 pt-0 ' ~ class) %}{{ inner }}{% endcall %}{% endmacro %}
 
 {% macro badge(text='', variant='default', class='') %}{% call bd.badge(variant=variant, class=class) %}{{ text }}{% endcall %}{% endmacro %}
-{% macro button(text='', variant='default', size='default', class='', type='button', attrs={}) %}{% set inner = caller() if caller is defined else '' %}{% call b.button(variant=variant, size=size, class=class, type=type, attrs_dict=attrs) %}{{ text }}{{ inner }}{% endcall %}{% endmacro %}
+{% macro button(text='', variant='default', size='default', class='', type='button', attrs={}, href=none) %}{% set inner = caller() if caller is defined else '' %}{% call b.button(variant=variant, size=size, class=class, type=type, href=href, attrs_dict=attrs) %}{{ text }}{{ inner }}{% endcall %}{% endmacro %}
 {% macro separator() %}<hr class="border-border">{% endmacro %}
 
 {% macro table_container() %}{% set inner = caller() %}<div class="rounded-lg border">{{ inner }}</div>{% endmacro %}
@@ -32,7 +32,7 @@
 
 {# The small overlays the canvas frame uses, drawn with Alpine and tokens only (help-and-overlays-v1): a tooltip that names an
    icon-only control, a popover opened by the "i" button, and a hover card previewing a note. #}
-{% macro tooltip(label) %}{% set inner = caller() %}<span class="group/tip relative inline-flex">{{ inner }}<span role="tooltip" class="pointer-events-none absolute bottom-full left-1/2 z-50 mb-1 hidden -translate-x-1/2 whitespace-nowrap rounded-md bg-foreground px-2 py-1 text-xs text-background group-hover/tip:block group-focus-within/tip:block">{{ label }}</span></span>{% endmacro %}
+{% macro tooltip(label, end=false) %}{% set inner = caller() %}<span class="group/tip relative inline-flex">{{ inner }}<span role="tooltip" class="pointer-events-none absolute bottom-full z-50 mb-1 hidden w-max max-w-56 {{ 'right-0' if end else 'left-1/2 -translate-x-1/2' }} rounded-md bg-foreground px-2 py-1 text-xs text-background group-hover/tip:block group-focus-within/tip:block">{{ label }}</span></span>{% endmacro %}
 
 {% macro popover(label, title, body, example='') %}
 <span class="relative inline-flex" x-data="{ open: false, up: false, end: false, toggle(el) { this.open = !this.open; if (this.open) { const r = el.getBoundingClientRect(); const box = el.closest('[role=region]').getBoundingClientRect(); this.up = window.innerHeight - r.bottom < 280; this.end = r.right - box.left > 288; } } }" @keydown.escape="open = false" @click.outside="open = false">
@@ -45,7 +45,29 @@
 </span>
 {% endmacro %}
 
-{% macro hover_card(side_class='left-0 top-full mt-1') %}{% set inner = caller() %}<div class="min-w-0 flex-1" x-data="{ open: false }" @mouseenter="open = true" @mouseleave="open = false" @focusin="open = true" @focusout="open = false" @keydown.escape="open = false">{{ inner }}</div>{% endmacro %}
+{# The edit popover of a note: a pencil button that opens a small form with the name prefilled, Save and Cancel. It posts to action
+   and changes only the element it names. It opens upward when the canvas region has little room below the button. #}
+{% macro edit_popover(label, title, action, box, name, uid) %}
+<span class="relative inline-flex" x-data="{ open: false, up: false, end: false, toggle(el) { this.open = !this.open; if (this.open) { const r = el.getBoundingClientRect(); const box = el.closest('[role=region]').getBoundingClientRect(); this.up = box.bottom - r.bottom < 200; this.end = r.right - box.left > 288; this.$nextTick(() => this.$refs.name.focus()); } } }" @keydown.escape="open = false" @click.outside="open = false">
+  {% call tooltip(label, true) %}{% call button(variant='ghost', size='icon-xs', class='text-muted-foreground', attrs={'aria-label': label, ':aria-expanded': 'open', '@click': 'toggle($el)', 'data-note-edit': ''}) %}{{ lucide('pencil', 'size-3') }}{% endcall %}{% endcall %}
+  <div x-show="open" x-cloak role="dialog" aria-label="{{ title }}" class="absolute z-50 w-64 rounded-md border bg-popover p-3 text-sm text-popover-foreground" :class="[up ? 'bottom-full mb-1' : 'top-full mt-1', end ? 'right-0' : 'left-0']">
+    <form method="post" action="{{ action }}" class="flex flex-col gap-3">
+      {{ hidden('csrf_token', csrf_token()) }}
+      {{ hidden('box', box) }}
+      <div class="flex flex-col gap-1.5">
+        {% call inp.label(for='rename-' ~ uid) %}Name{% endcall %}
+        {{ inp.input(id='rename-' ~ uid, name='name', value=name, required=true, size='sm', attrs_dict={'x-ref': 'name', 'autocomplete': 'off', 'data-note-rename-input': ''}) }}
+      </div>
+      <div class="flex justify-end gap-2">
+        {{ button(text='Cancel', variant='ghost', size='sm', attrs={'@click': 'open = false'}) }}
+        {{ button(text='Save', size='sm', type='submit', attrs={'data-note-rename-save': ''}) }}
+      </div>
+    </form>
+  </div>
+</span>
+{% endmacro %}
+
+{% macro hover_card(side_class='left-0 top-full mt-1') %}{% set inner = caller() %}<div class="min-w-24 flex-1" x-data="{ open: false }" @mouseenter="open = true" @mouseleave="open = false" @focusin="open = true" @focusout="open = false" @keydown.escape="open = false">{{ inner }}</div>{% endmacro %}
 {% macro hover_card_content(class='') %}{% set inner = caller() %}<div x-show="open" x-cloak class="absolute inset-x-2 z-50 mt-1 rounded-md border bg-popover p-3 text-popover-foreground {{ class }}">{{ inner }}</div>{% endmacro %}
 
 {% macro empty(title, description, icon='inbox', cta_text=none, cta_onclick=none, cta_href=none) %}{{ es.empty_state(icon=icon, title=title, description=description, cta_text=cta_text, cta_onclick=cta_onclick, cta_href=cta_href, cta_icon=('plus' if cta_onclick else none), compact=true, padding='py-2') }}{% endmacro %}
