@@ -9,6 +9,7 @@
 {% from 'macros/page_shell.html' import page_shell, stat_card %}
 {% from 'components/dropdown_menu.html' import dropdown_menu %}
 {% from 'components/button.html' import button %}
+{% from 'components/form_field.html' import form_field %}
 
 
 {% block title %}All Solutions{% endblock %}
@@ -23,12 +24,14 @@
        destination. ─ #}
     {% macro _solutions_page_actions() %}
     <div class="flex flex-wrap items-center gap-2" data-testid="page-actions">
-      {# Primary: New solution — creates a Solution directly (POST
-         /architecture-journey/start via the startSolution() Alpine method
-         on this page's x-data). A button that performs an action, not a
-         link to another page, so its label names the action instead of
-         quoting a destination <h1>. #}
-      {{ button(text='New solution', variant='default', size='sm', icon='plus', on_click='startSolution()', testid='btn-new-solution', aria_label='Create a new solution') }}
+      {# Primary: New solution — opens the New solution dialog. The record
+         is created only when the dialog's own Create button is pressed
+         (createSolutionFromDialog() below); opening or cancelling the
+         dialog creates nothing. Previously this button POSTed
+         /architecture-journey/start on the click that opened it, so one
+         click on "New solution" always left behind an untitled record
+         even when the person never typed anything. #}
+      {{ button(text='New solution', variant='default', size='sm', icon='plus', testid='btn-new-solution', aria_label='Create a new solution', attrs_dict={'data-modal-open': 'new-solution-dialog'}) }}
       {# Secondary actions: outline buttons, visible 2xl+ #}
       <div class="hidden 2xl:flex flex-wrap items-center gap-2">
         {{ button(text='Start Architecture Journey', variant='outline', size='sm', icon='zap', href=url_for('architecture_journey.index'), testid='btn-start-journey', aria_label='Start the guided Architecture Journey to design a new solution') }}
@@ -828,6 +831,28 @@
 {% endblock %}
 
 {% block modals %}
+<div x-data="newSolutionDialog()">
+{% call modal(id='new-solution-dialog', title='New solution', description='A solution is the design for one change: what it touches, what it costs and the decision.', size='default') %}
+<div class="space-y-4">
+  <div x-show="error" x-text="error" class="text-sm text-destructive-emphasis" role="alert"></div>
+  {{ form_field(id='new-sol-name', label='Name', required=true, attrs='x-model="form.name"') }}
+  {{ form_field(id='new-sol-problem', label='The problem, in one sentence', input_type='textarea', rows=2, required=true, placeholder='If we move monitoring to Grafana Cloud, what does it touch and what will it cost?', attrs='x-model="form.problem"') }}
+  {{ form_field(id='new-sol-link', label='Gap, capability or programme (optional)', placeholder='Leave blank if none yet', attrs='x-model="form.link"') }}
+  <div class="flex justify-end gap-2">
+    <button type="button" data-modal-close="new-solution-dialog" @click="reset()"
+            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center"
+            data-testid="btn-new-solution-cancel" aria-label="Cancel">
+      Cancel
+    </button>
+    <button type="button" @click="create()" :disabled="creating"
+            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center"
+            data-testid="btn-new-solution-create" aria-label="Create">
+      <span x-text="creating ? 'Creating…' : 'Create'"></span>
+    </button>
+  </div>
+</div>
+{% endcall %}
+</div>
 {% call modal(id='sol-bulk-delete-confirm', title='Delete Solutions', size='sm') %}
 <div class="space-y-4">
   <p id="sol-bulk-delete-msg" class="text-sm text-muted-foreground">You are about to permanently delete the selected solutions. This action cannot be undone.</p>
