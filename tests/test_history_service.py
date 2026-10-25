@@ -113,6 +113,28 @@ def _make_audit_log(db_session, org_id, user_id, table_name, record_id, action, 
     return entry
 
 
+def _record(db_session, org_id, table_name, record_id, snapshot, at, action="create",
+            user_id=None, source="screen", before=None):
+    """Write one audit row the way the audit middleware does (sealed in the chain)."""
+    from app.models.audit_log import AuditLog
+
+    entry = AuditLog(
+        organization_id=org_id,
+        user_id=user_id,
+        table_name=table_name,
+        record_id=record_id,
+        action=action,
+        created_at=at,
+        old_value=before,
+        new_value=snapshot if action != "delete" else None,
+        extra_json={"source": source, "correlation_id": f"run-{record_id}-{at.timestamp()}",
+                    "label": (snapshot or before or {}).get("name")},
+    )
+    db_session.add(entry)
+    db_session.flush()
+    return entry
+
+
 def _service(db_session, org_id):
     from app.modules.intelligence.services.history_service import HistoryService
     return HistoryService(db_session, org_id)
@@ -131,17 +153,17 @@ def test_as_of_returns_only_caller_organisation_elements(db_session):
     past = now - timedelta(hours=1)
 
     # Org A: one element
-    _make_entity_history(
+    _record(
         db_session, org_a.id, "archimate_elements", 1,
         {"name": "Element A", "type": "ApplicationComponent", "layer": "application"},
-        valid_from=past,
+        past,
     )
 
     # Org B: one element (should not appear)
-    _make_entity_history(
+    _record(
         db_session, org_b.id, "archimate_elements", 2,
         {"name": "Element B", "type": "BusinessActor", "layer": "business"},
-        valid_from=past,
+        past,
     )
 
     result = _service(db_session, org_a.id).as_of(now)
@@ -160,17 +182,17 @@ def test_as_of_returns_only_caller_organisation_relationships(db_session):
     past = now - timedelta(hours=1)
 
     # Org A: one relationship
-    _make_entity_history(
+    _record(
         db_session, org_a.id, "archimate_relationships", 1,
         {"type": "Composition", "source_id": 10, "target_id": 11},
-        valid_from=past,
+        past,
     )
 
     # Org B: one relationship (should not appear)
-    _make_entity_history(
+    _record(
         db_session, org_b.id, "archimate_relationships", 2,
         {"type": "Flow", "source_id": 20, "target_id": 21},
-        valid_from=past,
+        past,
     )
 
     result = _service(db_session, org_a.id).as_of(now)
@@ -193,17 +215,17 @@ def test_difference_returns_only_caller_organisation_changes(db_session):
     t3 = datetime(2025, 1, 3, 12, 0, 0)
 
     # Org A: one change in range
-    _make_entity_history(
+    _record(
         db_session, org_a.id, "archimate_elements", 1,
         {"name": "Element A", "type": "ApplicationComponent", "layer": "application"},
-        valid_from=t1, valid_to=t3,
+        t1,
     )
 
     # Org B: one change in range (should not appear)
-    _make_entity_history(
+    _record(
         db_session, org_b.id, "archimate_elements", 2,
         {"name": "Element B", "type": "BusinessActor", "layer": "business"},
-        valid_from=t1, valid_to=t3,
+        t1,
     )
 
     result = _service(db_session, org_a.id).difference(t1, t3)
@@ -231,11 +253,7 @@ def test_as_of_snapshot_matches_recorded_snapshot(db_session):
         "description": "A test element for snapshot verification",
     }
 
-    _make_entity_history(
-        db_session, org.id, "archimate_elements", 1,
-        snapshot,
-        valid_from=past,
-    )
+    _record(db_session, org.id, "archimate_elements", 1, snapshot, past)
 
     result = _service(db_session, org.id).as_of(now)
 
@@ -255,18 +273,16 @@ def test_as_of_excludes_elements_outside_date_range(db_session):
     t2 = datetime(2025, 1, 2, 12, 0, 0)
     t3 = datetime(2025, 1, 3, 12, 0, 0)
 
-    # Element valid from t1 to t2 (closed before t3)
-    _make_entity_history(
-        db_session, org.id, "archimate_elements", 1,
-        {"name": "Old Element", "type": "ApplicationComponent", "layer": "application"},
-        valid_from=t1, valid_to=t2,
-    )
+    # Element created at t1 and deleted at t2 (gone before t3)
+    old = {"name": "Old Element", "type": "ApplicationComponent", "layer": "application"}
+    _record(db_session, org.id, "archimate_elements", 1, old, t1)
+    _record(db_session, org.id, "archimate_elements", 1, None, t2, action="delete", before=old)
 
-    # Element valid from t2 onward (covers t3)
-    _make_entity_history(
+    # Element created at t2 (still there at t3)
+    _record(
         db_session, org.id, "archimate_elements", 2,
         {"name": "Current Element", "type": "BusinessActor", "layer": "business"},
-        valid_from=t2,
+        t2,
     )
 
     # Query as of t3: only the second element should appear
@@ -280,8 +296,8 @@ def test_as_of_excludes_elements_outside_date_range(db_session):
 # Difference completeness
 # ---------------------------------------------------------------------------
 
-def test_difference_lists_every_version_in_interval(db_session):
-    """Every entity_history version whose interval overlaps the range must appear."""
+def test_difference_lists_every_change_in_interval(db_session):
+    """Every recorded change inside the range must appear, with its before and after."""
     org = _make_org(db_session)
 
     t1 = datetime(2025, 1, 1, 12, 0, 0)
@@ -289,31 +305,18 @@ def test_difference_lists_every_version_in_interval(db_session):
     t3 = datetime(2025, 1, 3, 12, 0, 0)
     t4 = datetime(2025, 1, 4, 12, 0, 0)
 
-    # Version 1: t1 -> t2 (overlaps [t1, t4])
-    _make_entity_history(
-        db_session, org.id, "archimate_elements", 1,
-        {"name": "v1", "type": "ApplicationComponent", "layer": "application"},
-        valid_from=t1, valid_to=t2,
-    )
-    # Version 2: t2 -> t3 (overlaps [t1, t4])
-    _make_entity_history(
-        db_session, org.id, "archimate_elements", 1,
-        {"name": "v2", "type": "ApplicationComponent", "layer": "application"},
-        valid_from=t2, valid_to=t3,
-    )
-    # Version 3: t3 -> open (overlaps [t1, t4])
-    _make_entity_history(
-        db_session, org.id, "archimate_elements", 1,
-        {"name": "v3", "type": "ApplicationComponent", "layer": "application"},
-        valid_from=t3,
-    )
+    _record(db_session, org.id, "archimate_elements", 1,
+            {"name": "v1", "type": "ApplicationComponent"}, t1)
+    _record(db_session, org.id, "archimate_elements", 1, {"name": "v2"}, t2,
+            action="update", before={"name": "v1"})
+    _record(db_session, org.id, "archimate_elements", 1, {"name": "v3"}, t3,
+            action="update", before={"name": "v2"})
 
     result = _service(db_session, org.id).difference(t1, t4)
 
-    # All three versions should appear
-    assert len(result.changes) == 3
-    names = {c.snapshot["name"] for c in result.changes}
-    assert names == {"v1", "v2", "v3"}
+    assert [c.action for c in result.changes] == ["update", "update", "insert"]
+    assert [c.snapshot["name"] for c in result.changes] == ["v3", "v2", "v1"]
+    assert [c.previous_snapshot for c in result.changes[:2]] == [{"name": "v2"}, {"name": "v1"}]
 
 
 def test_difference_excludes_versions_outside_interval(db_session):
@@ -325,21 +328,11 @@ def test_difference_excludes_versions_outside_interval(db_session):
     t3 = datetime(2025, 1, 3, 12, 0, 0)
     t4 = datetime(2025, 1, 4, 12, 0, 0)
 
-    # Version entirely before the range (valid_to < from_date) -- ends well
-    # before t2, not exactly at it, so there is no boundary ambiguity about
-    # whether a change recorded exactly at from_date counts as in-range
-    before_end = t1 + timedelta(hours=1)
-    _make_entity_history(
-        db_session, org.id, "archimate_elements", 1,
-        {"name": "before", "type": "ApplicationComponent", "layer": "application"},
-        valid_from=t1, valid_to=before_end,
-    )
-    # Version entirely after the range (valid_from >= to_date)
-    _make_entity_history(
-        db_session, org.id, "archimate_elements", 2,
-        {"name": "after", "type": "BusinessActor", "layer": "business"},
-        valid_from=t4,
-    )
+    # A change recorded before the range, and one after it.
+    _record(db_session, org.id, "archimate_elements", 1,
+            {"name": "before", "type": "ApplicationComponent"}, t1 + timedelta(hours=1))
+    _record(db_session, org.id, "archimate_elements", 2,
+            {"name": "after", "type": "BusinessActor"}, t4)
 
     # Query [t2, t3]: neither version overlaps
     result = _service(db_session, org.id).difference(t2, t3)
@@ -355,20 +348,10 @@ def test_difference_includes_audit_log_who_and_why(db_session):
     t1 = datetime(2025, 1, 1, 12, 0, 0)
     t2 = datetime(2025, 1, 2, 12, 0, 0)
 
-    recorded = t1
-
-    _make_entity_history(
+    _record(
         db_session, org.id, "archimate_elements", 1,
-        {"name": "Element", "type": "ApplicationComponent", "layer": "application"},
-        valid_from=t1, valid_to=t2,
-        recorded_at=recorded,
-    )
-
-    _make_audit_log(
-        db_session, org.id, user.id,
-        "archimate_elements", 1, "insert",
-        created_at=recorded,
-        new_value={"change_reason": "Initial creation"},
+        {"name": "Element", "type": "ApplicationComponent", "change_reason": "Initial creation"},
+        t1, user_id=user.id, source="import",
     )
 
     result = _service(db_session, org.id).difference(t1, t2)
@@ -376,8 +359,9 @@ def test_difference_includes_audit_log_who_and_why(db_session):
     assert len(result.changes) == 1
     change = result.changes[0]
     assert change.changed_by_id == user.id
-    assert change.changed_by_name is not None
+    assert change.changed_by_name == user.email
     assert change.change_reason == "Initial creation"
+    assert change.source == "import"
 
 
 def test_difference_empty_range_returns_no_changes(db_session):
@@ -422,16 +406,16 @@ def test_api_as_of_respects_tenant_isolation(client, app, db_session, login_as):
     past = now - timedelta(hours=1)
 
     # Org A: one element
-    _make_entity_history(
+    _record(
         db_session, org_a.id, "archimate_elements", 1,
         {"name": "Element A", "type": "ApplicationComponent", "layer": "application"},
-        valid_from=past,
+        past,
     )
     # Org B: one element (should not appear)
-    _make_entity_history(
+    _record(
         db_session, org_b.id, "archimate_elements", 2,
         {"name": "Element B", "type": "BusinessActor", "layer": "business"},
-        valid_from=past,
+        past,
     )
 
     login_as(client, user_a)
@@ -453,16 +437,16 @@ def test_api_changes_respects_tenant_isolation(client, app, db_session, login_as
     t2 = datetime(2025, 1, 2, 12, 0, 0)
 
     # Org A: one change
-    _make_entity_history(
+    _record(
         db_session, org_a.id, "archimate_elements", 1,
         {"name": "Element A", "type": "ApplicationComponent", "layer": "application"},
-        valid_from=t1, valid_to=t2,
+        t1,
     )
     # Org B: one change (should not appear)
-    _make_entity_history(
+    _record(
         db_session, org_b.id, "archimate_elements", 2,
         {"name": "Element B", "type": "BusinessActor", "layer": "business"},
-        valid_from=t1, valid_to=t2,
+        t1,
     )
 
     login_as(client, user_a)

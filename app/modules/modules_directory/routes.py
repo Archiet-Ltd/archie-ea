@@ -145,9 +145,8 @@ _MORE_TOOLS = [
     ("Batch Import", "batch_import_view.dashboard", "upload"),
     ("Consolidation List", "consolidation_list.dashboard", "combine"),
     ("Duplicate Detection", "unified_duplicate.simple_dashboard", "copy"),
-    ("EA Briefings", "solution_design.ea_briefings", "newspaper"),
+    ("Weekly Briefing", "solution_design.ea_briefings", "newspaper"),
     ("Data Stewardship", "solution_design.data_stewardship", "database"),
-    ("Chief Architect Synthesis", "solution_design.architect_synthesis", "layout-dashboard"),
     # Hidden from this list on 30 Aug 2026 after every entry was requested with
     # a logged-in client and its status recorded:
     #   main.capability_framework.dashboard - 302 to /framework-management/,

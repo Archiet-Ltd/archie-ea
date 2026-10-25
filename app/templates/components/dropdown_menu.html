@@ -49,6 +49,9 @@
    belongs to (a board card): focus then lands on that subject, found again by
    that attribute, instead of on the trigger.
 
+   transition='opacity' fades the menu without scaling it, for toolbars where items must not move
+   under the cursor while it opens. Default 'default' keeps the scale-and-fade every caller has.
+
    5. Custom trigger content (the sidebar's organisation switcher and user menu):
    {% call dropdown_menu(id='user-menu', trigger_bare=true, trigger_class='w-full ...',
                          panel_class='bottom-full left-0 mb-2', items=[...]) %}
@@ -83,6 +86,7 @@
     trigger_title=none,
     trigger_attrs_dict={},
     subject_attr=none,
+    transition='default',
     trigger_bare=false,
     panel_class=none
 ) %}
@@ -147,12 +151,12 @@
     {# Dropdown Menu #}
     <div 
         x-show="menuOpen" x-cloak @keydown.escape.window="menuOpen = false"
-        x-transition:enter="transition ease-out duration-100"
+        {% if transition == 'opacity' %}x-transition.opacity.duration.120ms{% else %}x-transition:enter="transition ease-out duration-100"
         x-transition:enter-start="transform opacity-0 scale-95"
         x-transition:enter-end="transform opacity-100 scale-100"
         x-transition:leave="transition ease-in duration-75"
         x-transition:leave-start="transform opacity-100 scale-100"
-        x-transition:leave-end="transform opacity-0 scale-95"
+        x-transition:leave-end="transform opacity-0 scale-95"{% endif %}
         x-cloak
         class="absolute {{ panel_class or (positions.get(position, 'right-0') ~ ' mt-2') }} {{ menu_width }} rounded-lg border border-border bg-card z-50"
         role="menu"

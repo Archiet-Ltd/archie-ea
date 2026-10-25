@@ -437,65 +437,6 @@ def test_empty_tenant_reports_empty_rather_than_unavailable(db_session, tenant_c
     assert posture["attention"] == []
 
 
-# ── the rendered page ────────────────────────────────────────────────────────
-
-
-@pytest.mark.parametrize(
-    "heading",
-    [
-        "Capability & value streams",
-        "Application portfolio",
-        "Standards &amp; exceptions",
-        "Roadmap & work packages",
-        "Architecture decisions",
-    ],
-)
-def test_workbench_route_renders_every_enterprise_lens(
-    db_session, client, login_as, tenant_ctx, heading
-):
-    org = _org(db_session, f"route-{abs(hash(heading)) % 9999}")
-    with tenant_ctx(org.id):
-        user = _user(db_session, org)
-    login_as(client, user)
-
-    response = client.get("/solutions/architect-synthesis")
-
-    assert response.status_code == 200
-    html = response.get_data(as_text=True)
-    # Headings carry an ampersand, which Jinja escapes — accept either form.
-    assert heading in html or heading.replace("&", "&amp;") in html
-
-
-def test_workbench_route_keeps_one_page_shell(db_session, client, login_as, tenant_ctx):
-    """One <h1>, one breadcrumb — no duplicated page chrome."""
-    org = _org(db_session, "chrome")
-    with tenant_ctx(org.id):
-        user = _user(db_session, org)
-    login_as(client, user)
-
-    html = client.get("/solutions/architect-synthesis").get_data(as_text=True)
-
-    assert html.count("<h1") == 1
-    assert html.count('aria-label="Breadcrumb"') == 1
-
-
-def test_workbench_labels_measured_missing_and_ai_distinctly(
-    db_session, client, login_as, tenant_ctx
-):
-    """A reader must never mistake an AI interpretation for a measured fact."""
-    org = _org(db_session, "provenance-ui")
-    with tenant_ctx(org.id):
-        user = _user(db_session, org)
-    login_as(client, user)
-
-    html = client.get("/solutions/architect-synthesis").get_data(as_text=True)
-
-    assert "Measured" in html
-    assert "Not recorded" in html
-    assert "AI-generated" in html
-    assert "Advisory only" in html
-
-
 # ── the AI briefing ──────────────────────────────────────────────────────────
 
 

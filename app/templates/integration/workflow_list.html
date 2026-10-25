@@ -1,91 +1,139 @@
-{% extends 'layouts/admin_base.html' %}
-
+{# shadcn-reference: example:tasks@e55b60b #}
+{# design-block: data-table #}
+{% extends "layouts/admin_base.html" %}
+{% block head %}<meta name="shadcn-nearest" content="dashboard-01">{% endblock %}
 {% from 'components/page_header.html' import page_header %}
+{% from 'components/button.html' import button %}
+{% from 'components/badge.html' import badge %}
+{% from 'components/table.html' import table, table_header, table_body, table_row, table_head, table_cell %}
+{% from 'components/select.html' import native_select %}
+{% from 'components/form_field.html' import form_group %}
+{% from 'components/empty_state.html' import empty_state %}
+
 {% block title %}Workflow Catalog{% endblock %}
 
 {% block content %}
+{% set workflow_type_labels = {
+    'sequential': 'Sequential',
+    'parallel': 'Parallel',
+    'hybrid': 'Hybrid',
+} %}
+
 <div class="space-y-6">
-    <!-- Header -->
-    <div class="flex items-center justify-between">
-        {{ page_header(
-        title='Workflow Catalog', breadcrumbs=[{'label': 'Home', 'href': '/'}, {'label': 'Workflow Catalog'}],
-        description='Browse and start available automation workflows.'
+    {{ page_header(
+        title='Workflow Catalog',
+        description='Browse the workflow definitions available to this organisation.',
+        breadcrumbs=[
+            {'label': 'Home', 'href': url_for('main.index')},
+            {'label': 'Workflow Catalog'}
+        ],
+        actions=[
+            {'text': 'Back to Dashboard', 'icon': 'layout-dashboard', 'href': url_for('integration.workflow_dashboard'), 'variant': 'outline'}
+        ]
     ) }}
-        <div class="flex gap-2">
-            <a href="{{ url_for('integration.workflow_dashboard') }}" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
-                Back to Dashboard
-            </a>
-        </div>
-    </div>
 
-    <!-- Category Filter -->
-    <div class="flex gap-2 pb-4 overflow-x-auto">
-        <a href="{{ url_for('integration.list_workflows') }}" 
-           class="inline-flex items-center justify-center rounded-full px-4 py-1.5 text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 
-           {% if not selected_category %}bg-primary text-primary-foreground{% else %}bg-muted text-muted-foreground hover:bg-muted/80{% endif %}">
-            All
-        </a>
-        {% for category in workflows_by_category.keys() %}
-        <a href="{{ url_for('integration.list_workflows', category=category) }}" 
-           class="inline-flex items-center justify-center rounded-full px-4 py-1.5 text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 
-           {% if selected_category == category %}bg-primary text-primary-foreground{% else %}bg-muted text-muted-foreground hover:bg-muted/80{% endif %}">
-            {{ category|replace('_', ' ')|title }}
-        </a>
-        {% endfor %}
-    </div>
-
+    {# Filter toolbar (pattern P04). #}
     {% if workflows_by_category %}
-        {% for category, workflows in workflows_by_category.items() %}
-            {% if not selected_category or selected_category == category %}
-            <div class="space-y-4">
-                <h2 class="text-xl font-semibold tracking-tight border-b pb-2">{{ category|replace('_', ' ')|title }}</h2>
-                <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                    {% for def in workflows %}
-                    <div data-slot="card" class="rounded-lg border border-border bg-card text-card-foreground flex flex-col h-full transition-shadow">
-                        <div class="flex flex-col space-y-1.5 p-6 pb-2">
-                            <div class="flex items-center justify-between mb-2">
-                                <span class="inline-flex items-center rounded-md border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 border-transparent bg-secondary text-secondary-foreground hover:bg-secondary/80">
-                                    {{ def.workflow_type|dash|title }}
-                                </span>
-                                <span class="text-xs text-muted-foreground">
-                                    {{ def.automation_level|dash|title }}
-                                </span>
-                            </div>
-                            <h3 class="font-semibold leading-none tracking-tight">{{ def.workflow_name }}</h3>
-                        </div>
-                        <div class="p-6 pt-2 flex-1">
-                            <p class="text-sm text-muted-foreground">{{ def.workflow_description|dash }}</p>
-                            
-                            <div class="mt-4 flex flex-wrap gap-1">
-                                {% for step in def.steps %}
-                                    <span class="inline-flex items-center rounded-sm bg-muted px-2 py-1 text-xs font-medium text-muted-foreground ring-1 ring-inset ring-border" title="{{ step.step_name }}">
-                                        {{ loop.index }}
-                                    </span>
-                                {% endfor %}
-                                <span class="text-xs text-muted-foreground self-center ml-1">{{ def.steps|length }} steps</span>
-                            </div>
-                        </div>
-                        <div class="p-6 pt-0 mt-auto flex items-center justify-between border-t pt-4">
-                            <div class="text-xs text-muted-foreground">
-                                {{ def.execution_count|dash }} runs
-                            </div>
-                            <a href="{{ url_for('integration.workflow_detail', workflow_code=def.workflow_code) }}" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary text-primary-foreground text-sm font-semibold transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center justify-center">
-                                View Details
-                            </a>
-                        </div>
-                    </div>
+    <form method="get" action="{{ url_for('integration.list_workflows') }}" class="flex flex-col gap-4 rounded-lg border border-border bg-muted/30 p-4 lg:flex-row lg:items-end">
+        <div class="w-full lg:w-72">
+            {% call form_group(id='category', label='Category') %}
+                {% call native_select(id='category', name='category', selected=selected_category or '') %}
+                    <option value="">All categories</option>
+                    {% for category in categories %}
+                    <option value="{{ category }}"{% if selected_category == category %} selected{% endif %}>{{ category|replace('_', ' ')|title }}</option>
                     {% endfor %}
-                </div>
-            </div>
-            {% endif %}
+                {% endcall %}
+            {% endcall %}
+        </div>
+        <div class="flex flex-wrap items-center gap-2">
+            {{ button(text='Filter', type='submit', icon='filter') }}
+            {{ button(text='Clear', variant='ghost', href=url_for('integration.list_workflows')) }}
+        </div>
+    </form>
+
+    {# Data table of the catalog (pattern P03). #}
+    <p id="workflow-table-summary" class="text-sm text-muted-foreground">
+        {% if selected_category %}Showing {{ selected_category|replace('_', ' ')|title }} workflows.{% else %}Every workflow in the catalog.{% endif %}
+    </p>
+    {% call table(attrs_dict={'aria-label': 'Workflow definitions', 'aria-describedby': 'workflow-table-summary'}) %}
+        {% call table_header() %}
+            {% call table_row(class='hover:bg-transparent') %}
+                {% call table_head() %}Workflow{% endcall %}
+                {% call table_head() %}Category{% endcall %}
+                {% call table_head() %}Type{% endcall %}
+                {% call table_head() %}Automation{% endcall %}
+                {% call table_head(class='text-right') %}Steps{% endcall %}
+                {% call table_head(class='text-right') %}Runs{% endcall %}
+                {% call table_head(class='text-right') %}Actions{% endcall %}
+            {% endcall %}
+        {% endcall %}
+        {% call table_body() %}
+        {% for category, defs in workflows_by_category.items() %}
+        {% for definition in defs %}
+            {% call table_row() %}
+                {% call table_cell() %}
+                    <a href="{{ url_for('integration.workflow_detail', workflow_code=definition.workflow_code) }}"
+                       class="font-medium text-foreground hover:underline">{{ definition.workflow_name|dash }}</a>
+                    {% if definition.workflow_description %}
+                    <p class="text-xs text-muted-foreground">{{ definition.workflow_description }}</p>
+                    {% endif %}
+                {% endcall %}
+                {% call table_cell() %}
+                    {% call badge(variant='secondary') %}{{ category|replace('_', ' ')|title }}{% endcall %}
+                {% endcall %}
+                {% call table_cell() %}
+                    <span class="text-muted-foreground">{{ workflow_type_labels.get(definition.workflow_type, definition.workflow_type|dash|title) }}</span>
+                {% endcall %}
+                {% call table_cell() %}
+                    <span class="text-muted-foreground">{{ definition.automation_level|dash|replace('_', ' ')|title }}</span>
+                {% endcall %}
+                {% call table_cell(class='text-right') %}
+                    {{ (definition.steps or [])|length }}
+                {% endcall %}
+                {% call table_cell(class='text-right') %}
+                    {{ definition.execution_count|dash }}
+                {% endcall %}
+                {% call table_cell(class='text-right') %}
+                    {{ button(text='View Details', variant='ghost', icon='arrow-right', href=url_for('integration.workflow_detail', workflow_code=definition.workflow_code)) }}
+                {% endcall %}
+            {% endcall %}
         {% endfor %}
+        {% endfor %}
+        {% endcall %}
+    {% endcall %}
+    {% elif load_error %}
+        <div>
+            {{ empty_state(
+                icon='triangle-alert',
+                title='The workflow catalog could not be read',
+                description='The catalog could not be loaded. Refresh the page to try again.',
+                cta_text='Try again',
+                cta_href=url_for('integration.list_workflows'),
+                cta_icon='refresh-cw'
+            ) }}
+        </div>
+    {% elif selected_category %}
+        {% set empty_desc = 'There are no workflows in ' ~ (selected_category|replace('_', ' ')|title) ~ ' yet.' %}
+        <div>
+            {{ empty_state(
+                icon='search-x',
+                title='No workflows in this category',
+                description=empty_desc,
+                cta_text='View all workflows',
+                cta_href=url_for('integration.list_workflows'),
+                cta_icon='list'
+            ) }}
+        </div>
     {% else %}
-        <div class="flex flex-col items-center justify-center py-12 text-center">
-            <div class="rounded-full bg-muted/50 p-4 mb-4">
-                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-8 w-8 text-muted-foreground"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg>
-            </div>
-            <h3 class="text-lg font-semibold">No workflows found</h3>
-            <p class="text-muted-foreground mt-2">There are no workflow definitions available in this category.</p>
+        <div>
+            {{ empty_state(
+                icon='workflow',
+                title='No workflows yet',
+                description='No workflow definitions are available. Contact an administrator to set up the catalog.',
+                cta_text='Back to Dashboard',
+                cta_href=url_for('integration.workflow_dashboard'),
+                cta_icon='layout-dashboard'
+            ) }}
         </div>
     {% endif %}
 </div>
