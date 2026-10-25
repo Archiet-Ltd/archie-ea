@@ -120,7 +120,7 @@ def _canvas_boxes(canvas):
         boxes["cost-structure"] = [
             {
                 "text": f"{line['name']}: {line['amount']:,.0f} {line['currency']} a year",
-                "href": url_for("unified_applications.application_detail", id=line["id"]),
+                "href": url_for("unified_applications.application_fact_sheet", id=line["id"]),
             }
             for line in lines[:8]
         ]
