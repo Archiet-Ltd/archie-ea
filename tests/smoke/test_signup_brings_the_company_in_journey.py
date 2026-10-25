@@ -687,6 +687,7 @@ def test_the_public_signals_are_about_the_company_the_person_confirmed_and_sit_u
         email, _started = sign_up(page, str(server), people)
         # The welcome notice is a line on the page: it covers neither the progress steps nor the step heading.
         expect(page.get_by_test_id("signup-notice")).to_contain_text("Account created")
+        assert page.get_by_test_id("signup-notice").evaluate("e => e.scrollWidth <= e.clientWidth + 1 && !e.querySelector('.truncate')"), "the welcome notice is cut off"
         assert page.locator("#platform-toast-container [role=alert]").count() == 0
         if SHOTS:
             os.makedirs(SHOTS, exist_ok=True)
@@ -765,6 +766,9 @@ def test_the_public_signals_are_about_the_company_the_person_confirmed_and_sit_u
         for row in rows.all():
             cite = row.get_by_test_id("signal-cite")
             assert re.search(r" · (\d{2} \w{3} \d{4}|read \d{2} \w{3} \d{4})$", cite.inner_text()), cite.inner_text()
+        assert "\u2014" not in table.inner_text(), "a bare dash stands where the card should say why"
+        for plain in table.get_by_test_id("signal-informs-none").all():
+            expect(plain).to_have_text("Not matched to PESTLE or SWOT")
         from app.modules.organization.public_signals import sources as sources_module
 
         with app.app_context():

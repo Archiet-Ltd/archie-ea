@@ -185,7 +185,7 @@
                             <div class="flex flex-wrap gap-1">
                             {% if sig.pestle_factor %}{% call badge('neutral') %}{{ sig.pestle_factor | capitalize }}{% endcall %}{% endif %}
                             {% if sig.swot_quadrant %}{% call badge('info') %}{{ sig.swot_quadrant | capitalize }}{% endcall %}{% endif %}
-                            {% if not sig.pestle_factor and not sig.swot_quadrant %}<span class="text-muted-foreground" title="No PESTLE factor or SWOT quadrant applies to this signal.">&mdash;</span>{% endif %}
+                            {% if not sig.pestle_factor and not sig.swot_quadrant %}<span class="text-xs text-muted-foreground" data-testid="signal-informs-none">Not matched to PESTLE or SWOT</span>{% endif %}
                             </div>
                         </td>
                     </tr>
