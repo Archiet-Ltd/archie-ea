@@ -1,5 +1,10 @@
 {% extends 'layouts/admin_base.html' %}
+{# design-block: record-detail #}
 {% from 'macros/page_shell.html' import page_shell %}
+{% from 'components/button.html' import button %}
+{% from 'components/badge.html' import badge %}
+{% from 'components/card.html' import card %}
+{% from 'components/dense_table.html' import dense_table %}
 
 {% block title %}{{ entity.name }} — Data Entity — {{ config.APP_NAME }}{% endblock %}
 
@@ -18,11 +23,11 @@
 {% block content %}
 <div class="space-y-6">
     {% macro _ps_actions() %}
-    <a href="{{ url_for('data_architecture.edit_data_entity', entity_id=entity.id) }}"
-       class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background text-sm font-medium text-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 items-center">
-        <i data-lucide="pencil" class="w-4 h-4" aria-hidden="true"></i>
-        Edit
-    </a>
+    {{ button(text='Show in diagram', variant='outline', icon='workflow', href=url_for('data_architecture.data_entity_diagram', domain_id=entity.domain_id), testid='entity-diagram-link') }}
+    {% if entity.archimate_element_id %}
+    {{ button(text='Open in the architecture model', variant='outline', icon='box', href=url_for('archimate_crud.detail_element', layer='application', element_type='DataObject', element_id=entity.archimate_element_id), testid='entity-archimate-link') }}
+    {% endif %}
+    {{ button(text='Edit', icon='pencil', href=url_for('data_architecture.edit_data_entity', entity_id=entity.id)) }}
     {% endmacro %}
     {{ page_shell(title=entity.name, subtitle=entity.description or 'Data entity', actions_caller=_ps_actions) }}
 
@@ -44,6 +49,43 @@
             <div class="text-sm font-semibold text-foreground mt-1">{{ 'Yes' if entity.contains_pii else 'No' }}</div>
         </div>
     </div>
+
+    {# The logical model of this entity: its attributes, and how it relates to other entities. #}
+    {% call card(class='') %}
+    <section aria-labelledby="attributes-heading" data-testid="entity-attributes">
+        <div class="px-5 py-4 border-b border-border">
+            <h2 id="attributes-heading" class="text-lg font-semibold text-foreground">Attributes</h2>
+            <p class="text-xs text-muted-foreground mt-0.5">What a record of {{ entity.name }} holds. Add or change them in the <a href="{{ url_for('data_architecture.data_entity_diagram', domain_id=entity.domain_id) }}" class="text-primary hover:underline">domain diagram</a>.</p>
+        </div>
+        {% if entity.attributes %}
+        {% call dense_table(columns=[('Attribute', ''), ('Type', ''), ('Key', ''), ('Nullable', '')], caption='Attributes of ' ~ entity.name, rows=entity.attributes|length, flush=true) %}
+            {% for attr in entity.attributes %}
+            <tr class="h-10 border-b border-border">
+                <td class="px-4 align-middle font-mono text-sm">{{ attr.name }}</td>
+                <td class="px-4 align-middle font-mono text-sm">{{ attr.data_type or '—' }}</td>
+                <td class="px-4 align-middle text-sm">{% if attr.is_primary_key %}{% call badge('info') %}PK{% endcall %} {% endif %}{% if attr.is_foreign_key %}{% call badge('neutral') %}FK{% endcall %}{% endif %}{% if not attr.is_primary_key and not attr.is_foreign_key %}—{% endif %}</td>
+                <td class="px-4 align-middle text-sm">{{ 'Yes' if attr.is_nullable else 'No' }}</td>
+            </tr>
+            {% endfor %}
+        {% endcall %}
+        {% else %}
+        <p class="px-5 py-8 text-center text-sm text-muted-foreground">No attributes recorded for {{ entity.name }}. <a href="{{ url_for('data_architecture.data_entity_diagram', domain_id=entity.domain_id) }}" class="text-primary hover:underline">Add them in the domain diagram.</a></p>
+        {% endif %}
+        {% if entity.outgoing_relationships or entity.incoming_relationships %}
+        <div class="border-t border-border px-5 py-4">
+            <h3 class="text-sm font-semibold text-foreground">Relationships</h3>
+            <ul class="mt-2 space-y-1 text-sm text-foreground">
+                {% for r in entity.outgoing_relationships %}
+                <li>{{ entity.name }} {{ r.label or 'relates to' }} <a href="{{ url_for('data_architecture.data_entity_detail', entity_id=r.target_entity_id) }}" class="text-primary hover:underline">{{ r.target_entity.name }}</a></li>
+                {% endfor %}
+                {% for r in entity.incoming_relationships %}
+                <li><a href="{{ url_for('data_architecture.data_entity_detail', entity_id=r.source_entity_id) }}" class="text-primary hover:underline">{{ r.source_entity.name }}</a> {{ r.label or 'relates to' }} {{ entity.name }}</li>
+                {% endfor %}
+            </ul>
+        </div>
+        {% endif %}
+    </section>
+    {% endcall %}
 
     {# CRUD matrix: one row per application recorded as accessing this entity. #}
     <section class="rounded-lg border border-border bg-card" aria-labelledby="crud-matrix-heading" data-crud-matrix>

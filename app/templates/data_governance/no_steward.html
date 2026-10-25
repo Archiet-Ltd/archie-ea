@@ -1,33 +1,21 @@
+{# design-block: data-table #}
 {% extends 'layouts/admin_base.html' %}
 {% from 'components/dense_table.html' import dense_table %}
 {% from 'components/badge.html' import badge %}
 {% from 'components/button.html' import button %}
 {% from 'components/empty_state.html' import empty_state %}
-{% from 'components/_breadcrumb_root.html' import crumb_label %}
+{% from 'macros/page_shell.html' import page_shell %}
 
 {% block title %}Critical entities with no steward — {{ config.APP_NAME }}{% endblock %}
 
 {% block content %}
 <div class="flex-1 overflow-auto p-6">
-  <div class="mb-6">
-    <nav aria-label="Breadcrumb" class="mb-3">
-      <ol class="flex items-center gap-1.5 text-sm text-muted-foreground">
-        <li class="flex items-center gap-1.5"><a href="{{ url_for('main.index') }}" class="hover:text-foreground transition-colors">{{ crumb_label('Home', True) }}</a><i data-lucide="chevron-right" class="w-3.5 h-3.5 shrink-0" aria-hidden="true"></i></li>
-        <li class="flex items-center gap-1.5" aria-current="page"><span class="text-foreground font-medium">Data governance</span></li>
-      </ol>
-    </nav>
-    <div class="flex flex-col gap-4">
-      <div>
-        <h1 class="text-3xl font-bold tracking-[-0.02em] text-foreground">Critical entities with no steward</h1>
-        <p class="mt-1 text-sm text-muted-foreground">Data entities in a critical domain (mission-critical or business-critical) that have no steward assigned.</p>
-      </div>
-    </div>
-    <ul class="mt-4 flex items-center gap-1 border-b border-border text-sm">
-      {% for label, href, active in tabs %}
-      <li><a href="{{ href }}" class="inline-flex items-center px-3 py-2 border-b-2 -mb-px transition-colors {% if active %}border-primary text-foreground font-medium{% else %}border-transparent text-muted-foreground hover:text-foreground{% endif %}" {% if active %}aria-current="page"{% endif %}>{{ label }}</a></li>
-      {% endfor %}
-    </ul>
-  </div>
+  {{ page_shell(
+      title='Critical entities with no steward',
+      subtitle='Data entities in a critical domain (mission-critical or business-critical) that have no steward assigned.',
+      breadcrumb=[('Home', url_for('main.index')), ('Data governance', None)],
+      tabs=tabs
+  ) }}
   {% if entities %}
   {% call dense_table(
       columns=[('Data entity', ''), ('Domain', ''), ('Criticality', ''), ('', 'text-right')],
