@@ -115,11 +115,11 @@ def _keyword_match(question: str) -> Optional[Dict[str, Any]]:
 # names the service, else nothing (and the entry then asks the person to name
 # the service rather than guess).
 _SERVICE_PATTERNS = [
-    re.compile(r"\bif (?:the |our )?(.+?) (?:goes down|is down|fails|is unavailable)", re.I),
+    re.compile(r"\bif (?:the |our )?(.+?) (?:goes down|is down|fails|is unavailable)\b", re.I),
     re.compile(r"\bwhat depends on (?:the |our )?(.+?)\s*[?.]?\s*$", re.I),
-    re.compile(r"\bif (?:the |our )?(.+?) (?:is|are) (?:down|unavailable)", re.I),
-    re.compile(r"\b(?:services|journeys) (?:break|are affected) if (?:the |our )?(.+?) (?:fails|is)", re.I),
-    re.compile(r"\bbreaks? for .*? if (?:the |our )?(.+?) (?:is down|fails|goes down)", re.I),
+    re.compile(r"\bif (?:the |our )?(.+?) (?:is|are) (?:down|unavailable)\b", re.I),
+    re.compile(r"\b(?:services|journeys) (?:break|are affected) if (?:the |our )?(.+?) (?:fails|is)\b", re.I),
+    re.compile(r"\bbreaks? for .*? if (?:the |our )?(.+?) (?:is down|fails|goes down)\b", re.I),
 ]
 
 
