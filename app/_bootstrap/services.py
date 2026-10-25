@@ -22,7 +22,9 @@ def init_services(app, config_name):
     register_archimate_listeners()
 
     # Naming a vendor on a system writes the link to the vendor record.
-    import app.services.vendor_register  # noqa: F401
+    from app.services import vendor_register
+
+    app.add_template_global(vendor_register.page_summary, "vendor_page")
 
 
 def _check_session_configuration(app, config_name):

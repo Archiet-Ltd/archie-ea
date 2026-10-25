@@ -20,12 +20,15 @@
             // hasActiveFilters) are non-enumerable and Object.assign drops them.
             return Platform.dataTable.extend(
                 Platform.dataTable.mixin({
-                    apiUrl:     '/api/vendors/list',
+                    apiUrl:     '/api/vendors/register',
                     perPage:    25,
                     itemsKey:   'vendors',
                     storageKey: 'vendor-list'
                 }),
                 {
+                    // Which tab is showing: the vendors, or the systems still to be mapped.
+                    tab: 'vendors',
+
                     // ── Edit form state ───────────────────────────────
                     editForm: {
                         name:           '',

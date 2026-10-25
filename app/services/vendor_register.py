@@ -39,6 +39,13 @@ def _org(org_id: Optional[int]) -> Optional[int]:
     return None
 
 
+def can_see_vendor_cost(user) -> bool:
+    """Who is shown what a vendor costs: the cost-visibility roles, and the procurement and finance personas whose job it is."""
+    from app.utils.role_access import can_access_section, can_see_costs
+
+    return bool(can_see_costs(user) or can_access_section(user, "procurement"))
+
+
 def clean_name(name) -> str:
     return " ".join(str(name or "").split())
 
@@ -280,3 +287,39 @@ def _write_vendor_link(session, flush_context, instances):
         else:
             vendor_id = vendor.id
         obj.vendor_organization_id = vendor_id
+
+
+def page_summary() -> Optional[Dict]:
+    """What the Vendors page opens with: the plain answer and the systems still unmapped.
+
+    None when the register cannot be read, so the page says so instead of
+    showing a zero that reads as "no vendors".
+    """
+    from flask import current_app
+    from flask_login import current_user
+
+    org_id = _org(None)
+    if org_id is None:
+        return None
+    try:
+        rows = register(org_id)
+        unmapped = systems_without_vendor(org_id)
+        total_systems = db.session.execute(
+            db.select(func.count(ApplicationComponent.id)).where(*_live_apps(org_id))).scalar_one()
+    except Exception:  # noqa: BLE001 - the page reports it, rather than showing zeros
+        db.session.rollback()
+        current_app.logger.exception("Vendor register could not be read")
+        return None
+    costs = [r["annual_cost"] for r in rows if r["annual_cost"] is not None]
+    show_cost = can_see_vendor_cost(current_user)
+    return {
+        "vendor_count": len(rows),
+        "supplied_count": total_systems - len(unmapped),
+        "total_systems": total_systems,
+        "renewals_due": sum(1 for r in rows if r["renewal_due"]),
+        "annual_cost": sum(costs) if (costs and show_cost) else None,
+        "show_cost": show_cost,
+        "unmapped_count": len(unmapped),
+        "unmapped": [{"id": a.id, "name": a.name, "lifecycle_status": a.lifecycle_status}
+                     for a in unmapped[:200]],
+    }
