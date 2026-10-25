@@ -89,7 +89,7 @@ def test_the_overview_figure_matches_the_confirm_screen(app, client, login_as, m
         from app.models.organization import Organization
 
         held = confirm.profile_entries(db.session.get(Organization, org.id))
-    assert said == len([e for e in held if e["field"] != "social_profile"])
+    assert said == len(held)
 
 
 def test_a_fact_the_person_corrected_is_cited_as_theirs(app, client, login_as, make_org, monkeypatch, site):

@@ -15,7 +15,7 @@
             {% if facts %}
             {% include 'account/_company_facts.html' %}
             {% elif website %}
-            <p class="text-sm text-muted-foreground" role="status" aria-live="polite" data-source="website" data-testid="signup-status-website">{{ site_row.text }}</p>
+            {% include 'account/_website_reading.html' %}
             {% endif %}
             {% include 'account/_company_asked.html' %}
             {% include 'account/_company_choices.html' %}

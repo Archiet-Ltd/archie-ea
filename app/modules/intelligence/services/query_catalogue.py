@@ -782,7 +782,7 @@ def _company_profile(organization_id: int, topic: Optional[str] = None, **_: Any
     title, summary, fields = PROFILE_TOPICS[topic]
     org = db.session.get(Organization, organization_id)
     entries = [e for e in (confirm.profile_entries(org) if org is not None else [])
-               if (fields is None or e["field"] in fields) and e["field"] != "social_profile"]
+               if fields is None or e["field"] in fields]
     if fields:
         order = {name: i for i, name in enumerate(fields)}
         entries.sort(key=lambda e: order[e["field"]])

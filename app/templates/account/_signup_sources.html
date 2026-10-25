@@ -21,7 +21,7 @@
                 </div>
                 {{ checkbox(id='welcome-website-consent', label='You may read this website', description='We read up to 30 pages in the background and show you what we found to confirm in the next step. Nothing is added to your model until you confirm it.') }}
                 {{ button(text='Save website', variant='outline', size='sm', testid='signup-website-save', attrs_dict={'data-action': 'website'}) }}
-                <p class="text-sm text-muted-foreground" role="status" aria-live="polite" data-say="website" data-source="website" data-testid="signup-status-website">{{ (sources | selectattr('key', 'equalto', 'website') | first).text if (sources | selectattr('key', 'equalto', 'website') | first).state != 'not_given' else '' }}</p>
+                {% include 'account/_website_reading.html' %}
             </div>
 
             <div class="space-y-3 border-t border-border pt-6" data-testid="signup-github">

@@ -42,6 +42,44 @@
         button.setAttribute('aria-busy', on ? 'true' : 'false');
     }
 
+    function link(label, href, testid) {
+        var template = root.querySelector('template[data-reading-link]');
+        if (!template) return null;
+        var anchor = template.content.firstElementChild.cloneNode(true);
+        anchor.textContent = label;
+        anchor.setAttribute('href', href);
+        anchor.setAttribute('data-testid', testid);
+        return anchor;
+    }
+
+    // The website reading is more than a sentence: a bar of pages read against the limit, and the next step
+    // (confirm what was read) or what to do instead when the site could not be read.
+    function paintReading(row) {
+        var block = root.querySelector('[data-reading]');
+        if (!block) return;
+        var bar = block.querySelector('[data-reading-bar]');
+        if (bar) {
+            var shown = row.state === 'reading' && row.progress;
+            bar.classList.toggle('hidden', !shown);
+            var fill = bar.querySelector('[role="progressbar"]');
+            if (shown && fill) {
+                fill.setAttribute('aria-valuenow', String(row.progress.percent));
+                fill.style.transform = 'translateX(-' + (100 - row.progress.percent) + '%)';
+            }
+        }
+        var actions = block.querySelector('[data-reading-actions]');
+        if (!actions) return;
+        var wanted = [];
+        if (row.next) wanted.push(link(row.next.label, row.next.url, 'website-next'));
+        (row.instead || []).forEach(function (item) { wanted.push(link(item.label, item.url, 'website-instead')); });
+        var signature = JSON.stringify([row.next || null, row.instead || null]);
+        if (actions.getAttribute('data-signature') === signature) return;
+        actions.setAttribute('data-signature', signature);
+        actions.textContent = '';
+        wanted.forEach(function (anchor) { if (anchor) actions.appendChild(anchor); });
+    }
+
+    var announced = false;
     function paint(sources) {
         (sources || []).forEach(function (row) {
             var line = root.querySelector('[data-source="' + row.key + '"]');
@@ -50,6 +88,13 @@
             line.setAttribute('data-state', row.state);
             line.classList.toggle('text-destructive-emphasis', row.state === 'failed');
             line.classList.toggle('text-muted-foreground', row.state !== 'failed');
+            if (row.key === 'website') {
+                paintReading(row);
+                if (row.state === 'done' && row.next && !announced && window.Platform && window.Platform.toast) {
+                    announced = true;
+                    window.Platform.toast.success(row.text);
+                }
+            }
         });
     }
 
