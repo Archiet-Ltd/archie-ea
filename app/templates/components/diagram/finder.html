@@ -7,14 +7,14 @@
 {% from 'components/button.html' import button %}
 {% from 'components/diagram/palette.html' import notation_swatch with context %}
 
-{% macro diagram_finder() %}
-<section class="flex min-h-0 flex-1 flex-col" aria-label="Elements in this view" data-testid="diagram-finder">
+{% macro diagram_finder(noun='element', noun_plural='elements', empty_text=none, empty_action_text=none, empty_action_click=none) %}
+<section class="flex min-h-0 flex-1 flex-col" aria-label="{{ noun_plural|capitalize }} in this view" data-testid="diagram-finder">
   <div class="flex flex-col gap-2 border-b border-border p-3">
     <p class="text-xs text-muted-foreground">
       <span class="font-medium text-foreground tabular-nums" data-testid="finder-count" x-text="finderRows.length"></span>
-      <span x-text="finderFilter ? ('of ' + finderItems.length + ' elements match') : (finderItems.length === 1 ? 'element in this view' : 'elements in this view')"></span>
+      <span x-text="finderFilter ? ('of ' + finderItems.length + ' {{ noun_plural }} match') : (finderItems.length === 1 ? '{{ noun }} in this view' : '{{ noun_plural }} in this view')"></span>
     </p>
-    {{ input(type='search', placeholder='Find an element in this view', aria_label='Find an element in this view', class='h-8', attrs_dict={'x-model': 'finderFilter', 'data-testid': 'finder-search'}) }}
+    {{ input(type='search', placeholder='Find ' ~ ('an ' if noun == 'element' else 'a ') ~ noun ~ ' in this view', aria_label='Find ' ~ ('an ' if noun == 'element' else 'a ') ~ noun ~ ' in this view', class='h-8', attrs_dict={'x-model': 'finderFilter', 'data-testid': 'finder-search'}) }}
   </div>
   <ul class="min-h-0 flex-1 overflow-y-auto p-2" data-testid="finder-list">
     <template x-for="row in finderRows" :key="row.id">
@@ -32,11 +32,11 @@
     </template>
   </ul>
   <div x-show="finderItems.length === 0" x-cloak class="px-4 py-6 text-center text-sm text-muted-foreground" data-testid="finder-empty">
-    <p>This view has no elements yet. Add one from the Add tab, and it is listed here so you can find it again.</p>
-    {% call button(variant='outline', size='sm', class='mt-2', attrs_dict={'@click': 'shellRailTab = \'add\''}) %}Open the element palette{% endcall %}
+    <p>{{ empty_text or 'This view has no elements yet. Add one from the Add tab, and it is listed here so you can find it again.' }}</p>
+    {% call button(variant='outline', size='sm', class='mt-2', attrs_dict={'@click': empty_action_click or 'shellRailTab = \'add\''}) %}{{ empty_action_text or 'Open the element palette' }}{% endcall %}
   </div>
   <div x-show="finderItems.length > 0 && finderRows.length === 0" x-cloak class="px-4 py-6 text-center text-sm text-muted-foreground" data-testid="finder-no-match">
-    <p>No element in this view matches that search.</p>
+    <p>No {{ noun }} in this view matches that search.</p>
     {% call button(variant='outline', size='sm', class='mt-2', attrs_dict={'@click': 'finderFilter = \'\''}) %}Clear the search{% endcall %}
   </div>
 </section>

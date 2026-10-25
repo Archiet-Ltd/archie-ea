@@ -2,6 +2,7 @@
 {# design-block: dashboard #}
 {% extends "layouts/admin_base.html" %}
 {% from 'components/breadcrumb.html' import breadcrumb, breadcrumb_item, breadcrumb_separator %}
+{% from 'macros/page_shell.html' import page_shell %}
 {% from 'components/button.html' import button %}
 {% from 'components/card.html' import card, card_header, card_title, card_description, card_content, card_footer %}
 {% from 'components/badge.html' import badge %}
@@ -67,18 +68,13 @@
   <input type="hidden" id="rdm-csrf-token" value="{{ csrf_token() }}">
 
   {# ── Page Header ── #}
-  <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-    <div>
-      <h1 class="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">Enterprise Capability Roadmap</h1>
-      <p class="mt-1 text-sm text-muted-foreground">ArchiMate 3.2 Implementation &amp; Migration — Plateaus, Gaps, and Work Packages</p>
-    </div>
-    <div class="flex flex-wrap items-center gap-2">
-      {% call button(text='Detect Gaps', variant='outline', icon='scan-search', on_click='detectGaps()', attrs_dict={'x-show': '!isDetecting', 'x-cloak': ''}) %}{% endcall %}
-      {% call button(text='Detecting…', variant='outline', icon='scan-search', attrs_dict={'x-show': 'isDetecting', 'x-cloak': '', ':disabled': 'isDetecting'}) %}{% endcall %}
-      {% call button(text='Add Plateau', variant='outline', icon='layers', on_click='openCreatePlateauModal()') %}{% endcall %}
-      {% call button(text='Add Gap', variant='default', icon='plus', on_click='openCreateGapModal()') %}{% endcall %}
-    </div>
-  </div>
+  {% macro _roadmap_actions() %}
+    {% call button(text='Detect Gaps', variant='outline', icon='scan-search', on_click='detectGaps()', attrs_dict={'x-show': '!isDetecting', 'x-cloak': ''}) %}{% endcall %}
+    {% call button(text='Detecting…', variant='outline', icon='scan-search', attrs_dict={'x-show': 'isDetecting', 'x-cloak': '', ':disabled': 'isDetecting'}) %}{% endcall %}
+    {% call button(text='Add Plateau', variant='outline', icon='layers', on_click='openCreatePlateauModal()') %}{% endcall %}
+    {% call button(text='Add Gap', variant='default', icon='plus', on_click='openCreateGapModal()') %}{% endcall %}
+  {% endmacro %}
+  {{ page_shell(title='Enterprise Capability Roadmap', subtitle='ArchiMate 3.2 Implementation & Migration — Plateaus, Gaps, and Work Packages', actions_caller=_roadmap_actions) }}
 
   {# ── Metrics Row ── #}
   <div class="grid grid-cols-2 gap-4 md:grid-cols-6">
@@ -301,7 +297,7 @@
           <form class="space-y-4" @submit.prevent="submitGapForm()">
             <div>
               {% call label(for='rdm-gap-name', required=true) %}Gap Name{% endcall %}
-              {% call input(id='rdm-gap-name', attrs_dict={'x-model': 'form.name', 'aria-label': 'Gap Name'}) %}{% endcall %}
+              {{ input(id='rdm-gap-name', attrs_dict={'x-model': 'form.name', 'aria-label': 'Gap Name'}) }}
             </div>
             <div class="grid gap-4 grid-cols-1">
               <div>
@@ -355,16 +351,16 @@
           <form class="space-y-4" @submit.prevent="submitPlateauForm()">
             <div>
               {% call label(for='rdm-plateau-name', required=true) %}Plateau Name{% endcall %}
-              {% call input(id='rdm-plateau-name', placeholder='e.g. Plateau 1 — Foundation', attrs_dict={'x-model': 'form.name', 'aria-label': 'Plateau Name'}) %}{% endcall %}
+              {{ input(id='rdm-plateau-name', placeholder='e.g. Plateau 1 — Foundation', attrs_dict={'x-model': 'form.name', 'aria-label': 'Plateau Name'}) }}
             </div>
             <div class="grid gap-4 grid-cols-1">
               <div>
                 {% call label(for='rdm-plateau-order', required=true) %}Sequence Order{% endcall %}
-                {% call input(id='rdm-plateau-order', type='number', attrs_dict={'min': '1', 'x-model.number': 'form.sequence_order', 'aria-label': 'Sequence Order'}) %}{% endcall %}
+                {{ input(id='rdm-plateau-order', type='number', attrs_dict={'min': '1', 'x-model.number': 'form.sequence_order', 'aria-label': 'Sequence Order'}) }}
               </div>
               <div>
                 {% call label(for='rdm-plateau-date') %}Target Date{% endcall %}
-                {% call input(id='rdm-plateau-date', type='date', attrs_dict={'x-model': 'form.target_date', 'aria-label': 'Target Date'}) %}{% endcall %}
+                {{ input(id='rdm-plateau-date', type='date', attrs_dict={'x-model': 'form.target_date', 'aria-label': 'Target Date'}) }}
               </div>
             </div>
             <div>
@@ -398,7 +394,7 @@
           <form class="space-y-4" @submit.prevent="submitWpForm()">
             <div>
               {% call label(for='rdm-wp-name', required=true) %}Name{% endcall %}
-              {% call input(id='rdm-wp-name', attrs_dict={'x-model': 'form.name', 'aria-label': 'Name'}) %}{% endcall %}
+              {{ input(id='rdm-wp-name', attrs_dict={'x-model': 'form.name', 'aria-label': 'Name'}) }}
             </div>
             <div class="grid gap-4 grid-cols-1">
               <div>
@@ -422,16 +418,16 @@
               </div>
               <div>
                 {% call label(for='rdm-wp-start', required=true) %}Start Date{% endcall %}
-                {% call input(id='rdm-wp-start', type='date', attrs_dict={'x-model': 'form.start_date', 'aria-label': 'Start Date'}) %}{% endcall %}
+                {{ input(id='rdm-wp-start', type='date', attrs_dict={'x-model': 'form.start_date', 'aria-label': 'Start Date'}) }}
               </div>
               <div>
                 {% call label(for='rdm-wp-target', required=true) %}Target Date{% endcall %}
-                {% call input(id='rdm-wp-target', type='date', attrs_dict={'x-model': 'form.target_date', 'aria-label': 'Target Date'}) %}{% endcall %}
+                {{ input(id='rdm-wp-target', type='date', attrs_dict={'x-model': 'form.target_date', 'aria-label': 'Target Date'}) }}
               </div>
               <div>
                 {% call label(for='rdm-wp-gap') %}Linked Gap{% endcall %}
                 <div class="relative">
-                  {% call input(id='rdm-wp-gap', type='search', placeholder='Search gaps by name', attrs_dict={'autocomplete': 'off', 'x-model': 'gapQuery', '@input.debounce.300ms': 'searchGaps()', 'data-testid': 'wp-modal-gap-input'}) %}{% endcall %}
+                  {{ input(id='rdm-wp-gap', type='search', placeholder='Search gaps by name', attrs_dict={'autocomplete': 'off', 'x-model': 'gapQuery', '@input.debounce.300ms': 'searchGaps()', 'data-testid': 'wp-modal-gap-input'}) }}
                   <p class="mt-1 text-xs text-muted-foreground">
                     <span x-show="form.gap_id" x-cloak>Linked: <span x-text="gapName"></span></span>
                     <button type="button" x-show="form.gap_id" x-cloak class="ml-2 underline" @click="form.gap_id = null; gapName = ''; gapQuery = ''">Clear</button>
