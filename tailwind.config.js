@@ -102,6 +102,50 @@ module.exports = {
           DEFAULT: "hsl(var(--card) / <alpha-value>)",
           foreground: "hsl(var(--card-foreground) / <alpha-value>)",
         },
+        // ArchiMate notation: the fill and hairline stroke each layer is drawn in. Defined once in
+        // shadcn_tokens.css (light and dark); the composer's palette, canvas and legend use these classes.
+        notation: {
+          strategy: {
+            DEFAULT: "hsl(var(--notation-strategy) / <alpha-value>)",
+            stroke: "hsl(var(--notation-strategy-stroke) / <alpha-value>)",
+          },
+          business: {
+            DEFAULT: "hsl(var(--notation-business) / <alpha-value>)",
+            stroke: "hsl(var(--notation-business-stroke) / <alpha-value>)",
+          },
+          application: {
+            DEFAULT: "hsl(var(--notation-application) / <alpha-value>)",
+            stroke: "hsl(var(--notation-application-stroke) / <alpha-value>)",
+          },
+          technology: {
+            DEFAULT: "hsl(var(--notation-technology) / <alpha-value>)",
+            stroke: "hsl(var(--notation-technology-stroke) / <alpha-value>)",
+          },
+          physical: {
+            DEFAULT: "hsl(var(--notation-physical) / <alpha-value>)",
+            stroke: "hsl(var(--notation-physical-stroke) / <alpha-value>)",
+          },
+          motivation: {
+            DEFAULT: "hsl(var(--notation-motivation) / <alpha-value>)",
+            stroke: "hsl(var(--notation-motivation-stroke) / <alpha-value>)",
+          },
+          implementation: {
+            DEFAULT: "hsl(var(--notation-implementation) / <alpha-value>)",
+            stroke: "hsl(var(--notation-implementation-stroke) / <alpha-value>)",
+          },
+          migration: {
+            DEFAULT: "hsl(var(--notation-migration) / <alpha-value>)",
+            stroke: "hsl(var(--notation-migration-stroke) / <alpha-value>)",
+          },
+          location: {
+            DEFAULT: "hsl(var(--notation-location) / <alpha-value>)",
+            stroke: "hsl(var(--notation-location-stroke) / <alpha-value>)",
+          },
+          other: {
+            DEFAULT: "hsl(var(--notation-other) / <alpha-value>)",
+            stroke: "hsl(var(--notation-other-stroke) / <alpha-value>)",
+          },
+        },
         // ArchiMate layer hues. The DEFAULT is the fill/border colour; the
         // `-emphasis` twin is the only one legible as text on a /10 tint.
         // See DESIGN.md "ArchiMate Layer Colors".

@@ -1,0 +1,70 @@
+{# Diagram editor toolbar: tool, line style, zoom, history, Properties and Delete, Import and Export.
+   It drives the composer's own methods (composerApp); it draws nothing itself.
+
+   Usage: {% from 'components/diagram/toolbar.html' import diagram_toolbar with context %}
+          {{ diagram_toolbar(import_items=[...], export_items=[...], more_items=[...]) }}
+
+   Items are the dropdown_menu items: {'text', 'icon', 'onclick'} or {'divider': true} or {'header': 'Name'}. #}
+{% from 'components/button.html' import button %}
+{% from 'components/dropdown_menu.html' import dropdown_menu %}
+
+{# An icon-only button always carries its accessible name and a visible tooltip on hover and focus. #}
+{% macro icon_button(label, click, icon, disabled_expr=none, testid=none, pressed_expr=none) %}
+{% set attrs = {'@click': click} %}
+{% if disabled_expr %}{% set _ = attrs.update({':disabled': disabled_expr}) %}{% endif %}
+{% if pressed_expr %}{% set _ = attrs.update({':aria-pressed': pressed_expr, ':class': pressed_expr ~ " ? 'bg-accent text-foreground' : ''"}) %}{% endif %}
+<span class="relative inline-flex" x-data="{ tip: false }" @mouseenter="tip = true" @mouseleave="tip = false" @focusin="tip = true" @focusout="tip = false">
+  {{ button(variant='outline', size='icon-sm', icon=icon, aria_label=label, testid=testid, attrs_dict=attrs) }}
+  <span role="tooltip" x-show="tip" x-cloak class="absolute top-full left-1/2 z-50 mt-1 -translate-x-1/2 whitespace-nowrap rounded-md border border-border bg-popover px-2 py-1 text-xs text-popover-foreground pointer-events-none">{{ label }}</span>
+</span>
+{% endmacro %}
+
+{# One member of a toggle group: a pressed state read from an Alpine expression. #}
+{% macro toggle_item(label, value_expr, click, icon=none, text=none, testid=none) %}
+{% call button(variant='outline', size='sm' if text else 'icon-sm', icon=icon, aria_label=label, testid=testid, class='rounded-none first:rounded-l-md last:rounded-r-md', attrs_dict={'@click': click, ':aria-pressed': value_expr, ':class': value_expr ~ " ? 'bg-accent text-foreground' : ''"}) %}{% if text %}<span class="hidden 2xl:inline">{{ text }}</span>{% endif %}{% endcall %}
+{% endmacro %}
+
+{% macro diagram_toolbar(import_items=[], export_items=[], more_items=[]) %}
+<nav aria-label="Composer toolbar" class="shrink-0 border-b border-border bg-card px-3 py-2" data-testid="diagram-toolbar">
+  <div class="flex items-center gap-2" role="toolbar" aria-label="Diagram tools">
+    {# On a phone the tools scroll sideways in one row and the menus stay put, so a menu is never clipped. #}
+    <div class="flex min-w-0 flex-1 items-center gap-2 overflow-x-auto md:flex-wrap md:overflow-visible">
+    {{ icon_button('Show or hide the element list', "shellRailOpen = !shellRailOpen", 'panel-left', pressed_expr='shellRailOpen', testid='shell-rail-toggle') }}
+
+    <div class="inline-flex" role="group" aria-label="Tool">
+      {{ toggle_item('Select', "shellTool === 'select'", "shellSetTool('select')", icon='mouse-pointer-click', text='Select', testid='tool-select') }}
+      {{ toggle_item('Pan', "shellTool === 'pan'", "shellSetTool('pan')", icon='hand', text='Pan', testid='tool-pan') }}
+      {{ toggle_item('Connect', "shellTool === 'connect'", "shellSetTool('connect')", icon='arrow-up-right', text='Connect', testid='tool-connect') }}
+    </div>
+
+    <div class="inline-flex" role="group" aria-label="Line style">
+      {{ toggle_item('Straight lines', "connectorStyle === 'straight'", "shellSetConnector('straight')", icon='slash', testid='route-straight') }}
+      {{ toggle_item('Right-angled lines', "connectorStyle === 'manhattan'", "shellSetConnector('manhattan')", icon='corner-down-right', testid='route-manhattan') }}
+      {{ toggle_item('Curved lines', "connectorStyle === 'smooth'", "shellSetConnector('smooth')", icon='spline', testid='route-smooth') }}
+    </div>
+
+    <div class="inline-flex items-center gap-1" role="group" aria-label="Zoom">
+      {{ icon_button('Zoom out', 'zoomOut()', 'zoom-out', testid='zoom-out') }}
+      <span class="min-w-14 text-center text-xs tabular-nums text-muted-foreground" aria-live="polite" data-testid="zoom-percent" x-text="zoomPercent + '%'"></span>
+      {{ icon_button('Zoom in', 'zoomIn()', 'zoom-in', testid='zoom-in') }}
+      {{ icon_button('Fit the diagram to the view', 'fitCanvas()', 'maximize', testid='zoom-fit') }}
+    </div>
+
+    <div class="inline-flex items-center gap-1" role="group" aria-label="History">
+      {{ icon_button('Undo', 'undo()', 'undo-2', disabled_expr='!canUndoNow || mode === \'view\'', testid='history-undo') }}
+      {{ icon_button('Redo', 'redo()', 'redo-2', disabled_expr='!canRedoNow || mode === \'view\'', testid='history-redo') }}
+    </div>
+
+    <div class="inline-flex items-center gap-1" role="group" aria-label="Selection">
+      {% call button(variant='outline', size='sm', icon='pencil', aria_label='Properties', testid='action-properties', attrs_dict={'@click': 'shellOpenProperties()', ':disabled': '!hasProperties'}) %}<span class="hidden md:inline">Properties</span>{% endcall %}
+      {% call button(variant='outline', size='sm', icon='trash-2', aria_label='Delete', testid='action-delete', attrs_dict={'@click': 'deleteSelected()', ':disabled': '!hasSelection'}) %}<span class="hidden md:inline">Delete</span>{% endcall %}
+    </div>
+    </div>
+    <div class="inline-flex shrink-0 items-center gap-2">
+      {{ dropdown_menu(id='composer-import-menu', class='hidden md:block', trigger_text='Import', trigger_icon='upload', trigger_size='sm', transition='opacity', menu_width='w-56', trigger_testid='menu-import', trigger_aria_label='Import', items=import_items) }}
+      {{ dropdown_menu(id='composer-export-menu', class='hidden md:block', trigger_text='Export', trigger_icon='download', trigger_variant='primary', trigger_size='sm', transition='opacity', menu_width='w-56', trigger_testid='menu-export', trigger_aria_label='Export', items=export_items) }}
+      {{ dropdown_menu(id='composer-more-menu', trigger_icon='more-horizontal', trigger_icon_only=true, trigger_size='sm', transition='opacity', menu_width='w-64', trigger_testid='menu-more', trigger_aria_label='More actions', items=more_items) }}
+    </div>
+  </div>
+</nav>
+{% endmacro %}

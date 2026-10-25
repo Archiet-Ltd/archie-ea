@@ -138,7 +138,19 @@ def set_element_owner(
         return existing
 
     if replace_type or (replace_primary and ownership_type == "primary"):
-        _delete_other_owners_of_type(key, organization_id, ownership_type)
+        # A change of owner is one update of the existing record (so the change
+        # history shows who it was and who it became), not a delete and a create.
+        current = ApplicationOwner.query.filter_by(
+            organization_id=organization_id, ownership_type=ownership_type, **key,
+        ).order_by(ApplicationOwner.id).all()
+        if current:
+            record = current[0]
+            record.user_id = user_id
+            record.assigned_by = assigned_by
+            _delete_other_owners_of_type(key, organization_id, ownership_type, keep=record)
+            if commit:
+                db.session.commit()
+            return record
 
     record = ApplicationOwner(
         user_id=user_id,

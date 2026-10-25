@@ -99,6 +99,21 @@
     --layer-technology-emphasis: 142 71% 26%;
     --layer-implementation-emphasis: 199 89% 30%;
     --layer-risk-emphasis: 0 84% 42%;
+
+    /* ArchiMate 3.2 notation colours, as the standard teaches them: strategy tan, business yellow, application
+       blue, technology and physical green, motivation lilac, implementation pink, migration pale green,
+       location orange. Fill and hairline stroke per layer. The composer canvas, its palette and its legend
+       read these and nothing else. */
+    --notation-strategy: 39 78% 83%;        --notation-strategy-stroke: 38 55% 38%;
+    --notation-business: 60 100% 85%;       --notation-business-stroke: 55 70% 33%;
+    --notation-application: 180 100% 86%;   --notation-application-stroke: 190 80% 28%;
+    --notation-technology: 104 45% 80%;     --notation-technology-stroke: 120 45% 28%;
+    --notation-physical: 104 45% 80%;       --notation-physical-stroke: 120 45% 28%;
+    --notation-motivation: 240 100% 90%;    --notation-motivation-stroke: 250 40% 42%;
+    --notation-implementation: 0 100% 91%;  --notation-implementation-stroke: 0 50% 42%;
+    --notation-migration: 120 70% 90%;      --notation-migration-stroke: 130 45% 32%;
+    --notation-location: 30 90% 70%;        --notation-location-stroke: 25 65% 33%;
+    --notation-other: var(--background);    --notation-other-stroke: var(--muted-foreground);
   }
 
   .dark {
@@ -159,6 +174,16 @@
     --layer-technology-emphasis: 142 71% 64%;
     --layer-implementation-emphasis: 199 89% 68%;
     --layer-risk-emphasis: 0 84% 74%;
+
+    --notation-strategy: 38 40% 24%;        --notation-strategy-stroke: 38 55% 65%;
+    --notation-business: 58 45% 22%;        --notation-business-stroke: 56 65% 62%;
+    --notation-application: 190 50% 22%;    --notation-application-stroke: 190 60% 65%;
+    --notation-technology: 125 35% 22%;     --notation-technology-stroke: 125 40% 62%;
+    --notation-physical: 125 35% 22%;       --notation-physical-stroke: 125 40% 62%;
+    --notation-motivation: 250 35% 26%;     --notation-motivation-stroke: 250 60% 74%;
+    --notation-implementation: 0 35% 25%;   --notation-implementation-stroke: 0 60% 72%;
+    --notation-migration: 130 35% 22%;      --notation-migration-stroke: 130 45% 62%;
+    --notation-location: 30 50% 30%;        --notation-location-stroke: 28 70% 68%;
   }
 
   /* Public marketing theme. Opt-in: layouts/public_base.html puts this class on <body> for the marketing
