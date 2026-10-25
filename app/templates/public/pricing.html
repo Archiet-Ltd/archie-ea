@@ -7,6 +7,8 @@
    The monthly/annual toggle is two radios and sibling selectors in css/public_pricing.css, so it
    needs no script. Every checklist line is something that works today. #}
 {% extends 'layouts/public_base.html' %}
+{% from 'components/input.html' import input %}
+{% from 'components/table.html' import table %}
 
 {% from 'components/public_faq.html' import faq_chevron %}
 {% block title %}{{ page.title }}{% endblock %}
@@ -42,8 +44,8 @@
 
     <section class="pp-section pp-section--first" aria-labelledby="plans-heading" data-testid="pricing-plans" >
       <h2 id="plans-heading" class="sr-only">Plans</h2>
-      <input type="radio" class="pp-radio" name="pp-interval" id="pp-bill-year" checked>
-      <input type="radio" class="pp-radio" name="pp-interval" id="pp-bill-month">
+      {{ input(type="radio", name=("pp-interval"), id=("pp-bill-year"), class="h-4 w-4 shrink-0 !h-4 !w-4 !p-0 pp-radio", attrs_dict={"checked": "checked"}) }}
+      {{ input(type="radio", name=("pp-interval"), id=("pp-bill-month"), class="h-4 w-4 shrink-0 !h-4 !w-4 !p-0 pp-radio") }}
       <div class="pp-toggle" role="group" aria-label="Billing period" data-testid="pricing-toggle">
         <label for="pp-bill-year">Annual <span class="pp-save">Two months free</span></label>
         <label for="pp-bill-month">Monthly</label>
@@ -132,7 +134,7 @@
       <h2 id="compare-heading">Compare plans</h2>
       <p class="pp-sub">Every plan is priced per company, not per application. The same capabilities are in the model whichever plan you are on; the plans differ in who can edit, how people sign in and how you are supported.</p>
       <div class="pp-frame rounded-2xl border border-border">
-        <table class="public-table public-table--fit">
+        {% call table(class="public-table public-table--fit", wrapper_class="!overflow-visible") %}
           <caption class="sr-only">What each plan includes</caption>
           <thead>
             <tr>
@@ -183,7 +185,7 @@
             {% endfor %}
             {% endfor %}
           </tbody>
-        </table>
+        {% endcall %}
       </div>
     </section>
   </div>
