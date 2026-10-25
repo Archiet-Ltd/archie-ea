@@ -13,7 +13,7 @@ Additive only:
 Idempotent: each object is created only when missing. The down step drops them.
 
 Revision ID: 20261025_vendor_catalogue
-Revises: 20261024_mfa_recovery_codes
+Revises: 20261025_data_erd_tables
 Create Date: 2026-10-25
 """
 from __future__ import annotations
@@ -23,7 +23,7 @@ from alembic import op
 from sqlalchemy import text
 
 revision = "20261025_vendor_catalogue"
-down_revision = "20261024_mfa_recovery_codes"
+down_revision = "20261025_data_erd_tables"
 branch_labels = None
 depends_on = None
 
