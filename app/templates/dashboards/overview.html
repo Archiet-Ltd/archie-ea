@@ -39,6 +39,25 @@
 {% endcall %}
 </div>
 {% endif %}
+{% if skipped_sources %}
+<div class="mb-6" data-testid="signup-sources-skipped">
+{% call card() %}
+    {% call card_header() %}
+        {% call card_title() %}You have not added a source yet{% endcall %}
+        {% call card_description() %}You skipped GitHub, Jira and the company website when you signed up, so nothing here is read from your own systems.{% endcall %}
+    {% endcall %}
+    {% if mode != 'guided' %}
+    {% call card_content() %}
+        {% if first_actions.connect %}
+        {{ button(text='Connect GitHub', href=url_for('m365_connector.github_connect'), icon='github', testid='skipped-connect-github') }}
+        {% else %}
+        <p class="text-sm text-muted-foreground">Connecting GitHub or Jira is done by an organisation administrator.</p>
+        {% endif %}
+    {% endcall %}
+    {% endif %}
+{% endcall %}
+</div>
+{% endif %}
 {% macro question_box() %}
 <form method="get" action="/ai-chat" class="flex flex-col gap-2 sm:flex-row" data-testid="first-question-form">
     {{ input(name='q', type='text', placeholder='Ask anything, for example: what breaks if our payments service fails?', aria_label='Ask a question about your company', class='sm:flex-1', attrs_dict={'data-testid': 'first-question-input', 'maxlength': '2000', 'autocomplete': 'off'}) }}
@@ -100,12 +119,14 @@
             <p class="text-sm text-muted-foreground">Connecting GitHub or Jira is done by an organisation administrator.</p>
             {% endif %}
             {{ question_box() }}
-            {# The one onboarding question, answered inside the card: it keeps Startup unless changed. #}
+            {% if not company_kind_answered %}
+            {# Asked once: sign-up asks it, and the dashboard asks only an organisation that never answered. #}
             <div class="space-y-1.5" data-testid="company-kind-selector">
                 <p class="text-sm font-medium text-foreground">What kind of company are you?</p>
                 {{ company_kind_picker(kind=company_kind or 'startup') }}
                 {{ button(text='Not now', variant='ghost', size='sm', testid='company-kind-not-now', attrs_dict={'data-company-kind-default': 'startup'}) }}
             </div>
+            {% endif %}
         {% endcall %}
     </div>
     {% endcall %}
